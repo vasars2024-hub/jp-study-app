@@ -70,3 +70,37 @@ called the default contextual action row (13.0%) and maximized import row (6.8%)
 the clipped work viewport beside its independent chrome measure. Negative controls held: injected
 clip **0 → 1 → 0**; 200×140 produced **2** clips, **2** scrollers, **10** hidden owners, then restored.
 Focused guard: **4/4**. Baseline: `cat4-l7-flashcards.json`.
+
+## 2026-08-27 00:40 EDT — Flashcards category 6 passes 10/10
+
+Category 6 is **PASS 10/10**, taking Flashcards to **50/80**; both L7 bullets remain OPEN.
+This was a RUN of `cat6-feature-parity.cjs`, not a new probe — what was missing was the spec,
+which is data. `flashcards` is now the eleventh app in `l6-parity.js`: **8 feature rows**,
+5 steps, 8 mutations.
+
+Numbers: parity **8/8 standard = 8/8 liquid**, `na` 0, rows agree by id. Round trip
+standard → liquid → standard on a live 3,218-card deck held **byte-for-byte**, 0 diffs,
+fields and shell both, at 820×580 in both presentations. Control: **8 of 8 mutations flipped
+exactly their own row and restored**, verdict `CONTROL FAILED AS REQUIRED`. Drive:
+`EPUB decks (3,218)` → search `の` (2 groups) → clear → scroll 240 of a 331,582px range.
+
+**The driver's `dirtyField` empties this surface.** It takes the first visible text field,
+which here is `.flash-search-input`, and writes `lqp-roundtrip-食` — matching nothing, so
+`filteredDeck` goes to 0 and every group unmounts. A spec scored after it reads six rows false
+on a healthy deck. `clearSearch` in the drive is the sanctioned answer; scroll then carries the
+round trip's real user state.
+
+**Three authoring passes on one row, all the same defect wearing different clothes — the plant
+must attack the term the row scores.** `virtualizedList` first asked `span > clientHeight`,
+which a 24px spacer still satisfies at 1,728 over a 420px pane. Then it asked the right
+arithmetic but picked `sort(scrollHeight)[0]`, so shrinking the 3,074-card body dropped it
+below the untouched 144-card one and the row measured *that* instead — `ratio=1.001`, reachable
+true, control VOID a second time. It now scores **every** expanded body, so nothing can be moved
+out from under it. Third pass: reading `.flash-group-count` made it share an element with
+`bookGroups`, whose mutation then failed both rows and proved neither; size now comes from
+`aria-setsize`, which `VirtualList` publishes independently on every item.
+
+Row evidence at PASS: All **3,218** = Unfiled 3,218 + folders 0; group badges **144 + 3,074 =
+3,218**; both bodies render **16** rows at pitch **108** over scroll ranges **15,562** and
+**332,012** against expected 15,552 / 331,992 (ratio 1.001 / 1.000). Baseline:
+`cat6-l7-flashcards.json`.

@@ -107,6 +107,7 @@
   const novelState = specState('__LQP_NOVEL_ORIG');
   const mangaState = specState('__LQP_MANGA_ORIG');
   const vnState = specState('__LQP_VN_ORIG');
+  const flashState = specState('__LQP_FLASH_ORIG');
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -1879,6 +1880,302 @@
           window.__LQP_VN_ORIG = null;
           return done.length ? `vn:${done.join('+')}` : null;
         },
+      },
+    },
+
+    /**
+     * FLASHCARDS — L7's first surface, and the first spec whose whole difficulty is that
+     * the deck is REAL: 3,218 cards in two book groups, virtualized, behind a search box.
+     *
+     * Two things about this surface shape every row below.
+     *
+     * 1. THE DRIVER'S `dirtyField` LANDS IN THE SEARCH BOX AND EMPTIES THE APP. It takes the
+     *    first visible text field, which here is `.flash-search-input`, and writes
+     *    `lqp-roundtrip-食` into it. That matches nothing, so `filteredDeck` goes to 0, every
+     *    group unmounts, and a spec that scored after it would read six rows false on a
+     *    perfectly healthy deck — the instrument's own doing. `clearSearch` in the drive is
+     *    the answer the runner explicitly sanctions ("the drive may overwrite the dirty
+     *    value; snapshot A records whatever is really there and C has to match it"), and the
+     *    round trip still carries real user state because `scroll` runs after it and
+     *    `snapshot()` records offsets.
+     *
+     * 2. COUNTS ARE THE ONLY HONEST EVIDENCE HERE, so every row is an arithmetic agreement
+     *    between two independently rendered numbers rather than a presence check. The deck
+     *    rail says All=3,218; the group badges say 144 + 3,074; the tab says 3,218. Those
+     *    come from three different expressions over the same array, and a filter that lies
+     *    breaks the equation. `.flash-group-body-vlist` renders 16 rows for a 3,074-card
+     *    group — presence would score that identically to a list that materialised all
+     *    3,074 and froze the window.
+     *
+     * MUTATION INDEPENDENCE, which cost the most thought: `virtualizedList` and `cardRows`
+     * both read the rendered rows, so detaching the VirtualList spacer would fail both and
+     * prove neither. The spacer's height is therefore LIED about (`style` set to a short
+     * fixed height) rather than removed — scrollHeight collapses, the rows stay, and exactly
+     * one row falls. Same reason `folderRail` attacks the Unfiled chip's count while
+     * `bookGroups` measures itself against the All chip.
+     */
+    flashcards: {
+      titleRe: /Flashcards|フラッシュカード|闪卡|Карточк/i,
+      rootSel: '.flash-view',
+      features: [
+        {
+          // Exactly one overview tab is active, and the active one carries a real count in
+          // its own label. Two actives is the state the CSS cannot express and the user
+          // reads as "both views are open".
+          id: 'deckTabs',
+          f: (w) => {
+            const tabs = qa(w, '.flash-tabs .flash-tab').filter((b) => !b.closest('.epub-mining-mode-tabs'));
+            const active = tabs.filter((b) => b.classList.contains('active'));
+            const n = active[0] ? txt(active[0]).replace(/[^\d]/g, '') : '';
+            return {
+              ok: tabs.length >= 2 && active.length === 1 && n.length > 0,
+              ev: `tabs=${tabs.length} active=${active.length} activeCount=${n || 'none'}`,
+            };
+          },
+        },
+        {
+          // The rail PARTITIONS the deck: All must equal Unfiled plus every named folder.
+          // A chip whose count is decorative passes a presence check and fails this one.
+          id: 'folderRail',
+          f: (w) => {
+            const chips = folderChips(w).filter((c) => q(c, '.lib-chip-count'));
+            if (chips.length < 2) return { ok: false, ev: `only ${chips.length} counted chips` };
+            const all = Number(chipCount(chips[0]));
+            const rest = chips.slice(1).reduce((s, c) => s + Number(chipCount(c) || 0), 0);
+            const active = folderChips(w).filter((c) => c.classList.contains('active')).length;
+            return {
+              ok: Number.isFinite(all) && all === rest && active === 1,
+              ev: `all=${all} unfiled+folders=${rest} activeChips=${active} chips=${chips.length}`,
+            };
+          },
+        },
+        {
+          // Every group badge added up is the whole filtered deck. When a search is running
+          // the surface publishes that number itself in `.flash-search-count`, so the row
+          // checks against whichever denominator is actually on screen — the same equation
+          // either way, never a branch that stops asking.
+          id: 'bookGroups',
+          f: (w) => {
+            const groups = qa(w, '.flash-group');
+            if (!groups.length) return { ok: false, ev: 'no book groups rendered' };
+            const sum = groups.reduce((s, g) => s + Number(txt(q(g, '.flash-group-count')).replace(/[^\d]/g, '') || 0), 0);
+            const searchCount = q(w, '.flash-search-count');
+            const expect = searchCount
+              ? Number(txt(searchCount).replace(/[^\d]/g, ''))
+              : Number(chipCount(folderChips(w)[0]));
+            const titled = groups.filter((g) => txt(q(g, '.flash-group-title')).length > 0).length;
+            return {
+              ok: sum === expect && titled === groups.length,
+              ev: `groups=${groups.length} badgeSum=${sum} expected=${expect} titled=${titled} basis=${searchCount ? 'search count' : 'All chip'}`,
+            };
+          },
+        },
+        {
+          // The row this surface exists to earn. A 3,074-card group renders a couple of
+          // dozen rows over a scroll range that still spans the WHOLE deck.
+          //
+          // "A tall scroll range" is not the bar and the first version of this row said it
+          // was: `span > clientHeight` measured 1,524 against a 420px pane with the spacer
+          // deliberately shortened to 24px, so the mutation flipped nothing and the control
+          // read `exactlyOwnRow: false`. The absolutely-positioned window of rows keeps
+          // overflowing whatever the spacer says, and any list of a few screens passes.
+          //
+          // The real contract is arithmetic: scroll range = declared cards x row pitch.
+          // Pitch is measured from two consecutive rendered rows rather than read from
+          // `CARD_ROW_HEIGHT`, so the row scores the DOM and not the constant.
+          //
+          // AND IT SCORES EVERY EXPANDED BODY, not the tallest one. The second version
+          // picked `sort(scrollHeight)[0]`, so shortening the 3,074-card spacer to 24px
+          // dropped it below the untouched 144-card group and the row happily measured THAT
+          // one instead: ev read `declared=144 ratio=1.001`, reachable stayed true, and the
+          // control read `exactlyOwnRow: false` a second time. A term the plant can move out
+          // from under is not the term being scored. Selecting nothing removes the class.
+          //
+          // SIZE COMES FROM `aria-setsize`, NOT the header badge. Reading the badge made this
+          // row share an element with `bookGroups`, so detaching one count failed both and
+          // proved neither. `VirtualList` publishes the collection's true size on every item
+          // for the accessibility tree, which is an independent rendering of the same number
+          // — and cross-checking the declared set size against the painted scroll range is a
+          // better question than re-reading the badge two rows already agree about.
+          id: 'virtualizedList',
+          f: (w) => {
+            const bodies = qa(w, '.flash-group-body-vlist');
+            if (!bodies.length) return { ok: false, ev: 'no expanded group body' };
+            const read = bodies.map((el) => {
+              const sized = q(el, '[aria-setsize]');
+              const declared = Number((sized && sized.getAttribute('aria-setsize')) || 0);
+              const rows = qa(el, '.flash-row');
+              const pitch = rows.length >= 2
+                ? Math.round(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top)
+                : 0;
+              const expect = declared * pitch;
+              // A deck shorter than its own pane has nothing to virtualize, so rendering all
+              // of it is correct rather than a failure. The scroll-range equation still has
+              // to hold for it.
+              const windowed = expect > el.clientHeight ? declared > rows.length : true;
+              return {
+                declared,
+                rendered: rows.length,
+                pitch,
+                sh: el.scrollHeight,
+                expect,
+                ratio: expect > 0 ? el.scrollHeight / expect : 0,
+                windowed,
+              };
+            });
+            const good = read.filter((r) => r.pitch > 0 && r.windowed && r.ratio >= 0.9 && r.ratio <= 1.1);
+            return {
+              ok: good.length === read.length,
+              ev: read.map((r) => `${r.declared}cards/${r.rendered}rendered pitch=${r.pitch} sh=${r.sh} expected=${r.expect} ratio=${r.ratio.toFixed(3)}`).join(' | '),
+            };
+          },
+        },
+        {
+          // Content honesty per rendered row: a word, a meaning that is never blank (the
+          // component falls back to an em dash rather than nothing), and its own pair of
+          // file/remove controls — the reverse path every added card needs.
+          id: 'cardRows',
+          f: (w) => {
+            const rows = qa(w, '.flash-group-body-vlist .flash-row');
+            if (!rows.length) return { ok: false, ev: 'no card rows rendered' };
+            const worded = rows.filter((r) => txt(q(r, '.flash-row-word')).length > 0).length;
+            const meant = rows.filter((r) => txt(q(r, '.flash-row-meaning')).length > 0).length;
+            const removable = rows.filter((r) => q(r, '.flash-row-actions .flash-row-x')).length;
+            return {
+              ok: worded === rows.length && meant === rows.length && removable === rows.length,
+              ev: `rows=${rows.length} worded=${worded} meaning=${meant} removable=${removable}`,
+            };
+          },
+        },
+        {
+          // The deck strip is the surface's own summary of recent mining. Empty is allowed
+          // and must SAY so; what is not allowed is a strip of cards with nothing in them.
+          id: 'deckStrip',
+          f: (w) => {
+            const section = q(w, '.flash-strip-section');
+            if (!section) return { ok: false, ev: 'no deck strip section' };
+            const cards = qa(section, '.flash-strip-card');
+            if (!cards.length) {
+              return { ok: !!q(section, '.flash-strip-empty'), ev: 'strip empty — honest empty state required' };
+            }
+            const worded = cards.filter((c) => txt(q(c, '.flash-strip-word')).length > 0).length;
+            const sourced = cards.filter((c) => q(c, '.flash-strip-meaning') || q(c, '.flash-strip-reading')).length;
+            return {
+              ok: worded === cards.length && sourced === cards.length,
+              ev: `stripCards=${cards.length} worded=${worded} withReadingOrMeaning=${sourced}`,
+            };
+          },
+        },
+        {
+          // Reversibility, per group: the disclosure's declared state and the body it
+          // controls must agree. A header that says expanded over an unmounted list is the
+          // "enable with no working disable" defect in its collapse form.
+          id: 'groupCollapse',
+          f: (w) => {
+            const groups = qa(w, '.flash-group');
+            if (!groups.length) return { ok: false, ev: 'no book groups rendered' };
+            const rows = groups.map((g) => {
+              const tg = q(g, '.flash-group-head-toggle');
+              const declared = tg ? tg.getAttribute('aria-expanded') : null;
+              const mounted = !!q(g, '.flash-group-body');
+              return { declared, agrees: (declared === 'true') === mounted };
+            });
+            const agree = rows.filter((r) => r.agrees).length;
+            const declared = rows.filter((r) => r.declared === 'true' || r.declared === 'false').length;
+            return {
+              ok: agree === groups.length && declared === groups.length,
+              ev: `groups=${groups.length} ariaExpandedPresent=${declared} agreesWithMountedBody=${agree}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        openDecks: (w) => {
+          const tab = qa(w, '.flash-tabs .flash-tab').filter((b) => !b.closest('.epub-mining-mode-tabs'))[0];
+          if (!tab) return { refused: 'no overview tabs' };
+          tab.click();
+          return { clicked: txt(tab) };
+        },
+        // Exercises the filter for real and records the number it produced. Paired with
+        // `clearSearch` in the drive so the sequence is idempotent across the driver's
+        // per-mutation re-runs and leaves the deck whole for `check()`.
+        search: (w, query) => {
+          const el = q(w, '.flash-search-input');
+          if (!el) return { refused: 'no search field' };
+          typeInto(el, String(query == null ? '' : query));
+          return { query: el.value, groups: qa(w, '.flash-group').length };
+        },
+        clearSearch: (w) => {
+          const el = q(w, '.flash-search-input');
+          if (!el) return { refused: 'no search field' };
+          typeInto(el, '');
+          return { cleared: el.value === '', groups: qa(w, '.flash-group').length };
+        },
+        toggleGroup: (w, index) => {
+          const tg = qa(w, '.flash-group-head-toggle')[Number(index) || 0];
+          if (!tg) return { refused: 'no group headers' };
+          tg.click();
+          return { wasExpanded: tg.getAttribute('aria-expanded') };
+        },
+        // The round trip's real user state: this surface's editable field is the search box
+        // and the drive deliberately leaves it empty, so scroll is what a bad toggle can
+        // lose. Recorded once so `undo` puts the user's list back where they left it.
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'nothing scrollable — the deck fits its pane' };
+          const g = flashState();
+          if (g.scrollKey == null) { g.scrollKey = keyOf(el); g.scrollTop = el.scrollTop; }
+          el.scrollTop = Number(px) || 240;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      drive: ['openDecks', ['search', 'の'], 'clearSearch', ['scroll', '240']],
+      undo: {
+        flashcards: (w) => {
+          const g = window.__LQP_FLASH_ORIG;
+          if (!g) return null;
+          const done = [];
+          const el = q(w, '.flash-search-input');
+          if (el && el.value !== '') { typeInto(el, ''); done.push('search'); }
+          if (g.scrollKey != null) {
+            const back = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+            if (back && back.scrollTop !== g.scrollTop) { back.scrollTop = g.scrollTop; done.push('scroll'); }
+          }
+          window.__LQP_FLASH_ORIG = null;
+          return done.length ? `flashcards:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        // Two actives, which the row's "exactly one" clause is entirely about. The rail and
+        // the groups read neither tab, so this falls alone.
+        deckTabs: (w) => {
+          const tabs = qa(w, '.flash-tabs .flash-tab').filter((b) => !b.closest('.epub-mining-mode-tabs'));
+          const other = tabs.find((b) => !b.classList.contains('active'));
+          if (!other) return { refused: 'no inactive tab to falsify with' };
+          return addClassAll([other], 'active');
+        },
+        // The UNFILED chip's count, never All's — `bookGroups` measures itself against All.
+        folderRail: (w) => detach(q(w, '.lib-folders .lib-folder-chip:nth-of-type(2) .lib-chip-count'), 'no unfiled chip count'),
+        bookGroups: (w) => detach(q(w, '.flash-group .flash-group-count'), 'no group count badge'),
+        // A LIE about the spacer's height, not a deletion. Detaching it takes the rendered
+        // rows with it and `cardRows` falls too, which proves neither row; shortening it
+        // collapses the scroll range while every row stays exactly where it was.
+        virtualizedList: (w) => {
+          const el = qa(w, '.flash-group-body-vlist').sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+          const spacer = el && el.firstElementChild;
+          if (!spacer) return { refused: 'no virtual list spacer' };
+          return setAttr(spacer, 'style', 'height: 24px; position: relative;', 'no virtual list spacer');
+        },
+        cardRows: (w) => detach(q(w, '.flash-group-body-vlist .flash-row .flash-row-word'), 'no card rows'),
+        deckStrip: (w) => detach(q(w, '.flash-strip-card .flash-strip-word'), 'no strip cards'),
+        groupCollapse: (w) => setAttr(
+          qa(w, '.flash-group-head-toggle').find((t) => t.getAttribute('aria-expanded') === 'true'),
+          'aria-expanded',
+          'false',
+          'no expanded group header',
+        ),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
   };

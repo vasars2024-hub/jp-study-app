@@ -885,6 +885,17 @@ a wrapped contextual action row with an unrelated import row. Control: clip **0�
 200×140 produced **2** clips / **2** scrollers / **10** hidden owners and restored. Full evidence:
 `L7_REVIEW_LEARNING.md` and `cat4-l7-flashcards.json`. Both L7 bullets remain open; next is category 5.
 
+**Progress 2026-08-27 — Flashcards category 6 is 10/10; Flashcards is 50/80.** A RUN of the
+shared `cat6-feature-parity.cjs`; what was missing was the `flashcards` spec, which is data —
+now the eleventh app in `l6-parity.js` with 8 feature rows, 5 steps and 8 mutations. Parity
+**8/8 standard = 8/8 liquid**, rows agreeing by id; the standard → liquid → standard round trip
+on a live **3,218**-card deck held byte-for-byte with **0** diffs; the control flipped
+**8 of 8** rows exactly and restored, so the instrument is proven rather than assumed. Trap
+carried forward for every later spec: the runner's `dirtyField` lands in `.flash-search-input`
+and filters the deck to zero, so the drive must clear it before `check()` runs. Full evidence:
+`L7_REVIEW_LEARNING.md` and `cat6-l7-flashcards.json`. Next is category 5, which reads this
+baseline for Q7/Q8/Q9 and could not be scored before it existed.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
