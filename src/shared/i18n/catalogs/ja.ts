@@ -2086,6 +2086,8 @@ export const ja: Catalog = {
   'a11y.slider.pagePosition': 'ページ位置',
   'a11y.slider.readingPosition': '読書位置',
   'novel.seek': '本の中を移動',
+  'novel.tool.highlightColor': 'ハイライトの色',
+  'novel.tool.studyTools': '学習',
   'novel.tool.bookmarks': 'ブックマーク',
   'novel.tool.readerSettings': '表示設定',
   'novel.tool.addBookmark': '＋ ここに追加',

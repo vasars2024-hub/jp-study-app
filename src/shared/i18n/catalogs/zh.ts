@@ -2077,6 +2077,8 @@ export const zh: Catalog = {
   'a11y.slider.pagePosition': '页面位置',
   'a11y.slider.readingPosition': '阅读位置',
   'novel.seek': '在书中跳转',
+  'novel.tool.highlightColor': '高亮颜色',
+  'novel.tool.studyTools': '学习',
   'novel.tool.bookmarks': '书签',
   'novel.tool.readerSettings': '阅读设置',
   'novel.tool.addBookmark': '＋ 添加此处',

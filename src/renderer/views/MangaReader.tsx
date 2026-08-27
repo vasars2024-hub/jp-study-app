@@ -1832,7 +1832,11 @@ export default function MangaReader({ item, onClose }: Props) {
         scrubber's own controls were already measured against.
       */}
       <ContextualSurface as="header" className="reader-bar">
-        <button className="btn" onClick={requestClose}>
+        {/* Same role class as the novel reader's, and for the same reason: a reader fills the
+            OS window, so this control IS its way back, and the only handle on it was a
+            localised word. Manga answered category 5 Q2 YES on a coincidence — the docked OCR
+            tool's own "Close" button, which does not go back anywhere. */}
+        <button className="btn reader-back" onClick={requestClose}>
           <Icon name="chevron" size={13} style={{ transform: 'rotate(180deg)', marginRight: 4, verticalAlign: '-2px' }} />
           {t('manga.backLibrary')}
         </button>

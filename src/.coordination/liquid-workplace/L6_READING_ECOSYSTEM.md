@@ -1668,3 +1668,46 @@ control still present, and every disclosure closed at rest.
 transparent full-height page-turn zones with no visual presence at all, and the Q4 term counts
 them because `checkVisibility` is true. That is the next category-5 harness repair candidate —
 not taken here, because this turn had already spent two.
+
+## 2026-08-26 21:05 EDT — category 5, Novels: first score is VOID, second is PASS 10/10
+
+**Novels PASS 10/10, controlled** (`@.reader` with a volume open, 1264x821, both themes YES on
+all six live questions). Board **42 -> 43 of 48**; category 5 is **5 of 6** L6 surfaces, and
+the sixth is the VN panel, which VOIDs on a category-6 cell that is PARKED on a real title.
+
+**The first run scored VOID with three separate findings, and every one of them was product.**
+
+**Q2 NO — backAffordances 0, on a reader whose way back is in the top-left corner.** The term
+recognises a control whose LABEL is back/home/close/exit or whose CLASS contains one of those
+words; this reader's route out is a button that says "Library". Both readers' back buttons now
+carry `reader-back`, which is the same fix `.reader-btn-liquid` already got and for the same
+reason: a reader fills the OS window, so this control is its entire lifecycle and the only
+handle on it was a localised word. It also corrects manga, which answered Q2 YES on a
+coincidence — the docked OCR tool's own "Close" button, which goes back nowhere.
+
+**Q4 NO — 21 scanned, 0 disclosures -> 11 scanned, 2 disclosures.** The six-swatch highlight
+palette and the four selection actions (Collect, ask-about-selection, ask-about-passage,
+flashcard collection) are ten of the twenty-one and both are things you reach for on a passage,
+not things you read with. The swatch summary paints the ACTIVE colour rather than a word, which
+is what a palette control is for. `.settings-anchor` was deliberately left alone: those three
+divs are popover anchors and a panel anchored inside a closed `<details>` renders nowhere.
+
+**Q1/Q3 drift — the same defect manga had, from the same cause.** This reader declared no
+primary at all, so both questions fell back to a palette-relative accent guess: **1 accent in
+forest-night, 0 in classic-light**, on an identical scene. `.btn.primary` now marks the
+translation-visibility toggle — showing or hiding the translation of the page in front of you
+is what a Japanese-study novel reader is FOR, and it is the same call the manga scan control
+got. After: entryPoints 2/2, `explicitlyMarked: true`, all six verdicts identical in both
+themes.
+
+Control: titlesBlanked 1, primariesMoved 2, restoredMoved 2, residue 0, storeIdentical true,
+**CONTROL FAILED AS REQUIRED on Q2, Q3, Q5, Q10**. Book progress unchanged at 2% before and
+after (`悪の教典 02`, `p:7:0.0000`), so the volume this needed was opened and left as found.
+
+**Known imprecision in the new Q10 marker, recorded rather than fixed.** `contentDominantRegion`
+counts an element's own direct text nodes, so prose split across many `<p>` elements never
+registers: Novels reports `contentFrac 0` and the largest "content" node is a 14px icon. The
+cell still passes honestly at **3 of 4** on the other three markers, but a reader full of text
+scoring 0 for content is wrong in spirit. Next repair candidate, alongside the transparent
+`button.nav-zone` pair — neither taken here, because this turn had already spent two harness
+repairs plus one damage fix.

@@ -2249,6 +2249,8 @@ export const ru: Catalog = {
   'a11y.slider.pagePosition': 'Позиция страницы',
   'a11y.slider.readingPosition': 'Позиция чтения',
   'novel.seek': 'Перемещение по книге',
+  'novel.tool.highlightColor': 'Цвет выделения',
+  'novel.tool.studyTools': 'Учёба',
   'novel.tool.bookmarks': 'Закладки',
   'novel.tool.readerSettings': 'Настройки чтения',
   'novel.tool.addBookmark': '+ Добавить здесь',

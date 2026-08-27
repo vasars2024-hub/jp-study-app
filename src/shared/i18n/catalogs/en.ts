@@ -2217,6 +2217,8 @@ export const en: Catalog = {
   'a11y.slider.pagePosition': 'Page position',
   'a11y.slider.readingPosition': 'Reading position',
   'novel.seek': 'Seek through the book',
+  'novel.tool.highlightColor': 'Highlight colour',
+  'novel.tool.studyTools': 'Study',
   'novel.tool.bookmarks': 'Bookmarks',
   'novel.tool.readerSettings': 'Reading settings',
   'novel.tool.addBookmark': '+ Add here',

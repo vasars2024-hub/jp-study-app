@@ -17249,6 +17249,19 @@ html[data-taskbar-size='large'] .os-tray-btn {
   text-align: left;
   white-space: nowrap;
 }
+/* The novel reader's highlight palette. A column of six colour chips would be a strange
+   menu, so this one body opts back into a row; the summary paints the ACTIVE chip, which is
+   what a palette control is for and what a plain "Highlight" word would have thrown away. */
+.reader-anno-menu > .lq-overflow-body {
+  flex-direction: row;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 6px;
+}
+.reader-anno-menu > .lq-overflow-summary > .reader-anno-swatch {
+  display: inline-block;
+  pointer-events: none;
+}
 /* A footer-anchored overflow opens UPWARD; the reader's footer sits on the bottom edge and
    a `top: 100%` body would be drawn off-screen. Anchoring is the only difference. */
 .lq-overflow-up > .lq-overflow-body {
