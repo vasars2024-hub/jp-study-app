@@ -1587,9 +1587,23 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
             {folderErr && <div className="lib-folder-err">{folderErr}</div>}
 
             {filteredDeck.length === 0 ? (
-              <p className="muted">
-                {search ? t('flash.search.noMatches', { query: search }) : t('flash.noCardsInView')}
-              </p>
+              // This was a bare muted paragraph: neither the surface's own empty-state treatment
+              // (which review mode already renders) nor a way back out of the filter that emptied
+              // the list. An empty state that names its cause owes the reader the undo for it.
+              <div className="flash-empty flash-empty-inline">
+                <p className="muted">
+                  {search ? t('flash.search.noMatches', { query: search }) : t('flash.noCardsInView')}
+                </p>
+                {search ? (
+                  <button type="button" className="btn small" onClick={() => state.setSearch('')}>
+                    {t('flash.search.clear')}
+                  </button>
+                ) : folderFilter !== 'all' ? (
+                  <button type="button" className="btn small" onClick={() => state.setFolderFilter('all')}>
+                    {t('flash.deck.showAllCards')}
+                  </button>
+                ) : null}
+              </div>
             ) : (
               <div className="flash-groups">
                 {bookGroups.map((group) => {
@@ -1772,7 +1786,12 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           <p className="muted">{t('flash.noSavedWords.hint')}</p>
         </div>
       ) : filteredSaved.length === 0 ? (
-        <p className="muted">{t('flash.search.noMatches', { query: search })}</p>
+        <div className="flash-empty flash-empty-inline">
+          <p className="muted">{t('flash.search.noMatches', { query: search })}</p>
+          <button type="button" className="btn small" onClick={() => state.setSearch('')}>
+            {t('flash.search.clear')}
+          </button>
+        </div>
       ) : (
         <VirtualList
           items={filteredSaved}

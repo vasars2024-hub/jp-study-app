@@ -164,3 +164,40 @@ cell; carry `l0-ms-are-a-different-display` and the environment-ceiling correcti
 
 Regression checks after the category-5 product change, both re-run and both still clean:
 category 4 **PASS 10/10** and category 1 **PASS 10/10**.
+
+## 2026-08-27 02:20 EDT — Flashcards category 8 passes 10/10, on a product fix and a harness repair
+
+Flashcards is **70/80**; only category 7 is open.
+
+**Product.** Both deck-list empty states were a bare `<p className="muted">` — invisible to any
+`[class*="empty"]` sweep, and, more to the point, a dead end: the list told the reader which
+filter had emptied it and gave them nothing to press. They now render the surface's own
+`.flash-empty` treatment (`flash-empty-inline`, because the base rule's `margin-top: 10vh`
+pushes a message out of a list slot) with the undo for the filter that emptied them — `Clear
+search` when a search is active, `Show all cards` when a folder filter is. One new key,
+`flash.deck.showAllCards`, in all four catalogs.
+
+**Score, `baselines/cat8-l7-flashcards.json`, PASS 10/10 with the control and the four-language
+leg both run** — the first cat8 run in this repo to include `--langs`. Raw i18n keys **0** as
+the max across all four languages (not just English, which is what `--langs` upgrades),
+placeholders **0**, worst mute pairs **0**, `statesNamed` **1 of 1 observable** — `empty` is now
+observable at `hosts: 1` where it was 0, and its message is real text. Four distinct text hashes
+over 338 text runs, so the surface genuinely re-renders per language. Control moved all three
+counted bars 0→1 and restored 0.
+
+**Trap 1 — a title-named surface cannot be found in any language but English.** `--surface
+"Flashcards"` matches on `.fwin-title-text`, which is translated, so the language leg VOIDs on
+the second tag. Run a translated-chrome surface by the `@` selector form instead:
+`--surface "@.fwin:has(.flash-view)"` names the window by the thing that makes it that window.
+Same element, same scope, no harness change.
+
+**Trap 2, and it is the expensive one — that VOID used to strand the whole app in Japanese.**
+`langLeg()` returned on refuse *before* its restore, and nothing about the result reads as probe
+residue: the next run captured `ja` as `before.stored`, restored to it faithfully, and printed
+`restored: true` on a language the user never chose. The restore is now in a `finally`
+(correction 15). Proven by re-running the exact VOID that caused it: same
+`VOID - language leg: ja: surface not found: Flashcards`, and `localStorage.ui-lang` afterwards
+is **`en`**, where an hour earlier it was `ja`.
+
+Next: category 7 on Flashcards, the last cell. Carry `l0-ms-are-a-different-display` and the
+environment-ceiling correction into it.

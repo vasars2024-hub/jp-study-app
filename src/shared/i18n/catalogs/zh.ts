@@ -5660,6 +5660,7 @@ export const zh: Catalog = {
   'flash.newFolder': '＋ 新建文件夹',
   'flash.reservedName': '该名称已被保留。',
   'flash.noCardsInView': '此视图中没有卡片。请从 EPUB 挖掘，或切换文件夹筛选。',
+  'flash.deck.showAllCards': '显示全部卡片',
   'flash.search.placeholder': '搜索卡片…',
   'flash.search.aria': '按单词、读音、释义或来源搜索卡片',
   'flash.search.clear': '清除搜索',

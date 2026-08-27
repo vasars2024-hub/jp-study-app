@@ -91,4 +91,21 @@ describe('Flashcards Liquid regions', () => {
       /\.flash-view \.flash-group-head-toggle \{\s*flex-wrap:\s*wrap/,
     );
   });
+
+  it('marks both list empty states and gives each one the undo for the filter that emptied it', () => {
+    // Rubric category 8: an empty state that no honesty probe can find is one the reader
+    // cannot recognise either. Both deck-list empty states were a bare `<p className="muted">`
+    // while review mode already rendered `.flash-empty` two hundred lines further down.
+    const inline = SOURCE.match(/className="flash-empty flash-empty-inline"/g);
+    expect(inline).toHaveLength(2);
+    // Search empties the list -> clear the search. A folder filter empties it -> show all cards.
+    expect(SOURCE).toContain("{t('flash.search.clear')}");
+    expect(SOURCE).toContain("{t('flash.deck.showAllCards')}");
+    expect(SOURCE).toContain("onClick={() => state.setFolderFilter('all')}");
+    // The base `.flash-empty` centres a whole view with `margin-top: 10vh`, which pushes an
+    // inline message out of a list slot; the modifier is what makes the pattern reusable here.
+    expect(CONTROL_STYLES).toMatch(
+      /\.flash-view \.flash-empty\.flash-empty-inline \{[\s\S]*margin:\s*0/,
+    );
+  });
 });

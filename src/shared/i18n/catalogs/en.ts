@@ -6005,6 +6005,7 @@ export const en: Catalog = {
   'flash.newFolder': '+ New folder',
   'flash.reservedName': 'That name is reserved.',
   'flash.noCardsInView': 'No cards in this view. Mine from an EPUB or switch folder filters.',
+  'flash.deck.showAllCards': 'Show all cards',
   'flash.search.placeholder': 'Search cards…',
   'flash.search.aria': 'Search flashcards by word, reading, meaning, or source',
   'flash.search.clear': 'Clear search',

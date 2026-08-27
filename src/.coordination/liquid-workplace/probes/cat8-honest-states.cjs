@@ -551,25 +551,35 @@ async function langLeg() {
   const before = JSON.parse(await ev(
     "JSON.stringify({html:document.documentElement.lang,stored:localStorage.getItem('ui-lang')})",
   ));
-  const perLang = [];
-  for (const l of tags) {
-    const clicked = JSON.parse(await ev(clickLang(l.tag)));
-    if (clicked.refuse) return { refuse: `${clicked.refuse} (${l.tag}) - the Settings language control must be on screen` };
-    // The catalog is a dynamic import; the switch lands on its resolution, not on the click.
-    await sleep(1400);
-    const r = await run();
-    if (r.refuse) return { refuse: `${l.tag}: ${r.refuse}` };
-    if (r.storedLang !== l.stored) {
-      return { refuse: `language did not take: asked ${l.stored}, storage says ${r.storedLang} - the previous language would have been measured twice` };
-    }
-    perLang.push({
-      lang: l.stored, htmlLang: r.lang, textRuns: r.textRuns, textHash: r.textHash,
-      rawKeyCount: r.rawKeyCount, rawKeys: r.rawKeys,
-    });
-  }
   const restoreTag = before.stored === 'zh' ? 'zh-Hans' : (before.stored || 'en');
-  await ev(clickLang(restoreTag));
-  await sleep(1400);
+  const perLang = [];
+  // Correction 15: A REFUSE INSIDE THIS LOOP USED TO RETURN WITHOUT PUTTING THE LANGUAGE BACK,
+  // and the damage outlives the run. The leg died on `ja: surface not found` (a title-named
+  // surface cannot be found once its window title is translated) and left the whole app in
+  // Japanese. Nothing about that reads as probe residue: the very next run captured `ja` as
+  // `before.stored`, restored to it faithfully, and reported `restored: true` on a language the
+  // user never chose. Every exit from here now walks through the restore.
+  try {
+    for (const l of tags) {
+      const clicked = JSON.parse(await ev(clickLang(l.tag)));
+      if (clicked.refuse) return { refuse: `${clicked.refuse} (${l.tag}) - the Settings language control must be on screen` };
+      // The catalog is a dynamic import; the switch lands on its resolution, not on the click.
+      await sleep(1400);
+      const r = await run();
+      if (r.refuse) return { refuse: `${l.tag}: ${r.refuse}` };
+      if (r.storedLang !== l.stored) {
+        return { refuse: `language did not take: asked ${l.stored}, storage says ${r.storedLang} - the previous language would have been measured twice` };
+      }
+      perLang.push({
+        lang: l.stored, htmlLang: r.lang, textRuns: r.textRuns, textHash: r.textHash,
+        rawKeyCount: r.rawKeyCount, rawKeys: r.rawKeys,
+      });
+    }
+  } finally {
+    await ev(clickLang(restoreTag));
+    await sleep(1400);
+  }
+  if (perLang.length !== tags.length) return { refuse: 'language leg did not complete all four tags' };
   const after = JSON.parse(await ev(
     "JSON.stringify({html:document.documentElement.lang,stored:localStorage.getItem('ui-lang')})",
   ));

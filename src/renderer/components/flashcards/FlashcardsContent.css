@@ -170,3 +170,20 @@
     transition: none;
   }
 }
+
+/* The list empty states use the surface's own `.flash-empty` treatment, but inline: the base rule
+   carries `margin-top: 10vh`, which pushes the message off the bottom of a list slot inside a
+   section. Same centring and measure, sized for a slot rather than a whole view, with room under
+   the message for the control that undoes the filter. */
+.flash-view .flash-empty.flash-empty-inline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 20px 12px;
+}
+
+.flash-view .flash-empty.flash-empty-inline p {
+  margin: 0;
+}

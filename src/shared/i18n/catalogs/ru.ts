@@ -6287,6 +6287,7 @@ export const ru: Catalog = {
   'flash.newFolder': '+ Новая папка',
   'flash.reservedName': 'Это имя зарезервировано.',
   'flash.noCardsInView': 'В этом виде нет карточек. Добудьте их из EPUB или смените фильтр папки.',
+  'flash.deck.showAllCards': 'Показать все карточки',
   'flash.search.placeholder': 'Поиск карточек…',
   'flash.search.aria': 'Поиск карточек по слову, чтению, значению или источнику',
   'flash.search.clear': 'Очистить поиск',

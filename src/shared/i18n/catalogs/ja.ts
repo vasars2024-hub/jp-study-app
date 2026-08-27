@@ -5686,6 +5686,7 @@ export const ja: Catalog = {
   'flash.newFolder': '＋ 新しいフォルダ',
   'flash.reservedName': 'その名前は予約されています。',
   'flash.noCardsInView': 'この表示にカードはありません。EPUBからマイニングするか、フォルダフィルターを切り替えてください。',
+  'flash.deck.showAllCards': 'すべてのカードを表示',
   'flash.search.placeholder': 'カードを検索…',
   'flash.search.aria': '単語・読み・意味・出典でフラッシュカードを検索',
   'flash.search.clear': '検索をクリア',
