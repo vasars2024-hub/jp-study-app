@@ -312,12 +312,17 @@ Dominant task: open Deck Workbench from the disconnected Anki surface. It is the
 reveals the entire agent-reachable half without requiring AnkiConnect; the end-state inventory
 therefore covers the workbench's loaded source rail and saved sessions, not an empty launcher.
 
-Standard: **1 click**, worst renderer-received acknowledgement **11.8 ms**, dead ends **0**, modal
-traps **0**, scroll traps **0**. Liquid: the same **1 click**, **11.7 ms**, no dead end. The window
+Standard: **1 click**, worst renderer-received acknowledgement **12.7 ms**, dead ends **0**, modal
+traps **0**, scroll traps **0**. Liquid: the same **1 click**, **10.2 ms**, no dead end. The window
 returned byte-for-byte to Standard geometry **820x580**, and closing the disclosure restored the
 surface-state hash. Cost parity is **1 <= 1**. Control moved all three terms exactly: dead end,
 modal trap and scroll trap **0/0/0 -> 1/1/1 -> 0/0/0**. **PASS 10/10.** Evidence:
-`baselines/cat2-l7-anki.json`; no harness or product change was needed.
+`baselines/cat2-l7-anki.json`.
+
+Recovery caught the first control run leaving the workbench open: its injected dead-end task had
+incorrectly inherited the dominant task's disclosure-closing undo. The reusable harness now gives
+that sub-run no unrelated undo, then proves the real task+undo again. Live receipt after the rerun:
+`expanded:false`, workbench absent, presentation Standard. This is the one category-2 repair.
 
 One refused attempt is not hidden: selecting the fourth source after opening resolved below the
 viewport and correctly refused as occluded. The scored task stops at the fully-loaded workbench;

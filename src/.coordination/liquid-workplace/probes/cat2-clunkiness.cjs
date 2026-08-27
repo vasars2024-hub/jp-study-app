@@ -697,7 +697,7 @@ async function modalLeg(surface, snap) {
   return { traps, closedByEscape: closed };
 }
 
-async function measure(surface, taskSpec) {
+async function measure(surface, taskSpec, undoSpec = UNDO) {
   const raised = await raise(surface);
   const armed = JSON.parse(await ev(ARM(surface)));
   if (armed.refuse) return { refuse: armed.refuse };
@@ -735,11 +735,11 @@ async function measure(surface, taskSpec) {
   // on the surface's own base text hash. The presentation leg drives the same task twice by
   // construction, so a surface that does not come back cannot be compared with itself.
   let undo = null;
-  if (UNDO) {
-    const u = await runTask(surface, UNDO);
+  if (undoSpec) {
+    const u = await runTask(surface, undoSpec);
     const back = await snapOf(surface);
     undo = {
-      spec: UNDO,
+      spec: undoSpec,
       steps: u.refuse ? u.refuse : u.steps.map((s) => s.step),
       // Correction 17: judged on the surface, never on the announcement about the trip.
       restored: !u.refuse && !back.refuse && back.stateHash === base.stateHash,
@@ -896,7 +896,12 @@ async function measure(surface, taskSpec) {
   if (CONTROL) {
     const inj = JSON.parse(await ev(CONTROL_INJECT(SURFACE)));
     if (inj.refuse) { console.error(`REFUSE - control: ${inj.refuse}`); process.exit(2); }
-    const dirty = await measure(SURFACE, 'click:[data-lqcat2-deadend]');
+    // The injected task is not the dominant task, so the dominant task's undo does not belong
+    // here. On a disclosure path it inverted the surface: clicking the injected dead-end changed
+    // nothing, then `click:.collapse-header` opened the workbench and stranded it there while the
+    // control still reported `backToBaseline: true`. Removing the injected nodes is this sub-run's
+    // restore; the real task+undo is driven again below and proves the surface round trip.
+    const dirty = await measure(SURFACE, 'click:[data-lqcat2-deadend]', '');
     await ev(CONTROL_REMOVE);
     const restored = await measure(SURFACE, TASK);
     const moved = {
@@ -908,6 +913,7 @@ async function measure(surface, taskSpec) {
       scrollTrap: !dirty.refuse && dirty.scrollTraps.length > m.scrollTraps.length,
     };
     const backToBaseline = !restored.refuse
+      && (!restored.undo || restored.undo.restored)
       && restored.deadEnds.length === m.deadEnds.length
       && restored.modalTraps.length === m.modalTraps.length
       && restored.scrollTraps.length === m.scrollTraps.length;

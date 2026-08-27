@@ -18,17 +18,17 @@
   },
   "latencyMs": {
     "clickRecv": [
-      11.8
+      12.7
     ],
     "inputRecv": [],
-    "worstRecv": 11.8,
+    "worstRecv": 12.7,
     "overBar100": 0,
     "n": 1,
     "clickStampUnscored": [
-      15
+      15.5
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 15
+    "worstStampUnscored": 15.5
   },
   "steps": [
     {
@@ -103,14 +103,14 @@
       "box": "820x580",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 11.8
+      "worstRecv": 12.7
     },
     "second": {
       "presentation": "liquid",
       "box": "820x580",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 11.7
+      "worstRecv": 10.2
     },
     "restored": true,
     "restoredTo": {
@@ -160,7 +160,7 @@
       ]
     },
     "inertClickRecvMs": [
-      7.7
+      4.5
     ]
   }
 }
