@@ -876,6 +876,15 @@ default/maximized, compact clipping **3 → 0**, and compact hidden-overflow own
 still a measured FAIL: `.flash-group` is **180 > 174px** at compact, and dominant-content share falls
 **13.0% → 6.8%** when maximized. Resume those two residuals with the same harness next turn.
 
+**Progress 2026-08-26 (later) — Flashcards category 4 is 10/10; Flashcards is 40/80.** At default /
+compact / maximized the parameterised harness measured **0** clips, overlaps, scrollers, and hidden
+overflow owners; dead region **8.4 / 0.7 / 11.0%**; chrome **5.7 → 4.3%** while the visible work
+viewport grew **93.7 → 95.3%**. Compact header wrapping repaired `.flash-group` **180>174 → 174=174**.
+Correction 17 fixed the generic content-to-chrome measure after its deepest-leaf heuristic compared
+a wrapped contextual action row with an unrelated import row. Control: clip **0→1→0**; subminimum
+200×140 produced **2** clips / **2** scrollers / **10** hidden owners and restored. Full evidence:
+`L7_REVIEW_LEARNING.md` and `cat4-l7-flashcards.json`. Both L7 bullets remain open; next is category 5.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

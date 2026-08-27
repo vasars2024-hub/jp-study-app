@@ -106,6 +106,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .flash-view .flash-group-head-toggle {
+    flex-wrap: wrap;
+  }
+
   .flash-view .flash-group-head-actions,
   .flash-view .flash-row-actions {
     padding: 0 8px 8px;

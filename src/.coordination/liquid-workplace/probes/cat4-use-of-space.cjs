@@ -121,6 +121,13 @@
  *     fragments projected into one page viewport. This measures the pager's content buffer rather
  *     than whichever page happened to be visible. Falsifying the pager proof disables projection;
  *     `--control` verifies the number moves and restores on a last page.
+ * 17. A WRAPPED HEADER ROW IS NOT THE DOMINANT CONTENT CANVAS. Flashcards exposed the old
+ *     deepest-leaf heuristic: at default size it selected the 80px-tall contextual action row
+ *     (13.0%), while maximized it selected a 56px import-form row (6.8%). The application work
+ *     viewport grew in both dimensions, but the metric compared two unrelated chrome/form leaves
+ *     and called them content. Category 4 asks for the content-to-chrome ratio. The visible
+ *     `.fwin-body` (or the root itself on a chromeless surface) is that content viewport; its
+ *     clipped share is now reported beside the independently measured outermost chrome.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
@@ -480,9 +487,11 @@ const READ = (surface) => `(function(){
   });
   var chrome = outermost.reduce(function(s, e){ return s + clip(e.getBoundingClientRect()); }, 0);
   var total = R.width * R.height;
-  var dominant = regions.filter(function(c){
-    return !regions.some(function(o){ return o !== c && c.contains(o); });
-  }).reduce(function(bst, c){ return Math.max(bst, clip(c.getBoundingClientRect())); }, 0);
+  // CORRECTION 17. The regions list still proves the reader traversed real rendered content, but its
+  // deepest leaf is not a stable content-to-chrome denominator: responsive wrapping changes which
+  // unrelated leaf wins. The clipped work viewport is the content area the window gives back as
+  // chrome falls, and works unchanged for framed and chromeless surfaces.
+  var dominant = clip(B);
 
   return JSON.stringify({
     box: Math.round(R.width) + 'x' + Math.round(R.height),

@@ -60,5 +60,8 @@ describe('Flashcards Liquid regions', () => {
     expect(CONTROL_STYLES).toMatch(/min-width:\s*32px/);
     expect(CONTROL_STYLES).toMatch(/\.flash-view \.flash-strip \{[\s\S]*display:\s*grid/);
     expect(CONTROL_STYLES).toMatch(/@container \(max-width: 420px\)/);
+    expect(CONTROL_STYLES).toMatch(
+      /\.flash-view \.flash-group-head-toggle \{\s*flex-wrap:\s*wrap/,
+    );
   });
 });

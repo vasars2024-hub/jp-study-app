@@ -55,3 +55,18 @@ layout changed compact clipping **3 → 0** and hidden-overflow owners **19 → 
 compact `.flash-group` is **180 > 174px**, and dominant content falls **13.0% → 6.8%** when maximized.
 The negative clip control moved **0 → 1 → 0** and all three size legs restored geometry. Next turn
 opens by resolving those two measured residuals with this same category-4 harness, not a new probe.
+
+## 2026-08-26 23:53 EDT — Flashcards category 4 passes 10/10
+
+Category 4 is **PASS 10/10**, taking Flashcards to **40/80**; both L7 bullets remain OPEN. At
+820×580 / 260×170 / 1264×765 the shared harness measured **0/0/0** clipped elements, overlaps,
+horizontal scrollers, and hidden-overflow owners. Dead region was **8.4 / 0.7 / 11.0%**; chrome
+fell **5.7 → 4.3%** while the visible work viewport grew **93.7 → 95.3%**. All size legs restored.
+
+Product repair: the compact group header now wraps its fixed count badges; `.flash-group` fell
+**180>174 → 174=174**. Instrument correction 17 replaces a false deepest-leaf comparison: it had
+called the default contextual action row (13.0%) and maximized import row (6.8%) the same
+"dominant content". The rubric asks for content-to-chrome, so the parameterised harness now uses
+the clipped work viewport beside its independent chrome measure. Negative controls held: injected
+clip **0 → 1 → 0**; 200×140 produced **2** clips, **2** scrollers, **10** hidden owners, then restored.
+Focused guard: **4/4**. Baseline: `cat4-l7-flashcards.json`.
