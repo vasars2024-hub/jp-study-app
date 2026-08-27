@@ -6,10 +6,10 @@
   "presentation": "standard",
   "raised": "already-on-top",
   "base": {
-    "textRuns": 2136,
-    "controlCount": 485,
+    "textRuns": 2062,
+    "controlCount": 459,
     "box": "820x580",
-    "results": 1
+    "results": 400
   },
   "inputCost": {
     "clicks": 1,
@@ -25,10 +25,10 @@
     "overBar100": 0,
     "n": 1,
     "clickStampUnscored": [
-      24.2
+      24
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 24.2
+    "worstStampUnscored": 24
   },
   "steps": [
     {
@@ -37,7 +37,7 @@
         "sel": ".gx-notebook-view:nth-child(3)",
         "label": "Words",
         "disabled": false,
-        "at": "362,180"
+        "at": "362,227"
       },
       "counted": true,
       "moved": {
@@ -59,13 +59,13 @@
       "click:.gx-notebook-view:nth-child(1)"
     ],
     "restored": true,
-    "baseHash": "tdd4vs",
-    "afterHash": "tdd4vs",
+    "baseHash": "e6rzjq",
+    "afterHash": "e6rzjq",
     "liveRegionsBefore": [],
     "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "tdd4vs",
-      "after": "tdd4vs"
+      "base": "e6rzjq",
+      "after": "e6rzjq"
     }
   },
   "stepsDriven": 1,
@@ -90,7 +90,7 @@
       "box": "820x580",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 0.6
+      "worstRecv": 0.4
     },
     "restored": true,
     "restoredTo": {
@@ -140,7 +140,7 @@
       ]
     },
     "inertClickRecvMs": [
-      0.4
+      0.5
     ]
   }
 }

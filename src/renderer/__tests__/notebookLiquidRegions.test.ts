@@ -27,7 +27,7 @@ describe('Notebook Liquid regions', () => {
     expect(VIEW).toContain(
       "import { ContextualSurface } from '../components/liquid/LiquidSurface';",
     );
-    expect(VIEW).toContain('<ContextualSurface className="gx-notebook-overview">');
+    expect(VIEW).toContain('<ContextualSurface as="details" className="gx-notebook-filters">');
   });
 
   it('preserves the tab-list landmark and interaction contract', () => {
@@ -41,13 +41,19 @@ describe('Notebook Liquid regions', () => {
     );
   });
 
-  it('makes folder navigation contextual and keeps captured records outside it', () => {
+  it('progressively discloses filters and keeps captured records outside them', () => {
     expect(VIEW).toMatch(
-      /<div className="gx-notebook-body">[\s\S]*<ContextualSurface as="aside" className="gx-notebook-folders">[\s\S]*<section className="gx-notebook-timeline">/,
+      /<ContextualSurface as="details" className="gx-notebook-filters">[\s\S]*<NotebookStreamCounts state=\{state\} \/>[\s\S]*<ContextualSurface as="div" className="gx-notebook-folders">[\s\S]*<NotebookFolders state=\{state\} \/>[\s\S]*<div className="gx-notebook-body gx-notebook-body-timeline">[\s\S]*<section className="gx-notebook-timeline">/,
+    );
+    expect(VIEW.indexOf('className="gx-notebook-actions"')).toBeLessThan(
+      VIEW.indexOf('<NotebookViewTabs state={state} />'),
     );
     expect(VIEW).toContain('<LiveCaptionsPanel />');
     expect(VIEW).toContain('<NotebookTimeline state={state} onOpen={studyOsOpenHref} />');
     expect(VIEW.match(/<ContextualSurface/g)).toHaveLength(2);
+    expect(CSS).toMatch(
+      /\.gx-notebook-filters\[open\] \{[\s\S]*max-height: 220px;[\s\S]*overflow: auto;/,
+    );
     expect(VIEW.indexOf('<section className="gx-notebook-timeline">')).toBeGreaterThan(
       VIEW.lastIndexOf('</ContextualSurface>'),
     );
@@ -70,7 +76,14 @@ describe('Notebook Liquid regions', () => {
   it('reflows from the app window width and preserves the wide two-column default', () => {
     expect(CSS).toContain('.gx-notebook {\n  container-type: inline-size;\n}');
     expect(CSS).toMatch(
-      /@container \(max-width: 700px\) \{[\s\S]*\.gx-notebook-body \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+      /@container \(max-width: 700px\) \{[\s\S]*\.gx-notebook-body:not\(\.gx-notebook-body-timeline\) \{\s*grid-template-columns: minmax\(0, 1fr\);/,
+    );
+    expect(CSS).toContain(
+      '.gx-notebook-body-timeline {\n  grid-template-columns: minmax(0, 1fr);\n}',
+    );
+    expect(CSS).toContain('.gx-notebook-timeline {\n  min-width: 0;\n}');
+    expect(CSS).toMatch(
+      /@container \(max-width: 320px\) \{[\s\S]*\.gx-lc-actions,[\s\S]*flex-wrap: wrap;[\s\S]*\.gx-notebook-lineage-btn,[\s\S]*max-width: 100%;/,
     );
     const globalCss = readFileSync(resolve(__dirname, '../styles.css'), 'utf8');
     expect(globalCss).toContain(

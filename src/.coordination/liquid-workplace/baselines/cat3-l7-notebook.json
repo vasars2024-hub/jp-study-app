@@ -15,7 +15,7 @@
     "opacity": 1
   },
   "regions": 1612,
-  "controlsSkipped": 480,
+  "controlsSkipped": 481,
   "byRole": {
     "Work": 1,
     "Liquid-eligible": 3,
@@ -43,8 +43,8 @@
       "sel": "ul.gx-notebook-list",
       "path": [
         0,
-        2,
-        1,
+        3,
+        0,
         1
       ]
     },

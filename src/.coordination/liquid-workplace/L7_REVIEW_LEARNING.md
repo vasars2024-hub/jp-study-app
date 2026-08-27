@@ -377,3 +377,24 @@ feature parity cannot honestly score until the connected feature inventory exist
 human-blocked ladder exception, L7 advances to Notebook while retaining all eight Anki cells in
 units-left. Reachable product work is checkpointed through category 4; no user data or setting was
 changed.
+
+## 2026-08-27 13:31 EDT — interrupted Notebook slice recovered; categories 1–6 are 60/80
+
+HEAD had already banked category 6, while the crash left category 5's score/control untracked at
+**8/10**: Q1 had **0** entry points and Q4 exposed **36** controls. Recovery kept Review Notebook
+ahead of navigation and put stream/folder filtering behind one native disclosure. Final Q1 has
+**2** entry points; Q4 has **1** collapsed disclosure and **10** controls to scan. The control
+failed exactly Q2/Q3/Q5/Q10, then restored Standard, `forest-night`, and **0** plant residue.
+
+The DOM change invalidated the earlier measurements, so categories 1–4 and 6 were re-run rather
+than inherited. Expanding the disclosure first squeezed the timeline to 11px; its open height is
+now capped at 220px. Compact **260×170** then exposed one real horizontal scroller
+(`.gx-notebook-timeline` **286>202**), repaired by wrapping Live Captions actions/record metadata
+and clamping lineage controls. Final category 4: clips/overlaps/scrollers/hidden overflow
+**0/0/0/0** at default, compact, and maximized; dead region **3.4/0.4/10.1%**.
+
+Controlled results: category 1 **10/10** (0 hit-floor failures, contrast min **5.30**, control all
+five terms moved/restored); category 2 **10/10** (one click in Standard and Liquid, 0 dead/modal/
+scroll traps); category 3 **10/10** (0 dense Work on glass, 3/3 contextual/shared); category 4
+**10/10**; category 5 **10/10**; category 6 **8/8 = 8/8**, 0 round-trip diffs, all eight mutation
+rows fell alone and restored. Notebook is **60/80**; categories 7 and 8 remain.

@@ -1,0 +1,431 @@
+{
+  "surface": "Notebook",
+  "label": "l7-notebook",
+  "control": true,
+  "at": "2026-08-27T17:31:03.370Z",
+  "category": 5,
+  "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
+  "hostClass": "fwin",
+  "box": "820x580",
+  "presentationAsFound": "standard",
+  "cat6": {
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l7-notebook.json",
+    "verdict": "PASS 10/10",
+    "parity": {
+      "standard": "8/8",
+      "liquid": "8/8",
+      "na": 0,
+      "equal": true,
+      "rowsAgree": true,
+      "failing": [],
+      "onlyInOne": []
+    },
+    "roundTrip": {
+      "diffs": []
+    }
+  },
+  "axes": {
+    "theme": [
+      "forest-night",
+      "classic-light"
+    ]
+  },
+  "storeBefore": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "planted": {
+    "savedTitle": "Notebook",
+    "savedTransform": "",
+    "primaryFound": "button.btn",
+    "primaryFromPin": true,
+    "primariesMoved": 2,
+    "primariesFromPin": 2,
+    "primaryList": [
+      "button.btn",
+      "button.btn"
+    ],
+    "titlesBlanked": 2,
+    "titleList": [
+      "span.fwin-title",
+      "span.fwin-title-text"
+    ],
+    "dashboardCards": 6,
+    "expect": {
+      "Q2": "NO",
+      "Q3": "NO",
+      "Q5": "NO",
+      "Q10": "NO"
+    }
+  },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
+  },
+  "unplanted": {
+    "restoredMoved": 2,
+    "restoredTitles": 1,
+    "residue": 0
+  },
+  "storeAfter": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "storeIdentical": true,
+  "restored": {
+    "theme": "forest-night",
+    "presentation": "standard",
+    "box": "820x580",
+    "plantResidue": 0
+  },
+  "questions": [
+    {
+      "id": 1,
+      "q": "dominant task immediately obvious",
+      "verdict": "NO",
+      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "numbers": {
+        "entryPoints": 0,
+        "primaryInputs": 0,
+        "accentButtons": 0,
+        "accentList": [],
+        "inputList": []
+      }
+    },
+    {
+      "id": 2,
+      "q": "current location and way back obvious",
+      "verdict": "NO",
+      "bar": "a non-empty location label AND at least one way back",
+      "numbers": {
+        "titleText": "",
+        "titleFrom": "span.fwin-title",
+        "backAffordances": 1,
+        "backList": [
+          "×"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "q": "primary actions visible without hunting",
+      "verdict": "NO",
+      "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
+      "numbers": {
+        "primaryAction": "button.btn",
+        "insideBodyViewport": false,
+        "explicitlyMarked": true
+      }
+    },
+    {
+      "id": 4,
+      "q": "advanced tools discoverable without cluttering",
+      "verdict": "NO",
+      "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
+      "numbers": {
+        "collapsedDisclosures": 1,
+        "scannedControls": 15,
+        "chromeControlsRaw": 17,
+        "summaryHeaders": 2,
+        "behindDisclosure": 0,
+        "disclosures": {
+          "total": 1,
+          "open": 0
+        },
+        "scannedList": [
+          "Review Notebook",
+          "Refresh",
+          "Overview",
+          "Library",
+          "Words",
+          "Translations",
+          "Highlights",
+          "Captures",
+          "Start capture",
+          "Clear",
+          "card 0",
+          "card 1",
+          "card 2",
+          "card 3",
+          "card 4"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "q": "every readable surface has stable contrast",
+      "verdict": "NO",
+      "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
+      "numbers": {
+        "verdict": "NO",
+        "cells": [
+          {
+            "theme": "forest-night",
+            "measured": 2068,
+            "unmeasurable": 0,
+            "minRatio": 1.14,
+            "failingCount": 1,
+            "worst": {
+              "el": "span.",
+              "ratio": 1.14,
+              "bar": 4.5,
+              "bg": "span.@100%",
+              "text": "cat5 contrast plant"
+            }
+          },
+          {
+            "theme": "classic-light",
+            "measured": 2068,
+            "unmeasurable": 0,
+            "minRatio": 1.14,
+            "failingCount": 3,
+            "worst": {
+              "el": "span.",
+              "ratio": 1.14,
+              "bar": 4.5,
+              "bg": "span.@100%",
+              "text": "cat5 contrast plant"
+            }
+          }
+        ],
+        "failing": [
+          {
+            "el": "span.",
+            "ratio": 1.14,
+            "bar": 4.5,
+            "bg": "span.@100%",
+            "text": "cat5 contrast plant"
+          },
+          {
+            "el": "span.",
+            "ratio": 1.14,
+            "bar": 4.5,
+            "bg": "span.@100%",
+            "text": "cat5 contrast plant"
+          },
+          {
+            "el": "a.cat5ctl-kind-4",
+            "ratio": 1.53,
+            "bar": 4.5,
+            "bg": "div.@100%",
+            "text": "card 4"
+          },
+          {
+            "el": "summary.cat5ctl-kind-5",
+            "ratio": 1.16,
+            "bar": 4.5,
+            "bg": "div.@100%",
+            "text": "card 5"
+          }
+        ],
+        "themeAxisMoved": false
+      }
+    },
+    {
+      "id": 6,
+      "q": "Liquid motion explains a real relationship",
+      "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "YES",
+      "numbers": {
+        "measuredIn": "liquid",
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
+        },
+        "liquidRegions": 2,
+        "byBackdropFilter": 0,
+        "byContextualPaint": 2,
+        "carryingATransition": 2,
+        "infiniteAnimationsOnLiquid": 0,
+        "liquidMaterialTotal": 2,
+        "decoratedLeaves": [],
+        "regionList": [
+          "nav.lq-contextual",
+          "details.lq-contextual"
+        ],
+        "withoutTransition": [],
+        "inStandardPresentation": 0
+      }
+    },
+    {
+      "id": 7,
+      "q": "standard mode remains fully normal",
+      "bar": "category 6's parity: the same features reachable in standard as in Liquid",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "parity": {
+          "standard": "8/8",
+          "liquid": "8/8",
+          "na": 0,
+          "equal": true,
+          "rowsAgree": true,
+          "failing": [],
+          "onlyInOne": []
+        }
+      }
+    },
+    {
+      "id": 8,
+      "q": "Liquid can be turned off without losing state",
+      "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "roundTrip": {
+          "diffs": []
+        }
+      }
+    },
+    {
+      "id": 9,
+      "q": "all pre-migration features reachable and functional",
+      "bar": "category 6's row agreement: no row reachable in only one presentation",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "rowsAgree": true,
+        "onlyInOne": []
+      }
+    },
+    {
+      "id": 10,
+      "q": "still feels like itself, not a generic card dashboard",
+      "verdict": "NO",
+      "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
+      "numbers": {
+        "identityMarkers": {
+          "floatingWindowChrome": true,
+          "surfaceChrome": true,
+          "taskbar": true,
+          "desktopLayer": true,
+          "themeToken": true
+        },
+        "identityCount": 5,
+        "markerSet": "chromed (5 markers, bar 3 = 60%)",
+        "fillsViewport": false,
+        "bespokePrefixes": [
+          "muted:754"
+        ],
+        "contentDominant": null,
+        "contentFrac": 0,
+        "cardUniformity": 1,
+        "cardControlSignatures": 6,
+        "cardHost": "div. cards=6",
+        "cardHostDetail": "47% of body",
+        "cardHosts": [
+          {
+            "host": "div. cards=6",
+            "uniformity": 1,
+            "signatures": 6,
+            "detail": "47% of body"
+          }
+        ],
+        "dashboardHosts": 1
+      }
+    }
+  ],
+  "altThemeVerdicts": {
+    "q1": "NO",
+    "q2": "NO",
+    "q3": "NO",
+    "q4": "NO",
+    "q6": "NO-SUBJECT",
+    "q10": "NO"
+  },
+  "altThemeNumbers": {
+    "theme": "classic-light",
+    "controlsPainted": 466,
+    "q1": {
+      "entryPoints": 0,
+      "primaryInputs": 0,
+      "accentButtons": 0,
+      "accentList": [],
+      "inputList": []
+    },
+    "q4": {
+      "collapsedDisclosures": 1,
+      "scannedControls": 15,
+      "chromeControlsRaw": 17,
+      "summaryHeaders": 2,
+      "behindDisclosure": 0,
+      "disclosures": {
+        "total": 1,
+        "open": 0
+      },
+      "scannedList": [
+        "Review Notebook",
+        "Refresh",
+        "Overview",
+        "Library",
+        "Words",
+        "Translations",
+        "Highlights",
+        "Captures",
+        "Start capture",
+        "Clear",
+        "card 0",
+        "card 1",
+        "card 2",
+        "card 3",
+        "card 4"
+      ]
+    },
+    "q6": {
+      "liquidRegions": 0,
+      "byBackdropFilter": 0,
+      "byContextualPaint": 0,
+      "carryingATransition": 0,
+      "infiniteAnimationsOnLiquid": 0,
+      "liquidMaterialTotal": 0,
+      "decoratedLeaves": [],
+      "regionList": [],
+      "withoutTransition": []
+    },
+    "q10": {
+      "identityMarkers": {
+        "floatingWindowChrome": true,
+        "surfaceChrome": true,
+        "taskbar": true,
+        "desktopLayer": true,
+        "themeToken": true
+      },
+      "identityCount": 5,
+      "markerSet": "chromed (5 markers, bar 3 = 60%)",
+      "fillsViewport": false,
+      "bespokePrefixes": [
+        "muted:754"
+      ],
+      "contentDominant": null,
+      "contentFrac": 0,
+      "cardUniformity": 1,
+      "cardControlSignatures": 6,
+      "cardHost": "div. cards=6",
+      "cardHostDetail": "47% of body",
+      "cardHosts": [
+        {
+          "host": "div. cards=6",
+          "uniformity": 1,
+          "signatures": 6,
+          "detail": "47% of body"
+        }
+      ],
+      "dashboardHosts": 1
+    }
+  },
+  "controlsPaintedA": 466,
+  "controlResult": {
+    "Q2": true,
+    "Q3": true,
+    "Q5": true,
+    "Q10": true
+  },
+  "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q5, Q10",
+  "score": "CONTROL-OK"
+}

@@ -11,17 +11,17 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 2100,
+    "measured": 2062,
     "unmeasurable": 0,
     "minRatio": 5.3,
-    "minOwner": "span.gx-notebook-count-l \"Saved words\" 11px",
+    "minOwner": "span.muted \"OCR\" 13px",
     "failingCount": 0,
     "worst": [],
     "inactiveSkipped": 1,
     "inactiveWorst": []
   },
   "targets": {
-    "total": 485,
+    "total": 459,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
     "under32Count": 5,
@@ -56,7 +56,7 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 485,
+    "controls": 459,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
@@ -89,7 +89,7 @@
     "theme": "forest-night",
     "box": "820x580",
     "controls": 484,
-    "measured": 484,
+    "measured": 477,
     "belowFloorByRect": 5,
     "belowFloorByHit": 0,
     "belowFloor": [],
@@ -111,8 +111,44 @@
     "stolenCount": 0,
     "stolen": [],
     "worstShrunkBy": 0,
-    "occludedCount": 0,
-    "occluded": [],
+    "occludedCount": 7,
+    "occluded": [
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x60",
+        "by": "div.gx-notebook"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x60",
+        "by": "div.gx-notebook"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x60",
+        "by": "div.gx-notebook"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x60",
+        "by": "div.gx-notebook"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x60",
+        "by": "div.gx-notebook"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x44",
+        "by": "p.muted.gx-lc-desc"
+      },
+      {
+        "el": "button.gx-notebook-folder",
+        "rect": "145x44",
+        "by": "p.muted.gx-lc-desc"
+      }
+    ],
     "disabledCount": 1,
     "disabled": [
       {
@@ -120,11 +156,12 @@
         "rect": "61x35"
       }
     ],
-    "disclosedForRun": 0,
+    "disclosedForRun": 1,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "aside.lq-contextual.gx-notebook-folders 0,0 -> 221,0",
-      "section.gx-notebook-timeline 0,0 -> 32407,0"
+      "details.lq-contextual.gx-notebook-filters 99,0 -> 0,0",
+      "div.gx-notebook-folders 0,0 -> 41,0",
+      "section.gx-notebook-timeline 0,0 -> 32179,0"
     ],
     "scrollRestore": {
       "put": 0,
@@ -134,7 +171,7 @@
     "firstRun": {
       "belowFloorByHit": 0,
       "stolenCount": 0,
-      "occludedCount": 0
+      "occludedCount": 7
     }
   },
   "bars": {

@@ -925,6 +925,13 @@ deck/card/browser branch cannot mount without Anki + AnkiConnect, so Anki remain
 PARKED** and L7 advances under the human-blocked exception. Next surface: Notebook. Evidence:
 `L7_REVIEW_LEARNING.md`, `cat{1,2,3,4}-l7-anki*.json`.
 
+**Progress 2026-08-27 (later) — Notebook is 60/80 after interrupted-work recovery.** Categories
+1–6 are controlled **10/10** results; category 6 is **8/8 = 8/8** with 0 round-trip diffs. The
+category-5 failure recovered from disk moved **8/10 → 10/10**: entry points **0→2**, default
+controls to scan **36→10** behind one disclosure. Regression runs caught and repaired the open
+disclosure squeezing the timeline and one compact horizontal scroller (**286>202→0**). Categories
+7 and 8 remain. Evidence: `L7_REVIEW_LEARNING.md`, `cat{1..6}-l7-notebook*.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
