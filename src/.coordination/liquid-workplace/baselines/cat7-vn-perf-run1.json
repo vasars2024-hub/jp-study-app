@@ -1,0 +1,443 @@
+{
+  "surface": "vn",
+  "title": "Immersion",
+  "root": ".visual-novel-panel",
+  "at": "2026-08-27T02:37:09.025Z",
+  "scene": {
+    "fwins": 1,
+    "fwinElements": 663,
+    "documentElements": 784,
+    "titles": [
+      "Immersion"
+    ],
+    "theme": "forest-night",
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 227
+  },
+  "surfaceWindow": {
+    "matched": 1,
+    "elements": 663,
+    "deskWindows": 1,
+    "titles": [
+      "Immersion"
+    ]
+  },
+  "process": {
+    "pid": 11656,
+    "uptimeSecAtStart": 19022,
+    "mainRssMbBefore": 76.6,
+    "mainRssMbAfter": 86.9,
+    "mainHeapUsedMbAfter": 317.2
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "frames": 113,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 227
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 227
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1300
+      },
+      "jank_blocks": null,
+      "frames": 113,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 16.9,
+      "frames_over_16": 63,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1820,
+      "main_p50_ms": 3.4,
+      "main_p95_ms": 5.4,
+      "main_max_ms": 21.8
+    },
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Immersion",
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 227
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 228
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Immersion",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 16.3,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 50.1,
+      "frames_over_16": 54,
+      "frames_over_33": 1,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1814,
+      "main_p50_ms": 3.5,
+      "main_p95_ms": 7.5,
+      "main_max_ms": 18.3,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 50.1,
+          "over100": 0,
+          "mainMax": 18.3,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 17,
+          "over100": 0,
+          "mainMax": 20.8,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Immersion",
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 228
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 227
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Immersion",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 66,
+      "frame_min_ms": 16.6,
+      "frame_p50_ms": 33.4,
+      "frame_p95_ms": 66.8,
+      "frame_max_ms": 66.9,
+      "frames_over_16": 59,
+      "frames_over_33": 46,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1812,
+      "main_p50_ms": 3.8,
+      "main_p95_ms": 9.6,
+      "main_max_ms": 19.6,
+      "repeats": [
+        {
+          "p50": 33.4,
+          "p95": 66.8,
+          "max": 66.9,
+          "over100": 0,
+          "mainMax": 19.6,
+          "breached": true
+        },
+        {
+          "p50": 33.4,
+          "p95": 50.2,
+          "max": 66.8,
+          "over100": 0,
+          "mainMax": 18.6,
+          "breached": true
+        }
+      ],
+      "unstable": false
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Immersion",
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 229
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 663,
+        "documentElements": 784,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 230
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 43.6,
+        "restorePaintedMs": 42.3,
+        "restoredTo": "forest-night"
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 16.6,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 33.5,
+      "frames_over_16": 58,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1827,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 3.8,
+      "main_max_ms": 14.9,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 14.9,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 16.9,
+          "over100": 0,
+          "mainMax": 12.7,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "vn: analyze every captured line (DURING -DuringJs)",
+      "samples": 261,
+      "span_ms": 8009,
+      "min_ms": 1.3,
+      "p50_ms": 1.9,
+      "p95_ms": 3.8,
+      "max_ms": 15.9
+    },
+    "heavyProof": "N1 difficulty87 words108 kanji0% known coverage",
+    "idle": {
+      "label": "vn: idle",
+      "samples": 261,
+      "span_ms": 8007,
+      "min_ms": 1.4,
+      "p50_ms": 2,
+      "p95_ms": 2.7,
+      "max_ms": 11.8
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Immersion",
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 705,
+        "documentElements": 826,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 230
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 705,
+        "documentElements": 826,
+        "titles": [
+          "Immersion"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 230
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Immersion",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 12,
+      "frames": 66,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 116.8,
+      "frame_max_ms": 117.1,
+      "frames_over_16": 41,
+      "frames_over_33": 12,
+      "frames_over_100": 12,
+      "main_samples": 59,
+      "main_span_ms": 1814,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 3.8,
+      "main_max_ms": 13.5
+    }
+  },
+  "findings": [
+    "resize: p50 33.4 ms against a 16.7 ms ceiling",
+    "resize: p95 66.8 ms against a 16.8 ms ceiling"
+  ],
+  "voided": [],
+  "score": 0,
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}

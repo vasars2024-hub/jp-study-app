@@ -140,6 +140,26 @@ const SPECS = {
     },
     collection: { container: '.manga-canvas', row: 'img, canvas' },
   },
+  vn: {
+    // The visual-novel library REPLACES Immersion's browser INSIDE Immersion's own window,
+    // so its window chrome — bar, resize grip, title — is Immersion's and both gesture legs
+    // run unchanged. Both identity terms are load-bearing and neither is sufficient: the
+    // title alone matches the browser as well (`39872497` measured that mistake costing five
+    // fabricated regressions in category 6), and `.visual-novel-panel` alone names no window
+    // for the interaction probe to grip.
+    title: 'Immersion',
+    root: '.visual-novel-panel',
+    heavy: {
+      // Morphological analysis of every captured line is the only work this surface does at
+      // scale, and it is the one the user waits on. 8 s because the leg must COVER its load;
+      // `span_ms` is checked against it rather than assumed.
+      label: 'analyze every captured line',
+      durationMs: 8000,
+      js: `(() => { const b = document.querySelectorAll('.visual-novel-analysis-actions button')[0]; if (!b) return 'REFUSE: no analyze button'; if (b.disabled) return 'REFUSE: analyze is disabled — ' + (b.title || 'no reason given'); b.click(); return 'analyzing ' + document.querySelectorAll('.visual-novel-capture-row').length + ' lines'; })()`,
+      proof: `(() => { const s = document.querySelector('.visual-novel-analysis-summary'); return s ? s.textContent.trim().slice(0, 120) : '' })()`,
+    },
+    collection: { container: '.visual-novel-capture-list', row: '.visual-novel-capture-row' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',
@@ -250,11 +270,40 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
 
   const step = (s) => process.stderr.write(`[cat7] ${s}\n`);
   const legs = {};
-  // --- 1. the session's own frame ceiling ------------------------------------------
-  step('ceiling');
-  legs.ceiling = ps(IPROBE, ['-Interaction', 'ceiling', '-AsJson']);
-  const ceilingP50 = legs.ceiling.frame_p50_ms;
-  const ceilingP95 = legs.ceiling.frame_p95_ms;
+  // Collected before the scoring block exists, and merged into `voided` there.
+  const voidedEarly = [];
+  // --- 1. the session's own frame ceiling, AND its own outlier rate -----------------
+  /**
+   * THREE READINGS, NOT ONE, AND THE THIRD NUMBER THEY PRODUCE IS THE POINT. The ceiling leg
+   * animates a throwaway fixed layer with no layout, no React and no product code, so anything
+   * it reports is the machine. Measured 2026-08-26, eight consecutive ceiling readings on an
+   * otherwise idle desk: seven at p50 16.7 / max ~17, and one at **max 117.0 ms with 1 frame
+   * over 100**. One reading in eight, on a leg that runs no product code at all.
+   *
+   * That single number explains a run of results this harness has been producing. `breaches()`
+   * fired on `frames_over_100 > 0`, with no allowance for an outlier the display itself makes:
+   * a full run takes 6-9 gesture readings, so at a ~12% per-reading outlier rate MOST runs of a
+   * perfectly healthy surface either VOID as UNSTABLE or report a finding that six re-runs then
+   * disprove. Library's phantom "p95 66.9 / max 200.5 / 3 over 100" was this. The VN panel's
+   * first run here was this — p50 33.4 / p95 66.8, agreed by both repeats, then eight clean
+   * readings — and so were its second and third runs, which voided on a 7,989.5 ms frame and on
+   * a lone disagreeing resize.
+   *
+   * So the ceiling is now the ENVIRONMENT CONTROL as well as the frame budget: a gesture is not
+   * blamed for producing no more over-100 frames than the bare compositor produced in the same
+   * session. This does not loosen any bar that is about the product — p50 and p95 still score
+   * against the ceiling exactly as before, and every raw reading is still recorded. What it
+   * removes is a term the control demonstrably fails.
+   */
+  const ceilingRuns = [];
+  for (let i = 0; i < 3; i++) { step(`ceiling ${i + 1}/3`); ceilingRuns.push(ps(IPROBE, ['-Interaction', 'ceiling', '-AsJson'])); }
+  legs.ceiling = ceilingRuns.reduce((a, b) => (a.frame_p50_ms <= b.frame_p50_ms ? a : b));
+  legs.ceilingRuns = ceilingRuns.map((r) => ({ p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms, over100: r.frames_over_100, frames: r.frames }));
+  const ceilingP50 = Math.min(...ceilingRuns.map((r) => r.frame_p50_ms));
+  const ceilingP95 = Math.min(...ceilingRuns.map((r) => r.frame_p95_ms));
+  // The noise floor: the worst the machine did with nothing of ours running.
+  const ceilingOver100 = Math.max(...ceilingRuns.map((r) => r.frames_over_100));
+  const ceilingMaxMs = Math.max(...ceilingRuns.map((r) => r.frame_max_ms));
 
   // --- 2-4. the three gestures, every one scoped to THIS surface's window -----------
   // TWICE, and a third time only to break a tie. A single gesture reading is noise: Library's
@@ -267,7 +316,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // FINDING only when the majority of readings breach; otherwise the leg is UNSTABLE and every
   // reading is kept in the record.
   const breaches = (r) => (r.frame_p50_ms > ceilingP50 * 1.5) || (r.frame_p95_ms > ceilingP95 * 2)
-    || r.frames_over_100 > 0 || r.main_max_ms > L0.mainBlockBarMs;
+    || r.frames_over_100 > ceilingOver100 || r.main_max_ms > L0.mainBlockBarMs;
   for (const g of ['drag', 'resize', 'theme']) {
     step(g);
     const runs = [ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson'])];
@@ -292,6 +341,19 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // and reports it clean. The span each spec declares must COVER its own load, and the
   // achieved `span_ms` is checked below rather than trusted.
   legs.heavy = ps(PPROBE, ['-Samples', '40', '-DurationMs', String(spec.heavy.durationMs), '-Label', `${SURFACE}: ${spec.heavy.label}`, '-DuringJs', spec.heavy.js, '-AsJson']);
+  // THE LOAD'S OWN RECEIPT. `liquid-perf-probe.ps1` fires -DuringJs and never reads what it
+  // returned, by design — it is measuring main while the renderer works. The cost is that a
+  // heavy expression which REFUSES (no button, a disabled button, a root that moved) produces
+  // a perfectly clean distribution indistinguishable from a fast surface. That is the exact
+  // false-pass shape this file's header records for the path-vs-text bug, one layer up. A
+  // spec may declare `proof`: an expression evaluated after the leg whose answer must be
+  // non-empty and must not refuse. No proof, no claim — the leg is VOID, never a 10.
+  if (spec.heavy.proof) {
+    legs.heavyProof = await ev(spec.heavy.proof);
+    if (!legs.heavyProof || /^REFUSE/.test(String(legs.heavyProof))) {
+      voidedEarly.push(`heavy leg left no proof it ran: ${spec.heavy.label} answered ${JSON.stringify(legs.heavyProof)}`);
+    }
+  }
   // Idle, taken AFTER the load, is what makes the heavy number mean something.
   step('idle');
   legs.idle = ps(PPROBE, ['-Samples', '40', '-DurationMs', String(spec.heavy.durationMs), '-Label', `${SURFACE}: idle`, '-AsJson']);
@@ -305,14 +367,21 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // ---------------------------------------------------------------- scoring
   // Frames are scored against THIS session's ceiling, never against L0's milliseconds.
   const findings = [];
-  const voided = [];
+  const voided = [...voidedEarly];
+  const environment = [];
   for (const g of ['drag', 'resize', 'theme']) {
     const r = legs[g];
     if (!r.scene_stable) { voided.push(`${g}: the scene moved during the gesture (${r.scene_before.fwins}/${r.scene_before.fwinElements} -> ${r.scene_after.fwins}/${r.scene_after.fwinElements})`); continue; }
     if (r.stale_recorder) voided.push(`${g}: a stale frame recorder was found and disarmed; re-run to be sure`);
     if (r.frame_p50_ms > ceilingP50 * 1.5) findings.push(`${g}: p50 ${r.frame_p50_ms} ms against a ${ceilingP50} ms ceiling`);
     if (r.frame_p95_ms > ceilingP95 * 2) findings.push(`${g}: p95 ${r.frame_p95_ms} ms against a ${ceilingP95} ms ceiling`);
-    if (r.frames_over_100 > 0) findings.push(`${g}: ${r.frames_over_100} frames over 100 ms`);
+    if (r.frames_over_100 > ceilingOver100) findings.push(`${g}: ${r.frames_over_100} frames over 100 ms, against a ceiling that produced ${ceilingOver100} with no product code running`);
+    // Reported, never scored. A frame longer than anything the bare compositor managed is worth
+    // a reader's eye, but the control above shows the machine makes them unprompted, so it is
+    // not evidence about the surface.
+    if (r.frame_max_ms > Math.max(ceilingMaxMs, 100)) {
+      environment.push(`${g}: longest frame ${r.frame_max_ms} ms against a ceiling max of ${ceilingMaxMs} ms — recorded, not scored`);
+    }
     if (r.unstable) voided.push(`${g}: readings disagree across repeats (${r.repeats.map((x) => (x.breached ? 'BREACH' : 'clean')).join(', ')}); the majority is reported and the leg is UNSTABLE`);
     if (r.main_max_ms > L0.mainBlockBarMs) findings.push(`${g}: main blocked ${r.main_max_ms} ms, over the ${L0.mainBlockBarMs} ms bar`);
   }
@@ -337,8 +406,16 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     scene: legs.drag ? legs.drag.scene_before : null,
     surfaceWindow: { matched: found.matched, elements: found.matchedElements, deskWindows: found.windows, titles: found.titles },
     process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, mainRssMbBefore: mem.rssMb, mainRssMbAfter: memAfter.rssMb, mainHeapUsedMbAfter: memAfter.heapUsedMb },
-    sessionCeiling: { p50: ceilingP50, p95: ceilingP95, frames: legs.ceiling.frames, l0P50: L0.ceilingP50, note: ceilingP50 > L0.ceilingP50 * 1.4 ? 'THIS DISPLAY IS SLOWER THAN L0\'S — L0 ms are not comparable, only the ratio to this ceiling is' : 'comparable to L0' },
-    legs, findings, voided, score,
+    sessionCeiling: {
+      p50: ceilingP50, p95: ceilingP95, frames: legs.ceiling.frames, runs: legs.ceilingRuns,
+      noiseFloorOver100: ceilingOver100, noiseFloorMaxMs: ceilingMaxMs,
+      l0P50: L0.ceilingP50,
+      note: ceilingP50 > L0.ceilingP50 * 1.4 ? 'THIS DISPLAY IS SLOWER THAN L0\'S — L0 ms are not comparable, only the ratio to this ceiling is' : 'comparable to L0',
+      environmentNote: ceilingOver100 > 0 || ceilingMaxMs > 100
+        ? `THE MACHINE ITSELF STALLED DURING THIS RUN: the ceiling leg, which runs no product code, produced ${ceilingOver100} frame(s) over 100 ms and a ${ceilingMaxMs} ms longest frame. Gesture over-100 counts are scored against that floor.`
+        : 'ceiling clean — no environmental stall observed in this session',
+    },
+    legs, findings, voided, environment, score,
     l0Provenance: L0,
   };
   console.log(JSON.stringify(out, null, 2));
@@ -348,6 +425,8 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   console.log(`\nCATEGORY 7 — ${SURFACE}: ${score === 10 ? 'PASS 10/10' : score === 'VOID' ? 'VOID' : `${findings.length} finding(s), NOT a 10`}`);
   for (const f of findings) console.log(`  FINDING  ${f}`);
   for (const v of voided) console.log(`  VOID     ${v}`);
+  for (const e of environment) console.log(`  ENV      ${e}`);
+  if (out.sessionCeiling.environmentNote.startsWith('THE MACHINE')) console.log(`  ENV      ${out.sessionCeiling.environmentNote}`);
 })().catch((e) => {
   console.error(String(e && e.stack ? e.stack : e));
   if (e && e.cause) console.error('cause:', e.cause.code || '', e.cause.message || String(e.cause));
