@@ -1,0 +1,92 @@
+{
+  "label": "l7-anki",
+  "surface": "Anki",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "already-on-top",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "820x580",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 91,
+  "controlsSkipped": 78,
+  "byRole": {
+    "Work": 5,
+    "Liquid-eligible": 1,
+    "Anchor": 75,
+    "Anchor(holds work)": 10,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 1,
+  "sharedPrimitiveEligible": 1,
+  "eligibleTotal": 1,
+  "theme": "forest-night",
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.set-row.set-profile-picker",
+      "path": [
+        0,
+        0,
+        2
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        1,
+        1,
+        1,
+        5
+      ],
+      "oneRegionGlass": [
+        1,
+        1,
+        1,
+        1,
+        5
+      ],
+      "allGlass": [
+        5,
+        1,
+        1,
+        1,
+        5
+      ],
+      "restored": [
+        0,
+        1,
+        1,
+        1,
+        5
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

@@ -328,3 +328,17 @@ One refused attempt is not hidden: selecting the fourth source after opening res
 viewport and correctly refused as occluded. The scored task stops at the fully-loaded workbench;
 the category's scroll-trap inventory measures that state, while source import belongs to its own
 functional gates and is not manufactured through an off-screen synthetic click.
+
+## 2026-08-27 08:45 EDT — Anki category 3 PASS 10/10, selective Liquid over the whole workbench
+
+Measured with Deck Workbench open and its saved sessions settled: **91** classified regions and
+**78** controls skipped as controls, not misclassified as surfaces. Role census: Work **5**,
+Liquid-eligible **1**, Anchor **75**, Anchor(holds work) **10**, Ambient **0**.
+
+Dense Work on translucent backing: **0/5**. The one eligible contextual region is treated **1/1**
+and backed by the shared primitive **1/1**. The dense workbench, source rail, session list and
+settings remain stable anchors; only the contextual head takes Liquid. Control blurred one runtime
+Work region (**0 -> 1** failure), then all five (**0 -> 5**); all material signatures and counts
+returned exactly to **0/1/1/1/5**. **PASS 10/10.** The harness drove Standard → Liquid and restored
+Standard at **820x580**; the setup then closed only the workbench disclosure it found open.
+Evidence: `baselines/cat3-l7-anki.json`. No product or harness change was needed.
