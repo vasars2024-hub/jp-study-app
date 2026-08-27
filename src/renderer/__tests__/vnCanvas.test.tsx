@@ -181,6 +181,41 @@ describe('the visual novel panel through the L6 reading canvas', () => {
     expect(wrapper!.querySelector('.visual-novel-add')).not.toBe(null);
   });
 
+  it('names the entry list and its rows, so they are reachable by anything but their title text', async () => {
+    // Measured 2026-08-26: this was `<ul>` with a bare `<li><button className={
+    // selected ? 'is-selected' : ''}>`, while every other list in the panel is
+    // named. The one list of visual novels could only be found by its own
+    // TRANSLATED title text — the defect `reader-back` fixed on the reader.
+    const h = await mountPanel(1200);
+    const list = h.tool('library')!.querySelector('ul.visual-novel-entries');
+    expect(list).not.toBe(null);
+    // The CSS reaches these rows structurally, so the nesting is pinned beside
+    // the class rather than instead of it.
+    expect(list!.parentElement!.classList.contains('visual-novel-library')).toBe(true);
+    const rows = Array.from(h.tool('library')!.querySelectorAll('.visual-novel-entry'));
+    expect(rows.length).toBe(2);
+    expect(rows.every((r) => r.tagName === 'BUTTON' && r.parentElement!.tagName === 'LI')).toBe(true);
+  });
+
+  it('marks the selected entry in the accessibility tree, not only in the paint', async () => {
+    const h = await mountPanel(1200);
+    const rows = () => Array.from(h.tool('library')!.querySelectorAll<HTMLButtonElement>('.visual-novel-entry'));
+    const selected = () => rows().filter((r) => r.classList.contains('is-selected'));
+    expect(selected().length).toBe(1);
+    expect(selected()[0].getAttribute('aria-current')).toBe('true');
+    // Omitted, never `aria-current="false"`: a stale false on every other row is
+    // what a screen reader reads as "several currents".
+    expect(rows().filter((r) => !r.classList.contains('is-selected'))
+      .every((r) => r.getAttribute('aria-current') === null)).toBe(true);
+
+    const other = rows().find((r) => !r.classList.contains('is-selected'))!;
+    const label = other.textContent;
+    await h.click('.visual-novel-entry', rows().indexOf(other));
+    expect(selected().length).toBe(1);
+    expect(selected()[0].textContent).toBe(label);
+    expect(selected()[0].getAttribute('aria-current')).toBe('true');
+  });
+
   it('becomes a dismissible sheet in a pane the old media query could never see', async () => {
     // 600 − 12 − 384 = 204 < the library's 220 floor. The `@media (max-width:
     // 760px)` rule read `window.innerWidth`, which jsdom reports as 1024 here —

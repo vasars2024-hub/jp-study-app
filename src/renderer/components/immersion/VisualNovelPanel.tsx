@@ -675,10 +675,19 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
           recommendations={recommendationState.recommendations}
           onSelect={setSelectedId}
         />
-        <ul>
+        {/* The library list is this panel's primary object list and had no class handle at all —
+            its rows could only be found by their own (translated) title text, which is the same
+            defect the reader's back control had. Named after the panel's own convention so the
+            selected row is observable to assistive tech as well as to a selector. */}
+        <ul className="visual-novel-entries">
           {database.entries.map((entry) => (
             <li key={entry.id}>
-              <button type="button" className={entry.id === selectedId ? 'is-selected' : ''} onClick={() => setSelectedId(entry.id)}>
+              <button
+                type="button"
+                className={`visual-novel-entry${entry.id === selectedId ? ' is-selected' : ''}`}
+                aria-current={entry.id === selectedId ? 'true' : undefined}
+                onClick={() => setSelectedId(entry.id)}
+              >
                 <strong>{entry.title}</strong>
                 <span>{entry.engine} · {entry.status} · {Math.round(entry.completionPct)}%</span>
               </button>
@@ -820,7 +829,13 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                 <div className="visual-novel-reading-head"><strong>Reading overlay</strong><span>{captures.length} lines</span></div>
                 <div className="visual-novel-capture-list wk-on" data-dict-owner="" onPointerDown={noteLookupPointerDown} onMouseUp={onTextMouseUp}>
                   {captures.map((capture) => (
-                    <button key={capture.id} type="button" className={capture.id === selectedCapture?.id ? 'is-selected' : ''} onClick={() => setSelectedCaptureId(capture.id)}>
+                    <button
+                      key={capture.id}
+                      type="button"
+                      className={`visual-novel-capture-row${capture.id === selectedCapture?.id ? ' is-selected' : ''}`}
+                      aria-current={capture.id === selectedCapture?.id ? 'true' : undefined}
+                      onClick={() => setSelectedCaptureId(capture.id)}
+                    >
                       <small>{displayCaptureContext(capture) || capture.kind}</small>
                       <span>{capture.japanese}</span>
                       {capture.translation && <em>{capture.translation}</em>}
