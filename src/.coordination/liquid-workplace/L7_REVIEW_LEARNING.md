@@ -342,3 +342,24 @@ Work region (**0 -> 1** failure), then all five (**0 -> 5**); all material signa
 returned exactly to **0/1/1/1/5**. **PASS 10/10.** The harness drove Standard → Liquid and restored
 Standard at **820x580**; the setup then closed only the workbench disclosure it found open.
 Evidence: `baselines/cat3-l7-anki.json`. No product or harness change was needed.
+
+## 2026-08-27 08:50 EDT — Anki category 4 FAIL 108 clips → PASS 10/10
+
+First compact run at **260x170**: clipped **108**, hidden-overflow containers **2**. The workbench
+owned 134px inside the frame, but its viewport media query still saw 1264px and retained the
+two-column `200px + 2fr` grid. Long saved-session names then gave the off-screen detail column a
+526px scroll width. Product fix: `.deck-workbench` is an inline-size container, the existing narrow
+composition also runs as a container query, grid children keep `min-width:0`, and session names
+wrap anywhere. Result: clips **108 -> 0**, workbench overflow **540>162 -> 0**.
+
+The re-run retained one honest failure: `.set-profile-picker` was 170px wide while its shared
+`.set-select` held a 200px floor beside an 18px gap; `.fwin-body` read **257>248**. Shared compact
+fix: `.set-row` wraps and `.set-select` clamps its 200px preferred floor to 100%. It changes no
+wide row and makes narrow settings stack instead of disappear behind `overflow-x:hidden`.
+
+Final default / compact / maximized: clips **0/0/0**, overlaps **0/0/0**, horizontal scrollers
+**0/0/0**, hidden overflow **0/0/0**, dead region **6.9/1.3/9.7%**. Chrome **5.7 -> 4.3%** and
+content **93.7 -> 95.3%** as the window grows. Every size restored; injected clip fired
+**0 -> 1 -> 0**. **PASS 10/10.** Sub-minimum 200x140 remains a reported negative (**2** hidden
+overflow containers), outside the scored compact floor. Evidence: `baselines/cat4-l7-anki.json`;
+`ankiLiquidRegions.test.ts` **6/6**.

@@ -16,6 +16,10 @@ import { describe, expect, it } from 'vitest';
 const VIEW = readFileSync(resolve(__dirname, '../views/AnkiView.tsx'), 'utf8');
 const PREVIEW = readFileSync(resolve(__dirname, '../components/AnkiCardPreview.tsx'), 'utf8');
 const CONTENT = readFileSync(resolve(__dirname, '../components/anki/AnkiContent.tsx'), 'utf8');
+const WORKBENCH_CSS = readFileSync(
+  resolve(__dirname, '../components/anki/deckWorkbench.css'),
+  'utf8',
+).replace(/\r\n/g, '\n');
 // CRLF in the shared tree, LF in a fresh worktree (`autocrlf-flips-css-tests`), so every
 // assertion below matches on a newline-tolerant pattern rather than on a literal block.
 const CSS = readFileSync(resolve(__dirname, '../styles.css'), 'utf8').replace(/\r\n/g, '\n');
@@ -80,5 +84,23 @@ describe('Anki Liquid regions', () => {
     const setup = readFileSync(resolve(__dirname, '../components/AnkiSetup.tsx'), 'utf8');
     expect(setup).toContain('<div className="anki-setup-actions">');
     expect(setup.match(/className="btn small/g)).toHaveLength(2);
+  });
+
+  it('reflows the workbench from its in-window width and wraps saved-session names', () => {
+    expect(WORKBENCH_CSS).toMatch(/\.deck-workbench \{[^}]*container-type: inline-size;/);
+    expect(WORKBENCH_CSS).toMatch(
+      /@container \(max-width: 720px\) \{\n {2}\.deck-workbench-body \{\n {4}grid-template-columns: minmax\(0, 1fr\);/,
+    );
+    expect(WORKBENCH_CSS).toMatch(
+      /\.deck-workbench-sessions li > span \{\n {2}min-width: 0;\n {2}overflow-wrap: anywhere;/,
+    );
+    // NEGATIVE HALF: the wide two-column composition remains the default.
+    expect(WORKBENCH_CSS).toContain(
+      'grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr);',
+    );
+    expect(CSS).toMatch(/\.set-row \{[^}]*flex-wrap: wrap;/);
+    expect(CSS).toMatch(
+      /\.set-select \{[^}]*min-width: min\(200px, 100%\);[^}]*max-width: 100%;/,
+    );
   });
 });

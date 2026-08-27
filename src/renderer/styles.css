@@ -8829,6 +8829,7 @@ mark.lookup-mark,
 }
 .set-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -8908,7 +8909,8 @@ mark.lookup-mark,
   border-radius: 8px;
   padding: 8px 11px;
   font-size: 14px;
-  min-width: 200px;
+  min-width: min(200px, 100%);
+  max-width: 100%;
   cursor: pointer;
 }
 .set-select:focus {
