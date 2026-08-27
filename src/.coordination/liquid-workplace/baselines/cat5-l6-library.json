@@ -2,7 +2,7 @@
   "surface": "Library",
   "label": "l6-library",
   "control": false,
-  "at": "2026-08-26T22:54:08.703Z",
+  "at": "2026-08-27T00:15:06.440Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -238,7 +238,7 @@
       "id": 10,
       "q": "still feels like itself, not a generic card dashboard",
       "verdict": "YES",
-      "bar": ">=3 identity markers, and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
+      "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
       "numbers": {
         "identityMarkers": {
           "floatingWindowChrome": true,
@@ -248,6 +248,14 @@
           "themeToken": true
         },
         "identityCount": 5,
+        "markerSet": "chromed (5 markers, bar 3 = 60%)",
+        "fillsViewport": false,
+        "bespokePrefixes": [
+          "lib:7",
+          "cover:24"
+        ],
+        "contentDominant": "div.card-title text:204",
+        "contentFrac": 0.01,
         "cardUniformity": 0,
         "cardControlSignatures": 0,
         "cardHost": null,
@@ -319,6 +327,14 @@
         "themeToken": true
       },
       "identityCount": 5,
+      "markerSet": "chromed (5 markers, bar 3 = 60%)",
+      "fillsViewport": false,
+      "bespokePrefixes": [
+        "lib:7",
+        "cover:24"
+      ],
+      "contentDominant": "div.card-title text:204",
+      "contentFrac": 0.01,
       "cardUniformity": 0,
       "cardControlSignatures": 0,
       "cardHost": null,

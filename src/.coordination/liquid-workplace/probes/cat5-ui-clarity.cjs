@@ -635,8 +635,21 @@ const PLANT_JS = `(function(){
     ? [].slice.call(root.querySelectorAll('.fwin-title-text, .fwin-title'))
     : [].slice.call(root.querySelectorAll('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]'))
         .filter(function(e){ return plantPainted(e) && (e.textContent || '').trim().length > 0; });
+  /*
+   * innerHTML, NOT textContent, and this one was damaging the live app. \`.fwin-title\` is
+   * \`<span class="fwin-title"><Icon/><span class="fwin-title-text">…</span></span>\` — nested,
+   * so \`textContent = ''\` DELETES the inner span and the window's glyph, and restoring
+   * \`textContent\` puts back a bare text node. Measured on Library, 2026-08-26: after a clean
+   * CONTROL-OK run with residue 0, the live window's title read
+   * \`<span class="fwin-title">Library</span>\` and \`.fwin-title-text\` was gone from the
+   * document — the handle three other probes in this directory resolve windows BY. The
+   * previous single-node plant did the same thing (the selector list returns the outer span
+   * first in document order), so this had been happening on every fwin control run.
+   * Restoring the markup restores the subtree; \`residue: 0\` never saw any of it.
+   */
   titleEls.forEach(function(e){
     e.setAttribute(${A(PLANT)}, 'title');
+    e.setAttribute(${A(PLANT)} + '-html', e.innerHTML);
     e.setAttribute(${A(PLANT)} + '-text', e.textContent || '');
     e.textContent = '';
   });
@@ -716,10 +729,19 @@ const unplantJs = (savedTitle) => `(function(){
   // Attribute-driven, like the moved nodes below: each blanked title carries its own text, so
   // two blanked headings come back as two different strings. The \`savedTitle\` argument is kept
   // only as the fallback for a node whose attribute somehow did not survive.
-  var titles = [].slice.call(document.querySelectorAll('[${PLANT}="title"]'));
+  // Outermost first, so a nested pair is rebuilt by its ancestor's markup and the inner
+  // node's own entry then finds nothing left to do rather than re-blanking a rebuilt child.
+  var titles = [].slice.call(document.querySelectorAll('[${PLANT}="title"]'))
+    .sort(function(a, b){ return a.contains(b) ? -1 : b.contains(a) ? 1 : 0; });
   titles.forEach(function(t){
-    var was = t.getAttribute('${PLANT}-text');
-    t.textContent = was === null ? ${A(savedTitle === null ? '' : savedTitle)} : was;
+    if (!t.isConnected) return;
+    var html = t.getAttribute('${PLANT}-html');
+    if (html !== null) { t.innerHTML = html; }
+    else {
+      var was = t.getAttribute('${PLANT}-text');
+      t.textContent = was === null ? ${A(savedTitle === null ? '' : savedTitle)} : was;
+    }
+    t.removeAttribute('${PLANT}-html');
     t.removeAttribute('${PLANT}-text');
     t.removeAttribute(${A(PLANT)});
   });
@@ -733,7 +755,10 @@ const unplantJs = (savedTitle) => `(function(){
   });
   [].slice.call(document.querySelectorAll('[${PLANT}="contrast"],[${PLANT}="dashboard"]')).forEach(function(n){ n.remove(); });
   return JSON.stringify({ restoredMoved: moved.length, restoredTitles: titles.length,
-    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform],[${PLANT}-text]').length });
+    // The whole marker family, including \`-html\`. A residue count that does not sweep every
+    // attribute the plant writes reports 0 while the app still carries one, which is the
+    // exact shape of the restore defect this directory already paid for once.
+    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform],[${PLANT}-text],[${PLANT}-html]').length });
 })()`;
 
 // ---------------------------------------------------------------------------- scoring
