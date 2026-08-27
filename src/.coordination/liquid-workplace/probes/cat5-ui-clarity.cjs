@@ -437,15 +437,83 @@ const SNAP = `(function(){
   });
 
   // ---- Q10: still itself, not a generic card dashboard. -----------------------------------
-  var identityMarkers = {
-    // A root surface has no window chrome by construction; its equivalent identity marker is
-    // its own app chrome bar. Reported separately so the two host classes stay legible.
-    floatingWindowChrome: !!root.querySelector('.fwin-bar'),
-    surfaceChrome: !!root.querySelector('[class*="-toolbar"],[class*="-topbar"],[class*="-header"],[class*="-bar"]'),
-    taskbar: !!document.querySelector('.os-task-win'),
-    desktopLayer: !!document.querySelector('.desktop-root,.os-desktop,.os-wall-layer'),
-    themeToken: !!document.documentElement.getAttribute('data-theme')
-  };
+  /**
+   * TWO MARKER SETS, PICKED BY HOST CLASS — repaired 2026-08-26 after manga scored 8/10 on a
+   * term it could not answer. Three of the original five markers are OS chrome
+   * (\`floatingWindowChrome\`, \`taskbar\`, \`desktopLayer\`) and the bar is 3 of 5. Novels, the
+   * manga reader and the VN panel all REPLACE the desktop shell, so all three are absent by
+   * construction and identityCount is capped at 2 — half the L6 set could never answer Q10
+   * YES no matter what the product did. That is a harness defect wearing a product score.
+   *
+   * The discriminator is deliberately NOT "is the marker present", which is circular and would
+   * make the term vacuous. It is a structural property of the host, measured independently of
+   * every marker: a surface that is not a \`.fwin\` AND fills its viewport is chromeless.
+   *
+   * THE BAR IS NOT LOWERED. The chromed set is byte-identical to the one Library, Captures and
+   * Immersion scored against — those three re-derive unchanged. The chromeless set has FOUR
+   * markers against the same bar of 3, so it demands 75% where the chromed set demands 60%,
+   * and the two replacements are things a chromeless surface has to earn:
+   *
+   *   bespokeRegionPrefix   its painted structural regions share an app-domain class prefix
+   *                         that is not a generic container word. A generic card dashboard is
+   *                         built out of .card/.panel/.tile and has no such prefix; the manga
+   *                         reader has manga- x8, ocr- x4, reader- x2.
+   *   contentDominantRegion the largest painted CONTENT element (media, or a run of >=200 own
+   *                         text chars) covers >=25% of the surface. A dashboard's largest
+   *                         painted thing is a box of boxes, not a page.
+   *
+   * STATED RATHER THAN HIDDEN: the identity leg is not independently falsified by the control
+   * — the Q10 plant falsifies the DASHBOARD leg, which is what the question is actually about.
+   * A control that stripped the app's own class names would be testing the DOM, not the product.
+   */
+  var GENERIC_PREFIX = ['card','tile','panel','box','item','row','col','grid','container','wrapper',
+    'content','main','section','header','footer','sidebar','list','page','view','app','flex',
+    'inner','outer','body','block','btn','icon','group','stack','pane','bar','menu','modal',
+    'overlay','wrap','text','title','label','field','form','cell','area','frame','shell'];
+  var structural = [].slice.call(root.querySelectorAll('*')).filter(function(e){
+    if (!painted(e) || isControl(e)) return false;
+    var b = e.getBoundingClientRect();
+    return (b.width * b.height) / Math.max(1, R.width * R.height) >= 0.01;
+  });
+  var prefixTally = {};
+  structural.forEach(function(e){
+    String(e.className || '').trim().split(' ').forEach(function(tok){
+      if (!tok) return;
+      var p = tok.split('-')[0].toLowerCase();
+      if (p.length < 3 || GENERIC_PREFIX.indexOf(p) >= 0) return;
+      prefixTally[p] = (prefixTally[p] || 0) + 1;
+    });
+  });
+  var bespokePrefixes = Object.keys(prefixTally).filter(function(p){ return prefixTally[p] >= 3; });
+  var contentBest = null, contentBestArea = 0;
+  [].slice.call(root.querySelectorAll('*')).filter(painted).forEach(function(e){
+    var b = e.getBoundingClientRect();
+    var a = b.width * b.height;
+    if (a <= contentBestArea) return;
+    var isMedia = e.tagName === 'IMG' || e.tagName === 'CANVAS' || e.tagName === 'VIDEO'
+      || e.tagName === 'SVG' || e.tagName === 'svg' || e.tagName === 'PICTURE';
+    var ownText = [].slice.call(e.childNodes).filter(function(n){ return n.nodeType === 3; })
+      .map(function(n){ return n.textContent; }).join('').trim().length;
+    if (!isMedia && ownText < 200) return;
+    contentBestArea = a;
+    contentBest = name(e) + (isMedia ? ' media' : ' text:' + ownText);
+  });
+  var contentFrac = Math.round(contentBestArea / Math.max(1, R.width * R.height) * 100) / 100;
+  var fillsViewport = (R.width / Math.max(1, window.innerWidth)) >= 0.95
+    && (R.height / Math.max(1, window.innerHeight)) >= 0.95;
+  var chromelessHost = !isFwin && fillsViewport;
+  var surfaceChrome = !!root.querySelector('[class*="-toolbar"],[class*="-topbar"],[class*="-header"],[class*="-bar"]');
+  var themeToken = !!document.documentElement.getAttribute('data-theme');
+  var identityMarkers = chromelessHost
+    ? { surfaceChrome: surfaceChrome,
+        themeToken: themeToken,
+        bespokeRegionPrefix: bespokePrefixes.length > 0,
+        contentDominantRegion: contentFrac >= 0.25 }
+    : { floatingWindowChrome: !!root.querySelector('.fwin-bar'),
+        surfaceChrome: surfaceChrome,
+        taskbar: !!document.querySelector('.os-task-win'),
+        desktopLayer: !!document.querySelector('.desktop-root,.os-desktop,.os-wall-layer'),
+        themeToken: themeToken };
   var identityCount = Object.keys(identityMarkers).filter(function(k){ return identityMarkers[k]; }).length;
   var cardUniformity = 0, cardHost = null, cardHostDetail = null, cardControlSignatures = 0;
   var bodyArea = Math.max(1, B.width * B.height);
@@ -524,6 +592,10 @@ const SNAP = `(function(){
           regionList: liquidRegions.slice(0,8).map(name),
           withoutTransition: liquidRegions.filter(function(e){ return withTransition.indexOf(e) < 0; }).slice(0,8).map(name) },
     q10: { identityMarkers: identityMarkers, identityCount: identityCount,
+           markerSet: chromelessHost ? 'chromeless (4 markers, bar 3 = 75%)' : 'chromed (5 markers, bar 3 = 60%)',
+           fillsViewport: fillsViewport,
+           bespokePrefixes: bespokePrefixes.map(function(p){ return p + ':' + prefixTally[p]; }),
+           contentDominant: contentBest, contentFrac: contentFrac,
            cardUniformity: Math.round(cardUniformity*100)/100, cardControlSignatures: cardControlSignatures,
            cardHost: cardHost, cardHostDetail: cardHostDetail }
   });
@@ -537,13 +609,39 @@ const PLANT_JS = `(function(){
   var body = root.querySelector('.fwin-body') || root;
   var isFwin = root.classList && root.classList.contains('fwin');
 
-  // Q2 — blank the title/heading, remembering it verbatim.
-  var titleEl = isFwin
-    ? root.querySelector('.fwin-title-text, .fwin-title')
-    : ([].slice.call(root.querySelectorAll('h1,h2,[role="heading"],[class*="-title"]')).filter(function(e){
-        return (e.textContent || '').trim().length > 0; })[0] || null);
-  var savedTitle = titleEl ? titleEl.textContent : null;
-  if (titleEl) { titleEl.setAttribute(${A(PLANT)}, 'title'); titleEl.textContent = ''; }
+  /*
+   * Q2 — blank the location label. EVERY CANDIDATE, not the first one, and this is the same
+   * repair Q3 needed: the snapshot resolves the title as \`candidates.filter(painted &&
+   * non-empty)[0]\`, so blanking one node simply promotes the next and the control reports
+   * "DID NOT FAIL" on a perfectly falsifiable question. Measured on the manga reader
+   * (2026-08-26): the plant blanked \`div.reader-title\` and the term fell straight through to
+   * \`span.lq-reading-tool-title\` — "Page text", the open OCR tool's own heading — so Q2
+   * stayed YES and the whole run went CONTROL-VOID for the wrong reason. Any surface with a
+   * docked reading tool has at least two title-shaped elements, so this is Novels and the VN
+   * panel too, not a manga quirk.
+   *
+   * The selector is now the SNAPSHOT'S selector, character for character, including the
+   * \`painted\` filter — a plant that hunts a different population from the one under test is
+   * the defect this file has already recorded twice. Each node carries its own text on its
+   * own attribute, so N blanked nodes restore to N different strings and the restore does not
+   * depend on an array surviving the round trip through /eval.
+   */
+  function plantPainted(e){
+    return typeof e.checkVisibility === 'function'
+      ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
+      : true;
+  }
+  var titleEls = isFwin
+    ? [].slice.call(root.querySelectorAll('.fwin-title-text, .fwin-title'))
+    : [].slice.call(root.querySelectorAll('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]'))
+        .filter(function(e){ return plantPainted(e) && (e.textContent || '').trim().length > 0; });
+  titleEls.forEach(function(e){
+    e.setAttribute(${A(PLANT)}, 'title');
+    e.setAttribute(${A(PLANT)} + '-text', e.textContent || '');
+    e.textContent = '';
+  });
+  var titleEl = titleEls[0] || null;
+  var savedTitle = titleEl ? titleEl.getAttribute(${A(PLANT)} + '-text') : null;
 
   // Q3 — push EVERY primary-capable control far below the body's visible box.
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
@@ -607,12 +705,24 @@ const PLANT_JS = `(function(){
     primariesMoved: targets.length,
     primariesFromPin: pinnedAll.length,
     primaryList: targets.map(function(e){ return e.tagName.toLowerCase() + '.' + String(e.className||'').split(' ')[0]; }),
+    // Same reporting as the Q3 disjunction, for the same reason: a control that blanked one
+    // of two title-shaped nodes measured nothing, so the count is stated rather than assumed.
+    titlesBlanked: titleEls.length,
+    titleList: titleEls.map(function(e){ return e.tagName.toLowerCase() + '.' + String(e.className||'').split(' ')[0]; }),
     dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q5: 'NO', Q10: 'NO' } });
 })()`;
 
 const unplantJs = (savedTitle) => `(function(){
-  var t = document.querySelector('[${PLANT}="title"]');
-  if (t) { t.textContent = ${A(savedTitle === null ? '' : savedTitle)}; t.removeAttribute(${A(PLANT)}); }
+  // Attribute-driven, like the moved nodes below: each blanked title carries its own text, so
+  // two blanked headings come back as two different strings. The \`savedTitle\` argument is kept
+  // only as the fallback for a node whose attribute somehow did not survive.
+  var titles = [].slice.call(document.querySelectorAll('[${PLANT}="title"]'));
+  titles.forEach(function(t){
+    var was = t.getAttribute('${PLANT}-text');
+    t.textContent = was === null ? ${A(savedTitle === null ? '' : savedTitle)} : was;
+    t.removeAttribute('${PLANT}-text');
+    t.removeAttribute(${A(PLANT)});
+  });
   // Each moved node carries its OWN previous inline transform, so a plant that attacked
   // three nodes restores three, and none of them is restored to another one's value.
   var moved = [].slice.call(document.querySelectorAll('[${PLANT}="moved"]'));
@@ -622,8 +732,8 @@ const unplantJs = (savedTitle) => `(function(){
     m.removeAttribute(${A(PLANT)});
   });
   [].slice.call(document.querySelectorAll('[${PLANT}="contrast"],[${PLANT}="dashboard"]')).forEach(function(n){ n.remove(); });
-  return JSON.stringify({ restoredMoved: moved.length,
-    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform]').length });
+  return JSON.stringify({ restoredMoved: moved.length, restoredTitles: titles.length,
+    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform],[${PLANT}-text]').length });
 })()`;
 
 // ---------------------------------------------------------------------------- scoring
@@ -638,7 +748,7 @@ const BARS = {
   q7: "category 6's parity: the same features reachable in standard as in Liquid",
   q8: "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
   q9: "category 6's row agreement: no row reachable in only one presentation",
-  q10: '>=3 identity markers, and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)',
+  q10: '>=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)',
 };
 
 function scoreSnapshot(s) {

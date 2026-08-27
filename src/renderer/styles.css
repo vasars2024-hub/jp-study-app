@@ -17178,11 +17178,18 @@ html[data-taskbar-size='large'] .os-tray-btn {
 
    No `overflow: hidden` anywhere in this chain, deliberately — `.lq-hit-scope`'s 32px
    `::after` on each button is larger than the button's own box, and a clipping ancestor
-   cuts it back while still computing as landed. That is the recorded failure mode. */
-.immersion-overflow {
+   cuts it back while still computing as landed. That is the recorded failure mode.
+
+   `.lq-overflow` is the SAME pattern with no surface in its name. It was generalised the
+   moment a second surface needed it (the manga reader, category 5 Q4) rather than copied,
+   so there is one set of rules to fix when the next one arrives. `.immersion-*` is kept as
+   an alias only so the already-shipped Immersion markup is not churned in a scoring turn. */
+.immersion-overflow,
+.lq-overflow {
   position: relative;
 }
-.immersion-overflow-summary {
+.immersion-overflow-summary,
+.lq-overflow-summary {
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -17193,10 +17200,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   align-items: center;
   gap: 6px;
 }
-.immersion-overflow-summary::-webkit-details-marker {
+.immersion-overflow-summary::-webkit-details-marker,
+.lq-overflow-summary::-webkit-details-marker {
   display: none;
 }
-.immersion-overflow-summary::after {
+.immersion-overflow-summary::after,
+.lq-overflow-summary::after {
   content: '';
   width: 0;
   height: 0;
@@ -17207,10 +17216,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
      `prefers-reduced-motion` and under `:root.reduce-motion`. */
   transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
 }
-.immersion-overflow[open] > .immersion-overflow-summary::after {
+.immersion-overflow[open] > .immersion-overflow-summary::after,
+.lq-overflow[open] > .lq-overflow-summary::after {
   transform: rotate(180deg);
 }
-.immersion-overflow-body {
+.immersion-overflow-body,
+.lq-overflow-body {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
@@ -17228,13 +17239,74 @@ html[data-taskbar-size='large'] .os-tray-btn {
   background: var(--panel-2);
   box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
 }
-.immersion-overflow-body > button {
+.immersion-overflow-body > button,
+.lq-overflow-body > button,
+.lq-overflow-body > label {
   display: flex;
   align-items: center;
   gap: 8px;
   justify-content: flex-start;
   text-align: left;
   white-space: nowrap;
+}
+/* A footer-anchored overflow opens UPWARD; the reader's footer sits on the bottom edge and
+   a `top: 100%` body would be drawn off-screen. Anchoring is the only difference. */
+.lq-overflow-up > .lq-overflow-body {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+/* The manga reader's three hosts. Each is only a placement: the disclosure behaviour, the
+   32px floor and the opaque body all come from `.lq-overflow` above. */
+.reader-controls > .lq-overflow > .lq-overflow-body,
+.manga-view-mode-switcher > .lq-overflow-body {
+  min-width: 190px;
+}
+.manga-view-mode-switcher {
+  position: relative;
+}
+/* The mode menu's summary keeps segment styling so the control still reads as the view
+   switcher it replaced, and carries the ACTIVE mode as its own label — a menu whose
+   current value is only visible after opening it is a menu you cannot read. */
+.manga-view-mode-summary {
+  padding: 0 10px;
+}
+.manga-ocr-group {
+  width: 100%;
+}
+.manga-ocr-group > summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  min-height: var(--lq-hit-target);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.manga-ocr-group > summary::-webkit-details-marker {
+  display: none;
+}
+.manga-ocr-group > summary::after {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  transition: transform var(--lq-motion-move, 140ms) var(--lq-ease-move, ease);
+}
+.manga-ocr-group[open] > summary::after {
+  transform: rotate(180deg);
+}
+/* In flow, not floating: the OCR panel is a vertical inspector with room to grow, so an
+   expanding group pushes the rest of the panel down rather than covering the page. */
+.manga-ocr-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 2px;
 }
 .immersion-url {
   width: 100%;

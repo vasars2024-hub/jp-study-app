@@ -1456,6 +1456,22 @@ export default function MangaReader({ item, onClose }: Props) {
           <div className="ocr-toolbar">
             {engineReady ? (
               <>
+                {/*
+                  THREE GROUPS, not one flat row — rubric category 5 Q4. This toolbar put
+                  eleven controls on screen at once and mixed three unrelated jobs: how the
+                  overlay is displayed, what to run over the WHOLE volume, and the drawing
+                  tools for one page. What stays in the open is the pair a reader reaches
+                  for on the page in front of them: translate it, and show or hide the
+                  result. Nothing is removed and nothing moves surface — every control is
+                  in the same panel, one click further in.
+
+                  In flow rather than floating, unlike the toolbar's own overflow: this is
+                  a vertical inspector with room to grow, so an open group pushes the panel
+                  down instead of covering the page it is describing.
+                */}
+                <details className="manga-ocr-group">
+                  <summary>{t('manga.ocr.groupOptions')}</summary>
+                  <div className="manga-ocr-group-body">
                 <label className="ocr-check muted">
                   <input type="checkbox" checked={showSfx} onChange={(e) => setShowSfx(e.target.checked)} />
                   {t('manga.ocr.showSfx')}
@@ -1492,6 +1508,8 @@ export default function MangaReader({ item, onClose }: Props) {
                     ))}
                   </select>
                 </label>
+                  </div>
+                </details>
                 <button
                   className="btn small"
                   disabled={!!translatePageWhy}
@@ -1515,6 +1533,9 @@ export default function MangaReader({ item, onClose }: Props) {
                     {showTranslated ? t('manga.translate.hide') : t('manga.translate.show')}
                   </span>
                 </button>
+                <details className="manga-ocr-group">
+                  <summary>{t('manga.ocr.groupVolume')}</summary>
+                  <div className="manga-ocr-group-body">
                 {volumeBusy ? (
                   <button className="btn small" onClick={cancelVolumeAnalyze}>
                     {t('manga.ocr.volumeCancel')}
@@ -1622,6 +1643,11 @@ export default function MangaReader({ item, onClose }: Props) {
                     </span>
                   </div>
                 </div>
+                  </div>
+                </details>
+                <details className="manga-ocr-group">
+                  <summary>{t('manga.ocr.groupPageTools')}</summary>
+                  <div className="manga-ocr-group-body">
                 <button
                   className={`btn small${handwritingOpen ? ' active' : ''}`}
                   onClick={() => setHandwritingOpen((v) => !v)}
@@ -1643,6 +1669,8 @@ export default function MangaReader({ item, onClose }: Props) {
                 >
                   {ocrStatus === 'scanning' ? t('manga.ocr.scanning') : t('manga.ocr.rescan')}
                 </button>
+                  </div>
+                </details>
               </>
             ) : (
               <>
@@ -1815,22 +1843,6 @@ export default function MangaReader({ item, onClose }: Props) {
               {pages.length ? (scrub ?? idx) + 1 : 0} / {pages.length}
             </span>
           )}
-          <div className="sp-stepper">
-            <button className="btn small" onClick={() => bumpZoom(-0.15)} disabled={zoom <= ZOOM_MIN}>
-              −
-            </button>
-            <span className="sp-value">{Math.round(zoom * 100)}%</span>
-            <button className="btn small" onClick={() => bumpZoom(0.15)} disabled={zoom >= ZOOM_MAX}>
-              +
-            </button>
-          </div>
-          <button
-            className="btn small"
-            title={t('manga.settings.open')}
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Icon name="settings" size={13} />
-          </button>
           {ocrOpen && mokuroPage && (
             <MangaViewModeSwitcher
               value={viewMode}
@@ -1841,10 +1853,19 @@ export default function MangaReader({ item, onClose }: Props) {
             />
           )}
           <button
-            className={`btn manga-ocr-toggle${ocrOpen ? ' active' : ''}`}
+            className={`btn primary manga-ocr-toggle${ocrOpen ? ' active' : ''}`}
             // A toggle, so it reports its state: without `aria-pressed` the only
             // signal that the panel is open is a colour, and the only stable
             // handle on this control was a localised `title`.
+            //
+            // AND THE SURFACE'S DECLARED PRIMARY. The only control this reader marked
+            // `primary` used to be "OCR and translate every page" inside the OCR panel —
+            // a whole-volume batch job, which is not what a reader's dominant task is,
+            // and it disappeared the moment that batch group was tucked away. Scanning
+            // the page in front of you is the entry point here, and it is present whether
+            // or not the panel is open. `.btn.active`'s tint is painted after
+            // `.btn.primary`, so the accent edge shows only in the closed state and the
+            // open state looks exactly as it did.
             aria-pressed={ocrOpen}
             title={t('manga.ocr.scanTitle')}
             disabled={!pages.length}
@@ -1860,18 +1881,51 @@ export default function MangaReader({ item, onClose }: Props) {
             <Icon name="search" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
             {t('manga.ocr.scan')}
           </button>
-          <button
-            className="btn"
-            title={t('manga.lens.captureTitle')}
-            disabled={!pages.length}
-            onClick={() => void captureWithLens()}
-          >
-            <Icon name="eye" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-            {t('manga.lens.capture')}
-          </button>
           {presentation.presentable && (
+            /* Stays in the open, deliberately. It is the route back to a conventional
+               window, and the plan's reversibility clause is only worth anything if the
+               way back is visible; a toggle whose pressed state you must open a menu to
+               read is a toggle you cannot read. Same call the Immersion pass made. */
             <ReaderLiquidToggle liquid={presentation.liquid} onToggle={presentation.toggle} />
           )}
+          {/* Zoom, settings and the lens are ADJUSTMENTS, not the reading task, so they
+              move behind one disclosure. Transport stays in the open in both rows — the
+              page zones, the scrubber and the first/last jumps — which is the line the
+              Immersion pass drew and the one this reader is measured against.
+
+              The zoom readout travels with its own stepper rather than being left behind
+              as a number with nothing to change it. The tucked entries get TEXT labels:
+              the settings control was icon-only, which is legible in a row where position
+              carries meaning and illegible in a vertical list where it does not. */}
+          <details className="lq-overflow">
+            <summary className="btn small lq-overflow-summary" title={t('manga.toolbar.more')}>
+              {t('manga.toolbar.more')}
+            </summary>
+            <div className="lq-overflow-body">
+              <div className="sp-stepper">
+                <button className="btn small" onClick={() => bumpZoom(-0.15)} disabled={zoom <= ZOOM_MIN}>
+                  −
+                </button>
+                <span className="sp-value">{Math.round(zoom * 100)}%</span>
+                <button className="btn small" onClick={() => bumpZoom(0.15)} disabled={zoom >= ZOOM_MAX}>
+                  +
+                </button>
+              </div>
+              <button className="btn small" onClick={() => setSettingsOpen(true)}>
+                <Icon name="settings" size={13} />
+                {t('manga.settings.open')}
+              </button>
+              <button
+                className="btn small"
+                title={t('manga.lens.captureTitle')}
+                disabled={!pages.length}
+                onClick={() => void captureWithLens()}
+              >
+                <Icon name="eye" size={13} />
+                {t('manga.lens.capture')}
+              </button>
+            </div>
+          </details>
         </div>
       </ContextualSurface>
       <ReadingCanvas
