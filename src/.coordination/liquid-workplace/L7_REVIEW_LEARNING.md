@@ -305,3 +305,21 @@ failing of 161; targets `belowFloorByHit` **0**, stolen 0, occluded 0, smallest 
 Control (`--control`): all five terms moved — contrast 0→1, rect under-32 5→7, 2.5.8 0→2, keyboard
 0→1, `belowFloorByHit` **0→2** — and all five returned to baseline, rectDrift 0. Not a self-passing
 probe. `baselines/cat1-l7-anki{,-control}.json`.
+
+## 2026-08-27 08:40 EDT — Anki category 2 PASS 10/10 on the workbench entry path
+
+Dominant task: open Deck Workbench from the disconnected Anki surface. It is the one action that
+reveals the entire agent-reachable half without requiring AnkiConnect; the end-state inventory
+therefore covers the workbench's loaded source rail and saved sessions, not an empty launcher.
+
+Standard: **1 click**, worst renderer-received acknowledgement **11.8 ms**, dead ends **0**, modal
+traps **0**, scroll traps **0**. Liquid: the same **1 click**, **11.7 ms**, no dead end. The window
+returned byte-for-byte to Standard geometry **820x580**, and closing the disclosure restored the
+surface-state hash. Cost parity is **1 <= 1**. Control moved all three terms exactly: dead end,
+modal trap and scroll trap **0/0/0 -> 1/1/1 -> 0/0/0**. **PASS 10/10.** Evidence:
+`baselines/cat2-l7-anki.json`; no harness or product change was needed.
+
+One refused attempt is not hidden: selecting the fourth source after opening resolved below the
+viewport and correctly refused as occluded. The scored task stops at the fully-loaded workbench;
+the category's scroll-trap inventory measures that state, while source import belongs to its own
+functional gates and is not manufactured through an off-screen synthetic click.
