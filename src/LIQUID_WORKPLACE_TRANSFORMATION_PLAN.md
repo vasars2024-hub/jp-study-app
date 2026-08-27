@@ -868,6 +868,14 @@ nested folder delete pseudo-button with sibling native controls. The same harnes
 instruments for Anki onward; no Flashcards-only probe was added. Full evidence: L7 log and
 `cat1-l7-flashcards.json` / `cat3-l7-flashcards.json`.
 
+**Progress 2026-08-26 — Flashcards category 2 is 10/10; category 4 remains 0.** Switching EPUB →
+Dictionary costs **1 click** in both presentations, with **0** dead ends/traps, **12.1ms** worst
+renderer acknowledgement, and state hash `1hrek7n` restored; its control moved all three defect
+counts and restored them. Category 4's single repair pass removed the nested horizontal scroller at
+default/maximized, compact clipping **3 → 0**, and compact hidden-overflow owners **19 → 1**. It is
+still a measured FAIL: `.flash-group` is **180 > 174px** at compact, and dominant-content share falls
+**13.0% → 6.8%** when maximized. Resume those two residuals with the same harness next turn.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

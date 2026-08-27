@@ -1,0 +1,163 @@
+{
+  "label": "l7-flashcards",
+  "surface": "Flashcards",
+  "win": "(focused)",
+  "task": "click:.flash-tabs > .flash-tab:nth-child(2) >> wait:300",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 342,
+    "controlCount": 99,
+    "box": "820x580",
+    "results": 32
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      12.1
+    ],
+    "inputRecv": [],
+    "worstRecv": 12.1,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      47.3
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 47.3
+  },
+  "steps": [
+    {
+      "step": "click:.flash-tabs > .flash-tab:nth-child(2)",
+      "target": {
+        "sel": ".flash-tabs > .flash-tab:nth-child(2)",
+        "label": "Dictionary (1)",
+        "disabled": false,
+        "at": "313,283"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": true,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:300",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.flash-tabs > .flash-tab:nth-child(1) >> wait:300",
+    "steps": [
+      "click:.flash-tabs > .flash-tab:nth-child(1)",
+      "wait:300"
+    ],
+    "restored": true,
+    "baseHash": "1hrek7n",
+    "afterHash": "1hrek7n",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "1hrek7n",
+      "after": "1hrek7n"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 12.1
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 8.6
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        22
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      4.7
+    ]
+  }
+}

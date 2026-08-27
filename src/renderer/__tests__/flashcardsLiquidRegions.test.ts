@@ -58,5 +58,7 @@ describe('Flashcards Liquid regions', () => {
     expect(CONTROL_STYLES).toContain('.flash-view .flash-row-x');
     expect(CONTROL_STYLES).toMatch(/min-height:\s*32px/);
     expect(CONTROL_STYLES).toMatch(/min-width:\s*32px/);
+    expect(CONTROL_STYLES).toMatch(/\.flash-view \.flash-strip \{[\s\S]*display:\s*grid/);
+    expect(CONTROL_STYLES).toMatch(/@container \(max-width: 420px\)/);
   });
 });

@@ -59,3 +59,64 @@
   padding: 0;
   border-radius: 999px;
 }
+
+/* The recent-card preview is content, not navigation. Let it reflow with the window instead of
+   creating a second horizontal scroll axis inside the vertically scrolling work surface. */
+.flash-view .flash-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+.flash-view .flash-strip-card {
+  min-width: 0;
+}
+
+.flash-view,
+.flash-view .flash-row,
+.flash-view .flash-group,
+.flash-view .flash-review-setup-grid > * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.flash-view {
+  container-type: inline-size;
+}
+
+@container (max-width: 420px) {
+  .flash-view .view-head .actions,
+  .flash-view .flash-tabs,
+  .flash-view .flash-group-head-row,
+  .flash-view .flash-row {
+    flex-wrap: wrap;
+  }
+
+  .flash-view .view-head .actions,
+  .flash-view .flash-review-setup-grid,
+  .flash-view .flash-group-head-toggle,
+  .flash-view .flash-group-head-actions,
+  .flash-view .flash-row-main,
+  .flash-view .flash-row-actions {
+    width: 100%;
+  }
+
+  .flash-view .flash-review-setup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flash-view .flash-group-head-actions,
+  .flash-view .flash-row-actions {
+    padding: 0 8px 8px;
+  }
+
+  .flash-view .flash-search {
+    min-width: 0;
+  }
+
+  .flash-view .flash-search-input {
+    width: 100%;
+    min-width: 0;
+  }
+}

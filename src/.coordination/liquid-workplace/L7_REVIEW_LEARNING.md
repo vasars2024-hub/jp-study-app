@@ -42,3 +42,16 @@ effective targets and the adjacent remove failure fell **1 → 0**. Review geome
 Harness repairs, each one attempt: category 1 now preserves alpha while compositing translucent
 ancestor stacks (the old code stopped before the opaque card); category 3 treats `style=null` and
 React's equivalent empty style attribute as the same restored state. Focused guard: **4/4**.
+
+## 2026-08-26 23:29 EDT — Flashcards category 2 passes; category 4 stays open
+
+Category 2 is **PASS 10/10**: EPUB → Dictionary cost **1 click** in both Standard and Liquid,
+**0** dead ends, modal traps, scroll traps, or acknowledgements over 100ms; worst renderer latency
+**12.1ms**. Undo restored state hash `1hrek7n`; the control moved **0,0,0 → 1,1,22 → 0,0,0**.
+
+Category 4 is **FAIL / 0**, after the one repair pass allowed this turn. Reflowing the 24-card
+preview as a grid removed the horizontal scroller at default and maximized sizes; container-query
+layout changed compact clipping **3 → 0** and hidden-overflow owners **19 → 1**. Exact remainder:
+compact `.flash-group` is **180 > 174px**, and dominant content falls **13.0% → 6.8%** when maximized.
+The negative clip control moved **0 → 1 → 0** and all three size legs restored geometry. Next turn
+opens by resolving those two measured residuals with this same category-4 harness, not a new probe.
