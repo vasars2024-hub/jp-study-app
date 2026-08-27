@@ -828,6 +828,16 @@ close toggle, because the column is currently always visible. Deferred this turn
 OWNERSHIP, not on a decision: `VisualNovelPanel.tsx` carries another track's large uncommitted
 i18n rewrite. Full measurement in the L6 log's last section.
 
+**L6 Gate CLOSED 2026-08-26 — 48 of 48 rubric cells, six surfaces × eight categories**
+(checkpoint containing this entry). The final two cells were category 7 on the two root readers.
+The existing runner now selects its gesture mechanism from the DOM: a root inside `.fwin` uses
+the titled frame; a root with no frame uses pointer-only drag plus debug-bridge `/bounds` resize,
+with exact content-size restoration. Manga: drag/resize/theme p95 **16.9/16.8/16.9 ms**, heavy
+page-through main max **10.1 ms**, jank control **12** frames over 100 ms against the session's
+2-frame compositor floor. Novels: **16.9/16.9/16.9 ms**, rendered-volume scroll max **8.5 ms**,
+control **12 vs 0**. Both bounds round trips returned **1264×821**; exact manga and EPUB progress
+records were restored. Full evidence: `L6_READING_ECOSYSTEM.md` and `cat7-*-perf.json`.
+
 ### L7 — Review and learning loop
 
 Order: Flashcards → Anki → Notebook → Statistics → Calendar → Games.

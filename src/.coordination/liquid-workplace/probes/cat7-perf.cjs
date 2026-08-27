@@ -36,9 +36,10 @@
  *     `/mem`'s `uptimeSec` is recorded and a process still inside its first two minutes
  *     REFUSES — post-boot settling reads as a resize cost (L0's own 475.3 ms row).
  *
- * The surface's window must already be open; this runner measures, it does not navigate.
- * It refuses if no visible `.fwin` matches the spec's title, so a missing window can never
- * score as a fast one.
+ * The surface must already be open; this runner measures, it does not navigate. A spec root
+ * inside `.fwin` is scoped by title. A root with no `.fwin` ancestor is the OS window itself
+ * and uses the interaction probe's `-Root` branch. Either way, a missing root refuses so an
+ * absent surface can never score as a fast one.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface captures
@@ -118,17 +119,13 @@ const SPECS = {
   },
   novels: {
     title: 'Novels',
-    // The Novels window opens on the SHELF (`.nov-view`, a `jiten-table-wrap` of book rows),
-    // not on a rendered book -- `.novel-scroller` only exists once a volume is open. Rooting
-    // at `.novel-scroller` made the runner refuse, which was the runner behaving correctly on
-    // a spec that named a surface the window does not show.
-    root: '.nov-view',
-    heavy: { label: 'scroll the whole novel shelf', durationMs: 2500, js: scrollAll('.nov-view') },
-    collection: { container: '.nov-view', row: '.jiten-row' },
-    // NOT a complete category-7 cell on its own: the READER (`.novel-scroller`) is the heavy
-    // half of this surface and needs a volume open, which writes reading progress. Score the
-    // reader in the same run before calling Novels a 10.
-    partial: 'reader leg (.novel-scroller) not covered',
+    // The shelf was deliberately partial: it does not exercise the app's heaviest path. The
+    // complete cell opens a real volume, captures its progress, and restores it after this run.
+    // `.novel-scroller` has no `.fwin` ancestor because the reader replaces the desktop shell,
+    // so the runner selects the root-window gesture path from the DOM fact above.
+    root: '.novel-scroller',
+    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller') },
+    collection: { container: '.novel-scroller', row: '.novel-content p' },
   },
   manga: {
     title: 'Manga',
@@ -259,14 +256,17 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       matched: mine.length,
       matchedElements: mine.reduce(function(n, w){ return n + 1 + w.querySelectorAll('*').length; }, 0),
       rootPresent: !!root,
+      rootInFwin: !!(root && root.closest('.fwin')),
+      rootElements: root ? 1 + root.querySelectorAll('*').length : 0,
     });
   })()`));
-  if (found.matched === 0) {
+  if (!found.rootPresent) {
+    throw new Error(`REFUSE - structural root ${spec.root} is absent, so the requested surface is not on screen.`);
+  }
+  if (found.rootInFwin && found.matched === 0) {
     throw new Error(`REFUSE - no visible .fwin titled "${spec.title}". Open the surface first; a missing window measures as a fast one. Visible: ${JSON.stringify(found.titles)}`);
   }
-  if (!found.rootPresent) {
-    throw new Error(`REFUSE - the window titled "${spec.title}" is open but its structural root ${spec.root} is absent, so the surface is not the one on screen.`);
-  }
+  const interactionScope = found.rootInFwin ? ['-Title', spec.title] : ['-Root', spec.root];
 
   const step = (s) => process.stderr.write(`[cat7] ${s}\n`);
   const legs = {};
@@ -319,12 +319,12 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     || r.frames_over_100 > ceilingOver100 || r.main_max_ms > L0.mainBlockBarMs;
   for (const g of ['drag', 'resize', 'theme']) {
     step(g);
-    const runs = [ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson'])];
+    const runs = [ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson'])];
     step(`${g} (repeat)`);
-    runs.push(ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson']));
+    runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
     if (breaches(runs[0]) !== breaches(runs[1])) {
       step(`${g} (tie-break)`);
-      runs.push(ps(IPROBE, ['-Interaction', g, '-Title', spec.title, '-AsJson']));
+      runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
     }
     const bad = runs.filter(breaches).length;
     // Score the reading the majority agrees with, so the reported numbers are a real run and
@@ -360,7 +360,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
 
   // --- 6. the sensitivity control, when asked for -----------------------------------
   if (has('jank')) step('drag CONTROL (-Jank)');
-  if (has('jank')) legs.dragJank = ps(IPROBE, ['-Interaction', 'drag', '-Title', spec.title, '-Jank', '-AsJson']);
+  if (has('jank')) legs.dragJank = ps(IPROBE, ['-Interaction', 'drag', ...interactionScope, '-Jank', '-AsJson']);
 
   const memAfter = await get('/mem');
 
@@ -404,7 +404,13 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     surface: SURFACE, title: spec.title, root: spec.root,
     at: new Date().toISOString(),
     scene: legs.drag ? legs.drag.scene_before : null,
-    surfaceWindow: { matched: found.matched, elements: found.matchedElements, deskWindows: found.windows, titles: found.titles },
+    surfaceWindow: {
+      mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
+      matched: found.matched,
+      elements: found.rootInFwin ? found.matchedElements : found.rootElements,
+      deskWindows: found.windows,
+      titles: found.titles,
+    },
     process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, mainRssMbBefore: mem.rssMb, mainRssMbAfter: memAfter.rssMb, mainHeapUsedMbAfter: memAfter.heapUsedMb },
     sessionCeiling: {
       p50: ceilingP50, p95: ceilingP95, frames: legs.ceiling.frames, runs: legs.ceilingRuns,

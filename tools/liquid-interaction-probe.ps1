@@ -62,6 +62,12 @@
   `title=` field in the gesture record is the only place that showed. Pass it whenever the score
   names a surface. The largest-area default is kept so previously recorded runs reproduce.
 
+.PARAMETER Root
+  CSS selector for a surface that replaces the desktop shell and therefore has no `.fwin` chrome.
+  Drag dispatches pointer events only on that root; resize drives the debug bridge's `/bounds`
+  route and restores the exact content size it reported before the gesture. `Root` is used only
+  by drag/resize. Do not pass it for a surface hosted inside a conventional `.fwin`.
+
 .EXAMPLE
   pwsh tools/liquid-interaction-probe.ps1 -Interaction ceiling
   pwsh tools/liquid-interaction-probe.ps1 -Interaction drag -Title Dictionary
@@ -75,6 +81,7 @@ param(
   [string]$Label = '',
   [string]$ThemeId = 'oled-black',
   [string]$Title = '',
+  [string]$Root = '',
   [switch]$AsJson,
   [string]$OutFile = ''
 )
@@ -158,9 +165,71 @@ $gestureJs = switch ($Interaction) {
 "@
   }
   default {
-    $sel = if ($Interaction -eq 'drag') { '.fwin-bar' } else { '.fwin-resize' }
-    $titleJs = ($Title | ConvertTo-Json -Compress)
-    @"
+    if ($Root) {
+      $rootJs = ($Root | ConvertTo-Json -Compress)
+      if ($Interaction -eq 'drag') {
+        @"
+(() => {
+  const ROOT = $rootJs;
+  const grip = document.querySelector(ROOT);
+  if (!grip) { window.__lip = { done: true, refuse: 'no root ' + ROOT }; return 'refused'; }
+  const gr = grip.getBoundingClientRect();
+  if (gr.width <= 0 || gr.height <= 0 || getComputedStyle(grip).display === 'none') {
+    window.__lip = { done: true, refuse: 'root is hidden or zero-sized: ' + ROOT };
+    return 'refused';
+  }
+  const sx = Math.round(gr.left + gr.width / 2), sy = Math.round(gr.top + gr.height / 2);
+  const before = { left: gr.left, top: gr.top, width: gr.width, height: gr.height };
+  const ev = (type, x, y) => grip.dispatchEvent(new PointerEvent(type, {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1,
+    pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, isPrimary: true }));
+  window.__lip = { done: false, root: ROOT, before: before, mechanism: 'pointer events on surface root' };
+  ev('pointerdown', sx, sy);
+  const N = 60, AMP = 48;
+  let i = 0;
+  const step = () => {
+    i += 1;
+    // The event path returns to its origin. Pointerup is intentional: mouseup would fire the
+    // readers' dictionary lookup, which is a different interaction and changes the scene.
+    const d = Math.round(AMP * Math.sin((i / N) * Math.PI));
+    ev('pointermove', sx + d, sy + Math.round(d * 0.25));
+    if (i < N) { requestAnimationFrame(step); return; }
+    ev('pointerup', sx, sy);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const ar = grip.getBoundingClientRect();
+      const after = { left: ar.left, top: ar.top, width: ar.width, height: ar.height };
+      window.__lip = { done: true, steps: N, amplitudePx: AMP, root: ROOT,
+        mechanism: 'pointer events on surface root', before: before, after: after,
+        closedLoop: before.left === after.left && before.top === after.top &&
+          before.width === after.width && before.height === after.height };
+    }));
+  };
+  requestAnimationFrame(step);
+  return 'root pointer gesture started';
+})()
+"@
+      } else {
+        @"
+(() => {
+  const ROOT = $rootJs;
+  const grip = document.querySelector(ROOT);
+  if (!grip) { window.__lip = { done: true, refuse: 'no root ' + ROOT }; return 'refused'; }
+  const gr = grip.getBoundingClientRect();
+  if (gr.width <= 0 || gr.height <= 0 || getComputedStyle(grip).display === 'none') {
+    window.__lip = { done: true, refuse: 'root is hidden or zero-sized: ' + ROOT };
+    return 'refused';
+  }
+  window.__lip = { done: false, root: ROOT,
+    beforeRect: { left: gr.left, top: gr.top, width: gr.width, height: gr.height },
+    mechanism: 'debug bridge /bounds on root OS window' };
+  return 'root resize awaiting bridge';
+})()
+"@
+      }
+    } else {
+      $sel = if ($Interaction -eq 'drag') { '.fwin-bar' } else { '.fwin-resize' }
+      $titleJs = ($Title | ConvertTo-Json -Compress)
+      @"
 (() => {
   const WANT = $titleJs;
   const wins = [...document.querySelectorAll('.fwin')].filter((w) => getComputedStyle(w).display !== 'none')
@@ -203,6 +272,7 @@ $gestureJs = switch ($Interaction) {
   return 'gesture started';
 })()
 "@
+    }
   }
 }
 
@@ -213,8 +283,11 @@ $gestureJs = switch ($Interaction) {
 # in the element count of the open windows, so a category-7 number quoted without its scene
 # is not a measurement of anything. Captured before AND after -- a scene that moved during
 # the gesture (a window opened, a route swapped) invalidates the comparison just as surely.
+$rootSceneJs = ($Root | ConvertTo-Json -Compress)
 $sceneJs = @"
 (() => {
+  const ROOT = $rootSceneJs;
+  const root = ROOT ? document.querySelector(ROOT) : null;
   const wins = [].slice.call(document.querySelectorAll('.fwin')).filter((w) => {
     const r = w.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
@@ -226,6 +299,8 @@ $sceneJs = @"
   return {
     fwins: wins.length,
     fwinElements: wins.reduce((n, w) => n + 1 + w.querySelectorAll('*').length, 0),
+    root: ROOT || null,
+    rootElements: root ? 1 + root.querySelectorAll('*').length : null,
     documentElements: document.querySelectorAll('*').length,
     titles: wins.map(t),
     theme: document.documentElement.getAttribute('data-theme'),
@@ -292,22 +367,71 @@ $json = @{ js = $gestureJs } | ConvertTo-Json -Compress
 $content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, 'application/json')
 $task = $client.PostAsync("$base/eval", $content)
 
+# A root reader has no `.fwin-resize`; its frame is the OS window itself. Capture the content
+# size from the same route that will drive it. This is also the restore source -- frame bounds
+# include borders and are not byte-comparable to BrowserWindow content size.
+$rootResizeBefore = $null
+$rootResizeRestored = $false
+$rootResizeSteps = 0
+if ($Root -and $Interaction -eq 'resize') {
+  $rootResizeBefore = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json' -TimeoutSec 60
+  if (-not ($rootResizeBefore.ok -and $rootResizeBefore.contentSize)) {
+    Write-Error "Root resize cannot read /bounds -- refusing a gesture that cannot be restored."
+  }
+  # Eval only installs the pending receipt and returns immediately. Wait for that receipt before
+  # the first OS resize so the scene cannot move ahead of its own measurement marker.
+  try { $null = $task.GetAwaiter().GetResult() } catch { Write-Error "Root resize setup failed: $_" }
+}
+
 # Sample for a wall-clock window that COVERS the gesture. A fixed sample count does not:
 # /eval returns the moment the gesture says "started", so the POST completing bounds
 # nothing, and 30 back-to-back samples are over in 60 ms -- a full second before the
 # gesture ends. The 15 ms gap keeps the probe from being the load it is measuring.
 $times = New-Object System.Collections.Generic.List[double]
 $span = [System.Diagnostics.Stopwatch]::StartNew()
-while ($span.Elapsed.TotalMilliseconds -lt $DurationMs) {
-  $sw = [System.Diagnostics.Stopwatch]::StartNew()
-  try { $null = Invoke-RestMethod -Uri "$base/health" -Headers $headers -TimeoutSec 60 } catch { }
-  $sw.Stop()
-  $times.Add($sw.Elapsed.TotalMilliseconds)
-  Start-Sleep -Milliseconds 15
+try {
+  while ($span.Elapsed.TotalMilliseconds -lt $DurationMs) {
+    if ($rootResizeBefore -and -not $rootResizeRestored) {
+      $progress = [Math]::Min(1, $span.Elapsed.TotalMilliseconds / 1300)
+      $d = [Math]::Round(140 * [Math]::Sin($progress * [Math]::PI))
+      $rw = [int]$rootResizeBefore.contentSize.width + [int]$d
+      $rh = [int]$rootResizeBefore.contentSize.height + [int][Math]::Round($d * 0.5)
+      $rb = @{ width = $rw; height = $rh } | ConvertTo-Json -Compress
+      $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $rb -ContentType 'application/json' -TimeoutSec 60
+      $rootResizeSteps += 1
+      if ($progress -ge 1) {
+        $restore = @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height } | ConvertTo-Json -Compress
+        $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $restore -ContentType 'application/json' -TimeoutSec 60
+        $rootResizeRestored = $true
+      }
+    }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    try { $null = Invoke-RestMethod -Uri "$base/health" -Headers $headers -TimeoutSec 60 } catch { }
+    $sw.Stop()
+    $times.Add($sw.Elapsed.TotalMilliseconds)
+    Start-Sleep -Milliseconds 15
+  }
+} finally {
+  if ($rootResizeBefore -and -not $rootResizeRestored) {
+    $restore = @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height } | ConvertTo-Json -Compress
+    $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $restore -ContentType 'application/json' -TimeoutSec 60
+    $rootResizeRestored = $true
+  }
 }
 $span.Stop()
-try { $null = $task.GetAwaiter().GetResult() } catch { }
+if (-not $rootResizeBefore) { try { $null = $task.GetAwaiter().GetResult() } catch { } }
 $client.Dispose()
+
+if ($rootResizeBefore) {
+  $rootResizeAfter = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json' -TimeoutSec 60
+  $bw = [int]$rootResizeBefore.contentSize.width
+  $bh = [int]$rootResizeBefore.contentSize.height
+  $aw = [int]$rootResizeAfter.contentSize.width
+  $ah = [int]$rootResizeAfter.contentSize.height
+  $closed = ($bw -eq $aw -and $bh -eq $ah)
+  $closedJs = $closed.ToString().ToLowerInvariant()
+  $null = Invoke-Eval "(() => { const prior = window.__lip || {}; window.__lip = { done: true, root: prior.root, mechanism: prior.mechanism, steps: $rootResizeSteps, amplitudePx: 140, before: { width: $bw, height: $bh }, after: { width: $aw, height: $ah }, closedLoop: $closedJs }; return 'root resize complete'; })()"
+}
 
 # The gesture drives itself over rAF; wait for it rather than guessing a sleep.
 $state = $null
@@ -358,9 +482,10 @@ $record = [pscustomobject]@{
   interaction     = $Interaction + $(if ($Jank) { ' (CONTROL: 120 ms renderer blocks)' } else { '' })
   label           = if ($Label) { $Label } else { $Interaction }
   title           = if ($Title) { $Title } else { $null }
+  root            = if ($Root) { $Root } else { $null }
   scene_before    = $sceneBefore
   scene_after     = $sceneAfter
-  scene_stable    = ($sceneBefore.fwins -eq $sceneAfter.fwins -and $sceneBefore.fwinElements -eq $sceneAfter.fwinElements)
+  scene_stable    = ($sceneBefore.fwins -eq $sceneAfter.fwins -and $sceneBefore.fwinElements -eq $sceneAfter.fwinElements -and $sceneBefore.rootElements -eq $sceneAfter.rootElements)
   stale_recorder  = $staleRecorder
   gesture         = $state
   jank_blocks     = $jankBlocks

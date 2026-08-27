@@ -1803,3 +1803,25 @@ frames over 100 vs 0.
 
 **Board 43 → 46 of 48.** The two left are category 7 on manga and Novels, both chromeless: the
 gesture legs still require `.fwin-bar` / `.fwin-resize`, which neither surface has.
+
+## 2026-08-26 23:06 EDT — category 7 closes Manga, Novels, and the L6 Gate
+
+**Board 46 → 48 of 48; L6 Gate CLOSED.** One category-7 runner, six surfaces, all eight categories.
+The final refusal was structural: Manga and a rendered Novel replace the desktop shell, so both
+have zero `.fwin` nodes and no `.fwin-bar`/`.fwin-resize` to drive. The existing interaction
+instrument now accepts `-Root`: drag is a closed-loop pointer-only gesture on that root (no
+`mouseup`, which would fire dictionary lookup), and resize drives `/bounds` from a captured content
+size and restores it in `finally`. The runner chooses title versus root from `root.closest('.fwin')`.
+
+| surface | scene | drag / resize / theme p95 ms | heavy load | main RSS | control | score |
+| --- | --- | --- | --- | --- | --- | --- |
+| manga | root, 79 el | 16.9 / 16.8 / 16.9 | 13 real page advances, 3,004 ms, max 10.1 ms | 393.9 → 376.2 MB | 12 over-100 vs ceiling floor 2 | **10/10** |
+| novels | root, 299 el | 16.9 / 16.9 / 16.9 | rendered volume scroll, 3,007 ms, max 8.5 ms | 385.4 → 383.2 MB | 12 over-100 vs clean 0 | **10/10** |
+
+Both drag roots and both OS-size loops were byte-stable: root boxes unchanged and `/bounds`
+**1264×821 → 1264×821**. Manga's compositor control itself stalled once (2 frames over 100 ms,
+max 1,738.3 ms); it is disclosed in the baseline and sets the environment floor, not attributed
+to the product. Novels' three ceiling readings were clean. Manga progress restored exactly to
+`page: 8, percent: 0.47058823529411764`; EPUB progress restored to `p:7:0.0000` / 0.018150477069120395.
+Desk returned to one Immersion window, `forest-night`, 1264×821. Baselines:
+`cat7-manga-perf.json`, `cat7-novels-perf.json`. Checkpoint contains this entry.
