@@ -398,3 +398,16 @@ five terms moved/restored); category 2 **10/10** (one click in Standard and Liqu
 scroll traps); category 3 **10/10** (0 dense Work on glass, 3/3 contextual/shared); category 4
 **10/10**; category 5 **10/10**; category 6 **8/8 = 8/8**, 0 round-trip diffs, all eight mutation
 rows fell alone and restored. Notebook is **60/80**; categories 7 and 8 remain.
+
+## 2026-08-27 13:40 EDT — Notebook category 8 PASS 10/10 after one clean restart
+
+The pre-restart title-based language run was invalid: the shell title translated while a stale
+hot-reload module graph left the body in English. After restarting only this worker's Forge tree,
+the title form correctly refused at Japanese because `Notebook` itself had translated; the stable
+surface selector `@.gx-notebook` is the parameter the shared harness already accepts.
+
+Fresh-process score: raw keys **0**, placeholders **0**, unexplained disabled pairs **0**; the one
+observable empty state is named **1/1**. English/Japanese/Chinese/Russian produced **4 distinct**
+text hashes across **2,056** text runs each, with max raw keys **0**. Language restored exactly
+`en → en`. Control moved raw keys/placeholders/mute pairs **0/0/0 → 1/1/1 → 0/0/0**. Notebook is
+**70/80**; category 7 remains. Evidence: `baselines/cat8-l7-notebook.json`.

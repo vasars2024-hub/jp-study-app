@@ -932,6 +932,11 @@ controls to scan **36→10** behind one disclosure. Regression runs caught and r
 disclosure squeezing the timeline and one compact horizontal scroller (**286>202→0**). Categories
 7 and 8 remain. Evidence: `L7_REVIEW_LEARNING.md`, `cat{1..6}-l7-notebook*.json`.
 
+**Progress 2026-08-27 (category 8) — Notebook is 70/80.** Honest states pass with raw keys,
+placeholders, and unexplained disabled pairs all **0**; the one observable state is named **1/1**.
+Four locales produced four distinct text hashes and restored English exactly; the control moved
+all three defect terms **0→1→0**. Only category 7 remains.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
