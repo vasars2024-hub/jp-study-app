@@ -106,6 +106,7 @@
   const capState = specState('__LQP_CAP_ORIG');
   const novelState = specState('__LQP_NOVEL_ORIG');
   const mangaState = specState('__LQP_MANGA_ORIG');
+  const vnState = specState('__LQP_VN_ORIG');
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -1119,6 +1120,9 @@
     immersion: {
       titleRe: /Immersion|没入|イマー|浸入|Погруж/i,
       rootSel: '.immersion-root',
+      // The VN library mounts inside this very root, so without this the browser
+      // scores 2/7 whenever the library is up. See `findWin`.
+      notSel: '.visual-novel-panel',
       features: [
         {
           // The address bar shows the page that is actually loaded. This is also what
@@ -1649,6 +1653,234 @@
         ),
       },
     },
+
+    /**
+     * VISUAL NOVELS — the sixth L6 surface, and the first one that shares a window
+     * and a TITLE with another app in this file. The panel does not open beside
+     * Immersion; it REPLACES the browser inside Immersion's own `.fwin`, so
+     * `titleRe` here is deliberately Immersion's (it is what `raise()` needs to
+     * find the taskbar button) and `rootSel` is the only thing that says which of
+     * the two is actually mounted. `findWin` was tightened for this — see there.
+     *
+     * Every row cross-checks two places that must agree, because presence scoring
+     * on this surface is nearly free: the panel renders its whole workspace, forms
+     * and all, from one selected entry, so "the control exists" is true of a
+     * library that is showing the WRONG title's data.
+     *
+     * SAFETY, and it is why this spec drives nothing that writes: the library is
+     * the user's real one. `select` clicks an entry (local state), `kind` picks a
+     * capture kind (a form field), and the two lying mutations move a `<select>`
+     * WITHOUT pressing the Save button beside it — verified live 2026-08-26, the
+     * status editor is a pure form until `Save progress` is clicked. Nothing here
+     * launches, adds, removes, analyses or exports.
+     */
+    vn: {
+      titleRe: /Immersion|没入|イマー|浸入|Погруж/i,
+      rootSel: '.visual-novel-panel',
+      features: [
+        {
+          // The list itself, and the two ways it claims a selection. `aria-current`
+          // is the accessible one and `.is-selected` is the painted one; a row that
+          // is highlighted for the mouse and invisible to a screen reader is the
+          // defect this cross-check exists for, and it is what `7e853346` fixed.
+          id: 'libraryList',
+          f: (w) => {
+            const rows = qa(w, '.visual-novel-entry');
+            const whole = rows.filter((r) => q(r, 'strong') && q(r, 'span')).length;
+            const current = rows.filter((r) => r.getAttribute('aria-current') === 'true');
+            const marked = rows.filter((r) => r.classList.contains('is-selected'));
+            return {
+              ok: rows.length > 0 && whole === rows.length
+                && current.length === 1 && marked.length === current.length,
+              ev: `entries=${rows.length} complete=${whole} ariaCurrent=${current.length} isSelected=${marked.length}`,
+            };
+          },
+        },
+        {
+          // Stale detail, VN form. The workspace is rendered from ONE entry, so a
+          // summary that names a different title than the highlighted row means the
+          // whole right-hand column — capture, progress, routes, community — is
+          // editing something the user did not pick. A count of panels sees nothing.
+          id: 'selectedDetail',
+          f: (w) => {
+            const sel = qa(w, '.visual-novel-entry').find((r) => r.classList.contains('is-selected'));
+            const rowTitle = sel ? txt(q(sel, 'strong')) : null;
+            const head = txt(q(w, '.visual-novel-summary-title strong'));
+            const actions = qa(w, '.visual-novel-summary-actions button').length;
+            return {
+              ok: !!rowTitle && rowTitle === head && actions >= 2,
+              ev: `row="${rowTitle}" summary="${head}" summaryActions=${actions}`,
+            };
+          },
+        },
+        {
+          // The capture composer, scored STRUCTURALLY on purpose: every other row in
+          // this file that matched a button by its English text had to grow a
+          // four-language regex, and these three labels are catalogue keys. Five
+          // line kinds, both text areas and three actions is the composer; anything
+          // less is a form that cannot produce a card.
+          id: 'captureComposer',
+          f: (w) => {
+            const kind = q(w, '.visual-novel-capture select');
+            const kinds = kind ? qa(kind, 'option').length : 0;
+            const areas = qa(w, '.visual-novel-capture textarea').length;
+            const actions = qa(w, '.visual-novel-capture-actions button').length;
+            return {
+              ok: kinds >= 5 && areas >= 2 && actions >= 3,
+              ev: `lineKinds=${kinds} textareas=${areas} actions=${actions}`,
+            };
+          },
+        },
+        {
+          // The analysis button NAMES its scope ("Analyze Entire visual novel"), so
+          // the label and the select are one claim in two places. A button that says
+          // one scope and runs another is unfalsifiable from the UI, which is why the
+          // mutation below moves the select behind React's back rather than deleting it.
+          id: 'analysisScope',
+          f: (w) => {
+            const sel = q(w, '.visual-novel-analysis-actions select');
+            const btns = qa(w, '.visual-novel-analysis-actions button');
+            const label = sel && sel.selectedOptions[0] ? txt(sel.selectedOptions[0]) : null;
+            const primary = btns[0];
+            const names = !!primary && !!label && txt(primary).indexOf(label) >= 0;
+            return {
+              ok: !!sel && qa(sel, 'option').length >= 4 && btns.length >= 3 && names,
+              ev: `scopes=${sel ? qa(sel, 'option').length : 0} selected="${label}" primary="${primary ? txt(primary) : 'none'}" namesScope=${names}`,
+            };
+          },
+        },
+        {
+          // Reading status is shown twice — as the editor's `<select>` and inside the
+          // library row's meta line — and the editor is initialised from the saved
+          // entry. They agree or the editor is showing state the library has not got.
+          id: 'progressState',
+          f: (w) => {
+            const sel = q(w, '.visual-novel-progress select');
+            const opt = sel && sel.selectedOptions[0] ? txt(sel.selectedOptions[0]) : null;
+            const row = qa(w, '.visual-novel-entry').find((r) => r.classList.contains('is-selected'));
+            const meta = row ? txt(q(row, 'span')) : '';
+            return {
+              ok: !!opt && meta.indexOf(opt) >= 0,
+              ev: `editor="${opt}" libraryMeta="${meta}"`,
+            };
+          },
+        },
+        {
+          // Reversibility: the library is a docked reading tool with a real toggle in
+          // the panel head, and the toggle owes a boolean that agrees with whether the
+          // tool is mounted. Same shape as Immersion's `railReversibility`.
+          id: 'libraryReversibility',
+          f: (w) => {
+            const tg = qa(w, '.visual-novel-panel-tools button')[0];
+            const pressed = tg ? tg.getAttribute('aria-pressed') : null;
+            const open = !!q(w, '[data-reading-tool="library"]');
+            return {
+              ok: !!tg && (pressed === 'true' || pressed === 'false') && (pressed === 'true') === open,
+              ev: `toggle=${!!tg} ariaPressed=${pressed} libraryMounted=${open}`,
+            };
+          },
+        },
+        { id: 'canvasPlacement', f: (w) => canvasPlacement(w) },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // REFUSES on an empty library rather than adding one: an entry this harness
+        // creates is a row in the user's own store, and `visual-novel:remove` is the
+        // only way back out. Idempotent — it clicks only when nothing is selected.
+        select: (w) => {
+          const rows = qa(w, '.visual-novel-entry');
+          if (!rows.length) return { refused: 'library is empty — add a title before scoring' };
+          const g = vnState();
+          const cur = rows.find((r) => r.classList.contains('is-selected'));
+          if (g.selected == null) g.selected = cur ? txt(q(cur, 'strong')) : '';
+          const want = cur || rows[0];
+          if (!want.classList.contains('is-selected')) want.click();
+          return { selected: txt(q(want, 'strong')), of: rows.length };
+        },
+        // The round trip's user state. The driver's generic `dirtyField` lands in the
+        // add form's title input, which is chrome; this is state inside the workspace
+        // the toggle actually re-renders.
+        kind: (w, name) => {
+          const sel = q(w, '.visual-novel-capture select');
+          if (!sel) return { refused: 'no capture composer' };
+          const want = String(name || 'narration');
+          if (!qa(sel, 'option').some((o) => o.value === want)) {
+            return { refused: `no "${want}" line kind — have ${qa(sel, 'option').map((o) => o.value).join(', ')}` };
+          }
+          const g = vnState();
+          if (g.kind == null) g.kind = sel.value;
+          pickSelect(sel, want);
+          return { kind: sel.value, was: g.kind };
+        },
+      },
+      drive: ['select', ['kind', 'narration']],
+      mutations: {
+        // `aria-current` only. `selectedDetail` and `progressState` deliberately
+        // resolve the selected row through `.is-selected` instead, so this falls
+        // exactly one row — the one whose whole content is that the two agree.
+        libraryList: (w) => stripAttr(
+          qa(w, '.visual-novel-entry').find((r) => r.getAttribute('aria-current') === 'true'),
+          'aria-current',
+          'no selected library row',
+        ),
+        selectedDetail: (w) => detach(q(w, '.visual-novel-summary-title strong'), 'no summary title'),
+        captureComposer: (w) => detach(q(w, '.visual-novel-capture select'), 'no capture composer'),
+        // A LIE, not a deletion. Moving `selectedIndex` without dispatching `change`
+        // leaves React's label on the old scope, so the select and the button now
+        // disagree — which is precisely what the row claims cannot happen. Deleting
+        // the select would only prove the row notices a missing element.
+        analysisScope: (w) => {
+          const sel = q(w, '.visual-novel-analysis-actions select');
+          if (!sel) return { refused: 'no analysis scope select' };
+          if (qa(sel, 'option').length < 2) return { refused: 'only one scope offered' };
+          const g = vnState();
+          if (g.scopeIndex == null) g.scopeIndex = sel.selectedIndex;
+          sel.selectedIndex = sel.selectedIndex === 0 ? 1 : 0;
+          return { mutated: `scope now reads "${txt(sel.selectedOptions[0])}" while the button still names the old one` };
+        },
+        // The same shape one level up: React DOES hear this one, so the editor
+        // honestly re-renders to a status the library row was never told about.
+        // Verified live that nothing is saved until `Save progress` is pressed.
+        progressState: (w) => {
+          const sel = q(w, '.visual-novel-progress select');
+          if (!sel) return { refused: 'no progress editor' };
+          const g = vnState();
+          if (g.status == null) g.status = sel.value;
+          const other = qa(sel, 'option').map((o) => o.value).find((v) => v && v !== sel.value);
+          if (!other) return { refused: 'only one reading status' };
+          pickSelect(sel, other);
+          return { mutated: `editor now says "${sel.value}" while the library row still says "${g.status}"` };
+        },
+        libraryReversibility: (w) => stripAttr(
+          qa(w, '.visual-novel-panel-tools button')[0],
+          'aria-pressed',
+          'no library toggle',
+        ),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+      undo: {
+        vn: (w) => {
+          const g = window.__LQP_VN_ORIG;
+          if (!g) return null;
+          const done = [];
+          const kindSel = q(w, '.visual-novel-capture select');
+          if (g.kind != null && kindSel && kindSel.value !== g.kind) { pickSelect(kindSel, g.kind); done.push('kind'); }
+          const statusSel = q(w, '.visual-novel-progress select');
+          if (g.status != null && statusSel && statusSel.value !== g.status) { pickSelect(statusSel, g.status); done.push('status'); }
+          const scopeSel = q(w, '.visual-novel-analysis-actions select');
+          if (g.scopeIndex != null && scopeSel && scopeSel.selectedIndex !== g.scopeIndex) {
+            scopeSel.selectedIndex = g.scopeIndex;
+            done.push('scope');
+          }
+          if (g.selected) {
+            const back = qa(w, '.visual-novel-entry').find((r) => txt(q(r, 'strong')) === g.selected);
+            if (back && !back.classList.contains('is-selected')) { back.click(); done.push('selection'); }
+          }
+          window.__LQP_VN_ORIG = null;
+          return done.length ? `vn:${done.join('+')}` : null;
+        },
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -1779,9 +2011,27 @@
     const wins = qa(document, '.fwin').filter(
       (w) => !pres || w.getAttribute('data-presentation') === pres,
     );
-    const byTitle = wins.find((w) => s.titleRe.test(txt(q(w, '.fwin-title-text'))));
+    // Trap 4, TIGHTENED 2026-08-26 for `vn`. Two apps can share one window AND one
+    // title: the visual-novel library replaces Immersion's browser inside
+    // Immersion's own `.fwin`, so a title-only match hands back that window
+    // whichever of the two is mounted — and then every row of the app that is NOT
+    // showing scores false. That is a fabricated regression where the honest answer
+    // is a refusal. When a spec declares a structural root, the title match has to
+    // carry it too. Strictly narrower: every other spec's `rootSel` is inside its
+    // own window whenever that app is up, so nothing already scored changes.
+    //
+    // `rootSel` alone is not enough here and it was measured, not assumed: the VN
+    // panel mounts INSIDE `.immersion-root`, so with the library up
+    // `check('immersion')` scored 2 of 7 — five browser rows reported as
+    // regressions on a browser that is simply not on screen. `notSel` is the
+    // other half: a selector whose presence means a different app owns this
+    // window. Only a spec that shares a window needs one.
+    const owns = (w) => (!s.rootSel || q(w, s.rootSel)) && !(s.notSel && q(w, s.notSel));
+    const byTitle = wins.find(
+      (w) => s.titleRe.test(txt(q(w, '.fwin-title-text'))) && owns(w),
+    );
     if (byTitle) return { win: byTitle, matchedBy: 'title', host: 'fwin' };
-    const byRoot = wins.find((w) => s.rootSel && q(w, s.rootSel));
+    const byRoot = wins.find((w) => s.rootSel && q(w, s.rootSel) && owns(w));
     if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: 'fwin' };
     // Trap 8, REVISED 2026-08-25 (`6c16653f`). A pop-out is no longer chromeless:
     // `.popout-root` now carries `data-presentation` and its bar carries

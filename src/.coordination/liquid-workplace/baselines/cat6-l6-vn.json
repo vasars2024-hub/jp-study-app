@@ -1,0 +1,156 @@
+{
+  "label": "l6-vn",
+  "app": "vn",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "select",
+      "result": "{\"selected\":\"Rubric Fixture VN\",\"of\":1}"
+    },
+    {
+      "step": "kind",
+      "result": "{\"kind\":\"narration\",\"was\":\"dialogue\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "8/8",
+    "liquid": "8/8",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "INPUT",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "libraryList",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-current stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "libraryList"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-current\",\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "selectedDetail",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "selectedDetail"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "captureComposer",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "captureComposer"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "analysisScope",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "scope now reads \"Current route\" while the button still names the old one",
+        "reachable": "7/8",
+        "fellRows": [
+          "analysisScope"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "progressState",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "editor now says \"reading\" while the library row still says \"planned\"",
+        "reachable": "7/8",
+        "fellRows": [
+          "progressState"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"vn:kind+status\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "libraryReversibility",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-pressed stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "libraryReversibility"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-pressed stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"vn:kind\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
