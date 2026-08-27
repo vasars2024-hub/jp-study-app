@@ -289,6 +289,12 @@ const metricTuple = (row) => [
   row.byRole && row.byRole.Work,
 ];
 
+// React may reconcile `style={}` as an empty style attribute while a control is settling.
+// That is byte-different at the attribute layer (`null` versus `""`) but materially identical:
+// both carry zero inline declarations. Keep meaningful inline styles strict while treating those
+// two empty representations as the same restored state.
+const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ? null : style);
+
 (async () => {
   const raised = await raise();
 
@@ -383,7 +389,7 @@ const metricTuple = (row) => [
           && dirtyAll.byRole.Work === base.byRole.Work;
         const returned = JSON.stringify(metricTuple(restored)) === JSON.stringify(metricTuple(base));
         const oneMaterialReturned = oneRestored.material === one.before.material
-          && oneRestored.style === one.before.style;
+          && normalizedInlineStyle(oneRestored.style) === normalizedInlineStyle(one.before.style);
         const allGlassReturned = !allRestored.styleStillMounted
           && allRestored.attribute === all.before;
         out.control = {

@@ -45,6 +45,7 @@ import DeckActionMenu from '../DeckActionMenu';
 import AiCardStudio from '../AiCardStudio';
 import CsvEditorPanel from '../CsvEditorPanel';
 import DeckImportPanel from '../DeckImportPanel';
+import './FlashcardsContent.css';
 import {
   createDeckFolder,
   deleteDeckFolder,
@@ -1503,9 +1504,8 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 <span className="lib-chip-count">{epubCards.filter((c) => !c.folder).length}</span>
               </button>
               {folders.map((folder) => (
-                <button
+                <span
                   key={folder}
-                  type="button"
                   draggable
                   onDragStart={(e) => e.dataTransfer.setData('app/flash-folder', folder)}
                   onDragOver={(e) => {
@@ -1521,30 +1521,29 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                     }
                     state.onFolderDrop(e, folder);
                   }}
-                  className={`lib-folder-chip ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
-                  onClick={() => state.setFolderFilter(folder)}
+                  className={`lib-folder-chip flash-folder-chip-group ${folderFilter === folder ? 'active' : ''} ${dropHover === folder ? 'dragover' : ''}`}
                 >
-                  {folder}
-                  <span className="lib-chip-count">{epubCards.filter((c) => c.folder === folder).length}</span>
-                  <span
+                  <button
+                    type="button"
+                    className="flash-folder-chip-select"
+                    onClick={() => state.setFolderFilter(folder)}
+                  >
+                    {folder}
+                    <span className="lib-chip-count">{epubCards.filter((c) => c.folder === folder).length}</span>
+                  </button>
+                  <button
+                    type="button"
                     className="lib-chip-del"
-                    role="button"
-                    tabIndex={0}
                     title={t('flash.deleteFolder')}
+                    aria-label={t('flash.deleteFolder')}
                     onClick={(e) => {
                       e.stopPropagation();
                       state.removeFolder(folder);
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.stopPropagation();
-                        state.removeFolder(folder);
-                      }
-                    }}
                   >
                     ×
-                  </span>
-                </button>
+                  </button>
+                </span>
               ))}
               {creatingFolder ? (
                 <span className="lib-folder-chip lib-folder-editor">

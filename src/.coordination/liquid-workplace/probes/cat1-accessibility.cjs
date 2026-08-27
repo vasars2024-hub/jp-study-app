@@ -135,7 +135,14 @@ const PROBE = `(function(){
     return null;
   }
   function over(fg, bg){
-    return { r: fg.r*fg.a + bg.r*(1-fg.a), g: fg.g*fg.a + bg.g*(1-fg.a), b: fg.b*fg.a + bg.b*(1-fg.a), a: 1 };
+    var a = fg.a + bg.a*(1-fg.a);
+    if (a <= 0) return { r:0, g:0, b:0, a:0 };
+    return {
+      r: (fg.r*fg.a + bg.r*bg.a*(1-fg.a))/a,
+      g: (fg.g*fg.a + bg.g*bg.a*(1-fg.a))/a,
+      b: (fg.b*fg.a + bg.b*bg.a*(1-fg.a))/a,
+      a: a
+    };
   }
   function lum(c){
     function f(v){ var x = v/255; return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); }

@@ -857,6 +857,17 @@ same word, **0 / 3,218** position, card rect **724×360 at 137,360**, and action
 Log: `.coordination/liquid-workplace/L7_REVIEW_LEARNING.md`. Next: Flashcards feature parity and
 the rest of its rubric cells before Anki; one migrated app does not close either system-wide bullet.
 
+**Progress 2026-08-26 — Flashcards categories 1 and 3 are 20/20; both bullets remain OPEN.** The
+surface-parameterized accessibility harness measured **342** text owners (minimum **5.01:1**),
+**99** controls, **0** sub-32px effective pointer areas, **0** WCAG spacing failures, **0** unreachable
+controls, and reduced motion **57 → 0 → 57**. Its control moved every signal and restored it. The
+utilization harness measured **15** Work regions with **0** translucent, and **2/2** contextual
+regions treated through shared primitives; its controls falsified **1/15** and **15/15**, then
+restored **0/15**. Product repair changed **77 → 0** undersized effective targets and replaced the
+nested folder delete pseudo-button with sibling native controls. The same harnesses remain the
+instruments for Anki onward; no Flashcards-only probe was added. Full evidence: L7 log and
+`cat1-l7-flashcards.json` / `cat3-l7-flashcards.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

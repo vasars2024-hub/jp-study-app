@@ -17,6 +17,10 @@ const REVIEW = SOURCE.slice(
   SOURCE.indexOf('export function FlashcardReviewMode'),
   SOURCE.indexOf('/** EPUB / advanced / Jiten mining sub-tool.'),
 );
+const CONTROL_STYLES = readFileSync(
+  resolve(__dirname, '../components/flashcards/FlashcardsContent.css'),
+  'utf8',
+);
 
 describe('Flashcards Liquid regions', () => {
   it('uses the shared contextual primitive for mode launchers and navigation', () => {
@@ -44,5 +48,15 @@ describe('Flashcards Liquid regions', () => {
     expect(SOURCE).toContain('<VirtualList');
     expect(SOURCE).not.toMatch(/<ContextualSurface[^>]*>\s*<DeckImportPanel/s);
     expect(SOURCE).not.toMatch(/<ContextualSurface[^>]*>\s*<CsvEditorPanel/s);
+  });
+
+  it('gives compact deck controls a 32px pointer footprint without nested buttons', () => {
+    expect(SOURCE).toContain("import './FlashcardsContent.css';");
+    expect(SOURCE).toContain('className="flash-folder-chip-select"');
+    expect(SOURCE).toContain('className="lib-chip-del"');
+    expect(SOURCE).not.toContain('className="lib-chip-del"\n                    role="button"');
+    expect(CONTROL_STYLES).toContain('.flash-view .flash-row-x');
+    expect(CONTROL_STYLES).toMatch(/min-height:\s*32px/);
+    expect(CONTROL_STYLES).toMatch(/min-width:\s*32px/);
   });
 });

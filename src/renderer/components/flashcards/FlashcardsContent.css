@@ -1,0 +1,61 @@
+/* Flashcards keeps dense rows compact, but every operable control still owns a 32px pointer
+   footprint. Scope these overrides to the shared Study OS / Blanc content root so the global
+   compact button and Library folder styles retain their existing geometry elsewhere. */
+.flash-view .btn.small,
+.flash-view .flash-file-menu button,
+.flash-view .flash-search-input,
+.flash-view .flash-search-clear,
+.flash-view .flash-tab,
+.flash-view .lib-folder-chip,
+.flash-view .flash-review-setup-check,
+.flash-view .flash-group-title-btn,
+.flash-view .flash-row-x {
+  min-height: 32px;
+}
+
+.flash-view .flash-row-x {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.flash-view .flash-group-title-btn {
+  display: inline-flex;
+  align-items: center;
+}
+
+.flash-view .flash-folder-chip-group {
+  gap: 0;
+  padding: 0 2px 0 0;
+}
+
+.flash-view .flash-folder-chip-select,
+.flash-view .flash-folders .lib-chip-del {
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.flash-view .flash-folder-chip-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+}
+
+.flash-view .flash-folders .lib-chip-del {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+}

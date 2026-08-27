@@ -22,3 +22,23 @@ review. That is L7's fixed-task invariant measured rather than inferred. `Exit` 
 
 Guard `flashcardsLiquidRegions.test.ts`: **3/3** — all six contextual wrappers present, review owns
 none, and dense import/editor/list regions stay outside. Checkpoint containing this entry.
+
+## 2026-08-26 23:26 EDT — Flashcards categories 1 and 3 score 20/20
+
+**Flashcards remains 1 of 6 apps; both L7 bullets remain OPEN.** The two reusable category
+harnesses found one product defect and two instrument defects; no surface-specific probe was added.
+
+- Category 1: **PASS 10/10**. **342** text owners, minimum **5.01:1**, **99** controls,
+  **0** effective hit areas below 32px, **0** WCAG 2.5.8 failures, **0** unreachable controls,
+  and reduced motion **57 → 0 → 57**. The control moved all five signals and restored them.
+- Category 3: **PASS 10/10**. **15** Work regions, **0** on translucent material; **2/2**
+  contextual regions treated and **2/2** use a shared primitive. Controls made **1/15** and then
+  **15/15** Work regions translucent, then restored **0/15**.
+
+Product repair: Flashcards compact controls now own 32px pointer footprints; the nested folder
+delete pseudo-button became two sibling native buttons. The live count fell **77 → 0** undersized
+effective targets and the adjacent remove failure fell **1 → 0**. Review geometry remains unchanged.
+
+Harness repairs, each one attempt: category 1 now preserves alpha while compositing translucent
+ancestor stacks (the old code stopped before the opaque card); category 3 treats `style=null` and
+React's equivalent empty style attribute as the same restored state. Focused guard: **4/4**.
