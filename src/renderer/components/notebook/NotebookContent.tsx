@@ -12,7 +12,7 @@
  * in instead of silently doing nothing. Nothing here may import
  * `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import {
   aggregateNotebook,
@@ -24,6 +24,8 @@ import { NOTEBOOK_VIEWS, streamsForView, type NotebookViewId } from '../../noteb
 import { buildLineageIndex, lineageForEntry } from '../../notebook/lineage';
 import { collectAllAnnotationsMap } from '../../annotations';
 import { loadDeck } from '../../flashcardDeck';
+import { ContextualSurface } from '../liquid/LiquidSurface';
+import './notebookLiquid.css';
 
 export const STREAM_KEYS: NotebookStream[] = [
   'saved-words',
@@ -131,10 +133,15 @@ export function useNotebook(): NotebookState {
 
   // Switching views can strand a filter on a stream/folder the new view does
   // not contain, which reads as an empty notebook rather than a stale filter.
+  // The overview can own 400 rows plus provenance chains. Treat the replacement
+  // as non-urgent so the click paints acknowledgement before React reconciles
+  // the large history; the selected tab remains the only source of truth.
   const selectView = useCallback((next: NotebookViewId) => {
-    setView(next);
-    setStream('all');
-    setFolder('all');
+    startTransition(() => {
+      setView(next);
+      setStream('all');
+      setFolder('all');
+    });
   }, []);
 
   return {
@@ -168,7 +175,12 @@ export function studyOsOpenHref(href?: string): void {
 export function NotebookViewTabs({ state }: { state: NotebookState }) {
   const { t } = useT();
   return (
-    <nav className="gx-notebook-views" role="tablist" aria-label={t('notebook.status')}>
+    <ContextualSurface
+      as="nav"
+      className="gx-notebook-views"
+      role="tablist"
+      aria-label={t('notebook.status')}
+    >
       {NOTEBOOK_VIEWS.map((v) => (
         <button
           key={v}
@@ -181,7 +193,7 @@ export function NotebookViewTabs({ state }: { state: NotebookState }) {
           {t(`notebook.view.${v}`)}
         </button>
       ))}
-    </nav>
+    </ContextualSurface>
   );
 }
 

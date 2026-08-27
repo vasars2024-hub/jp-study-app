@@ -1,0 +1,185 @@
+{
+  "label": "l7-notebook",
+  "surface": "Notebook",
+  "win": "(focused)",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "820x580",
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 2100,
+    "unmeasurable": 0,
+    "minRatio": 5.3,
+    "minOwner": "span.gx-notebook-count-l \"Saved words\" 11px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 1,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 485,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 5,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 485,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "raised": "already-on-top",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 11,
+    "beforeLongest": {
+      "el": "div.fwin-bar",
+      "dur": 0.14
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 11,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": "Notebook",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "820x580",
+    "controls": 484,
+    "measured": 484,
+    "belowFloorByRect": 5,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 1,
+    "disabled": [
+      {
+        "el": "button.btn.ghost",
+        "rect": "61x35"
+      }
+    ],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "aside.lq-contextual.gx-notebook-folders 0,0 -> 221,0",
+      "section.gx-notebook-timeline 0,0 -> 32407,0"
+    ],
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        5,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        7,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        5,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

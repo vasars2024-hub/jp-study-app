@@ -1,0 +1,30 @@
+/*
+ * L7 Notebook control floor.
+ *
+ * The folder rail and provenance chains are dense records, so they stay opaque;
+ * density must not make their actions harder to hit. These are the two
+ * Notebook-owned classes that measured below the shared 32px pointer floor.
+ */
+.gx-notebook-folder,
+.gx-notebook-lineage-btn {
+  min-height: 32px;
+}
+
+/* A floating window can be compact while the desktop viewport stays wide. */
+.gx-notebook {
+  container-type: inline-size;
+}
+
+@container (max-width: 700px) {
+  .gx-notebook-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .gx-notebook-folders {
+    max-height: 120px;
+    padding-right: 0;
+    padding-bottom: 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}

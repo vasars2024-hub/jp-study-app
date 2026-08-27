@@ -14,6 +14,7 @@ import {
   useAeroMaterials,
 } from '../components/ui';
 import LiveCaptionsPanel from '../components/notebook/LiveCaptionsPanel';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
 
 export default function NotebookView() {
   const { t } = useT();
@@ -37,7 +38,7 @@ export default function NotebookView() {
       <div className="gx-notebook">
         <NotebookViewTabs state={state} />
 
-        <div className="gx-notebook-overview">
+        <ContextualSurface className="gx-notebook-overview">
           <NotebookStreamCounts state={state} />
           <div className="gx-notebook-actions">
             <button type="button" className="btn primary" onClick={reviewNotebook}>
@@ -47,12 +48,12 @@ export default function NotebookView() {
               {t('notebook.refresh')}
             </button>
           </div>
-        </div>
+        </ContextualSurface>
 
         <div className="gx-notebook-body">
-          <aside className="gx-notebook-folders">
+          <ContextualSurface as="aside" className="gx-notebook-folders">
             <NotebookFolders state={state} />
-          </aside>
+          </ContextualSurface>
 
           <section className="gx-notebook-timeline">
             <LiveCaptionsPanel />

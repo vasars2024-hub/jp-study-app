@@ -1,0 +1,146 @@
+{
+  "label": "l7-notebook",
+  "surface": "Notebook",
+  "win": "(focused)",
+  "task": "click:.gx-notebook-view:nth-child(3)",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 2136,
+    "controlCount": 485,
+    "box": "820x580",
+    "results": 1
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      0.5
+    ],
+    "inputRecv": [],
+    "worstRecv": 0.5,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      24.2
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 24.2
+  },
+  "steps": [
+    {
+      "step": "click:.gx-notebook-view:nth-child(3)",
+      "target": {
+        "sel": ".gx-notebook-view:nth-child(3)",
+        "label": "Words",
+        "disabled": false,
+        "at": "362,180"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.gx-notebook-view:nth-child(1)",
+    "steps": [
+      "click:.gx-notebook-view:nth-child(1)"
+    ],
+    "restored": true,
+    "baseHash": "tdd4vs",
+    "afterHash": "tdd4vs",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "tdd4vs",
+      "after": "tdd4vs"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 0.5
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 0.6
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.4
+    ]
+  }
+}
