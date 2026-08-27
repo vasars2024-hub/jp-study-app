@@ -1711,3 +1711,45 @@ cell still passes honestly at **3 of 4** on the other three markers, but a reade
 scoring 0 for content is wrong in spirit. Next repair candidate, alongside the transparent
 `button.nav-zone` pair — neither taken here, because this turn had already spent two harness
 repairs plus one damage fix.
+
+## 2026-08-26 22:40 EDT — the VN cells come off the park, and the panel's own list gets a handle
+
+**Decision, standing auto-approval, and it retires a needs-user entry.** VN's category-6 cell has
+been PARKED since 2026-08-26 13:40 on "a real visual novel in the library, and both routes in need
+a human". Re-derived against the tree: **that is half true and the half that mattered is false.**
+`Import JSON` (`visualNovelImportLibrary`) and `Scan folder` (`visualNovelDiscoverFolder`) do take
+no arguments and can only return `canceled` — but `visual-novel:add`
+(`src/main/immersion/visualNovels.ts:765`) takes a typed `VisualNovelCreateInput` and validates
+**only that the title is non-empty**, and the panel's own `Add to library` form feeds it. So the
+library was never behind a dialog; one of its three routes is, and the park read the surface by its
+loudest control. A self-made fixture through the product's own API is not a destructive act (relay
+pin), and the park entry itself named the remove control as what makes it reversible.
+
+**Driven end to end, both directions, on the user's real library.** Real folder and file created at
+`%TEMP%\jp-vn-fixture\Rubric Fixture VN\rubric-fixture-vn.exe`; the three form fields filled through
+the native value setter; `Add to library` → *"Visual novel added to the local library."*, 1 entry.
+A capture line (`主人公 / 今日はいい天気ですね。`) added through the panel's own composer → 1 capture
+row. Then `Remove` → *"Removed Rubric Fixture VN from the local library."*, **entries 0,
+`.visual-novel-empty` back**. The library is left exactly as found: empty.
+
+**Trap, and it cost a wrong conclusion for one probe call: the Remove read as a no-op.** One second
+after the click the status line still said *"Japanese text added to the reading overlay."* and
+`.visual-novel-entry` still counted 1. It had worked — the summary section unmounts with the
+selection, so the very next call threw on a null `.visual-novel-summary-actions`, which is what
+proved it. A remove on this panel is confirmed by the section going AWAY, not by the status line
+having changed yet.
+
+**Product finding, and it is the same one twice already this week** (`7e853346`). The library list
+was `<ul>` → `<li>` → `<button className={selected ? 'is-selected' : ''}>` — **no class handle at
+all**, in a panel where every other list is named. Its rows were reachable only by their own
+translated title text, exactly like the reader's back control before `reader-back`. Now
+`.visual-novel-entries` / `.visual-novel-entry` / `.visual-novel-capture-row`, plus
+`aria-current="true"` on the selected row of both lists (omitted, never `"false"`, elsewhere).
+`is-selected` stays in the class list so all four existing CSS rules still paint, and the rules are
+descendant selectors so nothing moved. Live after: `rows=1 selected=1 aria-current=true`,
+`capRows=1 selected=1`. Two controls, one per claim, each failing **exactly one** test and restored
+green: drop `aria-current` → 1 failed / 10 passed; drop the `<ul>` class → 1 failed / 10 passed.
+
+**Board does NOT move: still 43 of 48.** No cell was scored — cat6 VN needs a `vn` SPEC in
+`l6-parity.js` (none exists; the file has 9 apps and VN is not one) and cat5 VN reads its Q7/Q8/Q9
+from that cat6 baseline. What changed is that both are now ordinary work rather than parked.
