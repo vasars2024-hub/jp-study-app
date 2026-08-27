@@ -1,0 +1,231 @@
+{
+  "label": "anki",
+  "surface": "Anki",
+  "win": "(focused)",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "820x580",
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 161,
+    "unmeasurable": 0,
+    "minRatio": 4.94,
+    "minOwner": "p.anki-setup-msg \"Can't reach Anki. Open A\" 14px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 13,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 83,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 5,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 83,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "raised": "already-on-top",
+  "ariaDisclosed": {
+    "clicked": 1,
+    "sel": [
+      "collapse-header"
+    ],
+    "settle": {
+      "nodes": 275,
+      "controls": 83,
+      "text": 5353,
+      "expanded": 1,
+      "samples": 7,
+      "stable": 6,
+      "elapsedMs": 2273
+    }
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 74,
+    "beforeLongest": {
+      "el": "span.collapse-chevron",
+      "dur": 0.15
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 74,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": "Anki",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "820x580",
+    "controls": 76,
+    "measured": 76,
+    "belowFloorByRect": 5,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 7,
+    "disabled": [
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "169x42"
+      },
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "152x42"
+      },
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "165x42"
+      },
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "145x42"
+      },
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "162x42"
+      },
+      {
+        "el": "button.deck-workbench-step",
+        "rect": "154x42"
+      },
+      {
+        "el": "button.btn",
+        "rect": "59x35"
+      }
+    ],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "div.fwin-body 0,0 -> 2611,0"
+    ],
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        5,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        7,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        5,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "clicked": 1,
+    "sel": [
+      "collapse-header"
+    ],
+    "settle": {
+      "nodes": 88,
+      "controls": 11,
+      "text": 2665,
+      "expanded": 0,
+      "samples": 8,
+      "stable": 7,
+      "elapsedMs": 2097
+    }
+  }
+}

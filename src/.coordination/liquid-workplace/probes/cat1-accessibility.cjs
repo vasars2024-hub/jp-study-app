@@ -498,6 +498,84 @@ async function hitArea() {
 }
 
 /**
+ * ARIA DISCLOSURES, and this is the second half of a correction `l1-hit-area.js` only made once.
+ * That probe opens every `<details>` before it walks, because a control inside a closed one still
+ * reports a rect and got filed `occluded` — unscored. But `<details>` is not how this app ships
+ * most of its disclosure: `CollapsibleSection.tsx` is a `button[aria-expanded][aria-controls]`
+ * whose body is UNMOUNTED while closed, and Anki mounts the entire `DeckWorkbench` inside one.
+ * So the first Anki run measured **11** controls, reported `disclosedForRun: 0`, and read clean
+ * on a population that was missing a whole application. An unmeasured control is not a passing
+ * one — the same rule the `<details>` fix was written for.
+ *
+ * Why this lives in the DRIVER and not in the probe: React does not flush a click synchronously
+ * here. Measured on this surface — `b.click()` then re-counting inside ONE `/eval` returned
+ * 11 -> 11 -> 11. The body only exists on a later task, so opening and measuring cannot share an
+ * expression. Nor is one fixed nap enough: Anki's workbench mounts immediately and then adds its
+ * asynchronously-read draft sessions. A 250 ms nap measured 24 controls while the hit-area leg,
+ * later in the same run, found 76. Population is therefore polled to a quiet plateau, with the
+ * final counts written into the receipt. Nothing in the settle names a surface or entry count.
+ *
+ * Restores by clicking each one back, then asserts every `aria-expanded` returned to what it was.
+ * `ariaRestored: false` is reported, never swallowed: a probe that leaves the user's surface
+ * expanded is a mutation, and the next run would capture it as the default state.
+ */
+async function waitAriaPopulation() {
+  const started = Date.now();
+  let samples = 0;
+  let stable = 0;
+  let previous = '';
+  let population = {};
+  do {
+    await new Promise((s) => setTimeout(s, 250));
+    population = JSON.parse(await ev(`(function(){
+      var root = ${ROOT_EXPR};
+      if (!root) return JSON.stringify({ refuse: 'surface not found while settling disclosures' });
+      return JSON.stringify({
+        nodes: root.querySelectorAll('*').length,
+        controls: root.querySelectorAll('button,input,select,textarea,a[href],[role="button"],[tabindex]').length,
+        text: (root.innerText || '').length,
+        expanded: root.querySelectorAll('button[aria-expanded="true"][aria-controls]').length
+      });
+    })()`));
+    if (population.refuse) return population;
+    const signature = JSON.stringify(population);
+    stable = signature === previous ? stable + 1 : 0;
+    previous = signature;
+    samples++;
+    // Two seconds prevents the first synchronous render from masquerading as the plateau; four
+    // matching samples then prove a full second with no late content. Six seconds is a refusal
+    // ceiling, not a surface-specific expectation.
+  } while ((Date.now() - started < 2000 || stable < 4) && Date.now() - started < 6000);
+  return { ...population, samples, stable, elapsedMs: Date.now() - started };
+}
+
+async function ariaDisclose(open) {
+  const r = await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface not found' });
+    var remembered = window.__cat1AriaOpened || [];
+    var hits = [].slice.call(root.querySelectorAll('button[aria-expanded][aria-controls]'));
+    if (${open ? 'true' : 'false'}) {
+      hits = hits.filter(function(b){ return b.getAttribute('aria-expanded') === 'false'; })
+        .filter(function(b){ var r2 = b.getBoundingClientRect(); return r2.width > 0 && r2.height > 0; });
+      remembered = hits.map(function(b){ return b.getAttribute('aria-controls'); }).filter(Boolean);
+      window.__cat1AriaOpened = remembered;
+    } else {
+      hits = hits.filter(function(b){
+        return b.getAttribute('aria-expanded') === 'true' && remembered.indexOf(b.getAttribute('aria-controls')) >= 0;
+      });
+    }
+    for (var i = 0; i < hits.length; i++) hits[i].click();
+    if (!${open ? 'true' : 'false'}) delete window.__cat1AriaOpened;
+    return JSON.stringify({ clicked: hits.length, sel: hits.map(function(b){
+      return (b.className || '').toString().trim().split(/\\s+/).join('.'); }).slice(0, 8) });
+  })()`);
+  const out = JSON.parse(r);
+  if (out.clicked) out.settle = await waitAriaPopulation();
+  return out;
+}
+
+/**
  * RAISE FIRST, or the whole category measures nothing. `document.elementFromPoint` is
  * document-global, so every control of a window sitting under another resolves to the window on
  * top and the hit-area leg files it `occluded` — unscored. The first live run of this harness
@@ -554,34 +632,48 @@ async function motionLeg() {
   };
 }
 
+/**
+ * Every exit after the disclosure step goes through here. `refusing-leg-strands-app-state` is a
+ * recorded failure in this repo: cat8's language leg returned on refuse before its restore, left
+ * the whole app in Japanese, and the NEXT run then captured that as the user's own setting and
+ * printed `restored: true`. A probe that opens a disclosure and then refuses would do the same
+ * thing to the surface's default state, so the restore runs on the way out of every branch.
+ */
+let restoreAria = async () => ({ skipped: 'nothing was opened' });
+async function bail(code, msg) {
+  console.error(msg);
+  console.error(`  aria-disclosures on exit: ${JSON.stringify(await restoreAria())}`);
+  process.exit(code);
+}
+
 (async () => {
   const raised = await raise();
+  const disclosed = await ariaDisclose(true);
+  if (disclosed.refuse) { console.error(`REFUSE - aria-disclosure leg: ${disclosed.refuse}`); process.exit(2); }
+  if (disclosed.clicked) restoreAria = () => ariaDisclose(false);
   const base = await run();
-  if (base.refuse) { console.error(`REFUSE - ${base.refuse}`); process.exit(2); }
+  if (base.refuse) await bail(2, `REFUSE - ${base.refuse}`);
   base.raised = raised;
+  base.ariaDisclosed = disclosed;
   if (!base.parserSelfTest.ok) {
-    console.error(`VOID - colour parser self-test failed: ${base.parserSelfTest.why}`);
-    process.exit(3);
+    await bail(3, `VOID - colour parser self-test failed: ${base.parserSelfTest.why}`);
   }
   base.motion = await motionLeg();
-  if (base.motion.refuse) { console.error(`VOID - motion leg: ${base.motion.refuse}`); process.exit(3); }
+  if (base.motion.refuse) await bail(3, `VOID - motion leg: ${base.motion.refuse}`);
   if (!base.motion.emulationTook || !base.motion.emulationReleased) {
-    console.error(`VOID - prefers-reduced-motion emulation did not take or did not release: ${JSON.stringify(base.motion)}`);
-    process.exit(3);
+    await bail(3, `VOID - prefers-reduced-motion emulation did not take or did not release: ${JSON.stringify(base.motion)}`);
   }
 
   base.hit = await hitArea();
-  if (base.hit.refuse) { console.error(`VOID - hit-area leg: ${base.hit.refuse}`); process.exit(3); }
+  if (base.hit.refuse) await bail(3, `VOID - hit-area leg: ${base.hit.refuse}`);
   // An occluded control is not evidence about its hit area, so a run that could only score a
   // handful of controls is an empty measurement — which the rubric caps at 0, not at a pass.
   const scored = (base.hit.rows || base.hit.measured || base.targets.total) - (base.hit.occludedCount || 0);
   if (base.hit.occludedCount > 0 && scored < base.targets.total * 0.5) {
-    console.error(`VOID - ${base.hit.occludedCount} of ${base.targets.total} controls occluded; the surface was not raised clear. Scored ${scored}.`);
-    process.exit(3);
+    await bail(3, `VOID - ${base.hit.occludedCount} of ${base.targets.total} controls occluded; the surface was not raised clear. Scored ${scored}.`);
   }
   if (!base.hit.stable) {
-    console.error(`VOID - hit-area instrument disagreed with itself across two runs: ${JSON.stringify(base.hit.firstRun)} vs ${JSON.stringify({ belowFloorByHit: base.hit.belowFloorByHit, stolenCount: base.hit.stolenCount, occludedCount: base.hit.occludedCount })}`);
-    process.exit(3);
+    await bail(3, `VOID - hit-area instrument disagreed with itself across two runs: ${JSON.stringify(base.hit.firstRun)} vs ${JSON.stringify({ belowFloorByHit: base.hit.belowFloorByHit, stolenCount: base.hit.stolenCount, occludedCount: base.hit.occludedCount })}`);
   }
 
   // The rubric's bars, computed here so no caller has to remember them.
@@ -612,7 +704,7 @@ async function motionLeg() {
 
   if (CONTROL) {
     const inj = JSON.parse(await ev(CONTROL_INJECT));
-    if (inj.refuse) { console.error(`REFUSE - control: ${inj.refuse}`); process.exit(2); }
+    if (inj.refuse) await bail(2, `REFUSE - control: ${inj.refuse}`);
     const dirty = await run();
     // The control has to falsify the bar that is actually SCORED, which for targets is the
     // pointer walk — a control that only moves the rect count proves nothing about the number
@@ -652,8 +744,17 @@ async function motionLeg() {
     }
   }
 
+  // Put the surface back BEFORE the score is written, and record the round trip in the file:
+  // a scorecard that cannot say the disclosures returned to their default state is a scorecard
+  // whose next run may be measuring this run's leftovers.
+  out.ariaRestored = await restoreAria();
+
   const text = JSON.stringify(out, null, 2);
   if (OUT) fs.writeFileSync(OUT, text);
   console.log(text);
   process.exit(out.verdict.startsWith('PASS') ? 0 : 1);
-})().catch((e) => { console.error(String(e && e.message ? e.message : e)); process.exit(4); });
+})().catch(async (e) => {
+  console.error(String(e && e.message ? e.message : e));
+  try { console.error(`  aria-disclosures on throw: ${JSON.stringify(await restoreAria())}`); } catch { /* the bridge is what threw */ }
+  process.exit(4);
+});

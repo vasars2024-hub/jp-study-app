@@ -16,6 +16,9 @@ import { describe, expect, it } from 'vitest';
 const VIEW = readFileSync(resolve(__dirname, '../views/AnkiView.tsx'), 'utf8');
 const PREVIEW = readFileSync(resolve(__dirname, '../components/AnkiCardPreview.tsx'), 'utf8');
 const CONTENT = readFileSync(resolve(__dirname, '../components/anki/AnkiContent.tsx'), 'utf8');
+// CRLF in the shared tree, LF in a fresh worktree (`autocrlf-flips-css-tests`), so every
+// assertion below matches on a newline-tolerant pattern rather than on a literal block.
+const CSS = readFileSync(resolve(__dirname, '../styles.css'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('Anki Liquid regions', () => {
   it('gives the contextual head the shared primitive', () => {
@@ -60,5 +63,22 @@ describe('Anki Liquid regions', () => {
     // The file's own docstring names AppChrome as forbidden, so match the import, not the word.
     expect(CONTENT).not.toMatch(/^import[^;]*AppChrome/m);
     expect(CONTENT).not.toMatch(/data-materials|data-theme/);
+  });
+
+  /**
+   * Rubric category 1, measured live on this surface: `.anki-setup-actions .btn` was the ONE
+   * control under the 32 px floor (rect 52x26, pointer region 26.5). It is the recovery action
+   * on the screen that says Anki is unreachable, so it is the worst control in the app to make
+   * hard to hit. Scoped deliberately — `.btn.small` elsewhere is a secondary control beside a
+   * full-size one and is not touched.
+   */
+  it('gives the disconnected screen a recovery action that reaches the 32 px floor', () => {
+    expect(CSS).toMatch(/\.anki-setup-actions \.btn \{[^}]*min-height: 32px;[^}]*\}/);
+    // NEGATIVE HALF: the floor is not bought by inflating every small button in the app.
+    expect(CSS).toMatch(/\.btn\.small \{\n {2}padding: 5px 10px;\n {2}font-size: 12px;\n\}/);
+    // Both buttons in that row are covered, so Back does not stay at 26 while Retry grows.
+    const setup = readFileSync(resolve(__dirname, '../components/AnkiSetup.tsx'), 'utf8');
+    expect(setup).toContain('<div className="anki-setup-actions">');
+    expect(setup.match(/className="btn small/g)).toHaveLength(2);
   });
 });

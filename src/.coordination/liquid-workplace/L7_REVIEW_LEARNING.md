@@ -268,3 +268,40 @@ So the preview's two branches rest on the test and the source this turn, and say
 `needs-user.md`. What IS scorable without Anki, and is the next slice: the disconnected branch plus
 `DeckWorkbench`, which `AnkiView` mounts *outside* the connected branch precisely because three of
 its four sources need no Anki running.
+
+## 2026-08-27 04:55 EDT — Anki category 1 PASS 10/10, and the harness had been measuring 11 of 83 controls
+
+**The harness repair came first, because without it the score was a lie by omission.**
+`l1-hit-area.js` opens every `<details>` before it walks — a control inside a closed one still
+reports a rect, fails every hit test and is filed `occluded`, unscored. But `<details>` is not how
+this app ships disclosure. `CollapsibleSection.tsx` is a `button[aria-expanded][aria-controls]`
+whose body is **unmounted** while closed, and `AnkiView` mounts the whole `DeckWorkbench` inside
+one. First run: `disclosedForRun: 0`, **25** text nodes, **11** controls, and a clean sheet on a
+population missing an entire application.
+
+Why the fix is in the DRIVER, not the probe: **React does not flush the click synchronously here.**
+Measured on this surface — `b.click()` then re-counting inside ONE `/eval` returned 11 → 11 → 11.
+The body only exists on a later task, so opening and measuring cannot share an expression. Recovery
+caught the first fixed 250 ms settle reading **24** controls while the later hit leg found 76; the
+repaired driver waits for a generic DOM plateau and now reads **161** text / **83** controls / **76**
+walked on two fresh runs. It restores only disclosures it opened, leaving pre-opened ones intact.
+
+The restore runs on the way out of *every* branch (`bail()`), because `refusing-leg-strands-app-state`
+already happened here once: cat8's language leg refused before its restore, left the app in
+Japanese, and the next run captured that as the user's own setting. `ariaRestored` is written into
+the scorecard: `{clicked:1}` open, `{clicked:1}` closed.
+
+**The one real defect the widened population did not hide — it was there at 11 controls too.**
+`.anki-setup-actions .btn` measured rect **52x26**, pointer region **26.5**, the surface's only
+below-floor control. It is the recovery action on the screen that says Anki is unreachable: the
+retry that re-runs the check, and the Back that returns to the reader popup. Fixed with
+`min-height: 32px` scoped to that row — `.btn.small` elsewhere is a secondary control beside a
+full-size one and is untouched, which the test asserts as its negative half. hitMin **26.5 → 32.5**.
+
+**Score, all four numbers and the control.** contrast min **4.94** (`p.anki-setup-msg`), **0**
+failing of 161; targets `belowFloorByHit` **0**, stolen 0, occluded 0, smallest hit 32.0
+(`button.fwin-b.lq-hit`); WCAG 2.5.8 fails **0**; keyboard unreachable **0** of 83; reduced motion
+**74 → 0** over threshold, emulation took and released. Two hit-area runs agreed. **PASS 10/10.**
+Control (`--control`): all five terms moved — contrast 0→1, rect under-32 5→7, 2.5.8 0→2, keyboard
+0→1, `belowFloorByHit` **0→2** — and all five returned to baseline, rectDrift 0. Not a self-passing
+probe. `baselines/cat1-l7-anki{,-control}.json`.

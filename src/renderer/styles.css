@@ -5554,6 +5554,16 @@ mark.lookup-mark,
   justify-content: flex-end;
   gap: 8px;
 }
+/* L7 / rubric category 1. `.btn.small` renders 52x26, and on every other surface that is a
+   secondary control sitting beside a full-size one. Here it is the ONLY way out of the screen
+   that tells the user Anki is unreachable — the retry that re-runs the check, and the Back that
+   returns to the reader popup. A 26 px recovery action on an error state is the wrong place in
+   the whole app to be the hardest thing to hit, so these two reach the 32 px floor while the
+   rest of `.btn.small` is left alone. Measured: hitMin 26.5 -> 32.5, the surface's only
+   below-floor control. */
+.anki-setup-actions .btn {
+  min-height: 32px;
+}
 
 /* ---------- Coming soon ---------- */
 
