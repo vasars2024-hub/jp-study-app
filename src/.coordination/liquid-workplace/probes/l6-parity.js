@@ -108,6 +108,7 @@
   const mangaState = specState('__LQP_MANGA_ORIG');
   const vnState = specState('__LQP_VN_ORIG');
   const flashState = specState('__LQP_FLASH_ORIG');
+  const notebookState = specState('__LQP_NOTEBOOK_ORIG');
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -848,6 +849,181 @@
         // two rows proves neither. This fails exactly one.
         captureList: (w) => detach(q(w, '.reading-captures-row-meta'), 'no capture rows'),
         listReversibility: (w) => stripAttr(q(w, '.reading-captures-list-toggle'), 'aria-pressed', 'no list toggle'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * NOTEBOOK — L7's aggregate study history. The real surface currently owns
+     * 3,328 entries and renders the first 400 with provenance chains, so every
+     * row below cross-checks rendered content rather than counting controls.
+     * All drive steps change local view/filter/scroll state only; capture start,
+     * clear, refresh and cross-app navigation are inventoried but never pressed.
+     */
+    notebook: {
+      titleRe: /Notebook|ノート|笔记|Блокнот/i,
+      rootSel: '.gx-notebook',
+      features: [
+        {
+          id: 'viewTabs',
+          f: (w) => {
+            const tabs = qa(w, '.gx-notebook-view');
+            const selected = tabs.filter((b) => b.getAttribute('aria-selected') === 'true');
+            const named = tabs.filter((b) => txt(b).length > 0);
+            return {
+              ok: tabs.length === 6 && selected.length === 1 && named.length === tabs.length,
+              ev: `tabs=${tabs.length} selected=${selected.length} named=${named.length}`,
+            };
+          },
+        },
+        {
+          id: 'streamSummary',
+          f: (w) => {
+            const cards = qa(w, '.gx-notebook-count');
+            const counted = cards.filter((c) => /^\d+$/.test(txt(q(c, '.gx-notebook-count-n')))).length;
+            const named = cards.filter((c) => txt(q(c, '.gx-notebook-count-l')).length > 0).length;
+            const active = cards.filter((c) => c.classList.contains('active')).length;
+            return {
+              ok: cards.length > 0 && counted === cards.length && named === cards.length && active <= 1,
+              ev: `cards=${cards.length} counted=${counted} named=${named} active=${active}`,
+            };
+          },
+        },
+        {
+          id: 'folderRail',
+          f: (w) => {
+            const folders = qa(w, '.gx-notebook-folder');
+            const counts = folders.map((b) => Number((txt(b).match(/\((\d+)\)\s*$/) || [])[1]));
+            const active = folders.filter((b) => b.classList.contains('active')).length;
+            const sum = counts.slice(1).reduce((n, v) => n + (Number.isFinite(v) ? v : 0), 0);
+            return {
+              ok: folders.length > 1 && active === 1 && counts.every(Number.isFinite) && counts[0] === sum,
+              ev: `folders=${folders.length} active=${active} all=${counts[0]} children=${sum}`,
+            };
+          },
+        },
+        {
+          id: 'timelineRows',
+          f: (w) => {
+            const rows = qa(w, '.gx-notebook-item');
+            const titled = rows.filter((r) => txt(q(r, '.gx-notebook-item-title')).length > 0).length;
+            const meta = rows.filter((r) => txt(q(r, '.gx-notebook-item-meta')).length > 0).length;
+            const openable = rows.filter((r) => q(r, '.gx-notebook-item-btn')).length;
+            return {
+              ok: rows.length > 0 && rows.length <= 400 && titled === rows.length
+                && meta === rows.length && openable === rows.length,
+              ev: `rows=${rows.length} titled=${titled} meta=${meta} openable=${openable}`,
+            };
+          },
+        },
+        {
+          id: 'lineage',
+          f: (w) => {
+            const nodes = qa(w, '.gx-notebook-lineage-node');
+            const staged = nodes.filter((n) => txt(q(n, '.gx-notebook-lineage-stage')).length > 0).length;
+            const openable = nodes.filter((n) => q(n, '.gx-notebook-lineage-btn')).length;
+            return {
+              ok: nodes.length > 0 && staged === nodes.length && openable === nodes.length,
+              ev: `nodes=${nodes.length} staged=${staged} openable=${openable}`,
+            };
+          },
+        },
+        {
+          id: 'liveCaptions',
+          f: (w) => {
+            const panel = q(w, '.gx-lc-panel');
+            const state = txt(q(w, '.gx-lc-state'));
+            const actions = qa(w, '.gx-lc-actions button');
+            const errors = qa(w, '.gx-lc-error').filter((e) => txt(e).length > 0);
+            return {
+              ok: !!panel && state.length > 0 && actions.length === 2 && errors.length === 0,
+              ev: `panel=${!!panel} state="${state}" actions=${actions.length} errors=${errors.length}`,
+            };
+          },
+        },
+        {
+          id: 'handoffActions',
+          f: (w) => {
+            const actions = qa(w, '.gx-notebook-actions button');
+            const named = actions.filter((b) => txt(b).length > 0).length;
+            const enabled = actions.filter((b) => !b.disabled).length;
+            return {
+              ok: actions.length === 2 && named === 2 && enabled === 2,
+              ev: `actions=${actions.length} named=${named} enabled=${enabled}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        selectView: (w, index) => {
+          const tabs = qa(w, '.gx-notebook-view');
+          const target = tabs[Number(index) || 0];
+          if (!target) return { refused: `only ${tabs.length} view tabs` };
+          target.click();
+          return { clicked: txt(target) };
+        },
+        toggleStream: (w, index) => {
+          const cards = qa(w, '.gx-notebook-count');
+          const target = cards[Number(index) || 0];
+          if (!target) return { refused: `only ${cards.length} stream cards` };
+          target.click();
+          return { clicked: txt(q(target, '.gx-notebook-count-l')) };
+        },
+        selectFolder: (w, index) => {
+          const folders = qa(w, '.gx-notebook-folder');
+          const target = folders[Number(index) || 0];
+          if (!target) return { refused: `only ${folders.length} folders` };
+          target.click();
+          return { clicked: txt(target) };
+        },
+        scroll: (w, px) => {
+          const el = q(w, '.gx-notebook-timeline');
+          if (!el || el.scrollHeight <= el.clientHeight) return { refused: 'timeline is not scrollable' };
+          const g = notebookState();
+          if (g.scrollTop == null) g.scrollTop = el.scrollTop;
+          el.scrollTop = Number(px) || 240;
+          return { top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      drive: [
+        ['selectView', '2'],
+        ['selectView', '0'],
+        ['toggleStream', '0'],
+        ['toggleStream', '0'],
+        ['selectFolder', '1'],
+        ['selectFolder', '0'],
+        ['scroll', '240'],
+      ],
+      undo: {
+        notebook: (w) => {
+          const g = window.__LQP_NOTEBOOK_ORIG;
+          if (!g) return null;
+          const el = q(w, '.gx-notebook-timeline');
+          const done = [];
+          if (el && g.scrollTop != null && el.scrollTop !== g.scrollTop) {
+            el.scrollTop = g.scrollTop;
+            done.push('scroll');
+          }
+          window.__LQP_NOTEBOOK_ORIG = null;
+          return done.length ? `notebook:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        viewTabs: (w) => stripAttr(
+          qa(w, '.gx-notebook-view').find((b) => b.getAttribute('aria-selected') === 'true'),
+          'aria-selected',
+          'no selected view tab',
+        ),
+        streamSummary: (w) => detach(q(w, '.gx-notebook-count-n'), 'no stream count'),
+        folderRail: (w) => addClassAll(
+          [qa(w, '.gx-notebook-folder').find((b) => !b.classList.contains('active'))],
+          'active',
+        ),
+        timelineRows: (w) => detach(q(w, '.gx-notebook-item-meta'), 'no timeline metadata'),
+        lineage: (w) => detach(q(w, '.gx-notebook-lineage-stage'), 'no lineage stage'),
+        liveCaptions: (w) => detach(q(w, '.gx-lc-state'), 'no capture state'),
+        handoffActions: (w) => detach(q(w, '.gx-notebook-actions .btn.primary'), 'no review handoff'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

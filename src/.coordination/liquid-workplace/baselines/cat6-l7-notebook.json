@@ -1,0 +1,191 @@
+{
+  "label": "l7-notebook",
+  "app": "notebook",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "selectView",
+      "result": "{\"clicked\":\"Words\"}"
+    },
+    {
+      "step": "selectView",
+      "result": "{\"clicked\":\"Overview\"}"
+    },
+    {
+      "step": "toggleStream",
+      "result": "{\"clicked\":\"Saved words\"}"
+    },
+    {
+      "step": "toggleStream",
+      "result": "{\"clicked\":\"Saved words\"}"
+    },
+    {
+      "step": "selectFolder",
+      "result": "{\"clicked\":\"Flashcards (3218)\"}"
+    },
+    {
+      "step": "selectFolder",
+      "result": "{\"clicked\":\"All (3328)\"}"
+    },
+    {
+      "step": "scroll",
+      "result": "{\"top\":240,\"range\":32407}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "8/8",
+    "liquid": "8/8",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "viewTabs",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-selected stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "viewTabs"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-selected\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "streamSummary",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "streamSummary"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "folderRail",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "active added to 1 of 1",
+        "reachable": "7/8",
+        "fellRows": [
+          "folderRail"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"added-class\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "timelineRows",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "timelineRows"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "lineage",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "lineage"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "liveCaptions",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "liveCaptions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "handoffActions",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "handoffActions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-pressed stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"notebook:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
