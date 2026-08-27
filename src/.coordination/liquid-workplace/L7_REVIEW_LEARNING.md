@@ -201,3 +201,41 @@ is **`en`**, where an hour earlier it was `ja`.
 
 Next: category 7 on Flashcards, the last cell. Carry `l0-ms-are-a-different-display` and the
 environment-ceiling correction into it.
+
+## 2026-08-27 03:05 EDT — Flashcards category 7 passes 10/10. The surface is 80/80.
+
+`baselines/cat7-flashcards-perf.json`, scene **2 desk windows / 557 elements in the matched
+`.fwin`**, uptime **26,286 s** (the rubric's settled-process requirement), ceiling **p50 16.7 /
+p95 16.8, 0 frames over 100 across all three readings** — a clean environment, so nothing here
+is scored against a stalling machine.
+
+| leg | p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| drag | 16.7 | 16.9 | 17.0 | 0 | 9.9 |
+| resize | 16.7 | 33.5 | 66.8 | 0 | 12.5 |
+| theme swap | 16.7 | 16.8 | 16.9 | 0 | 19.4 |
+
+Heaviest real operation, **scroll the whole deck**: main p50 **2.3 ms**, p95 **3.2**, max **9.8**
+over a **3,029 ms** span against a declared 3,000 — so the leg covered its own load — versus an
+idle p50 of 2.4 / max 7.3 taken after it. The virtualised deck body churns without touching main.
+Control: `-Jank` produced **12 frames over 100 ms** against the clean run's **0**.
+
+The spec is ~10 lines of data, per RULE 1. No new probe.
+
+**The trap, and it VOIDed a correct leg before it caught anything real.** `scrollAll` chooses its
+scroller by LARGEST OVERFLOW; `document.querySelector` returns DOM ORDER. On Flashcards those are
+different nodes — two `.flash-group-body-vlist` bodies, the 15,142 px one first in the document
+and the 331,582 px one second. A proof written as a re-query read the untouched scroller, answered
+`scrollTop 0`, and VOIDed a leg that had scrolled the right element to 21,600 px. The receipt now
+comes from the load itself (`window.__lqScrollLoad`, cleared before any refuse so a stale record
+cannot vouch for a load that never armed) and the bar is the furthest point REACHED, not the
+resting position — a virtualised body's `scrollHeight` shrinks as rows unmount, so the browser
+clamps the final `scrollTop` well below where it was driven. This run's receipt: *scrolled
+flash-group-body flash-group-body-vlist to 21600 px over 91 ticks (overflow 331582)*.
+
+**Owed to the next worker, stated rather than buried:** `library`, `immersion` and `novels` all
+use `scrollAll` and NONE of their committed baselines carries a receipt, because `proof` did not
+exist for them. All four now declare `scrollProof`. Their heavy legs are very likely fine — the
+mechanism was proven correct here, on the surface where the two selectors disagree — but "likely"
+is not this rubric's currency, and re-running those three legs is cheap the next time each surface
+is open.

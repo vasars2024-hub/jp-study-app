@@ -65,6 +65,9 @@ const { spawnSync } = require('node:child_process');
 // virtualised scrolls in an ANCESTOR, so a hardcoded child selector silently misses and the
 // load never happens. Returns the element it chose so the record shows what was scrolled.
 const scrollAll = (rootSel) => `(() => {
+  // Cleared before any refuse, so a load that never armed cannot be vouched for by the
+  // PREVIOUS run's receipt. That is the zombie-recorder shape this repo has already paid for.
+  delete window.__lqScrollLoad;
   const root = document.querySelector(${JSON.stringify(rootSel)});
   if (!root) return 'REFUSE: no ' + ${JSON.stringify(rootSel)};
   let best = null, over = 0;
@@ -74,9 +77,37 @@ const scrollAll = (rootSel) => `(() => {
     if (o > over) { over = o; best = e; }
   }
   if (!best || over < 20) return 'REFUSE: nothing scrolls inside ' + ${JSON.stringify(rootSel)};
+  const rec = { sel: String(best.className || best.tagName).slice(0, 60), over: over, ticks: 0, reached: 0 };
+  window.__lqScrollLoad = rec;
   let n = 0;
-  const t = setInterval(() => { best.scrollTop = (n * 240) % Math.max(1, best.scrollHeight); if (++n > 90) clearInterval(t); }, 20);
-  return 'scrolling ' + (best.className || best.tagName) + ' over=' + over;
+  const t = setInterval(() => {
+    best.scrollTop = (n * 240) % Math.max(1, best.scrollHeight);
+    rec.ticks++;
+    if (best.scrollTop > rec.reached) rec.reached = best.scrollTop;
+    if (++n > 90) clearInterval(t);
+  }, 20);
+  return 'scrolling ' + rec.sel + ' over=' + over;
+})()`;
+
+/**
+ * The receipt for every `scrollAll` leg, and it has to come from the LOAD, not from a re-query.
+ *
+ * A proof written as `document.querySelector('<the scroller>').scrollTop` looks equivalent and is
+ * not: `scrollAll` chooses by LARGEST OVERFLOW and `querySelector` returns DOM ORDER, and on
+ * Flashcards those are different nodes — two `.flash-group-body-vlist` bodies, the 15,142 px one
+ * first in the document and the 331,582 px one second. The re-query read the untouched scroller,
+ * answered 0, and VOIDed a leg that had in fact scrolled the right element to 21,600 px. So the
+ * load records what IT touched, and this only reads it back.
+ *
+ * The bar is `reached`, not the resting `scrollTop`: a virtualised body's `scrollHeight` shrinks
+ * as rows unmount, so the browser clamps the final position well below the furthest point driven.
+ */
+const scrollProof = `(() => {
+  const s = window.__lqScrollLoad;
+  if (!s) return 'REFUSE: the scroll load never armed - nothing recorded a receipt';
+  if (s.ticks < 10) return 'REFUSE: the scroll load ticked only ' + s.ticks + ' times; its timer was throttled or cleared';
+  if (s.reached < 1000) return 'REFUSE: the scroll load reached only ' + Math.round(s.reached) + ' px on ' + s.sel;
+  return 'scrolled ' + s.sel + ' to ' + Math.round(s.reached) + ' px over ' + s.ticks + ' ticks (overflow ' + s.over + ')';
 })()`;
 
 const SPECS = {
@@ -99,6 +130,7 @@ const SPECS = {
       label: 'scroll the whole library',
       durationMs: 2500,
       js: scrollAll('.library'),
+      proof: scrollProof,
     },
     collection: { container: '.library', row: '.card' },
   },
@@ -114,6 +146,7 @@ const SPECS = {
       label: 'scroll the whole site rail',
       durationMs: 2500,
       js: scrollAll('.immersion-root'),
+      proof: scrollProof,
     },
     collection: { container: '.immersion-root', row: '.immersion-site-row' },
   },
@@ -124,7 +157,7 @@ const SPECS = {
     // `.novel-scroller` has no `.fwin` ancestor because the reader replaces the desktop shell,
     // so the runner selects the root-window gesture path from the DOM fact above.
     root: '.novel-scroller',
-    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller') },
+    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller'), proof: scrollProof },
     collection: { container: '.novel-scroller', row: '.novel-content p' },
   },
   manga: {
@@ -156,6 +189,22 @@ const SPECS = {
       proof: `(() => { const s = document.querySelector('.visual-novel-analysis-summary'); return s ? s.textContent.trim().slice(0, 120) : '' })()`,
     },
     collection: { container: '.visual-novel-capture-list', row: '.visual-novel-capture-row' },
+  },
+  flashcards: {
+    title: 'Flashcards',
+    root: '.flash-view',
+    heavy: {
+      // The deck body is a VirtualList over the whole collection, so scrolling it is not a
+      // paint — every frame unmounts and remounts a window of rows. Measured live before the
+      // spec was written: `.flash-group-body-vlist` carries 331,582 px of overflow against 32
+      // mounted `.flash-row`s, which is the whole point of picking it. Review is NOT the heavy
+      // leg: it renders one card and it writes SRS state the score does not need.
+      label: 'scroll the whole deck',
+      durationMs: 3000,
+      js: scrollAll('.flash-view'),
+      proof: scrollProof,
+    },
+    collection: { container: '.flash-group-body-vlist', row: '.flash-row' },
   },
   dictionary: {
     title: 'Dictionary',
