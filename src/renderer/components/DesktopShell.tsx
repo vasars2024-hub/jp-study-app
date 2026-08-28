@@ -22,6 +22,7 @@ import type {
 } from '../../shared/desktop';
 import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
+import { fitNewWindowRect } from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
 import { createRenderIdentityCache } from '../renderIdentityCache';
 import {
@@ -1543,13 +1544,16 @@ export default function DesktopShell({
         section === 'visualizer' ? 380 : section === 'musicwidget' ? 430 : isMediaCenter ? 1080 : section === 'youtube' ? 980 : section === 'settings' ? 960 : section === 'city' ? 680 : section === 'games' ? 980 : 820;
       const wantH =
         section === 'visualizer' ? 200 : section === 'musicwidget' ? 190 : isMediaCenter ? 700 : section === 'youtube' ? 640 : section === 'settings' ? 680 : section === 'city' ? 800 : section === 'games' ? 660 : 580;
+      const rect = fitNewWindowRect(
+        { x: 60 + n * 34, y: 24 + n * 30, w: wantW, h: wantH },
+        { w: dw, h: dh },
+        { w: MIN_W, h: MIN_H },
+      );
       return [
         ...ws,
         {
           id: section, section,
-          x: 60 + n * 34, y: 24 + n * 30,
-          w: Math.min(wantW, Math.max(MIN_W, dw - 140)),
-          h: Math.min(wantH, Math.max(MIN_H, dh - 60)),
+          ...rect,
           z: ++zTop.current,
         },
       ];

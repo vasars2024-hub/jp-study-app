@@ -894,3 +894,17 @@ Liquid”. Guard: `gameArenaLiquidRegions.test.ts` **2/2**.
 **Games is open, unscored 0/80.** Run the eight existing surface-parameterised harnesses next; no
 Games-only probe was added. Do not edit dirty `ArcadeGames.tsx` or `styles.css` without isolating
 foreign i18n/Aero hunks.
+
+## 2026-08-28 14:36 EDT — Games category 1 repairs taskbar obstruction; PASS 10/10
+
+First run: contrast/reachability/motion were clean, but the sixth cascaded window started at y=174
+with the same 660px height used at y=0. Its bottom crossed the taskbar; one game choice had only
+**31.5 px** of its **66.8 px** control hittable, so category 1 failed and the pointer control voided.
+
+`fitNewWindowRect` now caps width/height against the remaining work area at the cascade's actual
+origin. Unit guard **3/3**. Reopened live at **980×589**, y=174→bottom **763**; taskbar begins **765**.
+Final shared-harness receipt: **47** text owners, minimum contrast **4.72:1**; **17** controls, minimum
+target **32 px**, **0** pointer/spacing failures; **17/17** keyboard reachable; reduced motion owners
+**19→0→19**. Control terms contrast/rect/pointer/WCAG/keyboard all move **0→nonzero→0**.
+
+**Games is 10/80.** Evidence: `cat1-l7-games.json`. Category 2 is next.

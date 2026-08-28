@@ -1085,6 +1085,13 @@ and timing state remain on the stable work pane. A Standard→Liquid→Standard 
 alpha **0→0.72→0** while stage alpha stays **0.88**, selected game stays Sentence Builder, and XP stays
 0. Guard: `gameArenaLiquidRegions.test.ts` **2/2**. Games scoring is next.
 
+**Progress 2026-08-28 (Games category 1) — 10/80.** The first run found the sixth cascaded window
+ending below the taskbar, reducing one game choice's usable hit area to **31.5 px**. New windows now
+fit against the work area's remaining width/height at their actual cascade origin; reopened Games
+ends at y=**763**, taskbar y=**765**. Final: **47** text runs, min contrast **4.72:1**, **17/17**
+controls reachable, min target **32 px**, 0 obstruction, reduced motion 19→0→19; all five control
+terms move and restore. Evidence: `cat1-l7-games.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
