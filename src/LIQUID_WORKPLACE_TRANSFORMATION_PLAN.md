@@ -1123,6 +1123,30 @@ those bars. Guard: `gameArenaLiquidRegions.test.ts` **6/6**. **Only `deadRegion`
 **15.1%** default (513x305) and **36.1%** maximized (789x475), both the idle stage's lower-right
 void. Evidence: `baselines/cat4-l7-games.json`.
 
+**Progress 2026-08-28 (Games category 4) — controlled PASS 10/10; score 40/80.** The void was a
+product gap, not a layout one: `stats.ts` has always persisted the last **30** finished rounds
+(`GameProgressData.recent`, score/accuracy/level/missed) and **nothing ever showed them back**. The
+ready state now renders the selected game's recorded rounds — the one moment the stage has nothing
+else to say, and unlike a preview of the material pool it spoils no prompt. Three measured layout
+corrections followed: the ready block grows into the stage instead of a 180px launch stub;
+one-record-per-row left a **568x475** empty band between each summary and its right-aligned date, so
+records wrap at `minmax(230px, 1fr)`; and that 230px floor then broke compact, so the container
+query stacks them. Final: dead **4.8 / 0.8 / 12.0** pct of viewport at 980x589 / 260x170 / 1264x765,
+clipped, overlaps, scrollers and hidden-overflow all **0/0/0/0** at all three, chrome **36.4→29.8**
+falling while the canvas rises **93.9→95.3**. The injected-clip control moves clipped **0→1→0** with
+removal proven; the sub-minimum 200x140 shrink honestly reports **3** scrollers below the supported
+floor. Guard: `gameArenaLiquidRegions.test.ts` **7/7**; i18n **10,941**.
+
+**How this cell was populated, because the rubric caps an empty harness at 0.** The score is
+measured on **12** records written to the product's own `jp-game-progress-v1` key in the schema
+`recordGameResult` writes. The key **did not exist** before (0 bytes) and was removed after;
+`getItem` reads `null` again, byte-identical to the state found. The never-played state is banked
+separately in `baselines/cat4-l7-games-empty.json` and is an honest open finding rather than a
+score: dead **10.1 / 0.8 / 32.7**, so a player with no history still sees a 32.7% void at maximized.
+Filling that needs content the app does not have for a new player; do not close it by centring the
+empty message, which was measured and does not move the band. Evidence:
+`baselines/cat4-l7-games{,-empty}.json`. Categories 1–3 must be re-run: this changed the DOM.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

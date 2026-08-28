@@ -1,5 +1,5 @@
 {
-  "label": "l7-games",
+  "label": "l7-games-empty",
   "surface": "Game Arena",
   "win": "main",
   "rootKind": "floating window",
@@ -12,7 +12,7 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 4.8,
+      "deadPctViewport": 10.1,
       "deadRegionBasis": "visible surface",
       "chromePct": 36.4,
       "dominantCanvasPct": 93.9,
@@ -50,7 +50,7 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 12,
+      "deadPctViewport": 32.7,
       "deadRegionBasis": "visible surface",
       "chromePct": 29.8,
       "dominantCanvasPct": 95.3,
@@ -58,7 +58,7 @@
         "clipped": true,
         "overlaps": true,
         "horizontal": true,
-        "deadRegion": true
+        "deadRegion": false
       },
       "restored": true
     }
@@ -77,7 +77,7 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "513x97 at grid 19,16",
+      "deadRegionBox": "685x152 at grid 12,29",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -91,8 +91,8 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 378;",
-      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 378;",
+      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 382;",
+      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 382;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -111,13 +111,13 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 378;",
-      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 382;",
+      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 382;",
+      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 386;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "978x128 at grid 9,33",
+      "deadRegionBox": "978x347 at grid 9,21",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -130,42 +130,19 @@
     "clipped": true,
     "overlaps": true,
     "horizontal": true,
-    "deadRegion": true,
+    "deadRegion": false,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "PASS 10/10",
-  "failedBars": [],
+  "verdict": "FAIL",
+  "failedBars": [
+    "deadRegion"
+  ],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
     "contrast and focus order (rubric category 1 harness)",
     "input cost and dead ends (rubric category 2 harness)"
-  ],
-  "control": {
-    "injectedClip": {
-      "moved": true,
-      "backToBaseline": true,
-      "clipped": {
-        "base": 0,
-        "dirty": 1,
-        "restored": 0
-      },
-      "removalProven": true
-    },
-    "provenPagerDeadRegion": {
-      "applicable": false,
-      "reason": "no proven pager on its last page"
-    },
-    "subMinimumShrink": {
-      "requested": "200x140",
-      "box": "200x140",
-      "clipped": 0,
-      "overlaps": 0,
-      "horizontalScrollers": 3,
-      "hiddenOverflowX": 0,
-      "restored": true
-    }
-  }
+  ]
 }

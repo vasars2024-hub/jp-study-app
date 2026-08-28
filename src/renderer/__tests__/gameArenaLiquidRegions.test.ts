@@ -63,5 +63,20 @@ describe('Game Arena Liquid regions', () => {
     // the frame at 260px and would otherwise scroll the stage horizontally.
     expect(compact).toMatch(/\.game-round-hud,\s*\.game-arena \.game-match-grid\s*\{[^}]*minmax\(0, 1fr\)/s);
     expect(compact).toMatch(/\.game-coverage\s*\{[^}]*flex-direction: column/s);
+    expect(compact).toMatch(/\.game-history-list\s*\{[^}]*minmax\(0, 1fr\)/s);
+  });
+
+  it('shows the recorded rounds the store has always kept, with an honest empty state', () => {
+    expect(CONTENT).toContain('<ContextualSurface as="section" className="game-history"');
+    expect(CONTENT).toContain("t('games.history.label')");
+    expect(CONTENT).toContain("t('games.history.empty')");
+    expect(CONTENT).toContain("t('games.history.line'");
+    expect(CONTENT).toContain("progress.recent.filter((entry) => entry.gameId === selected)");
+    // Locale-aware: a bare toLocaleDateString() follows the OS, not the UI language.
+    expect(CONTENT).toContain('toLocaleDateString(LANG_TAGS[lang])');
+    // The records wrap into columns; one per row left a 568px empty band
+    // between each row's summary and its right-aligned date at stage width.
+    expect(LIQUID_CSS).toMatch(/\.game-history-list\s*\{[^}]*repeat\(auto-fill, minmax\(230px, 1fr\)\)/s);
+    expect(LIQUID_CSS).toMatch(/\.game-ready\s*\{[^}]*flex: 1 1 auto/s);
   });
 });

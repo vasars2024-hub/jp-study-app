@@ -15,6 +15,7 @@ import { useCountUp } from '../../motion/hooks';
 import { fireRewardAt } from '../../motion/rewardBurst';
 import { getUserLevel, onLevelChange } from '../../levelService';
 import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import Icon from '../Icons';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import { addDeckCards, onDeckChanged } from '../../flashcardDeck';
@@ -175,7 +176,7 @@ function makeSession(
 }
 
 export function GameArena() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [settings, setSettings] = useState(loadGameArenaSettings);
   const [serviceLevel, setServiceLevel] = useState(() => getUserLevel('ja'));
   const [progress, setProgress] = useState(loadGameProgress);
@@ -232,6 +233,15 @@ export function GameArena() {
     void seenNonce;
     return seenProgress(selected, level, gamePoolSize(selected, level, content));
   }, [selected, level, content, seenNonce]);
+  // Every finished round is already persisted with its score, accuracy and
+  // missed items (`stats.ts` keeps the last 30), and nothing has ever shown it
+  // back to the player. The ready state is where it belongs: it is the only
+  // moment the stage has nothing else to say, and reviewing your own last
+  // rounds spoils no prompt the way a preview of the material pool would.
+  const recentForGame = useMemo(
+    () => progress.recent.filter((entry) => entry.gameId === selected).slice(0, 12),
+    [progress.recent, selected],
+  );
   const arcadeUnlocked = wiredUnlocked || aeroUnlocked;
   const availableGames = useMemo(
     () => GAME_DEFINITIONS.filter((game) => arcadeUnlocked || !isArcadeGame(game.id)),
@@ -422,14 +432,44 @@ export function GameArena() {
           ) : (
             <>
               {!session && (
-                <div className="game-launch-panel">
-                  {selected === 'kana-sprint' && (
-                    <KanaScopePicker selection={settings.kana} />
-                  )}
-                  <button type="button" className="btn primary" onClick={startSelected}>
-                    <Icon name="player" size={14} /> {t('games.start')}
-                  </button>
-                  <span className="muted">{t('games.lengthRounds', { count: settings.gameLength })}</span>
+                <div className="game-ready">
+                  <div className="game-launch-panel">
+                    {selected === 'kana-sprint' && (
+                      <KanaScopePicker selection={settings.kana} />
+                    )}
+                    <button type="button" className="btn primary" onClick={startSelected}>
+                      <Icon name="player" size={14} /> {t('games.start')}
+                    </button>
+                    <span className="muted">{t('games.lengthRounds', { count: settings.gameLength })}</span>
+                  </div>
+                  {/* Post-round detail, which §11's Games split assigns to the
+                      contextual seam rather than the gameplay canvas. */}
+                  <ContextualSurface as="section" className="game-history" aria-label={t('games.history.label')}>
+                    <h4>{t('games.history.label')}</h4>
+                    {recentForGame.length === 0 ? (
+                      <p className="muted">{t('games.history.empty')}</p>
+                    ) : (
+                      <ol className="game-history-list">
+                        {recentForGame.map((entry) => (
+                          <li key={entry.id} className="game-history-row">
+                            <b>{entry.score}</b>
+                            <span>
+                              {t('games.history.line', {
+                                accuracy: Math.round((entry.accuracy ?? 0) * 100),
+                                level: entry.level,
+                                missed: entry.mistakes.length,
+                              })}
+                            </span>
+                            {/* Locale-aware: a bare toLocaleDateString() follows the
+                                OS, not the UI language. */}
+                            <em className="muted">
+                              {new Date(entry.createdAt).toLocaleDateString(LANG_TAGS[lang])}
+                            </em>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </ContextualSurface>
                 </div>
               )}
               {currentRound && (

@@ -12,6 +12,76 @@
   background: var(--lq-work-bg);
 }
 
+/* The ready state occupies the stage instead of leaving it empty below a
+   180px launch stub. The launch controls keep the top of the column and the
+   recorded-round history takes the rest, so the stage carries real content at
+   every size rather than one contiguous void in its lower-right quadrant. */
+.game-ready {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--lq-space-4);
+  min-height: 0;
+}
+
+.game-ready > .game-launch-panel {
+  align-items: stretch;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.game-ready > .game-launch-panel > .btn {
+  align-self: flex-start;
+}
+
+.game-history {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--lq-space-3);
+  min-height: 0;
+  overflow: auto;
+}
+
+.game-history > h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+}
+
+/* A one-per-row list left a 568px-wide empty band between each row's text and
+   its right-aligned date once the stage was 950px wide. The rounds are short
+   records, so they wrap into columns and stay dense at every stage width. */
+.game-history-list {
+  display: grid;
+  gap: var(--lq-space-2);
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.game-history-row {
+  align-items: baseline;
+  border: 1px solid var(--game-border);
+  border-radius: 7px;
+  display: grid;
+  gap: var(--lq-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: var(--lq-space-3) var(--lq-space-4);
+}
+
+.game-history-row > b {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-history-row > em {
+  font-size: 0.74rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
 /* The Arena reflows against its own frame, never the desktop viewport. It
    renders inside a floating window, so the existing `@media (max-width: 760px)`
    rules cannot fire while the window is narrow and the desktop is wide — which
@@ -75,5 +145,23 @@
 
   .game-arena .game-coverage-bar {
     flex: 0 0 4px;
+  }
+
+  /* The round records' 230px column floor is wider than the whole stage here,
+     and the score/summary/date triple does not fit on one line either. */
+  .game-arena .game-history-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .game-arena .game-history-row {
+    align-items: start;
+    gap: var(--lq-space-1);
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: var(--lq-space-2) var(--lq-space-3);
+  }
+
+  .game-arena .game-history-row > em {
+    grid-column: 2;
+    white-space: normal;
   }
 }
