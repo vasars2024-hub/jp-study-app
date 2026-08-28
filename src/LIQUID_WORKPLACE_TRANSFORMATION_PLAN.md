@@ -957,6 +957,12 @@ all five scored terms. It is nevertheless VOID because exact restoration failed 
 owners; **382** empty style attributes). Live residue and all failed files were restored. Per the
 one-repair rule, category 1 remains UNMEASURED and Statistics does not open.
 
+**Progress 2026-08-28 — interrupted category-1 repair safely recovered; Notebook remains 70/80.**
+The full population and five-term control reproduced, but the claimed **380/380** immediate restore
+was false: a post-run check found **381** empty style attributes. Residue and failed files are again
+restored to zero/HEAD. The open instrument boundary is delayed renderer-task restoration; category
+1 stays UNMEASURED and the next turn repairs that boundary before Statistics.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

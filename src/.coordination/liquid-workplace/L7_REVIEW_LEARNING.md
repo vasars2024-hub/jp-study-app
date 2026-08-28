@@ -461,3 +461,15 @@ The verdict is still VOID: the core receipt reported **0/381 owners restored** a
 probe, and overwritten baseline were restored byte-identical to HEAD under RULE 1. Notebook stays
 **70/80**, category 1 UNMEASURED. Next attempt must remove the temporary property before removing
 an originally-absent attribute, then assert the attribute remains absent after forced layout.
+
+## 2026-08-28 09:10 EDT — interrupted restoration repair recovered and rejected
+
+The crash left the shared core and pointer harnesses mid-edit. Completing that exact attempt again
+reached **2,056 text / 454 core / 472 pointer-measured controls**, with all five control terms moving
+**0 → 1/2/2/1/2 → 0**. Immediate receipts claimed **380/380** pointer owners restored.
+
+The independent post-run check caught the false pass: **381** empty `style` attributes remained.
+They were removed from a proven zero-style baseline; after 250 ms the live surface held **0** style
+attributes, **0** inline content-visibility, scroll **0**, and its disclosure closed. Failed harness
+and baseline files hash byte-identical to HEAD. Notebook remains **70/80**, category 1 UNMEASURED.
+The next repair must assert restoration on a later renderer task, not in the same synchronous eval.
