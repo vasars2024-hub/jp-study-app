@@ -111,6 +111,16 @@
   const notebookState = specState('__LQP_NOTEBOOK_ORIG');
   const statsState = specState('__LQP_STATS_ORIG');
   const calendarState = specState('__LQP_CAL_ORIG');
+  const gamesState = specState('__LQP_GAMES_ORIG');
+  // The Arena's typing game, which is also the one that owns the material-scope picker.
+  // Named by its own four localized titles rather than by list position: the catalogue is
+  // filtered by what the player has unlocked, so an index is not stable.
+  const KANA_GAME_RE = /Kana Sprint|かなスプリント|假名冲刺|Спринт по кане/i;
+  // A progress bar drawn with an inline `scaleX()` rather than a width. Returns NaN when
+  // the element is absent so a missing bar can never read as an agreeing zero.
+  const barScale = (el) => (el
+    ? Number((String(el.style.transform).match(/scaleX\(([\d.]+)\)/) || [])[1])
+    : NaN);
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -1354,6 +1364,267 @@
         monthGrid: (w) => detach(q(w, '.cal-month-cell .cal-month-daynum'), 'no month day number'),
         dateTransport: (w) => detach(q(w, '.cal-nav > .wgt-btn-icon'), 'no previous-date control'),
         eventComposer: (w) => stripAttr(q(w, '.calendar-context-head > .btn'), 'type', 'no new-event control'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * GAMES — the Arena. §11's parity list is "every game, typing input, source material,
+     * scores, level filters, accessibility", and two of those exist ONLY while a round is
+     * running, so the drive starts one, reads the answer box and the HUD, and aborts it.
+     *
+     * ABORTING IS NOT OPTIONAL AND IT IS THE PRODUCT'S OWN PATH. `finishSession` is the
+     * only writer of the player's progress, and it fires on the last submit or when the
+     * session timer expires (`settings.gameLength * 12_000` — 60s at the default 5). The
+     * drive never submits, and a list-item click runs `setSession(null)`, which is how the
+     * app itself discards a round. Nothing this spec does can record a score.
+     *
+     * THE DRIVE ENDS ON KANA SPRINT AND STAYS THERE, deliberately. It is the one game that
+     * is both a `type` round (so "typing input" is a real control rather than a token bank)
+     * and owns the in-Arena scope picker (so "level filters" is on screen rather than a
+     * jump into Settings). Leaving it selected is what lets the negative control falsify
+     * those rows with a control that is actually mounted; `undo` clicks the original game
+     * back and restores the scroll.
+     *
+     * THE PICKER HAS TWO SHAPES and scoring one of them would be wrong: Automatic renders
+     * the mode row plus a hint, Manual renders the mode row plus script and group rows.
+     * The row reads the declared mode and scores the shape that mode promises — and it
+     * never toggles the mode, because that is persisted settings.
+     */
+    games: {
+      titleRe: /Game Arena|ゲームアリーナ|游戏竞技场|Игровая арена/i,
+      rootSel: '.game-arena',
+      features: [
+        {
+          id: 'gameCatalog',
+          f: (w) => {
+            const items = qa(w, '.game-list-item');
+            const named = items.filter((b) => txt(q(b, 'b')).length > 0 && txt(q(b, 'small')).length > 0).length;
+            const real = items.filter((b) => b.getAttribute('type') === 'button').length;
+            const active = activeOf(items, 'active');
+            const g = gamesState();
+            return { ok: items.length >= 10 && named === items.length && real === items.length
+                && active === 1 && g.switched === true,
+              ev: `games=${items.length} named=${named} buttons=${real} active=${active} selectionWorks=${g.switched === true}` };
+          },
+        },
+        {
+          id: 'stageIdentity',
+          f: (w) => {
+            const active = qa(w, '.game-list-item').find((b) => b.classList.contains('active'));
+            const title = txt(q(w, '.game-stage-head h3'));
+            const desc = txt(q(w, '.game-stage-head p.muted'));
+            const listed = active ? txt(q(active, 'b')) : '';
+            const blurb = active ? txt(q(active, 'small')) : '';
+            return { ok: !!active && title.length > 0 && title === listed && desc.length > 0 && desc === blurb,
+              ev: `stage="${title}" listed="${listed}" descMatches=${desc.length > 0 && desc === blurb}` };
+          },
+        },
+        {
+          id: 'sourceMaterial',
+          f: (w) => {
+            const sec = qa(w, '.game-coverage').find((s) => !s.classList.contains('game-seen'));
+            const label = sec ? sec.getAttribute('aria-label') : null;
+            const note = txt(sec && q(sec, '.muted'));
+            const pct = (note.match(/(\d+)\s*%/) || [])[1];
+            const scale = barScale(sec && q(sec, '.game-coverage-bar i'));
+            // No list is an HONEST state, and it has its own agreement to keep: an empty
+            // deck must paint an empty bar. A filled bar over "no word list" is the lie
+            // this row exists for.
+            const agrees = pct === undefined ? scale === 0 : Math.abs(scale * 100 - Number(pct)) <= 1;
+            return { ok: !!sec && !!label && label.length > 0 && note.length > 0 && agrees,
+              ev: `label="${label}" note="${note.slice(0, 46)}" pct=${pct === undefined ? 'noList' : pct} scaleX=${scale} agrees=${agrees}` };
+          },
+        },
+        {
+          id: 'exposureTracking',
+          f: (w) => {
+            const sec = q(w, '.game-seen');
+            const note = txt(sec && q(sec, '.muted'));
+            const nums = note.match(/(\d+)\s*\/\s*(\d+)/);
+            const pct = (note.match(/(\d+)\s*%/) || [])[1];
+            const scale = barScale(sec && q(sec, '.game-coverage-bar i'));
+            const derived = nums ? Math.round((Number(nums[1]) / Math.max(1, Number(nums[2]))) * 100) : null;
+            return { ok: !!sec && !!sec.getAttribute('aria-label') && !!nums && pct !== undefined
+                && Number(pct) === derived && Math.abs(scale * 100 - Number(pct)) <= 1,
+              ev: `seen=${nums ? `${nums[1]}/${nums[2]}` : 'none'} statedPct=${pct} derivedPct=${derived} scaleX=${scale}` };
+          },
+        },
+        {
+          id: 'typingInput',
+          f: (w) => {
+            const g = gamesState();
+            const start = q(w, '.game-launch-panel > .btn.primary');
+            return { ok: g.typing === true && !!start && start.getAttribute('type') === 'button' && !start.disabled,
+              ev: `round=${g.typingEv || 'not driven'} startControl=${start ? start.getAttribute('type') : 'absent'} enabled=${!!start && !start.disabled}` };
+          },
+        },
+        {
+          id: 'scoreHud',
+          f: (w) => {
+            const g = gamesState();
+            const note = txt(q(w, '.game-launch-panel > .muted'));
+            const declared = (note.match(/\d+/) || [])[0];
+            return { ok: g.hud === true && declared !== undefined && Number(declared) === g.hudTotal,
+              ev: `hud=${g.hudEv || 'not driven'} readyStateRounds=${declared} hudRoundTotal=${g.hudTotal}` };
+          },
+        },
+        {
+          id: 'roundHistory',
+          f: (w) => {
+            const sec = q(w, '.game-history');
+            const heading = txt(sec && q(sec, 'h4'));
+            const rows = sec ? qa(sec, '.game-history-row') : [];
+            const complete = rows.filter((r) => txt(q(r, 'b')).length > 0
+              && txt(q(r, 'span')).length > 0 && txt(q(r, 'em')).length > 0).length;
+            const empty = txt(sec && q(sec, ':scope > .muted'));
+            const honest = rows.length > 0 ? complete === rows.length : empty.length > 0;
+            return { ok: !!sec && !!sec.getAttribute('aria-label') && heading.length > 0 && honest,
+              ev: `heading="${heading}" rows=${rows.length} complete=${complete} emptyState="${empty.slice(0, 34)}"` };
+          },
+        },
+        {
+          id: 'materialScope',
+          f: (w) => {
+            const picker = q(w, '.game-kana-picker');
+            const rows = picker ? qa(picker, '.os-viz-row') : [];
+            const modes = rows[0] ? qa(rows[0], 'button') : [];
+            const chosen = activeOf(modes, 'primary');
+            const manual = rows.length > 1;
+            const scripts = manual ? qa(rows[1], 'button') : [];
+            const groups = manual && rows[2] ? qa(rows[2], 'button') : [];
+            const shape = manual
+              ? scripts.length >= 2 && activeOf(scripts, 'primary') >= 1 && groups.length >= 1
+              : txt(q(picker, '.os-set-hint')).length > 0;
+            return { ok: !!picker && modes.length === 2 && chosen === 1 && shape,
+              ev: `picker=${!!picker} modes=${modes.length} chosen=${chosen} mode=${manual ? 'manual' : 'auto'} scripts=${scripts.length} groups=${groups.length} shapeHeld=${shape}` };
+          },
+        },
+        {
+          id: 'levelSettings',
+          f: (w) => {
+            const g = gamesState();
+            const meta = qa(w, '.game-stage-meta > span').map(txt);
+            const filled = meta.filter((s) => s.length > 0).length;
+            const entry = q(w, '.game-arena-progress button');
+            // The level is arena-wide, not per game: switching games must not move it.
+            // A per-game decoration would drift here, which is the defect this catches.
+            const stable = g.levelBefore != null && meta[0] === g.levelBefore;
+            return { ok: meta.length === 3 && filled === 3 && stable
+                && !!entry && entry.getAttribute('type') === 'button' && txt(entry).length > 0,
+              ev: `meta=[${meta.join(' | ')}] levelBeforeSwitch="${g.levelBefore}" stable=${stable} settingsEntry="${txt(entry)}"` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        begin: (w) => {
+          const g = gamesState();
+          const items = qa(w, '.game-list-item');
+          if (g.origIndex == null) g.origIndex = items.findIndex((b) => b.classList.contains('active'));
+          if (g.levelBefore == null) g.levelBefore = txt(qa(w, '.game-stage-meta > span')[0]);
+          const el = scroller(w);
+          if (g.scrollTop == null && el) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
+          const target = items.findIndex((b) => KANA_GAME_RE.test(txt(q(b, 'b'))));
+          if (target < 0) return { refused: 'no typing game with a material scope in the catalogue' };
+          g.targetIndex = target;
+          g.targetTitle = txt(q(items[target], 'b'));
+          items[target].click(); // also discards any session left running
+          return { from: g.origIndex, to: target, title: g.targetTitle, levelBefore: g.levelBefore };
+        },
+        startRound: (w) => {
+          const g = gamesState();
+          // Read the switch back AFTER React has re-rendered — this is its own call.
+          g.switched = txt(q(w, '.game-stage-head h3')) === g.targetTitle;
+          const start = q(w, '.game-launch-panel > .btn.primary');
+          if (!start) return { refused: 'the selected game renders no ready-state start control' };
+          start.click();
+          return { switched: g.switched, stage: txt(q(w, '.game-stage-head h3')) };
+        },
+        typeRound: (w) => {
+          const g = gamesState();
+          const box = q(w, '.game-answer-box');
+          if (!box) return { refused: 'the round did not start, or it is not a typing round' };
+          const hud = qa(w, '.game-round-hud > span').map(txt);
+          const bar = q(w, '.game-time-bar');
+          const now = bar ? Number(bar.getAttribute('aria-valuenow')) : NaN;
+          g.hudTotal = Number((txt(qa(w, '.game-round-hud > span')[0]).match(/\d+/g) || []).pop());
+          g.hud = hud.length === 4 && hud.every((s) => s.length > 0)
+            && !!bar && bar.getAttribute('role') === 'progressbar'
+            && now >= 0 && now <= 100 && (bar.getAttribute('aria-label') || '').length > 0;
+          g.hudEv = `spans=${hud.length} valuenow=${now} labelled=${!!bar && (bar.getAttribute('aria-label') || '').length > 0}`;
+          g.submitBefore = !!q(w, '.game-round .btn.primary') && q(w, '.game-round .btn.primary').disabled;
+          typeInto(box, 'ro'); // typed, never submitted — nothing is scored or recorded
+          return { hud, valuenow: now, roundTotal: g.hudTotal, submitDisabledBefore: g.submitBefore };
+        },
+        abortRound: (w) => {
+          const g = gamesState();
+          const box = q(w, '.game-answer-box');
+          const submit = q(w, '.game-round .btn.primary');
+          // The whole claim: an empty box locks submit, a typed box unlocks it, and the
+          // typed characters are really in the field. Presence of an <input> proves none
+          // of that.
+          g.typing = !!box && box.value === 'ro' && g.submitBefore === true && !!submit && !submit.disabled;
+          g.typingEv = `value="${box ? box.value : ''}" submitDisabled ${g.submitBefore}->${submit ? submit.disabled : 'gone'}`;
+          const active = qa(w, '.game-list-item').find((b) => b.classList.contains('active'));
+          if (!active) return { refused: 'no active game to discard the round through' };
+          active.click();
+          return { typing: g.typing, ev: g.typingEv };
+        },
+        settle: (w) => {
+          const g = gamesState();
+          const ready = !!q(w, '.game-launch-panel') && !q(w, '.game-round-shell');
+          g.typing = g.typing === true && ready;
+          g.typingEv = `${g.typingEv} readyStateReturned=${ready}`;
+          const el = scroller(w);
+          if (el) el.scrollTop = Math.min(120, Math.max(0, el.scrollHeight - el.clientHeight));
+          return { readyStateReturned: ready, scroll: el ? el.scrollTop : 0 };
+        },
+      },
+      drive: ['begin', 'startRound', 'typeRound', 'abortRound', 'settle'],
+      undo: {
+        games: (w) => {
+          const g = window.__LQP_GAMES_ORIG;
+          if (!g) return null;
+          const done = [];
+          const items = qa(w, '.game-list-item');
+          if (q(w, '.game-round-shell')) {
+            const active = items.find((b) => b.classList.contains('active'));
+            if (active) { active.click(); done.push('session'); }
+          }
+          const active = items.findIndex((b) => b.classList.contains('active'));
+          if (g.origIndex >= 0 && items[g.origIndex] && active !== g.origIndex) {
+            items[g.origIndex].click(); done.push('selection');
+          }
+          const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+          if (el && g.scrollTop != null && el.scrollTop !== g.scrollTop) {
+            el.scrollTop = g.scrollTop; done.push('scroll');
+          }
+          window.__LQP_GAMES_ORIG = null;
+          return done.length ? `games:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        gameCatalog: (w) => detach(q(w, '.game-list-item small'), 'no game blurb'),
+        stageIdentity: (w) => detach(q(w, '.game-stage-head h3'), 'no stage title'),
+        // Lie rather than delete: a full bar over an empty list is the exact defect.
+        sourceMaterial: (w) => {
+          const sec = qa(w, '.game-coverage').find((s) => !s.classList.contains('game-seen'));
+          return setAttr(sec && q(sec, '.game-coverage-bar i'), 'style',
+            'transform: scaleX(1)', 'no coverage bar');
+        },
+        exposureTracking: (w) => setAttr(q(w, '.game-seen .game-coverage-bar i'), 'style',
+          'transform: scaleX(1)', 'no exposure bar'),
+        typingInput: (w) => stripAttr(q(w, '.game-launch-panel > .btn.primary'), 'type', 'no start control'),
+        scoreHud: (w) => detach(q(w, '.game-launch-panel > .muted'), 'no session-length note'),
+        roundHistory: (w) => detach(q(w, '.game-history h4'), 'no history heading'),
+        materialScope: (w) => addClassAll(
+          [qa(w, '.game-kana-picker .os-viz-row')[0]
+            && qa(qa(w, '.game-kana-picker .os-viz-row')[0], 'button')
+              .find((b) => !b.classList.contains('primary'))].filter(Boolean),
+          'primary',
+        ),
+        levelSettings: (w) => detach(qa(w, '.game-stage-meta > span')[0], 'no level chip'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

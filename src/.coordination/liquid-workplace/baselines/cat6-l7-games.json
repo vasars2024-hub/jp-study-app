@@ -1,0 +1,213 @@
+{
+  "label": "l6-games",
+  "app": "games",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "980x589",
+  "driven": [
+    {
+      "step": "begin",
+      "result": "{\"from\":0,\"to\":3,\"title\":\"Kana Sprint\",\"levelBefore\":\"Level 1\"}"
+    },
+    {
+      "step": "startRound",
+      "result": "{\"switched\":true,\"stage\":\"Kana Sprint\"}"
+    },
+    {
+      "step": "typeRound",
+      "result": "{\"hud\":[\"1/5\",\"60s\",\"Combo 0\",\"Best 0\"],\"valuenow\":98,\"roundTotal\":5,\"submitDisabledBefore\":true}"
+    },
+    {
+      "step": "abortRound",
+      "result": "{\"typing\":true,\"ev\":\"value=\\\"ro\\\" submitDisabled true->false\"}"
+    },
+    {
+      "step": "settle",
+      "result": "{\"readyStateReturned\":true,\"scroll\":120}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "10/10",
+    "liquid": "10/10",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "980x589"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "gameCatalog",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "gameCatalog"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"games:selection\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "stageIdentity",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "stageIdentity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "sourceMaterial",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "style set to \"transform: scaleX(1)\"",
+        "reachable": "9/10",
+        "fellRows": [
+          "sourceMaterial"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"style\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "exposureTracking",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "style set to \"transform: scaleX(1)\"",
+        "reachable": "9/10",
+        "fellRows": [
+          "exposureTracking"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"style\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "typingInput",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "type stripped",
+        "reachable": "9/10",
+        "fellRows": [
+          "typingInput"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"type\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "scoreHud",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "scoreHud"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "roundHistory",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "roundHistory"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "materialScope",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "primary added to 1 of 1",
+        "reachable": "9/10",
+        "fellRows": [
+          "materialScope"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"added-class\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "levelSettings",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "levelSettings"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "aria-pressed stripped",
+        "reachable": "9/10",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"games:selection+scroll\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
