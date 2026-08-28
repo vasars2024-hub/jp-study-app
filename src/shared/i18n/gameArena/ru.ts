@@ -81,7 +81,7 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.coverage.noList': 'Для этого уровня не загружен список слов',
   'games.coverage.fallback': 'Используется встроенный материал',
   'games.seen.label': 'Материал, затронутый в этой игре',
-  'games.seen.count': 'Показано {seen}/{total} материала уровня {level} · {pct}%',
+  'games.seen.count': 'Показано {seen}/{total} материала уровня {level} · {pct}%',
   'games.history.label': 'Ваши последние раунды',
   'games.history.empty': 'Для этой игры пока нет записей. После игры здесь появятся счёт, точность и пропущенные элементы.',
   'games.history.line': 'Точность {accuracy}% · уровень {level} · пропущено: {missed}',

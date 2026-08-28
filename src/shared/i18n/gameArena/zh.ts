@@ -77,7 +77,7 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.coverage.noList': '本等级尚未上传词表',
   'games.coverage.fallback': '正在使用内置内容',
   'games.seen.label': '本局涉及的范围',
-  'games.seen.count': '本局已出现等级{level}内容的{seen}/{total} · {pct}%',
+  'games.seen.count': '本局已出现等级{level}内容的{seen}/{total} · {pct}%',
   'games.history.label': '最近的回合',
   'games.history.empty': '本游戏尚无记录。开始游玩后，这里会显示你的分数、正确率和答错的项目。',
   'games.history.line': '正确率 {accuracy}% · 等级 {level} · 答错 {missed} 个',
