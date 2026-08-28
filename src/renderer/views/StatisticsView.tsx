@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   AppChrome,
   StatusBarField,
@@ -27,6 +28,7 @@ export default function StatisticsView() {
   const aero = useAeroMaterials();
   const state = useStats();
   const { summary: s, peak, hasData, refresh, resetAllStats } = state;
+  const recentActivityRef = useRef<HTMLElement>(null);
 
   const menus: MenuBarMenu[] = [
     {
@@ -166,11 +168,25 @@ export default function StatisticsView() {
         {hasData && (
           <div className="actions">
             <button
-              className="btn"
-              onClick={() => void resetAllStats()}
+              type="button"
+              className="btn primary stats-recent-jump"
+              onClick={() => recentActivityRef.current?.scrollIntoView({ block: 'start' })}
             >
-              {t('stats.reset')}
+              <Icon name="chart-bar" size={13} />
+              {t('stats.last14Days')}
             </button>
+            <details className="stats-data-tools">
+              <summary className="btn">{t('stats.reset')}</summary>
+              <div className="stats-data-tools-panel">
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={() => void resetAllStats()}
+                >
+                  {t('stats.reset')}
+                </button>
+              </div>
+            </details>
           </div>
         )}
       </ContextualSurface>
@@ -189,7 +205,7 @@ export default function StatisticsView() {
         <>
           <StatsCards state={state} />
 
-          <section className="stats-section">
+          <section ref={recentActivityRef} className="stats-section stats-recent-activity">
             <h2>{t('stats.last14Days')}</h2>
             <StatsChart state={state} />
           </section>

@@ -23,7 +23,45 @@
 }
 
 .stats-context-head > .actions {
+  align-items: flex-start;
+  display: flex;
   flex: 0 0 auto;
+  gap: var(--lq-space-2);
+}
+
+.stats-recent-jump {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--lq-space-2);
+}
+
+.stats-data-tools {
+  position: relative;
+}
+
+.stats-data-tools > summary {
+  list-style: none;
+}
+
+.stats-data-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.stats-data-tools-panel {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + var(--lq-space-2));
+  right: 0;
+  min-width: 132px;
+  padding: var(--lq-space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--lq-radius-sm);
+  background: var(--panel);
+  box-shadow: var(--lq-anchor-shadow);
+}
+
+.stats-data-tools-panel > .btn {
+  width: 100%;
 }
 
 /* The Anki sync is the only Statistics-owned control whose shared small-button density measured
@@ -65,8 +103,20 @@
   }
 
   .stats-context-head > .actions,
-  .stats-context-head > .actions > .btn {
+  .stats-context-head > .actions > .btn,
+  .stats-context-head > .actions > .stats-data-tools,
+  .stats-context-head > .actions > .stats-data-tools > summary {
     width: 100%;
+  }
+
+  .stats-context-head > .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stats-data-tools-panel {
+    position: static;
+    margin-top: var(--lq-space-2);
   }
 
   .stats-view .stats-cards {

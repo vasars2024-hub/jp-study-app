@@ -543,3 +543,17 @@ shell survived Standard→Liquid→Standard with zero diffs.
 All eight controls independently moved **8/8→7/8→8/8**, each dropping only its declared row;
 restoration returned every detached node/attribute and the original scroll. **PASS 10/10.**
 Evidence: `cat6-l7-statistics.json`. Statistics is now **30/80**.
+
+## 2026-08-28 09:58 EDT — Statistics category 5 PASS 10/10; score 40/80
+
+The first clarity run scored **7/10**: no dominant task (Q1/Q3) and no compact disclosure (Q4).
+One product repair added a safe **Last 14 days** jump and placed destructive Reset in a collapsed,
+opaque anchor popup. Final Q1 has **1** entry point, Q3's primary is visible, and Q4 has **1**
+collapsed disclosure with **2** default controls.
+
+All ten questions now answer YES in forest-night and classic-light. Contrast sampled **100** runs
+per theme at minima **5.30/5.71** with zero failures; one Liquid region carries a transition and no
+loop. The control still forces Q2/Q3/Q5/Q10 NO and restores theme/presentation/store/residue exactly.
+Parity was refreshed after the product change: jump scroll **0→814**, Standard/Liquid **9/9 / 9/9**,
+nine controls **9→8→9**, zero round-trip diffs. Evidence: `cat5-l7-statistics{,-control}.json` and
+`cat6-l7-statistics.json`. **PASS 10/10; Statistics 40/80.**

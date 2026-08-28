@@ -1106,16 +1106,39 @@
           },
         },
         {
+          id: 'recentActivity',
+          f: (w) => {
+            const b = q(w, '.stats-recent-jump');
+            const target = q(w, '.stats-recent-activity');
+            return { ok: !!b && !!target && window.__LQP_STATS_RECENT_WORKED === true,
+              ev: `button=${!!b} target=${!!target} scrolled=${window.__LQP_STATS_RECENT_WORKED === true}` };
+          },
+        },
+        {
           id: 'resetRecovery',
           f: (w) => {
-            const b = q(w, '.stats-context-head .actions > button');
-            return { ok: !!b && !b.disabled && txt(b).length > 0,
-              ev: `present=${!!b} enabled=${!!b && !b.disabled} label="${txt(b)}"` };
+            const details = q(w, '.stats-data-tools');
+            const summary = details && q(details, ':scope > summary');
+            const action = details && q(details, '.stats-data-tools-panel > button');
+            return { ok: !!details && !details.open && txt(summary).length > 0
+                && !!action && !action.disabled && txt(action).length > 0,
+              ev: `details=${!!details} closed=${!!details && !details.open} summary="${txt(summary)}" action="${txt(action)}"` };
           },
         },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        recentActivity: (w) => {
+          const el = scroller(w);
+          const b = q(w, '.stats-recent-jump');
+          if (!el || !b) return { refused: 'recent-activity route is incomplete' };
+          const g = statsState();
+          if (g.scrollTop == null) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
+          const before = el.scrollTop;
+          b.click();
+          window.__LQP_STATS_RECENT_WORKED = el.scrollTop !== before;
+          return { before, after: el.scrollTop, moved: window.__LQP_STATS_RECENT_WORKED };
+        },
         scroll: (w, px) => {
           const el = scroller(w);
           if (!el) return { refused: 'surface has no scrollable region' };
@@ -1125,7 +1148,7 @@
           return { top: el.scrollTop, range: el.scrollHeight - el.clientHeight, key: keyOf(el) };
         },
       },
-      drive: [['scroll', '320']],
+      drive: ['recentActivity', ['scroll', '320']],
       undo: {
         statistics: (w) => {
           const g = window.__LQP_STATS_ORIG;
@@ -1133,6 +1156,7 @@
           const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
           if (el && el.scrollTop !== g.scrollTop) el.scrollTop = g.scrollTop;
           window.__LQP_STATS_ORIG = null;
+          window.__LQP_STATS_RECENT_WORKED = null;
           return el ? 'statistics:scroll' : null;
         },
       },
@@ -1149,7 +1173,11 @@
           const list = qa(w, 'ul.stats-books')[1];
           return stripAttr(list && q(list, '.stats-show-resume'), 'title', 'no show resume');
         },
-        resetRecovery: (w) => detach(q(w, '.stats-context-head .actions > button'), 'no reset action'),
+        recentActivity: (w) => removeClassAll(
+          [q(w, '.stats-recent-activity')],
+          'stats-recent-activity',
+        ),
+        resetRecovery: (w) => detach(q(w, '.stats-data-tools-panel > button'), 'no reset action'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

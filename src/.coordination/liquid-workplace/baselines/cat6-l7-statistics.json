@@ -2,12 +2,16 @@
   "label": "l7-statistics",
   "app": "statistics",
   "win": "main",
-  "raised": "raised",
+  "raised": "already-on-top",
   "matchedBy": "title",
   "host": "fwin",
   "presentationAsFound": "standard",
   "box": "820x580",
   "driven": [
+    {
+      "step": "recentActivity",
+      "result": "{\"before\":0,\"after\":814,\"moved\":true}"
+    },
     {
       "step": "scroll",
       "result": "{\"top\":320,\"range\":1438,\"key\":\"fwin-body\"}"
@@ -15,8 +19,8 @@
   ],
   "drivenRefusals": 0,
   "parity": {
-    "standard": "8/8",
-    "liquid": "8/8",
+    "standard": "9/9",
+    "liquid": "9/9",
     "na": 0,
     "equal": true,
     "rowsAgree": true,
@@ -37,121 +41,136 @@
       {
         "mutation": "knowledgeSummary",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "knowledgeSummary"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "levelEstimate",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "levelEstimate"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "summaryMetrics",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "summaryMetrics"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "activityChart",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "activityChart"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "bookBreakdown",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "bookBreakdown"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "showResume",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "title stripped",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "showResume"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"title\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "recentActivity",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "stats-recent-activity removed from 1 of 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "recentActivity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "resetRecovery",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "element detached",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "resetRecovery"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       },
       {
         "mutation": "windowLifecycle",
         "declaredCascade": [],
-        "preBaseline": "8/8",
+        "preBaseline": "9/9",
         "applied": "aria-pressed stripped",
-        "reachable": "7/8",
+        "reachable": "8/9",
         "fellRows": [
           "windowLifecycle"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"aria-pressed\",\"statistics:scroll\"]",
-        "afterRestore": "8/8",
+        "afterRestore": "9/9",
         "returned": true
       }
     ],

@@ -995,6 +995,13 @@ an eight-row Statistics spec. Standard/Liquid are **8/8 / 8/8**; an 820×580 pre
 trip retained a driven 320px scroll with zero diffs. Eight independent controls each moved
 **8/8→7/8→8/8** and only their declared row fell. Evidence: `cat6-l7-statistics.json`.
 
+**Progress 2026-08-28 (Statistics category 5) — 40/80.** A safe **Last 14 days** jump now owns
+the dominant-task slot and destructive Reset is behind one collapsed disclosure. Clarity moved
+**7/10→10/10** on the one repair: one top-third entry, visible primary, 2 default controls; two-theme
+contrast minima **5.30/5.71**, 0 failures. Q2/Q3/Q5/Q10 controls fail and restore. Refreshed parity
+includes the jump's **0→814** scroll effect at **9/9 / 9/9**, nine isolated controls, zero diffs.
+Evidence: `cat5-l7-statistics{,-control}.json`, `cat6-l7-statistics.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

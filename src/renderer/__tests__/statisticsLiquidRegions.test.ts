@@ -39,4 +39,15 @@ describe('Statistics Liquid regions', () => {
     expect(CONTENT).toContain('onClick={() => setMessage(null)}');
     expect(CONTENT).toContain("{t('common.close')}");
   });
+
+  it('keeps the safe recent-activity task visible and the destructive reset disclosed', () => {
+    expect(VIEW).toContain('const recentActivityRef = useRef<HTMLElement>(null);');
+    expect(VIEW).toContain('className="btn primary stats-recent-jump"');
+    expect(VIEW).toContain("recentActivityRef.current?.scrollIntoView({ block: 'start' })");
+    expect(VIEW).toContain('<details className="stats-data-tools">');
+    expect(VIEW).toContain('<summary className="btn">{t(\'stats.reset\')}</summary>');
+    expect(VIEW).toContain('ref={recentActivityRef} className="stats-section stats-recent-activity"');
+    expect(CSS).toContain('.stats-data-tools-panel {');
+    expect(CSS).toContain('background: var(--panel);');
+  });
 });
