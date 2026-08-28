@@ -341,9 +341,6 @@ export function GameArena() {
           <span>{t('games.xp', { xp: progress.xp })}</span>
           <span>{t('games.streak', { streak: progress.streak })}</span>
           <span>{t('games.badgeCount', { count: progress.badges.length })}</span>
-          <button type="button" className="btn small" onClick={openArenaSettings}>
-            <Icon name="settings" size={14} /> {t('games.settings')}
-          </button>
         </div>
       </ContextualSurface>
 
@@ -353,7 +350,8 @@ export function GameArena() {
             <button
               key={game.id}
               type="button"
-              className={`game-list-item ${selected === game.id ? 'active' : ''}`}
+              className={`game-list-item ${selected === game.id ? 'active game-list-item--primary' : ''}`}
+              aria-current={selected === game.id ? 'true' : undefined}
               onClick={() => {
                 setSelected(game.id);
                 setSession(null);
@@ -434,9 +432,19 @@ export function GameArena() {
               {!session && (
                 <div className="game-ready">
                   <div className="game-launch-panel">
-                    {selected === 'kana-sprint' && (
-                      <KanaScopePicker selection={settings.kana} />
-                    )}
+                    <details className="game-ready-options">
+                      <summary>
+                        <Icon name="settings" size={14} /> {t('games.roundOptions')}
+                      </summary>
+                      <div className="game-ready-options-body">
+                        {selected === 'kana-sprint' && (
+                          <KanaScopePicker selection={settings.kana} />
+                        )}
+                        <button type="button" className="btn small" onClick={openArenaSettings}>
+                          <Icon name="settings" size={14} /> {t('games.settings')}
+                        </button>
+                      </div>
+                    </details>
                     <button type="button" className="btn primary" onClick={startSelected}>
                       <Icon name="player" size={14} /> {t('games.start')}
                     </button>

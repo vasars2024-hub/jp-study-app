@@ -2,7 +2,7 @@
   "surface": "Game Arena",
   "label": "l7-games",
   "control": true,
-  "at": "2026-08-28T20:13:07.556Z",
+  "at": "2026-08-28T23:28:53.752Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -37,12 +37,11 @@
   "planted": {
     "savedTitle": "Game Arena",
     "savedTransform": "",
-    "primaryFound": "button.btn",
+    "primaryFound": "button.game-list-item",
     "primaryFromPin": true,
-    "primariesMoved": 2,
-    "primariesFromPin": 2,
+    "primariesMoved": 1,
+    "primariesFromPin": 1,
     "primaryList": [
-      "button.btn",
       "button.game-list-item"
     ],
     "titlesBlanked": 2,
@@ -66,7 +65,7 @@
     "restoredTo": "standard"
   },
   "unplanted": {
-    "restoredMoved": 2,
+    "restoredMoved": 1,
     "restoredTitles": 1,
     "residue": 0
   },
@@ -115,7 +114,7 @@
       "verdict": "NO",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "button.btn",
+        "primaryAction": "button.game-list-item",
         "insideBodyViewport": false,
         "explicitlyMarked": true
       }
@@ -123,20 +122,19 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 0,
-        "scannedControls": 7,
+        "collapsedDisclosures": 1,
+        "scannedControls": 6,
         "chromeControlsRaw": 8,
-        "summaryHeaders": 1,
+        "summaryHeaders": 2,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 0,
+          "total": 1,
           "open": 0
         },
         "scannedList": [
-          "Settings",
           "Start round",
           "card 0",
           "card 1",
@@ -307,7 +305,7 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "game:15",
+          "game:16",
           "muted:4"
         ],
         "contentDominant": "svg.[object media",
@@ -332,7 +330,7 @@
     "q1": "NO",
     "q2": "NO",
     "q3": "NO",
-    "q4": "NO",
+    "q4": "YES",
     "q6": "NO",
     "q10": "NO"
   },
@@ -347,17 +345,16 @@
       "inputList": []
     },
     "q4": {
-      "collapsedDisclosures": 0,
-      "scannedControls": 7,
+      "collapsedDisclosures": 1,
+      "scannedControls": 6,
       "chromeControlsRaw": 8,
-      "summaryHeaders": 1,
+      "summaryHeaders": 2,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 0,
+        "total": 1,
         "open": 0
       },
       "scannedList": [
-        "Settings",
         "Start round",
         "card 0",
         "card 1",
@@ -393,7 +390,7 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "game:15",
+        "game:16",
         "muted:4"
       ],
       "contentDominant": "svg.[object media",

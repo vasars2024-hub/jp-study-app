@@ -989,3 +989,26 @@ restored to Home; the game remains Sentence Builder and `jp-game-progress-v1` re
 
 **Games is 60/80** (categories 1, 2, 3, 4, 6, 8 PASS; 5 VOID; 7 VOID on unstable environment).
 Evidence: `cat8-l7-games-first.json`, `cat8-l7-games.json`.
+
+## 2026-08-28 19:29 EDT — Games categories 5 and 6 controlled PASS after disclosure repair
+
+Category 5's two named defects are closed without tuning an accent share. The selected game now
+declares `aria-current` plus a primary state, uses a neutral text-derived **16%** fill and a
+separate accent edge, while hover is **7%**. “Round options” is a native collapsed disclosure;
+Settings and Kana scope sit behind it, Start remains visible. Q1 is **1** entry point in every
+palette and Q4 is **1** disclosure / **1** scanned control.
+
+The first repair exposed active-description contrast **3.86:1** on forest-night; selected
+descriptions now use normal text ink. Expanding the same harness beyond classic-light then found
+the Arena's generic muted token at **4.36–4.46** on five light palettes. The Arena remaps it 85%
+muted / 15% text. Final Q5 minima: forest **5.87**, classic **6.23**, sepia **4.70**, ocean **4.88**,
+mint **4.77**, rose **4.73**, paper **5.12**. All six runs PASS 10/10; control moves Q2/Q3/Q5/Q10
+and returns with residue **0**. The nine accent presets no longer control fill separation.
+
+Category 6 opens the disclosure through its existing Games data drive, proves **10/10** rows in
+Standard and Liquid, returns zero round-trip diffs, then restores it closed. All **10/10** mutations
+drop exactly their own row and return. Categories 1–4 and 8 need pure RUNs after this DOM change;
+category 7 remains VOID only on its unstable drag environment.
+
+Evidence: `cat5-l7-games{,-control,-soft-sepia,-ocean-blue,-mint-green,-rose-pine,-paper}.json`,
+`cat6-l7-games.json`.

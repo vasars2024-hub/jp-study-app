@@ -2,7 +2,7 @@
   "surface": "Game Arena",
   "label": "l7-games",
   "control": false,
-  "at": "2026-08-28T23:28:29.485Z",
+  "at": "2026-08-28T23:28:49.670Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -27,7 +27,7 @@
   "axes": {
     "theme": [
       "forest-night",
-      "classic-light"
+      "paper"
     ]
   },
   "storeBefore": {
@@ -136,17 +136,17 @@
             }
           },
           {
-            "theme": "classic-light",
+            "theme": "paper",
             "measured": 55,
             "unmeasurable": 0,
-            "minRatio": 6.23,
+            "minRatio": 5.12,
             "failingCount": 0,
             "worst": {
-              "el": "small.",
-              "ratio": 6.23,
+              "el": "span.game-fallback-tag",
+              "ratio": 5.12,
               "bar": 4.5,
-              "bg": "aside.lq-contextual@88% over gradient on div.game-arena over div.game-arena@74% over section.fwin@100%",
-              "text": "Type the Japanese answer"
+              "bg": "main.game-stage@100%",
+              "text": "Using built-in content"
             }
           }
         ],
@@ -268,7 +268,7 @@
     "q10": "YES"
   },
   "altThemeNumbers": {
-    "theme": "classic-light",
+    "theme": "paper",
     "controlsPainted": 22,
     "q1": {
       "entryPoints": 1,

@@ -23,6 +23,7 @@ export const GAME_ARENA_CHROME_JA: Catalog = {
   'games.badgeCount': 'バッジ{count}個',
   'games.badges': 'バッジ',
   'games.settings': '設定',
+  'games.roundOptions': 'ラウンド設定',
   'games.list': 'ゲーム一覧',
   'games.def.sentence-builder.title': 'センテンスビルダー',
   'games.def.sentence-builder.desc': 'ばらばらの語句から日本語の文を組み立て直します。',

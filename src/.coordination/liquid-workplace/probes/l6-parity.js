@@ -1506,13 +1506,15 @@
             const g = gamesState();
             const meta = qa(w, '.game-stage-meta > span').map(txt);
             const filled = meta.filter((s) => s.length > 0).length;
-            const entry = q(w, '.game-arena-progress button');
+            const options = q(w, '.game-ready-options');
+            const entry = q(w, '.game-ready-options-body > button');
             // The level is arena-wide, not per game: switching games must not move it.
             // A per-game decoration would drift here, which is the defect this catches.
             const stable = g.levelBefore != null && meta[0] === g.levelBefore;
             return { ok: meta.length === 3 && filled === 3 && stable
-                && !!entry && entry.getAttribute('type') === 'button' && txt(entry).length > 0,
-              ev: `meta=[${meta.join(' | ')}] levelBeforeSwitch="${g.levelBefore}" stable=${stable} settingsEntry="${txt(entry)}"` };
+                && !!options && options.open && !!entry
+                && entry.getAttribute('type') === 'button' && txt(entry).length > 0,
+              ev: `meta=[${meta.join(' | ')}] levelBeforeSwitch="${g.levelBefore}" stable=${stable} optionsOpen=${!!options && options.open} settingsEntry="${txt(entry)}"` };
           },
         },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
@@ -1523,6 +1525,8 @@
           const items = qa(w, '.game-list-item');
           if (g.origIndex == null) g.origIndex = items.findIndex((b) => b.classList.contains('active'));
           if (g.levelBefore == null) g.levelBefore = txt(qa(w, '.game-stage-meta > span')[0]);
+          const options = q(w, '.game-ready-options');
+          if (g.optionsOpenBefore == null) g.optionsOpenBefore = !!options && options.open;
           const el = scroller(w);
           if (g.scrollTop == null && el) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
           const target = items.findIndex((b) => KANA_GAME_RE.test(txt(q(b, 'b'))));
@@ -1576,9 +1580,11 @@
           const ready = !!q(w, '.game-launch-panel') && !q(w, '.game-round-shell');
           g.typing = g.typing === true && ready;
           g.typingEv = `${g.typingEv} readyStateReturned=${ready}`;
+          const options = q(w, '.game-ready-options');
+          if (options && !options.open) options.open = true;
           const el = scroller(w);
           if (el) el.scrollTop = Math.min(120, Math.max(0, el.scrollHeight - el.clientHeight));
-          return { readyStateReturned: ready, scroll: el ? el.scrollTop : 0 };
+          return { readyStateReturned: ready, optionsOpen: !!options && options.open, scroll: el ? el.scrollTop : 0 };
         },
       },
       drive: ['begin', 'startRound', 'typeRound', 'abortRound', 'settle'],
@@ -1599,6 +1605,10 @@
           const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
           if (el && g.scrollTop != null && el.scrollTop !== g.scrollTop) {
             el.scrollTop = g.scrollTop; done.push('scroll');
+          }
+          const options = q(w, '.game-ready-options');
+          if (options && options.open !== g.optionsOpenBefore) {
+            options.open = g.optionsOpenBefore; done.push('options');
           }
           window.__LQP_GAMES_ORIG = null;
           return done.length ? `games:${done.join('+')}` : null;

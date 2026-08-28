@@ -1,7 +1,7 @@
 {
-  "label": "l6-games",
+  "label": "l7-games",
   "app": "games",
-  "win": "(focused)",
+  "win": "main",
   "raised": "already-on-top",
   "matchedBy": "title",
   "host": "fwin",
@@ -18,7 +18,7 @@
     },
     {
       "step": "typeRound",
-      "result": "{\"hud\":[\"1/5\",\"60s\",\"Combo 0\",\"Best 0\"],\"valuenow\":98,\"roundTotal\":5,\"submitDisabledBefore\":true}"
+      "result": "{\"hud\":[\"1/5\",\"60s\",\"Combo 0\",\"Best 0\"],\"valuenow\":99,\"roundTotal\":5,\"submitDisabledBefore\":true}"
     },
     {
       "step": "abortRound",
@@ -26,7 +26,7 @@
     },
     {
       "step": "settle",
-      "result": "{\"readyStateReturned\":true,\"scroll\":120}"
+      "result": "{\"readyStateReturned\":true,\"optionsOpen\":true,\"scroll\":120}"
     }
   ],
   "drivenRefusals": 0,
@@ -61,7 +61,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"games:selection\"]",
+        "restored": "[\"detached\",\"games:selection+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -76,7 +76,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "restored": "[\"detached\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -91,7 +91,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"style\",\"games:selection+scroll\"]",
+        "restored": "[\"style\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -106,7 +106,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"style\",\"games:selection+scroll\"]",
+        "restored": "[\"style\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -121,7 +121,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"type\",\"games:selection+scroll\"]",
+        "restored": "[\"type\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -136,7 +136,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "restored": "[\"detached\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -151,7 +151,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "restored": "[\"detached\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -166,7 +166,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"added-class\",\"games:selection+scroll\"]",
+        "restored": "[\"added-class\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -181,7 +181,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"games:selection+scroll\"]",
+        "restored": "[\"detached\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       },
@@ -196,7 +196,7 @@
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"aria-pressed\",\"games:selection+scroll\"]",
+        "restored": "[\"aria-pressed\",\"games:selection+scroll+options\"]",
         "afterRestore": "10/10",
         "returned": true
       }

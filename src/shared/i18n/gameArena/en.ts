@@ -39,6 +39,7 @@ export const GAME_ARENA_CHROME_EN: Catalog = {
   'games.badgeCount': '{count} badges',
   'games.badges': 'Badges',
   'games.settings': 'Settings',
+  'games.roundOptions': 'Round options',
   'games.list': 'Game list',
   'games.def.sentence-builder.title': 'Sentence Builder',
   'games.def.sentence-builder.desc': 'Rebuild the Japanese sentence from shuffled pieces.',

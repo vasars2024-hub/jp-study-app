@@ -26,6 +26,7 @@ export const GAME_ARENA_CHROME_RU: Catalog = {
   'games.badgeCount': { one: '{count} значок', few: '{count} значка', many: '{count} значков', other: '{count} значка' },
   'games.badges': 'Значки',
   'games.settings': 'Настройки',
+  'games.roundOptions': 'Настройки раунда',
   'games.list': 'Список игр',
   'games.def.sentence-builder.title': 'Конструктор предложений',
   'games.def.sentence-builder.desc': 'Соберите японское предложение из перемешанных кусочков.',

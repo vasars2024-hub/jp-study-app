@@ -22,6 +22,7 @@ export const GAME_ARENA_CHROME_ZH: Catalog = {
   'games.badgeCount': '{count}枚徽章',
   'games.badges': '徽章',
   'games.settings': '设置',
+  'games.roundOptions': '回合设置',
   'games.list': '游戏列表',
   'games.def.sentence-builder.title': '句子构建',
   'games.def.sentence-builder.desc': '用打乱的词块重新拼出这句日语。',

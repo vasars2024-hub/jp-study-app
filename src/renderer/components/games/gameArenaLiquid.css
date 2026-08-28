@@ -6,6 +6,24 @@
   -webkit-line-clamp: unset;
 }
 
+/* Selection is a declared state, not a fixed accent-alpha guess. A neutral
+   text tint keeps the fill separated on every light/dark palette; the accent
+   edge retains identity. Hover stays deliberately quieter than selection. */
+.game-list .game-list-item:hover:not(.active) {
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.game-list .game-list-item.active {
+  border-color: var(--accent-text);
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+  box-shadow: inset 3px 0 var(--accent-text);
+}
+
+.game-list .game-list-item.active small {
+  color: var(--text);
+}
+
 /* Gameplay, answers, and review feedback are dense work. Keep that primary
    canvas on the opaque semantic material in every presentation. */
 .game-stage {
@@ -32,6 +50,32 @@
 
 .game-ready > .game-launch-panel > .btn {
   align-self: flex-start;
+}
+
+.game-ready-options {
+  align-self: stretch;
+  border: 1px solid var(--lq-border-subtle);
+  border-radius: var(--lq-radius-control);
+}
+
+.game-ready-options > summary {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: var(--lq-space-2);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.game-ready-options-body {
+  display: grid;
+  gap: var(--lq-space-3);
+  padding: 0 var(--lq-space-3) var(--lq-space-3);
+}
+
+.game-ready-options-body > .btn {
+  justify-self: start;
 }
 
 .game-history {
@@ -88,6 +132,11 @@
    is exactly the state the category-4 harness measures at 260x170. */
 .game-arena {
   container-type: inline-size;
+  --game-muted-ink: color-mix(in srgb, var(--muted) 85%, var(--text));
+}
+
+.game-arena .muted {
+  color: var(--game-muted-ink);
 }
 
 /* Below the two-column floor the catalogue and the stage become one vertical

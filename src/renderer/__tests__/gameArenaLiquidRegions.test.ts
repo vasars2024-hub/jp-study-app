@@ -43,6 +43,17 @@ describe('Game Arena Liquid regions', () => {
     expect(LIQUID_CSS).toContain('-webkit-line-clamp: unset');
   });
 
+  it('declares selection independently of the palette and tucks advanced round controls away', () => {
+    expect(CONTENT).toContain("'active game-list-item--primary'");
+    expect(CONTENT).toContain("aria-current={selected === game.id ? 'true' : undefined}");
+    expect(LIQUID_CSS).toMatch(/\.game-list \.game-list-item\.active\s*\{[^}]*var\(--text\) 16%/s);
+    expect(LIQUID_CSS).toMatch(/\.game-list \.game-list-item:hover:not\(\.active\)\s*\{[^}]*var\(--text\) 7%/s);
+    expect(LIQUID_CSS).toMatch(/\.game-list \.game-list-item\.active small\s*\{[^}]*color: var\(--text\)/s);
+    expect(CONTENT).toContain('<details className="game-ready-options">');
+    expect(CONTENT).toContain("t('games.roundOptions')");
+    expect(CONTENT).toMatch(/game-ready-options-body[\s\S]*KanaScopePicker[\s\S]*openArenaSettings/);
+  });
+
   it('keeps the gameplay canvas on an opaque semantic work material', () => {
     expect(LIQUID_CSS).toMatch(/\.game-stage\s*\{[^}]*background: var\(--lq-work-bg\)/s);
   });
@@ -52,6 +63,8 @@ describe('Game Arena Liquid regions', () => {
     // styles.css cannot fire while the window is narrow and the desktop is wide.
     expect(LIQUID_CSS).toMatch(/\.game-arena\s*\{[^}]*container-type: inline-size/s);
     expect(LIQUID_CSS).toContain('@container (max-width: 560px)');
+    expect(LIQUID_CSS).toMatch(/--game-muted-ink:\s*color-mix\(in srgb, var\(--muted\) 85%, var\(--text\)\)/);
+    expect(LIQUID_CSS).toMatch(/\.game-arena \.muted\s*\{[^}]*color: var\(--game-muted-ink\)/s);
   });
 
   it('turns the catalogue and stage into one vertical document when narrow', () => {
