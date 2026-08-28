@@ -557,3 +557,31 @@ loop. The control still forces Q2/Q3/Q5/Q10 NO and restores theme/presentation/s
 Parity was refreshed after the product change: jump scroll **0→814**, Standard/Liquid **9/9 / 9/9**,
 nine controls **9→8→9**, zero round-trip diffs. Evidence: `cat5-l7-statistics{,-control}.json` and
 `cat6-l7-statistics.json`. **PASS 10/10; Statistics 40/80.**
+
+## 2026-08-28 10:20 EDT — Statistics category 4 PASS 10/10; score 50/80
+
+Recovered `codexA`'s interrupted turn first: it committed every slice through `697e0d3f` and left
+NOTHING uncommitted — the loss was bookkeeping only (no burn-down line, no handoff). The open
+defect it named was exact and reproduced on a fresh RUN of the existing harness: maximized dead
+region **17.0%** against the 15% bar, a **284x621** empty column at grid 31,6.
+
+Cause, measured: the harness marks TEXT RANGE rects, so a 397px card holding a four-glyph number
+covers ~30px and the rest is dead by construction; the whole view was one 1,216px column of
+stacked full-width sections in a 1,264px body.
+
+Repair is CSS-only and container-scoped: at `min-width: 1040px` the view becomes a two-column grid
+(knowledge | recent activity, books | shows, cards spanning) and a metric card reads as one line.
+An element cannot query itself, so the container sits on the view's PARENT behind
+`:where(.fwin-body, .ui-app-chrome__body):has(> .stats-view)` — a floating Statistics window has no
+`AppChrome` at all, and `:has` keeps the container off every other window body. `row dense` is what
+lets recent activity rise beside knowledge without reordering the DOM; nothing in either is
+focusable, so focus order is untouched. Placement is by class, not `nth-child`: books and shows are
+both conditional.
+
+Final: maximized **13.3%**, default **8.9%**, compact **0.5%**; clipped/overlaps/scrollers/hidden
+overflow **0** at all three sizes; chrome **11.4 -> 8.7%** as the window grows; all three sizes
+restored byte-identically. Controls: injected clip **0 -> 1 -> 0** with removal proven, and the
+sub-minimum **200x140** leg still fails with **13** clips and one hidden overflow. **PASS 10/10.**
+Parity re-checked after the product change: driven jump **0 -> 814**, `check('statistics')`
+**9/9**, scroll restored to 0. Focused suite **6/6**. Evidence: `cat4-l7-statistics.json`.
+Statistics is **50/80**; category 2 and 7 are unrun, category 8 is UNMEASURED.

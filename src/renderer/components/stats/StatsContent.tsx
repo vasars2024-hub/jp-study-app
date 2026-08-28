@@ -146,7 +146,7 @@ export function WordKnowledge() {
   };
 
   return (
-    <section className="stats-section">
+    <section className="stats-section stats-knowledge">
       <div className="wk-head">
         <h2>{t('stats.wk.title')}</h2>
         <button className="btn small" disabled={busy} onClick={sync}>

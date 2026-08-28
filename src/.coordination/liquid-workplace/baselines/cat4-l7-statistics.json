@@ -33,7 +33,7 @@
       "hiddenOverflowX": 0,
       "deadPctViewport": 0.5,
       "deadRegionBasis": "visible surface",
-      "chromePct": 69.1,
+      "chromePct": 76.8,
       "dominantCanvasPct": 78.8,
       "bars": {
         "clipped": true,
@@ -50,7 +50,7 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 17,
+      "deadPctViewport": 13.3,
       "deadRegionBasis": "visible surface",
       "chromePct": 8.7,
       "dominantCanvasPct": 95.3,
@@ -58,7 +58,7 @@
         "clipped": true,
         "overlaps": true,
         "horizontal": true,
-        "deadRegion": false
+        "deadRegion": true
       },
       "restored": true
     }
@@ -90,8 +90,8 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 247;",
-      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 247;",
+      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 271;",
+      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 271;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -109,13 +109,13 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 247;",
-      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 251;",
+      "restoredFrom": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 271;",
+      "restoredTo": "left: 128px; top: 84px; width: 820px; height: 580px; z-index: 275;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "284x621 at grid 31,6",
+      "deadRegionBox": "631x219 at grid 20,15",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -127,15 +127,13 @@
     "clipped": true,
     "overlaps": true,
     "horizontal": true,
-    "deadRegion": false,
+    "deadRegion": true,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "deadRegion"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [

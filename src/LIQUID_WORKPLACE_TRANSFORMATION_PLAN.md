@@ -1002,6 +1002,15 @@ contrast minima **5.30/5.71**, 0 failures. Q2/Q3/Q5/Q10 controls fail and restor
 includes the jump's **0→814** scroll effect at **9/9 / 9/9**, nine isolated controls, zero diffs.
 Evidence: `cat5-l7-statistics{,-control}.json`, `cat6-l7-statistics.json`.
 
+**Progress 2026-08-28 (Statistics category 4) — 50/80.** The maximized dead region closed
+**17.0%→13.3%** against the 15% bar. A wide window now runs a two-column composition (knowledge |
+recent activity, books | shows) with the container on the view's PARENT behind
+`:has(> .stats-view)`, because a floating window has no `AppChrome` and an element cannot query
+itself. Default **8.9%**, compact **0.5%**, clip/overlap/scroller/hidden-overflow **0** at all
+three sizes, chrome **11.4→8.7%**, all three restored. Injected clip **0→1→0** with removal proven;
+the sub-minimum **200×140** leg still fails with **13** clips. Parity re-checked after the product
+change at **9/9**. Evidence: `cat4-l7-statistics.json`. Categories 2 and 7 unrun, 8 UNMEASURED.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

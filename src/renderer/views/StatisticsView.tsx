@@ -211,14 +211,14 @@ export default function StatisticsView() {
           </section>
 
           {s.books.length > 0 && (
-            <section className="stats-section">
+            <section className="stats-section stats-by-book">
               <h2>{t('stats.byBook')}</h2>
               <StatsBooks state={state} />
             </section>
           )}
 
           {s.shows.length > 0 && (
-            <section className="stats-section">
+            <section className="stats-section stats-by-show">
               <h2>{t('stats.byShow')}</h2>
               <StatsShows state={state} />
             </section>

@@ -14,8 +14,23 @@ describe('Statistics Liquid regions', () => {
     // Dense data remains on the existing stable surfaces rather than becoming universal glass.
     expect(VIEW).toContain('<WordKnowledge />');
     expect(VIEW).toContain('<StatsCards state={state} />');
-    expect(VIEW).toContain('<section className="stats-section">');
+    expect(VIEW).toContain('<section className="stats-section stats-by-book">');
+    expect(VIEW).toContain('<section className="stats-section stats-by-show">');
     expect(VIEW).not.toContain('<ContextualSurface as="section"');
+  });
+
+  it('spends a wide window on a second column instead of an empty right margin', () => {
+    // The parent carries the container because an element cannot query itself, and `:has`
+    // keeps that off every other window body. A floating Statistics window has no AppChrome.
+    expect(CSS).toContain(':where(.fwin-body, .ui-app-chrome__body):has(> .stats-view) {');
+    expect(CSS).toContain('container: statsShell / inline-size;');
+    expect(CSS).toContain('@container statsShell (min-width: 1040px)');
+    expect(CSS).toContain('grid-auto-flow: row dense;');
+
+    // Placement is by name, not by nth-child: books and shows are both conditional.
+    expect(CONTENT).toContain('className="stats-section stats-knowledge"');
+    expect(CSS).toContain('.stats-view > .stats-knowledge,\n  .stats-view > .stats-by-book {\n    grid-column: 1;');
+    expect(CSS).toContain('.stats-view > .stats-recent-activity,\n  .stats-view > .stats-by-show {\n    grid-column: 2;');
   });
 
   it('reflows against the floating window rather than the desktop viewport', () => {

@@ -95,6 +95,67 @@
   min-height: var(--lq-hit-target);
 }
 
+/* Wide-window composition.
+ *
+ * A maximized Statistics window gives the body 1,264px and the view spent it on ONE 1,216px
+ * column of stacked full-width sections: the right 284px carried no glyph for the whole visible
+ * height (measured 17.0% of the viewport dead against the 15% bar). Two changes, both reversible
+ * and both scoped to this container query, so the 820x580 default and the compact window keep the
+ * single-column reading order they were scored on:
+ *   - knowledge sits beside recent activity, and books beside shows;
+ *   - a metric card reads as one line at this width instead of a tall block whose right half is
+ *     empty by construction.
+ * The container is the view's OWN PARENT, not the desktop viewport, for the same reason the 440px
+ * query below uses the view: a floating window must reflow on its own width. An element cannot
+ * query itself, so the parent carries it — and `:has(> .stats-view)` is what keeps that off every
+ * other window body. A floating Statistics window has no `AppChrome` at all (`.stats-view` is a
+ * direct child of `.fwin-body`); the full-view route has one; the selector covers both without a
+ * host branch. `statsShell` is named so the descendant queries below still resolve against
+ * `.stats-view`, which is itself a container. */
+:where(.fwin-body, .ui-app-chrome__body):has(> .stats-view) {
+  container: statsShell / inline-size;
+}
+
+@container statsShell (min-width: 1040px) {
+  .stats-view {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* `dense` is what lets recent activity rise into the row the knowledge section opened
+     * without reordering the DOM: nothing here is focusable in a different order than it
+     * reads, so the packing changes placement only. */
+    grid-auto-flow: row dense;
+    align-content: start;
+    column-gap: var(--lq-space-5);
+  }
+
+  .stats-view > .stats-context-head,
+  .stats-view > .stats-empty,
+  .stats-view > .stats-cards {
+    grid-column: 1 / -1;
+  }
+
+  .stats-view > .stats-knowledge,
+  .stats-view > .stats-by-book {
+    grid-column: 1;
+  }
+
+  .stats-view > .stats-recent-activity,
+  .stats-view > .stats-by-show {
+    grid-column: 2;
+  }
+
+  .stats-view .stats-card {
+    align-items: baseline;
+    flex-direction: row;
+    gap: var(--lq-space-4);
+    justify-content: space-between;
+  }
+
+  .stats-view .stats-card-lbl {
+    text-align: right;
+  }
+}
+
 /* Floating-window width, not desktop viewport width, decides when the contextual tools stack. */
 @container (max-width: 440px) {
   .stats-context-head {
