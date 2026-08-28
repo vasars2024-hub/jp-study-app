@@ -951,6 +951,12 @@ still measured only **33/479** controls and **117/2,062** prior text owners. The
 void; the edit and overwritten baseline were restored under RULE 1's one-repair limit. The next
 turn opens on that exact core-leg visibility assumption, not Statistics.
 
+**Progress 2026-08-27 (latest) — Notebook remains 70/80.** The next generic repair reached
+**2,056 text owners / 454 core controls** and **472/479** pointer controls; its control falsified
+all five scored terms. It is nevertheless VOID because exact restoration failed (**0/381** core
+owners; **382** empty style attributes). Live residue and all failed files were restored. Per the
+one-repair rule, category 1 remains UNMEASURED and Statistics does not open.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

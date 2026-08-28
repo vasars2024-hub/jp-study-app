@@ -445,3 +445,19 @@ inline `content-visibility:visible`; it must retain one-record-at-a-time reveal 
 Notebook remains **70/80**, category 1 UNMEASURED. Product source was impossible this turn because
 the only open Notebook gate exhausted its one permitted harness repair and Statistics may not open
 before Notebook closes.
+
+## 2026-08-27 22:18 EDT — full population reached, but exact restoration failed
+
+Live falsification isolated the boundary: an AUTO owner's own `checkVisibility` is true while its
+descendants are false; inline `content-visibility:visible` makes those descendants measurable and
+restoring the original attribute hides them again. A generic one-record-at-a-time repair then read
+**2,056 text owners / 454 core controls** and **472/479 pointer controls**, with zero contrast,
+keyboard, 2.5.8, pointer-floor, or theft failures. The control moved all five scored terms from
+**0 → 1/2/2/1/2 → 0**.
+
+The verdict is still VOID: the core receipt reported **0/381 owners restored** and inspection found
+**382** empty `style` attributes. Those were removed live; final residue is **0** style attributes,
+**0** inline content-visibility declarations, and timeline scroll **0**. The harness, delegated
+probe, and overwritten baseline were restored byte-identical to HEAD under RULE 1. Notebook stays
+**70/80**, category 1 UNMEASURED. Next attempt must remove the temporary property before removing
+an originally-absent attribute, then assert the attribute remains absent after forced layout.
