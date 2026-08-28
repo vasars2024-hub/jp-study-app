@@ -4721,6 +4721,7 @@ export const ja: Catalog = {
   'stats.wk.readingCards': 'Ankiのカードを読み込み中…',
   'stats.wk.syncFailed': '同期に失敗しました。',
   'stats.wk.syncResult': 'Ankiから{scanned}語を同期 — {changed}語を更新しました。',
+  'stats.wk.syncStale': 'Ankiが今回の更新に応答しませんでした。前回同期した{scanned}語を表示しています。',
   'stats.wk.known': '既知',
   'stats.wk.familiar': 'なじみあり',
   'stats.wk.learning': '学習中',

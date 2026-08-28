@@ -123,7 +123,7 @@ export function WordKnowledge() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
-    tone: 'busy' | 'error' | 'success';
+    tone: 'busy' | 'error' | 'success' | 'stale';
   } | null>(null);
 
   useEffect(() => onKnowledgeChanged(() => setCounts(knowledgeCounts())), []);
@@ -136,6 +136,13 @@ export function WordKnowledge() {
     setBusy(false);
     if (!r.ok) {
       setMessage({ text: r.error ?? t('stats.wk.syncFailed'), tone: 'error' });
+    } else if (r.stale) {
+      // Real counts from the last good snapshot, but nothing was re-read from Anki just
+      // now. Saying "synced" here is the false success this tone exists to prevent.
+      setMessage({
+        text: t('stats.wk.syncStale', { scanned: r.scanned ?? 0 }),
+        tone: 'stale',
+      });
     } else {
       setMessage({
         text: t('stats.wk.syncResult', { scanned: r.scanned ?? 0, changed: r.changed ?? 0 }),

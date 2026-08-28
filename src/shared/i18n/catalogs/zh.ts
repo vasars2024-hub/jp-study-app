@@ -4702,6 +4702,7 @@ export const zh: Catalog = {
   'stats.wk.readingCards': '正在读取 Anki 卡片…',
   'stats.wk.syncFailed': '同步失败。',
   'stats.wk.syncResult': '已从 Anki 同步 {scanned} 个词 — 更新了 {changed} 个。',
+  'stats.wk.syncStale': 'Anki 未响应本次刷新 — 显示上次同步的 {scanned} 个词。',
   'stats.wk.known': '已掌握',
   'stats.wk.familiar': '熟悉',
   'stats.wk.learning': '学习中',

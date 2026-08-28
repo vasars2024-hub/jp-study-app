@@ -5212,6 +5212,8 @@ export const ru: Catalog = {
   'stats.wk.readingCards': 'Чтение ваших карточек Anki…',
   'stats.wk.syncFailed': 'Синхронизация не удалась.',
   'stats.wk.syncResult': 'Синхронизировано {scanned} слов из Anki — обновлено {changed}.',
+  'stats.wk.syncStale':
+    'Anki не ответил на это обновление — показаны {scanned} слов из последней синхронизации.',
   'stats.wk.known': 'известно',
   'stats.wk.familiar': 'знакомо',
   'stats.wk.learning': 'изучается',

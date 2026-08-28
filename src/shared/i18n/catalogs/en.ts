@@ -4994,6 +4994,8 @@ export const en: Catalog = {
   'stats.wk.readingCards': 'Reading your Anki cards…',
   'stats.wk.syncFailed': 'Sync failed.',
   'stats.wk.syncResult': 'Synced {scanned} words from Anki — {changed} updated.',
+  'stats.wk.syncStale':
+    'Anki did not answer this refresh — showing the last synced {scanned} words.',
   'stats.wk.known': 'known',
   'stats.wk.familiar': 'familiar',
   'stats.wk.learning': 'learning',

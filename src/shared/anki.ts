@@ -290,6 +290,34 @@ export interface IntervalSnapshot {
 }
 
 /**
+ * What a forced interval refresh actually achieved.
+ *
+ * `anki:getIntervals` is a data-preferring channel: when the poll throws it serves the
+ * last good snapshot rather than rejecting, so the caller sees a full snapshot and cannot
+ * tell a refresh from a fallback. A manual sync that reports that snapshot as "synced N
+ * words" is a false success — it has been observed announcing 87,260 words against an
+ * AnkiConnect URL on a refused port. Link state and snapshot age are the two signals that
+ * separate the cases.
+ */
+export type IntervalSyncOutcome = 'refreshed' | 'stale' | 'disconnected';
+
+export function classifyIntervalSyncOutcome(input: {
+  /** Epoch ms captured immediately BEFORE asking for the forced refresh. */
+  requestedAt: number;
+  /** `IntervalSnapshot.generatedAt` of whatever came back. */
+  generatedAt: number;
+  state: AnkiLinkState;
+}): IntervalSyncOutcome {
+  if (input.state === 'disconnected') return 'disconnected';
+  // `runPoll` stamps `generatedAt` AFTER its last AnkiConnect call returns, so any poll
+  // whose result reaches us — including one already in flight when we asked, which the
+  // single-flight gate coalesces us into — is stamped later than `requestedAt`. An older
+  // stamp therefore means no poll completed for this request and the cache was served.
+  if (input.generatedAt < input.requestedAt) return 'stale';
+  return 'refreshed';
+}
+
+/**
  * Preserve one bounded recency timestamp per expression and advance it only
  * when the authoritative Anki interval changes between snapshots.
  */

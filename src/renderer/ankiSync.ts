@@ -1,8 +1,8 @@
 // Infer word knowledge from the user's Anki collection (Kalba-style). Card
 // intervals become knowledge levels; words the user graded by hand are left
 // untouched (handled inside knownWords.bulkSetFromAnki).
-import type { IntervalSnapshot } from '../shared/anki';
-import { levelForIntervalDays } from '../shared/anki';
+import type { AnkiLinkState, IntervalSnapshot, IntervalSyncOutcome } from '../shared/anki';
+import { classifyIntervalSyncOutcome, levelForIntervalDays } from '../shared/anki';
 import { bulkSetFromAnki, type WkLevel } from './knownWords';
 import { getActiveProfile } from './profileState';
 import { getTokenizer, tokenizeSync, tokenizerReady } from './tokenizer';
@@ -12,6 +12,11 @@ export interface SyncResult {
   error?: string;
   changed?: number;
   scanned?: number;
+  /**
+   * The counts came from the last good snapshot because the forced refresh did not
+   * complete. They are real, they are just not new — the caller must say so.
+   */
+  stale?: boolean;
 }
 
 /** Lemma + threshold fold shared by the manual sync and the live push listener. */
@@ -53,7 +58,24 @@ window.api.onAnkiIntervalsChanged((snapshot) => {
   void foldSnapshot(snapshot).then(({ levels }) => bulkSetFromAnki(levels));
 });
 
+/**
+ * `anki:getIntervals` never rejects — a failed poll falls back to the cached snapshot —
+ * so a manual sync has to establish for itself whether anything was refreshed. Read the
+ * link state alongside the snapshot and let the shared classifier decide.
+ */
+async function readLinkState(): Promise<{ state: AnkiLinkState; error?: string }> {
+  try {
+    const status = await window.api.ankiLinkState();
+    return { state: status.state, error: status.error };
+  } catch {
+    // The channel itself is unreachable, which is a stronger disconnection than any the
+    // heartbeat can report.
+    return { state: 'disconnected' };
+  }
+}
+
 export async function syncKnowledgeFromAnki(): Promise<SyncResult> {
+  const requestedAt = Date.now();
   let snapshot: IntervalSnapshot;
   try {
     snapshot = await window.api.ankiGetIntervals({ maxAgeMs: 0 });
@@ -61,7 +83,15 @@ export async function syncKnowledgeFromAnki(): Promise<SyncResult> {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
+  const link = await readLinkState();
+  const outcome: IntervalSyncOutcome = classifyIntervalSyncOutcome({
+    requestedAt,
+    generatedAt: snapshot.generatedAt,
+    state: link.state,
+  });
+  if (outcome === 'disconnected') return { ok: false, error: link.error };
+
   const { levels, scanned } = await foldSnapshot(snapshot);
   const changed = bulkSetFromAnki(levels);
-  return { ok: true, changed, scanned };
+  return { ok: true, changed, scanned, ...(outcome === 'stale' ? { stale: true } : {}) };
 }

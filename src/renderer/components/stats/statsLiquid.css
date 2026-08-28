@@ -86,6 +86,14 @@
   border-color: var(--danger);
 }
 
+/* Served from the last good snapshot because the forced refresh never completed. It is
+ * neither a failure nor a sync, so it gets its own edge rather than borrowing one of
+ * theirs. Border only, like .error above — the text keeps the panel's own foreground, so
+ * no status hue is ever asked to clear a contrast bar it does not meet on light panels. */
+.stats-view .wk-message.stale {
+  border-color: var(--warning);
+}
+
 .stats-view .wk-message > span {
   min-width: 0;
 }
