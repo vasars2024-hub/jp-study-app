@@ -749,3 +749,18 @@ other app in that list.
 
 Next: Calendar's rubric cells through the eight existing surface-parameterised harnesses. No
 Calendar-only probe was added and none is needed.
+
+## 2026-08-28 11:00 EDT — Calendar category 1 PASS 10/10 (interrupted run recovered)
+
+The existing category-1 harness completed before the worker stopped; its untracked receipt was
+the only stranded artifact. On the live **782×513** Calendar window it measured **60/60** text
+owners at or above **5.30:1**, **9/9** controls keyboard reachable, **0** WCAG 2.5.8 failures,
+and **0** targets below the 32px pointer floor. Reduced-motion moved over-threshold transitions
+**2→0→2** and the pointer re-run was stable with **0** stolen or occluded controls.
+
+The negative control moved every scored defect term: contrast **0→1**, pointer-by-hit **0→2**,
+pointer-by-rect **0→2**, WCAG 2.5.8 **0→1**, keyboard **0→2**, then restored all five to zero.
+The harness also proved **0** deferred owners and exact restoration on its immediate, verified,
+and delayed checks. Evidence: `baselines/cat1-l7-calendar.json`.
+
+**Calendar is 10/80.** Category 2 is next; no new probe or harness repair was needed.

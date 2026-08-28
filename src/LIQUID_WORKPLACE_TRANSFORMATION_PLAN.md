@@ -1036,6 +1036,11 @@ own defect. `anki:linkState` is the honest seam. The other route is closed too: 
 FROZEN, so no renderer stub can arm the state. All driven state restored and verified
 (profiles.json byte-identical by SHA-256; knowledge store back to 0/0/0/0).
 
+**Progress 2026-08-28 (Calendar category 1) — 10/80.** The interrupted controlled run was
+recovered from disk: 60 text owners and 9 controls with zero contrast, reachability, pointer,
+WCAG 2.5.8, or motion failures. The five-term control moved **0/0/0/0/0 → 1/2/2/1/2 →
+0/0/0/0/0**, with exact delayed restoration. Evidence: `cat1-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
