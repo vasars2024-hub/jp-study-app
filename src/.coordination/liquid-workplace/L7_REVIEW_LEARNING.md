@@ -957,3 +957,20 @@ questions. Evidence `cat5-l7-games.json` + `cat5-l7-games-control.json`.
 
 **Games is 50/80** (cats 1, 2, 3, 4, 6 PASS; cat 5 VOID; cats 7, 8 unmeasured). Next: cat 7, cat 8,
 then Q1's settled share sweep and Q4's disclosure.
+
+## 2026-08-28 19:14 EDT — interrupted Games slice recovered; category 7 first run is VOID
+
+Recovery found the index empty and every path owned by `58c34960`, `8969c8a4`, and `7493a97f`
+clean at HEAD. The category-6 PASS and category-5 VOID evidence is therefore checkpointed rather
+than stranded; its nearest suites re-ran **28/28**. The latest boss-audit NUL/typing findings are
+also already closed at HEAD (`70505beb`, `81174fac`): all four named sources contain **0** NULs.
+
+Games is now DATA in the shared category-7 harness. Its read-only load cycles all **15** available
+games **60** times, mounts each branch four times, starts no round, and restores selection **0**.
+Heavy/idle main-loop p95 are **3.5/3.5 ms**, maxima **80.7/9.7 ms**; resize and theme majorities are
+clean and every gesture restores geometry/theme. The run nevertheless stays **VOID**, not 10:
+drag repeats read **BREACH / clean / clean / clean / BREACH** (max **150.5 / 33.5 / 50.2 / 33.5 /
+601.7 ms**), so the instrument's disagreement guard fired. This is an environmental stall, not a
+named product finding; no harness repair was attempted. Retry after the remaining categories.
+
+**Games remains 50/80.** Evidence: `cat7-games-perf.json`.

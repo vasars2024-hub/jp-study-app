@@ -284,6 +284,47 @@ const SPECS = {
     },
     collection: { container: '.cal-month-grid', row: '.cal-month-cell' },
   },
+  games: {
+    title: 'Game Arena',
+    root: '.game-arena',
+    heavy: {
+      // Selecting a game replaces the Arena's complete work branch without writing a result.
+      // Cycle every available game repeatedly, then restore the exact starting selection; this
+      // exercises the surface's largest repeatable renderer load without starting or scoring a
+      // round, changing settings, requesting camera access, or touching persisted progress.
+      label: 'cycle every available game',
+      durationMs: 3500,
+      js: `(() => {
+        delete window.__lqGamesLoad;
+        const buttons = Array.from(document.querySelectorAll('.game-arena .game-list-item'));
+        if (buttons.length < 11) return 'REFUSE: expected the complete game list, found ' + buttons.length;
+        const start = buttons.findIndex((b) => b.classList.contains('active'));
+        if (start < 0) return 'REFUSE: game list has no active selection';
+        const rec = { start, count: buttons.length, ticks: 0, visits: buttons.map(() => 0), restored: false };
+        window.__lqGamesLoad = rec;
+        const timer = setInterval(() => {
+          const next = rec.ticks % buttons.length;
+          buttons[next].click();
+          rec.visits[next] += 1;
+          rec.ticks += 1;
+          if (rec.ticks >= buttons.length * 4) {
+            clearInterval(timer);
+            buttons[start].click();
+            setTimeout(() => { rec.restored = buttons[start].classList.contains('active'); }, 160);
+          }
+        }, 45);
+        return 'cycling ' + buttons.length + ' games from ' + start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqGamesLoad;
+        if (!r) return 'REFUSE: Games load never armed';
+        if (r.ticks < r.count * 4 || r.visits.some((n) => n < 4)) return 'REFUSE: incomplete Games cycle ' + JSON.stringify(r);
+        if (!r.restored) return 'REFUSE: Games did not restore selection ' + r.start;
+        return 'cycled ' + r.count + ' games ' + r.ticks + ' times, restored selection ' + r.start;
+      })()`,
+    },
+    collection: { container: '.game-list', row: '.game-list-item' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',
