@@ -1027,6 +1027,15 @@ idle **2.2/8.3** and a 500 ms bar, receipt 1,438 px over 91 ticks restored to 0.
 **99.4→109.6 MB**, renderer heap **254 MB**, uptime **3,553 s**. The `--jank` control moved p95
 **17.1→100.3** and over-100 **0→11**. Evidence: `cat7-statistics-perf.json`.
 
+**Progress 2026-08-28 (Statistics category 8) — stays 70/80, and the blocker is a DEFECT.**
+With `ankiUrl` repointed to a refused port and the app restarted onto it, the sync reported
+**"Synced 87,260 words from Anki — 0 updated"** as a `role="status"` success. `anki:getIntervals`
+(`main/anki/index.ts:942`) serves the cached snapshot on a failed refresh and never rejects, so
+`syncKnowledgeFromAnki` cannot report an unreachable Anki — a false success, which is category 8's
+own defect. `anki:linkState` is the honest seam. The other route is closed too: `window.api` is
+FROZEN, so no renderer stub can arm the state. All driven state restored and verified
+(profiles.json byte-identical by SHA-256; knowledge store back to 0/0/0/0).
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

@@ -629,3 +629,43 @@ Sensitivity control (`--jank`) is what makes the zeros mean anything: the same d
 120 ms blocks moved p95 **17.1 -> 100.3**, max **83.5 -> 133.8** and over-100 **0 -> 11**. The
 recorder sees the frames it claims to. **PASS 10/10.** Evidence: `cat7-statistics-perf.json`.
 Statistics is **70/80**; only category 8 remains, still UNMEASURED.
+
+## 2026-08-28 11:50 EDT — Statistics category 8 stays UNMEASURED, and the reason is a real defect
+
+Statistics is **70/80**. Category 8 needs one adverse state driven; on a populated profile the only
+one it has is the Anki sync failing. Two routes were tried and BOTH are now closed with evidence,
+so nobody re-derives them:
+
+1. **Stubbing the bridge is impossible.** `window.api` is frozen — `Object.isFrozen` true, and
+   `ankiGetIntervals`'s descriptor is `writable:false, configurable:false`. The assignment fails
+   silently, which is worse than throwing.
+2. **Repointing `ankiUrl` does not produce a failure.** Following the recorded precedent in
+   `dictionaryUnreachableAnkiHooks.test.tsx`, `userData/profiles.json`'s `ankiUrl` was repointed to
+   `http://127.0.0.1:1` (refused, not hanging) and the app was RESTARTED onto it, because main does
+   not hot-reload. The sync then reported **"Synced 87,260 words from Anki — 0 updated"** with
+   `role="status"` and class `wk-message success`.
+
+**FINDING — a false success, which is category 8's own defect.** `anki:getIntervals`
+(`src/main/anki/index.ts:942`) is a data-preferring channel: on a failed refresh it returns
+`getCachedSnapshot() ?? emptySnapshot()` and never rejects. So `syncKnowledgeFromAnki`
+(`src/renderer/ankiSync.ts:56`) cannot return `{ok:false}` for an unreachable Anki, and Statistics
+announces a successful sync against a provably unreachable AnkiConnect. The honest seam already
+exists — main reports link state separately on `anki:linkState`, named in that handler's own
+comment. The fix is to consult it (or snapshot staleness) and say "showing the last synced N words,
+Anki is unreachable" rather than "Synced N". Its **"0 updated" is also wrong**: the store went from
+0 entries to **41,535** on that same click, and the rendered counts kept saying 0 until a reload,
+because `knownWords`' in-memory cache is not invalidated by the write.
+
+Everything driven here is restored and verified: `profiles.json` is byte-identical by SHA-256
+(`bae2e124…`), the app was restarted onto the real `ankiUrl`, `jp-word-knowledge-ja` (41,535
+entries, `manual` 0) was removed and the live cards read **0/0/0/0** after a reload, four windows
+standing, 0 probe residue.
+
+Two harness facts the next run needs: `--surface "Statistics"` VOIDs the `--langs` leg at ja
+(`surface not found`) because the window TITLE translates — use `@.stats-view`; and `--langs`
+refuses unless Settings is already open on Appearance.
+
+**Next slice, and it opens the next turn:** fix the false success, then re-run
+`cat8-honest-states.cjs --surface "@.stats-view" --control --langs --drive-click
+".wk-head > .btn.small" --drive-undo ".wk-message-close"` with `ankiUrl` at `127.0.0.1:1`. That
+drive then produces a real error state and closes Statistics at 80/80.
