@@ -809,3 +809,18 @@ dead region **5.4/0.9/9.7%**. Chrome falls **17.8→13.9%** and the work viewpor
 
 The injected clip moved **0→1→0** with removal proven; the 200×140 leg stayed clean and restored.
 Guard **6/6**. **Calendar is 40/80.** Evidence: `cat4-l7-calendar.json`. Category 5 is next.
+
+## 2026-08-28 14:16 EDT — Calendar category 6 PASS 10/10; score 50/80
+
+Calendar is now the fourteenth spec in the existing parity engine: **5 feature rows**, 9 drive
+steps, 5 independent mutations. The drive visits Month/Week/Day/Agenda, shifts back and forward,
+opens and cancels the real event composer (**6 inputs / 3 selects / 1 textarea / 2 actions**),
+and carries a real **120px** scroll through the presentation trip. It never creates, edits, or
+deletes an event.
+
+Standard and Liquid each reach **5/5**; the 820×580 Standard→Liquid→Standard trip retains fields,
+shell, and scroll with zero diffs. All five controls move **5/5→4/5→5/5**, each dropping only its
+declared row. The first date-transport plant stripped a tooltip while the visible ‹ still proved
+the control and correctly voided; the one repair removes the counted control itself.
+
+**Calendar is 50/80.** Evidence: `cat6-l7-calendar.json`. Category 5 can now run.

@@ -1056,6 +1056,11 @@ horizontal scroller from `.calendar-view` **262>212px → 0**. All four defect c
 820×580, 260×170, and 1264×765; dead region is **5.4/0.9/9.7%**, every size restored, and the
 clip control moved **0→1→0**. Evidence: `cat4-l7-calendar.json`.
 
+**Progress 2026-08-28 (Calendar category 6) — 50/80.** Five rows cover four view branches, the
+42-cell month grid, reversible date transport, open/cancel event composition, and window lifecycle.
+Standard/Liquid are **5/5 / 5/5**, the 120px-scroll round trip has zero diffs, and all five controls
+move only their own row **5/5→4/5→5/5**. Evidence: `cat6-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

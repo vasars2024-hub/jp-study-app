@@ -110,6 +110,7 @@
   const flashState = specState('__LQP_FLASH_ORIG');
   const notebookState = specState('__LQP_NOTEBOOK_ORIG');
   const statsState = specState('__LQP_STATS_ORIG');
+  const calendarState = specState('__LQP_CAL_ORIG');
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -1178,6 +1179,181 @@
           'stats-recent-activity',
         ),
         resetRecovery: (w) => detach(q(w, '.stats-data-tools-panel > button'), 'no reset action'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * CALENDAR — four render branches, reversible date transport, and the non-writing half of
+     * event creation. The drive opens and cancels the real composer but never creates, edits, or
+     * deletes user data. Its scroll is the app state carried through the presentation round trip.
+     */
+    calendar: {
+      titleRe: /Calendar|カレンダー|日历|Календар/i,
+      rootSel: '.calendar-view',
+      features: [
+        {
+          id: 'viewModes',
+          f: (w) => {
+            const buttons = qa(w, '.cal-mode-btn');
+            const active = activeOf(buttons, 'active');
+            const seen = (window.__LQP_CAL_ORIG && window.__LQP_CAL_ORIG.visited) || {};
+            const visited = ['month', 'week', 'day', 'agenda'].filter((m) => seen[m]).length;
+            return { ok: buttons.length === 4 && active === 1 && visited === 4,
+              ev: `buttons=${buttons.length} active=${active} visited=${visited}/4` };
+          },
+        },
+        {
+          id: 'monthGrid',
+          f: (w) => {
+            const grid = q(w, '.cal-month-grid');
+            const dows = grid ? qa(grid, '.cal-month-dow') : [];
+            const cells = grid ? qa(grid, '.cal-month-cell') : [];
+            const numbered = cells.filter((c) => txt(q(c, '.cal-month-daynum')).length > 0).length;
+            return { ok: !!grid && dows.length === 7 && cells.length === 42 && numbered === 42,
+              ev: `dows=${dows.length} cells=${cells.length} numbered=${numbered}` };
+          },
+        },
+        {
+          id: 'dateTransport',
+          f: (w) => {
+            const nav = q(w, '.cal-nav');
+            const buttons = nav ? qa(nav, ':scope > button') : [];
+            const arrowsNamed = buttons.filter((b) => txt(b).length > 0 || (b.title || '').length > 0).length;
+            const jump = nav && q(nav, 'input[type="date"]');
+            const g = window.__LQP_CAL_ORIG || {};
+            return { ok: buttons.length === 3 && arrowsNamed === 3 && !!jump
+                && txt(q(nav, '.cal-header-label')).length > 0 && g.transport === true,
+              ev: `buttons=${buttons.length} named=${arrowsNamed} jump=${!!jump} shiftedAndReturned=${g.transport === true}` };
+          },
+        },
+        {
+          id: 'eventComposer',
+          f: (w) => {
+            const trigger = q(w, '.calendar-context-head > .btn');
+            const g = window.__LQP_CAL_ORIG || {};
+            return { ok: !!trigger && trigger.getAttribute('type') === 'button'
+                && g.composerComplete === true && !q(w, '.cal-modal'),
+              ev: `trigger=${!!trigger} complete=${g.composerComplete === true} closed=${!q(w, '.cal-modal')}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        begin: (w) => {
+          const g = calendarState();
+          const buttons = qa(w, '.cal-mode-btn');
+          if (g.modeIndex == null) g.modeIndex = buttons.findIndex((b) => b.classList.contains('active'));
+          g.visited = {};
+          g.visited.month = !!q(w, '.cal-month-grid');
+          const el = scroller(w);
+          if (g.scrollTop == null && el) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
+          if (!buttons[1]) return { refused: 'week mode is absent' };
+          buttons[1].click();
+          return { from: g.modeIndex, to: 'week' };
+        },
+        visitWeek: (w) => {
+          const g = calendarState();
+          g.visited.week = qa(w, '.cal-week-col').length === 7 && qa(w, '.cal-add-inline').length === 7;
+          const b = qa(w, '.cal-mode-btn')[2];
+          if (!b) return { refused: 'day mode is absent' };
+          b.click();
+          return { week: g.visited.week, to: 'day' };
+        },
+        visitDay: (w) => {
+          const g = calendarState();
+          g.visited.day = !!q(w, '.cal-day-list');
+          const b = qa(w, '.cal-mode-btn')[3];
+          if (!b) return { refused: 'agenda mode is absent' };
+          b.click();
+          return { day: g.visited.day, to: 'agenda' };
+        },
+        visitAgenda: (w) => {
+          const g = calendarState();
+          g.visited.agenda = qa(w, '.cal-agenda > section').length === 3;
+          const b = qa(w, '.cal-mode-btn')[0];
+          if (!b) return { refused: 'month mode is absent' };
+          b.click();
+          return { agenda: g.visited.agenda, to: 'month' };
+        },
+        visitMonth: (w) => {
+          const g = calendarState();
+          g.visited.month = qa(w, '.cal-month-cell').length === 42;
+          const nav = qa(w, '.cal-nav > button');
+          g.headerBefore = txt(q(w, '.cal-header-label'));
+          if (!nav[0]) return { refused: 'previous-date control is absent' };
+          nav[0].click();
+          return { month: g.visited.month, before: g.headerBefore };
+        },
+        returnDate: (w) => {
+          const g = calendarState();
+          const now = txt(q(w, '.cal-header-label'));
+          g.shifted = now.length > 0 && now !== g.headerBefore;
+          const nav = qa(w, '.cal-nav > button');
+          if (!nav[2]) return { refused: 'next-date control is absent' };
+          nav[2].click();
+          return { shifted: g.shifted, back: 'next' };
+        },
+        openComposer: (w) => {
+          const g = calendarState();
+          g.transport = g.shifted === true && txt(q(w, '.cal-header-label')) === g.headerBefore;
+          const trigger = q(w, '.calendar-context-head > .btn');
+          if (!trigger) return { refused: 'new-event control is absent' };
+          trigger.click();
+          return { transport: g.transport };
+        },
+        closeComposer: (w) => {
+          const g = calendarState();
+          const modal = q(w, '.cal-modal');
+          if (!modal) return { refused: 'event composer did not open' };
+          const inputs = qa(modal, 'input').length;
+          const selects = qa(modal, 'select').length;
+          const textareas = qa(modal, 'textarea').length;
+          const actions = qa(modal, '.cal-modal-actions button');
+          g.composerComplete = inputs >= 5 && selects >= 3 && textareas === 1 && actions.length >= 2;
+          const cancel = actions.find((b) => !b.classList.contains('primary') && !b.classList.contains('danger'));
+          if (!cancel) return { refused: 'event composer has no cancel recovery' };
+          cancel.click();
+          return { inputs, selects, textareas, actions: actions.length, complete: g.composerComplete };
+        },
+        finish: (w) => {
+          const g = calendarState();
+          g.composerComplete = g.composerComplete === true && !q(w, '.cal-modal');
+          const el = scroller(w);
+          if (el) el.scrollTop = Math.min(120, Math.max(0, el.scrollHeight - el.clientHeight));
+          return { composerClosed: !q(w, '.cal-modal'), scroll: el ? el.scrollTop : 0 };
+        },
+      },
+      drive: ['begin', 'visitWeek', 'visitDay', 'visitAgenda', 'visitMonth', 'returnDate',
+        'openComposer', 'closeComposer', 'finish'],
+      undo: {
+        calendar: (w) => {
+          const g = window.__LQP_CAL_ORIG;
+          if (!g) return null;
+          const done = [];
+          const modalClose = q(w, '.cal-modal .cbh-icon-btn');
+          if (modalClose) { modalClose.click(); done.push('modal'); }
+          const buttons = qa(w, '.cal-mode-btn');
+          const active = buttons.findIndex((b) => b.classList.contains('active'));
+          if (g.modeIndex >= 0 && buttons[g.modeIndex] && active !== g.modeIndex) {
+            buttons[g.modeIndex].click(); done.push('mode');
+          }
+          const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+          if (el && g.scrollTop != null && el.scrollTop !== g.scrollTop) {
+            el.scrollTop = g.scrollTop; done.push('scroll');
+          }
+          window.__LQP_CAL_ORIG = null;
+          return done.length ? `calendar:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        viewModes: (w) => addClassAll(
+          [qa(w, '.cal-mode-btn').find((b) => !b.classList.contains('active'))].filter(Boolean),
+          'active',
+        ),
+        monthGrid: (w) => detach(q(w, '.cal-month-cell .cal-month-daynum'), 'no month day number'),
+        dateTransport: (w) => detach(q(w, '.cal-nav > .wgt-btn-icon'), 'no previous-date control'),
+        eventComposer: (w) => stripAttr(q(w, '.calendar-context-head > .btn'), 'type', 'no new-event control'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

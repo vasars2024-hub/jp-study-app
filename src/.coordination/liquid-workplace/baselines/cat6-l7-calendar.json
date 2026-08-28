@@ -1,0 +1,154 @@
+{
+  "label": "l7-calendar",
+  "app": "calendar",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "begin",
+      "result": "{\"from\":0,\"to\":\"week\"}"
+    },
+    {
+      "step": "visitWeek",
+      "result": "{\"week\":true,\"to\":\"day\"}"
+    },
+    {
+      "step": "visitDay",
+      "result": "{\"day\":true,\"to\":\"agenda\"}"
+    },
+    {
+      "step": "visitAgenda",
+      "result": "{\"agenda\":true,\"to\":\"month\"}"
+    },
+    {
+      "step": "visitMonth",
+      "result": "{\"month\":true,\"before\":\"August 2026\"}"
+    },
+    {
+      "step": "returnDate",
+      "result": "{\"shifted\":true,\"back\":\"next\"}"
+    },
+    {
+      "step": "openComposer",
+      "result": "{\"transport\":true}"
+    },
+    {
+      "step": "closeComposer",
+      "result": "{\"inputs\":6,\"selects\":3,\"textareas\":1,\"actions\":2,\"complete\":true}"
+    },
+    {
+      "step": "finish",
+      "result": "{\"composerClosed\":true,\"scroll\":120}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "5/5",
+    "liquid": "5/5",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "viewModes",
+        "declaredCascade": [],
+        "preBaseline": "5/5",
+        "applied": "active added to 1 of 1",
+        "reachable": "4/5",
+        "fellRows": [
+          "viewModes"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"added-class\",\"calendar:scroll\"]",
+        "afterRestore": "5/5",
+        "returned": true
+      },
+      {
+        "mutation": "monthGrid",
+        "declaredCascade": [],
+        "preBaseline": "5/5",
+        "applied": "element detached",
+        "reachable": "4/5",
+        "fellRows": [
+          "monthGrid"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"calendar:scroll\"]",
+        "afterRestore": "5/5",
+        "returned": true
+      },
+      {
+        "mutation": "dateTransport",
+        "declaredCascade": [],
+        "preBaseline": "5/5",
+        "applied": "element detached",
+        "reachable": "4/5",
+        "fellRows": [
+          "dateTransport"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"calendar:scroll\"]",
+        "afterRestore": "5/5",
+        "returned": true
+      },
+      {
+        "mutation": "eventComposer",
+        "declaredCascade": [],
+        "preBaseline": "5/5",
+        "applied": "type stripped",
+        "reachable": "4/5",
+        "fellRows": [
+          "eventComposer"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"type\",\"calendar:scroll\"]",
+        "afterRestore": "5/5",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "5/5",
+        "applied": "aria-pressed stripped",
+        "reachable": "4/5",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"calendar:scroll\"]",
+        "afterRestore": "5/5",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
