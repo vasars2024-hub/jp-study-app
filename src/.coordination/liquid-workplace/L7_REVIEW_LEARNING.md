@@ -496,3 +496,15 @@ Container-scoped reflow follows the 820×580 floating window rather than the 1,2
 Live HMR receipt: contextual regions **1**, dense contextual regions **0**, header **772×35**,
 Standard background transparent, container `inline-size`. Focused suites **15/15**. Next: categories
 1–3 through the existing surface-parameterised harnesses; no Statistics-only probe was added.
+
+## 2026-08-28 09:35 EDT — Statistics categories 1 and 3 PASS; score 20/80
+
+Category 1 first found the only Statistics-owned target below floor: Anki sync **26.5px**. A scoped
+minimum moved it to **32px**. Final: 99 text owners, minimum **5.30:1**; core/pointer controls
+**10/10**, contrast/WCAG/keyboard/pointer-floor/theft failures **0**; motion **20→0→20**. The
+five-term control moved **0→1/2/2/1/2→0**. **PASS 10/10.**
+
+Category 3 classified **91** regions: Work **3**, Liquid-eligible **1**, Anchor **84**, Anchor holding
+work **3**. Dense Work on translucent **0/3**; contextual/shared primitive **1/1**. Controls forced
+one then all Work regions onto glass (**0→1→3→0**) and restored the material. **PASS 10/10.**
+Evidence: `cat{1,3}-l7-statistics.json`. Category 2 remains open rather than scoring a fake task.

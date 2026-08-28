@@ -971,6 +971,12 @@ keyboard/pointer-floor/theft failures all **0**, reduced motion **11→0→11**.
 moved **0→1/2/2/1/2→0**; an independent 750 ms check found **0** residue. Evidence:
 `L7_REVIEW_LEARNING.md` and `cat1-l7-notebook.json`. Next surface: Statistics.
 
+**Progress 2026-08-28 (Statistics) — 20/80 after categories 1 and 3.** Accessibility passes after
+repairing the sole 26.5px target to 32px: 99 text owners, 10 controls, 0 failures, motion **20→0→20**.
+Selective use passes across **91** regions: dense Work on glass **0/3**, contextual/shared **1/1**;
+controls moved **0→1→3→0**. Category 2 is not flattered with reset, failed Anki sync, or a one-way
+media handoff as the dominant task. Evidence: `L7_REVIEW_LEARNING.md`, `cat{1,3}-l7-statistics.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

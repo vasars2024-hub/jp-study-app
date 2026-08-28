@@ -25,6 +25,12 @@
   flex: 0 0 auto;
 }
 
+/* The Anki sync is the only Statistics-owned control whose shared small-button density measured
+ * below the 32px pointer floor (26.5px live). Keep the compact label, restore the hit target. */
+.stats-view .wk-head > .btn.small {
+  min-height: var(--lq-hit-target);
+}
+
 /* Floating-window width, not desktop viewport width, decides when the contextual tools stack. */
 @container (max-width: 440px) {
   .stats-context-head {

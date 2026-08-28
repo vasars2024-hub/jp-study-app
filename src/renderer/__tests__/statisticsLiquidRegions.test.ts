@@ -22,4 +22,8 @@ describe('Statistics Liquid regions', () => {
     expect(CSS).toContain('@container (max-width: 440px)');
     expect(CSS).not.toContain('@media');
   });
+
+  it('keeps the compact Anki sync label on the shared pointer floor', () => {
+    expect(CSS).toContain('.stats-view .wk-head > .btn.small {\n  min-height: var(--lq-hit-target);');
+  });
 });
