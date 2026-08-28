@@ -70,6 +70,7 @@ describe('Game Arena Liquid regions', () => {
     expect(CONTENT).toContain('<ContextualSurface as="section" className="game-history"');
     expect(CONTENT).toContain("t('games.history.label')");
     expect(CONTENT).toContain("t('games.history.empty')");
+    expect(CONTENT).toContain('className="muted game-history-empty"');
     expect(CONTENT).toContain("t('games.history.line'");
     expect(CONTENT).toContain("progress.recent.filter((entry) => entry.gameId === selected)");
     // Locale-aware: a bare toLocaleDateString() follows the OS, not the UI language.

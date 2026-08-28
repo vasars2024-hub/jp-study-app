@@ -447,7 +447,7 @@ export function GameArena() {
                   <ContextualSurface as="section" className="game-history" aria-label={t('games.history.label')}>
                     <h4>{t('games.history.label')}</h4>
                     {recentForGame.length === 0 ? (
-                      <p className="muted">{t('games.history.empty')}</p>
+                      <p className="muted game-history-empty">{t('games.history.empty')}</p>
                     ) : (
                       <ol className="game-history-list">
                         {recentForGame.map((entry) => (

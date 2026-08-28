@@ -974,3 +974,18 @@ drag repeats read **BREACH / clean / clean / clean / BREACH** (max **150.5 / 33.
 named product finding; no harness repair was attempted. Retry after the remaining categories.
 
 **Games remains 50/80.** Evidence: `cat7-games-perf.json`.
+
+## 2026-08-28 19:18 EDT — Games category 8 repaired and PASS 10/10; score 60/80
+
+The first controlled run was **UNMEASURED**, not passed: the ready state already says “No rounds
+recorded …”, but its generic `.muted` markup exposed **0** semantic state hosts. The existing copy
+now also carries `game-history-empty`; no data, behavior, or layout changed. Guard **7/7**.
+
+The same shared harness now measures **1/1** observable empty state named, **0** raw keys,
+placeholders, or unexplained disabled controls. EN/JA/ZH/RU produce **4** distinct hashes with
+zero raw keys and restore English. The control moves all three defects **0→1→0**. Settings was
+captured on Home, opened to Appearance through its own navigation for the language leg, and
+restored to Home; the game remains Sentence Builder and `jp-game-progress-v1` remains absent.
+
+**Games is 60/80** (categories 1, 2, 3, 4, 6, 8 PASS; 5 VOID; 7 VOID on unstable environment).
+Evidence: `cat8-l7-games-first.json`, `cat8-l7-games.json`.
