@@ -51,11 +51,31 @@ async function foldSnapshot(
   return { levels, scanned: snapshot.entries.length };
 }
 
+async function foldIntoKnowledge(snapshot: IntervalSnapshot): Promise<number> {
+  const { levels } = await foldSnapshot(snapshot);
+  return bulkSetFromAnki(levels);
+}
+
+/**
+ * A manual sync forces a poll, and `commitSnapshot` pushes the result to this listener
+ * BEFORE the `anki:getIntervals` reply reaches the caller. Both then fold the same data,
+ * and whichever lands first takes every level change with it — which is how a sync that
+ * really wrote 41,535 words announced "0 updated" (L7_REVIEW_LEARNING.md, 2026-08-27).
+ * While a manual sync is in flight the push is DEFERRED rather than dropped, so a snapshot
+ * newer than the one the sync folded is still applied afterwards.
+ */
+let manualSyncPending = false;
+let deferredPush: IntervalSnapshot | null = null;
+
 // Reader tints stay live with zero user interaction: every pushed snapshot
 // (heartbeat reconnect, periodic 5 min poll, query-union change) folds
 // straight into the knowledge store (SERVICES_PATCH.md AC-3).
 window.api.onAnkiIntervalsChanged((snapshot) => {
-  void foldSnapshot(snapshot).then(({ levels }) => bulkSetFromAnki(levels));
+  if (manualSyncPending) {
+    deferredPush = snapshot;
+    return;
+  }
+  void foldIntoKnowledge(snapshot);
 });
 
 /**
@@ -76,22 +96,35 @@ async function readLinkState(): Promise<{ state: AnkiLinkState; error?: string }
 
 export async function syncKnowledgeFromAnki(): Promise<SyncResult> {
   const requestedAt = Date.now();
-  let snapshot: IntervalSnapshot;
+  manualSyncPending = true;
+  // 0 until this sync actually folds something, so a deferred push always wins the
+  // comparison below when the sync bailed out without folding.
+  let foldedAt = 0;
   try {
-    snapshot = await window.api.ankiGetIntervals({ maxAgeMs: 0 });
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    let snapshot: IntervalSnapshot;
+    try {
+      snapshot = await window.api.ankiGetIntervals({ maxAgeMs: 0 });
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+
+    const link = await readLinkState();
+    const outcome: IntervalSyncOutcome = classifyIntervalSyncOutcome({
+      requestedAt,
+      generatedAt: snapshot.generatedAt,
+      state: link.state,
+    });
+    if (outcome === 'disconnected') return { ok: false, error: link.error };
+
+    const { levels, scanned } = await foldSnapshot(snapshot);
+    const changed = bulkSetFromAnki(levels);
+    foldedAt = snapshot.generatedAt;
+    return { ok: true, changed, scanned, ...(outcome === 'stale' ? { stale: true } : {}) };
+  } finally {
+    manualSyncPending = false;
+    const pending = deferredPush;
+    deferredPush = null;
+    // Only a snapshot newer than the one this sync folded still has anything to say.
+    if (pending && pending.generatedAt > foldedAt) void foldIntoKnowledge(pending);
   }
-
-  const link = await readLinkState();
-  const outcome: IntervalSyncOutcome = classifyIntervalSyncOutcome({
-    requestedAt,
-    generatedAt: snapshot.generatedAt,
-    state: link.state,
-  });
-  if (outcome === 'disconnected') return { ok: false, error: link.error };
-
-  const { levels, scanned } = await foldSnapshot(snapshot);
-  const changed = bulkSetFromAnki(levels);
-  return { ok: true, changed, scanned, ...(outcome === 'stale' ? { stale: true } : {}) };
 }
