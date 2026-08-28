@@ -945,6 +945,12 @@ category-1 run is retracted rather than inherited. Its shared harness exhausted 
 at **484/38 falsely occluded**; category 1 is UNMEASURED until it reveals one deferred row at a
 time. Evidence and the exact restart A/B are in `L7_REVIEW_LEARNING.md`.
 
+**Progress 2026-08-27 (later category-1 attempt) — Notebook remains 70/80.** One generic
+one-record-at-a-time repair made the pointer leg measure **452/479** controls, but the core leg
+still measured only **33/479** controls and **117/2,062** prior text owners. The apparent PASS is
+void; the edit and overwritten baseline were restored under RULE 1's one-repair limit. The next
+turn opens on that exact core-leg visibility assumption, not Statistics.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

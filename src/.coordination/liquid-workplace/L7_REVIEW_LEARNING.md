@@ -429,3 +429,19 @@ restoring row deferral is therefore an instrument boundary, not an accessibility
 one-repair rule, category 1 is **UNMEASURED**, not passed or failed. Next turn opens by teaching
 the shared harness to reveal and restore one deferred record at a time, then re-runs category 1.
 Notebook remains **70/80**: categories 2–8 pass; category 1 is the one open cell.
+
+## 2026-08-27 21:56 EDT — one category-1 harness repair attempted and rejected
+
+The property-driven repair revealed only the current `content-visibility:auto` ancestor and
+restored its exact inline declaration. Its pointer leg improved from the interrupted **38 scored /
+484 occluded** failure to **452 measured / 27 occluded of 479**, with **381** unique deferred
+owners restored. The core leg still counted only **33/479 controls** and **117** text owners versus
+the pre-deferral population of **459 controls / 2,062 text owners**. Its reported PASS was void.
+
+The failed harness edit and overwritten baseline were restored; no score or product change was
+banked. Per RULE 1, there is no second repair this turn. The next turn opens by falsifying the
+core leg's assumption that `checkVisibility({contentVisibilityAuto:true})` becomes true after an
+inline `content-visibility:visible`; it must retain one-record-at-a-time reveal and restoration.
+Notebook remains **70/80**, category 1 UNMEASURED. Product source was impossible this turn because
+the only open Notebook gate exhausted its one permitted harness repair and Statistics may not open
+before Notebook closes.
