@@ -607,3 +607,25 @@ returned the exact base state hash.
 Control moved all three terms **0,0,0 → 1,1,1 → 0,0,0** with the inert-button click acknowledged in
 **0.3 ms**. **PASS 10/10.** Evidence: `cat2-l7-statistics.json`. Statistics is **60/80**; category
 7 is unrun and category 8 is UNMEASURED.
+
+## 2026-08-28 10:52 EDT — Statistics category 7 PASS 10/10; score 70/80
+
+Adding the surface was ten lines of DATA in the existing runner's `SPECS`, exactly as its header
+says. One trap is worth the line: `scrollAll('.stats-view')` correctly finds nothing, because the
+view is exactly as tall as its content and the scroller is the WINDOW BODY above it — the spec uses
+`.fwin:has(.stats-view) .fwin-body` so it scopes to this window rather than to whichever `.fwin`
+is first in the document. Statistics also has no destructive-free recompute: Reset wipes the store
+and Anki sync writes 41k entries, so scrolling the whole view is the heaviest repeatable work.
+
+Session ceiling **16.7 ms p50** across three runs (this display is 60 Hz, not L0's ~100 Hz), noise
+floor over-100 **0**. Drag **16.7 / 17.1 / 83.5**, resize **16.7 / 17.0 / 67.0**, theme
+**16.7 / 16.9 / 66.9** — over-100 **0** on all three, scene stable, geometry closed-loop, theme
+restored to forest-night. Theme paint **83.2 ms** apply / **122.8 ms** restore. Main loop under the
+heavy leg **p50 2.1 / max 7.9 ms** against idle **2.2 / 8.3** and a 500 ms bar; the load's own
+receipt: 1,438 px over 91 ticks, restored to 0. Main RSS **99.4 -> 109.6 MB**, renderer heap
+**254 MB**, uptime **3,553 s** at start.
+
+Sensitivity control (`--jank`) is what makes the zeros mean anything: the same drag with injected
+120 ms blocks moved p95 **17.1 -> 100.3**, max **83.5 -> 133.8** and over-100 **0 -> 11**. The
+recorder sees the frames it claims to. **PASS 10/10.** Evidence: `cat7-statistics-perf.json`.
+Statistics is **70/80**; only category 8 remains, still UNMEASURED.

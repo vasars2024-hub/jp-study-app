@@ -1019,6 +1019,14 @@ harness gained one generic repair — `scroll:` as a second uncounted restore pr
 task that scrolls could not be driven twice, which is correction 13's shape for scroll. Control
 moved all three terms **0,0,0→1,1,1→0,0,0**. Evidence: `cat2-l7-statistics.json`.
 
+**Progress 2026-08-28 (Statistics category 7) — 70/80.** Ten lines of spec data in the existing
+runner, no new probe. Session ceiling **16.7 ms p50** over three runs; drag **16.7/17.1/83.5**,
+resize **16.7/17.0/67.0**, theme **16.7/16.9/66.9**, over-100 **0** on all three with the scene
+stable and geometry closed-loop. Main loop under the heavy scroll **p50 2.1 / max 7.9 ms** against
+idle **2.2/8.3** and a 500 ms bar, receipt 1,438 px over 91 ticks restored to 0. Main RSS
+**99.4→109.6 MB**, renderer heap **254 MB**, uptime **3,553 s**. The `--jank` control moved p95
+**17.1→100.3** and over-100 **0→11**. Evidence: `cat7-statistics-perf.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

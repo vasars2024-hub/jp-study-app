@@ -226,6 +226,23 @@ const SPECS = {
     },
     collection: { container: '.gx-notebook-timeline', row: '.gx-notebook-item' },
   },
+  statistics: {
+    title: 'Statistics',
+    root: '.stats-view',
+    heavy: {
+      // Statistics has no destructive-free recompute a user can repeat -- Reset wipes the store
+      // and Anki sync writes 41k entries (L7_REVIEW_LEARNING, 2026-08-28 09:48). Scrolling the
+      // whole view is its heaviest repeatable read-only work, and the scroller is the WINDOW
+      // BODY, an ANCESTOR of the root: `.stats-view` is exactly as tall as its content, so
+      // scrollAll('.stats-view') correctly finds nothing and refuses. `:has` scopes the body to
+      // this window rather than to whichever .fwin happens to be first in the document.
+      label: 'scroll the whole statistics view',
+      durationMs: 2500,
+      js: scrollAll('.fwin:has(.stats-view) .fwin-body'),
+      proof: scrollProof,
+    },
+    collection: { container: '.stats-view', row: '.stats-book-row' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',
