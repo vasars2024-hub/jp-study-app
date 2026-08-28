@@ -193,8 +193,31 @@ const SNAP = `(function(){
       var img = cs.backgroundImage || 'none';
       if (img !== 'none' && /url\\(/.test(img)) { unmeasurable = 'background-image: url() on ' + name(n); break; }
       if (img !== 'none' && /gradient\\(/.test(img)) {
-        var stops = (img.match(/(rgba?\\([^)]*\\)|color\\([^)]*\\))/g) || []).map(parseRgb).filter(Boolean);
-        if (stops.length) { layers.push({ stops: stops, a: 1 }); from.push('gradient on ' + name(n)); break; }
+        // TRAP 7's OTHER HALF, found on Games 2026-08-28. The trap-7 correction below was made
+        // for background-COLOR and never reached this branch, which read every gradient stop as
+        // if it were opaque and then \`break\`, so nothing under the gradient composited. The
+        // Arena's \`.game-arena\` paints
+        // \`linear-gradient(color(srgb .847 .922 .878 / 0.04), rgba(0,0,0,0))\` — a 4% sheen — and
+        // that stop read as opaque rgb(216,235,224), which is EXACTLY the h2's own colour. The
+        // harness reported \`h2 "Game Arena"\` at 1.00:1 in BOTH themes: a fabricated total
+        // collapse on a heading that is plainly legible, and one that also pinned \`minRatio\` at
+        // 1 in both cells and so VOIDed Q5's theme axis on a surface whose \`failingCount\` had
+        // in fact moved 19 -> 5. A stop keeps its own alpha, a fully transparent stop paints
+        // nothing at all, and only a gradient that is opaque everywhere may stop the walk.
+        var raw = img.match(/(rgba?\\([^)]*\\)|color\\([^)]*\\))/g) || [];
+        var stops = [], alphas = [];
+        for (var gi = 0; gi < raw.length; gi++) {
+          var ga = alphaOf(raw[gi]);
+          if (ga <= 0.004) continue;
+          var gc = parseRgb(raw[gi]);
+          if (gc) { stops.push(gc); alphas.push(ga); }
+        }
+        if (stops.length) {
+          layers.push({ stops: stops, alphas: alphas, a: Math.max.apply(null, alphas) });
+          from.push('gradient on ' + name(n));
+          // Falls through to this same element's background-color, which a gradient paints OVER.
+          if (Math.min.apply(null, alphas) >= 0.996) break;
+        }
       }
       var a = alphaOf(cs.backgroundColor);
       if (a > 0.004) {
@@ -217,7 +240,10 @@ const SNAP = `(function(){
       for (var bi = 0; bi < acc.length; bi++) {
         for (var si = 0; si < L.stops.length; si++) {
           var s = L.stops[si], b = acc[bi];
-          next.push([0,1,2].map(function(k){ return Math.round(s[k]*L.a + b[k]*(1-L.a)); }));
+          // Per-stop alpha when the layer carries one (a gradient); the layer's single alpha
+          // otherwise (a background-color). Same compositing, one alpha per thing that painted.
+          var sa = (L.alphas && L.alphas[si] != null) ? L.alphas[si] : L.a;
+          next.push([0,1,2].map(function(k){ return Math.round(s[k]*sa + b[k]*(1-sa)); }));
         }
       }
       acc = next.slice(0, 8);

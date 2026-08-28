@@ -21383,7 +21383,12 @@ html.lockscreen-widget-root #root {
   padding-bottom: 12px;
 }
 .game-arena-kicker {
-  color: var(--accent-2);
+  /* The tenth rule of the `--accent-2`-as-text family, missed when the other nine moved.
+     Measured on the live Arena 2026-08-28: "Practice" read 1.66:1 against a 4.5 bar on
+     classic-light, in exactly the 1.55-1.73 band the note at the top of this file records for
+     that family. `--accent-text` is the token this repo already built for the accent WHEN IT
+     IS TEXT; dark palettes keep `var(--accent-2)` verbatim, so nothing changes there. */
+  color: var(--accent-text);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
