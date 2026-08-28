@@ -523,7 +523,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
     <div className="cal-agenda">
       <section>
         <h3>{t('calendar.today')}</h3>
-        {agendaToday.length === 0 ? <p className="muted">{t('calendar.agenda.nothingToday')}</p> : (
+        {agendaToday.length === 0 ? <p className="muted cal-empty-state">{t('calendar.agenda.nothingToday')}</p> : (
           <ul className="cal-agenda-list">
             {agendaToday.map((ev) => (
               <li key={`${ev.id}-${ev.occurrenceDate}`}>
@@ -535,7 +535,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
       </section>
       <section>
         <h3>{t('calendar.agenda.upcoming')}</h3>
-        {agendaUpcoming.length === 0 ? <p className="muted">{t('calendar.agenda.nothingUpcoming')}</p> : (
+        {agendaUpcoming.length === 0 ? <p className="muted cal-empty-state">{t('calendar.agenda.nothingUpcoming')}</p> : (
           <ul className="cal-agenda-list">
             {agendaUpcoming.map((ev) => (
               <li key={`${ev.id}-${ev.occurrenceDate}`}>
@@ -548,7 +548,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
       </section>
       <section>
         <h3>{t('calendar.agenda.overdueReminders')}</h3>
-        {agendaOverdue.length === 0 ? <p className="muted">{t('calendar.agenda.none')}</p> : (
+        {agendaOverdue.length === 0 ? <p className="muted cal-empty-state">{t('calendar.agenda.none')}</p> : (
           <ul className="cal-agenda-list">
             {agendaOverdue.map((ev) => (
               <li key={`${ev.id}-${ev.occurrenceDate}`}>

@@ -1072,6 +1072,12 @@ Heavy/idle main-loop p95 are **3.7/3.0 ms**, maxima **9.5/10.6 ms**; all gesture
 and theme. The compositor control itself stalled twice (max **1,721.6 ms**), recorded as environment
 noise; the injected-jank control still yields **11** >100 ms frames. Evidence: `cat7-calendar-perf.json`.
 
+**Progress 2026-08-28 (Calendar category 8) — controlled 80/80.** Agenda's three existing absence
+messages now carry an explicit empty-state semantic. Driving Month→Agenda→Month measures **1/1**
+observable state named, restores the exact text hash, and finds **0** raw keys, placeholders, or
+unexplained disabled controls. Four languages produce four hashes and restore English; the negative
+control moves all three defect counts **0→1→0**. Evidence: `cat8-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

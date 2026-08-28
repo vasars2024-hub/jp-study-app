@@ -76,4 +76,11 @@ describe('Calendar Liquid regions', () => {
     expect(CSS).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(CSS).not.toContain('rgba(');
   });
+
+  it('marks Agenda absence copy as an honest empty state', () => {
+    expect(CONTENT.match(/className="muted cal-empty-state"/g)).toHaveLength(3);
+    expect(CONTENT).toContain("t('calendar.agenda.nothingToday')");
+    expect(CONTENT).toContain("t('calendar.agenda.nothingUpcoming')");
+    expect(CONTENT).toContain("t('calendar.agenda.none')");
+  });
 });

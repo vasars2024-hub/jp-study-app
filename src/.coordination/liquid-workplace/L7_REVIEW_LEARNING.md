@@ -862,3 +862,18 @@ heavy main p50/p95/max were **2.0/3.7/9.5 ms** versus idle **1.9/3.0/10.6 ms**. 
 
 **Calendar is 70/80.** Evidence: `cat7-calendar-perf.json`. Category 8 remains; no single-use
 probe was added.
+
+## 2026-08-28 14:28 EDT — Calendar category 8 repaired and PASS 10/10; score 80/80
+
+The first controlled run was honestly **UNMEASURED**: Agenda rendered three truthful absence
+messages, but all were generic `.muted` prose, so the shared state instrument found **0** semantic
+state hosts. The product repair adds `cal-empty-state` to those existing messages; copy and stored
+events are unchanged. Guard: `calendarLiquidRegions.test.ts` **8/8**.
+
+Driving Month→Agenda→Month now produces **3** empty hosts, **1/1** observable state named, a changed
+then exactly restored surface hash, and **0** raw keys, placeholders, or unexplained disabled
+controls. EN/JA/ZH/RU produce **4** distinct text hashes with **0** raw keys and restore English.
+The negative control moves raw-key/placeholder/mute counts **0/0/0→1/1/1→0/0/0**.
+
+**Calendar is controlled 80/80.** Evidence: `cat8-l7-calendar.json`. L7 remains open: Games is
+next, while Anki remains explicitly parked at 0/80 on its external runtime gate.
