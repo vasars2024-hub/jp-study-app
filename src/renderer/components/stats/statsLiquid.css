@@ -1,0 +1,39 @@
+/*
+ * L7 Statistics composition.
+ *
+ * The chart, metric cards, knowledge meter, and per-title rows are dense reading surfaces and
+ * deliberately retain their stable opaque paint. Only the intro/action strip is contextual;
+ * ContextualSurface stays pixel-inert in Standard and takes the shared Liquid material solely
+ * when the containing window opts in.
+ */
+.stats-view {
+  container-type: inline-size;
+  width: 100%;
+}
+
+.stats-context-head {
+  align-items: flex-start;
+  gap: var(--lq-space-4);
+}
+
+.stats-context-head > .muted {
+  min-width: 0;
+  margin: 0;
+}
+
+.stats-context-head > .actions {
+  flex: 0 0 auto;
+}
+
+/* Floating-window width, not desktop viewport width, decides when the contextual tools stack. */
+@container (max-width: 440px) {
+  .stats-context-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stats-context-head > .actions,
+  .stats-context-head > .actions > .btn {
+    width: 100%;
+  }
+}

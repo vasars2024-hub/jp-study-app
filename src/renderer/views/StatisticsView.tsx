@@ -19,6 +19,8 @@ import {
   useStats,
 } from '../components/stats/StatsContent';
 import { useT } from '../i18n';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
+import '../components/stats/statsLiquid.css';
 
 export default function StatisticsView() {
   const { t } = useT();
@@ -159,7 +161,7 @@ export default function StatisticsView() {
   return (
     <AppChrome menus={menus} status={classicStatus} className="stats-chrome">
     <div className="stats-view">
-      <div className="view-head">
+      <ContextualSurface as="header" className="view-head stats-context-head">
         <p className="muted">{t('stats.intro')}</p>
         {hasData && (
           <div className="actions">
@@ -171,7 +173,7 @@ export default function StatisticsView() {
             </button>
           </div>
         )}
-      </div>
+      </ContextualSurface>
 
       <WordKnowledge />
 

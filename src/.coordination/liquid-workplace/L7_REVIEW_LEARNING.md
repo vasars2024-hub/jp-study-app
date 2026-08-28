@@ -485,3 +485,14 @@ Score: **1,260** text owners, minimum **5.30:1**, failures **0**; core controls 
 failures **0**, unreachable **0**; pointer controls **464**, measured **437**, below-floor/theft
 **0/0**; reduced motion **11→0→11**. The control moved all five terms **0→1/2/2/1/2→0**.
 Categories 1–8 are now controlled **80/80**. Next surface: Statistics.
+
+## 2026-08-28 09:31 EDT — Statistics opens on the selective Liquid seam
+
+The live **772×1,931** content surface has 13 metric cards, one chart, 19 per-title rows, and four
+dense sections. Those remain stable opaque work. Only the intro/reset strip is contextual through
+the shared primitive; it is transparent at Standard and owns one declared contextual region.
+Container-scoped reflow follows the 820×580 floating window rather than the 1,264px desktop.
+
+Live HMR receipt: contextual regions **1**, dense contextual regions **0**, header **772×35**,
+Standard background transparent, container `inline-size`. Focused suites **15/15**. Next: categories
+1–3 through the existing surface-parameterised harnesses; no Statistics-only probe was added.
