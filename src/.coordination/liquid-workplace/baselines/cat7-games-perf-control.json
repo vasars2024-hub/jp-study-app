@@ -2,7 +2,7 @@
   "surface": "games",
   "title": "Game Arena",
   "root": ".game-arena",
-  "at": "2026-08-28T23:37:05.628Z",
+  "at": "2026-08-28T23:37:50.993Z",
   "scene": {
     "fwins": 6,
     "fwinElements": 4920,
@@ -20,7 +20,7 @@
     "theme": "forest-night",
     "viewport": "1264x821",
     "dpr": 1,
-    "heapMB": 253
+    "heapMB": 262
   },
   "surfaceWindow": {
     "mechanism": "floating .fwin",
@@ -38,40 +38,40 @@
   },
   "process": {
     "pid": 40648,
-    "uptimeSecAtStart": 32549,
-    "mainRssMbBefore": 153.6,
-    "mainRssMbAfter": 117.6,
-    "mainHeapUsedMbAfter": 297.7
+    "uptimeSecAtStart": 32600,
+    "mainRssMbBefore": 112.9,
+    "mainRssMbAfter": 110.2,
+    "mainHeapUsedMbAfter": 301.4
   },
   "sessionCeiling": {
     "p50": 16.7,
-    "p95": 16.9,
-    "frames": 111,
+    "p95": 16.8,
+    "frames": 112,
     "runs": [
       {
         "p50": 16.7,
-        "p95": 16.9,
-        "max": 17,
-        "over100": 0,
-        "frames": 111
-      },
-      {
-        "p50": 16.7,
-        "p95": 16.9,
-        "max": 33.5,
-        "over100": 0,
-        "frames": 108
-      },
-      {
-        "p50": 16.7,
-        "p95": 16.9,
+        "p95": 16.8,
         "max": 16.9,
         "over100": 0,
-        "frames": 109
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 17,
+        "max": 17.2,
+        "over100": 0,
+        "frames": 110
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 110
       }
     ],
     "noiseFloorOver100": 0,
-    "noiseFloorMaxMs": 33.5,
+    "noiseFloorMaxMs": 17.2,
     "l0P50": 10,
     "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
     "environmentNote": "ceiling clean — no environmental stall observed in this session"
@@ -99,7 +99,7 @@
         "theme": "forest-night",
         "viewport": "1264x821",
         "dpr": 1,
-        "heapMB": 253
+        "heapMB": 258
       },
       "scene_after": {
         "fwins": 6,
@@ -118,51 +118,51 @@
         "theme": "forest-night",
         "viewport": "1264x821",
         "dpr": 1,
-        "heapMB": 253
+        "heapMB": 261
       },
       "scene_stable": true,
       "stale_recorder": false,
       "gesture": {
         "done": true,
         "note": "compositor ceiling",
-        "spanMs": 1306
+        "spanMs": 1312
       },
       "jank_blocks": null,
-      "frames": 111,
-      "frame_min_ms": 16.4,
+      "frames": 112,
+      "frame_min_ms": 16.5,
       "frame_p50_ms": 16.7,
-      "frame_p95_ms": 16.9,
-      "frame_max_ms": 17,
-      "frames_over_16": 58,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 16.9,
+      "frames_over_16": 59,
       "frames_over_33": 0,
       "frames_over_100": 0,
-      "main_samples": 60,
-      "main_span_ms": 1831,
-      "main_p50_ms": 2.3,
-      "main_p95_ms": 3.5,
-      "main_max_ms": 15.3
+      "main_samples": 59,
+      "main_span_ms": 1808,
+      "main_p50_ms": 2.1,
+      "main_p95_ms": 4.3,
+      "main_max_ms": 10.7
     },
     "ceilingRuns": [
       {
         "p50": 16.7,
-        "p95": 16.9,
-        "max": 17,
-        "over100": 0,
-        "frames": 111
-      },
-      {
-        "p50": 16.7,
-        "p95": 16.9,
-        "max": 33.5,
-        "over100": 0,
-        "frames": 108
-      },
-      {
-        "p50": 16.7,
-        "p95": 16.9,
+        "p95": 16.8,
         "max": 16.9,
         "over100": 0,
-        "frames": 109
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 17,
+        "max": 17.2,
+        "over100": 0,
+        "frames": 110
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 110
       }
     ],
     "drag": {
@@ -187,7 +187,105 @@
         "theme": "forest-night",
         "viewport": "1264x821",
         "dpr": 1,
-        "heapMB": 253
+        "heapMB": 262
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 4920,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 5070,
+        "titles": [
+          "Immersion",
+          "Notebook",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 255
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Game Arena",
+        "before": {
+          "x": "230px",
+          "y": "174px",
+          "w": "980px",
+          "h": "589px"
+        },
+        "after": {
+          "x": "230px",
+          "y": "174px",
+          "w": "980px",
+          "h": "589px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 15.9,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 33.3,
+      "frames_over_16": 56,
+      "frames_over_33": 1,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1816,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 3.9,
+      "main_max_ms": 13.8,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.3,
+          "over100": 0,
+          "mainMax": 13.8,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 12.2,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Game Arena",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 4920,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 5070,
+        "titles": [
+          "Immersion",
+          "Notebook",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 255
       },
       "scene_after": {
         "fwins": 6,
@@ -230,42 +328,42 @@
         "closedLoop": true
       },
       "jank_blocks": null,
-      "frames": 105,
-      "frame_min_ms": 16.5,
+      "frames": 109,
+      "frame_min_ms": 16.2,
       "frame_p50_ms": 16.7,
-      "frame_p95_ms": 16.9,
-      "frame_max_ms": 66.9,
-      "frames_over_16": 56,
-      "frames_over_33": 2,
+      "frame_p95_ms": 17,
+      "frame_max_ms": 33.4,
+      "frames_over_16": 58,
+      "frames_over_33": 1,
       "frames_over_100": 0,
       "main_samples": 59,
-      "main_span_ms": 1824,
-      "main_p50_ms": 2.3,
-      "main_p95_ms": 7.3,
-      "main_max_ms": 14.4,
+      "main_span_ms": 1823,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 3.7,
+      "main_max_ms": 10.7,
       "repeats": [
         {
           "p50": 16.7,
-          "p95": 16.9,
-          "max": 66.9,
+          "p95": 17,
+          "max": 33.4,
           "over100": 0,
-          "mainMax": 14.4,
+          "mainMax": 10.7,
           "breached": false
         },
         {
           "p50": 16.7,
           "p95": 16.9,
-          "max": 33.4,
+          "max": 33.5,
           "over100": 0,
-          "mainMax": 12.6,
+          "mainMax": 19,
           "breached": false
         }
       ],
       "unstable": false
     },
-    "resize": {
-      "interaction": "resize",
-      "label": "resize",
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
       "title": "Game Arena",
       "root": null,
       "scene_before": {
@@ -304,7 +402,111 @@
         "theme": "forest-night",
         "viewport": "1264x821",
         "dpr": 1,
-        "heapMB": 254
+        "heapMB": 257
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 53.7,
+        "restorePaintedMs": 102.7,
+        "restoredTo": "forest-night"
+      },
+      "jank_blocks": null,
+      "frames": 104,
+      "frame_min_ms": 16.3,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17,
+      "frame_max_ms": 66.8,
+      "frames_over_16": 57,
+      "frames_over_33": 3,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1811,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 3.6,
+      "main_max_ms": 15.4,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 17,
+          "max": 66.8,
+          "over100": 0,
+          "mainMax": 15.4,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 17.1,
+          "max": 83.5,
+          "over100": 0,
+          "mainMax": 10.6,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "games: cycle every available game (DURING -DuringJs)",
+      "samples": 113,
+      "span_ms": 3502,
+      "min_ms": 1.7,
+      "p50_ms": 2.3,
+      "p95_ms": 3.7,
+      "max_ms": 8.6
+    },
+    "heavyProof": "cycled 15 games 60 times, restored selection 0",
+    "idle": {
+      "label": "games: idle",
+      "samples": 115,
+      "span_ms": 3523,
+      "min_ms": 1.5,
+      "p50_ms": 2.2,
+      "p95_ms": 3.4,
+      "max_ms": 7.8
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Game Arena",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 4920,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 5070,
+        "titles": [
+          "Immersion",
+          "Notebook",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 259
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 4920,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 5070,
+        "titles": [
+          "Immersion",
+          "Notebook",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 263
       },
       "scene_stable": true,
       "stale_recorder": false,
@@ -327,167 +529,20 @@
         },
         "closedLoop": true
       },
-      "jank_blocks": null,
-      "frames": 109,
-      "frame_min_ms": 15.8,
-      "frame_p50_ms": 16.7,
-      "frame_p95_ms": 16.9,
-      "frame_max_ms": 33.5,
-      "frames_over_16": 51,
-      "frames_over_33": 1,
-      "frames_over_100": 0,
-      "main_samples": 59,
-      "main_span_ms": 1817,
+      "jank_blocks": 11,
+      "frames": 65,
+      "frame_min_ms": 15.2,
+      "frame_p50_ms": 16.8,
+      "frame_p95_ms": 100.4,
+      "frame_max_ms": 150.4,
+      "frames_over_16": 41,
+      "frames_over_33": 14,
+      "frames_over_100": 11,
+      "main_samples": 57,
+      "main_span_ms": 1802,
       "main_p50_ms": 2.3,
-      "main_p95_ms": 4,
-      "main_max_ms": 10.5,
-      "repeats": [
-        {
-          "p50": 16.7,
-          "p95": 16.9,
-          "max": 33.5,
-          "over100": 0,
-          "mainMax": 10.5,
-          "breached": false
-        },
-        {
-          "p50": 16.7,
-          "p95": 16.9,
-          "max": 33.5,
-          "over100": 0,
-          "mainMax": 10.6,
-          "breached": false
-        }
-      ],
-      "unstable": false
-    },
-    "theme": {
-      "interaction": "theme",
-      "label": "theme",
-      "title": "Game Arena",
-      "root": null,
-      "scene_before": {
-        "fwins": 6,
-        "fwinElements": 4920,
-        "root": null,
-        "rootElements": null,
-        "documentElements": 5070,
-        "titles": [
-          "Immersion",
-          "Notebook",
-          "Statistics",
-          "Settings",
-          "Calendar",
-          "Game Arena"
-        ],
-        "theme": "forest-night",
-        "viewport": "1264x821",
-        "dpr": 1,
-        "heapMB": 256
-      },
-      "scene_after": {
-        "fwins": 6,
-        "fwinElements": 4920,
-        "root": null,
-        "rootElements": null,
-        "documentElements": 5070,
-        "titles": [
-          "Immersion",
-          "Notebook",
-          "Statistics",
-          "Settings",
-          "Calendar",
-          "Game Arena"
-        ],
-        "theme": "forest-night",
-        "viewport": "1264x821",
-        "dpr": 1,
-        "heapMB": 262
-      },
-      "scene_stable": true,
-      "stale_recorder": false,
-      "gesture": {
-        "done": true,
-        "applyPaintedMs": 67.3,
-        "restorePaintedMs": 107.8,
-        "restoredTo": "forest-night"
-      },
-      "jank_blocks": null,
-      "frames": 101,
-      "frame_min_ms": 16.5,
-      "frame_p50_ms": 16.7,
-      "frame_p95_ms": 16.8,
-      "frame_max_ms": 66.9,
-      "frames_over_16": 52,
-      "frames_over_33": 5,
-      "frames_over_100": 0,
-      "main_samples": 56,
-      "main_span_ms": 1805,
-      "main_p50_ms": 2.3,
-      "main_p95_ms": 4.5,
-      "main_max_ms": 66,
-      "repeats": [
-        {
-          "p50": 16.7,
-          "p95": 16.9,
-          "max": 183.8,
-          "over100": 1,
-          "mainMax": 25.4,
-          "breached": true
-        },
-        {
-          "p50": 16.7,
-          "p95": 16.8,
-          "max": 66.9,
-          "over100": 0,
-          "mainMax": 66,
-          "breached": false
-        },
-        {
-          "p50": 16.7,
-          "p95": 16.9,
-          "max": 83.7,
-          "over100": 0,
-          "mainMax": 12.6,
-          "breached": false
-        },
-        {
-          "p50": 16.7,
-          "p95": 17,
-          "max": 66.8,
-          "over100": 0,
-          "mainMax": 3.8,
-          "breached": false
-        },
-        {
-          "p50": 16.7,
-          "p95": 17,
-          "max": 66.9,
-          "over100": 0,
-          "mainMax": 11,
-          "breached": false
-        }
-      ],
-      "unstable": false
-    },
-    "heavy": {
-      "label": "games: cycle every available game (DURING -DuringJs)",
-      "samples": 114,
-      "span_ms": 3508,
-      "min_ms": 1.6,
-      "p50_ms": 2.1,
-      "p95_ms": 3.4,
-      "max_ms": 9
-    },
-    "heavyProof": "cycled 15 games 60 times, restored selection 0",
-    "idle": {
-      "label": "games: idle",
-      "samples": 113,
-      "span_ms": 3521,
-      "min_ms": 1.7,
-      "p50_ms": 2.4,
-      "p95_ms": 3.9,
-      "max_ms": 8.4
+      "main_p95_ms": 6.6,
+      "main_max_ms": 64.4
     }
   },
   "findings": [],

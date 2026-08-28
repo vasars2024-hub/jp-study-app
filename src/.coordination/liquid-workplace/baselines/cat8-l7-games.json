@@ -7,7 +7,7 @@
   "theme": "forest-night",
   "rect": "942x522",
   "textRuns": 49,
-  "textHash": -1994696722,
+  "textHash": -33941883,
   "rawKeyCount": 0,
   "rawKeys": [],
   "placeholderCount": 0,
@@ -43,7 +43,7 @@
         "lang": "en",
         "htmlLang": "en",
         "textRuns": 49,
-        "textHash": -1994696722,
+        "textHash": -33941883,
         "rawKeyCount": 0,
         "rawKeys": []
       },
@@ -51,7 +51,7 @@
         "lang": "ja",
         "htmlLang": "ja",
         "textRuns": 49,
-        "textHash": -1362443188,
+        "textHash": -540597347,
         "rawKeyCount": 0,
         "rawKeys": []
       },
@@ -59,7 +59,7 @@
         "lang": "zh",
         "htmlLang": "zh-Hans",
         "textRuns": 49,
-        "textHash": 287042002,
+        "textHash": -1015957670,
         "rawKeyCount": 0,
         "rawKeys": []
       },
@@ -67,7 +67,7 @@
         "lang": "ru",
         "htmlLang": "ru",
         "textRuns": 49,
-        "textHash": -1841526651,
+        "textHash": 1291011311,
         "rawKeyCount": 0,
         "rawKeys": []
       }

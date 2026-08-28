@@ -52,6 +52,7 @@ describe('Game Arena Liquid regions', () => {
     expect(CONTENT).toContain('<details className="game-ready-options">');
     expect(CONTENT).toContain("t('games.roundOptions')");
     expect(CONTENT).toMatch(/game-ready-options-body[\s\S]*KanaScopePicker[\s\S]*openArenaSettings/);
+    expect(LIQUID_CSS).toMatch(/\.game-ready-options-body > \.btn\s*\{[^}]*min-height: 32px/s);
   });
 
   it('keeps the gameplay canvas on an opaque semantic work material', () => {

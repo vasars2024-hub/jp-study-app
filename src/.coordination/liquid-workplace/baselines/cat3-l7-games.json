@@ -14,12 +14,12 @@
     "image": null,
     "opacity": 1
   },
-  "regions": 41,
-  "controlsSkipped": 17,
+  "regions": 42,
+  "controlsSkipped": 18,
   "byRole": {
     "Work": 1,
     "Liquid-eligible": 6,
-    "Anchor": 32,
+    "Anchor": 33,
     "Anchor(holds work)": 2,
     "Ambient": 0
   },

@@ -7,7 +7,7 @@
   "raised": "already-on-top",
   "base": {
     "textRuns": 55,
-    "controlCount": 22,
+    "controlCount": 21,
     "box": "980x589",
     "results": null
   },
@@ -18,17 +18,17 @@
   },
   "latencyMs": {
     "clickRecv": [
-      27.7
+      26
     ],
     "inputRecv": [],
-    "worstRecv": 27.7,
+    "worstRecv": 26,
     "overBar100": 0,
     "n": 1,
     "clickStampUnscored": [
-      70.2
+      73
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 70.2
+    "worstStampUnscored": 73
   },
   "steps": [
     {
@@ -37,7 +37,7 @@
         "sel": ".game-launch-panel .btn.primary",
         "label": "Start round",
         "disabled": false,
-        "at": "613,477"
+        "at": "613,521"
       },
       "counted": true,
       "moved": {
@@ -59,13 +59,13 @@
       "click:.game-list-item.active"
     ],
     "restored": true,
-    "baseHash": "hofjc9",
-    "afterHash": "hofjc9",
+    "baseHash": "1bm0xha",
+    "afterHash": "1bm0xha",
     "liveRegionsBefore": [],
     "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "hofjc9",
-      "after": "hofjc9"
+      "base": "1bm0xha",
+      "after": "1bm0xha"
     }
   },
   "stepsDriven": 1,
@@ -83,14 +83,14 @@
       "box": "980x589",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 27.7
+      "worstRecv": 26
     },
     "second": {
       "presentation": "liquid",
       "box": "980x589",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 33.1
+      "worstRecv": 29
     },
     "restored": true,
     "restoredTo": {
@@ -140,7 +140,7 @@
       ]
     },
     "inertClickRecvMs": [
-      0.3
+      0.4
     ]
   }
 }
