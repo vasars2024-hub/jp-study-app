@@ -1066,6 +1066,12 @@ translated disclosure changes Q4 from **0 disclosures / 9 controls → 1 / 8** a
 YES answers. Q2/Q3/Q5/Q10 controls all fail and restore; refreshed categories 1–4 and 6 remain
 controlled 10/10. Evidence: `cat5-l7-calendar{,-control}.json` and refreshed `cat{1,2,3,4,6}`.
 
+**Progress 2026-08-28 (Calendar category 7) — 70/80.** The shared performance harness cycles all
+four views **56** times (**14/14/14/14**) without writing events and restores the starting mode.
+Heavy/idle main-loop p95 are **3.7/3.0 ms**, maxima **9.5/10.6 ms**; all gestures restore geometry
+and theme. The compositor control itself stalled twice (max **1,721.6 ms**), recorded as environment
+noise; the injected-jank control still yields **11** >100 ms frames. Evidence: `cat7-calendar-perf.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

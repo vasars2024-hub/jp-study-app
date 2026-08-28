@@ -844,3 +844,21 @@ the pointer pass, with all five defect terms zero; compact geometry remains 0/0/
 
 **Calendar is 60/80.** Evidence: `cat5-l7-calendar{,-control}.json` plus refreshed `cat{1,2,3,4,6}`.
 Categories 7 and 8 remain.
+
+## 2026-08-28 14:25 EDT — Calendar category 7 controlled PASS 10/10; score 70/80
+
+The first two unchanged runs each voided on one inconsistent >100 ms gesture outlier, migrating
+from theme to drag while every main-loop load result remained clean. The shared harness already
+documents a ~12% bare-compositor outlier rate but voided a 2:1 clean consensus. Its one allowed
+generic repair now takes two confirmations after disagreement: **4:1** is a consensus; **3:2**
+remains UNSTABLE and void. Every raw reading remains in the receipt.
+
+The controlled run then measured its own noisy environment honestly: three compositor ceilings
+included **2** >100 ms frames and a **1,721.6 ms** maximum. Against that session floor, drag,
+resize, and theme all had p50 **16.7 ms**, p95 ≤**17.1 ms**, and no scored finding. Calendar's
+read-only load cycled Month/Week/Day/Agenda **56** times (**14/14/14/14**) and restored mode 0;
+heavy main p50/p95/max were **2.0/3.7/9.5 ms** versus idle **1.9/3.0/10.6 ms**. Main RSS was
+**149.0→150.1 MB**. The jank control produced **11** frames over 100 ms, proving sensitivity.
+
+**Calendar is 70/80.** Evidence: `cat7-calendar-perf.json`. Category 8 remains; no single-use
+probe was added.

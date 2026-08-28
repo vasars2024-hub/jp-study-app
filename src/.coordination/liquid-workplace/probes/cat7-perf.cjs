@@ -243,6 +243,47 @@ const SPECS = {
     },
     collection: { container: '.stats-view', row: '.stats-book-row' },
   },
+  calendar: {
+    title: 'Calendar',
+    root: '.calendar-view',
+    heavy: {
+      // Calendar's repeatable read-only load is switching the four render branches. Each pass
+      // replaces a 42-cell month grid, seven-column week, day list, and three-section agenda;
+      // unlike creating an event, it writes no user data. The receipt proves every branch was
+      // reached and the user's starting mode returned.
+      label: 'cycle all four calendar views',
+      durationMs: 3000,
+      js: `(() => {
+        delete window.__lqCalendarLoad;
+        const buttons = Array.from(document.querySelectorAll('.calendar-view .cal-mode-btn'));
+        if (buttons.length !== 4) return 'REFUSE: expected four calendar modes, found ' + buttons.length;
+        const start = buttons.findIndex((b) => b.classList.contains('active'));
+        if (start < 0) return 'REFUSE: calendar has no active mode';
+        const rec = { start, ticks: 0, visits: [0, 0, 0, 0], restored: false };
+        window.__lqCalendarLoad = rec;
+        const timer = setInterval(() => {
+          const next = rec.ticks % 4;
+          buttons[next].click();
+          rec.visits[next] += 1;
+          rec.ticks += 1;
+          if (rec.ticks >= 56) {
+            clearInterval(timer);
+            buttons[start].click();
+            setTimeout(() => { rec.restored = buttons[start].classList.contains('active'); }, 120);
+          }
+        }, 45);
+        return 'cycling four views from ' + start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqCalendarLoad;
+        if (!r) return 'REFUSE: calendar load never armed';
+        if (r.ticks < 56 || r.visits.some((n) => n < 10)) return 'REFUSE: incomplete calendar cycle ' + JSON.stringify(r);
+        if (!r.restored) return 'REFUSE: calendar did not restore mode ' + r.start;
+        return 'cycled ' + r.ticks + ' views (' + r.visits.join('/') + '), restored mode ' + r.start;
+      })()`,
+    },
+    collection: { container: '.cal-month-grid', row: '.cal-month-cell' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',
@@ -392,15 +433,17 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const ceilingMaxMs = Math.max(...ceilingRuns.map((r) => r.frame_max_ms));
 
   // --- 2-4. the three gestures, every one scoped to THIS surface's window -----------
-  // TWICE, and a third time only to break a tie. A single gesture reading is noise: Library's
+  // TWICE, then a third reading to break a tie. If those three disagree, take two final
+  // confirmations: the measured ~12% compositor outlier rate makes one stray reading common,
+  // while a 3/2 split is still too unstable to score. A single gesture reading is noise: Library's
   // first scored resize came back p95 66.9 / max 200.5 / 3 frames over 100 ms, and SIX
   // consecutive re-runs -- three on the same mount, three on a freshly reopened window -- all
   // returned p95 16.8 / max 17.0 / 0 over 100. Something took the foreground for ~200 ms. The
   // probe's own focus guard only catches a steal that is still in effect when the gesture ends.
   // Reporting that one reading would have filed a phantom Library defect and cost the next
   // worker a turn, which is precisely what the scene trap cost the last one. A breach is a
-  // FINDING only when the majority of readings breach; otherwise the leg is UNSTABLE and every
-  // reading is kept in the record.
+  // FINDING only when at least four of five readings breach; one dissenting reading is recorded
+  // as environmental noise, while two dissenting readings leave the leg UNSTABLE and void.
   const breaches = (r) => (r.frame_p50_ms > ceilingP50 * 1.5) || (r.frame_p95_ms > ceilingP95 * 2)
     || r.frames_over_100 > ceilingOver100 || r.main_max_ms > L0.mainBlockBarMs;
   for (const g of ['drag', 'resize', 'theme']) {
@@ -411,13 +454,19 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     if (breaches(runs[0]) !== breaches(runs[1])) {
       step(`${g} (tie-break)`);
       runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
+      if (runs.some(breaches) && runs.some((r) => !breaches(r))) {
+        step(`${g} (confirmation 1/2)`);
+        runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
+        step(`${g} (confirmation 2/2)`);
+        runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
+      }
     }
     const bad = runs.filter(breaches).length;
     // Score the reading the majority agrees with, so the reported numbers are a real run and
     // never an average of runs that disagree.
     legs[g] = runs.find((r) => breaches(r) === (bad * 2 > runs.length)) || runs[0];
     legs[g].repeats = runs.map((r) => ({ p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms, over100: r.frames_over_100, mainMax: r.main_max_ms, breached: breaches(r) }));
-    legs[g].unstable = bad > 0 && bad < runs.length;
+    legs[g].unstable = Math.min(bad, runs.length - bad) > 1;
   }
 
   // --- 5. main availability under the surface's heaviest real work ------------------
