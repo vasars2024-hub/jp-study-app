@@ -908,3 +908,52 @@ target **32 px**, **0** pointer/spacing failures; **17/17** keyboard reachable; 
 **19→0→19**. Control terms contrast/rect/pointer/WCAG/keyboard all move **0→nonzero→0**.
 
 **Games is 10/80.** Evidence: `cat1-l7-games.json`. Category 2 is next.
+
+## 2026-08-28 16:2x EDT — Games categories 6 and 5; 6 PASSES, 5 is VOID on a named defect
+
+**Category 6 — PASS 10/10, a pure RUN.** `games` was registered in `l6-parity.js` as DATA (ten
+rows against §11's own parity list); the runner needed no change. standard 10/10, liquid 10/10,
+rowsAgree, round trip held with zero diffs. Negative control: **10 of 10 mutations fell exactly
+their own row**, zero unexpected, all returned. The drive starts a real round to reach "typing
+input" and "scores", then discards it through the product's own path — measured,
+`jp-game-progress-v1` **ABSENT before and after**. Evidence `cat6-l7-games.json` (`58c34960`).
+
+**Category 5 — the instrument was fabricating a total collapse, and one real defect was under
+it.** `cat5-ui-clarity.cjs`'s TRAP-7 correction was written for background-COLOR and never reached
+the background-IMAGE branch: every gradient stop was read as opaque and the walk then `break`.
+`.game-arena`'s 4% sheen stop `color(srgb .847 .922 .878 / .04)` resolved to **rgb(216,235,224) —
+exactly the h2's own colour** — so `h2 "Game Arena"` reported **1.00:1 in BOTH themes**, and the
+identical fake minimum also VOIDed Q5's theme axis on a surface whose failing count really moved
+**19 → 5**. Stops now keep their own alpha and only an everywhere-opaque gradient stops the walk.
+
+Underneath it, a real one: `.game-arena-kicker` is the **tenth** `color: var(--accent-2)` rule of
+the family `--accent-text` was built for. "Practice" read **1.66:1 against a 4.5 bar** on
+classic-light. Moved to `var(--accent-text)`; dark palettes are untouched by construction. Q5
+re-measured after the fix: forest-night **4.57, 0 failing/55**; classic-light **5.38, 0/55**. NO →
+YES, axis moves. `accentTextToken.test.ts` + `arcadeGamesI18n.test.tsx` 21/21 (`8969c8a4`).
+**43 rules in `styles.css` still paint `color: var(--accent-2)`** — an open finding, not swept.
+
+**Category 5 stays VOID, counted, never dropped**, on two named defects:
+
+1. **Q1 drifts with the palette — a real selection-visibility failure, measured.** The only entry
+   point either theme finds is the *selected game item*, via the harness's palette-relative
+   fallback. `.game-list-item.active` fills with `--game-accent-soft` = accent at a fixed **16%**
+   over an unknown ground: composited that separates **1.30:1** from `.game-list` on forest-night
+   and **1.16:1** on classic-light, against the 1.2 bar. A fixed alpha over an unknown background
+   is the identical recipe error `--accent-2`-as-text was. `.game-list-item:hover` and `.active`
+   are also byte-identical rules, so hover and selection are indistinguishable.
+   **NOT FIXED THIS TURN AND DELIBERATELY NOT GUESSED**: a live share sweep read 1.16 → 1.42 and
+   then plateaued, because `.game-list-item` carries `transition: background`, so each same-tick
+   `getComputedStyle` returns a mid-transition colour. The share must be swept **settled, one
+   bridge call per share**, and across the nine accent presets × six light palettes — the
+   `--accent-text` note's own words: a share tuned to one hue is not a measurement.
+2. **Q4 — zero collapsed disclosures.** The default ready state scans **2** controls (Settings,
+   Start round) against a bar of ≥1 disclosure AND ≤12 scanned. No clutter, no progressive
+   disclosure either; §11 assigns help/coverage/difficulty/post-round detail to the contextual
+   seam, so the Arena's own scope and difficulty controls belong behind one, not in Settings.
+
+Everything else answers YES: Q2, Q3, Q5, Q6, Q7, Q8, Q9, Q10. Control run moved all four planted
+questions. Evidence `cat5-l7-games.json` + `cat5-l7-games-control.json`.
+
+**Games is 50/80** (cats 1, 2, 3, 4, 6 PASS; cat 5 VOID; cats 7, 8 unmeasured). Next: cat 7, cat 8,
+then Q1's settled share sweep and Q4's disclosure.
