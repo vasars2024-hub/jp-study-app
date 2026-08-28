@@ -824,3 +824,23 @@ declared row. The first date-transport plant stripped a tooltip while the visibl
 the control and correctly voided; the one repair removes the counted control itself.
 
 **Calendar is 50/80.** Evidence: `cat6-l7-calendar.json`. Category 5 can now run.
+
+## 2026-08-28 14:18 EDT — Calendar clarity 9/10 → PASS 10/10; score 60/80
+
+The first score answered YES on nine questions and NO on Q4: the raw date input sat beside all
+eight primary transport controls, with **0** collapsed disclosures. Direct date entry is secondary
+to prev/today/next, so it now lives behind a native `details` labelled by the existing translated
+`calendar.jumpToDate` string. Nothing was removed; keyboard and pointer activation disclose it.
+
+Final Q4 is **1** collapsed disclosure and **8** controls to scan. All ten questions answer YES:
+Q1 has **2** entry points, Q5 samples **67** text runs per theme at minima **5.30/5.71** with zero
+failures, Q6 has **2/2** Liquid regions carrying transitions and zero loops, and category-6 parity
+remains **5/5 / 5/5** with zero round-trip diffs. The Q2/Q3/Q5/Q10 plant moves all four to NO and
+restores theme, Standard presentation, store bytes, and **0** residue.
+
+The DOM change invalidated earlier cells, so categories 1–4 and 6 were re-run: all remain controlled
+10/10. Accessibility now measures 61 text owners, 8 default controls and the disclosed input for
+the pointer pass, with all five defect terms zero; compact geometry remains 0/0/0/0.
+
+**Calendar is 60/80.** Evidence: `cat5-l7-calendar{,-control}.json` plus refreshed `cat{1,2,3,4,6}`.
+Categories 7 and 8 remain.

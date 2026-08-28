@@ -12,7 +12,7 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 60,
+    "measured": 61,
     "unmeasurable": 0,
     "minRatio": 5.3,
     "minOwner": "div.cal-month-daynum \"26\" 12px",
@@ -22,7 +22,7 @@
     "inactiveWorst": []
   },
   "targets": {
-    "total": 9,
+    "total": 8,
     "smallest": "button.cal-mode-btn 32px",
     "smallestPx": 32,
     "under32Count": 0,
@@ -31,7 +31,7 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 9,
+    "controls": 8,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
@@ -110,7 +110,7 @@
     "occluded": [],
     "disabledCount": 0,
     "disabled": [],
-    "disclosedForRun": 0,
+    "disclosedForRun": 1,
     "disclosuresRestored": true,
     "scrollLeaks": [],
     "deferredRestore": {

@@ -39,6 +39,14 @@ describe('Calendar Liquid regions', () => {
     expect(CONTENT).toContain('</AnchorSurface>');
   });
 
+  it('keeps direct date entry discoverable without adding it to the default control scan', () => {
+    expect(CONTENT).toContain('<details className="cal-date-tools">');
+    expect(CONTENT).toContain("<summary>{t('calendar.jumpToDate')}</summary>");
+    expect(CONTENT).toContain('className="cal-jump"');
+    expect(CSS).toContain('.cal-context-toolbar .cal-date-tools > summary {');
+    expect(CSS).toContain('min-height: var(--lq-hit-target);');
+  });
+
   it('raises the transport controls to the shared pointer floor', () => {
     // Measured from the existing rules: the mode chips are 5px/12px on a 12px face and the
     // date jump 3px/6px, both about 24px against a 32px bar.

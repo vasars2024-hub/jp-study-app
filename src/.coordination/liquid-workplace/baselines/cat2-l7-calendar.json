@@ -6,8 +6,8 @@
   "presentation": "standard",
   "raised": "root surface - no taskbar button",
   "base": {
-    "textRuns": 60,
-    "controlCount": 9,
+    "textRuns": 61,
+    "controlCount": 8,
     "box": "782x513",
     "results": 0
   },
@@ -18,17 +18,17 @@
   },
   "latencyMs": {
     "clickRecv": [
-      57.5
+      27.5
     ],
     "inputRecv": [],
-    "worstRecv": 57.5,
+    "worstRecv": 27.5,
     "overBar100": 0,
     "n": 1,
     "clickStampUnscored": [
-      652.7
+      138.6
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 652.7
+    "worstStampUnscored": 138.6
   },
   "steps": [
     {
@@ -59,13 +59,13 @@
       "click:.cal-mode-btn:nth-child(1)"
     ],
     "restored": true,
-    "baseHash": "1xxouml",
-    "afterHash": "1xxouml",
+    "baseHash": "15v7b35",
+    "afterHash": "15v7b35",
     "liveRegionsBefore": [],
     "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "1xxouml",
-      "after": "1xxouml"
+      "base": "15v7b35",
+      "after": "15v7b35"
     }
   },
   "stepsDriven": 1,
@@ -83,14 +83,14 @@
       "box": "820x580",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 57.5
+      "worstRecv": 27.5
     },
     "second": {
       "presentation": "liquid",
       "box": "820x580",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 9.4
+      "worstRecv": 25.7
     },
     "restored": true,
     "restoredTo": {
@@ -140,7 +140,7 @@
       ]
     },
     "inertClickRecvMs": [
-      2.4
+      0.4
     ]
   }
 }

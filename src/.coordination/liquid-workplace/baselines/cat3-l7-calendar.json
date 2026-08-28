@@ -15,7 +15,7 @@
     "opacity": 1
   },
   "regions": 51,
-  "controlsSkipped": 9,
+  "controlsSkipped": 10,
   "byRole": {
     "Work": 1,
     "Liquid-eligible": 2,

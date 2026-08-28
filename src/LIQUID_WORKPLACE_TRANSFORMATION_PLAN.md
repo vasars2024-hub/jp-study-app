@@ -1061,6 +1061,11 @@ clip control moved **0→1→0**. Evidence: `cat4-l7-calendar.json`.
 Standard/Liquid are **5/5 / 5/5**, the 120px-scroll round trip has zero diffs, and all five controls
 move only their own row **5/5→4/5→5/5**. Evidence: `cat6-l7-calendar.json`.
 
+**Progress 2026-08-28 (Calendar category 5) — 60/80.** Moving direct date entry behind a native,
+translated disclosure changes Q4 from **0 disclosures / 9 controls → 1 / 8** and yields all ten
+YES answers. Q2/Q3/Q5/Q10 controls all fail and restore; refreshed categories 1–4 and 6 remain
+controlled 10/10. Evidence: `cat5-l7-calendar{,-control}.json` and refreshed `cat{1,2,3,4,6}`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

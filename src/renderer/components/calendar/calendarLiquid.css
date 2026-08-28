@@ -39,6 +39,19 @@
   min-width: var(--lq-hit-target);
 }
 
+.cal-context-toolbar .cal-date-tools > summary {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  min-height: var(--lq-hit-target);
+}
+
+.cal-context-toolbar .cal-date-tools[open] {
+  align-items: center;
+  display: flex;
+  gap: var(--lq-space-2);
+}
+
 /* Reflow against the floating Calendar window, not the desktop viewport. `.cal-header-label`
  * carries a 160px floor that pushes the date jump out of a narrow window entirely, so the
  * label takes the row it needs instead of forcing a horizontal scroll on the transport. */
@@ -65,6 +78,10 @@
     flex: 1 0 100%;
     min-width: 0;
     order: -1;
+  }
+
+  .cal-context-toolbar .cal-date-tools[open] {
+    flex-wrap: wrap;
   }
 }
 

@@ -405,16 +405,19 @@ export function CalendarNav({ state }: { state: CalendarState }) {
           <button type="button" className="btn small" onClick={goToday}>{t('calendar.today')}</button>
           <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title={t('calendar.next')}>›</button>
           <span className="cal-header-label">{headerLabel}</span>
-          <input
-            type="date"
-            className="cal-jump"
-            value={jumpVal}
-            onChange={(e) => {
-              setJumpVal(e.target.value);
-              jump(e.target.value);
-            }}
-            title={t('calendar.jumpToDate')}
-          />
+          <details className="cal-date-tools">
+            <summary>{t('calendar.jumpToDate')}</summary>
+            <input
+              type="date"
+              className="cal-jump"
+              value={jumpVal}
+              onChange={(e) => {
+                setJumpVal(e.target.value);
+                jump(e.target.value);
+              }}
+              title={t('calendar.jumpToDate')}
+            />
+          </details>
         </AnchorSurface>
       )}
     </ContextualSurface>
