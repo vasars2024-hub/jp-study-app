@@ -669,3 +669,48 @@ refuses unless Settings is already open on Appearance.
 `cat8-honest-states.cjs --surface "@.stats-view" --control --langs --drive-click
 ".wk-head > .btn.small" --drive-undo ".wk-message-close"` with `ankiUrl` at `127.0.0.1:1`. That
 drive then produces a real error state and closes Statistics at 80/80.
+
+## 2026-08-28 10:58 EDT — Statistics closes at 80/80: category 8 PASS 10/10 (`593d6ba8`)
+
+The false success is fixed and the category is scored. `classifyIntervalSyncOutcome`
+(`shared/anki.ts`) reads the two signals `anki:getIntervals` throws away: link state, and whether
+the returned snapshot's `generatedAt` is younger than the moment we asked. **`runPoll` stamps
+`generatedAt` AFTER its last AnkiConnect call (`intervals.ts:485`), so any poll whose result
+reaches us — including one already in flight that the single-flight gate coalesced us into — is
+stamped later than `requestedAt`.** That is what makes the age test sound rather than racy, and it
+is the one non-obvious fact in this fix.
+
+Live reproduction of the defect, measured this turn and needing NO settings change at all: Anki
+desktop is not running on this machine, so `anki:linkState` reads `disconnected` with **71
+consecutive failures**. A forced `ankiGetIntervals({maxAgeMs:0})` still resolved with **87,260
+entries / 155,384 notes**, stamped **706,659,811 ms = 8.18 days** before the request. The previous
+turn had to repoint `ankiUrl` to `127.0.0.1:1` and restart to see this; that is unnecessary and
+nobody should spend a restart on it again.
+
+Live A/B on the same button, same surface:
+- BEFORE (previous turn, recorded above): `wk-message success`, `role="status"`, "Synced 87,260
+  words from Anki — 0 updated."
+- AFTER (this turn): `wk-message error`, `role="alert"`, "Can't reach Anki. Open Anki desktop and
+  make sure the AnkiConnect add-on is installed." Knowledge cards stayed **0/0/0/0** — the
+  disconnected branch never folds, so the phantom 41,535-entry write recorded above cannot happen
+  down this path either.
+
+Third state added rather than folded into the other two: `stale` — real counts from the last good
+snapshot when the refresh did not complete but the link is not reported down. Border-only tone,
+like `.error` beside it, so no status hue is asked to clear a contrast bar it misses on light
+panels.
+
+**Category 8 = PASS 10/10**, `cat8-honest-states.cjs --surface "@.stats-view" --control --langs
+--drive-click ".wk-head > .btn.small" --drive-undo ".wk-message-close"`. textRuns **94**, rawKeys
+**0**, placeholders **0**, mute pairs **0**, disabled controls **0**; statesNamed **1 of 1
+observable** (empty/loading/offline `notObservable`); four distinct language hashes with rawKeys 0
+in each, `ui-lang` restored to `en` and asserted. Drive `surfaceChanged: true, restored: true`.
+**Control moved all three: 0,0,0 → 1,1,1 → 0,0,0.** Evidence: `baselines/cat8-l7-statistics.json`.
+
+**Statistics is 80/80 and DONE — the second finished L7 surface after Flashcards.**
+
+Two traps this turn, both cheap to avoid. A run VOIDed at `surfaceChanged: false, restored: false`
+purely because a message left over from my own manual click was already on screen: **clear
+`.wk-message` before driving, or the drive's before-state already contains the after-state.**
+And `--langs` needs the ui-language card, which is reached by clicking
+`button.os-set-nav-item` whose text is "Appearance" — the `LI` wrapper's `.click()` does nothing.
