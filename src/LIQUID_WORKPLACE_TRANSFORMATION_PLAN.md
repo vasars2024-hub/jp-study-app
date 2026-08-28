@@ -1104,6 +1104,14 @@ still painted at alpha **0.88**. It now uses the opaque semantic Work material: 
 shared primitives. The one-region and all-glass controls move the Work failure **0→1→0** and fully
 restore presentation/material state. Evidence: `cat3-l7-games.json`.
 
+**Finding 2026-08-28 (Games category 4) — stays 30/80.** The shared harness measures default,
+compact, and maximized at **980×589 / 260×170 / 1264×765**. Current CSS fails compact with **1**
+clipped region and **1/1** horizontal/hidden overflow; dead region is **15.1%** default and **36.1%**
+maximized. One component-container attempt removed clipping but exposed **6** header/list overlaps,
+kept a horizontal scroller, and did not move dead space, so it was reverted under the one-attempt
+rule. Next: design the compact header/list as a genuine vertical document and distribute idle-stage
+content before re-running `cat4-use-of-space.cjs`; do not reuse that partial rule set.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
