@@ -31,6 +31,14 @@ describe('Calendar Liquid regions', () => {
     expect(VIEW).toContain('{modal && <EventModal initial={modal} onClose={() => setModal(null)} />}');
   });
 
+  it('anchors the date-input subgroup instead of putting a dense form on glass', () => {
+    expect(CONTENT).toContain(
+      "import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface'",
+    );
+    expect(CONTENT).toContain('<AnchorSurface bare className="cal-nav">');
+    expect(CONTENT).toContain('</AnchorSurface>');
+  });
+
   it('raises the transport controls to the shared pointer floor', () => {
     // Measured from the existing rules: the mode chips are 5px/12px on a 12px face and the
     // date jump 3px/6px, both about 24px against a 32px bar.

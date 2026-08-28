@@ -9,7 +9,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
-import { ContextualSurface } from '../liquid/LiquidSurface';
+import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import './calendarLiquid.css';
 import {
   addEvent,
@@ -397,7 +397,10 @@ export function CalendarNav({ state }: { state: CalendarState }) {
         ))}
       </div>
       {mode !== 'agenda' && (
-        <div className="cal-nav">
+        // The date input makes this subgroup a dense form. Keep it on an opaque anchor while the
+        // surrounding mode/transport strip remains contextual; universal toolbar glass would put
+        // Calendar's one editing control directly on translucent material.
+        <AnchorSurface bare className="cal-nav">
           <button type="button" className="wgt-btn-icon" onClick={() => shift(-1)} title={t('calendar.prev')}>‹</button>
           <button type="button" className="btn small" onClick={goToday}>{t('calendar.today')}</button>
           <button type="button" className="wgt-btn-icon" onClick={() => shift(1)} title={t('calendar.next')}>›</button>
@@ -412,7 +415,7 @@ export function CalendarNav({ state }: { state: CalendarState }) {
             }}
             title={t('calendar.jumpToDate')}
           />
-        </div>
+        </AnchorSurface>
       )}
     </ContextualSurface>
   );

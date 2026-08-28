@@ -778,3 +778,19 @@ the exact base state hash. Its control moved dead-end/modal/scroll defects **0/0
 the inert control was acknowledged in **2.4 ms**. Evidence: `cat2-l7-calendar.json`.
 
 **Calendar is 20/80.** Category 3 is next; this was a pure run of the shared harness.
+
+## 2026-08-28 14:08 EDT — Calendar category 3 repairs dense glass; PASS 10/10
+
+The first controlled run found **1/1** Work regions translucent: `.cal-nav` contains the date
+input, so the classifier correctly treats it as a dense form, but it inherited the surrounding
+contextual material. The control could not move an already-failed term and voided rather than
+granting a score.
+
+`AnchorSurface bare` now gives that date-navigation subgroup the stable opaque backing §2.3
+requires while the surrounding mode/transport strip remains contextual. The rerun classified
+**51** regions: Work **1**, Liquid-eligible **2**, Anchor **47**, Anchor-holding-work **1**.
+Dense Work on translucent fell **1→0**; both contextual regions are treated **2/2** and use a
+shared primitive **2/2**. Controls moved one/all Work failures **0→1→1→0**, restored the exact
+`rgb(18,28,23)` anchor material, and returned Standard presentation. Guard **6/6**.
+
+**Calendar is 30/80.** Evidence: `cat3-l7-calendar.json`. Category 4 is next.

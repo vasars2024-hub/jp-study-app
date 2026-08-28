@@ -1046,6 +1046,11 @@ Standard and Liquid, with 0 dead ends, modal traps, scroll traps, or acknowledge
 The control moved all three defect terms **0/0/0→1/1/1→0/0/0** and the exact state/presentation
 restored. Evidence: `cat2-l7-calendar.json`.
 
+**Progress 2026-08-28 (Calendar category 3) — 30/80.** The first run found Calendar's date-input
+subgroup as dense Work on contextual glass **1/1**. `AnchorSurface bare` reduced that to **0/1**
+while retaining contextual/shared treatment **2/2**; controls moved **0→1→1→0** and restored the
+exact material plus Standard presentation. Evidence: `cat3-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
