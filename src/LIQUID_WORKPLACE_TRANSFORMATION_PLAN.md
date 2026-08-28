@@ -937,6 +937,14 @@ placeholders, and unexplained disabled pairs all **0**; the one observable state
 Four locales produced four distinct text hashes and restored English exactly; the control moved
 all three defect terms **0→1→0**. Only category 7 remains.
 
+**Progress 2026-08-27 (interrupted category-7 recovery) — Notebook remains 70/80, with the open
+cell moving from category 7 to category 1.** Timeline row deferral fixes a repeatable resize
+failure (**33.4/50.2 → 16.7/16.9 ms** p50/p95), and category 7 passes 10/10 with a jank control.
+That optimization changes which off-screen controls have synchronous geometry, so the earlier
+category-1 run is retracted rather than inherited. Its shared harness exhausted one repair attempt
+at **484/38 falsely occluded**; category 1 is UNMEASURED until it reveals one deferred row at a
+time. Evidence and the exact restart A/B are in `L7_REVIEW_LEARNING.md`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

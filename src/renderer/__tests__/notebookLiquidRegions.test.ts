@@ -82,6 +82,10 @@ describe('Notebook Liquid regions', () => {
       '.gx-notebook-body-timeline {\n  grid-template-columns: minmax(0, 1fr);\n}',
     );
     expect(CSS).toContain('.gx-notebook-timeline {\n  min-width: 0;\n}');
+    expect(CSS).toMatch(/\.gx-notebook-item\s*\{[^}]*content-visibility:\s*auto/s);
+    expect(CSS).toMatch(
+      /\.gx-notebook-item\s*\{[^}]*contain-intrinsic-block-size:\s*auto\s+88px/s,
+    );
     expect(CSS).toMatch(
       /@container \(max-width: 320px\) \{[\s\S]*\.gx-lc-actions,[\s\S]*flex-wrap: wrap;[\s\S]*\.gx-notebook-lineage-btn,[\s\S]*max-width: 100%;/,
     );

@@ -77,14 +77,19 @@ const scrollAll = (rootSel) => `(() => {
     if (o > over) { over = o; best = e; }
   }
   if (!best || over < 20) return 'REFUSE: nothing scrolls inside ' + ${JSON.stringify(rootSel)};
-  const rec = { sel: String(best.className || best.tagName).slice(0, 60), over: over, ticks: 0, reached: 0 };
+  const start = best.scrollTop;
+  const rec = { sel: String(best.className || best.tagName).slice(0, 60), over: over, ticks: 0, reached: 0, start, restored: false };
   window.__lqScrollLoad = rec;
   let n = 0;
   const t = setInterval(() => {
     best.scrollTop = (n * 240) % Math.max(1, best.scrollHeight);
     rec.ticks++;
     if (best.scrollTop > rec.reached) rec.reached = best.scrollTop;
-    if (++n > 90) clearInterval(t);
+    if (++n > 90) {
+      clearInterval(t);
+      best.scrollTop = start;
+      rec.restored = best.scrollTop === start;
+    }
   }, 20);
   return 'scrolling ' + rec.sel + ' over=' + over;
 })()`;
@@ -107,7 +112,8 @@ const scrollProof = `(() => {
   if (!s) return 'REFUSE: the scroll load never armed - nothing recorded a receipt';
   if (s.ticks < 10) return 'REFUSE: the scroll load ticked only ' + s.ticks + ' times; its timer was throttled or cleared';
   if (s.reached < 1000) return 'REFUSE: the scroll load reached only ' + Math.round(s.reached) + ' px on ' + s.sel;
-  return 'scrolled ' + s.sel + ' to ' + Math.round(s.reached) + ' px over ' + s.ticks + ' ticks (overflow ' + s.over + ')';
+  if (!s.restored) return 'REFUSE: the scroll load did not restore its starting offset ' + s.start + ' on ' + s.sel;
+  return 'scrolled ' + s.sel + ' to ' + Math.round(s.reached) + ' px over ' + s.ticks + ' ticks (overflow ' + s.over + '), restored to ' + s.start;
 })()`;
 
 const SPECS = {
@@ -205,6 +211,20 @@ const SPECS = {
       proof: scrollProof,
     },
     collection: { container: '.flash-group-body-vlist', row: '.flash-row' },
+  },
+  notebook: {
+    title: 'Notebook',
+    root: '.gx-notebook',
+    heavy: {
+      // The timeline renders the capped 400-row aggregate plus its provenance chains. Scrolling
+      // that whole tree is the heaviest read-only operation a Notebook user can repeat without
+      // starting Live Captions or navigating into another app and changing the measured surface.
+      label: 'scroll the whole notebook timeline',
+      durationMs: 3000,
+      js: scrollAll('.gx-notebook'),
+      proof: scrollProof,
+    },
+    collection: { container: '.gx-notebook-timeline', row: '.gx-notebook-item' },
   },
   dictionary: {
     title: 'Dictionary',

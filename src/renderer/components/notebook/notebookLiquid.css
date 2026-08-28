@@ -59,6 +59,14 @@
   min-width: 0;
 }
 
+/* The timeline deliberately keeps up to 400 provenance-rich records available. Skip layout and
+ * paint for off-screen records so resizing the window does not reflow the whole history. `auto`
+ * preserves each measured row height after its first reveal; 88px is only the pre-reveal estimate. */
+.gx-notebook-item {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 88px;
+}
+
 @container (max-width: 700px) {
   .gx-notebook-body:not(.gx-notebook-body-timeline) {
     grid-template-columns: minmax(0, 1fr);

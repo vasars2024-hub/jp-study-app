@@ -411,3 +411,21 @@ observable empty state is named **1/1**. English/Japanese/Chinese/Russian produc
 text hashes across **2,056** text runs each, with max raw keys **0**. Language restored exactly
 `en → en`. Control moved raw keys/placeholders/mute pairs **0/0/0 → 1/1/1 → 0/0/0**. Notebook is
 **70/80**; category 7 remains. Evidence: `baselines/cat8-l7-notebook.json`.
+
+## 2026-08-27 21:36 EDT — recovered category 7 passes; category 1 is retracted, so Notebook stays 70/80
+
+The interrupted tree held a complete category-7 RUN plus its product repair. Without row deferral,
+two clean resize repeats failed at p50/p95 **33.4/50.2 ms** against the session's **16.7/16.8**
+ceiling. `content-visibility:auto` on the 400 timeline records restored resize to **16.7/16.9**;
+drag **16.7/16.8**, theme **16.7/17.5**, and heavy-scroll main max **14.4 ms**. The load scrolled
+to **21,600 px**, restored to 0, and the jank control produced **13** >100 ms frames. Category 7
+is controlled **10/10** in `cat7-notebook-perf.json`.
+
+The repair changes the category-1 population, so its earlier 10 cannot be inherited. A fresh run
+saw only **38** controls before deferred rows painted; the interrupted one-shot harness repair
+revealed every row at once and then falsely reported **484/38 occluded**. Removing the repair and
+restarting proved the old product at **459 controls / 0 unreachable / 0 pointer-floor failures**;
+restoring row deferral is therefore an instrument boundary, not an accessibility score. Per the
+one-repair rule, category 1 is **UNMEASURED**, not passed or failed. Next turn opens by teaching
+the shared harness to reveal and restore one deferred record at a time, then re-runs category 1.
+Notebook remains **70/80**: categories 2–8 pass; category 1 is the one open cell.

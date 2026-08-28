@@ -2,7 +2,7 @@
   "surface": "Notebook",
   "label": "l7-notebook",
   "control": false,
-  "at": "2026-08-27T17:31:07.850Z",
+  "at": "2026-08-27T18:01:18.498Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -133,7 +133,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 2062,
+            "measured": 123,
             "unmeasurable": 0,
             "minRatio": 5.3,
             "failingCount": 0,
@@ -147,7 +147,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 2062,
+            "measured": 123,
             "unmeasurable": 0,
             "minRatio": 5.71,
             "failingCount": 0,
@@ -251,7 +251,7 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "muted:754"
+          "muted:38"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
@@ -274,7 +274,7 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 460,
+    "controlsPainted": 39,
     "q1": {
       "entryPoints": 2,
       "primaryInputs": 0,
@@ -331,7 +331,7 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "muted:754"
+        "muted:38"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
@@ -343,7 +343,7 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 460,
+  "controlsPaintedA": 39,
   "findings": [],
   "voided": [],
   "score": 10,

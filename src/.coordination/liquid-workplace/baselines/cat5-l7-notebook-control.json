@@ -2,7 +2,7 @@
   "surface": "Notebook",
   "label": "l7-notebook",
   "control": true,
-  "at": "2026-08-27T17:31:03.370Z",
+  "at": "2026-08-27T18:01:04.605Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -164,7 +164,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 2068,
+            "measured": 129,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -178,7 +178,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 2068,
+            "measured": 129,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 3,
@@ -311,7 +311,7 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "muted:754"
+          "muted:38"
         ],
         "contentDominant": null,
         "contentFrac": 0,
@@ -341,7 +341,7 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 466,
+    "controlsPainted": 45,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -400,7 +400,7 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "muted:754"
+        "muted:38"
       ],
       "contentDominant": null,
       "contentFrac": 0,
@@ -419,7 +419,7 @@
       "dashboardHosts": 1
     }
   },
-  "controlsPaintedA": 466,
+  "controlsPaintedA": 45,
   "controlResult": {
     "Q2": true,
     "Q3": true,
