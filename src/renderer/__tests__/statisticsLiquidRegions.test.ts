@@ -47,7 +47,12 @@ describe('Statistics Liquid regions', () => {
   });
 
   it('names Anki sync outcomes and gives every message a reversible close action', () => {
-    expect(CONTENT).toContain("tone: 'busy' | 'error' | 'success';");
+    // Four tones, not three: `anki:getIntervals` serves the cached snapshot on a failed
+    // refresh, so "the counts are real but nothing was re-read" is a state of its own and
+    // must not be painted as either a failure or a sync.
+    expect(CONTENT).toContain("tone: 'busy' | 'error' | 'success' | 'stale';");
+    expect(CONTENT).toContain("text: t('stats.wk.syncStale', { scanned: r.scanned ?? 0 }),");
+    expect(CSS).toContain('.stats-view .wk-message.stale {');
     expect(CONTENT).toContain("role={message.tone === 'error' ? 'alert' : 'status'}");
     expect(CONTENT).toContain('aria-live="polite"');
     expect(CONTENT).toContain('className="btn small wk-message-close"');
