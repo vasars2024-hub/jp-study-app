@@ -585,3 +585,25 @@ sub-minimum **200x140** leg still fails with **13** clips and one hidden overflo
 Parity re-checked after the product change: driven jump **0 -> 814**, `check('statistics')`
 **9/9**, scroll restored to 0. Focused suite **6/6**. Evidence: `cat4-l7-statistics.json`.
 Statistics is **50/80**; category 2 and 7 are unrun, category 8 is UNMEASURED.
+
+## 2026-08-28 10:35 EDT — Statistics category 2 PASS 10/10; score 60/80
+
+The run refused twice before it scored, and the refusals were the harness being right. Statistics'
+dominant task ends 814 px down the scroll, and the presentation leg drives every task twice, so on
+the second pass every earlier target sat above the fold and `POINT` reported it occluded. This is
+correction 13's shape for scroll instead of text, so it got correction 13's answer: `scroll:` is
+now the second UNCOUNTED restore primitive in the shared DSL — one repair, generic, no
+Statistics-only probe. A stranded 814 px scroll from the first refusal then made the third run
+refuse at step 0; a refused run leaves the surface where it stopped.
+
+Task driven: disclose the data tools, jump to Last 14 days, restore. Input cost **2 clicks /
+0 keystrokes**, dead ends **0** of 2 counted steps, modal traps **0**, scroll traps **0**, worst
+renderer-side acknowledgement **4.9 ms** against the 100 ms bar (the unscored main-hop stamp was
+73.5 ms — correction 2's reason for not scoring it). Cost parity is a real second leg, not an
+assumption: the same window and geometry in Liquid cost **2** against Standard's **2**, and the
+presentation restored to standard/`aria-pressed=false`/820x580. Undo closed the disclosure and
+returned the exact base state hash.
+
+Control moved all three terms **0,0,0 → 1,1,1 → 0,0,0** with the inert-button click acknowledged in
+**0.3 ms**. **PASS 10/10.** Evidence: `cat2-l7-statistics.json`. Statistics is **60/80**; category
+7 is unrun and category 8 is UNMEASURED.

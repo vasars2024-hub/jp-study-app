@@ -1011,6 +1011,14 @@ three sizes, chrome **11.4→8.7%**, all three restored. Injected clip **0→1�
 the sub-minimum **200×140** leg still fails with **13** clips. Parity re-checked after the product
 change at **9/9**. Evidence: `cat4-l7-statistics.json`. Categories 2 and 7 unrun, 8 UNMEASURED.
 
+**Progress 2026-08-28 (Statistics category 2) — 60/80.** Input cost of the dominant task is
+**2 clicks / 0 keystrokes**; dead ends **0**, modal traps **0**, scroll traps **0**, worst
+renderer-side acknowledgement **4.9 ms** against 100 ms. Cost parity was driven, not assumed:
+the same window in Liquid cost **2** against Standard **2** and the presentation restored. The
+harness gained one generic repair — `scroll:` as a second uncounted restore primitive — because a
+task that scrolls could not be driven twice, which is correction 13's shape for scroll. Control
+moved all three terms **0,0,0→1,1,1→0,0,0**. Evidence: `cat2-l7-statistics.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

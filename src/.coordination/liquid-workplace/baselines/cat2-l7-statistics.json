@@ -1,0 +1,246 @@
+{
+  "label": "l7-statistics",
+  "surface": "Statistics",
+  "win": "main",
+  "task": "click:.stats-data-tools > summary >> wait:300 >> click:.stats-recent-jump >> wait:400 >> scroll:.fwin-body=0 >> wait:200",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 100,
+    "controlCount": 10,
+    "box": "820x580",
+    "results": 13
+  },
+  "inputCost": {
+    "clicks": 2,
+    "keystrokes": 0,
+    "total": 2
+  },
+  "latencyMs": {
+    "clickRecv": [
+      3.5,
+      4.9
+    ],
+    "inputRecv": [],
+    "worstRecv": 4.9,
+    "overBar100": 0,
+    "n": 2,
+    "clickStampUnscored": [
+      73.5,
+      69.2
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 73.5
+  },
+  "steps": [
+    {
+      "step": "click:.stats-data-tools > summary",
+      "target": {
+        "sel": ".stats-data-tools > summary",
+        "label": "Reset",
+        "disabled": false,
+        "at": "887,152"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:300",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.stats-recent-jump",
+      "target": {
+        "sel": ".stats-recent-jump",
+        "label": "Last 14 days",
+        "disabled": false,
+        "at": "792,152"
+      },
+      "counted": true,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": true,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "scroll:.fwin-body=0",
+      "target": {
+        "sel": ".fwin-body",
+        "was": 814,
+        "now": 0,
+        "range": 1438
+      },
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": true,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:200",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.stats-data-tools > summary",
+    "steps": [
+      "click:.stats-data-tools > summary"
+    ],
+    "restored": true,
+    "baseHash": "uw2lfz",
+    "afterHash": "uw2lfz",
+    "liveRegionsBefore": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "liveRegionsAfter": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "textHashRoundTrip": {
+      "base": "paneqo",
+      "after": "paneqo"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 2,
+      "deadEnds": 0,
+      "worstRecv": 4.9
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 2,
+      "deadEnds": 0,
+      "worstRecv": 6.2
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 2,
+    "standardTotal": 2
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.3
+    ]
+  }
+}

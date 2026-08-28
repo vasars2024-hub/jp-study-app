@@ -31,6 +31,7 @@
  *   type:<css>=<text>  focus() the field, then /type the text as real char events
  *   clear:<css>        empty a text filter through React's native setter (a RESTORE primitive:
  *                      it costs no input, so `--undo` can put a surface back without being billed)
+ *   scroll:<css>=<px>  put a scroll container back (the second RESTORE primitive, correction 18)
  *   key:<Key>          /key, e.g. `key:Escape`, `key:Enter`
  *   wait:<ms>          settle
  * Steps are separated by ` >> `, which no CSS selector can contain. `type:` splits on its LAST `=`
@@ -94,6 +95,12 @@
  *     excludes live regions and is what `undo.restored` compares, while `textHash` keeps them and
  *     is what the change signal reads - a step whose only effect is a message did something. The
  *     live-region contents are reported before and after rather than dropped.
+ * 18. A TASK THAT SCROLLS CANNOT BE DRIVEN TWICE, and the presentation leg drives every task
+ *     twice by construction — the same shape correction 13 fixed for text filters. Statistics'
+ *     dominant task is a jump to a section 814 px down; on the second pass every earlier step's
+ *     target sat above the fold and `POINT` correctly refused it as occluded, so the surface could
+ *     not be scored at all. `scroll:` is the second restore primitive: it puts a container back,
+ *     and like `clear:` it is UNCOUNTED, because a restore is not a gesture the user spends.
  * 10. A COMMENT INSIDE THE IN-PAGE TEMPLATE LITERAL MUST CONTAIN NO BACKTICK AND NO DOLLAR-BRACE.
  *     Both are a SyntaxError in the harness rather than in the browser, so the failure names the
  *     wrong file. Same trap the category-8 harness records.
@@ -405,6 +412,21 @@ const CLEAR = (surface, sel) => `(function(){
 })()`;
 
 /**
+ * Correction 18's primitive. `scrollTop` is assigned directly rather than driven, because a
+ * restore must not be billed as input and must not depend on a wheel landing where it is aimed.
+ * The container is resolved inside the surface, so a task never reaches another window's scroller.
+ */
+const SCROLLTO = (surface, sel, px) => `(function(){
+  var root = ${rootExpr(surface)};
+  if (!root) return JSON.stringify({ refuse: 'surface not found' });
+  var el = root.matches(${JSON.stringify(sel)}) ? root : root.querySelector(${JSON.stringify(sel)});
+  if (!el) return JSON.stringify({ refuse: 'no match in surface for ' + ${JSON.stringify(sel)} });
+  var was = el.scrollTop;
+  el.scrollTop = ${JSON.stringify(px)};
+  return JSON.stringify({ was: was, now: el.scrollTop, range: el.scrollHeight - el.clientHeight })
+})()`;
+
+/**
  * Correction 12: THE SECOND TERM IS THE SAME WINDOW, NOT A SECOND SURFACE.
  *
  * `L1_CLUNKINESS.md` got its only Standard-vs-Liquid delta by finding two DIFFERENT windows that
@@ -631,6 +653,20 @@ async function driveStep(surface, step, before) {
     out.after = await snapOf(surface);
     out.moved = movedBetween(before, out.after);
     // Clearing is a restore primitive, not a user gesture: it spends no input the rubric counts.
+    out.counted = false;
+    return out;
+  }
+
+  if (kind === 'scroll') {
+    const eq = rem.lastIndexOf('=');
+    if (eq < 0) return { ...out, refuse: 'scroll: needs <css>=<px>' };
+    const s = JSON.parse(await ev(SCROLLTO(surface, rem.slice(0, eq), Number(rem.slice(eq + 1)) || 0)));
+    if (s.refuse) return { ...out, refuse: s.refuse };
+    await sleep(SETTLE);
+    out.target = { sel: rem.slice(0, eq), was: s.was, now: s.now, range: s.range };
+    out.after = await snapOf(surface);
+    out.moved = movedBetween(before, out.after);
+    // Correction 18: a restore primitive, not a user gesture — same billing as `clear:`.
     out.counted = false;
     return out;
   }
