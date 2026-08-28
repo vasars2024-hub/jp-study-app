@@ -9,6 +9,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
+import './calendarLiquid.css';
 import {
   addEvent,
   CATEGORY_COLORS,
@@ -384,7 +386,9 @@ export function CalendarNav({ state }: { state: CalendarState }) {
   const { t } = useT();
   const { mode, setMode, modeLabels, shift, goToday, headerLabel, jumpVal, setJumpVal, jump } = state;
   return (
-    <div className="cal-toolbar">
+    // Mode switch and date transport: contextual tools, not data. `ContextualSurface` is
+    // pixel-inert in Standard and in Blanc, so both hosts keep the toolbar they had.
+    <ContextualSurface className="cal-toolbar cal-context-toolbar">
       <div className="cal-modes">
         {(['month', 'week', 'day', 'agenda'] as ViewMode[]).map((m) => (
           <button key={m} type="button" className={`cal-mode-btn ${mode === m ? 'active' : ''}`} onClick={() => setMode(m)}>
@@ -410,7 +414,7 @@ export function CalendarNav({ state }: { state: CalendarState }) {
           />
         </div>
       )}
-    </div>
+    </ContextualSurface>
   );
 }
 

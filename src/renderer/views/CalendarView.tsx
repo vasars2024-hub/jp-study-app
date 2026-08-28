@@ -20,6 +20,8 @@ import {
 } from '../components/calendar/CalendarContent';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
+import '../components/calendar/calendarLiquid.css';
 
 export default function CalendarView() {
   const { t, lang } = useT();
@@ -85,7 +87,7 @@ export default function CalendarView() {
   return (
     <AppChrome menus={calMenus} status={calStatus} className="aero-calendar-chrome">
     <div className={`calendar-view${aero ? ' aero-calendar' : ''}`}>
-      <div className="view-head">
+      <ContextualSurface as="header" className="view-head calendar-context-head">
         <div>
           <h1>{t('calendar.title')}</h1>
           <p className="muted">{t('calendar.intro')}</p>
@@ -93,7 +95,7 @@ export default function CalendarView() {
         <button type="button" className="btn primary" onClick={() => openNew(toKey(cursor))}>
           <Icon name="plus" size={14} /> {t('calendar.newEvent')}
         </button>
-      </div>
+      </ContextualSurface>
 
       {aero && (
         <aside className="aero-cal-sidebar" aria-label="Calendar navigator">

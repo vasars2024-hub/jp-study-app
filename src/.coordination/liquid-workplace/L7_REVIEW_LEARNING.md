@@ -714,3 +714,38 @@ purely because a message left over from my own manual click was already on scree
 `.wk-message` before driving, or the drive's before-state already contains the after-state.**
 And `--langs` needs the ui-language card, which is reached by clicking
 `button.os-set-nav-item` whose text is "Appearance" — the `LI` wrapper's `.click()` does nothing.
+
+## 2026-08-28 11:22 EDT — Calendar opens on the selective Liquid seam (fifth L7 surface)
+
+L7's order is Flashcards → Anki → Notebook → Statistics → Calendar → Games; the first four are
+80/80, 80/80 PARKED-at-0, 80/80 and now 80/80, so Calendar is next.
+
+§2.3 names calendars explicitly as a WORK surface, so the month/week/day grids, the agenda lists
+and the event modal keep their opaque paint and were not touched. Two strips are contextual: the
+intro/new-event header (`CalendarView.tsx`) and the mode + date transport (`CalendarNav`, which is
+the shared component Blanc also mounts — `ContextualSurface` is pixel-inert there, so Blanc keeps
+the toolbar it had).
+
+Live receipt on a **782×513** Calendar window: contextual regions **2**
+(`HEADER.lq-contextual view-head calendar-context-head`, `DIV.lq-contextual cal-toolbar
+cal-context-toolbar`), `container-type: inline-size` resolved, contextual header background
+`rgba(0,0,0,0)` at Standard — the seam paints nothing until the window opts in.
+
+**Pointer floor, with the control that makes the number mean something.** All eight transport
+controls measured **26 / 26 / 26 / 26 / 28 / 26 / 28 / 24 px** — **8 of 8 below the 32px bar**,
+worst the date jump at 24. With the floor: **8 of 8 at exactly 32, 0 under**. Measured by
+suspending the new rule inline on the live surface, re-measuring, restoring and re-measuring;
+after restore the surface holds **0** inline styles and **0** probe attributes.
+
+Guard: `calendarLiquidRegions.test.ts`, 5/5 — including that the grids stay off
+`ContextualSurface` and that the shared sheet names no hex or `rgba()` colour, because Liquid is
+a composition language and a shared component with one shell's palette breaks Aero, Wired and
+Blanc at once.
+
+Trap for the next run: **the Calendar window is not open by default and there is no
+`desktop:open` event.** Reach it through the shell's own Start menu — click `.os-start-btn`, then
+the `[class*="os-start"] button` whose text is exactly `Calendar`. The same recipe reaches every
+other app in that list.
+
+Next: Calendar's rubric cells through the eight existing surface-parameterised harnesses. No
+Calendar-only probe was added and none is needed.

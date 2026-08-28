@@ -1,0 +1,69 @@
+/*
+ * L7 Calendar composition — the fifth surface, after Flashcards, Anki, Notebook and Statistics.
+ *
+ * §2.3 names calendars explicitly as a WORK surface, so the month/week/day grids, the agenda
+ * lists and the event modal keep their stable opaque paint and are not touched here. Only two
+ * strips are contextual: the intro/new-event header, and the mode + date transport. Both are
+ * `ContextualSurface`, which is pixel-inert in Standard and in Blanc and takes the shared Liquid
+ * material solely when the containing window opts in.
+ */
+.calendar-view {
+  container-type: inline-size;
+}
+
+.calendar-context-head,
+.cal-context-toolbar {
+  align-items: center;
+  gap: var(--lq-space-4);
+}
+
+.calendar-context-head > div {
+  min-width: 0;
+}
+
+.calendar-context-head > .btn {
+  flex: 0 0 auto;
+}
+
+/* The transport's controls all measured under the shared pointer floor: the mode chips are
+ * 5px/12px on a 12px face and the date jump 3px/6px, which is ~24px against a 32px bar. The
+ * compact labels stay; only the target grows. */
+.cal-context-toolbar .cal-mode-btn,
+.cal-context-toolbar .cal-nav > .btn.small,
+.cal-context-toolbar .cal-nav > .wgt-btn-icon,
+.cal-context-toolbar .cal-jump {
+  min-height: var(--lq-hit-target);
+}
+
+.cal-context-toolbar .cal-nav > .wgt-btn-icon {
+  min-width: var(--lq-hit-target);
+}
+
+/* Reflow against the floating Calendar window, not the desktop viewport. `.cal-header-label`
+ * carries a 160px floor that pushes the date jump out of a narrow window entirely, so the
+ * label takes the row it needs instead of forcing a horizontal scroll on the transport. */
+@container (max-width: 520px) {
+  .calendar-context-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-context-head > .btn {
+    width: 100%;
+  }
+
+  .cal-context-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cal-context-toolbar .cal-nav {
+    flex-wrap: wrap;
+  }
+
+  .cal-context-toolbar .cal-header-label {
+    flex: 1 0 100%;
+    min-width: 0;
+    order: -1;
+  }
+}
