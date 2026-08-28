@@ -6,10 +6,10 @@
   "presentation": "standard",
   "raised": "already-on-top",
   "base": {
-    "textRuns": 53,
+    "textRuns": 55,
     "controlCount": 22,
     "box": "980x589",
-    "results": 0
+    "results": null
   },
   "inputCost": {
     "clicks": 1,
@@ -18,17 +18,17 @@
   },
   "latencyMs": {
     "clickRecv": [
-      20.4
+      27.7
     ],
     "inputRecv": [],
-    "worstRecv": 20.4,
+    "worstRecv": 27.7,
     "overBar100": 0,
     "n": 1,
     "clickStampUnscored": [
-      26.5
+      70.2
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 26.5
+    "worstStampUnscored": 70.2
   },
   "steps": [
     {
@@ -37,13 +37,13 @@
         "sel": ".game-launch-panel .btn.primary",
         "label": "Start round",
         "disabled": false,
-        "at": "613,534"
+        "at": "613,477"
       },
       "counted": true,
       "moved": {
         "text": true,
         "controls": true,
-        "results": true,
+        "results": false,
         "dialogs": false,
         "scroll": false,
         "focus": true,
@@ -59,13 +59,13 @@
       "click:.game-list-item.active"
     ],
     "restored": true,
-    "baseHash": "7qo17",
-    "afterHash": "7qo17",
+    "baseHash": "hofjc9",
+    "afterHash": "hofjc9",
     "liveRegionsBefore": [],
     "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "7qo17",
-      "after": "7qo17"
+      "base": "hofjc9",
+      "after": "hofjc9"
     }
   },
   "stepsDriven": 1,
@@ -83,14 +83,14 @@
       "box": "980x589",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 20.4
+      "worstRecv": 27.7
     },
     "second": {
       "presentation": "liquid",
       "box": "980x589",
       "total": 1,
       "deadEnds": 0,
-      "worstRecv": 18.5
+      "worstRecv": 33.1
     },
     "restored": true,
     "restoredTo": {
@@ -140,7 +140,7 @@
       ]
     },
     "inertClickRecvMs": [
-      0.7
+      0.3
     ]
   }
 }

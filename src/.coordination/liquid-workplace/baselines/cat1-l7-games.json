@@ -1,10 +1,10 @@
 {
   "label": "l7-games",
-  "surface": "@.game-arena",
+  "surface": "Game Arena",
   "win": "main",
   "theme": "forest-night",
-  "presentation": null,
-  "box": "942x522",
+  "presentation": "standard",
+  "box": "980x589",
   "deferredVisibilityOwners": 0,
   "parserSelfTest": {
     "ok": true,
@@ -12,7 +12,7 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 47,
+    "measured": 55,
     "unmeasurable": 0,
     "minRatio": 4.72,
     "minOwner": "small \"Rebuild the Japanese sen\" 11.5px",
@@ -22,16 +22,42 @@
     "inactiveWorst": []
   },
   "targets": {
-    "total": 17,
-    "smallest": "button.btn 32px",
-    "smallestPx": 32,
-    "under32Count": 0,
-    "under32": [],
+    "total": 22,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 5,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      }
+    ],
     "wcag258FailCount": 0,
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 17,
+    "controls": 22,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
@@ -59,7 +85,7 @@
     },
     "restored": true
   },
-  "raised": "root surface - no taskbar button",
+  "raised": "already-on-top",
   "ariaDisclosed": {
     "clicked": 0,
     "sel": []
@@ -67,40 +93,42 @@
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 19,
+    "beforeOverThreshold": 26,
     "beforeLongest": {
       "el": "i",
       "dur": 0.32
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 19,
+    "afterOverThreshold": 26,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
   "hit": {
-    "title": ".game-arena",
+    "title": "Game Arena",
     "floor": 32,
-    "presentation": null,
+    "presentation": "standard",
     "theme": "forest-night",
-    "box": "942x522",
+    "box": "980x589",
     "deferredVisibilityOwners": 0,
-    "controls": 17,
-    "measured": 17,
-    "belowFloorByRect": 0,
+    "controls": 22,
+    "measured": 22,
+    "belowFloorByRect": 5,
     "belowFloorByHit": 0,
     "belowFloor": [],
     "smallestHit": {
-      "el": "button.btn.small",
-      "rect": "90x32",
-      "rectMin": 32,
-      "hit": "52.5x32.5",
-      "hitMin": 32.5,
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
       "shrunk": false,
       "shrunkBy": 0,
       "blockers": [
-        "header.lq-contextual.game-arena-top",
-        "header.lq-contextual.game-arena-top"
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
       ]
     },
     "stolenCount": 0,
@@ -113,7 +141,7 @@
     "disclosedForRun": 0,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "aside.lq-contextual.game-list 0,0 -> 609,0"
+      "aside.lq-contextual.game-list 0,0 -> 653,0"
     ],
     "deferredRestore": {
       "first": {
@@ -192,21 +220,21 @@
     "counts": {
       "base": [
         0,
-        0,
+        5,
         0,
         0,
         0
       ],
       "dirty": [
         1,
-        2,
+        7,
         2,
         1,
         2
       ],
       "restored": [
         0,
-        0,
+        5,
         0,
         0
       ]

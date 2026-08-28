@@ -14,20 +14,20 @@
     "image": null,
     "opacity": 1
   },
-  "regions": 36,
+  "regions": 41,
   "controlsSkipped": 17,
   "byRole": {
     "Work": 1,
-    "Liquid-eligible": 5,
-    "Anchor": 28,
+    "Liquid-eligible": 6,
+    "Anchor": 32,
     "Anchor(holds work)": 2,
     "Ambient": 0
   },
   "denseWorkOnTranslucent": 0,
   "denseWorkOnTranslucentList": [],
-  "liquidTreatedEligible": 5,
-  "sharedPrimitiveEligible": 5,
-  "eligibleTotal": 5,
+  "liquidTreatedEligible": 6,
+  "sharedPrimitiveEligible": 6,
+  "eligibleTotal": 6,
   "theme": "forest-night",
   "materials": null,
   "viewport": "1264x821",
@@ -50,30 +50,30 @@
     "counts": {
       "base": [
         0,
-        5,
-        5,
-        5,
+        6,
+        6,
+        6,
         1
       ],
       "oneRegionGlass": [
         1,
-        5,
-        5,
-        5,
+        6,
+        6,
+        6,
         1
       ],
       "allGlass": [
         1,
-        5,
-        5,
-        5,
+        6,
+        6,
+        6,
         1
       ],
       "restored": [
         0,
-        5,
-        5,
-        5,
+        6,
+        6,
+        6,
         1
       ]
     },

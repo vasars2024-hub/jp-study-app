@@ -1147,6 +1147,17 @@ Filling that needs content the app does not have for a new player; do not close 
 empty message, which was measured and does not move the band. Evidence:
 `baselines/cat4-l7-games{,-empty}.json`. Categories 1–3 must be re-run: this changed the DOM.
 
+**Progress 2026-08-28 (Games categories 1–3 re-certified after the DOM change) — 40/80 stands.**
+All three are RUNs of the existing harnesses against the new ready state; none needed a repair.
+Category 1 measures **55** text owners at minimum **4.72:1**, **22** controls with `under32` limited
+to the shell's own 24px `.fwin-b` frame buttons, **22/22** keyboard reachable, reduced motion
+**26→0→26**. Category 2 is **1 click / 0 keys** with dead ends, modal traps and scroll traps
+**0/0/0**, and the parity leg drives the same task in both presentations at the same 980x589 box —
+Liquid **1** against Standard **1**, presentation restored. Category 3 now finds **6** eligible
+contextual regions rather than 5 (the round history is the sixth), **6/6** Liquid-treated and
+**6/6** on shared primitives, dense-work-on-translucent **0**, and its control failed as required.
+Categories 5–8 remain. Evidence: `baselines/cat{1,2,3}-l7-games.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
