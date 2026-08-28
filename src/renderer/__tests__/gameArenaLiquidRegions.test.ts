@@ -76,7 +76,9 @@ describe('Game Arena Liquid regions', () => {
     expect(CONTENT).toContain('toLocaleDateString(LANG_TAGS[lang])');
     // The records wrap into columns; one per row left a 568px empty band
     // between each row's summary and its right-aligned date at stage width.
-    expect(LIQUID_CSS).toMatch(/\.game-history-list\s*\{[^}]*repeat\(auto-fill, minmax\(230px, 1fr\)\)/s);
+    // The floor is clamped with `min(…, 100%)`, which `gridTrackFloorsFitTheWindow`
+    // requires of every auto-fill grid whose track floor exceeds the 212px window minimum.
+    expect(LIQUID_CSS).toMatch(/\.game-history-list\s*\{[^}]*repeat\(auto-fill, minmax\(min\(230px, 100%\), 1fr\)\)/s);
     expect(LIQUID_CSS).toMatch(/\.game-ready\s*\{[^}]*flex: 1 1 auto/s);
   });
 });
