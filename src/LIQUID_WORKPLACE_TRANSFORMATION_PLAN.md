@@ -1098,6 +1098,12 @@ description wraps in full. Final task cost is **1 click / 0 keys** in Standard a
 acknowledgement **20.4/18.5 ms**, exact undo hash restored, and dead ends/modal traps/scroll traps
 are **0/0/0**. The negative control moves all three **0→1→0**. Evidence: `cat2-l7-games.json`.
 
+**Progress 2026-08-28 (Games category 3) — 30/80.** The first run found the dense gameplay pane
+still painted at alpha **0.88**. It now uses the opaque semantic Work material: **1** Work region,
+**0** dense-work-on-translucent, and **5/5** eligible regions both Liquid-treated and backed by
+shared primitives. The one-region and all-glass controls move the Work failure **0→1→0** and fully
+restore presentation/material state. Evidence: `cat3-l7-games.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

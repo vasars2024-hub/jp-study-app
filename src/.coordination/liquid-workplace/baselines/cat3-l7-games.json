@@ -1,0 +1,92 @@
+{
+  "label": "l7-games",
+  "surface": "Game Arena",
+  "win": "main",
+  "depth": 12,
+  "raised": "already-on-top",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "980x589",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 36,
+  "controlsSkipped": 17,
+  "byRole": {
+    "Work": 1,
+    "Liquid-eligible": 5,
+    "Anchor": 28,
+    "Anchor(holds work)": 2,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 5,
+  "sharedPrimitiveEligible": 5,
+  "eligibleTotal": 5,
+  "theme": "forest-night",
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "main.game-stage",
+      "path": [
+        0,
+        1,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        5,
+        5,
+        5,
+        1
+      ],
+      "oneRegionGlass": [
+        1,
+        5,
+        5,
+        5,
+        1
+      ],
+      "allGlass": [
+        1,
+        5,
+        5,
+        5,
+        1
+      ],
+      "restored": [
+        0,
+        5,
+        5,
+        5,
+        1
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgb(12, 20, 16)",
+      "immediate": "none|rgb(12, 20, 16)",
+      "settled": "none|rgb(12, 20, 16)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

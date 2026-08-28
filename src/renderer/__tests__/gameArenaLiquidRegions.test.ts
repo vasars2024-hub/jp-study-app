@@ -42,4 +42,8 @@ describe('Game Arena Liquid regions', () => {
     expect(LIQUID_CSS).toContain('overflow: visible');
     expect(LIQUID_CSS).toContain('-webkit-line-clamp: unset');
   });
+
+  it('keeps the gameplay canvas on an opaque semantic work material', () => {
+    expect(LIQUID_CSS).toMatch(/\.game-stage\s*\{[^}]*background: var\(--lq-work-bg\)/s);
+  });
 });

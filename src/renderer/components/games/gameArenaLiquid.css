@@ -5,3 +5,9 @@
   overflow: visible;
   -webkit-line-clamp: unset;
 }
+
+/* Gameplay, answers, and review feedback are dense work. Keep that primary
+   canvas on the opaque semantic material in every presentation. */
+.game-stage {
+  background: var(--lq-work-bg);
+}
