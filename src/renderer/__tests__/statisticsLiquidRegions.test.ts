@@ -19,7 +19,10 @@ describe('Statistics Liquid regions', () => {
 
   it('reflows against the floating window rather than the desktop viewport', () => {
     expect(CSS).toContain('.stats-view {\n  container-type: inline-size;');
+    expect(CSS).toContain('max-width: none;');
     expect(CSS).toContain('@container (max-width: 440px)');
+    expect(CSS).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(CSS).toContain('.stats-view .stats-level-estimate');
     expect(CSS).not.toContain('@media');
   });
 

@@ -977,6 +977,12 @@ Selective use passes across **91** regions: dense Work on glass **0/3**, context
 controls moved **0→1→3→0**. Category 2 is not flattered with reset, failed Anki sync, or a one-way
 media handoff as the dominant task. Evidence: `L7_REVIEW_LEARNING.md`, `cat{1,3}-l7-statistics.json`.
 
+**Progress 2026-08-28 (Statistics category 4) — remains 20/80.** Container-scoped single-column
+reflow removed compact defects (**12 clips / 1 hidden overflow → 0/0**); all defect counts are zero
+at three scored sizes and controls move/recover. The score stays **0/10** because maximized dead
+space is **17.0%** against ≤15% (default 8.9%, compact 0.5%). One repair attempt is exhausted;
+`cat4-l7-statistics.json` preserves the exact next boundary.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

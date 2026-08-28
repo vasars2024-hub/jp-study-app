@@ -508,3 +508,14 @@ Category 3 classified **91** regions: Work **3**, Liquid-eligible **1**, Anchor 
 work **3**. Dense Work on translucent **0/3**; contextual/shared primitive **1/1**. Controls forced
 one then all Work regions onto glass (**0→1→3→0**) and restored the material. **PASS 10/10.**
 Evidence: `cat{1,3}-l7-statistics.json`. Category 2 remains open rather than scoring a fake task.
+
+## 2026-08-28 09:40 EDT — Statistics compact reflow repaired; category 4 remains 0/10
+
+The first reusable category-4 run found **12** clipped elements and one hidden horizontal overflow
+at **260×170**. A container-scoped single-column repair reduced all four defect counts to **0** at
+default, compact, and maximized sizes; the injected clip moved **0→1→0**, and the deliberately
+subminimum **200×140** control still failed with **13** clips and one hidden overflow.
+
+The category remains **FAIL 0/10** because the maximized window's measured dead region is **17.0%**
+(bar ≤15%); default is **8.9%**, compact **0.5%**. The one harness repair allowance is exhausted.
+Evidence: `cat4-l7-statistics.json`. Next category-4 pass starts on that exact maximized-width gap.

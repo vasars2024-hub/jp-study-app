@@ -8,6 +8,7 @@
  */
 .stats-view {
   container-type: inline-size;
+  max-width: none;
   width: 100%;
 }
 
@@ -41,5 +42,23 @@
   .stats-context-head > .actions,
   .stats-context-head > .actions > .btn {
     width: 100%;
+  }
+
+  .stats-view .stats-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stats-view .stats-card,
+  .stats-view .stats-book-row {
+    min-width: 0;
+  }
+
+  .stats-view .stats-level-estimate {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .stats-view .stats-level-badge {
+    align-self: flex-start;
   }
 }
