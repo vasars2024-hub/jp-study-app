@@ -1012,3 +1012,26 @@ category 7 remains VOID only on its unstable drag environment.
 
 Evidence: `cat5-l7-games{,-control,-soft-sepia,-ocean-blue,-mint-green,-rose-pine,-paper}.json`,
 `cat6-l7-games.json`.
+
+## 2026-08-28 19:42 EDT — Games is controlled 80/80
+
+The post-disclosure category-1 RUN first caught the Settings button at **26.5 px**. The Arena now
+gives disclosure buttons a **32 px** minimum; final accessibility is **55** text owners, minimum
+contrast **4.72:1**, **22/22** controls reachable, and all five planted defects move and restore.
+Categories 2 and 3 re-pass at **1 click / 0 keys**, **0** traps, **6/6** eligible Liquid regions,
+**6/6** shared primitives, and **0** dense Work regions on translucent material.
+
+Category 4 re-drove the required non-empty state with **12** schema-valid recent rounds. Dead region
+is **6.9 / 0.8 / 11.1%** at default/compact/maximized and every clip, overlap, horizontal-scroll, and
+hidden-overflow count is zero. The temporary progress key was removed back to `null`; the separately
+banked never-played finding remains honest rather than being used for the score.
+
+Category 7's environmental retry agrees: all gesture majorities are clean, all **15** games cycle
+**60** times and restore selection 0, and heavy main-loop p50/p95/max are **2.1/3.4/9.0 ms** against
+idle **2.4/3.9/8.4 ms**. Its injected-jank control records **11** frames over 100 ms (p95 **100.4**,
+max **150.4**). Category 8 re-passes at **1/1** named state, **0** honesty defects, **4** language
+hashes, and a **0→1→0** control; English, Settings Home, Standard presentation, the closed disclosure,
+and absent game progress all restore.
+
+**Games is 8 of 8 categories / 80/80.** Fix/evidence commit `b6e55253`; scorecard and receipts:
+`LIQUID_SCORECARD.md`, `cat{1,2,3,4,5,6,8}-l7-games*.json`, and `cat7-games-perf{,-control}.json`.

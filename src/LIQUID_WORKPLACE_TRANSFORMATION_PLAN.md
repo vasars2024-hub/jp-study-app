@@ -1158,6 +1158,14 @@ contextual regions rather than 5 (the round history is the sixth), **6/6** Liqui
 **6/6** on shared primitives, dense-work-on-translucent **0**, and its control failed as required.
 Categories 5–8 remain. Evidence: `baselines/cat{1,2,3}-l7-games.json`.
 
+**Progress 2026-08-28 (Games controlled close) — 80/80.** Categories 1–4 and 8 re-pass after
+the disclosure DOM change; category 5 is 10/10 across all six shipped light palettes and category 6
+is **10/10 / 10/10** Standard/Liquid with all ten controls exact. Category 7's retry is stable:
+**60** game cycles restore selection, heavy main-loop p95/max are **3.4/9.0 ms**, and its jank
+control records **11** frames over 100 ms. Category 8 is **1/1** named state, **0** honesty defects,
+four language hashes, and **0→1→0** control. All live state restores, including absent game progress.
+Fix/evidence commit `b6e55253`; full receipt: `L7_REVIEW_LEARNING.md` and `LIQUID_SCORECARD.md`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

@@ -703,3 +703,26 @@ share a statement whose plan ends `USE TEMP B-TREE FOR ORDER BY`, so their scan 
 fire either — **10,904.4 ms cold outside the app to return 11 rows**. Driven live on this boot it
 was **304.2 ms**, *under* the bar, which is why category 7 scores 10 and why this is recorded as the
 next fix rather than as a failure. The smaller number is the one quoted.
+
+## 2026-08-28 — Game Arena — 80/80 — commit `b6e55253`
+
+State driven: all **15** games selected **60** times without starting a round; layout scored with
+**12** schema-valid recent-round records and the key removed back to `null`; never-played state is
+banked separately. Standard and Liquid both driven at 980×589, with compact and maximized layout.
+Restart before main-process measurement: yes — the unchanged main had a real live boot at PID
+**40648**; category 7 verified that same PID before/after every closed-loop run. No main code changed.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | 10/10 | 55 text owners; min 4.72:1; 22/22 reachable; min app target 32 px | contrast/reachability/pointer/target/motion all moved and restored |
+| 2 | Clunkiness | 10/10 | 1 click, 0 keys in both presentations; 0 traps | dead end/modal/scroll trap 0→1→0 |
+| 3 | Liquid utilization | 10/10 | 6/6 eligible and 6/6 shared; dense translucent Work 0 | one-region and all-glass controls failed then restored |
+| 4 | Use of space | 10/10 | dead 6.9/0.8/11.1%; all four defect counts zero at three sizes | injected clip 0→1→0 |
+| 5 | UI clarity | 10/10 | 10/10 answers on six light palettes; contrast minima 4.70–6.23:1 | Q2/Q3/Q5/Q10 failed and residue returned to 0 |
+| 6 | Feature parity + reversibility | 10/10 | 10/10 rows in Standard and Liquid; zero round-trip diffs | each of 10 mutations dropped only its own row |
+| 7 | Performance under real load | 10/10 | 60 cycles; heavy p50/p95/max 2.1/3.4/9.0 ms | injected jank produced 11 frames >100 ms, p95 100.4 ms |
+| 8 | Honest states | 10/10 | 1/1 named state; 0 defects; 4 language hashes | three defects 0→1→0 |
+
+Lowest category: tied at 10/10. The last product failure was category 1's **26.5 px** disclosure
+button; fixed to 32 px in `b6e55253`. Instruments: shared `css-measure`, `jp-bridge`, parity,
+performance, and honest-state harnesses. Receipts are the `cat*-l7-games*.json` baselines.
