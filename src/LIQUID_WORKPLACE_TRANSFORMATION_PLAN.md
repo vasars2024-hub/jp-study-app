@@ -1166,6 +1166,14 @@ control records **11** frames over 100 ms. Category 8 is **1/1** named state, **
 four language hashes, and **0→1→0** control. All live state restores, including absent game progress.
 Fix/evidence commit `b6e55253`; full receipt: `L7_REVIEW_LEARNING.md` and `LIQUID_SCORECARD.md`.
 
+**L7 status 2026-08-28 — COMPLETE EXCEPT EXTERNAL; L8 opens.** The earlier Statistics 70/80
+paragraph is chronological, not current: its false success was fixed in `593d6ba8`, race-hardened
+in `9f9fcc1c`, and controlled category 8 closed in `1441e2b5`. Flashcards, Notebook, Statistics,
+Calendar, and Games are therefore **5/5 reachable surfaces at 80/80**. Anki remains **0/80 PARKED**:
+Anki desktop is not installed and 127.0.0.1:8765 still refuses connections. Its eight cells and
+the two system-wide L7 bullets remain counted and open; the human-blocked exception advances the
+agent-owned ladder to Resources without calling the L7 Gate closed.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
