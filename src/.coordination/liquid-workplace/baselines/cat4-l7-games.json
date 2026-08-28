@@ -1,0 +1,148 @@
+{
+  "label": "l7-games",
+  "surface": "Game Arena",
+  "win": "main",
+  "rootKind": "floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "980x589",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 15.1,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 36.4,
+      "dominantCanvasPct": 93.9,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": false
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 0.8,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 50.6,
+      "dominantCanvasPct": 78.8,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x765",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 36.1,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 29.8,
+      "dominantCanvasPct": 95.3,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": false
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "513x305 at grid 19,18",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "aside.lq-contextual"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 362;",
+      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 362;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "258x30 at grid 0,0",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "aside.lq-contextual"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 362;",
+      "restoredTo": "left: 230px; top: 174px; width: 980px; height: 589px; z-index: 366;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "789x475 at grid 15,14",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "aside.lq-contextual"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": false,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "deadRegion"
+  ],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ]
+}

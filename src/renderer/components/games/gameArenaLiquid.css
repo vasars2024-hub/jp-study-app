@@ -11,3 +11,69 @@
 .game-stage {
   background: var(--lq-work-bg);
 }
+
+/* The Arena reflows against its own frame, never the desktop viewport. It
+   renders inside a floating window, so the existing `@media (max-width: 760px)`
+   rules cannot fire while the window is narrow and the desktop is wide — which
+   is exactly the state the category-4 harness measures at 260x170. */
+.game-arena {
+  container-type: inline-size;
+}
+
+/* Below the two-column floor the catalogue and the stage become one vertical
+   document instead of a 210px rail forcing the stage to 18px of client width.
+   Every game, control and meter stays mounted; only the axis changes. */
+@container (max-width: 560px) {
+  .game-arena {
+    gap: var(--lq-space-3);
+    padding: var(--lq-space-3);
+  }
+
+  .game-arena .game-arena-top {
+    padding-bottom: var(--lq-space-3);
+  }
+
+  .game-arena .game-arena-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The catalogue keeps its own scroll and yields the rest of the column to the
+     stage, so both regions stay reachable at the smallest measured frame. */
+  .game-arena .game-list {
+    flex: 0 1 auto;
+    max-height: 200px;
+    min-width: 0;
+  }
+
+  .game-arena .game-stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--lq-space-3);
+  }
+
+  /* Four 76px HUD chips and a two-column match board are both wider than the
+     frame at this size; they stack rather than push a horizontal scroller. */
+  .game-arena .game-round-hud,
+  .game-arena .game-match-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The coverage and exposure meters read "bar beside label" at every other
+     size. The label's min-content alone was 199px inside a 168px stage, so at
+     this width the meter takes its own row above the count it explains. */
+  .game-arena .game-coverage {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--lq-space-1);
+  }
+
+  .game-arena .game-coverage > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .game-arena .game-coverage-bar {
+    flex: 0 0 4px;
+  }
+}

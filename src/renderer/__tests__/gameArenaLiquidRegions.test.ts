@@ -46,4 +46,22 @@ describe('Game Arena Liquid regions', () => {
   it('keeps the gameplay canvas on an opaque semantic work material', () => {
     expect(LIQUID_CSS).toMatch(/\.game-stage\s*\{[^}]*background: var\(--lq-work-bg\)/s);
   });
+
+  it('reflows against its own frame rather than the desktop viewport', () => {
+    // The Arena renders inside a floating window, so `@media (max-width: …)` in
+    // styles.css cannot fire while the window is narrow and the desktop is wide.
+    expect(LIQUID_CSS).toMatch(/\.game-arena\s*\{[^}]*container-type: inline-size/s);
+    expect(LIQUID_CSS).toContain('@container (max-width: 560px)');
+  });
+
+  it('turns the catalogue and stage into one vertical document when narrow', () => {
+    const compact = LIQUID_CSS.slice(LIQUID_CSS.indexOf('@container (max-width: 560px)'));
+    expect(compact).toMatch(/\.game-arena-layout\s*\{[^}]*flex-direction: column/s);
+    expect(compact).toMatch(/\.game-list\s*\{[^}]*max-height: 200px/s);
+    expect(compact).toMatch(/\.game-stage\s*\{[^}]*flex: 1 1 auto/s);
+    // Four 76px HUD chips and the two-column match board are both wider than
+    // the frame at 260px and would otherwise scroll the stage horizontally.
+    expect(compact).toMatch(/\.game-round-hud,\s*\.game-arena \.game-match-grid\s*\{[^}]*minmax\(0, 1fr\)/s);
+    expect(compact).toMatch(/\.game-coverage\s*\{[^}]*flex-direction: column/s);
+  });
 });

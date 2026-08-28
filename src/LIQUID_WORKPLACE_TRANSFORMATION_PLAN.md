@@ -1112,6 +1112,17 @@ kept a horizontal scroller, and did not move dead space, so it was reverted unde
 rule. Next: design the compact header/list as a genuine vertical document and distribute idle-stage
 content before re-running `cat4-use-of-space.cjs`; do not reuse that partial rule set.
 
+**Progress 2026-08-28 (Games category 4, compact half) — stays 30/80, two of three bars closed.**
+The cause is measured, not the CSS the reverted attempt guessed at: the Arena is a floating window,
+so `@media (max-width: 760px)` in `styles.css` cannot fire while the frame is 260px and the desktop
+is 1264px. `.game-arena` is now an inline-size container and reflows to a vertical document below
+560px. Compact moves **clipped 1→0**, **hiddenOverflowX 1→0**, and after stacking the coverage meter
+(its label's min-content alone was **199px** inside a **168px** stage) **horizontalScrollers 1→0**;
+stage `scrollWidth 207→168 = clientWidth`. Default and maximized are unchanged and still clean on
+those bars. Guard: `gameArenaLiquidRegions.test.ts` **6/6**. **Only `deadRegion` still fails**:
+**15.1%** default (513x305) and **36.1%** maximized (789x475), both the idle stage's lower-right
+void. Evidence: `baselines/cat4-l7-games.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
