@@ -983,6 +983,13 @@ at three scored sizes and controls move/recover. The score stays **0/10** becaus
 space is **17.0%** against ≤15% (default 8.9%, compact 0.5%). One repair attempt is exhausted;
 `cat4-l7-statistics.json` preserves the exact next boundary.
 
+**Progress 2026-08-28 (Statistics category 8) — remains 20/80.** Passive bars are clean
+(99 text runs; raw keys/placeholders/mute pairs 0/0/0; 4/4 language hashes; control
+0/0/0→1/1/1→0/0/0), but no adverse state was observable. Sync outcomes are now semantic and
+dismissible, yet the real-sync drive succeeded and was not reversible by text hash; its 41,535
+Anki-only writes were immediately removed back to the pre-proven zero store. Category 8 stays
+UNMEASURED; the next attempt must isolate a deterministic error and must not drive live sync.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

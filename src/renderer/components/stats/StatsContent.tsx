@@ -121,18 +121,27 @@ export function WordKnowledge() {
   const { t } = useT();
   const [counts, setCounts] = useState(() => knowledgeCounts());
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [message, setMessage] = useState<{
+    text: string;
+    tone: 'busy' | 'error' | 'success';
+  } | null>(null);
 
   useEffect(() => onKnowledgeChanged(() => setCounts(knowledgeCounts())), []);
 
   const total = counts[1] + counts[2] + counts[3];
   const sync = async () => {
     setBusy(true);
-    setMsg(t('stats.wk.readingCards'));
+    setMessage({ text: t('stats.wk.readingCards'), tone: 'busy' });
     const r = await syncKnowledgeFromAnki();
     setBusy(false);
-    if (!r.ok) setMsg(r.error ?? t('stats.wk.syncFailed'));
-    else setMsg(t('stats.wk.syncResult', { scanned: r.scanned ?? 0, changed: r.changed ?? 0 }));
+    if (!r.ok) {
+      setMessage({ text: r.error ?? t('stats.wk.syncFailed'), tone: 'error' });
+    } else {
+      setMessage({
+        text: t('stats.wk.syncResult', { scanned: r.scanned ?? 0, changed: r.changed ?? 0 }),
+        tone: 'success',
+      });
+    }
     setCounts(knowledgeCounts());
   };
 
@@ -171,10 +180,23 @@ export function WordKnowledge() {
           <span className="stats-card-lbl">{t('stats.wk.trackedTotal')}</span>
         </div>
       </div>
-      <p className="muted wk-note">
-        {t('stats.wk.note')}
-        {msg ? ` · ${msg}` : ''}
-      </p>
+      <p className="muted wk-note">{t('stats.wk.note')}</p>
+      {message && (
+        <div
+          className={`wk-message ${message.tone}`}
+          role={message.tone === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>{message.text}</span>
+          <button
+            type="button"
+            className="btn small wk-message-close"
+            onClick={() => setMessage(null)}
+          >
+            {t('common.close')}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

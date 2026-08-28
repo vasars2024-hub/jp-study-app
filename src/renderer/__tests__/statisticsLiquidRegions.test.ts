@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const VIEW = readFileSync(new URL('../views/StatisticsView.tsx', import.meta.url), 'utf8');
 const CSS = readFileSync(new URL('../components/stats/statsLiquid.css', import.meta.url), 'utf8');
+const CONTENT = readFileSync(new URL('../components/stats/StatsContent.tsx', import.meta.url), 'utf8');
 
 describe('Statistics Liquid regions', () => {
   it('treats only the contextual command header as Liquid-eligible', () => {
@@ -28,5 +29,14 @@ describe('Statistics Liquid regions', () => {
 
   it('keeps the compact Anki sync label on the shared pointer floor', () => {
     expect(CSS).toContain('.stats-view .wk-head > .btn.small {\n  min-height: var(--lq-hit-target);');
+  });
+
+  it('names Anki sync outcomes and gives every message a reversible close action', () => {
+    expect(CONTENT).toContain("tone: 'busy' | 'error' | 'success';");
+    expect(CONTENT).toContain("role={message.tone === 'error' ? 'alert' : 'status'}");
+    expect(CONTENT).toContain('aria-live="polite"');
+    expect(CONTENT).toContain('className="btn small wk-message-close"');
+    expect(CONTENT).toContain('onClick={() => setMessage(null)}');
+    expect(CONTENT).toContain("{t('common.close')}");
   });
 });

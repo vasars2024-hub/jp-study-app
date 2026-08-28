@@ -32,6 +32,31 @@
   min-height: var(--lq-hit-target);
 }
 
+.stats-view .wk-message {
+  align-items: center;
+  display: flex;
+  gap: var(--lq-space-3);
+  justify-content: space-between;
+  margin-top: var(--lq-space-2);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--lq-radius-sm);
+  background: var(--panel);
+}
+
+.stats-view .wk-message.error {
+  border-color: var(--danger);
+}
+
+.stats-view .wk-message > span {
+  min-width: 0;
+}
+
+.stats-view .wk-message-close {
+  flex: 0 0 auto;
+  min-height: var(--lq-hit-target);
+}
+
 /* Floating-window width, not desktop viewport width, decides when the contextual tools stack. */
 @container (max-width: 440px) {
   .stats-context-head {
@@ -60,5 +85,10 @@
 
   .stats-view .stats-level-badge {
     align-self: flex-start;
+  }
+
+  .stats-view .wk-message {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

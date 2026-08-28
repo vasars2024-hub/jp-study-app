@@ -519,3 +519,16 @@ subminimum **200×140** control still failed with **13** clips and one hidden ov
 The category remains **FAIL 0/10** because the maximized window's measured dead region is **17.0%**
 (bar ≤15%); default is **8.9%**, compact **0.5%**. The one harness repair allowance is exhausted.
 Evidence: `cat4-l7-statistics.json`. Next category-4 pass starts on that exact maximized-width gap.
+
+## 2026-08-28 09:48 EDT — Statistics category 8 remains UNMEASURED; unsafe drive retired
+
+Passive evidence was clean but incomplete: **99** text runs; raw keys/placeholders/mute pairs
+**0/0/0**; four languages produced four hashes and restored English; the negative control moved
+all three defects **0/0/0→1/1/1→0/0/0**. No adverse state was observable, so the score stays 0.
+
+One product repair now renders Anki sync busy/success as status, failures as an alert, and gives
+every message a localized Close recovery. The attempted state drive was invalid: sync succeeded,
+changed the surface, and its close did not restore the hash. It also imported **41,535** Anki-only
+entries (**36,215/2,327/2,993**, manual **0**) into a pre-proven zero-count store. That exact key
+was removed and verified absent; live counts returned **0/0/0/0**. Do not drive real sync again.
+No baseline is banked. The next category-8 pass needs an isolated deterministic error state.
