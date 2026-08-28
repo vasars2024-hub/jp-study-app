@@ -1,0 +1,146 @@
+{
+  "label": "l7-games",
+  "surface": "Game Arena",
+  "win": "main",
+  "task": "click:.game-launch-panel .btn.primary",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 53,
+    "controlCount": 22,
+    "box": "980x589",
+    "results": 0
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      20.4
+    ],
+    "inputRecv": [],
+    "worstRecv": 20.4,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      26.5
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 26.5
+  },
+  "steps": [
+    {
+      "step": "click:.game-launch-panel .btn.primary",
+      "target": {
+        "sel": ".game-launch-panel .btn.primary",
+        "label": "Start round",
+        "disabled": false,
+        "at": "613,534"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "click:.game-list-item.active",
+    "steps": [
+      "click:.game-list-item.active"
+    ],
+    "restored": true,
+    "baseHash": "7qo17",
+    "afterHash": "7qo17",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "7qo17",
+      "after": "7qo17"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "980x589",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 20.4
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "980x589",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 18.5
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "980x589"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.7
+    ]
+  }
+}

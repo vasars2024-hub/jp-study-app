@@ -1092,6 +1092,12 @@ ends at y=**763**, taskbar y=**765**. Final: **47** text runs, min contrast **4.
 controls reachable, min target **32 px**, 0 obstruction, reduced motion 19→0→19; all five control
 terms move and restore. Evidence: `cat1-l7-games.json`.
 
+**Progress 2026-08-28 (Games category 2) — 20/80.** The first run found **3** clipped game
+descriptions (14 unreachable px each). Games now overrides the shared badge clamp so every study
+description wraps in full. Final task cost is **1 click / 0 keys** in Standard and Liquid, renderer
+acknowledgement **20.4/18.5 ms**, exact undo hash restored, and dead ends/modal traps/scroll traps
+are **0/0/0**. The negative control moves all three **0→1→0**. Evidence: `cat2-l7-games.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

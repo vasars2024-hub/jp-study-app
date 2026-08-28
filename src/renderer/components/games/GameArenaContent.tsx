@@ -10,6 +10,7 @@
  * `AppChrome`/`MenuBar`/`StatusBar`, and it never did.
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import './gameArenaLiquid.css';
 import { useCountUp } from '../../motion/hooks';
 import { fireRewardAt } from '../../motion/rewardBurst';
 import { getUserLevel, onLevelChange } from '../../levelService';

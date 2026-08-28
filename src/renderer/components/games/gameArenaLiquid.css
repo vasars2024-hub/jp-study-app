@@ -1,0 +1,7 @@
+/* Game descriptions are study context, not decorative metadata. Keep them
+   readable instead of inheriting the shared two-line badge clamp. */
+.game-list .game-list-item small {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
