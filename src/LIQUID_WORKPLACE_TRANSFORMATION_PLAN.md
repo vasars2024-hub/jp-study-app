@@ -990,6 +990,11 @@ dismissible, yet the real-sync drive succeeded and was not reversible by text ha
 Anki-only writes were immediately removed back to the pre-proven zero store. Category 8 stays
 UNMEASURED; the next attempt must isolate a deterministic error and must not drive live sync.
 
+**Progress 2026-08-28 (Statistics category 6) — 30/80.** The shared parity engine now carries
+an eight-row Statistics spec. Standard/Liquid are **8/8 / 8/8**; an 820×580 presentation round
+trip retained a driven 320px scroll with zero diffs. Eight independent controls each moved
+**8/8→7/8→8/8** and only their declared row fell. Evidence: `cat6-l7-statistics.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

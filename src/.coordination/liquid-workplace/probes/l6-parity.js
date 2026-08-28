@@ -109,6 +109,7 @@
   const vnState = specState('__LQP_VN_ORIG');
   const flashState = specState('__LQP_FLASH_ORIG');
   const notebookState = specState('__LQP_NOTEBOOK_ORIG');
+  const statsState = specState('__LQP_STATS_ORIG');
   const novelPageSignature = (w) => `${txt(q(w, '.reader-pagecount'))}|${txt(q(w, '.novel-content')).slice(0, 160)}`;
   const novelToolTrigger = (w, id) => qa(w, '.settings-anchor button').find((b) => {
     const label = `${b.title} ${b.getAttribute('aria-label') || ''}`;
@@ -1024,6 +1025,131 @@
         lineage: (w) => detach(q(w, '.gx-notebook-lineage-stage'), 'no lineage stage'),
         liveCaptions: (w) => detach(q(w, '.gx-lc-state'), 'no capture state'),
         handoffActions: (w) => detach(q(w, '.gx-notebook-actions .btn.primary'), 'no review handoff'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * STATISTICS — populated local reading and watching evidence. Sync and reset are inventoried
+     * but never driven: both write user data. The scroll leg is the reversible state carried
+     * through the presentation round trip; every feature row cross-checks rendered values with
+     * its label/structure rather than treating a container's presence as feature parity.
+     */
+    statistics: {
+      titleRe: /Statistics|統計|统计|Статистик/i,
+      rootSel: '.stats-view',
+      features: [
+        {
+          id: 'knowledgeSummary',
+          f: (w) => {
+            const section = q(w, '.wk-head') && q(w, '.wk-head').closest('.stats-section');
+            const cards = section ? qa(section, '.stats-card') : [];
+            const complete = cards.filter((c) => txt(q(c, '.stats-card-val')).length > 0
+              && txt(q(c, '.stats-card-lbl')).length > 0).length;
+            const sync = section && q(section, '.wk-head button');
+            return { ok: cards.length === 4 && complete === 4 && !!sync && !sync.disabled,
+              ev: `cards=${cards.length} complete=${complete} syncEnabled=${!!sync && !sync.disabled}` };
+          },
+        },
+        {
+          id: 'levelEstimate',
+          f: (w) => {
+            const meter = q(w, '.stats-level-estimate');
+            const badge = txt(q(meter, '.stats-level-badge'));
+            const title = txt(q(meter, '.stats-level-title'));
+            return { ok: !!meter && meter.getAttribute('role') === 'status' && badge.length > 0 && title.length > 0,
+              ev: `role=${meter && meter.getAttribute('role')} badge="${badge}" title="${title}"` };
+          },
+        },
+        {
+          id: 'summaryMetrics',
+          f: (w) => {
+            const grid = q(w, '.stats-view > .stats-cards');
+            const cards = grid ? qa(grid, ':scope > .stats-card') : [];
+            const complete = cards.filter((c) => txt(q(c, '.stats-card-val')).length > 0
+              && txt(q(c, '.stats-card-lbl')).length > 0).length;
+            return { ok: cards.length >= 6 && complete === cards.length,
+              ev: `cards=${cards.length} complete=${complete}` };
+          },
+        },
+        {
+          id: 'activityChart',
+          f: (w) => {
+            const bars = qa(w, '.stats-chart .stats-bar-col');
+            const labelled = bars.filter((b) => txt(q(b, '.stats-bar-lbl')).length > 0
+              && (b.getAttribute('title') || '').length > 0).length;
+            return { ok: bars.length === 14 && labelled === 14,
+              ev: `bars=${bars.length} labelled=${labelled}` };
+          },
+        },
+        {
+          id: 'bookBreakdown',
+          f: (w) => {
+            const list = qa(w, 'ul.stats-books')[0];
+            const rows = list ? qa(list, ':scope > li') : [];
+            const complete = rows.filter((r) => txt(q(r, '.stats-book-title')).length > 0
+              && txt(q(r, '.stats-book-meta')).length > 0).length;
+            return { ok: rows.length > 0 && complete === rows.length,
+              ev: `rows=${rows.length} complete=${complete}` };
+          },
+        },
+        {
+          id: 'showResume',
+          f: (w) => {
+            const list = qa(w, 'ul.stats-books')[1];
+            const rows = list ? qa(list, ':scope > li') : [];
+            const controls = list ? qa(list, '.stats-show-resume') : [];
+            const labelled = controls.filter((b) => (b.getAttribute('title') || '').length > 0
+              && txt(q(b, '.stats-book-title')).length > 0).length;
+            return { ok: rows.length > 0 && controls.length === rows.length && labelled === controls.length,
+              ev: `rows=${rows.length} controls=${controls.length} labelled=${labelled}` };
+          },
+        },
+        {
+          id: 'resetRecovery',
+          f: (w) => {
+            const b = q(w, '.stats-context-head .actions > button');
+            return { ok: !!b && !b.disabled && txt(b).length > 0,
+              ev: `present=${!!b} enabled=${!!b && !b.disabled} label="${txt(b)}"` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'surface has no scrollable region' };
+          const g = statsState();
+          if (g.scrollTop == null) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
+          el.scrollTop = Number(px) || 320;
+          return { top: el.scrollTop, range: el.scrollHeight - el.clientHeight, key: keyOf(el) };
+        },
+      },
+      drive: [['scroll', '320']],
+      undo: {
+        statistics: (w) => {
+          const g = window.__LQP_STATS_ORIG;
+          if (!g) return null;
+          const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+          if (el && el.scrollTop !== g.scrollTop) el.scrollTop = g.scrollTop;
+          window.__LQP_STATS_ORIG = null;
+          return el ? 'statistics:scroll' : null;
+        },
+      },
+      mutations: {
+        knowledgeSummary: (w) => detach(
+          q(w, '.stats-section .stats-cards .stats-card-val'),
+          'no knowledge value',
+        ),
+        levelEstimate: (w) => detach(q(w, '.stats-level-title'), 'no level title'),
+        summaryMetrics: (w) => detach(q(w, '.stats-view > .stats-cards .stats-card-lbl'), 'no summary label'),
+        activityChart: (w) => detach(q(w, '.stats-chart .stats-bar-lbl'), 'no chart label'),
+        bookBreakdown: (w) => detach(q(w, 'ul.stats-books .stats-book-title'), 'no book title'),
+        showResume: (w) => {
+          const list = qa(w, 'ul.stats-books')[1];
+          return stripAttr(list && q(list, '.stats-show-resume'), 'title', 'no show resume');
+        },
+        resetRecovery: (w) => detach(q(w, '.stats-context-head .actions > button'), 'no reset action'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

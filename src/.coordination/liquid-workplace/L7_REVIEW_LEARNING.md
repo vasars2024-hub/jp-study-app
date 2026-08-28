@@ -532,3 +532,14 @@ changed the surface, and its close did not restore the hash. It also imported **
 entries (**36,215/2,327/2,993**, manual **0**) into a pre-proven zero-count store. That exact key
 was removed and verified absent; live counts returned **0/0/0/0**. Do not drive real sync again.
 No baseline is banked. The next category-8 pass needs an isolated deterministic error state.
+
+## 2026-08-28 09:55 EDT — Statistics category 6 PASS 10/10; score 30/80
+
+The existing parity engine gained one Statistics spec, not a new probe. Eight rows cover knowledge,
+level estimate, summary metrics, 14-day chart, books, show resume, reset recovery, and window
+lifecycle. Standard and Liquid each reached **8/8**; a driven **320px** scroll and the **820×580**
+shell survived Standard→Liquid→Standard with zero diffs.
+
+All eight controls independently moved **8/8→7/8→8/8**, each dropping only its declared row;
+restoration returned every detached node/attribute and the original scroll. **PASS 10/10.**
+Evidence: `cat6-l7-statistics.json`. Statistics is now **30/80**.

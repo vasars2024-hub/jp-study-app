@@ -1,0 +1,167 @@
+{
+  "label": "l7-statistics",
+  "app": "statistics",
+  "win": "main",
+  "raised": "raised",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "scroll",
+      "result": "{\"top\":320,\"range\":1438,\"key\":\"fwin-body\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "8/8",
+    "liquid": "8/8",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "knowledgeSummary",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "knowledgeSummary"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "levelEstimate",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "levelEstimate"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "summaryMetrics",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "summaryMetrics"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "activityChart",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "activityChart"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "bookBreakdown",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "bookBreakdown"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "showResume",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "title stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "showResume"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "resetRecovery",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "resetRecovery"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-pressed stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"statistics:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
