@@ -1051,6 +1051,11 @@ subgroup as dense Work on contextual glass **1/1**. `AnchorSurface bare` reduced
 while retaining contextual/shared treatment **2/2**; controls moved **0→1→1→0** and restored the
 exact material plus Standard presentation. Evidence: `cat3-l7-calendar.json`.
 
+**Progress 2026-08-28 (Calendar category 4) — 40/80.** Compact mode/day tracks reduced the only
+horizontal scroller from `.calendar-view` **262>212px → 0**. All four defect counts are zero at
+820×580, 260×170, and 1264×765; dead region is **5.4/0.9/9.7%**, every size restored, and the
+clip control moved **0→1→0**. Evidence: `cat4-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

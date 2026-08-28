@@ -794,3 +794,18 @@ shared primitive **2/2**. Controls moved one/all Work failures **0→1→1→0**
 `rgb(18,28,23)` anchor material, and returned Standard presentation. Guard **6/6**.
 
 **Calendar is 30/80.** Evidence: `cat3-l7-calendar.json`. Category 4 is next.
+
+## 2026-08-28 14:10 EDT — Calendar category 4 compact reflow PASS 10/10
+
+The first shared-harness run found one compact horizontal scroller: `.calendar-view` measured
+**262>212px** because the four intrinsic mode buttons consumed **240px** and the seven `1fr` day
+columns retained **211px** of min-content inside a 168px row. Default and maximized were clean.
+
+At a 300px container the modes now form a 2-column grid and the month/week grids use explicit
+`minmax(0,1fr)` tracks with compact gaps/padding. Final default / compact / maximized results:
+clips **0/0/0**, overlaps **0/0/0**, horizontal scrollers **0/0/0**, hidden overflow **0/0/0**;
+dead region **5.4/0.9/9.7%**. Chrome falls **17.8→13.9%** and the work viewport grows
+**93.7→95.3%**. All three sizes restored.
+
+The injected clip moved **0→1→0** with removal proven; the 200×140 leg stayed clean and restored.
+Guard **6/6**. **Calendar is 40/80.** Evidence: `cat4-l7-calendar.json`. Category 5 is next.

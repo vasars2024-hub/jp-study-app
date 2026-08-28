@@ -67,3 +67,30 @@
     order: -1;
   }
 }
+
+/* At the harness's 260px frame the view has 168px of content after window chrome and padding.
+ * Four intrinsic-width mode buttons consumed 240px, while seven `1fr` day columns retained their
+ * min-content floors and consumed 211px. Reflow the transport and allow calendar columns to
+ * shrink explicitly; the month/week semantics and all controls remain present. */
+@container (max-width: 300px) {
+  .cal-context-toolbar .cal-modes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cal-context-toolbar .cal-mode-btn {
+    min-width: 0;
+    padding-inline: var(--lq-space-2);
+  }
+
+  .cal-month-grid,
+  .cal-week-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--lq-space-1);
+  }
+
+  .cal-month-cell {
+    min-width: 0;
+    padding: var(--lq-space-1);
+  }
+}

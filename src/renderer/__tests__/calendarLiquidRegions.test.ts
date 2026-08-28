@@ -56,6 +56,9 @@ describe('Calendar Liquid regions', () => {
     // the date jump leaves a narrow window entirely.
     expect(CSS).toContain('.cal-context-toolbar .cal-header-label {');
     expect(CSS).toContain('min-width: 0;');
+    expect(CSS).toContain('@container (max-width: 300px)');
+    expect(CSS).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(CSS).toContain('grid-template-columns: repeat(7, minmax(0, 1fr));');
     expect(CSS).not.toContain('@media');
   });
 
