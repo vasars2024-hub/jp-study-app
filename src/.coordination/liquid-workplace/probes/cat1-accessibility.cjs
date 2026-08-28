@@ -98,6 +98,48 @@ async function ev(js) {
   return t.result;
 }
 
+/**
+ * Validate a probe's exact style-attribute round trip after the synchronous eval has yielded.
+ * Chromium can materialise an empty style attribute only after that eval returns, so the first
+ * later task records and repairs drift, the second verifies the repair, and a final delayed task
+ * proves it stayed repaired. A mismatch on either verification voids the run; the last task still
+ * repairs before dropping the element references so a failed instrument cannot strand residue.
+ */
+async function settleDeferredStyles(key) {
+  const inspect = async (repair, clear) => JSON.parse(await ev(`(function(){
+    var rows = window[${JSON.stringify(key)}] || [];
+    function exact(r){ return !r.e.isConnected || r.e.getAttribute('style') === r.style; }
+    function put(r){
+      if (!r.e.isConnected) return;
+      r.e.style.removeProperty('content-visibility');
+      if (r.style === null) r.e.removeAttribute('style');
+      else r.e.setAttribute('style', r.style);
+    }
+    var drift = rows.filter(function(r){ return !exact(r); });
+    if (${repair ? 'true' : 'false'}) drift.forEach(put);
+    void document.documentElement.offsetHeight;
+    var remaining = rows.filter(function(r){ return !exact(r); }).length;
+    var disconnected = rows.filter(function(r){ return !r.e.isConnected; }).length;
+    if (${clear ? 'true' : 'false'}) {
+      if (remaining) rows.forEach(put);
+      delete window[${JSON.stringify(key)}];
+    }
+    return JSON.stringify({ owners:rows.length, drift:drift.length, remaining:remaining, disconnected:disconnected });
+  })()`));
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const repaired = await inspect(true, false);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const verified = await inspect(false, false);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const delayed = await inspect(false, true);
+  return {
+    repaired,
+    verified,
+    delayed,
+    restored: verified.remaining === 0 && delayed.remaining === 0,
+  };
+}
+
 const ROOT_EXPR = IS_SELECTOR
   ? `document.querySelector(${JSON.stringify(SELECTOR)})`
   : `[].slice.call(document.querySelectorAll('.fwin')).filter(function(w){
@@ -169,6 +211,32 @@ const PROBE = `(function(){
       ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
       : true;
   }
+  // content-visibility:auto deliberately removes off-screen records from paint and hit-testing.
+  // Reveal only the deferred owner of the record currently being measured, then restore its
+  // exact original style ATTRIBUTE. The Node driver validates that restore on later renderer
+  // tasks; an immediate CSSOM read is not evidence because Chromium can materialise style=""
+  // after this synchronous evaluation has returned.
+  var deferredStyles = new Map();
+  function deferredOwner(e){
+    if (painted(e)) return null;
+    for (var n = e; n && n !== root.parentElement; n = n.parentElement) {
+      if (getComputedStyle(n).contentVisibility === 'auto') return n;
+    }
+    return null;
+  }
+  function revealDeferred(e){
+    var owner = deferredOwner(e);
+    if (!owner) return function(){};
+    if (!deferredStyles.has(owner)) deferredStyles.set(owner, { e:owner, style:owner.getAttribute('style') });
+    owner.style.setProperty('content-visibility', 'visible');
+    owner.getBoundingClientRect();
+    return function(){
+      var saved = deferredStyles.get(owner).style;
+      owner.style.removeProperty('content-visibility');
+      if (saved === null) owner.removeAttribute('style');
+      else owner.setAttribute('style', saved);
+    };
+  }
   function effectiveBg(el){
     var acc = null, n = el;
     while (n && n !== document.documentElement.parentElement) {
@@ -193,21 +261,25 @@ const PROBE = `(function(){
     var s = t.nodeValue && t.nodeValue.trim();
     if (!s) continue;
     var el = t.parentElement;
-    if (!el || seen.has(el) || !painted(el)) continue;
-    seen.add(el);
-    var r = el.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) continue;
-    var cs = getComputedStyle(el);
-    var fg = parseColor(cs.color);
-    if (!fg) { textRows.push({ el: label(el), unmeasurable: cs.color }); continue; }
-    var bg = effectiveBg(el);
-    var composited = fg.a < 1 ? over(fg, bg) : fg;
-    var px = parseFloat(cs.fontSize) || 16;
-    var bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
-    var large = px >= 24 || (bold && px >= 18.66);
-    textRows.push({ el: label(el), text: s.slice(0,24), px: Math.round(px*10)/10, large: large,
-                    ratio: Math.round(ratio(composited, bg)*100)/100, bar: large ? 3 : 4.5,
-                    inactive: !!el.closest(':disabled') });
+    if (!el || seen.has(el)) continue;
+    var hideAgain = revealDeferred(el);
+    try {
+      if (!painted(el)) continue;
+      seen.add(el);
+      var r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      var cs = getComputedStyle(el);
+      var fg = parseColor(cs.color);
+      if (!fg) { textRows.push({ el: label(el), unmeasurable: cs.color }); continue; }
+      var bg = effectiveBg(el);
+      var composited = fg.a < 1 ? over(fg, bg) : fg;
+      var px = parseFloat(cs.fontSize) || 16;
+      var bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
+      var large = px >= 24 || (bold && px >= 18.66);
+      textRows.push({ el: label(el), text: s.slice(0,24), px: Math.round(px*10)/10, large: large,
+                      ratio: Math.round(ratio(composited, bg)*100)/100, bar: large ? 3 : 4.5,
+                      inactive: !!el.closest(':disabled') });
+    } finally { hideAgain(); }
   }
   var measurable = textRows.filter(function(x){ return typeof x.ratio === 'number'; });
   // WCAG 1.4.3's own exemption: text that is part of an INACTIVE user interface component has
@@ -229,14 +301,17 @@ const PROBE = `(function(){
 
   // ---- 2. hit targets, WITH the 2.5.8 spacing exception -------------------------
   var CTRL = 'button,a[href],input,select,textarea,[role="button"],[role="tab"],[role="checkbox"],[tabindex]';
-  var boxes = [].slice.call(root.querySelectorAll(CTRL)).filter(function(e){
-    if (!painted(e)) return false;
-    var b = e.getBoundingClientRect();
-    return b.width >= 1 && b.height >= 1;
-  }).map(function(e){
-    var b = e.getBoundingClientRect();
-    return { e: e, cx: b.left + b.width/2, cy: b.top + b.height/2, min: Math.min(b.width, b.height) };
-  });
+  var boxes = [];
+  var boxEls = [].slice.call(root.querySelectorAll(CTRL));
+  for (var bi = 0; bi < boxEls.length; bi++) {
+    var boxEl = boxEls[bi];
+    var hideBoxAgain = revealDeferred(boxEl);
+    try {
+      if (!painted(boxEl)) continue;
+      var b = boxEl.getBoundingClientRect();
+      if (b.width >= 1 && b.height >= 1) boxes.push({ e: boxEl, cx: b.left + b.width/2, cy: b.top + b.height/2, min: Math.min(b.width, b.height) });
+    } finally { hideBoxAgain(); }
+  }
   for (var i = 0; i < boxes.length; i++) {
     var nearest = Infinity;
     for (var j = 0; j < boxes.length; j++) {
@@ -273,60 +348,68 @@ const PROBE = `(function(){
   var composites = [].slice.call(root.querySelectorAll(COMPOSITE));
   for (var ci = 0; ci < composites.length; ci++) {
     var cEl = composites[ci];
-    var members = [].slice.call(cEl.querySelectorAll('[tabindex]')).filter(painted);
-    var stop = members.filter(function(m){ return m.getAttribute('tabindex') === '0'; })[0];
-    var others = members.filter(function(m){ return m.getAttribute('tabindex') === '-1'; });
-    if (!stop || others.length === 0) continue;
-    var horizontal = cEl.getAttribute('aria-orientation') !== 'vertical';
-    var key = horizontal ? 'ArrowRight' : 'ArrowDown';
-    var backKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
-    var movedTo = null, restored = true;
-    // DRIVING A TABLIST CHANGES THE SURFACE. With automatic activation the arrow key does not
-    // only move focus, it selects — the first live run switched the Reading Finder tab and the
-    // motion leg then sampled 7 durations before and 45 after, on a panel that had remounted
-    // underneath it. The drive is reversed with the opposite arrow and the restore is asserted,
-    // so a container that cannot be put back is reported rather than silently left mutated.
-    var wasSelected = members.map(function(m){ return m.getAttribute('aria-selected'); });
+    var hideCompositeAgain = revealDeferred(cEl);
     try {
-      stop.focus({ preventScroll: true });
-      stop.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
-      if (document.activeElement !== stop && members.indexOf(document.activeElement) >= 0) {
-        movedTo = label(document.activeElement);
-        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: backKey, bubbles: true, cancelable: true }));
+      var members = [].slice.call(cEl.querySelectorAll('[tabindex]')).filter(painted);
+      var stop = members.filter(function(m){ return m.getAttribute('tabindex') === '0'; })[0];
+      var others = members.filter(function(m){ return m.getAttribute('tabindex') === '-1'; });
+      if (!stop || others.length === 0) continue;
+      var horizontal = cEl.getAttribute('aria-orientation') !== 'vertical';
+      var key = horizontal ? 'ArrowRight' : 'ArrowDown';
+      var backKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
+      var movedTo = null, restored = true;
+      // DRIVING A TABLIST CHANGES THE SURFACE. With automatic activation the arrow key does not
+      // only move focus, it selects — the first live run switched the Reading Finder tab and the
+      // motion leg then sampled 7 durations before and 45 after, on a panel that had remounted
+      // underneath it. The drive is reversed with the opposite arrow and the restore is asserted,
+      // so a container that cannot be put back is reported rather than silently left mutated.
+      var wasSelected = members.map(function(m){ return m.getAttribute('aria-selected'); });
+      try {
+        stop.focus({ preventScroll: true });
+        stop.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+        if (document.activeElement !== stop && members.indexOf(document.activeElement) >= 0) {
+          movedTo = label(document.activeElement);
+          document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: backKey, bubbles: true, cancelable: true }));
+        }
+      } catch (err) { movedTo = null; }
+      for (var si = 0; si < members.length; si++) {
+        if (members[si].getAttribute('aria-selected') !== wasSelected[si]) restored = false;
       }
-    } catch (err) { movedTo = null; }
-    for (var si = 0; si < members.length; si++) {
-      if (members[si].getAttribute('aria-selected') !== wasSelected[si]) restored = false;
-    }
-    var works = !!movedTo;
-    roving.push({ container: label(cEl), role: cEl.getAttribute('role'), key: key, members: members.length, arrowMoved: works, movedTo: movedTo, selectionRestored: restored });
-    if (works) for (var mi = 0; mi < others.length; mi++) rovingMembers.add(others[mi]);
+      var works = !!movedTo;
+      roving.push({ container: label(cEl), role: cEl.getAttribute('role'), key: key, members: members.length, arrowMoved: works, movedTo: movedTo, selectionRestored: restored });
+      if (works) for (var mi = 0; mi < others.length; mi++) rovingMembers.add(others[mi]);
+    } finally { hideCompositeAgain(); }
   }
 
   var unreachable = [], focusHosts = [];
   for (var k = 0; k < boxes.length; k++) {
     var e2 = boxes[k].e;
-    if (e2.disabled) continue;
-    var isControl = e2.matches(INTERACTIVE);
-    if (e2.getAttribute('tabindex') === '-1') {
-      if (rovingMembers.has(e2)) continue; // reachable by arrow key, proven above
-      (isControl ? unreachable : focusHosts).push({ el: label(e2), why: 'tabindex=-1' });
-      continue;
-    }
+    var hideFocusAgain = revealDeferred(e2);
     try {
-      e2.focus({ preventScroll: true });
-      if (document.activeElement !== e2) unreachable.push({ el: label(e2), why: 'focus() did not take' });
-    } catch (err) { unreachable.push({ el: label(e2), why: 'focus() threw' }); }
+      if (e2.disabled) continue;
+      var isControl = e2.matches(INTERACTIVE);
+      if (e2.getAttribute('tabindex') === '-1') {
+        if (rovingMembers.has(e2)) continue; // reachable by arrow key, proven above
+        (isControl ? unreachable : focusHosts).push({ el: label(e2), why: 'tabindex=-1' });
+        continue;
+      }
+      try {
+        e2.focus({ preventScroll: true });
+        if (document.activeElement !== e2) unreachable.push({ el: label(e2), why: 'focus() did not take' });
+      } catch (err) { unreachable.push({ el: label(e2), why: 'focus() threw' }); }
+    } finally { hideFocusAgain(); }
   }
   if (prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus({ preventScroll: true });
 
   var htmlEl = document.documentElement;
+  window.__cat1CoreDeferredRestore = Array.from(deferredStyles.values());
 
   return JSON.stringify({
     surface: ${JSON.stringify(SURFACE)},
     theme: htmlEl.getAttribute('data-theme'),
     presentation: root.getAttribute && root.getAttribute('data-presentation'),
     box: Math.round(WR.width) + 'x' + Math.round(WR.height),
+    deferredVisibilityOwners: deferredStyles.size,
     parserSelfTest: st,
     text: {
       measured: measurable.length,
@@ -469,7 +552,9 @@ async function hitArea() {
   // Twice, and the pass condition for the INSTRUMENT is that the two agree: the recorded
   // scroll-leak defect made consecutive runs on an unchanged surface read 4 then 9.
   const a = JSON.parse(await ev(HIT_AREA));
+  const aDeferredRestore = await settleDeferredStyles('__cat1HitDeferredRestore');
   const b = JSON.parse(await ev(HIT_AREA));
+  const bDeferredRestore = await settleDeferredStyles('__cat1HitDeferredRestore');
   await ev(`(function(){ delete window.__lqScoreRoot; delete window.__lqScoreTitle; return 'cleared' })()`);
   const restore = JSON.parse(await ev(`(function(){
     var snap = window.__cat1Scroll || [];
@@ -489,8 +574,12 @@ async function hitArea() {
     return JSON.stringify({ put: put, cleared: cleared });
   })()`));
   if (a.refuse || b.refuse) return { refuse: a.refuse || b.refuse };
+  if (!aDeferredRestore.restored || !bDeferredRestore.restored) {
+    return { refuse: 'deferred hit-area styles did not restore on a later renderer task', deferredRestore: { first:aDeferredRestore, second:bDeferredRestore } };
+  }
   return {
     ...b,
+    deferredRestore: { first:aDeferredRestore, second:bDeferredRestore },
     scrollRestore: restore,
     stable: a.belowFloorByHit === b.belowFloorByHit && a.stolenCount === b.stolenCount,
     firstRun: { belowFloorByHit: a.belowFloorByHit, stolenCount: a.stolenCount, occludedCount: a.occludedCount },
@@ -603,7 +692,13 @@ async function raise() {
   return r;
 }
 
-const run = async () => JSON.parse(await ev(PROBE));
+const run = async () => {
+  const result = JSON.parse(await ev(PROBE));
+  const deferredRestore = await settleDeferredStyles('__cat1CoreDeferredRestore');
+  result.deferredRestore = deferredRestore;
+  if (!deferredRestore.restored) result.refuse = 'deferred core styles did not restore on a later renderer task';
+  return result;
+};
 const sampleMotion = async () => JSON.parse(await ev(MOTION_SAMPLE));
 const emulate = async (features) => post('/emulate', features ? { features } : { clear: true });
 

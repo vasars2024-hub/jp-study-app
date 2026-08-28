@@ -963,6 +963,14 @@ was false: a post-run check found **381** empty style attributes. Residue and fa
 restored to zero/HEAD. The open instrument boundary is delayed renderer-task restoration; category
 1 stays UNMEASURED and the next turn repairs that boundary before Statistics.
 
+**Progress 2026-08-28 (later) — Notebook is controlled 80/80 and DONE; Statistics opens.** The
+generic category-1 repair preserves each deferred owner's exact original style attribute, repairs
+the expected delayed CSSOM drift on the next renderer task, and requires two later exact reads.
+Full population: **1,260** text owners, **439** core / **464** pointer controls, contrast/WCAG/
+keyboard/pointer-floor/theft failures all **0**, reduced motion **11→0→11**. The five-term control
+moved **0→1/2/2/1/2→0**; an independent 750 ms check found **0** residue. Evidence:
+`L7_REVIEW_LEARNING.md` and `cat1-l7-notebook.json`. Next surface: Statistics.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

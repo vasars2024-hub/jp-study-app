@@ -473,3 +473,15 @@ They were removed from a proven zero-style baseline; after 250 ms the live surfa
 attributes, **0** inline content-visibility, scroll **0**, and its disclosure closed. Failed harness
 and baseline files hash byte-identical to HEAD. Notebook remains **70/80**, category 1 UNMEASURED.
 The next repair must assert restoration on a later renderer task, not in the same synchronous eval.
+
+## 2026-08-28 09:28 EDT — Notebook category 1 PASS 10/10; Notebook closes at 80/80
+
+The reusable harness now reveals one `content-visibility:auto` record at a time and preserves the
+exact original `style` attribute. Delayed CSSOM drift was real (**381** core and **380** pointer
+owners), repaired on the next renderer task, then remained exact at 30 ms and 250 ms. An independent
+750 ms receipt found **0** style attributes, inline declarations, control residue, scroll, or globals.
+
+Score: **1,260** text owners, minimum **5.30:1**, failures **0**; core controls **439**, WCAG 2.5.8
+failures **0**, unreachable **0**; pointer controls **464**, measured **437**, below-floor/theft
+**0/0**; reduced motion **11→0→11**. The control moved all five terms **0→1/2/2/1/2→0**.
+Categories 1–8 are now controlled **80/80**. Next surface: Statistics.

@@ -80,6 +80,35 @@
   if (!WR.width || !WR.height)
     return JSON.stringify({ refuse: 'window is 0x0 (minimised?) — refusing to record zeros' });
 
+  // Reveal one content-visibility:auto record at a time. Preserve the exact style ATTRIBUTE,
+  // including the difference between absent and empty; the category driver validates these
+  // snapshots again on later renderer tasks before it accepts this probe's numbers.
+  const deferredStyles = new Map();
+  const painted = (e) =>
+    typeof e.checkVisibility === 'function'
+      ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
+      : true;
+  const deferredOwner = (e) => {
+    if (painted(e)) return null;
+    for (let n = e; n && n !== win.parentElement; n = n.parentElement) {
+      if (getComputedStyle(n).contentVisibility === 'auto') return n;
+    }
+    return null;
+  };
+  const revealDeferred = (e) => {
+    const owner = deferredOwner(e);
+    if (!owner) return () => {};
+    if (!deferredStyles.has(owner)) deferredStyles.set(owner, { e: owner, style: owner.getAttribute('style') });
+    owner.style.setProperty('content-visibility', 'visible');
+    owner.getBoundingClientRect();
+    return () => {
+      const saved = deferredStyles.get(owner).style;
+      owner.style.removeProperty('content-visibility');
+      if (saved === null) owner.removeAttribute('style');
+      else owner.setAttribute('style', saved);
+    };
+  };
+
   const label = (e) =>
     !e
       ? 'null'
@@ -109,16 +138,23 @@
   // being scored against a floor they are exempt from by design. Whether disabling them is
   // HONEST is rubric category 8's question, not this walk's.
   const disabled = [];
-  const els = [...win.querySelectorAll(INTERACTIVE)].filter((e) => {
-    const r = e.getBoundingClientRect();
-    if (!(r.width > 0 && r.height > 0) || getComputedStyle(e).visibility === 'hidden') return false;
-    // `aria-disabled` too: a `[role="button"]` cannot carry the DOM property.
-    if (e.disabled === true || e.getAttribute('aria-disabled') === 'true') {
-      disabled.push({ el: label(e), rect: `${Math.round(r.width)}x${Math.round(r.height)}` });
-      return false;
+  const els = [];
+  for (const e of win.querySelectorAll(INTERACTIVE)) {
+    const hideAgain = revealDeferred(e);
+    try {
+      if (!painted(e)) continue;
+      const r = e.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0) || getComputedStyle(e).visibility === 'hidden') continue;
+      // `aria-disabled` too: a `[role="button"]` cannot carry the DOM property.
+      if (e.disabled === true || e.getAttribute('aria-disabled') === 'true') {
+        disabled.push({ el: label(e), rect: `${Math.round(r.width)}x${Math.round(r.height)}` });
+        continue;
+      }
+      els.push(e);
+    } finally {
+      hideAgain();
     }
-    return true;
-  });
+  }
 
   // A form control's pointer target is the control PLUS its `<label>`s: clicking a label
   // activates the control it labels, so measuring the 13x13 checkbox glyph alone reports a
@@ -206,6 +242,8 @@
   };
 
   for (const el of els) {
+    const hideAgain = revealDeferred(el);
+    try {
     // ALWAYS centre, never "only if the centre is not already owned". That shortcut is what
     // made the result depend on iteration order: a control that happened to be visible was
     // measured where it sat, which near a scroller's clip edge means its walk terminates
@@ -271,6 +309,9 @@
         ) / 10,
       blockers: [left, right, up, down].map((w) => w.blocker).filter(Boolean),
     });
+    } finally {
+      hideAgain();
+    }
   }
 
   for (const s of details) s.d.open = s.open;
@@ -299,6 +340,7 @@
     return [...m.values()].sort((a, b) => b.n - a.n);
   };
 
+  window.__cat1HitDeferredRestore = [...deferredStyles.values()];
   return JSON.stringify({
     // The SCORED root, not the fallback title. `TITLE` keeps its `'Dictionary'` default so the
     // recorded title-form runs reproduce, but printing it while `ROOT_SEL` is what was measured
@@ -308,6 +350,7 @@
     presentation: win.getAttribute('data-presentation'),
     theme: document.documentElement.getAttribute('data-theme'),
     box: `${Math.round(WR.width)}x${Math.round(WR.height)}`,
+    deferredVisibilityOwners: deferredStyles.size,
     controls: els.length,
     measured: rows.length,
     // The headline pair: the rubric's number as a rect, and as a pointer sees it.

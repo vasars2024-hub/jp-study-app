@@ -1,17 +1,18 @@
 {
   "label": "l7-notebook",
   "surface": "Notebook",
-  "win": "(focused)",
+  "win": "main",
   "theme": "forest-night",
   "presentation": "standard",
   "box": "820x580",
+  "deferredVisibilityOwners": 381,
   "parserSelfTest": {
     "ok": true,
     "why": "channels scaled 0..1 -> 0..255",
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 2062,
+    "measured": 1260,
     "unmeasurable": 0,
     "minRatio": 5.3,
     "minOwner": "span.muted \"OCR\" 13px",
@@ -21,7 +22,7 @@
     "inactiveWorst": []
   },
   "targets": {
-    "total": 459,
+    "total": 439,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
     "under32Count": 5,
@@ -56,12 +57,33 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 459,
+    "controls": 439,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
     "focusHosts": [],
     "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 381,
+      "drift": 381,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 381,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 381,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
   },
   "raised": "already-on-top",
   "ariaDisclosed": {
@@ -88,8 +110,9 @@
     "presentation": "standard",
     "theme": "forest-night",
     "box": "820x580",
-    "controls": 484,
-    "measured": 477,
+    "deferredVisibilityOwners": 380,
+    "controls": 464,
+    "measured": 437,
     "belowFloorByRect": 5,
     "belowFloorByHit": 0,
     "belowFloor": [],
@@ -111,7 +134,7 @@
     "stolenCount": 0,
     "stolen": [],
     "worstShrunkBy": 0,
-    "occludedCount": 7,
+    "occludedCount": 27,
     "occluded": [
       {
         "el": "button.gx-notebook-folder",
@@ -147,6 +170,11 @@
         "el": "button.gx-notebook-folder",
         "rect": "145x44",
         "by": "p.muted.gx-lc-desc"
+      },
+      {
+        "el": "button.gx-notebook-lineage-btn",
+        "rect": "52x32",
+        "by": "li.gx-notebook-item"
       }
     ],
     "disabledCount": 1,
@@ -160,9 +188,53 @@
     "disclosuresRestored": true,
     "scrollLeaks": [
       "details.lq-contextual.gx-notebook-filters 99,0 -> 0,0",
-      "div.gx-notebook-folders 0,0 -> 41,0",
-      "section.gx-notebook-timeline 0,0 -> 32179,0"
+      "div.lq-contextual.gx-notebook-folders 0,0 -> 41,0",
+      "section.gx-notebook-timeline 0,0 -> 37054,0"
     ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 380,
+          "drift": 380,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 380,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 380,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 380,
+          "drift": 380,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 380,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 380,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
     "scrollRestore": {
       "put": 0,
       "cleared": 0
@@ -171,7 +243,7 @@
     "firstRun": {
       "belowFloorByHit": 0,
       "stolenCount": 0,
-      "occludedCount": 7
+      "occludedCount": 27
     }
   },
   "bars": {
