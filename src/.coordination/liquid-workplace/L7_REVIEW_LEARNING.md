@@ -764,3 +764,17 @@ The harness also proved **0** deferred owners and exact restoration on its immed
 and delayed checks. Evidence: `baselines/cat1-l7-calendar.json`.
 
 **Calendar is 10/80.** Category 2 is next; no new probe or harness repair was needed.
+
+## 2026-08-28 14:06 EDT — Calendar category 2 PASS 10/10; score 20/80
+
+The dominant task is moving from the month overview to the week schedule. It costs **1 click / 0
+keystrokes**, with **0** dead ends, modal traps, scroll traps, or acknowledgements over 100 ms;
+the worst renderer-side acknowledgement was **57.5 ms**. The unscored cross-process stamp was
+652.7 ms, which is the harness's recorded reason for measuring from renderer receipt.
+
+Cost parity was driven, not inferred: Standard and Liquid each cost **1** input at the same
+820×580 geometry. The harness restored Month, Standard presentation, `aria-pressed=false`, and
+the exact base state hash. Its control moved dead-end/modal/scroll defects **0/0/0→1/1/1→0/0/0**;
+the inert control was acknowledged in **2.4 ms**. Evidence: `cat2-l7-calendar.json`.
+
+**Calendar is 20/80.** Category 3 is next; this was a pure run of the shared harness.

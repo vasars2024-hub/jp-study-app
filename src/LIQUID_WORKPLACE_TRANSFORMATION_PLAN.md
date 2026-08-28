@@ -1041,6 +1041,11 @@ recovered from disk: 60 text owners and 9 controls with zero contrast, reachabil
 WCAG 2.5.8, or motion failures. The five-term control moved **0/0/0/0/0 → 1/2/2/1/2 →
 0/0/0/0/0**, with exact delayed restoration. Evidence: `cat1-l7-calendar.json`.
 
+**Progress 2026-08-28 (Calendar category 2) — 20/80.** Month→Week costs one click in both
+Standard and Liquid, with 0 dead ends, modal traps, scroll traps, or acknowledgements over 100 ms.
+The control moved all three defect terms **0/0/0→1/1/1→0/0/0** and the exact state/presentation
+restored. Evidence: `cat2-l7-calendar.json`.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.
