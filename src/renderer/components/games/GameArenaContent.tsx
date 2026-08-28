@@ -15,6 +15,7 @@ import { fireRewardAt } from '../../motion/rewardBurst';
 import { getUserLevel, onLevelChange } from '../../levelService';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { addDeckCards, onDeckChanged } from '../../flashcardDeck';
 import { onLevelListsChanged } from '../../levelLists';
 import { loadArenaContent, levelCoverage } from '../../games/contentStore';
@@ -319,7 +320,7 @@ export function GameArena() {
 
   return (
     <div className="game-arena">
-      <header className="game-arena-top">
+      <ContextualSurface as="header" className="game-arena-top">
         <div>
           <div className="game-arena-kicker">{t('games.kicker')}</div>
           <h2>{t('games.title')}</h2>
@@ -333,10 +334,10 @@ export function GameArena() {
             <Icon name="settings" size={14} /> {t('games.settings')}
           </button>
         </div>
-      </header>
+      </ContextualSurface>
 
       <div className="game-arena-layout">
-        <aside className="game-list" aria-label={t('games.list')}>
+        <ContextualSurface as="aside" className="game-list" aria-label={t('games.list')}>
           {availableGames.map((game) => (
             <button
               key={game.id}
@@ -354,10 +355,10 @@ export function GameArena() {
               </span>
             </button>
           ))}
-        </aside>
+        </ContextualSurface>
 
         <main className="game-stage">
-          <section className="game-stage-head">
+          <ContextualSurface as="section" className="game-stage-head">
             <div>
               <h3>{t(gameTitleKey(selectedDef.id))}</h3>
               <p className="muted">{t(gameDescKey(selectedDef.id))}</p>
@@ -367,12 +368,12 @@ export function GameArena() {
               <span>{t(`games.lang.${settings.sourceLang}`)}</span>
               <span>{highScore == null ? t('games.noHighScore') : t('games.highScore', { score: highScore })}</span>
             </div>
-          </section>
+          </ContextualSurface>
 
           {/* How much of this level's list the deck can actually teach, and
               whether the round is running on the player's own material. */}
           {selected !== 'mirror-writing' && !isArcadeGame(selected) && (
-            <section className="game-coverage" aria-label={t('games.coverage.label')}>
+            <ContextualSurface as="section" className="game-coverage" aria-label={t('games.coverage.label')}>
               <div className="game-coverage-bar">
                 <i style={{ transform: `scaleX(${Math.min(1, coverage.pct / 100)})` }} />
               </div>
@@ -386,13 +387,13 @@ export function GameArena() {
                   : t('games.coverage.noList')}
               </span>
               {content.usingFallback && <span className="game-fallback-tag">{t('games.coverage.fallback')}</span>}
-            </section>
+            </ContextualSurface>
           )}
 
           {/* Per-game exposure: how much of this level's pool this game has
               already shown the player. */}
           {gameSeen && gameSeen.total > 0 && (
-            <section className="game-coverage game-seen" aria-label={t('games.seen.label')}>
+            <ContextualSurface as="section" className="game-coverage game-seen" aria-label={t('games.seen.label')}>
               <div className="game-coverage-bar">
                 <i style={{ transform: `scaleX(${Math.min(1, gameSeen.pct / 100)})` }} />
               </div>
@@ -404,7 +405,7 @@ export function GameArena() {
                   level,
                 })}
               </span>
-            </section>
+            </ContextualSurface>
           )}
 
           {selected === 'mirror-writing' ? (
@@ -895,7 +896,7 @@ function ResultPanel({ session, onRestart }: { session: Session; onRestart: () =
   }, [session.accuracy]);
 
   return (
-    <div className="game-result">
+    <ContextualSurface className="game-result">
       <div className="game-result-score motion-ticker" ref={scoreRef}>
         {score}
       </div>
@@ -940,7 +941,7 @@ function ResultPanel({ session, onRestart }: { session: Session; onRestart: () =
           ))}
         </div>
       )}
-    </div>
+    </ContextualSurface>
   );
 }
 

@@ -1078,6 +1078,13 @@ observable state named, restores the exact text hash, and finds **0** raw keys, 
 unexplained disabled controls. Four languages produce four hashes and restore English; the negative
 control moves all three defect counts **0→1→0**. Evidence: `cat8-l7-calendar.json`.
 
+**Progress 2026-08-28 (Games opening).** The live **942×593** Game Arena now exposes **5** sanctioned
+contextual regions: app header, 15-game navigation, game/difficulty header, material coverage, and
+seen coverage; post-round detail uses the same primitive when reached. Gameplay, answer inputs, HUD,
+and timing state remain on the stable work pane. A Standard→Liquid→Standard trip changes contextual
+alpha **0→0.72→0** while stage alpha stays **0.88**, selected game stays Sentence Builder, and XP stays
+0. Guard: `gameArenaLiquidRegions.test.ts` **2/2**. Games scoring is next.
+
 ### L8 — Discovery, operations, and configuration
 
 Order: Resources → Scraper → Settings → YouTube → Music.

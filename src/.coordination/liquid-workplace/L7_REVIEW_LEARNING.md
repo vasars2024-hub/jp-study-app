@@ -877,3 +877,20 @@ The negative control moves raw-key/placeholder/mute counts **0/0/0→1/1/1→0/0
 
 **Calendar is controlled 80/80.** Evidence: `cat8-l7-calendar.json`. L7 remains open: Games is
 next, while Anki remains explicitly parked at 0/80 on its external runtime gate.
+
+## 2026-08-28 14:32 EDT — Games opens on the selective Liquid seam (sixth L7 surface)
+
+Live before the change: **942×593**, **15** game choices, **17** controls, **128** rendered elements,
+and **0** contextual regions. The plan's split is now explicit: app header, game navigation,
+game/difficulty header, material coverage, seen coverage, and post-round detail use the shared
+`ContextualSurface`; gameplay, timer/HUD, answer input, and timing-sensitive review state stay on
+the existing stable pane. The shared component remains inert in Blanc and conventional windows.
+
+Live Standard→Liquid→Standard: **5** currently rendered contextual regions; header background alpha
+**0→0.72→0**, while gameplay stage stays **0.88** throughout. Selected game remains Sentence Builder,
+XP remains **0**, and the presentation action returns from “Return to standard window” to “Make
+Liquid”. Guard: `gameArenaLiquidRegions.test.ts` **2/2**.
+
+**Games is open, unscored 0/80.** Run the eight existing surface-parameterised harnesses next; no
+Games-only probe was added. Do not edit dirty `ArcadeGames.tsx` or `styles.css` without isolating
+foreign i18n/Aero hunks.
