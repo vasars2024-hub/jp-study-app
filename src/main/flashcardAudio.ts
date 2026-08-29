@@ -4,14 +4,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
+import type { FlashcardAudioFailure } from '../shared/flashcardAudioMessages';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
+
+/**
+ * The classification lives in `shared/` because the renderer picks the wording
+ * from it; main is the only side that can see what the synthesizer printed, so
+ * main is the side that assigns it. `error` stays the diagnostic detail and stops
+ * being the user-facing message.
+ */
+export type { FlashcardAudioFailure };
 
 export interface FlashcardAudioResult {
   ok: boolean;
   path?: string;
   dataUrl?: string;
   error?: string;
+  reason?: FlashcardAudioFailure;
 }
 
 function audioRoot(): string {
@@ -31,6 +41,14 @@ export function isManagedFlashcardAudioPath(filePath: string, root = audioRoot()
   return Boolean(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
+/** A spawn failure that carries which classification the caller should report. */
+class SynthesizerError extends Error {
+  constructor(message: string, readonly reason: FlashcardAudioFailure) {
+    super(message);
+    this.name = 'SynthesizerError';
+  }
+}
+
 function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv } = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -40,12 +58,34 @@ function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv
     });
     let stderr = '';
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
-    child.on('error', reject);
+    // The binary is absent, not broken. Distinguished here because it is the only
+    // failure a user fixes by installing something rather than by retrying.
+    child.on('error', (error: NodeJS.ErrnoException) => reject(
+      error.code === 'ENOENT'
+        ? new SynthesizerError(`${path.basename(command)} is not installed.`, 'no-synthesizer')
+        : error,
+    ));
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(stderr.trim() || `${path.basename(command)} exited with code ${code}`));
     });
   });
+}
+
+/**
+ * Classify what a failed synthesis run said. Every platform's "no voice for this
+ * language" wording is distinct and none of them is a machine-readable code, so
+ * this is a match on the three messages the three back ends actually produce —
+ * the PowerShell `throw` in `synthesizeWindows` below is one of them, and is ours.
+ */
+export function classifySynthesisFailure(message: string): FlashcardAudioFailure {
+  const text = message.toLowerCase();
+  if (text.includes('no offline voice is installed')) return 'no-voice';
+  if (text.includes('voice') && (text.includes('not found') || text.includes('not installed'))) {
+    return 'no-voice';
+  }
+  if (text.includes('is not installed') || text.includes('enoent')) return 'no-synthesizer';
+  return 'failed';
 }
 
 function fileHash(...parts: Array<string | number>): string {
@@ -139,7 +179,7 @@ export async function synthesizeFlashcardAudio(
   language = 'ja',
 ): Promise<FlashcardAudioResult> {
   const sentence = text.trim().slice(0, 2_000);
-  if (!sentence) return { ok: false, error: 'Card text is empty.' };
+  if (!sentence) return { ok: false, error: 'Card text is empty.', reason: 'empty-text' };
   const culture = cultureForLanguage(language);
   const extension = process.platform === 'darwin' ? 'aiff' : 'wav';
   const directory = path.join(audioRoot(), 'tts');
@@ -156,13 +196,21 @@ export async function synthesizeFlashcardAudio(
     return { ok: true, path: output };
   } catch (error) {
     try { fs.rmSync(output, { force: true }); } catch { /* best effort */ }
-    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    const message = error instanceof Error ? error.message : String(error);
+    const reason = error instanceof SynthesizerError
+      ? error.reason
+      : classifySynthesisFailure(message);
+    return { ok: false, error: message, reason };
   }
 }
 
 function readManagedAudio(filePath: string): FlashcardAudioResult {
   if (!isManagedFlashcardAudioPath(filePath) || !fs.existsSync(filePath)) {
-    return { ok: false, error: 'Audio file is outside the managed flashcard library.' };
+    return {
+      ok: false,
+      error: 'Audio file is outside the managed flashcard library.',
+      reason: 'not-managed',
+    };
   }
   const extension = path.extname(filePath).toLowerCase();
   const mime = extension === '.mp3'

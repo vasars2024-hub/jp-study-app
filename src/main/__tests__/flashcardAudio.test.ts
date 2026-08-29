@@ -13,11 +13,13 @@ vi.mock('electron', () => ({
 }));
 
 import {
+  classifySynthesisFailure,
   cultureForLanguage,
   extractFlashcardAudioClip,
   isManagedFlashcardAudioPath,
   synthesizeFlashcardAudio,
 } from '../flashcardAudio';
+import { flashcardAudioErrorKey } from '../../shared/flashcardAudioMessages';
 
 afterAll(() => {
   fs.rmSync(testRoot, { recursive: true, force: true });
@@ -54,5 +56,39 @@ describe('flashcard audio safety', () => {
     expect(generated.status, generated.stderr.toString()).toBe(0);
     const clip = await extractFlashcardAudioClip(source, 'fixture', 0.4, 1.2, 'テストです。');
     expect(fs.statSync(clip).size).toBeGreaterThan(1_000);
+  });
+});
+
+/**
+ * A failure a user cannot act on is barely better than a fabricated success. Each of
+ * these strings is what one of the three back ends really prints: the first is the
+ * `throw` inside `synthesizeWindows`, the second is macOS `say`, the third is the
+ * ENOENT text `run` builds when espeak is simply not installed.
+ */
+describe('a failed synthesis says which kind of failure it was', () => {
+  it('separates "no voice for this language" from "no synthesizer at all"', () => {
+    expect(classifySynthesisFailure('No offline voice is installed for ja-JP.')).toBe('no-voice');
+    expect(classifySynthesisFailure('Voice Kyoko not found')).toBe('no-voice');
+    expect(classifySynthesisFailure('espeak is not installed.')).toBe('no-synthesizer');
+    // Anything else keeps its detail and is reported as a generic failure rather
+    // than being guessed into one of the actionable buckets.
+    expect(classifySynthesisFailure('Access to the path is denied.')).toBe('failed');
+  });
+
+  it('empty text is refused before a process is spawned, and says so', async () => {
+    const result = await synthesizeFlashcardAudio('   ', 'ja');
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('empty-text');
+  });
+
+  it('every reason resolves to a translated key, and an unset one does not fall through', () => {
+    expect(flashcardAudioErrorKey('no-voice')).toBe('flash.audioError.noVoice');
+    expect(flashcardAudioErrorKey('no-synthesizer')).toBe('flash.audioError.noSynthesizer');
+    expect(flashcardAudioErrorKey('not-managed')).toBe('flash.audioError.notManaged');
+    expect(flashcardAudioErrorKey('empty-text')).toBe('flash.audioError.emptyText');
+    // The control: an absent or unknown reason must still be a KEY. Returning the
+    // raw detail here is exactly the bug — English text in a Russian UI.
+    expect(flashcardAudioErrorKey(undefined)).toBe('flash.audioGenerationFailed');
+    expect(flashcardAudioErrorKey('Access is denied')).toBe('flash.audioGenerationFailed');
   });
 });

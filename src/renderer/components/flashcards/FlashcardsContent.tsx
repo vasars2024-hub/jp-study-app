@@ -81,6 +81,7 @@ import {
   type FlashcardPromptKind,
   type FlashcardReviewMode,
 } from '../../../shared/flashcardReview';
+import { flashcardAudioErrorKey } from '../../../shared/flashcardAudioMessages';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -688,7 +689,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     try {
       const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
       if (!result.ok || !result.path) {
-        setAudioError(result.error || t('flash.audioGenerationFailed'));
+        // NOT `result.error`: that is the synthesizer's own English sentence, and it
+        // was reaching users reading the app in ja/zh/ru verbatim. The classification
+        // main assigns is what carries meaning across languages.
+        setAudioError(t(flashcardAudioErrorKey(result.reason)));
         return;
       }
       const nextDeck = updateDeckCard(card.id, { audioPath: result.path });
@@ -711,16 +715,24 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setAudioError('');
     const updates: Array<{ id: string; audioPath: string }> = [];
     let failures = 0;
+    let firstReason: unknown;
     try {
       // The OS synthesizer owns one voice device. Sequential generation avoids
       // competing speech engines while still keeping the renderer responsive.
       for (const card of candidates) {
         const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
         if (result.ok && result.path) updates.push({ id: card.id, audioPath: result.path });
-        else failures += 1;
+        else {
+          failures += 1;
+          if (firstReason === undefined) firstReason = result.reason;
+        }
       }
       if (updates.length) setDeck(updateDeckCardAudioBatch(updates));
-      if (failures) setAudioError(t('flash.audioBatchFailed', { count: failures }));
+      // A count alone told the user nothing they could act on. A missing voice fails
+      // every card in the batch for one reason, and that reason is the whole answer.
+      if (failures) {
+        setAudioError(`${t('flash.audioBatchFailed', { count: failures })} ${t(flashcardAudioErrorKey(firstReason))}`);
+      }
     } finally {
       setAudioBusy(false);
     }
