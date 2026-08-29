@@ -10,7 +10,7 @@
  * control this repo keeps finding.
  */
 
-export type PracticeMode = 'none' | 'match' | 'write' | 'learn';
+export type PracticeMode = 'none' | 'match' | 'write' | 'learn' | 'test';
 
 /** Everything except `none`, which is the launcher's own state. */
 export type PracticeModeId = Exclude<PracticeMode, 'none'>;
@@ -25,13 +25,15 @@ export interface PracticeModeEntry {
 
 /**
  * Order is pedagogical, not alphabetical: Learn introduces material and carries
- * it to mastery, Write and Match drill what is already half-known. A user
- * reading down the list gets the sequence.
+ * it to mastery, Write and Match drill what is already half-known, and Test
+ * measures the result — which is why it is last and not first. A user reading
+ * down the list gets the sequence.
  */
 export const PRACTICE_MODES: readonly PracticeModeEntry[] = [
   { id: 'learn', startKey: 'flash.learn.start', aboutKey: 'flash.learn.about' },
   { id: 'write', startKey: 'flash.write.start', aboutKey: 'flash.write.about' },
   { id: 'match', startKey: 'flash.match.start', aboutKey: 'flash.match.about' },
+  { id: 'test', startKey: 'flash.test.start', aboutKey: 'flash.test.about' },
 ];
 
 export function isPracticeMode(value: string): value is PracticeModeId {

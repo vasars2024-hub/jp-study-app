@@ -196,3 +196,52 @@
   font-size: var(--font-size-sm);
   color: var(--text-muted, var(--text));
 }
+
+/*
+ * The results sheet is dense read-back, not a Liquid surface: it stays on the
+ * stable anchor material so a long paper is legible rather than translucent.
+ */
+.flash-test-sheet {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flash-test-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: baseline;
+  padding: var(--space-xs);
+  border-left: 3px solid var(--border);
+  background: var(--surface);
+  font-size: var(--font-size-sm);
+}
+
+.flash-test-line.is-correct {
+  border-left-color: var(--success, #2e7d32);
+}
+
+.flash-test-line.is-close {
+  border-left-color: var(--warning, #b26a00);
+}
+
+.flash-test-line.is-wrong {
+  border-left-color: var(--danger, #b3261e);
+}
+
+.flash-test-line__no {
+  color: var(--text-muted, var(--text));
+  white-space: nowrap;
+}
+
+.flash-test-line__outcome {
+  font-weight: 600;
+}
+
+.flash-test-line__answer {
+  color: var(--text-muted, var(--text));
+}
