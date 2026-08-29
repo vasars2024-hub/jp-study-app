@@ -18,8 +18,8 @@
  */
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import {
-  MAX_DESIRED_RETENTION,
-  MIN_DESIRED_RETENTION,
+  MAX_LOCAL_RETENTION,
+  MIN_LOCAL_RETENTION,
   type SchedulingConfig,
 } from '../../../shared/flashcardScheduling';
 import type { LocalSrsAlgorithm } from '../../../shared/localSrs';
@@ -111,8 +111,8 @@ export default function SchedulingPreferencesPanel() {
           {t('flash.schedule.retention', { percent: Math.round(config.desiredRetention * 100) })}
           <input
             type="range"
-            min={Math.round(MIN_DESIRED_RETENTION * 100)}
-            max={Math.round(MAX_DESIRED_RETENTION * 100)}
+            min={Math.round(MIN_LOCAL_RETENTION * 100)}
+            max={Math.round(MAX_LOCAL_RETENTION * 100)}
             value={Math.round(config.desiredRetention * 100)}
             onChange={setRetention}
           />

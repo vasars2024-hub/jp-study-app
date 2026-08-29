@@ -17,8 +17,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_SCHEDULING_CONFIG,
-  MAX_DESIRED_RETENTION,
-  MIN_DESIRED_RETENTION,
+  MAX_LOCAL_RETENTION,
+  MIN_LOCAL_RETENTION,
   adaptStateForAlgorithm,
   migrateSrsState,
   normalizeSchedulingConfig,
@@ -114,9 +114,9 @@ describe('normalizeSchedulingConfig', () => {
 
   it('clamps retention and the interval ceiling instead of trusting them', () => {
     expect(normalizeSchedulingConfig({ desiredRetention: 0.999 }).desiredRetention)
-      .toBe(MAX_DESIRED_RETENTION);
+      .toBe(MAX_LOCAL_RETENTION);
     expect(normalizeSchedulingConfig({ desiredRetention: 0.1 }).desiredRetention)
-      .toBe(MIN_DESIRED_RETENTION);
+      .toBe(MIN_LOCAL_RETENTION);
     expect(normalizeSchedulingConfig({ desiredRetention: Number.NaN }).desiredRetention)
       .toBe(DEFAULT_SCHEDULING_CONFIG.desiredRetention);
     expect(normalizeSchedulingConfig({ maximumIntervalDays: 0 }).maximumIntervalDays)

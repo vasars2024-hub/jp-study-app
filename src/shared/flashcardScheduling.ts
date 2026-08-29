@@ -58,8 +58,8 @@ export const DEFAULT_SCHEDULING_CONFIG: SchedulingConfig = {
   maximumIntervalDays: MAX_INTERVAL_CEILING,
 };
 
-export const MIN_DESIRED_RETENTION = 0.7;
-export const MAX_DESIRED_RETENTION = 0.97;
+export const MIN_LOCAL_RETENTION = 0.7;
+export const MAX_LOCAL_RETENTION = 0.97;
 
 export function normalizeSchedulingConfig(
   value?: Partial<SchedulingConfig> | null,
@@ -69,7 +69,7 @@ export function normalizeSchedulingConfig(
   return {
     algorithm: value?.algorithm === 'fsrs' ? 'fsrs' : 'sm2',
     desiredRetention: Number.isFinite(retention)
-      ? Math.min(MAX_DESIRED_RETENTION, Math.max(MIN_DESIRED_RETENTION, retention))
+      ? Math.min(MAX_LOCAL_RETENTION, Math.max(MIN_LOCAL_RETENTION, retention))
       : DEFAULT_SCHEDULING_CONFIG.desiredRetention,
     maximumIntervalDays: Number.isFinite(maximum) && maximum >= 1
       ? Math.min(MAX_INTERVAL_CEILING, Math.floor(maximum))

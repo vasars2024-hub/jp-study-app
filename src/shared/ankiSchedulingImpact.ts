@@ -48,9 +48,14 @@ import { todayDueDay } from './ankiStaleCards';
  * learns a per-user decay, it lives in `col.conf`, and the draft reads neither
  * `col.conf` nor `cards.data`. A result therefore states `decay` so a surface
  * can say which curve produced the number instead of implying it is the user's.
+ *
+ * The two constants now live in `fsrs.ts`, the local scheduler's memory model,
+ * and are re-exported here so this module's existing importers keep working.
+ * One definition: an estimator and a scheduler disagreeing about the shape of
+ * the forgetting curve would be a defect nobody would ever look for.
  */
-export const FSRS_DECAY = -0.5;
-export const FSRS_FACTOR = 19 / 81;
+export { FSRS_DECAY, FSRS_FACTOR } from './fsrs';
+import { FSRS_DECAY, FSRS_FACTOR } from './fsrs';
 
 /** Anki refuses desired retention outside this band, and so does this module. */
 export const MIN_DESIRED_RETENTION = 0.7;
