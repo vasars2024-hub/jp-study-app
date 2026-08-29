@@ -13,6 +13,7 @@ vi.mock('electron', () => ({
 }));
 
 import {
+  cancelFlashcardSynthesis,
   classifySynthesisFailure,
   cultureForLanguage,
   extractFlashcardAudioClip,
@@ -80,6 +81,24 @@ describe('flashcard audio safety', () => {
     expect(result.voiceResolution).toBe('language');
     const japanese = (await listFlashcardVoices()).voices.filter((voice) => voice.language === 'ja');
     expect(japanese.map((voice) => voice.name)).toContain(result.voice);
+  }, 20_000);
+
+  it.runIf(process.platform === 'win32')('cancels an in-flight offline synthesis process', async () => {
+    const requestId = `cancel-${Date.now()}`;
+    const pending = synthesizeFlashcardAudio(
+      `これはキャンセルできる長い音声です。${'まだ続きます。'.repeat(180)}`,
+      'ja',
+      undefined,
+      requestId,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(cancelFlashcardSynthesis(requestId)).toBe(true);
+
+    const result = await pending;
+    expect(result).toMatchObject({ ok: false, reason: 'cancelled' });
+    // The reverse transition is complete: a settled id no longer cancels
+    // anything, so it cannot kill a later request that reuses the string.
+    expect(cancelFlashcardSynthesis(requestId)).toBe(false);
   }, 20_000);
 
   it('extracts a bounded sentence clip with bundled ffmpeg', async () => {
@@ -159,6 +178,7 @@ describe('a failed synthesis says which kind of failure it was', () => {
     expect(flashcardAudioErrorKey('no-voice')).toBe('flash.audioError.noVoice');
     expect(flashcardAudioErrorKey('no-synthesizer')).toBe('flash.audioError.noSynthesizer');
     expect(flashcardAudioErrorKey('not-managed')).toBe('flash.audioError.notManaged');
+    expect(flashcardAudioErrorKey('cancelled')).toBe('flash.audioError.cancelled');
     expect(flashcardAudioErrorKey('empty-text')).toBe('flash.audioError.emptyText');
     // The control: an absent or unknown reason must still be a KEY. Returning the
     // raw detail here is exactly the bug — English text in a Russian UI.

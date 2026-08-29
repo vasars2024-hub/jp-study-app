@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { FlashcardAudioFailure } from '../shared/flashcardAudioMessages';
 import {
@@ -295,23 +296,56 @@ class SynthesizerError extends Error {
   }
 }
 
-function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv } = {}): Promise<void> {
+const activeSynthesisRequests = new Set<string>();
+const cancelledSynthesisRequests = new Set<string>();
+const synthesisChildren = new Map<string, ChildProcessWithoutNullStreams>();
+
+function finishSynthesisRequest(requestId?: string): void {
+  if (!requestId) return;
+  activeSynthesisRequests.delete(requestId);
+  cancelledSynthesisRequests.delete(requestId);
+  synthesisChildren.delete(requestId);
+}
+
+export function cancelFlashcardSynthesis(requestId: string): boolean {
+  if (!requestId || !activeSynthesisRequests.has(requestId)) return false;
+  cancelledSynthesisRequests.add(requestId);
+  synthesisChildren.get(requestId)?.kill();
+  return true;
+}
+
+function run(
+  command: string,
+  args: string[],
+  options: { env?: NodeJS.ProcessEnv; requestId?: string } = {},
+): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (options.requestId && cancelledSynthesisRequests.has(options.requestId)) {
+      reject(new SynthesizerError('Offline audio generation was cancelled.', 'cancelled'));
+      return;
+    }
     const child = spawn(command, args, {
       shell: false,
       windowsHide: true,
       env: options.env ?? process.env,
     });
+    if (options.requestId) synthesisChildren.set(options.requestId, child);
     let stderr = '';
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
     // The binary is absent, not broken. Distinguished here because it is the only
     // failure a user fixes by installing something rather than by retrying.
-    child.on('error', (error: NodeJS.ErrnoException) => reject(
-      error.code === 'ENOENT'
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      if (options.requestId) synthesisChildren.delete(options.requestId);
+      reject(error.code === 'ENOENT'
         ? new SynthesizerError(`${path.basename(command)} is not installed.`, 'no-synthesizer')
-        : error,
-    ));
+        : error);
+    });
     child.on('close', (code) => {
+      if (options.requestId) synthesisChildren.delete(options.requestId);
+      if (options.requestId && cancelledSynthesisRequests.has(options.requestId)) {
+        reject(new SynthesizerError('Offline audio generation was cancelled.', 'cancelled'));
+        return;
+      }
       if (code === 0) resolve();
       else reject(new Error(stderr.trim() || `${path.basename(command)} exited with code ${code}`));
     });
@@ -504,6 +538,7 @@ async function synthesizeWindows(
   culture: string,
   output: string,
   voiceName: string,
+  requestId?: string,
 ): Promise<void> {
   const script = [
     'Add-Type -AssemblyName System.Speech',
@@ -531,6 +566,7 @@ async function synthesizeWindows(
       JP_FLASHCARD_TTS_OUTPUT: output,
       JP_FLASHCARD_TTS_VOICE: voiceName,
     },
+    requestId,
   });
 }
 
@@ -539,6 +575,7 @@ async function synthesizeMac(
   culture: string,
   output: string,
   voiceName: string,
+  requestId?: string,
 ): Promise<void> {
   // The table is the fallback for a machine whose voice list could not be read;
   // a resolved choice always wins over it.
@@ -548,7 +585,7 @@ async function synthesizeMac(
     'ru-RU': 'Milena',
     'en-US': 'Samantha',
   };
-  await run('say', ['-v', voiceName || preferred[culture] || 'Samantha', '-r', '175', '-o', output, text]);
+  await run('say', ['-v', voiceName || preferred[culture] || 'Samantha', '-r', '175', '-o', output, text], { requestId });
 }
 
 async function synthesizeLinux(
@@ -556,12 +593,16 @@ async function synthesizeLinux(
   culture: string,
   output: string,
   voiceName: string,
+  requestId?: string,
 ): Promise<void> {
   const voice = voiceName || culture.split('-', 1)[0].toLowerCase();
   try {
-    await run('espeak-ng', ['-v', voice, '-s', '165', '-w', output, text]);
+    await run('espeak-ng', ['-v', voice, '-s', '165', '-w', output, text], { requestId });
   } catch {
-    await run('espeak', ['-v', voice, '-s', '165', '-w', output, text]);
+    if (requestId && cancelledSynthesisRequests.has(requestId)) {
+      throw new SynthesizerError('Offline audio generation was cancelled.', 'cancelled');
+    }
+    await run('espeak', ['-v', voice, '-s', '165', '-w', output, text], { requestId });
   }
 }
 
@@ -570,6 +611,7 @@ export async function synthesizeFlashcardAudio(
   text: string,
   language = 'ja',
   preferredVoiceId?: string,
+  requestId?: string,
 ): Promise<FlashcardAudioResult> {
   const sentence = text.trim().slice(0, 2_000);
   if (!sentence) return { ok: false, error: 'Card text is empty.', reason: 'empty-text' };
@@ -579,12 +621,14 @@ export async function synthesizeFlashcardAudio(
   // reportable state rather than a synthesizer error the user has to interpret.
   // An inventory that could not be read is not treated as an empty one: the run
   // proceeds and the back end's own selection decides, as it always did.
+  if (requestId) activeSynthesisRequests.add(requestId);
   const inventory = await listFlashcardVoices();
   let chosen: FlashcardVoice | null = null;
   let resolution: VoiceResolution = 'preferred';
   if (inventory.ok && inventory.voices.length) {
     const resolved = resolveVoice(inventory.voices, culture, preferredVoiceId);
     if (resolved.resolution === 'none') {
+      finishSynthesisRequest(requestId);
       return {
         ok: false,
         error: `No offline voice is installed for ${culture}.`,
@@ -602,13 +646,17 @@ export async function synthesizeFlashcardAudio(
   // different files, and sharing a path would hand back the wrong one forever.
   const output = path.join(directory, `${fileHash(culture, chosen?.id ?? '', sentence)}.${extension}`);
   if (fs.existsSync(output) && fs.statSync(output).size > 0) {
+    finishSynthesisRequest(requestId);
     return { ok: true, path: output, voice: chosen?.name, voiceResolution: resolution };
   }
   try {
     const voiceId = chosen?.id ?? '';
-    if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output, voiceId);
-    else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output, voiceId);
-    else await synthesizeLinux(sentence, culture, output, voiceId);
+    if (requestId && cancelledSynthesisRequests.has(requestId)) {
+      throw new SynthesizerError('Offline audio generation was cancelled.', 'cancelled');
+    }
+    if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output, voiceId, requestId);
+    else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output, voiceId, requestId);
+    else await synthesizeLinux(sentence, culture, output, voiceId, requestId);
     if (!fs.existsSync(output) || fs.statSync(output).size === 0) {
       throw new Error('The offline voice produced no audio.');
     }
@@ -620,6 +668,8 @@ export async function synthesizeFlashcardAudio(
       ? error.reason
       : classifySynthesisFailure(message);
     return { ok: false, error: message, reason };
+  } finally {
+    finishSynthesisRequest(requestId);
   }
 }
 
@@ -641,12 +691,16 @@ function readManagedAudio(filePath: string): FlashcardAudioResult {
 }
 
 export function registerFlashcardAudioIpc(): void {
-  ipcMain.handle('flashcards:synthesizeAudio', (_event, text?: string, language?: string, voice?: string) => (
+  ipcMain.handle('flashcards:synthesizeAudio', (_event, text?: string, language?: string, voice?: string, requestId?: string) => (
     synthesizeFlashcardAudio(
       typeof text === 'string' ? text : '',
       typeof language === 'string' ? language : 'ja',
       typeof voice === 'string' ? voice : undefined,
+      typeof requestId === 'string' ? requestId : undefined,
     )
+  ));
+  ipcMain.handle('flashcards:cancelSynthesis', (_event, requestId?: unknown) => (
+    cancelFlashcardSynthesis(typeof requestId === 'string' ? requestId : '')
   ));
   ipcMain.handle('flashcards:listVoices', (_event, refresh?: unknown) => (
     listFlashcardVoices(refresh === true)
@@ -690,4 +744,3 @@ export function registerFlashcardAudioIpc(): void {
     )
   ));
 }
-

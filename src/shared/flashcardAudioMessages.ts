@@ -16,6 +16,8 @@ export type FlashcardAudioFailure =
   | 'no-synthesizer'
   /** The path is not inside the managed flashcard-audio directory, or is gone. */
   | 'not-managed'
+  /** The user stopped a synthesis request before it completed. */
+  | 'cancelled'
   /** It ran and failed for some other reason; the raw detail is kept for diagnostics. */
   | 'failed';
 
@@ -24,6 +26,7 @@ const KEYS: Record<FlashcardAudioFailure, string> = {
   'no-voice': 'flash.audioError.noVoice',
   'no-synthesizer': 'flash.audioError.noSynthesizer',
   'not-managed': 'flash.audioError.notManaged',
+  cancelled: 'flash.audioError.cancelled',
   failed: 'flash.audioGenerationFailed',
 };
 

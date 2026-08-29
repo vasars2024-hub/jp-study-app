@@ -1732,7 +1732,9 @@ declare global {
         text: string,
         language?: string,
         voice?: string,
+        requestId?: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
+      flashcardCancelSynthesis(requestId: string): Promise<boolean>;
       flashcardListVoices(
         refresh?: boolean,
       ): Promise<import('../shared/flashcardVoices').FlashcardVoiceInventory>;

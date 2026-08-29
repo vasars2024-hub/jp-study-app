@@ -233,6 +233,7 @@ export interface FlashcardsState {
   reviewMode: FlashcardReviewMode;
   setReviewMode: (v: FlashcardReviewMode) => void;
   audioBusy: boolean;
+  audioCancelling: boolean;
   audioError: string;
   audioCandidateCount: number;
   bookFolderMenu: string | null;
@@ -281,6 +282,7 @@ export interface FlashcardsState {
   playCurrentAudio: () => Promise<void>;
   addAudioToCurrent: () => Promise<void>;
   addAudioToReviewPool: () => Promise<void>;
+  cancelAudioBatch: () => void;
   openEpubMining: (ui: EpubMiningUi) => void;
   startReviewForGroup: (group: BookGroup) => void;
   saveGroupCsv: (group: BookGroup) => Promise<void>;
@@ -336,7 +338,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [reviewDueOnly, setReviewDueOnly] = useState(true);
   const [reviewMode, setReviewMode] = useState<FlashcardReviewMode>('mixed');
   const [audioBusy, setAudioBusy] = useState(false);
+  const [audioCancelling, setAudioCancelling] = useState(false);
   const [audioError, setAudioError] = useState('');
+  const audioBatchRef = useRef<{ id: string; cancelled: boolean } | null>(null);
   const [bookFolderMenu] = useState<string | null>(null);
   const [deckMenuGroup, setDeckMenuGroup] = useState<BookGroup | null>(null);
   const [epubMiningUi, setEpubMiningUi] = useState<EpubMiningUi>('simple');
@@ -747,7 +751,10 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const candidates = epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath);
     if (!candidates.length) return;
     setAudioBusy(true);
+    setAudioCancelling(false);
     setAudioError('');
+    const batch = { id: crypto.randomUUID(), cancelled: false };
+    audioBatchRef.current = batch;
     const updates: Array<{ id: string; audioPath: string }> = [];
     let failures = 0;
     let firstReason: unknown;
@@ -756,7 +763,14 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       // competing speech engines while still keeping the renderer responsive.
       const voice = preferredVoiceFor('ja');
       for (const card of candidates) {
-        const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja', voice);
+        if (batch.cancelled) break;
+        const result = await window.api.flashcardSynthesizeAudio(
+          card.sentence || card.word,
+          'ja',
+          voice,
+          batch.id,
+        );
+        if (batch.cancelled || result.reason === 'cancelled') break;
         if (result.ok && result.path) updates.push({ id: card.id, audioPath: result.path });
         else {
           failures += 1;
@@ -764,14 +778,27 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         }
       }
       if (updates.length) setDeck(updateDeckCardAudioBatch(updates));
+      if (batch.cancelled) {
+        setAudioError(t('flash.audioBatchCancelled', { count: updates.length }));
+      }
       // A count alone told the user nothing they could act on. A missing voice fails
       // every card in the batch for one reason, and that reason is the whole answer.
       if (failures) {
         setAudioError(`${t('flash.audioBatchFailed', { count: failures })} ${t(flashcardAudioErrorKey(firstReason))}`);
       }
     } finally {
+      if (audioBatchRef.current === batch) audioBatchRef.current = null;
+      setAudioCancelling(false);
       setAudioBusy(false);
     }
+  }
+
+  function cancelAudioBatch(): void {
+    const batch = audioBatchRef.current;
+    if (!batch || batch.cancelled) return;
+    batch.cancelled = true;
+    setAudioCancelling(true);
+    void window.api.flashcardCancelSynthesis(batch.id);
   }
 
   function openEpubMining(ui: EpubMiningUi): void {
@@ -1016,6 +1043,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     reviewMode,
     setReviewMode,
     audioBusy,
+    audioCancelling,
     audioError,
     audioCandidateCount,
     bookFolderMenu,
@@ -1062,6 +1090,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     playCurrentAudio,
     addAudioToCurrent,
     addAudioToReviewPool,
+    cancelAudioBatch,
     openEpubMining,
     startReviewForGroup,
     saveGroupCsv,
@@ -1877,6 +1906,16 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   ? t('flash.addingAudio')
                   : t('flash.addAudioToDeck', { count: state.audioCandidateCount })}
               </button>
+              {state.audioBusy && (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={state.audioCancelling}
+                  onClick={state.cancelAudioBatch}
+                >
+                  {state.audioCancelling ? t('flash.audioCancelling') : t('common.cancel')}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn primary"
