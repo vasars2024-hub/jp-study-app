@@ -1,7 +1,7 @@
 // Local-deck spaced repetition. An Anki-exported copy remains scheduled by
 // Anki itself; this contract controls only the card in `jp-flashcard-deck`.
 
-export type LocalSrsRating = 'again' | 'good';
+export type LocalSrsRating = 'again' | 'hard' | 'good' | 'easy';
 
 export interface LocalSrsState {
   version: 1;
@@ -31,7 +31,7 @@ export function isLocalSrsState(value: unknown): value is LocalSrsState {
     typeof state.repetitions === 'number' && Number.isInteger(state.repetitions) && state.repetitions >= 0 &&
     typeof state.lapses === 'number' && Number.isInteger(state.lapses) && state.lapses >= 0 &&
     typeof state.lastReviewedAt === 'number' && Number.isFinite(state.lastReviewedAt) && state.lastReviewedAt >= 0 &&
-    (state.lastRating === 'again' || state.lastRating === 'good')
+    ['again', 'hard', 'good', 'easy'].includes(state.lastRating ?? '')
   );
 }
 
@@ -48,9 +48,9 @@ export function filterLocalReviewsDue<T extends { srs?: unknown }>(
 }
 
 /**
- * A deliberately small SM-2-style schedule matching the review surface's two
- * existing judgements. Again starts a ten-minute relearning step and lowers
- * ease; Good graduates through 1 day, 3 days, then the current ease factor.
+ * An SM-2-style four-button schedule. Again starts a ten-minute relearning
+ * step; Hard grows slowly and lowers ease; Good graduates through 1 and 3 days;
+ * Easy starts at four days and raises ease.
  */
 export function scheduleLocalReview(
   previous: unknown,
@@ -69,6 +69,45 @@ export function scheduleLocalReview(
       ease,
       repetitions: 0,
       lapses: (prior?.lapses ?? 0) + 1,
+      lastReviewedAt: now,
+      lastRating: rating,
+    };
+  }
+
+  if (rating === 'hard') {
+    const repetitions = (prior?.repetitions ?? 0) + 1;
+    const intervalDays = prior?.repetitions
+      ? Math.max(1, Math.min(MAX_INTERVAL_DAYS, Math.round((prior.intervalDays || 1) * 1.2)))
+      : 0.5;
+    const ease = Math.max(LOCAL_SRS_MIN_EASE, (prior?.ease ?? LOCAL_SRS_DEFAULT_EASE) - 0.15);
+    return {
+      version: 1,
+      dueAt: now + intervalDays * DAY_MS,
+      intervalDays,
+      ease,
+      repetitions,
+      lapses: prior?.lapses ?? 0,
+      lastReviewedAt: now,
+      lastRating: rating,
+    };
+  }
+
+  if (rating === 'easy') {
+    const repetitions = (prior?.repetitions ?? 0) + 1;
+    const ease = (prior?.ease ?? LOCAL_SRS_DEFAULT_EASE) + 0.15;
+    const intervalDays = repetitions === 1
+      ? 4
+      : Math.min(
+          MAX_INTERVAL_DAYS,
+          Math.max(4, Math.round((prior?.intervalDays || 1) * ease * 1.3)),
+        );
+    return {
+      version: 1,
+      dueAt: now + intervalDays * DAY_MS,
+      intervalDays,
+      ease,
+      repetitions,
+      lapses: prior?.lapses ?? 0,
       lastReviewedAt: now,
       lastRating: rating,
     };

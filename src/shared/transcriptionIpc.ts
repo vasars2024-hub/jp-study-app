@@ -76,6 +76,31 @@ export interface TranscriptionRequest {
   sourceSubtitleId?: string;
 }
 
+/** Word/window-aligned cue returned by the local Whisper worker. */
+export interface TranscriptionCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** Local-deck card emitted when a Japanese transcript finishes. */
+export interface TranscriptionCardDraft {
+  mediaId: string;
+  title: string;
+  sentence: string;
+  translation: string;
+  startSec: number;
+  endSec: number;
+  audioPath?: string;
+}
+
+export interface TranscriptionCardsReady {
+  mediaId: string;
+  title: string;
+  batchId: string;
+  cards: TranscriptionCardDraft[];
+}
+
 export interface TranscriptionResult {
   ok: boolean;
   mediaId?: string;
@@ -92,6 +117,13 @@ export interface TranscriptionResult {
   offsetConfident?: boolean;
   /** Cues left untranscribed, by reason — songs, signs, and empties. */
   excludedCues?: Record<string, number>;
+}
+
+export interface TranscriptionChunkResult {
+  ok: boolean;
+  text?: string;
+  cues?: TranscriptionCue[];
+  error?: string;
 }
 
 /** A job is abandoned after this many failed attempts. */

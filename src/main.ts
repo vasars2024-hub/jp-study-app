@@ -106,6 +106,7 @@ import {
   registerOsHotkeyHelperIpc,
 } from './main/osHotkeyHelper';
 import { registerLiveCaptionsIpc } from './main/liveCaptions';
+import { registerFlashcardAudioIpc } from './main/flashcardAudio';
 import { logDiagnostic, errorDetail } from './main/errorLog';
 
 if (started) {
@@ -1593,6 +1594,7 @@ app.whenReady().then(async () => {
   registerAppLifecycleIpc();
   registerToolboxIpc();
   registerMediaIpc();
+  registerFlashcardAudioIpc();
   registerYtPlaylistsIpc();
   registerProfileIpc();
   registerAnkiIpc();

@@ -25,6 +25,9 @@ import {
   MAX_TRANSCRIPTION_ATTEMPTS,
   estimateEtaMs,
   type TranscriptionJob,
+  type TranscriptionCue,
+  type TranscriptionChunkResult,
+  type TranscriptionCardsReady,
   type TranscriptionPhase,
   type TranscriptionProgress,
   type TranscriptionRequest,
@@ -58,6 +61,8 @@ import { extractAudioPcm } from './media';
 import { estimateSubtitleOffset } from './subtitleSync';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import { arbitrateFusionDecisions } from './subtitleFusionArbiter';
+import { segmentTranscriptSentences } from '../shared/transcriptionSentenceCards';
+import { extractFlashcardAudioClip } from './flashcardAudio';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -133,10 +138,13 @@ function loadQueue(): TranscriptionJob[] {
 // Renderer RPC
 // ---------------------------------------------------------------------------
 
-const pendingReplies = new Map<string, { resolve: (r: { ok: boolean; text?: string; error?: string }) => void; timer: NodeJS.Timeout }>();
+const pendingReplies = new Map<string, {
+  resolve: (result: TranscriptionChunkResult) => void;
+  timer: NodeJS.Timeout;
+}>();
 
 /** Called by the renderer when a chunk comes back. */
-export function resolveTranscriptionChunk(id: string, payload: { ok: boolean; text?: string; error?: string }): void {
+export function resolveTranscriptionChunk(id: string, payload: TranscriptionChunkResult): void {
   const pending = pendingReplies.get(id);
   if (!pending) return;
   clearTimeout(pending.timer);
@@ -144,7 +152,7 @@ export function resolveTranscriptionChunk(id: string, payload: { ok: boolean; te
   pending.resolve(payload);
 }
 
-function requestChunk(pcm: Float32Array, lang: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+function requestChunk(pcm: Float32Array, lang: string): Promise<TranscriptionChunkResult> {
   const windows = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   if (!windows.length) {
     return Promise.resolve({ ok: false, error: 'no-window' });
@@ -184,6 +192,30 @@ function broadcast(progress: TranscriptionProgress): void {
   }
 }
 
+function broadcastCardsReady(payload: TranscriptionCardsReady): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('transcription:cards-ready', payload);
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  run: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < values.length) {
+      const index = next;
+      next += 1;
+      results[index] = await run(values[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, worker));
+  return results;
+}
+
 // ---------------------------------------------------------------------------
 // SRT assembly
 // ---------------------------------------------------------------------------
@@ -217,6 +249,17 @@ export function chunksToSrt(chunks: readonly string[], chunkSeconds = CHUNK_SECO
     index += 1;
   });
   return cues.join('\n');
+}
+
+/** Preserve Whisper's returned timestamps instead of collapsing them to 30 s. */
+export function timestampedCuesToSrt(cues: readonly TranscriptionCue[]): string {
+  return cues
+    .filter((cue) => cue.text.trim() && Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end > cue.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .map((cue, index) => (
+      `${index + 1}\n${timestamp(cue.start)} --> ${timestamp(cue.end)}\n${cue.text.trim()}\n`
+    ))
+    .join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +299,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
     total = Math.max(1, Math.ceil(samples.length / perChunk));
 
     const texts: string[] = [];
+    const timedCues: TranscriptionCue[] = [];
     for (let i = 0; i < total; i += 1) {
       if (cancelled.has(job.mediaId)) {
         emit('cancelled', i);
@@ -277,10 +321,18 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         continue;
       }
       texts.push(reply.text ?? '');
+      for (const cue of reply.cues ?? []) {
+        if (!cue.text.trim() || cue.end <= cue.start) continue;
+        timedCues.push({
+          start: cue.start + i * CHUNK_SECONDS,
+          end: cue.end + i * CHUNK_SECONDS,
+          text: cue.text.trim(),
+        });
+      }
     }
 
     emit('aligning', total);
-    const srt = chunksToSrt(texts);
+    const srt = timedCues.length ? timestampedCuesToSrt(timedCues) : chunksToSrt(texts);
     if (!srt.trim()) {
       emit('error', total, { error: 'empty' });
       return { ok: false, error: 'empty-transcript' };
@@ -313,8 +365,75 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       subtitlesCheckedAt: Date.now(),
     });
 
+    // Japanese transcription is also a sentence-mining action. The renderer
+    // owns the local deck, so main prepares exact managed clips and broadcasts
+    // a reversible batch instead of writing renderer storage from another
+    // process.
+    if (/^ja\b/i.test(job.lang)) {
+      emit('aligning', total);
+      const sourceCues = timedCues.length
+        ? timedCues
+        : texts.map((text, index) => ({
+            start: index * CHUNK_SECONDS,
+            end: (index + 1) * CHUNK_SECONDS,
+            text,
+          }));
+      const segments = segmentTranscriptSentences(sourceCues).slice(0, 250);
+      const translations = await translateWindowReferences(
+        segments.map((segment) => segment.text),
+        'ja',
+        'en',
+        () => cancelled.has(job.mediaId),
+      );
+      if (cancelled.has(job.mediaId)) {
+        emit('cancelled', total);
+        return { ok: false, error: 'cancelled' };
+      }
+      const cards = await mapWithConcurrency(segments, 2, async (segment, index) => {
+        let audioPath: string | undefined;
+        try {
+          if (cancelled.has(job.mediaId)) throw new Error('cancelled');
+          audioPath = await extractFlashcardAudioClip(
+            item.path,
+            job.mediaId,
+            segment.start,
+            segment.end,
+            segment.text,
+          );
+        } catch {
+          // A malformed cue or one unreadable audio range must not discard the
+          // sentence or fail an otherwise complete transcript.
+        }
+        return {
+          mediaId: job.mediaId,
+          title: job.title,
+          sentence: segment.text,
+          translation: translations[index] ?? '',
+          startSec: segment.start,
+          endSec: segment.end,
+          ...(audioPath ? { audioPath } : {}),
+        };
+      });
+      if (cancelled.has(job.mediaId)) {
+        emit('cancelled', total);
+        return { ok: false, error: 'cancelled' };
+      }
+      if (cards.length && !cancelled.has(job.mediaId)) {
+        broadcastCardsReady({
+          mediaId: job.mediaId,
+          title: job.title,
+          batchId: `transcription:${job.mediaId}:ja`,
+          cards,
+        });
+      }
+    }
+
     emit('done', total);
-    return { ok: true, mediaId: job.mediaId, lines: texts.filter((t) => t.trim()).length };
+    return {
+      ok: true,
+      mediaId: job.mediaId,
+      lines: timedCues.length || texts.filter((t) => t.trim()).length,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === 'no-window') throw error; // requeue, do not count as a failure
@@ -883,7 +1002,7 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
       typeof mediaId === 'string' ? mediaId : '',
       typeof subtitleId === 'string' ? subtitleId : '',
     ));
-  ipcMain.on('transcription:chunk-reply', (_e, payload: { id: string; ok: boolean; text?: string; error?: string }) => {
+  ipcMain.on('transcription:chunk-reply', (_e, payload: TranscriptionChunkResult & { id: string }) => {
     if (payload && typeof payload.id === 'string') resolveTranscriptionChunk(payload.id, payload);
   });
 
@@ -895,6 +1014,7 @@ export function registerTranscriptionIpc(transcriptionHost: TranscriptionHost): 
 
 export const __transcriptionTestables = {
   chunksToSrt,
+  timestampedCuesToSrt,
   timestamp,
   pickEnglishTrack,
   planNoWindowRetry,

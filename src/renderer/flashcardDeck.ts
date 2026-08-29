@@ -245,6 +245,7 @@ export function updateDeckCard(
       | 'back'
       | 'imagePath'
       | 'audioPath'
+      | 'audioDataUrl'
       | 'studyKind'
       | 'frequency'
       | 'jlptLevel'
@@ -261,6 +262,21 @@ export function updateDeckCard(
 ): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.map((c) => (c.id === id ? { ...c, ...patch } : c));
+  writeStore(store);
+  return store.cards;
+}
+
+/** Attach generated/captured audio to many cards with one persisted deck write. */
+export function updateDeckCardAudioBatch(
+  updates: ReadonlyArray<{ id: string; audioPath?: string; audioDataUrl?: string }>,
+): DeckFlashcard[] {
+  if (!updates.length) return loadDeck();
+  const byId = new Map(updates.map((update) => [update.id, update]));
+  const store = readStore();
+  store.cards = store.cards.map((card) => {
+    const update = byId.get(card.id);
+    return update ? { ...card, ...update } : card;
+  });
   writeStore(store);
   return store.cards;
 }
@@ -291,7 +307,7 @@ export function reviewDeckCard(
     reviewed = true;
     return {
       ...card,
-      known: rating === 'good' || undefined,
+      known: rating !== 'again' || undefined,
       srs: scheduleLocalReview(card.srs, rating, reviewedAt),
     };
   });

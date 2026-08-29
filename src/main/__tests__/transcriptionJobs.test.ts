@@ -27,7 +27,13 @@ vi.mock('electron', () => ({
 const pcm = vi.hoisted(() => ({ bytes: 0 }));
 vi.mock('../media', () => ({ extractAudioPcm: async () => new ArrayBuffer(pcm.bytes) }));
 
-const { chunksToSrt, timestamp, pickEnglishTrack, planNoWindowRetry } = __transcriptionTestables;
+const {
+  chunksToSrt,
+  timestampedCuesToSrt,
+  timestamp,
+  pickEnglishTrack,
+  planNoWindowRetry,
+} = __transcriptionTestables;
 
 describe('timestamp', () => {
   it('formats SRT timestamps with a comma before the milliseconds', () => {
@@ -43,6 +49,15 @@ describe('timestamp', () => {
 });
 
 describe('chunksToSrt', () => {
+  it('preserves the local Whisper timestamps when they are available', () => {
+    const srt = timestampedCuesToSrt([
+      { start: 1.25, end: 2.8, text: '一つ目。' },
+      { start: 3.1, end: 4.05, text: '二つ目。' },
+    ]);
+    expect(srt).toContain('00:00:01,250 --> 00:00:02,800\n一つ目。');
+    expect(srt).toContain('00:00:03,100 --> 00:00:04,050\n二つ目。');
+  });
+
   it('numbers cues from one and spans each chunk window', () => {
     const srt = chunksToSrt(['first', 'second'], 30);
     expect(srt).toContain('1\n00:00:00,000 --> 00:00:30,000\nfirst');

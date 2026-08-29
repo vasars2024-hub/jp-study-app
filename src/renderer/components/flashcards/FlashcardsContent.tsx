@@ -61,6 +61,8 @@ import {
   searchDeckCards,
   setBookGroupFolder,
   setDeckCardFolder,
+  updateDeckCard,
+  updateDeckCardAudioBatch,
   reviewDeckCard,
   setDeckFolders,
   type DeckFlashcard,
@@ -72,7 +74,13 @@ import {
   LOCAL_SRS_RELEARN_MINUTES,
   scheduleLocalReview,
   type LocalSrsState,
+  type LocalSrsRating,
 } from '../../../shared/localSrs';
+import {
+  planFlashcardReview,
+  type FlashcardPromptKind,
+  type FlashcardReviewMode,
+} from '../../../shared/flashcardReview';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -107,6 +115,13 @@ export interface ReviewCard {
   word: string;
   reading: string;
   meaning: string;
+  sentence?: string;
+  front?: string;
+  back?: string;
+  audioDataUrl?: string;
+  audioPath?: string;
+  reviewGroup?: string;
+  promptKind: FlashcardPromptKind;
   srs?: LocalSrsState;
 }
 
@@ -185,6 +200,11 @@ export interface FlashcardsState {
   setReviewBookKey: (v: string) => void;
   reviewDueOnly: boolean;
   setReviewDueOnly: (v: boolean) => void;
+  reviewMode: FlashcardReviewMode;
+  setReviewMode: (v: FlashcardReviewMode) => void;
+  audioBusy: boolean;
+  audioError: string;
+  audioCandidateCount: number;
   bookFolderMenu: string | null;
   deckMenuGroup: BookGroup | null;
   setDeckMenuGroup: (g: BookGroup | null) => void;
@@ -193,7 +213,7 @@ export interface FlashcardsState {
   initialMiningBookId: string;
   initialJitenDeckId: number | null;
   deckLevels: Record<string, BookLevelEstimate>;
-  stripRef: React.RefObject<HTMLDivElement>;
+  stripRef: React.RefObject<HTMLDivElement | null>;
   // derived
   epubCards: DeckFlashcard[];
   recentStrip: DeckFlashcard[];
@@ -202,6 +222,7 @@ export interface FlashcardsState {
   epubReviewBooks: BookGroup[];
   epubDueCards: DeckFlashcard[];
   epubReviewCandidates: DeckFlashcard[];
+  epubReviewSessionCandidates: DeckFlashcard[];
   filteredSaved: SavedWord[];
   unknownReviewCards: ReviewCard[];
   knownReviewCards: ReviewCard[];
@@ -224,7 +245,12 @@ export interface FlashcardsState {
   shuffleReview: () => void;
   flip: () => void;
   gotIt: () => void;
+  hard: () => void;
+  easy: () => void;
   again: () => void;
+  playCurrentAudio: () => Promise<void>;
+  addAudioToCurrent: () => Promise<void>;
+  addAudioToReviewPool: () => Promise<void>;
   openEpubMining: (ui: EpubMiningUi) => void;
   startReviewForGroup: (group: BookGroup) => void;
   saveGroupCsv: (group: BookGroup) => Promise<void>;
@@ -278,6 +304,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const [sessionStartedAt, setSessionStartedAt] = useState(0);
   const [reviewBookKey, setReviewBookKey] = useState<string>('all');
   const [reviewDueOnly, setReviewDueOnly] = useState(true);
+  const [reviewMode, setReviewMode] = useState<FlashcardReviewMode>('mixed');
+  const [audioBusy, setAudioBusy] = useState(false);
+  const [audioError, setAudioError] = useState('');
   const [bookFolderMenu] = useState<string | null>(null);
   const [deckMenuGroup, setDeckMenuGroup] = useState<BookGroup | null>(null);
   const [epubMiningUi, setEpubMiningUi] = useState<EpubMiningUi>('simple');
@@ -373,6 +402,16 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     const pool = filterDeckByBook(epubReviewPool, reviewBookKey);
     return reviewDueOnly ? filterLocalReviewsDue(pool) : pool;
   }, [epubReviewPool, reviewBookKey, reviewDueOnly]);
+  const epubReviewSessionCandidates = useMemo(
+    () => reviewMode === 'audio'
+      ? epubReviewCandidates.filter((card) => card.audioDataUrl || card.audioPath)
+      : epubReviewCandidates,
+    [epubReviewCandidates, reviewMode],
+  );
+  const audioCandidateCount = useMemo(
+    () => epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath).length,
+    [epubReviewCandidates],
+  );
 
   // Seed deck level badges from cache, then idle-enrich missing estimates.
   useEffect(() => {
@@ -421,22 +460,29 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   const sessionComplete = sessionCards.length > 0 && masteredIds.size >= sessionCards.length;
 
   function savedToReviewCards(words: SavedWord[]): ReviewCard[] {
-    return words.map((w) => ({
+    return planFlashcardReview(words.map((w) => ({
       id: `dict:${w.word}`,
       word: w.word,
       reading: w.reading,
       meaning: w.meaning,
-    }));
+      reviewGroup: 'dictionary',
+    })), { mode: 'text' });
   }
 
   function deckToReviewCards(cards: DeckFlashcard[]): ReviewCard[] {
-    return cards.map((c) => ({
+    return planFlashcardReview(cards.map((c) => ({
       id: c.id,
       word: c.word,
       reading: c.reading,
       meaning: c.meaning || c.back || '',
+      sentence: c.sentence,
+      front: c.front,
+      back: c.back,
+      audioDataUrl: c.audioDataUrl,
+      audioPath: c.audioPath,
+      reviewGroup: `${c.bookId ?? c.source}:${c.bookTitle ?? c.folder ?? ''}`,
       srs: c.srs,
-    }));
+    })), { mode: reviewMode });
   }
 
   function markExplored(id: string): void {
@@ -481,7 +527,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }
 
   function startEpubReview(): void {
-    const pool = epubReviewCandidates;
+    const pool = epubReviewSessionCandidates;
     const initialMastered = reviewDueOnly
       ? new Set<string>()
       : new Set(pool.filter((c) => c.known).map((c) => c.id));
@@ -531,7 +577,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setFlipped((f) => !f);
   }
 
-  function gotIt(): void {
+  function accept(rating: Exclude<LocalSrsRating, 'again'>): void {
     const card = sessionCards[reviewIndex];
     if (!card || masteredIds.has(card.id)) return;
     if (wiredFx) window.dispatchEvent(new CustomEvent('wired:sync-ok'));
@@ -541,7 +587,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewed((n) => n + 1);
     setFlipped(false);
     if (reviewSource === 'epub') {
-      const nextDeck = reviewDeckCard(card.id, 'good');
+      const nextDeck = reviewDeckCard(card.id, rating);
       const reviewedCard = nextDeck.find((candidate) => candidate.id === card.id);
       setDeck(nextDeck);
       if (reviewedCard) {
@@ -559,6 +605,18 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewIndex(0);
     const firstUnknown = sessionCards.find((c) => !nextMastered.has(c.id));
     if (firstUnknown) markExplored(firstUnknown.id);
+  }
+
+  function gotIt(): void {
+    accept('good');
+  }
+
+  function hard(): void {
+    accept('hard');
+  }
+
+  function easy(): void {
+    accept('easy');
   }
 
   function again(): void {
@@ -596,6 +654,73 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       });
     }
     setFlipped(false);
+  }
+
+  async function resolveAudio(card: ReviewCard): Promise<string | null> {
+    if (card.audioDataUrl) return card.audioDataUrl;
+    if (!card.audioPath) return null;
+    const managed = await window.api.flashcardReadAudio(card.audioPath);
+    if (managed.ok && managed.dataUrl) return managed.dataUrl;
+    const captured = await window.api.visualNovelReadCaptureAudio(card.audioPath);
+    return captured.ok && captured.dataUrl ? captured.dataUrl : null;
+  }
+
+  async function playCurrentAudio(): Promise<void> {
+    const card = sessionCards[reviewIndex];
+    if (!card) return;
+    setAudioError('');
+    const dataUrl = await resolveAudio(card);
+    if (!dataUrl) {
+      setAudioError(t('flash.audioUnavailable'));
+      return;
+    }
+    await new Audio(dataUrl).play().catch(() => setAudioError(t('flash.audioPlaybackFailed')));
+  }
+
+  async function addAudioToCurrent(): Promise<void> {
+    const card = sessionCards[reviewIndex];
+    if (!card || reviewSource !== 'epub' || audioBusy) return;
+    setAudioBusy(true);
+    setAudioError('');
+    try {
+      const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
+      if (!result.ok || !result.path) {
+        setAudioError(result.error || t('flash.audioGenerationFailed'));
+        return;
+      }
+      const nextDeck = updateDeckCard(card.id, { audioPath: result.path });
+      setDeck(nextDeck);
+      setSessionCards((cards) => cards.map((candidate) => (
+        candidate.id === card.id ? { ...candidate, audioPath: result.path } : candidate
+      )));
+      const data = await window.api.flashcardReadAudio(result.path);
+      if (data.ok && data.dataUrl) await new Audio(data.dataUrl).play().catch(() => undefined);
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  async function addAudioToReviewPool(): Promise<void> {
+    if (audioBusy) return;
+    const candidates = epubReviewCandidates.filter((card) => !card.audioDataUrl && !card.audioPath);
+    if (!candidates.length) return;
+    setAudioBusy(true);
+    setAudioError('');
+    const updates: Array<{ id: string; audioPath: string }> = [];
+    let failures = 0;
+    try {
+      // The OS synthesizer owns one voice device. Sequential generation avoids
+      // competing speech engines while still keeping the renderer responsive.
+      for (const card of candidates) {
+        const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
+        if (result.ok && result.path) updates.push({ id: card.id, audioPath: result.path });
+        else failures += 1;
+      }
+      if (updates.length) setDeck(updateDeckCardAudioBatch(updates));
+      if (failures) setAudioError(t('flash.audioBatchFailed', { count: failures }));
+    } finally {
+      setAudioBusy(false);
+    }
   }
 
   function openEpubMining(ui: EpubMiningUi): void {
@@ -824,6 +949,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setReviewBookKey,
     reviewDueOnly,
     setReviewDueOnly,
+    reviewMode,
+    setReviewMode,
+    audioBusy,
+    audioError,
+    audioCandidateCount,
     bookFolderMenu,
     deckMenuGroup,
     setDeckMenuGroup,
@@ -840,6 +970,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     epubReviewBooks,
     epubDueCards,
     epubReviewCandidates,
+    epubReviewSessionCandidates,
     filteredSaved,
     unknownReviewCards,
     knownReviewCards,
@@ -861,7 +992,12 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     shuffleReview,
     flip,
     gotIt,
+    hard,
+    easy,
     again,
+    playCurrentAudio,
+    addAudioToCurrent,
+    addAudioToReviewPool,
     openEpubMining,
     startReviewForGroup,
     saveGroupCsv,
@@ -892,6 +1028,10 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
     cardFx,
     sessionStartedAt,
   } = state;
+
+  useEffect(() => {
+    if (current?.promptKind === 'listening') void state.playCurrentAudio();
+  }, [current?.id, current?.promptKind]);
 
   /**
    * "Ask about how this session went" — a different gesture from asking about the
@@ -930,12 +1070,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
         data-review-active={active ? 'true' : undefined}
         className={`flash-strip-card flash-review-strip-card${active ? ' active' : ''}${mastered ? ' mastered' : ''}`}
         onClick={() => state.goToReviewIndex(i)}
-        title={card.word}
+        title={card.promptKind === 'listening' ? t('flash.prompt.listening') : card.word}
       >
         <span className="flash-strip-word" lang="ja">
-          {card.word}
+          {card.promptKind === 'listening' ? t('flash.audioCardShort') : card.word}
         </span>
-        {card.reading && card.reading !== card.word && (
+        {card.promptKind !== 'listening' && card.reading && card.reading !== card.word && (
           <span className="flash-strip-reading" lang="ja">
             {card.reading}
           </span>
@@ -972,6 +1112,12 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   const pct = total ? (reviewed / total) * 100 : 0;
   const nextGoodInterval = reviewSource === 'epub'
     ? scheduleLocalReview(current.srs, 'good').intervalDays
+    : null;
+  const nextHardInterval = reviewSource === 'epub'
+    ? scheduleLocalReview(current.srs, 'hard').intervalDays
+    : null;
+  const nextEasyInterval = reviewSource === 'epub'
+    ? scheduleLocalReview(current.srs, 'easy').intervalDays
     : null;
   const reviewTitle =
     reviewSource === 'epub' && reviewBookKey !== 'all'
@@ -1049,16 +1195,74 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
           )}
         </div>
 
+        <div className="flash-audio-tools">
+          {(current.audioDataUrl || current.audioPath) ? (
+            <button type="button" className="btn small" onClick={() => void state.playCurrentAudio()}>
+              <Icon name="player" size={13} />
+              {t('flash.replayAudio')}
+            </button>
+          ) : reviewSource === 'epub' ? (
+            <button
+              type="button"
+              className="btn small"
+              disabled={state.audioBusy}
+              onClick={() => void state.addAudioToCurrent()}
+            >
+              <Icon name="player" size={13} />
+              {state.audioBusy ? t('flash.addingAudio') : t('flash.addAudio')}
+            </button>
+          ) : null}
+          {state.audioError && <span className="flash-audio-error" role="status">{state.audioError}</span>}
+        </div>
+
         <div className={`flash-card${cardFx ? ` is-${cardFx}` : ''}`} onClick={flipped ? undefined : state.flip}>
-          <span className="flash-word" lang="ja">
-            {current.word}
-          </span>
+          {!flipped && current.promptKind === 'listening' ? (
+            <div className="flash-listening-prompt">
+              <span className="flash-prompt-kind">{t('flash.prompt.listening')}</span>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void state.playCurrentAudio();
+                }}
+              >
+                <Icon name="player" size={16} />
+                {t('flash.replayAudio')}
+              </button>
+            </div>
+          ) : !flipped && current.promptKind === 'recall' ? (
+            <>
+              <span className="flash-prompt-kind">{t('flash.prompt.recall')}</span>
+              <span className="flash-meaning flash-recall-prompt">
+                {current.meaning || current.back || t('flash.noMeaningSaved')}
+              </span>
+            </>
+          ) : !flipped ? (
+            <>
+              <span className="flash-prompt-kind">
+                {t(current.promptKind === 'comprehension'
+                  ? 'flash.prompt.comprehension'
+                  : 'flash.prompt.reading')}
+              </span>
+              <span className="flash-word" lang="ja">
+                {current.promptKind === 'comprehension'
+                  ? current.sentence || current.front || current.word
+                  : current.word}
+              </span>
+            </>
+          ) : (
+            <span className="flash-word" lang="ja">{current.word}</span>
+          )}
           {flipped ? (
             <div className="flash-answer">
               {current.reading && current.reading !== current.word && (
                 <span className="flash-reading" lang="ja">
                   {current.reading}
                 </span>
+              )}
+              {current.sentence && current.sentence !== current.word && (
+                <span className="flash-sentence" lang="ja">{current.sentence}</span>
               )}
               <span className="flash-meaning">{current.meaning || t('flash.noMeaningSaved')}</span>
             </div>
@@ -1070,18 +1274,34 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
         {flipped ? (
           <div className="flash-actions">
             <button className="btn flash-again" onClick={state.again}>
-              {t('flash.dontKnow')}
+              {t('flash.rating.again')}
               {reviewSource === 'epub' && (
                 <span className="flash-srs-hint">
                   {t('flash.srs.againDue', { minutes: LOCAL_SRS_RELEARN_MINUTES })}
                 </span>
               )}
             </button>
+            <button className="btn flash-hard" onClick={state.hard}>
+              {t('flash.rating.hard')}
+              {nextHardInterval != null && (
+                <span className="flash-srs-hint">
+                  {t('flash.srs.daysDue', { days: nextHardInterval })}
+                </span>
+              )}
+            </button>
             <button className="btn primary flash-got" onClick={state.gotIt}>
-              {t('flash.know')}
+              {t('flash.rating.good')}
               {nextGoodInterval != null && (
                 <span className="flash-srs-hint">
                   {t('flash.srs.goodDue', { days: nextGoodInterval })}
+                </span>
+              )}
+            </button>
+            <button className="btn flash-easy" onClick={state.easy}>
+              {t('flash.rating.easy')}
+              {nextEasyInterval != null && (
+                <span className="flash-srs-hint">
+                  {t('flash.srs.daysDue', { days: nextEasyInterval })}
                 </span>
               )}
             </button>
@@ -1281,10 +1501,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     search,
     bookGroups,
     epubReviewBooks,
-    epubReviewCandidates,
+    epubReviewSessionCandidates,
     recentStrip,
     reviewBookKey,
     reviewDueOnly,
+    reviewMode,
     collapsedBooks,
     creatingFolder,
     newFolderName,
@@ -1446,17 +1667,40 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 />
                 {t('flash.dueOnly')}
               </label>
+              <label>
+                {t('flash.reviewMode')}
+                <select
+                  value={reviewMode}
+                  onChange={(event) => state.setReviewMode(event.target.value as FlashcardReviewMode)}
+                >
+                  <option value="mixed">{t('flash.reviewMode.mixed')}</option>
+                  <option value="text">{t('flash.reviewMode.text')}</option>
+                  <option value="audio">{t('flash.reviewMode.audio')}</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn"
+                disabled={state.audioCandidateCount === 0 || state.audioBusy}
+                onClick={() => void state.addAudioToReviewPool()}
+              >
+                <Icon name="player" size={13} />
+                {state.audioBusy
+                  ? t('flash.addingAudio')
+                  : t('flash.addAudioToDeck', { count: state.audioCandidateCount })}
+              </button>
               <button
                 type="button"
                 className="btn primary"
-                disabled={epubReviewCandidates.length === 0}
+                disabled={epubReviewSessionCandidates.length === 0}
                 onClick={state.startEpubReview}
               >
-                {epubReviewCandidates.length
-                  ? t('flash.startReviewCount', { count: epubReviewCandidates.length })
+                {epubReviewSessionCandidates.length
+                  ? t('flash.startReviewCount', { count: epubReviewSessionCandidates.length })
                   : t('flash.startReview')}
               </button>
             </div>
+            {state.audioError && <p className="flash-audio-error" role="status">{state.audioError}</p>}
           </section>
 
           <section className="flash-strip-section anki-card">

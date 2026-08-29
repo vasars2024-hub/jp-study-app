@@ -187,3 +187,61 @@
 .flash-view .flash-empty.flash-empty-inline p {
   margin: 0;
 }
+
+.flash-view .flash-audio-tools {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.flash-view .flash-audio-tools .btn,
+.flash-view .flash-listening-prompt .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flash-view .flash-audio-error {
+  max-width: 42rem;
+  color: var(--danger, #b42318);
+  font-size: 12px;
+}
+
+.flash-view .flash-listening-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.flash-view .flash-prompt-kind {
+  color: var(--text-muted, #667085);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.flash-view .flash-recall-prompt {
+  max-width: 42rem;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  text-align: center;
+}
+
+.flash-view .flash-sentence {
+  max-width: 48rem;
+  font-size: 1rem;
+  line-height: 1.65;
+  text-align: center;
+}
+
+.flash-view .flash-actions {
+  flex-wrap: wrap;
+}
+
+.flash-view .flash-actions .flash-hard,
+.flash-view .flash-actions .flash-easy {
+  min-width: 112px;
+}

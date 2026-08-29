@@ -1695,8 +1695,8 @@ declare global {
         entries: Array<{ id: string; type: string; text: string; createdAt: number }>,
       ): void;
       enqueueTranscription(
-        request: import('../../shared/transcriptionIpc').TranscriptionRequest,
-      ): Promise<import('../../shared/transcriptionIpc').TranscriptionResult>;
+        request: import('../shared/transcriptionIpc').TranscriptionRequest,
+      ): Promise<import('../shared/transcriptionIpc').TranscriptionResult>;
       /** Windows Live Captions background capture (see main/liveCaptions.ts). */
       liveCaptionsStatus(): Promise<import('../main/liveCaptions').LiveCaptionsStatus>;
       liveCaptionsStart(): Promise<{
@@ -1717,18 +1717,30 @@ declare global {
         cb: (status: import('../main/liveCaptions').LiveCaptionsStatus) => void,
       ): () => void;
       cancelTranscription(mediaId?: string): Promise<void>;
-      transcriptionQueue(): Promise<import('../../shared/transcriptionIpc').TranscriptionJob[]>;
+      transcriptionQueue(): Promise<import('../shared/transcriptionIpc').TranscriptionJob[]>;
       fusionTrackMeta(
         mediaId: string,
         subtitleId: string,
       ): Promise<import('../shared/subtitleFusionMeta').FusionTrackMeta | null>;
       onTranscriptionProgress(
-        cb: (p: import('../../shared/transcriptionIpc').TranscriptionProgress) => void,
+        cb: (p: import('../shared/transcriptionIpc').TranscriptionProgress) => void,
       ): () => void;
+      onTranscriptionCardsReady(
+        cb: (payload: import('../shared/transcriptionIpc').TranscriptionCardsReady) => void,
+      ): () => void;
+      flashcardSynthesizeAudio(
+        text: string,
+        language?: string,
+      ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
+      flashcardReadAudio(
+        filePath: string,
+      ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
       onTranscriptionChunkRequest(
         cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
       ): () => void;
-      replyTranscriptionChunk(payload: { id: string; ok: boolean; text?: string; error?: string }): void;
+      replyTranscriptionChunk(
+        payload: import('../shared/transcriptionIpc').TranscriptionChunkResult & { id: string },
+      ): void;
       onExtensionTranscribeRequest(cb: (payload: { id: string; pcmBase64: string }) => void): () => void;
       replyExtensionTranscribe(
         id: string,

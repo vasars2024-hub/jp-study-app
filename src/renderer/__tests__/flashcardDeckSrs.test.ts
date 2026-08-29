@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addDeckCardsTracked, loadDeck, reviewDeckCard } from '../flashcardDeck';
+import {
+  addDeckCardsTracked,
+  loadDeck,
+  reviewDeckCard,
+  updateDeckCardAudioBatch,
+} from '../flashcardDeck';
 
 const NOW = Date.UTC(2026, 7, 12, 9);
 
@@ -21,6 +26,14 @@ function addCard() {
 }
 
 describe('local deck review persistence', () => {
+  it('persists Easy as known with a four-day first interval', () => {
+    const card = addCard();
+    const [reviewed] = reviewDeckCard(card.id, 'easy', NOW);
+
+    expect(reviewed.known).toBe(true);
+    expect(reviewed.srs).toMatchObject({ intervalDays: 4, lastRating: 'easy' });
+  });
+
   it('persists Good as known with a one-day due date', () => {
     const card = addCard();
     const [reviewed] = reviewDeckCard(card.id, 'good', NOW);
@@ -55,5 +68,22 @@ describe('local deck review persistence', () => {
 
     expect(localStorage.getItem('jp-flashcard-deck')).toBe(before);
     expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it('attaches a generated-audio deck batch in one persisted update', () => {
+    const first = addCard();
+    const second = addDeckCardsTracked([
+      { word: '犬', reading: 'いぬ', meaning: 'dog', source: 'epub' },
+    ])[0];
+    vi.mocked(window.dispatchEvent).mockClear();
+
+    const deck = updateDeckCardAudioBatch([
+      { id: first.id, audioPath: 'C:/managed/cat.wav' },
+      { id: second.id, audioPath: 'C:/managed/dog.wav' },
+    ]);
+
+    expect(deck.find((card) => card.id === first.id)?.audioPath).toContain('cat.wav');
+    expect(deck.find((card) => card.id === second.id)?.audioPath).toContain('dog.wav');
+    expect(window.dispatchEvent).toHaveBeenCalledTimes(1);
   });
 });

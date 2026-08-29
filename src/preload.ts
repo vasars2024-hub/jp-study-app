@@ -2667,6 +2667,22 @@ const api = {
     ipcRenderer.on('transcription:progress', handler);
     return () => ipcRenderer.removeListener('transcription:progress', handler);
   },
+  onTranscriptionCardsReady: (
+    cb: (payload: import('./shared/transcriptionIpc').TranscriptionCardsReady) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      payload: import('./shared/transcriptionIpc').TranscriptionCardsReady,
+    ): void => cb(payload);
+    ipcRenderer.on('transcription:cards-ready', handler);
+    return () => ipcRenderer.removeListener('transcription:cards-ready', handler);
+  },
+  flashcardSynthesizeAudio: (text: string, language = 'ja'):
+    Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
+    ipcRenderer.invoke('flashcards:synthesizeAudio', text, language),
+  flashcardReadAudio: (filePath: string):
+    Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
+    ipcRenderer.invoke('flashcards:readAudio', filePath),
   /** Main asks the renderer to run Whisper on one slice of audio. */
   onTranscriptionChunkRequest: (
     cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
@@ -2675,7 +2691,9 @@ const api = {
     ipcRenderer.on('transcription:chunk-request', handler);
     return () => ipcRenderer.removeListener('transcription:chunk-request', handler);
   },
-  replyTranscriptionChunk: (payload: { id: string; ok: boolean; text?: string; error?: string }): void => {
+  replyTranscriptionChunk: (
+    payload: import('./shared/transcriptionIpc').TranscriptionChunkResult & { id: string },
+  ): void => {
     ipcRenderer.send('transcription:chunk-reply', payload);
   },
   onExtensionTranscribeRequest: (

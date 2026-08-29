@@ -43,7 +43,7 @@ import { canPresentLiquid } from './liquidWindowPresentation';
 import { readPopoutPresentation, togglePopoutPresentation } from './popoutPresentation';
 import { useReaderResumeHandoff } from './readerResumeHandoff';
 import { sectionOpensMediaWorkspace } from '../shared/mediaWorkspace';
-import { addDeckCards } from './flashcardDeck';
+import { addDeckCards, loadDeck, removeDeckCards } from './flashcardDeck';
 import { recordClipboardEntry, loadClipboardHistory, type ClipboardEntryType } from './clipboardHistory';
 import { getLevel, setLevel, type WkLevel } from './knownWords';
 import { estimateLevelFromText } from './bookLevelEstimate';
@@ -379,6 +379,41 @@ export default function App() {
           });
         }
       })();
+    });
+  }, []);
+
+  // A completed Japanese transcript becomes one reversible local-deck batch.
+  // Re-running transcription replaces that media/language batch instead of
+  // silently duplicating every sentence.
+  useEffect(() => {
+    return window.api.onTranscriptionCardsReady((payload) => {
+      const previousIds = loadDeck()
+        .filter((card) => card.studyActionId === payload.batchId)
+        .map((card) => card.id);
+      if (previousIds.length) removeDeckCards(previousIds);
+      addDeckCards(payload.cards.map((card) => ({
+        word: card.sentence,
+        reading: '',
+        meaning: card.translation,
+        sentence: card.sentence,
+        front: card.sentence,
+        back: card.translation,
+        source: 'media' as const,
+        bookId: payload.mediaId,
+        bookTitle: payload.title,
+        folder: 'Media',
+        audioPath: card.audioPath,
+        sceneReference: `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
+        studyActionId: payload.batchId,
+      })));
+      appendNotebookEvent({
+        stream: 'audio',
+        title: payload.title,
+        detail: `${payload.cards.length} transcript sentence cards`,
+        folder: 'Media',
+        origin: 'app',
+        href: 'flashcards',
+      });
     });
   }, []);
 

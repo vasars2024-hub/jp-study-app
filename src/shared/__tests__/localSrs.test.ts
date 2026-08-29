@@ -12,6 +12,16 @@ const NOW = Date.UTC(2026, 7, 12, 9);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('local SRS schedule', () => {
+  it('supports Anki-style Hard and Easy intervals', () => {
+    const hard = scheduleLocalReview(undefined, 'hard', NOW);
+    const easy = scheduleLocalReview(undefined, 'easy', NOW);
+
+    expect(hard).toMatchObject({ intervalDays: 0.5, repetitions: 1, lastRating: 'hard' });
+    expect(hard.ease).toBeLessThan(2.5);
+    expect(easy).toMatchObject({ intervalDays: 4, repetitions: 1, lastRating: 'easy' });
+    expect(easy.ease).toBeGreaterThan(2.5);
+  });
+
   it('treats every legacy or malformed schedule as due', () => {
     expect(isLocalReviewDue(undefined, NOW)).toBe(true);
     expect(isLocalReviewDue({ dueAt: NOW + DAY_MS }, NOW)).toBe(true);

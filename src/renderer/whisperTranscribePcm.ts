@@ -10,6 +10,7 @@
 export interface PcmTranscription {
   ok: boolean;
   text?: string;
+  cues?: Array<{ start: number; end: number; text: string }>;
   error?: string;
 }
 
@@ -49,6 +50,7 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
     }
 
     const chunks: string[] = [];
+    const cues: Array<{ start: number; end: number; text: string }> = [];
     let settled = false;
     const finish = (result: PcmTranscription): void => {
       if (settled) return;
@@ -58,13 +60,28 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
     };
 
     worker.onmessage = (event: MessageEvent) => {
-      const message = event.data as { type?: string; cues?: Array<{ text?: string }>; message?: string };
+      const message = event.data as {
+        type?: string;
+        cues?: Array<{ start?: number; end?: number; text?: string }>;
+        message?: string;
+      };
       if (message.type === 'partial' && Array.isArray(message.cues)) {
         for (const cue of message.cues) {
-          if (cue?.text?.trim()) chunks.push(cue.text.trim());
+          const text = cue?.text?.trim();
+          if (!text) continue;
+          chunks.push(text);
+          if (
+            typeof cue.start === 'number'
+            && Number.isFinite(cue.start)
+            && typeof cue.end === 'number'
+            && Number.isFinite(cue.end)
+            && cue.end > cue.start
+          ) {
+            cues.push({ start: cue.start, end: cue.end, text });
+          }
         }
       } else if (message.type === 'done') {
-        finish({ ok: true, text: chunks.join(' ').trim() });
+        finish({ ok: true, text: chunks.join(' ').trim(), cues });
       } else if (message.type === 'error') {
         finish({ ok: false, error: message.message || 'Whisper error' });
       }
