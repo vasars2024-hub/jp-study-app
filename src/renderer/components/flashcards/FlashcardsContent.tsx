@@ -89,6 +89,7 @@ import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
 import DeckAudioExport from './DeckAudioExport';
+import MatchMode from './MatchMode';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
@@ -1617,6 +1618,11 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     hideAiStudio,
   } = state;
 
+  // Match is opened and closed here rather than through the mode machine: it is
+  // a self-contained practice surface over the same deck, and routing it through
+  // `setMode` would tear down the overview it sits inside.
+  const [matchOpen, setMatchOpen] = useState(false);
+
   /**
    * The saved-word list, bounded, with the place it came from attached.
    *
@@ -1683,6 +1689,18 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       <AutoAudioPreferencesPanel />
       <AutoReadingPreferencesPanel />
       <DeckAudioExport />
+
+      {matchOpen ? (
+        <MatchMode onExit={() => setMatchOpen(false)} />
+      ) : (
+        <fieldset className="auto-reading-options">
+          <legend>{t('flash.match.title')}</legend>
+          <p className="muted">{t('flash.match.lead')}</p>
+          <button type="button" onClick={() => setMatchOpen(true)}>
+            {t('flash.match.start')}
+          </button>
+        </fieldset>
+      )}
 
       <ContextualSurface className="flash-tabs">
         <button

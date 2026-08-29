@@ -82,3 +82,48 @@
   border-top: 1px solid var(--border);
   font-size: var(--font-size-xs);
 }
+
+/*
+ * Match mode's board. An opaque anchor like the panels above it: this is a dense
+ * reading-and-choosing surface, which the Liquid selectivity rule keeps off glass.
+ */
+.flash-match-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0;
+}
+
+.flash-match-tile {
+  min-height: 44px;
+  padding: var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.flash-match-tile.is-picked {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Colour is never the only signal: a miss also loses its border and dims. */
+.flash-match-tile.is-wrong {
+  border-style: dashed;
+  border-color: var(--danger, #c0392b);
+}
+
+.flash-match-tile.is-matched {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.flash-match-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
