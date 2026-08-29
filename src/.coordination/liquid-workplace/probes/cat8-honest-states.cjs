@@ -29,7 +29,9 @@
  * it restores and asserts the restore, and a failed restore VOIDS rather than passes.
  *
  * THE FOUR NUMBERS, and the rubric's 10 needs all four:
- *   rawKeyCount        rendered text that is a bare i18n key (bar: 0, in every language run)
+ *   rawKeyCount        rendered text that is a bare i18n key (bar: 0, in every language run).
+ *                      A KEY IS ONE THAT EXISTS IN THE CATALOGS — see correction 19 beside
+ *                      `refineRawKeys`; the shape alone also matches every hostname on screen.
  *   placeholderCount   rendered text that is scaffolding shown as real data (bar: 0)
  *   mutePairCount      a control the user cannot act on and cannot find out why (bar: 0)
  *   statesNamed        of the states OBSERVABLE on this surface, how many render a real message
@@ -324,8 +326,13 @@ const PROBE = `(function(){
     rect: Math.round(WR.width) + 'x' + Math.round(WR.height),
     textRuns: textRuns,
     textHash: hash,
+    // Correction 19: the WHOLE candidate list, not the first ten. The node side decides
+    // which of these are real catalog keys, and it cannot subtract from a truncated list.
+    // Capped anyway, with the cap declared, so a pathological surface refuses rather than
+    // silently reporting a partial count as a whole one.
     rawKeyCount: rawKeys.length,
-    rawKeys: rawKeys.slice(0, 10),
+    rawKeys: rawKeys.slice(0, 200),
+    rawKeysTruncated: rawKeys.length > 200,
     placeholderCount: placeholders.length,
     placeholders: placeholders.slice(0, 8),
     mutePairCount: mutePairs.length,
@@ -424,7 +431,77 @@ async function raise() {
   return r;
 }
 
-const run = async () => JSON.parse(await ev(PROBE));
+/**
+ * CORRECTION 19, measured 2026-08-28 on Resources — A DOTTED TOKEN IS NOT AN i18n KEY.
+ *
+ * The in-page scanner matches `^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+){2,}$`, which is the SHAPE
+ * of a key and equally the shape of a hostname. Resources renders the host of every catalogue
+ * entry on purpose — `apps.ankiweb.net`, `kanji.koohii.com`, `www3.nhk.or.jp`, `aozora.gr.jp`,
+ * `heavenlypath.notion.site` — and the harness reported five raw keys and scored the surface
+ * FAIL on a bar whose own words are "rendered text that is a bare i18n key". Five deliberate,
+ * correct, user-facing strings. Package names, file names and version strings are the same
+ * class of false positive and would have arrived next.
+ *
+ * The discriminator is not a better regex, it is the CATALOGS: a raw key is a key that exists.
+ * The browser half stays a cheap shape filter and returns candidates; this half looks each one
+ * up in the union of `src/shared/i18n/catalogs/*.ts`. Nothing is dropped silently — the
+ * discarded candidates are reported as `keyShapedNonCatalog` and the catalog size is published
+ * with every scan, so a run against a missing or unparsable catalog is visible rather than
+ * being a free pass. If the catalogs cannot be read at all the harness keeps the old
+ * shape-only count and says so, because scoring 0 on an unread catalog would be the flattery
+ * the pin forbids.
+ *
+ * THE HOLE THIS WOULD OTHERWISE OPEN, closed in the same pass: `t('foo.bar')` for a key that
+ * is missing from every catalog renders the key itself, and that is the WORST raw key there
+ * is — a membership test alone would discard exactly it. So a candidate also counts when its
+ * first segment is a known catalog NAMESPACE (105 of them: `dict`, `resources`, `media`, ...),
+ * which a deleted or mistyped key keeps and a hostname does not. Checked, not assumed: none of
+ * the five hostnames above starts with a namespace. A host like `media.example.com` would be
+ * reported, and that is the right way round — a false positive is investigated, a false
+ * negative flatters.
+ *
+ * The negative control still falsifies: it injects `dict.results.err.addFailed`, which IS a
+ * real key (`catalogs/en.ts:2315`). That is not a coincidence to rely on — a control that
+ * injected a made-up token would now be testing the wrong thing, and this is the note that
+ * says so.
+ */
+const CATALOG_KEYS = (() => {
+  const keys = new Set();
+  try {
+    const dir = path.join(__dirname, '..', '..', '..', 'shared', 'i18n', 'catalogs');
+    for (const f of fs.readdirSync(dir).filter((n) => n.endsWith('.ts'))) {
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      const re = /^\s*'([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)'\s*:/gm;
+      let m = re.exec(src);
+      while (m) { keys.add(m[1]); m = re.exec(src); }
+    }
+  } catch {
+    return new Set();
+  }
+  return keys;
+})();
+const CATALOG_NAMESPACES = new Set([...CATALOG_KEYS].map((k) => k.split('.')[0]));
+const isRawKey = (token) => CATALOG_KEYS.has(token)
+  || CATALOG_NAMESPACES.has(token.split('.')[0]);
+
+const refineRawKeys = (r) => {
+  if (!r || !Array.isArray(r.rawKeys)) return r;
+  r.rawKeyCatalogSize = CATALOG_KEYS.size;
+  if (!CATALOG_KEYS.size || r.rawKeysTruncated) {
+    r.rawKeyBasis = CATALOG_KEYS.size
+      ? 'shape only - candidate list truncated at 200'
+      : 'shape only - i18n catalogs could not be read';
+    return r;
+  }
+  const real = r.rawKeys.filter((k) => isRawKey(k.token));
+  r.keyShapedNonCatalog = r.rawKeys.filter((k) => !isRawKey(k.token));
+  r.rawKeyCount = real.length;
+  r.rawKeys = real.slice(0, 10);
+  r.rawKeyBasis = `${CATALOG_KEYS.size} catalog keys / ${CATALOG_NAMESPACES.size} namespaces`;
+  return r;
+};
+
+const run = async () => refineRawKeys(JSON.parse(await ev(PROBE)));
 
 /**
  * Correction 9: DRIVE the empty state rather than waiting for it.
