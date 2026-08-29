@@ -284,6 +284,54 @@ const SPECS = {
     },
     collection: { container: '.cal-month-grid', row: '.cal-month-cell' },
   },
+  resources: {
+    title: 'Resources',
+    root: '.res-view',
+    heavy: {
+      // Resources' heaviest repeatable read-only work is the category rail, NOT scrolling.
+      // `showLanding` is `filter === 'All' && !query`, so every step off All unmounts a
+      // 256-path SVG choropleth, a 10-tile bundle grid, the My-tools strip and the New
+      // strip, and every step back mounts all four again — on top of re-deriving and
+      // re-rendering the whole filtered group list. It writes no user data and it restores
+      // the chip the user was on.
+      label: 'cycle the category rail, mounting and unmounting the landing sections',
+      durationMs: 3000,
+      js: `(() => {
+        delete window.__lqResourcesLoad;
+        const chips = Array.from(document.querySelectorAll('.res-view .res-filter .gram-level-btn'));
+        if (chips.length < 3) return 'REFUSE: expected a category rail, found ' + chips.length + ' chips';
+        const start = chips.findIndex((b) => b.classList.contains('active'));
+        if (start < 0) return 'REFUSE: the category rail has no active chip';
+        const rec = { start, chips: chips.length, ticks: 0, categories: 0, landings: 0, restored: false };
+        window.__lqResourcesLoad = rec;
+        let n = 0;
+        const timer = setInterval(() => {
+          const goLanding = n % 2 === 1;
+          const idx = goLanding ? 0 : 1 + (Math.floor(n / 2) % (chips.length - 1));
+          chips[idx].click();
+          if (goLanding) { rec.landings += 1; } else { rec.categories += 1; }
+          rec.ticks += 1;
+          n += 1;
+          if (rec.ticks >= 44) {
+            clearInterval(timer);
+            chips[start].click();
+            setTimeout(() => { rec.restored = chips[start].classList.contains('active'); }, 120);
+          }
+        }, 55);
+        return 'cycling ' + (chips.length - 1) + ' categories from chip ' + start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqResourcesLoad;
+        if (!r) return 'REFUSE: the resources load never armed';
+        if (r.ticks < 44) return 'REFUSE: incomplete category cycle ' + JSON.stringify(r);
+        if (r.categories < 20 || r.landings < 20) return 'REFUSE: unbalanced cycle ' + JSON.stringify(r);
+        if (!r.restored) return 'REFUSE: the rail did not return to chip ' + r.start;
+        return 'cycled ' + r.ticks + ' filters (' + r.categories + ' category / ' + r.landings
+          + ' landing), restored chip ' + r.start;
+      })()`,
+    },
+    collection: { container: '.res-view', row: '.res-card' },
+  },
   games: {
     title: 'Game Arena',
     root: '.game-arena',

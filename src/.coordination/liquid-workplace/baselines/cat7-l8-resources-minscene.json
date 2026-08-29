@@ -1,0 +1,632 @@
+{
+  "surface": "resources",
+  "title": "Resources",
+  "root": ".res-view",
+  "at": "2026-08-29T01:04:18.232Z",
+  "scene": {
+    "fwins": 6,
+    "fwinElements": 2383,
+    "root": null,
+    "rootElements": null,
+    "documentElements": 6394,
+    "titles": [
+      "Immersion",
+      "Statistics",
+      "Settings",
+      "Calendar",
+      "Game Arena",
+      "Resources"
+    ],
+    "theme": "forest-night",
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 293
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "elements": 938,
+    "deskWindows": 6,
+    "titles": [
+      "Immersion",
+      "Statistics",
+      "Settings",
+      "Calendar",
+      "Game Arena",
+      "Resources"
+    ]
+  },
+  "process": {
+    "pid": 40648,
+    "uptimeSecAtStart": 37770,
+    "mainRssMbBefore": 106.4,
+    "mainRssMbAfter": 111.7,
+    "mainHeapUsedMbAfter": 305.4
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.9,
+    "frames": 109,
+    "runs": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 33.3,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 109
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 33.3,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 294
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 299
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1315
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 33.3,
+      "frames_over_16": 78,
+      "frames_over_33": 1,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1820,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 4.1,
+      "main_max_ms": 11.7
+    },
+    "ceilingRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 33.3,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 109
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Resources",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 293
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 276
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Resources",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 103,
+      "frame_min_ms": 15.7,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17,
+      "frame_max_ms": 66.8,
+      "frames_over_16": 66,
+      "frames_over_33": 3,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1815,
+      "main_p50_ms": 2.4,
+      "main_p95_ms": 3.7,
+      "main_max_ms": 10.7,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 50.1,
+          "max": 668.6,
+          "over100": 2,
+          "mainMax": 11,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 17,
+          "max": 66.8,
+          "over100": 0,
+          "mainMax": 10.7,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 66.9,
+          "over100": 0,
+          "mainMax": 12,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 83.9,
+          "over100": 0,
+          "mainMax": 10.7,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 66.9,
+          "over100": 0,
+          "mainMax": 13.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Resources",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 279
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 292
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Resources",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 96,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 33.4,
+      "frame_max_ms": 83.5,
+      "frames_over_16": 71,
+      "frames_over_33": 9,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1808,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 5.4,
+      "main_max_ms": 11.6,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 33.4,
+          "max": 83.5,
+          "over100": 0,
+          "mainMax": 11.6,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 33.5,
+          "max": 100.4,
+          "over100": 1,
+          "mainMax": 10.2,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 33.5,
+          "max": 83.7,
+          "over100": 0,
+          "mainMax": 11,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 33.4,
+          "max": 83.7,
+          "over100": 0,
+          "mainMax": 12.9,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 33.5,
+          "max": 100.3,
+          "over100": 1,
+          "mainMax": 14.2,
+          "breached": true
+        }
+      ],
+      "unstable": true
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Resources",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 299
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 279
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 107.2,
+        "restorePaintedMs": 223.4,
+        "restoredTo": "forest-night"
+      },
+      "jank_blocks": null,
+      "frames": 95,
+      "frame_min_ms": 16.1,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17.3,
+      "frame_max_ms": 150.3,
+      "frames_over_16": 71,
+      "frames_over_33": 4,
+      "frames_over_100": 1,
+      "main_samples": 57,
+      "main_span_ms": 1819,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 5.3,
+      "main_max_ms": 25,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 17.3,
+          "max": 150.3,
+          "over100": 1,
+          "mainMax": 25,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 17.3,
+          "max": 133.6,
+          "over100": 1,
+          "mainMax": 10,
+          "breached": true
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "resources: cycle the category rail, mounting and unmounting the landing sections (DURING -DuringJs)",
+      "samples": 99,
+      "span_ms": 3015,
+      "min_ms": 1.7,
+      "p50_ms": 2.2,
+      "p95_ms": 5.6,
+      "max_ms": 8.8
+    },
+    "heavyProof": "cycled 44 filters (22 category / 22 landing), restored chip 0",
+    "idle": {
+      "label": "resources: idle",
+      "samples": 97,
+      "span_ms": 3002,
+      "min_ms": 1.8,
+      "p50_ms": 2.4,
+      "p95_ms": 3.5,
+      "max_ms": 10.3
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Resources",
+      "root": null,
+      "scene_before": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 295
+      },
+      "scene_after": {
+        "fwins": 6,
+        "fwinElements": 2383,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 6394,
+        "titles": [
+          "Immersion",
+          "Statistics",
+          "Settings",
+          "Calendar",
+          "Game Arena",
+          "Resources"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 287
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Resources",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 11,
+      "frames": 64,
+      "frame_min_ms": 16.6,
+      "frame_p50_ms": 16.8,
+      "frame_p95_ms": 100.3,
+      "frame_max_ms": 133.7,
+      "frames_over_16": 47,
+      "frames_over_33": 13,
+      "frames_over_100": 9,
+      "main_samples": 59,
+      "main_span_ms": 1826,
+      "main_p50_ms": 2.5,
+      "main_p95_ms": 3.9,
+      "main_max_ms": 11.5
+    }
+  },
+  "findings": [
+    "theme: 1 frames over 100 ms, against a ceiling that produced 0 with no product code running"
+  ],
+  "voided": [
+    "resize: readings disagree across repeats (clean, BREACH, clean, clean, BREACH); the majority is reported and the leg is UNSTABLE"
+  ],
+  "environment": [
+    "theme: longest frame 150.3 ms against a ceiling max of 33.3 ms — recorded, not scored"
+  ],
+  "score": "VOID",
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}
