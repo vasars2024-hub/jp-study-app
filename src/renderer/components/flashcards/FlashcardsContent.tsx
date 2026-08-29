@@ -901,9 +901,22 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         if (flipped) again();
         else return false;
       }),
+      registerCommandHandler('flashcards.hard', () => {
+        if (flipped) hard();
+        else return false;
+      }),
       registerCommandHandler('flashcards.gotIt', () => {
         if (flipped) gotIt();
         else return false;
+      }),
+      registerCommandHandler('flashcards.easy', () => {
+        if (flipped) easy();
+        else return false;
+      }),
+      // Not gated on `flipped`: in audio-only review the prompt IS the audio, so
+      // replaying it before the answer is revealed is the whole point of the key.
+      registerCommandHandler('flashcards.replayAudio', () => {
+        void playCurrentAudio();
       }),
     ];
     return () => offs.forEach((off) => off());

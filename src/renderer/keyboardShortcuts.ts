@@ -368,17 +368,40 @@ export const COMMAND_CATALOG: AppCommand[] = [
   },
   {
     id: 'flashcards.again',
-    label: 'Mark again (hard)',
+    label: 'Rate Again',
     category: 'Flashcards',
     defaultKeys: '1',
     note: 'After the card is flipped. Bare A is reserved for video subtitle prev.',
   },
   {
-    id: 'flashcards.gotIt',
-    label: 'Mark got it (good)',
+    id: 'flashcards.hard',
+    label: 'Rate Hard',
     category: 'Flashcards',
-    defaultKeys: '2|G',
+    defaultKeys: '2',
     note: 'After the card is flipped.',
+  },
+  {
+    id: 'flashcards.gotIt',
+    label: 'Rate Good',
+    category: 'Flashcards',
+    defaultKeys: '3|G',
+    // Was '2|G' until the Hard/Easy ratings existed. 1/2/3/4 is the Anki order the
+    // on-screen buttons already read left to right, so the digit row now matches them.
+    note: 'After the card is flipped.',
+  },
+  {
+    id: 'flashcards.easy',
+    label: 'Rate Easy',
+    category: 'Flashcards',
+    defaultKeys: '4',
+    note: 'After the card is flipped.',
+  },
+  {
+    id: 'flashcards.replayAudio',
+    label: 'Replay card audio',
+    category: 'Flashcards',
+    defaultKeys: 'P',
+    note: 'The only way to repeat the prompt in audio-only review. Bare R is reserved for video subtitle replay.',
   },
   {
     id: 'flashcards.prev',
