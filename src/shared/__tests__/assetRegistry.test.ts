@@ -4,6 +4,8 @@ import {
   REGISTRY_SCHEMA,
   SIZE_TOLERANCE,
   TEMP_OVERHEAD_FACTOR,
+  assetBundleSize,
+  assetDependencyClosure,
   assetPinCoverage,
   assetsForLang,
   canTransition,
@@ -44,6 +46,19 @@ const status = (over: Partial<AssetStatus> = {}): AssetStatus => ({
 });
 
 describe('catalog', () => {
+  it('describes Supertonic 3 as one pinned Japanese bundle', () => {
+    const bundle = assetDependencyClosure(ASSET_CATALOG, 'supertonic-3');
+    expect(bundle).toHaveLength(16);
+    expect(bundle.every((asset) => asset.sha256 && asset.version === '3cadd1e')).toBe(true);
+    expect(assetBundleSize(ASSET_CATALOG, 'supertonic-3')).toBe(401_276_744);
+    expect(bundle.at(-1)).toMatchObject({
+      id: 'supertonic-3',
+      kind: 'tts',
+      lang: 'ja',
+      ownsRequires: true,
+    });
+  });
+
   it('has unique ids and install dirs', () => {
     const ids = ASSET_CATALOG.map((a) => a.id);
     const dirs = ASSET_CATALOG.map((a) => a.installDir);
@@ -289,7 +304,9 @@ describe('sha256 pin coverage (audit T6)', () => {
    * fresh download from the URL, the sha256 of the installed copy on disk, and
    * the hash already in the install record. See the comment on that spec.
    *
-   * **1 of 21 is the correct ceiling here, not a shortfall.** The other 20 URLs
+   * **Raised to 17 of 37 on 2026-08-29.** Supertonic 3 contributes sixteen
+   * pinned files because every URL names the model repository's immutable
+   * `3cadd1e` revision. The remaining 20 URLs are mutable and stay unpinned.
    * are mutable (HuggingFace `/resolve/main/`, GitHub `raw/main/` and
    * `releases/latest/`, regenerated MDBG and Tatoeba exports), and pinning a
    * moving target turns every legitimate upstream release into a
@@ -302,7 +319,7 @@ describe('sha256 pin coverage (audit T6)', () => {
    * This is a ratchet, not a target: it guarantees the number only ever moves
    * the right way.
    */
-  const PINNED_BASELINE = 1;
+  const PINNED_BASELINE = 17;
 
   it('never loses a pin it already had', () => {
     const { pinned, total, unpinned } = assetPinCoverage();
@@ -317,6 +334,6 @@ describe('sha256 pin coverage (audit T6)', () => {
     // If this fails because someone pinned an asset: good — raise
     // PINNED_BASELINE to the new number and update the comment above.
     const { pinned, total } = assetPinCoverage();
-    expect({ pinned, total }).toEqual({ pinned: 1, total: 21 });
+    expect({ pinned, total }).toEqual({ pinned: 17, total: 37 });
   });
 });

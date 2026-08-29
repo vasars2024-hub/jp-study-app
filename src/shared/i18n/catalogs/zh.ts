@@ -2245,9 +2245,11 @@ export const zh: Catalog = {
   'storage.group.dictionary': '词典',
   'storage.group.whisper': '转写模型',
   'storage.group.ocr': '图片与漫画 OCR',
+  'storage.group.tts': '离线语音模型',
   'storage.group.accent': '发音',
   'storage.group.examples': '例句',
   'storage.group.sentences': '分级例句',
+  'storage.asset.supertonic3.desc': '使用 10 种本地音色离线生成高质量日语语音。',
   'storage.modelCount': { other: '已安装 {count} 个模型' },
 
   'assetError.diskSpace':

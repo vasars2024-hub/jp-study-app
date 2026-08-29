@@ -2254,9 +2254,11 @@ export const ja: Catalog = {
   'storage.group.dictionary': '辞書',
   'storage.group.whisper': '文字起こしモデル',
   'storage.group.ocr': '画像・漫画OCR',
+  'storage.group.tts': 'オフライン音声モデル',
   'storage.group.accent': '発音',
   'storage.group.examples': '例文',
   'storage.group.sentences': 'レベル別例文',
+  'storage.asset.supertonic3.desc': '10種類のローカル音声で、高品質な日本語音声をオフライン生成します。',
   'storage.modelCount': { other: '{count} 個のモデルをインストール済み' },
 
   'assetError.diskSpace':

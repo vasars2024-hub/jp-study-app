@@ -9,6 +9,7 @@
 export type AssetKind =
   | 'dictionary'
   | 'whisper'
+  | 'tts'
   | 'ocr'
   | 'tessdata'
   | 'examples'
@@ -24,6 +25,8 @@ export interface AssetSpec {
   name: string;
   /** One-line description shown under the name in the Storage page. */
   description: string;
+  /** Optional translated description key; `description` remains the registry fallback. */
+  descriptionKey?: string;
   kind: AssetKind;
   lang: AssetLang;
   url: string;
@@ -48,6 +51,11 @@ export interface AssetSpec {
   file?: string;
   /** Assets that must be installed alongside this one (e.g. an ONNX tokenizer). */
   requires?: string[];
+  /**
+   * The dependencies exist only for this bundle, so cancelling/removing the
+   * parent also reclaims them. Shared dependencies deliberately leave this off.
+   */
+  ownsRequires?: boolean;
 }
 
 /**
@@ -340,6 +348,129 @@ export const ASSET_CATALOG: AssetSpec[] = [
     file: 'ggml-medium.bin',
   },
   {
+    id: 'supertonic-3',
+    name: 'Supertonic 3',
+    description: 'High-quality offline Japanese speech with ten local voice styles.',
+    descriptionKey: 'storage.asset.supertonic3.desc',
+    kind: 'tts',
+    lang: 'ja',
+    // Immutable upstream revision, verified byte-for-byte on 2026-08-29. The
+    // official Node reference uses these same ONNX graphs with onnxruntime-node.
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/vector_estimator.onnx',
+    sizeBytes: 256_534_781,
+    sha256: '883ac868ea0275ef0e991524dc64f16b3c0376efd7c320af6b53f5b780d7c61c',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-vector',
+    file: 'vector_estimator.onnx',
+    requires: [
+      'supertonic-3-duration',
+      'supertonic-3-text',
+      'supertonic-3-vocoder',
+      'supertonic-3-config',
+      'supertonic-3-indexer',
+      'supertonic-3-voice-f1',
+      'supertonic-3-voice-f2',
+      'supertonic-3-voice-f3',
+      'supertonic-3-voice-f4',
+      'supertonic-3-voice-f5',
+      'supertonic-3-voice-m1',
+      'supertonic-3-voice-m2',
+      'supertonic-3-voice-m3',
+      'supertonic-3-voice-m4',
+      'supertonic-3-voice-m5',
+    ],
+    ownsRequires: true,
+  },
+  {
+    id: 'supertonic-3-duration',
+    name: 'Supertonic 3 duration graph',
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/duration_predictor.onnx',
+    sizeBytes: 3_700_147,
+    sha256: 'c3eb91414d5ff8a7a239b7fe9e34e7e2bf8a8140d8375ffb14718b1c639325db',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-duration',
+    file: 'duration_predictor.onnx',
+  },
+  {
+    id: 'supertonic-3-text',
+    name: 'Supertonic 3 text graph',
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/text_encoder.onnx',
+    sizeBytes: 36_416_150,
+    sha256: 'c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-text',
+    file: 'text_encoder.onnx',
+  },
+  {
+    id: 'supertonic-3-vocoder',
+    name: 'Supertonic 3 vocoder',
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/vocoder.onnx',
+    sizeBytes: 101_424_195,
+    sha256: '085de76dd8e8d5836d6ca66826601f615939218f90e519f70ee8a36ed2a4c4ba',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-vocoder',
+    file: 'vocoder.onnx',
+  },
+  {
+    id: 'supertonic-3-config',
+    name: 'Supertonic 3 configuration',
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/tts.json',
+    sizeBytes: 8_253,
+    sha256: '42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-config',
+    file: 'tts.json',
+  },
+  {
+    id: 'supertonic-3-indexer',
+    name: 'Supertonic 3 Unicode indexer',
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: 'https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/onnx/unicode_indexer.json',
+    sizeBytes: 277_676,
+    sha256: '9bf7346e43883a81f8645c81224f786d43c5b57f3641f6e7671a7d6c493cb24f',
+    version: '3cadd1e',
+    installDir: 'supertonic-3-indexer',
+    file: 'unicode_indexer.json',
+  },
+  ...([
+    ['f1', 292_046, 'bbdec6ee00231c2c742ad05483df5334cab3b52fda3ba38e6a07059c4563dbc2'],
+    ['f2', 292_423, '7c722c6a72707b1a77f035d67f0d1351ba187738e06f7683e8c72b1df3477fc6'],
+    ['f3', 290_794, '12f6ef2573baa2defa1128069cb59f203e3ab67c92af77b42df8a0e3a2f7c6ab'],
+    ['f4', 291_808, 'c2fa764c1225a76dfc3e2c73e8aa4f70d9ee48793860eb34c295fff01c2e032b'],
+    ['f5', 291_479, '45966e73316415626cf41a7d1c6f3b4c70dbc1ba2bee5c1978ef0ce33244fc8d'],
+    ['m1', 291_748, 'e35604687f5d23694b8e91593a93eec0e4eca6c0b02bb8ed69139ab2ea6b0a5b'],
+    ['m2', 292_055, 'b76cbf62bac707c710cf0ae5aba5e31eea1a6339a9734bfae33ab98499534a50'],
+    ['m3', 290_198, 'ea1ac35ccb91b0d7ecad533a2fbd0eec10c91513d8951e3b25fbba99954e159b'],
+    ['m4', 291_522, 'ca8eefad4fcd989c9379032ff3e50738adc547eeb5e221b82593a6d7b3bac303'],
+    ['m5', 291_469, 'dd22b92740314321f8ae11c5e87f8dd60d060f15dd3a632b5adf77f471f77af2'],
+  ] as const).map(([voice, sizeBytes, sha256]): AssetSpec => ({
+    id: `supertonic-3-voice-${voice}`,
+    name: `Supertonic 3 voice ${voice.toUpperCase()}`,
+    description: 'Installed automatically with Supertonic 3.',
+    kind: 'tts',
+    lang: 'ja',
+    url: `https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323/voice_styles/${voice.toUpperCase()}.json`,
+    sizeBytes,
+    sha256,
+    version: '3cadd1e',
+    installDir: `supertonic-3-voice-${voice}`,
+    file: `${voice.toUpperCase()}.json`,
+  })),
+  {
     id: 'manga-ocr',
     name: 'Manga OCR',
     description: 'Reads whole speech bubbles in one pass. Replaces Tesseract for manga.',
@@ -586,6 +717,28 @@ export const ASSET_CATALOG: AssetSpec[] = [
 
 export function findAsset(assets: AssetSpec[], id: string): AssetSpec | undefined {
   return assets.find((a) => a.id === id);
+}
+
+/** The root plus every transitive companion, in stable dependency-first order. */
+export function assetDependencyClosure(assets: AssetSpec[], id: string): AssetSpec[] {
+  const byId = new Map(assets.map((asset) => [asset.id, asset]));
+  const seen = new Set<string>();
+  const result: AssetSpec[] = [];
+  const visit = (nextId: string): void => {
+    if (seen.has(nextId)) return;
+    seen.add(nextId);
+    const asset = byId.get(nextId);
+    if (!asset) return;
+    for (const dependency of asset.requires ?? []) visit(dependency);
+    result.push(asset);
+  };
+  visit(id);
+  return result;
+}
+
+/** What one visible bundle costs, including the companion rows hidden in Storage. */
+export function assetBundleSize(assets: AssetSpec[], id: string): number {
+  return assetDependencyClosure(assets, id).reduce((sum, asset) => sum + asset.sizeBytes, 0);
 }
 
 /**

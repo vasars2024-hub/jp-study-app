@@ -8,6 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import AdmZip from 'adm-zip';
 import {
   ASSET_CATALOG,
+  assetDependencyClosure,
   formatBytes,
   mergeRegistry,
   preflightDiskSpace,
@@ -815,7 +816,7 @@ export interface StartResult {
 
 const UNKNOWN_ASSET: AssetError = { key: 'assetError.unknownAsset' };
 
-export async function startDownload(
+async function queueDownload(
   id: string,
   seen: Set<string> = new Set(),
 ): Promise<StartResult> {
@@ -835,7 +836,7 @@ export async function startDownload(
   for (const depId of spec.requires ?? []) {
     const depStatus = statusOf(depId);
     if (depStatus && depStatus.state !== 'installed') {
-      const depResult = await startDownload(depId, seen);
+      const depResult = await queueDownload(depId, seen);
       if (!depResult.ok) return depResult;
     }
   }
@@ -844,31 +845,45 @@ export async function startDownload(
 
   ensureDirs();
 
-  // Pre-flight: only the bytes we still have to fetch need room, but the temp
-  // copy and extraction do not care that we resumed, so bill the full size.
-  // Dependencies run their own pre-flight above when cascading.
-  const free = await freeBytesOnVolume(modelsRoot());
-  const pre = preflightDiskSpace(spec.sizeBytes, free);
-  if (!pre.ok) {
-    const error: AssetError = {
-      key: 'assetError.diskSpace',
-      vars: {
-        name: spec.name,
-        required: formatBytes(pre.requiredBytes),
-        free: formatBytes(pre.freeBytes),
-        shortfall: formatBytes(pre.shortfallBytes),
-      },
-    };
-    setStatus(id, { state: status.state === 'paused' ? 'paused' : 'not-installed', error });
-    broadcast(id, true);
-    return { ok: false, error };
-  }
-
   setStatus(id, { state: 'queued', bytesPerSecond: 0, error: undefined });
   broadcast(id, true);
   queue.push(id);
   pump();
   return { ok: true };
+}
+
+export async function startDownload(id: string): Promise<StartResult> {
+  const spec = catalog.find((asset) => asset.id === id);
+  const status = statusOf(id);
+  if (!spec || !status) return { ok: false, error: UNKNOWN_ASSET };
+
+  // Pre-flight the visible bundle as one operation. Checking each companion
+  // independently against the same free-space number could queue a 401 MB TTS
+  // bundle on a volume that only had room for any one of its files.
+  const pending = assetDependencyClosure(catalog, id).filter(
+    (asset) => statusOf(asset.id)?.state !== 'installed',
+  );
+  if (pending.length) {
+    const payloadBytes = pending.reduce((sum, asset) => sum + asset.sizeBytes, 0);
+    const free = await freeBytesOnVolume(modelsRoot());
+    const pre = preflightDiskSpace(payloadBytes, free);
+    if (!pre.ok) {
+      const error: AssetError = {
+        key: 'assetError.diskSpace',
+        vars: {
+          name: spec.name,
+          required: formatBytes(pre.requiredBytes),
+          free: formatBytes(pre.freeBytes),
+          shortfall: formatBytes(pre.shortfallBytes),
+        },
+      };
+      setStatus(id, { state: status.state === 'paused' ? 'paused' : 'not-installed', error });
+      broadcast(id, true);
+      return { ok: false, error };
+    }
+  }
+
+  return queueDownload(id);
 }
 
 export function pauseDownload(id: string): void {
@@ -886,9 +901,12 @@ export function pauseDownload(id: string): void {
   controllers.get(id)?.abort();
 }
 
-export async function cancelDownload(id: string): Promise<void> {
+async function cancelOneDownload(id: string): Promise<void> {
   const status = statusOf(id);
   if (!status) return;
+  // Cancel means "stop installing", not "forget an installed file without
+  // deleting it". Installed owned companions are handled by removeAsset.
+  if (status.state === 'installed') return;
   const at = queue.indexOf(id);
   if (at >= 0) queue.splice(at, 1);
   controllers.get(id)?.abort();
@@ -901,6 +919,14 @@ export async function cancelDownload(id: string): Promise<void> {
   broadcast(id, true);
 }
 
+export async function cancelDownload(id: string): Promise<void> {
+  const spec = catalog.find((asset) => asset.id === id);
+  const ids = spec?.ownsRequires
+    ? assetDependencyClosure(catalog, id).map((asset) => asset.id)
+    : [id];
+  await Promise.all(ids.map((assetId) => cancelOneDownload(assetId)));
+}
+
 /**
  * Delete an installed asset.
  *
@@ -908,13 +934,13 @@ export async function cancelDownload(id: string): Promise<void> {
  * delete that works on the developer's machine and fails on a user's, because
  * the model happened to be mmapped by a live worker at the time.
  */
-export async function removeAsset(id: string): Promise<StartResult> {
+async function removeOneAsset(id: string): Promise<StartResult> {
   const spec = catalog.find((a) => a.id === id);
   if (!spec) return { ok: false, error: UNKNOWN_ASSET };
 
   // An in-flight download is a delete too — stop it and drop the partial.
   if (statusOf(id)?.state !== 'installed') {
-    await cancelDownload(id);
+    await cancelOneDownload(id);
     return { ok: true };
   }
 
@@ -952,6 +978,19 @@ export async function removeAsset(id: string): Promise<StartResult> {
     error: undefined,
   });
   broadcast(id, true);
+  return { ok: true };
+}
+
+export async function removeAsset(id: string): Promise<StartResult> {
+  const spec = catalog.find((asset) => asset.id === id);
+  if (!spec) return { ok: false, error: UNKNOWN_ASSET };
+  const assets = spec.ownsRequires
+    ? [...assetDependencyClosure(catalog, id)].reverse()
+    : [spec];
+  for (const asset of assets) {
+    const result = await removeOneAsset(asset.id);
+    if (!result.ok) return result;
+  }
   return { ok: true };
 }
 

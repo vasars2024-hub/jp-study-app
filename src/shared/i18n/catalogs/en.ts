@@ -2393,9 +2393,11 @@ export const en: Catalog = {
   'storage.group.dictionary': 'Dictionaries',
   'storage.group.whisper': 'Transcription models',
   'storage.group.ocr': 'Image and manga OCR',
+  'storage.group.tts': 'Offline speech models',
   'storage.group.accent': 'Pronunciation',
   'storage.group.examples': 'Example sentences',
   'storage.group.sentences': 'Graded sentences',
+  'storage.asset.supertonic3.desc': 'High-quality offline Japanese speech with ten local voice styles.',
   // The plural case Russian actually needs: 1 / 2–4 / 5+.
   'storage.modelCount': {
     one: '{count} model installed',

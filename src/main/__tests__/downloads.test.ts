@@ -25,6 +25,7 @@ vi.mock('electron', () => ({
 const {
   initDownloads,
   startDownload,
+  cancelDownload,
   removeAsset,
   isInstalled,
   assetPath,
@@ -239,6 +240,41 @@ describe('download → verify → install', () => {
     expect(getAssetStatus('test-model')?.error?.key).toBe('assetError.sizeMismatch');
   });
 
+  it('checks an owned bundle against disk space as one user action', async () => {
+    const dependency = fileSpec({
+      id: 'bundle-dependency',
+      name: 'Bundle dependency',
+      installDir: 'bundle-dependency',
+      file: 'dependency.bin',
+      sizeBytes: 600,
+    });
+    const root = fileSpec({
+      id: 'bundle-root',
+      name: 'Neural voices',
+      installDir: 'bundle-root',
+      file: 'root.bin',
+      sizeBytes: 600,
+      requires: [dependency.id],
+      ownsRequires: true,
+    });
+    await initDownloads({ catalog: [root, dependency] });
+    const statfsSpy = vi.spyOn(fsp, 'statfs').mockResolvedValue({
+      bavail: 2_000,
+      bsize: 1,
+    } as unknown as Awaited<ReturnType<typeof fsp.statfs>>);
+
+    const result = await startDownload(root.id);
+    statfsSpy.mockRestore();
+
+    // Either 600-byte file fits by itself (1,320 bytes with temp overhead),
+    // but the 1,200-byte bundle does not (2,640). Nothing may be queued.
+    expect(result).toMatchObject({ ok: false, error: { key: 'assetError.diskSpace' } });
+    expect(result.error?.vars?.name).toBe('Neural voices');
+    expect(getAssetStatus(root.id)?.state).toBe('not-installed');
+    expect(getAssetStatus(dependency.id)?.state).toBe('not-installed');
+    expect(requests).toHaveLength(0);
+  });
+
   it('refuses to start when the pre-flight disk check fails, with the asset name and sizes as vars', async () => {
     const spec = fileSpec({ sha256: PAYLOAD_SHA, name: 'Whisper Base', sizeBytes: 500_000_000 });
     await boot(spec);
@@ -380,6 +416,41 @@ describe('resume', () => {
 });
 
 describe('delete and re-download', () => {
+  it('cancels and removes dependencies owned by a bundle root', async () => {
+    const dependency = fileSpec({
+      id: 'owned-dependency',
+      installDir: 'owned-dependency',
+      file: 'dependency.bin',
+      sha256: PAYLOAD_SHA,
+    });
+    const root = fileSpec({
+      id: 'owned-root',
+      installDir: 'owned-root',
+      file: 'root.bin',
+      sha256: PAYLOAD_SHA,
+      requires: [dependency.id],
+      ownsRequires: true,
+    });
+    await initDownloads({ catalog: [root, dependency] });
+
+    await startDownload(root.id);
+    await cancelDownload(root.id);
+    expect(getAssetStatus(root.id)?.state).toBe('not-installed');
+    expect(getAssetStatus(dependency.id)?.state).toBe('not-installed');
+
+    await startDownload(root.id);
+    await settle(dependency.id);
+    await settle(root.id);
+    expect(isInstalled(root.id)).toBe(true);
+    expect(isInstalled(dependency.id)).toBe(true);
+
+    expect(await removeAsset(root.id)).toEqual({ ok: true });
+    expect(isInstalled(root.id)).toBe(false);
+    expect(isInstalled(dependency.id)).toBe(false);
+    expect(fs.existsSync(path.join(userDataDir, 'models', 'owned-root'))).toBe(false);
+    expect(fs.existsSync(path.join(userDataDir, 'models', 'owned-dependency'))).toBe(false);
+  });
+
   it('removes an installed asset and can install it again', async () => {
     await boot(fileSpec({ sha256: PAYLOAD_SHA }));
 

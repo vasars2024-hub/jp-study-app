@@ -3,7 +3,13 @@ import SettingsCard from '../SettingsCard';
 import { useSettings } from '../SettingsContext';
 import { useAssets, useAssetIntegrity, type AssetView } from '../../../assetStore';
 import type { AssetIntegrity, ReverifyOutcome } from '../../../../main/downloads';
-import { formatBytes, isBusy, type AssetKind } from '../../../../shared/assetRegistry';
+import {
+  assetDependencyClosure,
+  formatBytes,
+  isBusy,
+  type AssetKind,
+  type AssetStatus,
+} from '../../../../shared/assetRegistry';
 import { useT } from '../../../i18n';
 import type { TVars } from '../../../../shared/i18n/core';
 import DictionaryImportCard from './DictionaryImportCard';
@@ -16,6 +22,7 @@ import DictionaryImportCard from './DictionaryImportCard';
 const KIND_GROUP_KEY: Record<AssetKind, string> = {
   dictionary: 'storage.group.dictionary',
   whisper: 'storage.group.whisper',
+  tts: 'storage.group.tts',
   ocr: 'storage.group.ocr',
   tessdata: 'storage.group.ocr',
   examples: 'storage.group.examples',
@@ -33,6 +40,7 @@ const GROUP_ORDER = [
   // surfaced here — listing them was the "downloads don't match the dropdown"
   // confusion.
   'storage.group.ocr',
+  'storage.group.tts',
   'storage.group.accent',
   'storage.group.examples',
   'storage.group.sentences',
@@ -43,6 +51,49 @@ function progressPercent(view: AssetView): number {
   const { receivedBytes, totalBytes } = view.status;
   if (!totalBytes) return 0;
   return Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+}
+
+function bundleView(root: AssetView, all: AssetView[]): AssetView {
+  const specs = all.map((view) => view.spec);
+  const closure = assetDependencyClosure(specs, root.spec.id);
+  if (closure.length <= 1) return root;
+  const byId = new Map(all.map((view) => [view.spec.id, view]));
+  const members = closure.map((spec) => byId.get(spec.id)).filter((view): view is AssetView => Boolean(view));
+  const states = members.map((view) => view.status.state);
+  const failed = members.find((view) => view.status.state === 'failed');
+  const state: AssetStatus['state'] = states.every((value) => value === 'installed')
+    ? 'installed'
+    : failed
+      ? 'failed'
+      : states.includes('downloading')
+        ? 'downloading'
+        : states.includes('verifying')
+          ? 'verifying'
+          : states.includes('queued')
+            ? 'queued'
+            : states.includes('paused')
+              ? 'paused'
+              : 'not-installed';
+  const totalBytes = closure.reduce((sum, spec) => sum + spec.sizeBytes, 0);
+  const receivedBytes = members.reduce(
+    (sum, view) => sum + (
+      view.status.state === 'installed'
+        ? view.status.totalBytes || view.spec.sizeBytes
+        : view.status.receivedBytes
+    ),
+    0,
+  );
+  return {
+    spec: { ...root.spec, sizeBytes: totalBytes },
+    status: {
+      ...root.status,
+      state,
+      receivedBytes,
+      totalBytes,
+      bytesPerSecond: members.reduce((sum, view) => sum + view.status.bytesPerSecond, 0),
+      error: failed?.status.error ?? root.status.error,
+    },
+  };
 }
 
 function statusLine(view: AssetView, t: (key: string, vars?: TVars) => string): string {
@@ -158,7 +209,7 @@ export default function StoragePage() {
       if (companionIds.has(view.spec.id)) continue;
       const key = KIND_GROUP_KEY[view.spec.kind];
       const list = byGroup.get(key) ?? [];
-      list.push(view);
+      list.push(bundleView(view, views));
       byGroup.set(key, list);
     }
     return GROUP_ORDER.filter((key) => byGroup.has(key)).map((key) => ({
@@ -228,7 +279,9 @@ export default function StoragePage() {
                         <span className="asset-tag">{spec.lang === 'ja' ? 'JA' : 'ZH'}</span>
                       )}
                     </div>
-                    <div className="asset-desc">{spec.description}</div>
+                    <div className="asset-desc">
+                      {spec.descriptionKey ? t(spec.descriptionKey) : spec.description}
+                    </div>
                     <div
                       className={`asset-status ${status.state === 'failed' ? 'is-error' : ''}`}
                     >

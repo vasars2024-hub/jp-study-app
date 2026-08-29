@@ -2417,9 +2417,11 @@ export const ru: Catalog = {
   'storage.group.dictionary': 'Словари',
   'storage.group.whisper': 'Модели транскрипции',
   'storage.group.ocr': 'OCR изображений и манги',
+  'storage.group.tts': 'Офлайн-модели речи',
   'storage.group.accent': 'Произношение',
   'storage.group.examples': 'Примеры предложений',
   'storage.group.sentences': 'Предложения по уровням',
+  'storage.asset.supertonic3.desc': 'Высококачественная офлайн-озвучка японского текста с десятью локальными голосами.',
   'storage.modelCount': {
     one: 'Установлена {count} модель',
     few: 'Установлено {count} модели',
