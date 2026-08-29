@@ -87,6 +87,8 @@ import { cardAudio } from '../../cardAudioPlayback';
 import { TranscriptionCardDeckStatus } from '../media/TranscriptionCardOptions';
 import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import AutoReadingPreferencesPanel from './AutoReadingPreferences';
+import CardVoicePicker from './CardVoicePicker';
+import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -708,7 +710,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     setAudioBusy(true);
     setAudioError('');
     try {
-      const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
+      const result = await window.api.flashcardSynthesizeAudio(
+        card.sentence || card.word,
+        'ja',
+        preferredVoiceFor('ja'),
+      );
       if (!result.ok || !result.path) {
         // NOT `result.error`: that is the synthesizer's own English sentence, and it
         // was reaching users reading the app in ja/zh/ru verbatim. The classification
@@ -740,8 +746,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
     try {
       // The OS synthesizer owns one voice device. Sequential generation avoids
       // competing speech engines while still keeping the renderer responsive.
+      const voice = preferredVoiceFor('ja');
       for (const card of candidates) {
-        const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja');
+        const result = await window.api.flashcardSynthesizeAudio(card.sentence || card.word, 'ja', voice);
         if (result.ok && result.path) updates.push({ id: card.id, audioPath: result.path });
         else {
           failures += 1;
@@ -1671,6 +1678,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       </ContextualSurface>
 
       <TranscriptionCardDeckStatus />
+      <CardVoicePicker />
       <AutoAudioPreferencesPanel />
       <AutoReadingPreferencesPanel />
 

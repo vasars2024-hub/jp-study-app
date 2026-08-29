@@ -20,6 +20,7 @@ import {
   type AutoAudioPreferences,
 } from '../shared/flashcardAutoAudio';
 import { updateDeckCardAudioBatch, type DeckFlashcard } from './flashcardDeck';
+import { preferredVoiceFor } from './flashcardVoicePreference';
 
 const PREF_KEY = 'jp-flashcard-auto-audio-v1';
 export const AUTO_AUDIO_EVENT = 'flashcard-auto-audio';
@@ -69,12 +70,15 @@ export async function narrateNewCards(
 
   const updates: Array<{ id: string; audioPath: string }> = [];
   const report: AutoAudioReport = { added: 0, failed: 0, deferred: selection.deferred };
+  // Read once, not once per card: the batch is one sitting, and a voice swapped
+  // halfway through it would be audible.
+  const voice = preferredVoiceFor('ja');
   // Sequential on purpose: the OS synthesizer owns one voice device, and
   // parallel requests there deadlock rather than go faster.
   for (const card of selection.chosen) {
     let result: { ok: boolean; path?: string; reason?: unknown };
     try {
-      result = await window.api.flashcardSynthesizeAudio(autoAudioTextFor(card), 'ja');
+      result = await window.api.flashcardSynthesizeAudio(autoAudioTextFor(card), 'ja', voice);
     } catch (error) {
       result = { ok: false, reason: error };
     }

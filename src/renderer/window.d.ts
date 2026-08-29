@@ -1731,7 +1731,11 @@ declare global {
       flashcardSynthesizeAudio(
         text: string,
         language?: string,
+        voice?: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
+      flashcardListVoices(
+        refresh?: boolean,
+      ): Promise<import('../shared/flashcardVoices').FlashcardVoiceInventory>;
       flashcardReadAudio(
         filePath: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;

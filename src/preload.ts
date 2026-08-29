@@ -2677,9 +2677,13 @@ const api = {
     ipcRenderer.on('transcription:cards-ready', handler);
     return () => ipcRenderer.removeListener('transcription:cards-ready', handler);
   },
-  flashcardSynthesizeAudio: (text: string, language = 'ja'):
+  flashcardSynthesizeAudio: (text: string, language = 'ja', voice?: string):
     Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
-    ipcRenderer.invoke('flashcards:synthesizeAudio', text, language),
+    ipcRenderer.invoke('flashcards:synthesizeAudio', text, language, voice),
+  /** Every offline voice installed on this machine. `refresh` re-enumerates. */
+  flashcardListVoices: (refresh = false):
+    Promise<import('./shared/flashcardVoices').FlashcardVoiceInventory> =>
+    ipcRenderer.invoke('flashcards:listVoices', refresh),
   flashcardReadAudio: (filePath: string):
     Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
     ipcRenderer.invoke('flashcards:readAudio', filePath),

@@ -18,6 +18,7 @@ import {
   extractFlashcardAudioClip,
   flashcardAudioUsage,
   isManagedFlashcardAudioPath,
+  listFlashcardVoices,
   pruneMediaClips,
   releaseFlashcardAudio,
   sweepUnreferencedFlashcardAudio,
@@ -48,6 +49,37 @@ describe('flashcard audio safety', () => {
     const result = await synthesizeFlashcardAudio('今日はいい天気ですね。', 'ja');
     expect(result.ok, result.error).toBe(true);
     expect(result.path && fs.statSync(result.path).size).toBeGreaterThan(1_000);
+    // The run names the voice it used rather than leaving the caller to assume.
+    expect(result.voice).toBeTruthy();
+    expect(result.voiceResolution).toBe('preferred');
+  }, 20_000);
+
+  it.runIf(process.platform === 'win32')('enumerates this machine\'s real voices', async () => {
+    const inventory = await listFlashcardVoices(true);
+    expect(inventory.ok, inventory.error).toBe(true);
+    expect(inventory.platform).toBe('win32');
+    expect(inventory.voices.length).toBeGreaterThan(0);
+    // Every voice must carry a usable id and a language, or the picker shows
+    // rows the synthesizer cannot be asked for.
+    for (const voice of inventory.voices) {
+      expect(voice.id).toBeTruthy();
+      expect(voice.language).toMatch(/^[a-z]{2}$/);
+    }
+  }, 20_000);
+
+  it.runIf(process.platform === 'win32')('falls back within the language and discloses it', async () => {
+    // The negative control for the whole voice preference: a saved voice that is
+    // not installed must still produce Japanese audio, and must not report the
+    // result as the user's own choice.
+    const result = await synthesizeFlashcardAudio(
+      '発音を確かめます。',
+      'ja',
+      'Microsoft Nobody Desktop',
+    );
+    expect(result.ok, result.error).toBe(true);
+    expect(result.voiceResolution).toBe('language');
+    const japanese = (await listFlashcardVoices()).voices.filter((voice) => voice.language === 'ja');
+    expect(japanese.map((voice) => voice.name)).toContain(result.voice);
   }, 20_000);
 
   it('extracts a bounded sentence clip with bundled ffmpeg', async () => {

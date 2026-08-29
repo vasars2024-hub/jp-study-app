@@ -5,6 +5,13 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { FlashcardAudioFailure } from '../shared/flashcardAudioMessages';
+import {
+  resolveVoice,
+  voiceLanguageOf,
+  type FlashcardVoice,
+  type FlashcardVoiceInventory,
+  type VoiceResolution,
+} from '../shared/flashcardVoices';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -22,6 +29,14 @@ export interface FlashcardAudioResult {
   dataUrl?: string;
   error?: string;
   reason?: FlashcardAudioFailure;
+  /** The voice that actually spoke, so the caller can say so instead of guessing. */
+  voice?: string;
+  /**
+   * How that voice was arrived at. `language` means the saved choice was gone
+   * and a sibling spoke instead — a result the UI has to disclose, because the
+   * card sounds different from the one before it for a reason the user set.
+   */
+  voiceResolution?: VoiceResolution;
 }
 
 function audioRoot(): string {
@@ -236,6 +251,130 @@ function run(command: string, args: string[], options: { env?: NodeJS.ProcessEnv
   });
 }
 
+/** Same spawn contract as `run`, but the answer is what the command printed. */
+function capture(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { shell: false, windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.on('error', (error: NodeJS.ErrnoException) => reject(
+      error.code === 'ENOENT'
+        ? new SynthesizerError(`${path.basename(command)} is not installed.`, 'no-synthesizer')
+        : error,
+    ));
+    child.on('close', (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(stderr.trim() || `${path.basename(command)} exited with code ${code}`));
+    });
+  });
+}
+
+/**
+ * Windows lists voices as JSON, which is the only back end that needs no
+ * scraping. A single installed voice serialises as an object rather than an
+ * array, which is the shape that would otherwise silently produce nothing.
+ */
+export function parseWindowsVoices(stdout: string): FlashcardVoice[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim() || 'null');
+  } catch {
+    return [];
+  }
+  const rows = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  const out: FlashcardVoice[] = [];
+  for (const row of rows) {
+    const entry = row as { Name?: unknown; Culture?: unknown };
+    const name = typeof entry?.Name === 'string' ? entry.Name.trim() : '';
+    if (!name) continue;
+    const culture = typeof entry?.Culture === 'string' ? entry.Culture.trim() : '';
+    out.push({ id: name, name, culture, language: voiceLanguageOf(culture) });
+  }
+  return out;
+}
+
+/** `say -v '?'` prints `Kyoko               ja_JP    # …`, one voice per line. */
+export function parseMacVoices(stdout: string): FlashcardVoice[] {
+  const out: FlashcardVoice[] = [];
+  for (const line of stdout.split('\n')) {
+    const match = /^(.+?)\s{2,}([A-Za-z]{2}[-_][A-Za-z0-9]+)\s/.exec(line);
+    if (!match) continue;
+    const name = match[1].trim();
+    const culture = match[2].replace('_', '-');
+    out.push({ id: name, name, culture, language: voiceLanguageOf(culture) });
+  }
+  return out;
+}
+
+/**
+ * `espeak-ng --voices` prints a fixed-width table whose first row is a header.
+ * The voice the synthesizer accepts back is column 4 (`VoiceName`), not the
+ * language code, which is why the id and the culture differ on this platform.
+ */
+export function parseLinuxVoices(stdout: string): FlashcardVoice[] {
+  const out: FlashcardVoice[] = [];
+  for (const line of stdout.split('\n')) {
+    const cells = line.trim().split(/\s+/);
+    if (cells.length < 4 || cells[0] === 'Pty' || !/^\d+$/.test(cells[0])) continue;
+    const culture = cells[1];
+    const name = cells[3];
+    if (!name) continue;
+    out.push({ id: name, name, culture, language: voiceLanguageOf(culture) });
+  }
+  return out;
+}
+
+let voiceCache: FlashcardVoiceInventory | null = null;
+
+/**
+ * Every offline voice this machine can speak with.
+ *
+ * Cached because enumerating spawns a process — on Windows a whole PowerShell —
+ * and a settings panel that re-reads on every render would spawn one per
+ * keystroke. `refresh` is how a user who just installed a language pack sees it
+ * without restarting the app, which is the only reason the cache is escapable.
+ */
+export async function listFlashcardVoices(refresh = false): Promise<FlashcardVoiceInventory> {
+  if (voiceCache && !refresh) return voiceCache;
+  const platform = process.platform;
+  try {
+    let voices: FlashcardVoice[];
+    if (platform === 'win32') {
+      const script = [
+        'Add-Type -AssemblyName System.Speech',
+        '$s=New-Object System.Speech.Synthesis.SpeechSynthesizer',
+        '$s.GetInstalledVoices()|Where-Object {$_.Enabled}|ForEach-Object {'
+          + '[pscustomobject]@{Name=$_.VoiceInfo.Name;Culture=$_.VoiceInfo.Culture.Name}'
+          + '}|ConvertTo-Json -Compress',
+      ].join(';');
+      const encoded = Buffer.from(script, 'utf16le').toString('base64');
+      voices = parseWindowsVoices(
+        await capture('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded]),
+      );
+    } else if (platform === 'darwin') {
+      voices = parseMacVoices(await capture('say', ['-v', '?']));
+    } else {
+      voices = parseLinuxVoices(
+        await capture('espeak-ng', ['--voices']).catch(() => capture('espeak', ['--voices'])),
+      );
+    }
+    voiceCache = { ok: true, voices, platform };
+  } catch (error) {
+    // An inventory that failed is reported as failed. Returning an empty list
+    // would be indistinguishable from a machine with no voices at all, and the
+    // advice the user needs is the opposite in each case.
+    voiceCache = {
+      ok: false,
+      voices: [],
+      platform,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+  return voiceCache;
+}
+
 /**
  * Classify what a failed synthesis run said. Every platform's "no voice for this
  * language" wording is distinct and none of them is a machine-readable code, so
@@ -293,13 +432,22 @@ export async function extractFlashcardAudioClip(
   }
 }
 
-async function synthesizeWindows(text: string, culture: string, output: string): Promise<void> {
+async function synthesizeWindows(
+  text: string,
+  culture: string,
+  output: string,
+  voiceName: string,
+): Promise<void> {
   const script = [
     'Add-Type -AssemblyName System.Speech',
     '$text=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:JP_FLASHCARD_TTS_TEXT_B64))',
     '$culture=New-Object Globalization.CultureInfo($env:JP_FLASHCARD_TTS_CULTURE)',
     '$speaker=New-Object System.Speech.Synthesis.SpeechSynthesizer',
-    '$voice=$speaker.GetInstalledVoices($culture)|Where-Object {$_.Enabled}|Select-Object -First 1',
+    '$wanted=$env:JP_FLASHCARD_TTS_VOICE',
+    '$installed=$speaker.GetInstalledVoices($culture)|Where-Object {$_.Enabled}',
+    '$voice=if($wanted){$installed|Where-Object {$_.VoiceInfo.Name -eq $wanted}|Select-Object -First 1}'
+      + 'else{$installed|Select-Object -First 1}',
+    'if(-not $voice){$voice=$installed|Select-Object -First 1}',
     'if(-not $voice){throw "No offline voice is installed for $($culture.Name)."}',
     '$speaker.SelectVoice($voice.VoiceInfo.Name)',
     '$speaker.Rate=-1',
@@ -314,22 +462,35 @@ async function synthesizeWindows(text: string, culture: string, output: string):
       JP_FLASHCARD_TTS_TEXT_B64: Buffer.from(text, 'utf8').toString('base64'),
       JP_FLASHCARD_TTS_CULTURE: culture,
       JP_FLASHCARD_TTS_OUTPUT: output,
+      JP_FLASHCARD_TTS_VOICE: voiceName,
     },
   });
 }
 
-async function synthesizeMac(text: string, culture: string, output: string): Promise<void> {
+async function synthesizeMac(
+  text: string,
+  culture: string,
+  output: string,
+  voiceName: string,
+): Promise<void> {
+  // The table is the fallback for a machine whose voice list could not be read;
+  // a resolved choice always wins over it.
   const preferred: Record<string, string> = {
     'ja-JP': 'Kyoko',
     'zh-CN': 'Tingting',
     'ru-RU': 'Milena',
     'en-US': 'Samantha',
   };
-  await run('say', ['-v', preferred[culture] ?? 'Samantha', '-r', '175', '-o', output, text]);
+  await run('say', ['-v', voiceName || preferred[culture] || 'Samantha', '-r', '175', '-o', output, text]);
 }
 
-async function synthesizeLinux(text: string, culture: string, output: string): Promise<void> {
-  const voice = culture.split('-', 1)[0].toLowerCase();
+async function synthesizeLinux(
+  text: string,
+  culture: string,
+  output: string,
+  voiceName: string,
+): Promise<void> {
+  const voice = voiceName || culture.split('-', 1)[0].toLowerCase();
   try {
     await run('espeak-ng', ['-v', voice, '-s', '165', '-w', output, text]);
   } catch {
@@ -341,23 +502,50 @@ async function synthesizeLinux(text: string, culture: string, output: string): P
 export async function synthesizeFlashcardAudio(
   text: string,
   language = 'ja',
+  preferredVoiceId?: string,
 ): Promise<FlashcardAudioResult> {
   const sentence = text.trim().slice(0, 2_000);
   if (!sentence) return { ok: false, error: 'Card text is empty.', reason: 'empty-text' };
   const culture = cultureForLanguage(language);
+
+  // Resolving before spawning is what makes "no Japanese voice at all" a
+  // reportable state rather than a synthesizer error the user has to interpret.
+  // An inventory that could not be read is not treated as an empty one: the run
+  // proceeds and the back end's own selection decides, as it always did.
+  const inventory = await listFlashcardVoices();
+  let chosen: FlashcardVoice | null = null;
+  let resolution: VoiceResolution = 'preferred';
+  if (inventory.ok && inventory.voices.length) {
+    const resolved = resolveVoice(inventory.voices, culture, preferredVoiceId);
+    if (resolved.resolution === 'none') {
+      return {
+        ok: false,
+        error: `No offline voice is installed for ${culture}.`,
+        reason: 'no-voice',
+      };
+    }
+    chosen = resolved.voice;
+    resolution = resolved.resolution;
+  }
+
   const extension = process.platform === 'darwin' ? 'aiff' : 'wav';
   const directory = path.join(audioRoot(), 'tts');
   fs.mkdirSync(directory, { recursive: true });
-  const output = path.join(directory, `${fileHash(culture, sentence)}.${extension}`);
-  if (fs.existsSync(output) && fs.statSync(output).size > 0) return { ok: true, path: output };
+  // The voice is part of the cache key: two voices reading one sentence are two
+  // different files, and sharing a path would hand back the wrong one forever.
+  const output = path.join(directory, `${fileHash(culture, chosen?.id ?? '', sentence)}.${extension}`);
+  if (fs.existsSync(output) && fs.statSync(output).size > 0) {
+    return { ok: true, path: output, voice: chosen?.name, voiceResolution: resolution };
+  }
   try {
-    if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output);
-    else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output);
-    else await synthesizeLinux(sentence, culture, output);
+    const voiceId = chosen?.id ?? '';
+    if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output, voiceId);
+    else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output, voiceId);
+    else await synthesizeLinux(sentence, culture, output, voiceId);
     if (!fs.existsSync(output) || fs.statSync(output).size === 0) {
       throw new Error('The offline voice produced no audio.');
     }
-    return { ok: true, path: output };
+    return { ok: true, path: output, voice: chosen?.name, voiceResolution: resolution };
   } catch (error) {
     try { fs.rmSync(output, { force: true }); } catch { /* best effort */ }
     const message = error instanceof Error ? error.message : String(error);
@@ -386,8 +574,15 @@ function readManagedAudio(filePath: string): FlashcardAudioResult {
 }
 
 export function registerFlashcardAudioIpc(): void {
-  ipcMain.handle('flashcards:synthesizeAudio', (_event, text?: string, language?: string) => (
-    synthesizeFlashcardAudio(typeof text === 'string' ? text : '', typeof language === 'string' ? language : 'ja')
+  ipcMain.handle('flashcards:synthesizeAudio', (_event, text?: string, language?: string, voice?: string) => (
+    synthesizeFlashcardAudio(
+      typeof text === 'string' ? text : '',
+      typeof language === 'string' ? language : 'ja',
+      typeof voice === 'string' ? voice : undefined,
+    )
+  ));
+  ipcMain.handle('flashcards:listVoices', (_event, refresh?: unknown) => (
+    listFlashcardVoices(refresh === true)
   ));
   ipcMain.handle('flashcards:readAudio', (_event, filePath?: string) => (
     readManagedAudio(typeof filePath === 'string' ? filePath : '')
