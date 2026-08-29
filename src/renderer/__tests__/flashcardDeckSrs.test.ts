@@ -40,13 +40,42 @@ describe('local deck review persistence', () => {
 
     expect(reviewed.known).toBe(true);
     expect(reviewed.srs).toMatchObject({
-      version: 1,
+      // Version 2 since the scheduler became configurable: the state now
+      // records which scheduler wrote it. The intervals are unchanged, which is
+      // the half of that change that must never move.
+      version: 2,
+      algorithm: 'sm2',
       dueAt: NOW + 24 * 60 * 60 * 1000,
       intervalDays: 1,
       repetitions: 1,
       lastRating: 'good',
     });
+    // SM-2 writes no FSRS memory. A stability here would mean the seam had
+    // fabricated one from the ease factor.
+    expect(reviewed.srs?.stability).toBeUndefined();
+    expect(reviewed.srs?.difficulty).toBeUndefined();
     expect(loadDeck()[0].srs).toEqual(reviewed.srs);
+  });
+
+  it('keeps reading a version-1 schedule written before the scheduler was a setting', () => {
+    const card = addCard();
+    const legacy = {
+      version: 1,
+      dueAt: NOW - 1_000,
+      intervalDays: 3,
+      ease: 2.5,
+      repetitions: 2,
+      lapses: 0,
+      lastReviewedAt: NOW - 3 * 24 * 60 * 60 * 1000,
+      lastRating: 'good',
+    };
+    const store = JSON.parse(localStorage.getItem('jp-flashcard-deck') as string);
+    store.cards[0].srs = legacy;
+    localStorage.setItem('jp-flashcard-deck', JSON.stringify(store));
+
+    const [reviewed] = reviewDeckCard(card.id, 'good', NOW);
+    // Read, migrated and continued — repetitions 2 -> 3, not restarted at 1.
+    expect(reviewed.srs).toMatchObject({ version: 2, algorithm: 'sm2', repetitions: 3 });
   });
 
   it('persists Again as unknown without discarding lapse history', () => {
