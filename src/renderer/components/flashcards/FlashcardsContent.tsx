@@ -90,6 +90,7 @@ import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
 import DeckAudioExport from './DeckAudioExport';
+import SchedulingPreferencesPanel from './SchedulingPreferences';
 import LearnMode from './LearnMode';
 import MatchMode from './MatchMode';
 import TestMode from './TestMode';
@@ -1694,6 +1695,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       <CardVoicePicker />
       <AutoAudioPreferencesPanel />
       <AutoReadingPreferencesPanel />
+      <SchedulingPreferencesPanel />
       <DeckAudioExport />
 
       {practice === 'match' && <MatchMode onExit={() => setPractice('none')} />}

@@ -180,6 +180,65 @@ export function localBacklog(cards: BacklogCard[]): LocalBacklog {
   return { total: cards.length, known, unknown: cards.length - known, groups };
 }
 
+/** Minimal shape the local due forecast needs. `srs` is whatever is on disk. */
+export interface LocalForecastCard {
+  srs?: unknown;
+}
+
+export interface LocalDueForecast {
+  /** Already past due, and every unscheduled card, which is due by definition. */
+  overdue: number;
+  /** Exactly `days` entries, offset 0..days-1. Offset 0 is the rest of today. */
+  days: ForecastDay[];
+  /** Scheduled beyond the window. Counted, never folded into the last day. */
+  beyond: number;
+  total: number;
+}
+
+/**
+ * What the coming days of LOCAL review actually look like.
+ *
+ * Unlike the Anki half of this module, this one can be computed honestly: a
+ * local card stores its own `dueAt`, so the date is read rather than derived
+ * from an interval length. Two rules keep the picture from flattering:
+ *
+ * - a card scheduled past the window is counted in `beyond`, never dropped and
+ *   never piled onto the last day, which would read as a wall of work on a day
+ *   that has none;
+ * - a card with no schedule is OVERDUE, not "someday". Every reader in the app
+ *   treats an unscheduled card as due now, and a forecast that quietly excluded
+ *   them would disagree with the button the user is about to press.
+ */
+export function localDueForecast(
+  cards: readonly LocalForecastCard[],
+  days = FORECAST_DAYS,
+  now = Date.now(),
+): LocalDueForecast {
+  const span = Math.max(1, Math.floor(days));
+  const buckets = Array.from({ length: span }, (_, offsetDays) => ({ offsetDays, due: 0 }));
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  let overdue = 0;
+  let beyond = 0;
+  for (const card of cards) {
+    const state = card.srs as { dueAt?: unknown } | undefined;
+    const dueAt = typeof state?.dueAt === 'number' && Number.isFinite(state.dueAt)
+      ? state.dueAt
+      : null;
+    if (dueAt === null || dueAt <= now) {
+      overdue += 1;
+      continue;
+    }
+    const offset = Math.floor((dueAt - startOfToday.getTime()) / dayMs);
+    if (offset < 0) overdue += 1;
+    else if (offset < span) buckets[offset].due += 1;
+    else beyond += 1;
+  }
+  return { overdue, days: buckets, beyond, total: cards.length };
+}
+
 /**
  * Day label for an offset: Today, Tomorrow, then the weekday name.
  *

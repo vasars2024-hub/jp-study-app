@@ -5,6 +5,7 @@ import {
   emptyForecast,
   isDueForecast,
   localBacklog,
+  localDueForecast,
   summarizeForecast,
   type DueForecast,
 } from '../reviewForecast';
@@ -167,5 +168,49 @@ describe('dayLabel', () => {
     expect(dayLabel(3, endOfMonth)).toBe(
       new Date(2026, 7, 2).toLocaleDateString(undefined, { weekday: 'short' }),
     );
+  });
+});
+
+describe('localDueForecast', () => {
+  // Midday, so "later today" is unambiguous in the local zone the function uses.
+  const NOW = new Date(2026, 7, 29, 12).getTime();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const at = (offsetDays: number) => ({ srs: { dueAt: NOW + offsetDays * DAY_MS } });
+
+  it('reads stored due dates rather than deriving them from intervals', () => {
+    const result = localDueForecast([at(0.1), at(1), at(1), at(3)], 7, NOW);
+    expect(result.days[0].due).toBe(1);
+    expect(result.days[1].due).toBe(2);
+    expect(result.days[3].due).toBe(1);
+    expect(result.total).toBe(4);
+    expect(result.days).toHaveLength(7);
+  });
+
+  it('counts an unscheduled card as due now, agreeing with the review button', () => {
+    const result = localDueForecast([{}, { srs: null }, { srs: { dueAt: 'soon' } }], 7, NOW);
+    expect(result.overdue).toBe(3);
+    expect(result.days.every((day) => day.due === 0)).toBe(true);
+  });
+
+  it('counts a past-due card as overdue, never as day zero', () => {
+    const result = localDueForecast([at(-5), at(-0.1)], 7, NOW);
+    expect(result.overdue).toBe(2);
+    expect(result.days[0].due).toBe(0);
+  });
+
+  it('REFUSAL: a card beyond the window is counted apart, never piled onto the last day', () => {
+    const result = localDueForecast([at(30), at(90)], 7, NOW);
+    expect(result.beyond).toBe(2);
+    expect(result.days[6].due).toBe(0);
+    expect(result.days.reduce((sum, day) => sum + day.due, 0)).toBe(0);
+  });
+
+  it('keeps every card in exactly one column', () => {
+    const cards = [at(-1), at(0.2), at(2), at(400), {}];
+    const result = localDueForecast(cards, 7, NOW);
+    const counted = result.overdue + result.beyond
+      + result.days.reduce((sum, day) => sum + day.due, 0);
+    expect(counted).toBe(result.total);
+    expect(result.total).toBe(cards.length);
   });
 });
