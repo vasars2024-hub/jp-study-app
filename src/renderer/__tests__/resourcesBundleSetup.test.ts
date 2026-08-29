@@ -233,6 +233,19 @@ describe('Resources bundle setup truthfulness', () => {
     expect(heatmap).not.toContain('<canvas');
   });
 
+  it('keeps secondary new-resource cards behind a keyboard-native collapsed disclosure', () => {
+    const content = readFileSync(
+      new URL('../components/resources/ResourcesContent.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(content).toContain('<details className="new-section">');
+    expect(content).toContain('<summary className="bundles-head">');
+    expect(content).not.toContain('<details className="new-section" open>');
+    expect(content).toContain("t('resources.new.title')");
+    expect(content).toContain("t('resources.new.blurb')");
+  });
+
   it('defines every changed UI claim in all four catalogs', async () => {
     const { CATALOGS } = await import('../../shared/i18n/catalogs/all');
     const keys = [

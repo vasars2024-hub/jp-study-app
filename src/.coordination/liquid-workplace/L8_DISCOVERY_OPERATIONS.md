@@ -91,3 +91,38 @@ compositor can be clean while six other app windows still spend one frame repain
 Resources is **70/80**: categories 1, 2, 3, 4, 6, 7 and 8 are controlled 10/10. Category 5 is
 the only open cell; Q4 still requires one collapsed disclosure, followed by the whole cat5 run.
 Evidence: `baselines/cat7-l8-resources.json`; guard: `resourcesBundleSetup.test.ts` **7/7**.
+
+## 2026-08-29 — Resources closes at 80/80; the "at rest" trap that nearly buried it
+
+Recovered codexA's interrupted Q4 slice (it died 9 min after `0fa65fbe` with the edit on disk,
+uncommitted). The New-resources block is now a **collapsed `<details>`/`<summary>`** rather than
+a `<section>`/`<div>`: the cards are still one keystroke away, `Tab` reaches the summary, and
+nothing was deleted — Q4's bar wants a disclosure, not a trim, and this is the disclosure.
+
+| leg | measured result |
+| --- | --- |
+| cat5 score | **PASS 10/10** — all ten YES, `findings []`, `voided []` |
+| Q4 specifically | `collapsedDisclosures` **1** (was 0), `scannedControls` **10** of 12, `behindDisclosure` 0 |
+| Q5 theme axis | forest-night min **5.30** / classic-light min **5.17**, 246 runs each, 0 failing |
+| Q7/Q8/Q9 | read from `baselines/cat6-l8-resources.json`: parity 8/8 = 8/8, roundTrip diffs 0 |
+| negative control | **FAILED AS REQUIRED on Q2, Q3, Q5, Q10** — 4 of 4 moved, residue 0, `storeIdentical` true |
+
+**The trap, and it published a false FINDING first.** The first post-disclosure run scored
+**9/10** with `Q3 primaryAction: input.gram-search, insideBodyViewport: false`, which reads
+exactly like the disclosure having pushed the search field out of view. It had not. An earlier
+probe left `.fwin-body` at **`scrollTop: 1563`**, so the field sat at `top: -1364` — a screen
+and a half above its own window. The layout never changed; **the leftover scroll was the whole
+finding**. Same family as the stale-`"dict"`-in-the-search-box trap above: leftover UI state
+manufactures false failures as readily as false passes.
+
+So the harness is repaired once, surface-parameterised as RULE 1 requires: **`bodyScrollTop` is
+reported in every cat5 snapshot, and a non-zero one REFUSES** — "at rest" (Q3) and "the default
+state" (Q4) are undefined on a body somebody else scrolled. Verified by running it against the
+still-scrolled window: `REFUSE - body is scrolled 1563px off its resting position`. `--allow-scroll`
+scores anyway for a surface that genuinely restores an offset on mount, and the recorded number
+is what then makes that score arguable rather than asserted.
+
+**Resources is 80/80** — categories 1–8 all controlled 10/10. Evidence:
+`baselines/cat5-l8-resources.json` + `-control.json`; guard `resourcesBundleSetup.test.ts` **8/8**.
+Next surface in L8's order: **Scraper**, then Settings, YouTube, Music. Every category harness
+now exists, so each is a RUN, not a BUILD.

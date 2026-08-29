@@ -334,11 +334,11 @@ export function ResourceNewSection({ state }: { state: ResourcesState }) {
   const { t } = useT();
   if (state.newEntries.length === 0) return null;
   return (
-    <section className="new-section">
-      <div className="bundles-head">
-        <h2>{t('resources.new.title')}</h2>
-        <p className="muted">{t('resources.new.blurb')}</p>
-      </div>
+    <details className="new-section">
+      <summary className="bundles-head">
+        <span className="resources-disclosure-title">{t('resources.new.title')}</span>
+        <span className="muted">{t('resources.new.blurb')}</span>
+      </summary>
       <div className="res-grid">
         {state.newEntries.map((r) => (
           <button key={r.url} className="res-card new-card" onClick={() => openLink(r.url)}>
@@ -359,7 +359,7 @@ export function ResourceNewSection({ state }: { state: ResourcesState }) {
           </button>
         ))}
       </div>
-    </section>
+    </details>
   );
 }
 

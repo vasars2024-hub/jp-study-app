@@ -2,15 +2,28 @@
   "surface": "@.fwin:has(.res-view)",
   "label": "l8-resources",
   "control": false,
-  "at": "2026-08-29T00:38:41.739Z",
+  "at": "2026-08-29T05:27:21.087Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
   "box": "820x580",
+  "bodyScrollTop": 0,
   "presentationAsFound": "liquid",
   "cat6": {
     "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json",
-    "missing": true
+    "verdict": "PASS 10/10",
+    "parity": {
+      "liquid": "8/8",
+      "standard": "8/8",
+      "na": 0,
+      "equal": true,
+      "rowsAgree": true,
+      "failing": [],
+      "onlyInOne": []
+    },
+    "roundTrip": {
+      "diffs": []
+    }
   },
   "axes": {
     "theme": [
@@ -82,16 +95,16 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 0,
+        "collapsedDisclosures": 1,
         "scannedControls": 10,
-        "chromeControlsRaw": 10,
-        "summaryHeaders": 0,
+        "chromeControlsRaw": 11,
+        "summaryHeaders": 1,
         "behindDisclosure": 0,
         "disclosures": {
-          "total": 0,
+          "total": 1,
           "open": 0
         },
         "scannedList": [
@@ -118,7 +131,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 303,
+            "measured": 246,
             "unmeasurable": 0,
             "minRatio": 5.3,
             "failingCount": 0,
@@ -132,7 +145,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 303,
+            "measured": 246,
             "unmeasurable": 0,
             "minRatio": 5.17,
             "failingCount": 0,
@@ -179,31 +192,41 @@
       "id": 7,
       "q": "standard mode remains fully normal",
       "bar": "category 6's parity: the same features reachable in standard as in Liquid",
-      "verdict": "MEASURE",
+      "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "parity": null
+        "parity": {
+          "liquid": "8/8",
+          "standard": "8/8",
+          "na": 0,
+          "equal": true,
+          "rowsAgree": true,
+          "failing": [],
+          "onlyInOne": []
+        }
       }
     },
     {
       "id": 8,
       "q": "Liquid can be turned off without losing state",
       "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
-      "verdict": "MEASURE",
+      "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "roundTrip": null
+        "roundTrip": {
+          "diffs": []
+        }
       }
     },
     {
       "id": 9,
       "q": "all pre-migration features reachable and functional",
       "bar": "category 6's row agreement: no row reachable in only one presentation",
-      "verdict": "MEASURE",
+      "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "rowsAgree": null,
-        "onlyInOne": null
+        "rowsAgree": true,
+        "onlyInOne": []
       }
     },
     {
@@ -223,12 +246,12 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "res:182",
+          "res:139",
           "muted:13",
           "heatmap:3",
           "[object:11",
           "svganimatedstring]:11",
-          "bundles:5",
+          "bundles:4",
           "bundle:20"
         ],
         "contentDominant": "svg.[object media",
@@ -243,12 +266,6 @@
             "uniformity": 1,
             "signatures": 1,
             "detail": "127% of body"
-          },
-          {
-            "host": "div.res-grid cards=14",
-            "uniformity": 1,
-            "signatures": 1,
-            "detail": "158% of body"
           },
           {
             "host": "div.res-grid cards=6",
@@ -301,13 +318,13 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "NO",
+    "q4": "YES",
     "q6": "YES",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 78,
+    "controlsPainted": 65,
     "q1": {
       "entryPoints": 1,
       "primaryInputs": 1,
@@ -318,13 +335,13 @@
       ]
     },
     "q4": {
-      "collapsedDisclosures": 0,
+      "collapsedDisclosures": 1,
       "scannedControls": 10,
-      "chromeControlsRaw": 10,
-      "summaryHeaders": 0,
+      "chromeControlsRaw": 11,
+      "summaryHeaders": 1,
       "behindDisclosure": 0,
       "disclosures": {
-        "total": 0,
+        "total": 1,
         "open": 0
       },
       "scannedList": [
@@ -365,12 +382,12 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "res:182",
+        "res:139",
         "muted:13",
         "heatmap:3",
         "[object:11",
         "svganimatedstring]:11",
-        "bundles:5",
+        "bundles:4",
         "bundle:20"
       ],
       "contentDominant": "svg.[object media",
@@ -385,12 +402,6 @@
           "uniformity": 1,
           "signatures": 1,
           "detail": "127% of body"
-        },
-        {
-          "host": "div.res-grid cards=14",
-          "uniformity": 1,
-          "signatures": 1,
-          "detail": "158% of body"
         },
         {
           "host": "div.res-grid cards=6",
@@ -438,15 +449,9 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 78,
-  "findings": [
-    "Q4 advanced tools discoverable without cluttering"
-  ],
-  "voided": [
-    "Q7 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json",
-    "Q8 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json",
-    "Q9 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json"
-  ],
-  "score": "VOID",
-  "verdict": "VOID"
+  "controlsPaintedA": 65,
+  "findings": [],
+  "voided": [],
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

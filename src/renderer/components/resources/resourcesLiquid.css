@@ -36,6 +36,32 @@
   margin-bottom: var(--lq-space-5);
 }
 
+.new-section > summary.bundles-head {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 12px;
+  min-height: 32px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.new-section[open] > summary.bundles-head {
+  margin-bottom: 12px;
+}
+
+.resources-disclosure-title {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .new-section > summary.bundles-head {
+    grid-template-columns: 1fr;
+  }
+}
+
 @container (max-width: 560px) {
   .res-controls,
   .res-controls-right {

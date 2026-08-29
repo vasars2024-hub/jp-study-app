@@ -60,6 +60,10 @@
  *     with `===` before any verdict is computed.
  *  5. `.fwin-body` computes to `rgba(0,0,0,0)` — the fill is painted by an ancestor. Comparing
  *     against it compares against BLACK. `effectiveBg` walks up until something paints.
+ *  6. A body left SCROLLED by an earlier probe makes Q3's "at rest" and Q4's "default state"
+ *     meaningless, and it published a false Q3 FINDING on Resources before it was caught.
+ *     `bodyScrollTop` is reported in every snapshot and a non-zero one REFUSES; `--allow-scroll`
+ *     scores anyway for a surface that genuinely restores an offset. Argued at the refusal.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat5-ui-clarity.cjs --surface "Library" --label l6-library
@@ -81,6 +85,12 @@ const SURFACE = arg('surface', '');
 const WIN = arg('win', '');
 const ALT_THEME = arg('alt', 'classic-light');
 const CONTROL = has('control');
+/**
+ * `--allow-scroll` — measure a surface whose body is NOT at its resting scroll position.
+ * Off by default and deliberately awkward: see the refusal in SNAP. The value is recorded in
+ * every snapshot either way, so a run taken with it stays attributable rather than silent.
+ */
+const ALLOW_SCROLL = has('allow-scroll');
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own.');
   console.error('         A window title ("Library") or a root selector ("@.reader").');
@@ -267,6 +277,25 @@ const SNAP = `(function(){
   var isFwin = root.classList && root.classList.contains('fwin');
   var body = root.querySelector('.fwin-body') || root;
   var B = body.getBoundingClientRect();
+  /**
+   * TRAP 6 — "AT REST" IS NOT WHATEVER THE LAST PROBE LEFT BEHIND, and this one had already
+   * published a false FINDING before it was caught. Q3's bar is literally "the primary action
+   * is inside the body viewport AT REST", and Q4's is "the default state" — both are undefined
+   * on a body someone else scrolled. Resources' first post-disclosure run scored Q3 NO with
+   * \`primaryAction: input.gram-search, insideBodyViewport: false\`, which read exactly like a
+   * layout regression from the disclosure landing above it. It was not: an earlier probe had
+   * left \`.fwin-body\` at \`scrollTop: 1563\`, so the search field sat at \`top: -1364\` — off
+   * the top of its own window, 1.5 screens up. The layout never changed.
+   *
+   * Same family as the stale-search-box trap this surface already paid for: leftover UI state
+   * manufactures both false passes and false failures. So the value is REPORTED in every
+   * snapshot, and a non-zero one REFUSES rather than scoring. \`--allow-scroll\` measures
+   * anyway when a surface genuinely restores a scroll offset on mount, and the recorded
+   * number is then what makes that score arguable.
+   */
+  var bodyScrollTop = Math.round(body.scrollTop || 0);
+  if (bodyScrollTop > 0 && !${ALLOW_SCROLL})
+    return JSON.stringify({ refuse: 'body is scrolled ' + bodyScrollTop + 'px off its resting position - "at rest" (Q3) and "the default state" (Q4) are undefined here. Scroll it to the top, or pass --allow-scroll to score it where it stands.' });
   var controls = [].slice.call(root.querySelectorAll(CTRL)).filter(painted);
   function inBody(e){
     var b = e.getBoundingClientRect();
@@ -622,6 +651,7 @@ const SNAP = `(function(){
     lang: document.documentElement.lang,
     presentation: root.getAttribute('data-presentation') || null,
     box: Math.round(R.width) + 'x' + Math.round(R.height),
+    bodyScrollTop: bodyScrollTop,
     controlsPainted: controls.length,
     q1: { entryPoints: entryPoints, primaryInputs: primaryInputs.length, accentButtons: accentButtons.length,
           accentList: accentButtons.map(function(e){ return name(e) + '::' + (e.textContent||'').trim().slice(0,18); }),
@@ -861,6 +891,7 @@ function scoreSnapshot(s) {
   if (found.refuse) throw new Error(`REFUSE - ${found.refuse}`);
   out.hostClass = found.hostClass;
   out.box = found.box;
+  out.bodyScrollTop = found.bodyScrollTop;
   out.presentationAsFound = found.presentation;
 
   // --- Q7/Q8/Q9 come from category 6's committed baseline, never re-driven ----------------
