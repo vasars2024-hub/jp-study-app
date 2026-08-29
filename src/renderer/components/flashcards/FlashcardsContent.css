@@ -209,6 +209,21 @@
   font-size: 12px;
 }
 
+/*
+  Honest state, not a warning: the clip is usable, its timestamps are estimated.
+  Muted foreground on a bordered chip so it reads as a qualifier next to the
+  replay button rather than as an error competing with `.flash-audio-error`.
+*/
+.flash-view .flash-audio-estimated {
+  padding: 2px 8px;
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 999px;
+  color: var(--text-muted, #667085);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .flash-view .flash-listening-prompt {
   display: flex;
   flex-direction: column;

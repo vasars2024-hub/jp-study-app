@@ -1,3 +1,14 @@
+import type { TranscriptCardTiming } from './transcriptionIpc';
+
+/**
+ * What the resulting cards' timestamps are worth, decided by the one thing that
+ * determines it: whether the worker returned cue windows at all. Kept here, and
+ * pure, so the honest-label contract is testable without an Electron job run.
+ */
+export function transcriptTimingSource(timedCueCount: number): TranscriptCardTiming {
+  return timedCueCount > 0 ? 'cue-aligned' : 'chunk-estimated';
+}
+
 /** Timed transcript cue produced by Whisper or a subtitle track. */
 export interface TimedTranscriptCue {
   start: number;

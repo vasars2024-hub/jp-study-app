@@ -5355,6 +5355,8 @@ export const ja: Catalog = {
   'flash.addAudioToDeck': '{count}枚のカードに音声を追加',
   'flash.audioBatchFailed': '{count}枚のカードの音声を生成できませんでした。',
   'flash.audioUnavailable': 'このカードには再生できる音声がありません。',
+  'flash.timing.estimated': 'タイミングは推定',
+  'flash.timing.estimated.detail': '文字起こしから字幕の時間枠が得られなかったため、この音声は元ファイルの固定長ブロック内に推定で配置されています。文は含まれていますが、時刻は正確な同期ではなく推定値です。',
   'flash.audioPlaybackFailed': '音声を再生できませんでした。',
   'flash.audioGenerationFailed': 'オフライン音声を生成できませんでした。',
   'flash.showAnswer': '答えを表示',

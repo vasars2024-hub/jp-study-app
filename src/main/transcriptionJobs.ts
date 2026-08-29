@@ -28,6 +28,7 @@ import {
   type TranscriptionCue,
   type TranscriptionChunkResult,
   type TranscriptionCardsReady,
+  type TranscriptCardTiming,
   type TranscriptionPhase,
   type TranscriptionProgress,
   type TranscriptionRequest,
@@ -61,7 +62,10 @@ import { extractAudioPcm } from './media';
 import { estimateSubtitleOffset } from './subtitleSync';
 import { isTranslateAvailable, runTranslationBatch } from './translate';
 import { arbitrateFusionDecisions } from './subtitleFusionArbiter';
-import { segmentTranscriptSentences } from '../shared/transcriptionSentenceCards';
+import {
+  segmentTranscriptSentences,
+  transcriptTimingSource,
+} from '../shared/transcriptionSentenceCards';
 import { extractFlashcardAudioClip } from './flashcardAudio';
 
 export interface TranscriptionHost {
@@ -371,6 +375,10 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
     // process.
     if (/^ja\b/i.test(job.lang)) {
       emit('aligning', total);
+      // No cue windows means no alignment. The chunk grid still puts the sentence
+      // in the right neighbourhood, which is worth a card — but every surface
+      // downstream has to be told that these seconds are an estimate.
+      const timing: TranscriptCardTiming = transcriptTimingSource(timedCues.length);
       const sourceCues = timedCues.length
         ? timedCues
         : texts.map((text, index) => ({
@@ -412,6 +420,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
           startSec: segment.start,
           endSec: segment.end,
           ...(audioPath ? { audioPath } : {}),
+          timing,
         };
       });
       if (cancelled.has(job.mediaId)) {
@@ -424,6 +433,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
           title: job.title,
           batchId: `transcription:${job.mediaId}:ja`,
           cards,
+          timing,
         });
       }
     }

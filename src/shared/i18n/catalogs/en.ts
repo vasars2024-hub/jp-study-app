@@ -5652,6 +5652,8 @@ export const en: Catalog = {
   'flash.addAudioToDeck': 'Add audio to {count} cards',
   'flash.audioBatchFailed': 'Audio could not be generated for {count} cards.',
   'flash.audioUnavailable': 'This card has no playable audio.',
+  'flash.timing.estimated': 'Estimated timing',
+  'flash.timing.estimated.detail': 'The transcript returned no cue windows, so this clip was placed inside a fixed chunk of the source. The audio contains the sentence, but the timestamps are an estimate, not an alignment.',
   'flash.audioPlaybackFailed': 'Audio playback failed.',
   'flash.audioGenerationFailed': 'Offline audio generation failed.',
   'flash.showAnswer': 'Show answer',

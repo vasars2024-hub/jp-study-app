@@ -5896,6 +5896,8 @@ export const ru: Catalog = {
   'flash.addAudioToDeck': 'Добавить аудио к {count} карточкам',
   'flash.audioBatchFailed': 'Не удалось создать аудио для {count} карточек.',
   'flash.audioUnavailable': 'У карточки нет доступного аудио.',
+  'flash.timing.estimated': 'Время приблизительное',
+  'flash.timing.estimated.detail': 'Расшифровка не вернула временные окна субтитров, поэтому фрагмент размещён внутри блока источника фиксированной длины. Аудио содержит предложение, но метки времени — оценка, а не точная синхронизация.',
   'flash.audioPlaybackFailed': 'Не удалось воспроизвести аудио.',
   'flash.audioGenerationFailed': 'Не удалось создать офлайн-аудио.',
   'flash.showAnswer': 'Показать ответ',

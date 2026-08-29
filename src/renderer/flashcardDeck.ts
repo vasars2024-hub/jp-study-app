@@ -32,6 +32,13 @@ export interface DeckFlashcard {
   frequency?: number;
   jlptLevel?: string;
   sceneReference?: string;
+  /**
+   * What `sceneReference` and `audioPath` are worth on a transcript-derived card.
+   * Absent on every other source, and on transcript cards written before the
+   * field existed — which is why the review surface treats only the explicit
+   * `chunk-estimated` value as a claim, and says nothing when it is missing.
+   */
+  timingFidelity?: import('../shared/transcriptionIpc').TranscriptCardTiming;
   /** Exact media context retained by Study Mode and player handoffs. */
   sourceRef?: import('../shared/mediaStudyOrchestrator').StudyContextRef;
   /** Reversible Study action that created this card batch. */

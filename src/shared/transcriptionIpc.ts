@@ -83,6 +83,17 @@ export interface TranscriptionCue {
   text: string;
 }
 
+/**
+ * How much the card's timestamps are actually worth.
+ *
+ * `cue-aligned` — the worker returned real cue windows and the sentence sits
+ * inside them. `chunk-estimated` — it returned text only, so the job placed the
+ * sentence proportionally inside its fixed `CHUNK_SECONDS` window. The second
+ * kind is a usable study clip but it is NOT an alignment, and a surface that
+ * prints its seconds as though it were is claiming precision nobody measured.
+ */
+export type TranscriptCardTiming = 'cue-aligned' | 'chunk-estimated';
+
 /** Local-deck card emitted when a Japanese transcript finishes. */
 export interface TranscriptionCardDraft {
   mediaId: string;
@@ -92,6 +103,7 @@ export interface TranscriptionCardDraft {
   startSec: number;
   endSec: number;
   audioPath?: string;
+  timing: TranscriptCardTiming;
 }
 
 export interface TranscriptionCardsReady {
@@ -99,6 +111,8 @@ export interface TranscriptionCardsReady {
   title: string;
   batchId: string;
   cards: TranscriptionCardDraft[];
+  /** The batch's worst case — `chunk-estimated` if any card is estimated. */
+  timing: TranscriptCardTiming;
 }
 
 export interface TranscriptionResult {

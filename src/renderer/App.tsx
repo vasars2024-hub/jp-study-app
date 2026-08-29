@@ -403,7 +403,10 @@ export default function App() {
         bookTitle: payload.title,
         folder: 'Media',
         audioPath: card.audioPath,
-        sceneReference: `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
+        sceneReference: card.timing === 'chunk-estimated'
+          ? `≈ ${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`
+          : `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
+        timingFidelity: card.timing,
         studyActionId: payload.batchId,
       })));
       appendNotebookEvent({

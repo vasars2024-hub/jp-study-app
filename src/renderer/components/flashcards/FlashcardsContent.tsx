@@ -123,6 +123,8 @@ export interface ReviewCard {
   reviewGroup?: string;
   promptKind: FlashcardPromptKind;
   srs?: LocalSrsState;
+  /** Only ever set on transcript-derived cards; see `DeckFlashcard`. */
+  timingFidelity?: DeckFlashcard['timingFidelity'];
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -482,6 +484,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       audioPath: c.audioPath,
       reviewGroup: `${c.bookId ?? c.source}:${c.bookTitle ?? c.folder ?? ''}`,
       srs: c.srs,
+      timingFidelity: c.timingFidelity,
     })), { mode: reviewMode });
   }
 
@@ -1225,6 +1228,16 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
               {state.audioBusy ? t('flash.addingAudio') : t('flash.addAudio')}
             </button>
           ) : null}
+          {/*
+            The clip on an estimated card really does contain the sentence, but its
+            seconds were placed inside a fixed chunk window rather than measured. Say
+            so where the audio controls are, not in a tooltip nobody opens.
+          */}
+          {current.timingFidelity === 'chunk-estimated' && (
+            <span className="flash-audio-estimated" title={t('flash.timing.estimated.detail')}>
+              {t('flash.timing.estimated')}
+            </span>
+          )}
           {state.audioError && <span className="flash-audio-error" role="status">{state.audioError}</span>}
         </div>
 

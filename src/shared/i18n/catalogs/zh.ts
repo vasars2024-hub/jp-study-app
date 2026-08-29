@@ -5330,6 +5330,8 @@ export const zh: Catalog = {
   'flash.addAudioToDeck': '为 {count} 张卡片添加音频',
   'flash.audioBatchFailed': '有 {count} 张卡片无法生成音频。',
   'flash.audioUnavailable': '此卡片没有可播放的音频。',
+  'flash.timing.estimated': '时间为估算',
+  'flash.timing.estimated.detail': '转写未返回字幕时间窗，因此该片段是在源文件的固定区块内估算定位的。音频包含该句子，但时间戳只是估算值，并非精确对齐。',
   'flash.audioPlaybackFailed': '音频播放失败。',
   'flash.audioGenerationFailed': '离线音频生成失败。',
   'flash.showAnswer': '显示答案',
