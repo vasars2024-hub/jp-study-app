@@ -31,7 +31,7 @@ export interface DeckMediaExportOutcome {
  * written — is a real outcome that must be reported as one instead of being
  * rounded to success or to failure.
  */
-export async function exportDeckWithAudio(
+export async function runDeckAudioExport(
   cards: readonly DeckMediaExportCard[],
   fileName = 'deck.csv',
   delimiter: CsvDelimiter = ',',

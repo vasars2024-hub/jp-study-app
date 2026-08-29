@@ -9,7 +9,7 @@
  */
 import { useState } from 'react';
 import { loadDeck } from '../../flashcardDeck';
-import { exportDeckWithAudio, type DeckMediaExportOutcome } from '../../deckMediaExport';
+import { runDeckAudioExport, type DeckMediaExportOutcome } from '../../deckMediaExport';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
@@ -22,7 +22,7 @@ export default function DeckAudioExport() {
     setBusy(true);
     setOutcome(null);
     try {
-      setOutcome(await exportDeckWithAudio(loadDeck(), 'deck.csv'));
+      setOutcome(await runDeckAudioExport(loadDeck(), 'deck.csv'));
     } catch (error) {
       setOutcome({
         ok: false,
