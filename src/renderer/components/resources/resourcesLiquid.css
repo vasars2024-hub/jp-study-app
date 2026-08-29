@@ -18,6 +18,18 @@
   margin-block: 0;
 }
 
+/* The left half of the command surface is category chips — contextual navigation,
+   and correctly Liquid. The right half is not: it holds a text field the user
+   types into, and category 3 scored `.res-controls-right` as dense Work reading
+   at alpha 0.72 on the contextual material. Selective means this half sits back
+   down on an opaque anchor while the chips keep the seam. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface .res-controls-right {
+  background: var(--lq-anchor-bg);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  padding: var(--lq-space-2);
+}
+
 /* A selected bundle is still dense setup work. Its header becomes the
    contextual inspector edge; checklist and resource sections stay opaque. */
 :is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-bundle-context {
