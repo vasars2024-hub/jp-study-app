@@ -1,0 +1,209 @@
+{
+  "label": "l8-resources",
+  "surface": "@.fwin:has(.res-view)",
+  "win": "(focused)",
+  "task": "click:.res-filter .gram-level-btn:nth-child(2) >> wait:500 >> type:.gram-search=anki >> wait:700",
+  "presentation": "liquid",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 312,
+    "controlCount": 78,
+    "box": "820x580",
+    "results": 51
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 4,
+    "total": 5
+  },
+  "latencyMs": {
+    "clickRecv": [
+      24.8
+    ],
+    "inputRecv": [
+      32.4,
+      20.7,
+      8.4,
+      4.1
+    ],
+    "worstRecv": 32.4,
+    "overBar100": 0,
+    "n": 5,
+    "clickStampUnscored": [
+      70.1
+    ],
+    "inputStampUnscored": [
+      34.9,
+      21.2,
+      8.6,
+      4.3
+    ],
+    "worstStampUnscored": 70.1
+  },
+  "steps": [
+    {
+      "step": "click:.res-filter .gram-level-btn:nth-child(2)",
+      "target": {
+        "sel": ".res-filter .gram-level-btn:nth-child(2)",
+        "label": "Dictionaries & lookup",
+        "disabled": false,
+        "at": "218,127"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "type:.gram-search=anki",
+      "target": {
+        "sel": ".gram-search",
+        "text": "anki",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:700",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "undo": {
+    "spec": "clear:.gram-search >> click:.res-filter .gram-level-btn:nth-child(1)",
+    "steps": [
+      "clear:.gram-search",
+      "click:.res-filter .gram-level-btn:nth-child(1)"
+    ],
+    "restored": true,
+    "baseHash": "xenfw6",
+    "afterHash": "xenfw6",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "xenfw6",
+      "after": "xenfw6"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 5,
+      "deadEnds": 0,
+      "worstRecv": 32.4
+    },
+    "second": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 5,
+      "deadEnds": 0,
+      "worstRecv": 24.6
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "liquid",
+      "pressed": "true",
+      "box": "820x580"
+    },
+    "liquidTotal": 5,
+    "standardTotal": 5
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.5
+    ]
+  }
+}
