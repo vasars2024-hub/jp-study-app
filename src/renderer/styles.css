@@ -8334,24 +8334,25 @@ mark.lookup-mark,
   border: 1px solid transparent;
 }
 /* The cost chip paints its own translucent background over `.res-card`, so its
-   text is scored against that composite and not against `--panel`. Measured in
-   forest-night the old #5fd29a came to 4.15:1 against the composited 62,88,74 —
-   under the 4.5 body bar at 11px. #7fdeae measures 4.82:1 there. The opaque base
-   is `.res-card`, which stays dark under the light themes too (classic-light
-   composites to 12,25,18), so this is one colour and not a per-scheme pair:
-   the same green measures 11.13:1 on classic-light. */
+   text is scored against that composite, not against `--panel`. Both halves of
+   the chip are hue identity, so the TEXT mixes its hue into `--text` rather than
+   naming a colour: that follows the theme instead of needing a light/dark pair.
+   Measured raw, cost-free was 4.15:1 in forest-night and 1.37:1 in classic-light
+   (the light themes give `.res-card` a light base, which an earlier probe here
+   misread as dark — the category-5 harness switches themes properly and is the
+   authority). */
 .res-cost.cost-free {
-  color: #7fdeae;
+  color: color-mix(in srgb, #5fd29a 32%, var(--text));
   background: rgba(95, 210, 154, 0.12);
   border-color: rgba(95, 210, 154, 0.35);
 }
 .res-cost.cost-freemium {
-  color: var(--accent-2);
+  color: color-mix(in srgb, var(--accent-2) 32%, var(--text));
   background: rgba(108, 123, 255, 0.14);
   border-color: rgba(108, 123, 255, 0.35);
 }
 .res-cost.cost-paid {
-  color: var(--accent);
+  color: color-mix(in srgb, var(--accent) 32%, var(--text));
   background: rgba(224, 85, 106, 0.13);
   border-color: rgba(224, 85, 106, 0.35);
 }
@@ -8481,7 +8482,7 @@ mark.lookup-mark,
   font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--bundle-accent, var(--accent-2)) 55%, var(--text));
+  color: color-mix(in srgb, var(--bundle-accent, var(--accent-2)) 45%, var(--text));
 }
 .bundle-card-gem em {
   font-style: normal;
