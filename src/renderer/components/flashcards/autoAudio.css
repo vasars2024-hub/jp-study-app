@@ -126,4 +126,73 @@
 .flash-match-actions {
   display: flex;
   gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+/* The practice launcher: one row per mode, its own line of what it drills. */
+.flash-practice-list {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.flash-practice-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 0.75rem);
+  flex-wrap: wrap;
+}
+
+.flash-practice-list button {
+  min-height: 44px;
+  min-width: 10rem;
+}
+
+/*
+ * Write mode. A typing surface stays on the opaque anchor with the panels
+ * around it — reading and editing are exactly what the Liquid selectivity rule
+ * keeps off glass.
+ */
+.flash-write-progress {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted, var(--text));
+}
+
+.flash-write-prompt {
+  margin: var(--space-xs) 0;
+  font-size: var(--font-size-lg, 1.25rem);
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.flash-write-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin: var(--space-xs) 0;
+}
+
+.flash-write-form input {
+  min-height: 44px;
+  min-width: 14rem;
+  flex: 1 1 14rem;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-md, 1rem);
+}
+
+.flash-write-form button {
+  min-height: 44px;
+}
+
+.flash-write-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted, var(--text));
 }

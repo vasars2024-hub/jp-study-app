@@ -90,6 +90,8 @@ import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
 import DeckAudioExport from './DeckAudioExport';
 import MatchMode from './MatchMode';
+import WriteMode from './WriteMode';
+import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
@@ -1618,10 +1620,12 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
     hideAiStudio,
   } = state;
 
-  // Match is opened and closed here rather than through the mode machine: it is
-  // a self-contained practice surface over the same deck, and routing it through
-  // `setMode` would tear down the overview it sits inside.
-  const [matchOpen, setMatchOpen] = useState(false);
+  // The practice modes are opened and closed here rather than through the mode
+  // machine: each is a self-contained surface over the same deck, and routing
+  // one through `setMode` would tear down the overview it sits inside. One
+  // piece of state, not one boolean each, so two modes can never be open at
+  // once and every one of them exits back to the same place.
+  const [practice, setPractice] = useState<PracticeMode>('none');
 
   /**
    * The saved-word list, bounded, with the place it came from attached.
@@ -1690,15 +1694,22 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       <AutoReadingPreferencesPanel />
       <DeckAudioExport />
 
-      {matchOpen ? (
-        <MatchMode onExit={() => setMatchOpen(false)} />
-      ) : (
+      {practice === 'match' && <MatchMode onExit={() => setPractice('none')} />}
+      {practice === 'write' && <WriteMode onExit={() => setPractice('none')} />}
+      {practice === 'none' && (
         <fieldset className="auto-reading-options">
-          <legend>{t('flash.match.title')}</legend>
-          <p className="muted">{t('flash.match.lead')}</p>
-          <button type="button" onClick={() => setMatchOpen(true)}>
-            {t('flash.match.start')}
-          </button>
+          <legend>{t('flash.practice.title')}</legend>
+          <p className="muted">{t('flash.practice.lead')}</p>
+          <ul className="flash-practice-list">
+            {PRACTICE_MODES.map((entry) => (
+              <li key={entry.id}>
+                <button type="button" onClick={() => setPractice(entry.id)}>
+                  {t(entry.startKey)}
+                </button>
+                <span className="muted">{t(entry.aboutKey)}</span>
+              </li>
+            ))}
+          </ul>
         </fieldset>
       )}
 
