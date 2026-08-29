@@ -56,3 +56,14 @@
   font-size: var(--font-size-xs);
   color: var(--muted);
 }
+
+/* What the audio costs on disk, and the one action that reduces it. */
+.auto-audio-options__disk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+}

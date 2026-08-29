@@ -2687,6 +2687,13 @@ const api = {
   flashcardReleaseAudio: (paths: readonly string[]):
     Promise<{ removed: number; skipped: number }> =>
     ipcRenderer.invoke('flashcards:releaseAudio', [...paths]),
+  flashcardAudioUsage: ():
+    Promise<import('./main/flashcardAudio').FlashcardAudioUsage> =>
+    ipcRenderer.invoke('flashcards:audioUsage'),
+  /** `referenced` is every path the local deck still points at. */
+  flashcardSweepAudio: (referenced: readonly string[]):
+    Promise<{ removed: number; bytes: number; kept: number }> =>
+    ipcRenderer.invoke('flashcards:audioSweep', [...referenced]),
   /** Main asks the renderer to run Whisper on one slice of audio. */
   onTranscriptionChunkRequest: (
     cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,

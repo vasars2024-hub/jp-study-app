@@ -1738,6 +1738,10 @@ declare global {
       flashcardReleaseAudio(
         paths: readonly string[],
       ): Promise<{ removed: number; skipped: number }>;
+      flashcardAudioUsage(): Promise<import('../main/flashcardAudio').FlashcardAudioUsage>;
+      flashcardSweepAudio(
+        referenced: readonly string[],
+      ): Promise<{ removed: number; bytes: number; kept: number }>;
       onTranscriptionChunkRequest(
         cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
       ): () => void;

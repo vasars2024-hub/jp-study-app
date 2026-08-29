@@ -16,9 +16,11 @@ import {
   classifySynthesisFailure,
   cultureForLanguage,
   extractFlashcardAudioClip,
+  flashcardAudioUsage,
   isManagedFlashcardAudioPath,
   pruneMediaClips,
   releaseFlashcardAudio,
+  sweepUnreferencedFlashcardAudio,
   synthesizeFlashcardAudio,
 } from '../flashcardAudio';
 import { flashcardAudioErrorKey } from '../../shared/flashcardAudioMessages';
@@ -130,5 +132,60 @@ describe('a failed synthesis says which kind of failure it was', () => {
     // raw detail here is exactly the bug — English text in a Russian UI.
     expect(flashcardAudioErrorKey(undefined)).toBe('flash.audioGenerationFailed');
     expect(flashcardAudioErrorKey('Access is denied')).toBe('flash.audioGenerationFailed');
+  });
+});
+
+describe('what card audio costs, and reclaiming what nothing points at', () => {
+  const root = path.join(testRoot, 'flashcard-audio');
+  const write = (relative: string, size: number): string => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, Buffer.alloc(size, 3));
+    return file;
+  };
+
+  it('splits the usage by what produced it, and survives an absent root', async () => {
+    fs.rmSync(root, { recursive: true, force: true });
+    // A profile that has never mined audio reports zero, not a crash.
+    expect(await flashcardAudioUsage()).toEqual({
+      clips: { files: 0, bytes: 0 },
+      speech: { files: 0, bytes: 0 },
+      total: { files: 0, bytes: 0 },
+    });
+
+    write('media/show-1/a.mp3', 100);
+    write('media/show-2/b.mp3', 200);
+    write('tts/spoken.wav', 50);
+    expect(await flashcardAudioUsage()).toEqual({
+      clips: { files: 2, bytes: 300 },
+      speech: { files: 1, bytes: 50 },
+      total: { files: 3, bytes: 350 },
+    });
+  });
+
+  it('sweeps only what the deck stopped referencing', async () => {
+    fs.rmSync(root, { recursive: true, force: true });
+    const kept = write('media/show-1/kept.mp3', 10);
+    const orphan = write('media/show-1/orphan.mp3', 40);
+    const spoken = write('tts/spoken.wav', 25);
+    // A card can point at a capture outside the managed root; naming it here
+    // must not make the sweep reach outside, and must not save an orphan.
+    const outside = path.join(testRoot, 'capture.wav');
+    fs.writeFileSync(outside, Buffer.alloc(5, 4));
+
+    const result = await sweepUnreferencedFlashcardAudio([kept, outside, '']);
+    expect(result).toEqual({ removed: 2, bytes: 65, kept: 1 });
+    expect(fs.existsSync(kept)).toBe(true);
+    expect(fs.existsSync(orphan)).toBe(false);
+    expect(fs.existsSync(spoken)).toBe(false);
+    expect(fs.existsSync(outside)).toBe(true);
+  });
+
+  it('an empty reference set is a full sweep, not a refusal', async () => {
+    fs.rmSync(root, { recursive: true, force: true });
+    write('media/show-1/a.mp3', 10);
+    write('tts/b.wav', 10);
+    expect(await sweepUnreferencedFlashcardAudio([])).toEqual({ removed: 2, bytes: 20, kept: 0 });
+    expect((await flashcardAudioUsage()).total).toEqual({ files: 0, bytes: 0 });
   });
 });

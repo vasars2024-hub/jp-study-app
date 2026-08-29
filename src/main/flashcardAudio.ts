@@ -104,6 +104,107 @@ export function pruneMediaClips(
   return { removed, bytes };
 }
 
+export interface FlashcardAudioBucket {
+  files: number;
+  bytes: number;
+}
+
+export interface FlashcardAudioUsage {
+  /** Sentence clips cut from a media file, under `media/<mediaId>/`. */
+  clips: FlashcardAudioBucket;
+  /** Everything else the managed root holds — synthesized speech. */
+  speech: FlashcardAudioBucket;
+  total: FlashcardAudioBucket;
+}
+
+/**
+ * Every managed file, with the sub-root it belongs to.
+ *
+ * Asynchronous throughout: a long-running deck's audio directory is thousands
+ * of small files, and a synchronous walk of it would be a visible stall on the
+ * main event loop for anyone who has been mining for a while.
+ */
+async function walkManagedAudio(): Promise<Array<{ path: string; bytes: number; clip: boolean }>> {
+  const root = audioRoot();
+  const clipRoot = path.resolve(root, 'media');
+  const found: Array<{ path: string; bytes: number; clip: boolean }> = [];
+  const visit = async (directory: string): Promise<void> => {
+    let entries: Awaited<ReturnType<typeof fs.promises.readdir>>;
+    try {
+      entries = await fs.promises.readdir(directory, { withFileTypes: true });
+    } catch {
+      return; // Absent root, or a directory removed mid-walk.
+    }
+    for (const entry of entries) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(full);
+        continue;
+      }
+      try {
+        found.push({
+          path: full,
+          bytes: (await fs.promises.stat(full)).size,
+          clip: !path.relative(clipRoot, path.resolve(full)).startsWith('..'),
+        });
+      } catch {
+        // A file removed between readdir and stat is simply already gone.
+      }
+    }
+  };
+  await visit(root);
+  return found;
+}
+
+/** What card audio currently costs on disk, split by what produced it. */
+export async function flashcardAudioUsage(): Promise<FlashcardAudioUsage> {
+  const empty = (): FlashcardAudioBucket => ({ files: 0, bytes: 0 });
+  const usage: FlashcardAudioUsage = { clips: empty(), speech: empty(), total: empty() };
+  for (const file of await walkManagedAudio()) {
+    const bucket = file.clip ? usage.clips : usage.speech;
+    bucket.files += 1;
+    bucket.bytes += file.bytes;
+    usage.total.files += 1;
+    usage.total.bytes += file.bytes;
+  }
+  return usage;
+}
+
+/**
+ * Delete managed audio no card points at any more.
+ *
+ * The deck lives in renderer storage, so the reference set has to come from
+ * there; main contributes the half the renderer cannot see — which files exist.
+ * Only the managed root is walked, so a visual-novel capture or any other
+ * outside path a card references is never a candidate in the first place.
+ */
+export async function sweepUnreferencedFlashcardAudio(
+  referenced: readonly string[],
+): Promise<{ removed: number; bytes: number; kept: number }> {
+  const keep = new Set(
+    referenced
+      .filter((entry): entry is string => typeof entry === 'string' && Boolean(entry))
+      .map((entry) => path.resolve(entry)),
+  );
+  let removed = 0;
+  let bytes = 0;
+  let kept = 0;
+  for (const file of await walkManagedAudio()) {
+    if (keep.has(path.resolve(file.path))) {
+      kept += 1;
+      continue;
+    }
+    try {
+      await fs.promises.rm(file.path, { force: true });
+      removed += 1;
+      bytes += file.bytes;
+    } catch {
+      kept += 1;
+    }
+  }
+  return { removed, bytes, kept };
+}
+
 /** A spawn failure that carries which classification the caller should report. */
 class SynthesizerError extends Error {
   constructor(message: string, readonly reason: FlashcardAudioFailure) {
@@ -293,6 +394,12 @@ export function registerFlashcardAudioIpc(): void {
   ));
   ipcMain.handle('flashcards:releaseAudio', (_event, paths?: unknown) => (
     releaseFlashcardAudio(Array.isArray(paths) ? paths.filter((entry): entry is string => typeof entry === 'string') : [])
+  ));
+  ipcMain.handle('flashcards:audioUsage', () => flashcardAudioUsage());
+  ipcMain.handle('flashcards:audioSweep', (_event, referenced?: unknown) => (
+    sweepUnreferencedFlashcardAudio(
+      Array.isArray(referenced) ? referenced.filter((entry): entry is string => typeof entry === 'string') : [],
+    )
   ));
 }
 
