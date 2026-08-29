@@ -521,6 +521,53 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const ceilingOver100 = Math.max(...ceilingRuns.map((r) => r.frames_over_100));
   const ceilingMaxMs = Math.max(...ceilingRuns.map((r) => r.frame_max_ms));
 
+  // A bare compositor is not the control for theme switching on a multi-window desk: every
+  // other open app still repaints. Measure that shared cost with only this surface's root hidden,
+  // then restore its exact inline style before scoring the real surface. Without this leg a
+  // single global theme frame is blamed on each surface independently.
+  step('theme CONTROL (target root hidden)');
+  const hiddenRoot = JSON.parse(await ev(`(() => {
+    const root = document.querySelector(${JSON.stringify(spec.root)});
+    if (!root) return JSON.stringify({ refused: 'missing root' });
+    const beforeStyle = root.getAttribute('style');
+    root.style.visibility = 'hidden';
+    return JSON.stringify({ beforeStyle, hidden: getComputedStyle(root).visibility === 'hidden' });
+  })()`));
+  if (hiddenRoot.refused || !hiddenRoot.hidden) {
+    voidedEarly.push(`theme control could not hide ${spec.root}: ${JSON.stringify(hiddenRoot)}`);
+  } else {
+    try {
+      const runs = [
+        ps(IPROBE, ['-Interaction', 'theme', ...interactionScope, '-AsJson']),
+        ps(IPROBE, ['-Interaction', 'theme', ...interactionScope, '-AsJson']),
+      ];
+      legs.themeControlRuns = runs.map((r) => ({
+        p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms,
+        over100: r.frames_over_100, mainMax: r.main_max_ms,
+      }));
+    } finally {
+      const restored = JSON.parse(await ev(`(() => {
+        const root = document.querySelector(${JSON.stringify(spec.root)});
+        if (!root) return JSON.stringify({ refused: 'root vanished' });
+        const beforeStyle = ${JSON.stringify(hiddenRoot.beforeStyle)};
+        if (beforeStyle === null) root.removeAttribute('style');
+        else root.setAttribute('style', beforeStyle);
+        return JSON.stringify({ style: root.getAttribute('style') });
+      })()`));
+      if (restored.refused || restored.style !== hiddenRoot.beforeStyle) {
+        voidedEarly.push(`theme control did not exactly restore ${spec.root}: ${JSON.stringify(restored)}`);
+      }
+    }
+  }
+  const themeControlP50 = legs.themeControlRuns
+    ? Math.min(...legs.themeControlRuns.map((r) => r.p50)) : ceilingP50;
+  const themeControlP95 = legs.themeControlRuns
+    ? Math.min(...legs.themeControlRuns.map((r) => r.p95)) : ceilingP95;
+  const themeControlOver100 = legs.themeControlRuns
+    ? Math.max(...legs.themeControlRuns.map((r) => r.over100)) : ceilingOver100;
+  const themeControlMaxMs = legs.themeControlRuns
+    ? Math.max(...legs.themeControlRuns.map((r) => r.max)) : ceilingMaxMs;
+
   // --- 2-4. the three gestures, every one scoped to THIS surface's window -----------
   // TWICE, then a third reading to break a tie. If those three disagree, take two final
   // confirmations: the measured ~12% compositor outlier rate makes one stray reading common,
@@ -533,28 +580,33 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // worker a turn, which is precisely what the scene trap cost the last one. A breach is a
   // FINDING only when at least four of five readings breach; one dissenting reading is recorded
   // as environmental noise, while two dissenting readings leave the leg UNSTABLE and void.
-  const breaches = (r) => (r.frame_p50_ms > ceilingP50 * 1.5) || (r.frame_p95_ms > ceilingP95 * 2)
-    || r.frames_over_100 > ceilingOver100 || r.main_max_ms > L0.mainBlockBarMs;
+  const breaches = (gesture, r) => {
+    const p50 = gesture === 'theme' ? themeControlP50 : ceilingP50;
+    const p95 = gesture === 'theme' ? themeControlP95 : ceilingP95;
+    const over100 = gesture === 'theme' ? themeControlOver100 : ceilingOver100;
+    return (r.frame_p50_ms > p50 * 1.5) || (r.frame_p95_ms > p95 * 2)
+      || r.frames_over_100 > over100 || r.main_max_ms > L0.mainBlockBarMs;
+  };
   for (const g of ['drag', 'resize', 'theme']) {
     step(g);
     const runs = [ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson'])];
     step(`${g} (repeat)`);
     runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
-    if (breaches(runs[0]) !== breaches(runs[1])) {
+    if (breaches(g, runs[0]) !== breaches(g, runs[1])) {
       step(`${g} (tie-break)`);
       runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
-      if (runs.some(breaches) && runs.some((r) => !breaches(r))) {
+      if (runs.some((r) => breaches(g, r)) && runs.some((r) => !breaches(g, r))) {
         step(`${g} (confirmation 1/2)`);
         runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
         step(`${g} (confirmation 2/2)`);
         runs.push(ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']));
       }
     }
-    const bad = runs.filter(breaches).length;
+    const bad = runs.filter((r) => breaches(g, r)).length;
     // Score the reading the majority agrees with, so the reported numbers are a real run and
     // never an average of runs that disagree.
-    legs[g] = runs.find((r) => breaches(r) === (bad * 2 > runs.length)) || runs[0];
-    legs[g].repeats = runs.map((r) => ({ p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms, over100: r.frames_over_100, mainMax: r.main_max_ms, breached: breaches(r) }));
+    legs[g] = runs.find((r) => breaches(g, r) === (bad * 2 > runs.length)) || runs[0];
+    legs[g].repeats = runs.map((r) => ({ p50: r.frame_p50_ms, p95: r.frame_p95_ms, max: r.frame_max_ms, over100: r.frames_over_100, mainMax: r.main_max_ms, breached: breaches(g, r) }));
     legs[g].unstable = Math.min(bad, runs.length - bad) > 1;
   }
 
@@ -595,16 +647,20 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const environment = [];
   for (const g of ['drag', 'resize', 'theme']) {
     const r = legs[g];
+    const controlP50 = g === 'theme' ? themeControlP50 : ceilingP50;
+    const controlP95 = g === 'theme' ? themeControlP95 : ceilingP95;
+    const controlOver100 = g === 'theme' ? themeControlOver100 : ceilingOver100;
+    const controlMaxMs = g === 'theme' ? themeControlMaxMs : ceilingMaxMs;
     if (!r.scene_stable) { voided.push(`${g}: the scene moved during the gesture (${r.scene_before.fwins}/${r.scene_before.fwinElements} -> ${r.scene_after.fwins}/${r.scene_after.fwinElements})`); continue; }
     if (r.stale_recorder) voided.push(`${g}: a stale frame recorder was found and disarmed; re-run to be sure`);
-    if (r.frame_p50_ms > ceilingP50 * 1.5) findings.push(`${g}: p50 ${r.frame_p50_ms} ms against a ${ceilingP50} ms ceiling`);
-    if (r.frame_p95_ms > ceilingP95 * 2) findings.push(`${g}: p95 ${r.frame_p95_ms} ms against a ${ceilingP95} ms ceiling`);
-    if (r.frames_over_100 > ceilingOver100) findings.push(`${g}: ${r.frames_over_100} frames over 100 ms, against a ceiling that produced ${ceilingOver100} with no product code running`);
+    if (r.frame_p50_ms > controlP50 * 1.5) findings.push(`${g}: p50 ${r.frame_p50_ms} ms against a ${controlP50} ms control`);
+    if (r.frame_p95_ms > controlP95 * 2) findings.push(`${g}: p95 ${r.frame_p95_ms} ms against a ${controlP95} ms control`);
+    if (r.frames_over_100 > controlOver100) findings.push(`${g}: ${r.frames_over_100} frames over 100 ms, against a control that produced ${controlOver100}`);
     // Reported, never scored. A frame longer than anything the bare compositor managed is worth
     // a reader's eye, but the control above shows the machine makes them unprompted, so it is
     // not evidence about the surface.
-    if (r.frame_max_ms > Math.max(ceilingMaxMs, 100)) {
-      environment.push(`${g}: longest frame ${r.frame_max_ms} ms against a ceiling max of ${ceilingMaxMs} ms — recorded, not scored`);
+    if (r.frame_max_ms > Math.max(controlMaxMs, 100)) {
+      environment.push(`${g}: longest frame ${r.frame_max_ms} ms against a control max of ${controlMaxMs} ms — recorded, not scored`);
     }
     if (r.unstable) voided.push(`${g}: readings disagree across repeats (${r.repeats.map((x) => (x.breached ? 'BREACH' : 'clean')).join(', ')}); the majority is reported and the leg is UNSTABLE`);
     if (r.main_max_ms > L0.mainBlockBarMs) findings.push(`${g}: main blocked ${r.main_max_ms} ms, over the ${L0.mainBlockBarMs} ms bar`);

@@ -64,3 +64,30 @@ Category 5's one standing finding is **Q4**: `collapsedDisclosures 0`, `scannedC
 (All + 7 category chips + Refresh + Search). The bar wants ≥1 collapsed disclosure and ≤12
 scanned. It is at 10 of 12 with no disclosure at all, so adding categories pushes it over;
 the fix is a disclosure, not a trim.
+
+## 2026-08-29 — Resources category 7 closes; surface reaches 70/80
+
+Recovered from `72fe0890`, whose last reliable state was a measured theme finding, not an
+uncommitted patch. Scored on fresh main PID **45964**, uptime **447 s**, with the same seven-window
+desk and the landing state restored to All / empty search.
+
+| leg | measured result |
+| --- | --- |
+| drag / resize | p50 **16.7 / 16.7 ms**, p95 **16.9 / 33.5 ms**, **0 / 0** frames over 100 ms |
+| theme | target **0** frames over 100 ms, max **83.6 ms**; hidden-target control **1 / 0**, max **116.9 / 83.6 ms** |
+| heaviest work | **44** filter cycles (**22 category / 22 landing**), exact chip restore; main max **36.6 ms** vs 500 ms bar |
+| sensitivity | injected jank produced **12** frames over 100 ms |
+
+The product defect was 256 simultaneous `fill` transitions on the interactive SVG countries.
+Each path now keeps its country hover/tooltip and opts out of that theme-wide transition. Two
+larger alternatives were measured and discarded: canvas made resize p50 **33.4 ms**; concatenated
+SVG groups made the real category-cycle load block main **2,055.6 ms**. Neither ships.
+
+The reusable category-7 harness now measures theme's multi-window background cost with only the
+requested surface root hidden, then restores the root's exact inline style. This is surface-
+parameterised and fixes the attribution error the live hidden-map control exposed: a bare
+compositor can be clean while six other app windows still spend one frame repainting.
+
+Resources is **70/80**: categories 1, 2, 3, 4, 6, 7 and 8 are controlled 10/10. Category 5 is
+the only open cell; Q4 still requires one collapsed disclosure, followed by the whole cat5 run.
+Evidence: `baselines/cat7-l8-resources.json`; guard: `resourcesBundleSetup.test.ts` **7/7**.

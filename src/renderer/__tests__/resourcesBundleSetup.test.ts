@@ -220,6 +220,19 @@ describe('Resources bundle setup truthfulness', () => {
     expect(detail).not.toContain('<ContextualSurface as="section" className="bundle-checklist">');
   });
 
+  it('keeps country hover targets while opting the map out of theme-wide fill transitions', () => {
+    const heatmap = readFileSync(
+      new URL('../components/resources/WorldHeatMap.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(heatmap).toContain("Object.entries(mapData.WORLD_MAP_PATHS).map(([iso, d]) =>");
+    expect(heatmap).toContain("style={{ transition: 'none' }}");
+    expect(heatmap).toContain('onMouseEnter={() => setHover({ iso, count })}');
+    expect(heatmap).toContain('onMouseLeave={() => setHover(null)}');
+    expect(heatmap).not.toContain('<canvas');
+  });
+
   it('defines every changed UI claim in all four catalogs', async () => {
     const { CATALOGS } = await import('../../shared/i18n/catalogs/all');
     const keys = [

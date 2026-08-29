@@ -109,7 +109,11 @@ export default function WorldHeatMap({
     return { total: totalN, countryCount: entries.length, max: maxN, ranked: rankedList };
   }, [displayCounts]);
 
-  // Nothing to show yet (no worker / no consent / no local guess).
+  const caption = t('resources.heatmap.caption', { count: countryCount, total });
+  const displayCountry = (iso: string): string => mapData?.countryName(iso) ?? iso;
+
+  // Nothing to show yet (no worker / no consent / no local guess). These
+  // returns stay below every hook so a load-state change cannot reorder hooks.
   if (loaded && countryCount === 0) {
     if (!compact) return null;
     const emptyKey = statsConfigured()
@@ -129,9 +133,6 @@ export default function WorldHeatMap({
     );
   }
 
-  const caption = t('resources.heatmap.caption', { count: countryCount, total });
-  const displayCountry = (iso: string): string => mapData?.countryName(iso) ?? iso;
-
   return (
     <section className={sectionClass} aria-label={t('resources.heatmap.aria')}>
       <div className="heatmap-caption">{caption}</div>
@@ -148,6 +149,7 @@ export default function WorldHeatMap({
                   fill={colorFor(count, max)}
                   stroke="var(--border)"
                   strokeWidth={0.4}
+                  style={{ transition: 'none' }}
                   onMouseEnter={() => setHover({ iso, count })}
                   onMouseLeave={() => setHover(null)}
                 />
