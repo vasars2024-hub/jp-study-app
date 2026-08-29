@@ -8333,8 +8333,15 @@ mark.lookup-mark,
   padding: 2px 9px;
   border: 1px solid transparent;
 }
+/* The cost chip paints its own translucent background over `.res-card`, so its
+   text is scored against that composite and not against `--panel`. Measured in
+   forest-night the old #5fd29a came to 4.15:1 against the composited 62,88,74 —
+   under the 4.5 body bar at 11px. #7fdeae measures 4.82:1 there. The opaque base
+   is `.res-card`, which stays dark under the light themes too (classic-light
+   composites to 12,25,18), so this is one colour and not a per-scheme pair:
+   the same green measures 11.13:1 on classic-light. */
 .res-cost.cost-free {
-  color: #5fd29a;
+  color: #7fdeae;
   background: rgba(95, 210, 154, 0.12);
   border-color: rgba(95, 210, 154, 0.35);
 }
