@@ -1,6 +1,7 @@
-import { app, ipcMain } from 'electron';
+import { app, ipcMain, shell } from 'electron';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
@@ -218,6 +219,72 @@ export async function sweepUnreferencedFlashcardAudio(
     }
   }
   return { removed, bytes, kept };
+}
+
+export interface DeckExportResult {
+  ok: boolean;
+  /** The folder written. Reported so the caller can offer to reveal it. */
+  directory?: string;
+  /** Media files actually written. */
+  written?: number;
+  /** Files whose source was gone or outside the managed root; named, never hidden. */
+  failed?: number;
+  error?: string;
+}
+
+/**
+ * Write a deck's text export and its audio into a fresh folder under userData.
+ *
+ * A folder rather than a save dialog: it needs no native picker, so the whole
+ * path is testable and every host can offer it identically. `directory` is
+ * always new, so an export can never overwrite an earlier one, and deleting it
+ * is the entire reverse path.
+ *
+ * The refusal is load-bearing. A card's `audioPath` is only ever a managed
+ * asset; copying an arbitrary path because a card claimed one would turn an
+ * export button into a file-exfiltration primitive.
+ */
+export async function exportDeckWithAudio(
+  text: string,
+  fileName: string,
+  media: ReadonlyArray<{ fileName: string; sourcePath?: string; dataUrl?: string }>,
+): Promise<DeckExportResult> {
+  const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '') || 'deck.csv';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const directory = path.join(app.getPath('userData'), 'exports', `deck-${stamp}`);
+  const mediaDirectory = path.join(directory, 'media');
+  try {
+    await fsp.mkdir(mediaDirectory, { recursive: true });
+    await fsp.writeFile(path.join(directory, safeName), text, 'utf8');
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  let written = 0;
+  let failed = 0;
+  for (const item of media) {
+    const target = path.join(mediaDirectory, path.basename(item.fileName));
+    try {
+      if (item.sourcePath) {
+        if (!isManagedFlashcardAudioPath(item.sourcePath)) {
+          failed += 1;
+          continue;
+        }
+        await fsp.copyFile(item.sourcePath, target);
+      } else if (item.dataUrl) {
+        const comma = item.dataUrl.indexOf(',');
+        if (comma < 0) { failed += 1; continue; }
+        await fsp.writeFile(target, Buffer.from(item.dataUrl.slice(comma + 1), 'base64'));
+      } else {
+        failed += 1;
+        continue;
+      }
+      written += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { ok: true, directory, written, failed };
 }
 
 /** A spawn failure that carries which classification the caller should report. */
@@ -584,6 +651,32 @@ export function registerFlashcardAudioIpc(): void {
   ipcMain.handle('flashcards:listVoices', (_event, refresh?: unknown) => (
     listFlashcardVoices(refresh === true)
   ));
+  ipcMain.handle('flashcards:exportDeck', (_event, payload?: unknown) => {
+    const request = (payload ?? {}) as {
+      text?: unknown;
+      fileName?: unknown;
+      media?: unknown;
+    };
+    return exportDeckWithAudio(
+      typeof request.text === 'string' ? request.text : '',
+      typeof request.fileName === 'string' ? request.fileName : 'deck.csv',
+      Array.isArray(request.media)
+        ? (request.media as Array<{ fileName?: unknown }>).filter(
+          (item): item is { fileName: string; sourcePath?: string; dataUrl?: string } =>
+            typeof item?.fileName === 'string' && item.fileName.length > 0,
+        )
+        : [],
+    );
+  });
+  ipcMain.handle('flashcards:revealExport', (_event, directory?: unknown) => {
+    // Only a folder this process created under userData/exports may be opened.
+    if (typeof directory !== 'string') return false;
+    const root = path.join(app.getPath('userData'), 'exports');
+    const relative = path.relative(root, path.resolve(directory));
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return false;
+    void shell.openPath(path.resolve(directory));
+    return true;
+  });
   ipcMain.handle('flashcards:readAudio', (_event, filePath?: string) => (
     readManagedAudio(typeof filePath === 'string' ? filePath : '')
   ));

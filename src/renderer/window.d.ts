@@ -1736,6 +1736,12 @@ declare global {
       flashcardListVoices(
         refresh?: boolean,
       ): Promise<import('../shared/flashcardVoices').FlashcardVoiceInventory>;
+      flashcardExportDeck(request: {
+        text: string;
+        fileName: string;
+        media: ReadonlyArray<import('../shared/deckMediaExport').DeckMediaItem>;
+      }): Promise<import('../main/flashcardAudio').DeckExportResult>;
+      flashcardRevealExport(directory: string): Promise<boolean>;
       flashcardReadAudio(
         filePath: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;

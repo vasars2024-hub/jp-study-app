@@ -88,6 +88,7 @@ import { TranscriptionCardDeckStatus } from '../media/TranscriptionCardOptions';
 import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
+import DeckAudioExport from './DeckAudioExport';
 import { preferredVoiceFor } from '../../flashcardVoicePreference';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
@@ -1681,6 +1682,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       <CardVoicePicker />
       <AutoAudioPreferencesPanel />
       <AutoReadingPreferencesPanel />
+      <DeckAudioExport />
 
       <ContextualSurface className="flash-tabs">
         <button

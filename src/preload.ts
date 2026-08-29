@@ -2684,6 +2684,16 @@ const api = {
   flashcardListVoices: (refresh = false):
     Promise<import('./shared/flashcardVoices').FlashcardVoiceInventory> =>
     ipcRenderer.invoke('flashcards:listVoices', refresh),
+  /** Write a deck's text export plus its audio into a fresh folder under userData. */
+  flashcardExportDeck: (request: {
+    text: string;
+    fileName: string;
+    media: ReadonlyArray<import('./shared/deckMediaExport').DeckMediaItem>;
+  }): Promise<import('./main/flashcardAudio').DeckExportResult> =>
+    ipcRenderer.invoke('flashcards:exportDeck', request),
+  /** Open a folder this app wrote under userData/exports. Refuses anything else. */
+  flashcardRevealExport: (directory: string): Promise<boolean> =>
+    ipcRenderer.invoke('flashcards:revealExport', directory),
   flashcardReadAudio: (filePath: string):
     Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
     ipcRenderer.invoke('flashcards:readAudio', filePath),
