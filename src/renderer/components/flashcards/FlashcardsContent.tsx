@@ -72,10 +72,11 @@ import {
 import {
   filterLocalReviewsDue,
   LOCAL_SRS_RELEARN_MINUTES,
-  scheduleLocalReview,
   type LocalSrsState,
   type LocalSrsRating,
 } from '../../../shared/localSrs';
+import { previewSchedule } from '../../../shared/flashcardScheduling';
+import { loadSchedulingConfig } from '../../flashcardScheduling';
 import {
   audioReviewPoolStatus,
   planFlashcardReview,
@@ -1172,15 +1173,14 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
   }
 
   const pct = total ? (reviewed / total) * 100 : 0;
-  const nextGoodInterval = reviewSource === 'epub'
-    ? scheduleLocalReview(current.srs, 'good').intervalDays
+  // One preview through the seam rather than three direct scheduler calls, so
+  // the button labels move when the algorithm setting does.
+  const nextIntervals = reviewSource === 'epub'
+    ? previewSchedule(current.srs, loadSchedulingConfig())
     : null;
-  const nextHardInterval = reviewSource === 'epub'
-    ? scheduleLocalReview(current.srs, 'hard').intervalDays
-    : null;
-  const nextEasyInterval = reviewSource === 'epub'
-    ? scheduleLocalReview(current.srs, 'easy').intervalDays
-    : null;
+  const nextGoodInterval = nextIntervals ? nextIntervals.good : null;
+  const nextHardInterval = nextIntervals ? nextIntervals.hard : null;
+  const nextEasyInterval = nextIntervals ? nextIntervals.easy : null;
   const reviewTitle =
     reviewSource === 'epub' && reviewBookKey !== 'all'
       ? epubReviewBooks.find((g) => `${g.bookId}::${g.bookTitle}` === reviewBookKey)?.bookTitle

@@ -3,8 +3,21 @@
 
 export type LocalSrsRating = 'again' | 'hard' | 'good' | 'easy';
 
+/** Which scheduler produced a state. Absent on every version-1 state, which
+ *  predates the choice and was always SM-2. */
+export type LocalSrsAlgorithm = 'sm2' | 'fsrs';
+
+/**
+ * 1: the original SM-2 shape, still on disk in every deck written before the
+ *    scheduler became configurable. It is read, never written.
+ * 2: adds the FSRS memory pair and records which scheduler wrote the state, so
+ *    a deck whose algorithm was switched is detectable rather than silently
+ *    rescheduled against numbers that mean something else.
+ */
+export type LocalSrsVersion = 1 | 2;
+
 export interface LocalSrsState {
-  version: 1;
+  version: LocalSrsVersion;
   dueAt: number;
   intervalDays: number;
   ease: number;
@@ -12,6 +25,12 @@ export interface LocalSrsState {
   lapses: number;
   lastReviewedAt: number;
   lastRating: LocalSrsRating;
+  /** Version 2 only, and only when FSRS wrote it. Days to 90% recall. */
+  stability?: number;
+  /** Version 2 only, and only when FSRS wrote it. 1..10. */
+  difficulty?: number;
+  /** Version 2 only. Read a missing value as `sm2`. */
+  algorithm?: LocalSrsAlgorithm;
 }
 
 export const LOCAL_SRS_RELEARN_MINUTES = 10;
@@ -20,11 +39,22 @@ export const LOCAL_SRS_MIN_EASE = 1.3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_INTERVAL_DAYS = 36_500;
 
+/** Optional in the type, so absent passes; present must still be sane. */
+function optionalNumber(value: unknown, low: number, high: number): boolean {
+  if (value === undefined) return true;
+  return typeof value === 'number' && Number.isFinite(value) && value >= low && value <= high;
+}
+
 export function isLocalSrsState(value: unknown): value is LocalSrsState {
   if (!value || typeof value !== 'object') return false;
   const state = value as Partial<LocalSrsState>;
+  if (!optionalNumber(state.stability, 0, 36_500)) return false;
+  if (!optionalNumber(state.difficulty, 1, 10)) return false;
+  if (state.algorithm !== undefined && state.algorithm !== 'sm2' && state.algorithm !== 'fsrs') {
+    return false;
+  }
   return (
-    state.version === 1 &&
+    (state.version === 1 || state.version === 2) &&
     typeof state.dueAt === 'number' && Number.isFinite(state.dueAt) && state.dueAt >= 0 &&
     typeof state.intervalDays === 'number' && Number.isFinite(state.intervalDays) && state.intervalDays >= 0 &&
     typeof state.ease === 'number' && Number.isFinite(state.ease) && state.ease >= LOCAL_SRS_MIN_EASE &&
@@ -63,7 +93,8 @@ export function scheduleLocalReview(
   if (rating === 'again') {
     const ease = Math.max(LOCAL_SRS_MIN_EASE, (prior?.ease ?? LOCAL_SRS_DEFAULT_EASE) - 0.2);
     return {
-      version: 1,
+      version: 2,
+      algorithm: 'sm2',
       dueAt: now + LOCAL_SRS_RELEARN_MINUTES * 60 * 1000,
       intervalDays: 0,
       ease,
@@ -81,7 +112,8 @@ export function scheduleLocalReview(
       : 0.5;
     const ease = Math.max(LOCAL_SRS_MIN_EASE, (prior?.ease ?? LOCAL_SRS_DEFAULT_EASE) - 0.15);
     return {
-      version: 1,
+      version: 2,
+      algorithm: 'sm2',
       dueAt: now + intervalDays * DAY_MS,
       intervalDays,
       ease,
@@ -102,7 +134,8 @@ export function scheduleLocalReview(
           Math.max(4, Math.round((prior?.intervalDays || 1) * ease * 1.3)),
         );
     return {
-      version: 1,
+      version: 2,
+      algorithm: 'sm2',
       dueAt: now + intervalDays * DAY_MS,
       intervalDays,
       ease,
@@ -123,7 +156,8 @@ export function scheduleLocalReview(
           Math.max(1, Math.round((prior?.intervalDays || 1) * (prior?.ease ?? LOCAL_SRS_DEFAULT_EASE))),
         );
   return {
-    version: 1,
+    version: 2,
+    algorithm: 'sm2',
     dueAt: now + intervalDays * DAY_MS,
     intervalDays,
     ease: prior?.ease ?? LOCAL_SRS_DEFAULT_EASE,

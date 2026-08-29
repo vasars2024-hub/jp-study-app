@@ -28,10 +28,17 @@ export type FlashcardTextProvenance =
   | 'book-text';
 
 import {
-  scheduleLocalReview,
+  type LocalSrsAlgorithm,
   type LocalSrsRating,
   type LocalSrsState,
 } from '../shared/localSrs';
+import {
+  adaptStateForAlgorithm,
+  migrateSrsState,
+  resetSrsState,
+  scheduleReview,
+} from '../shared/flashcardScheduling';
+import { loadSchedulingConfig } from './flashcardScheduling';
 
 export interface DeckFlashcard {
   id: string;
@@ -358,7 +365,9 @@ export function reviewDeckCard(
     return {
       ...card,
       known: rating !== 'again' || undefined,
-      srs: scheduleLocalReview(card.srs, rating, reviewedAt),
+      // Through the seam, never a scheduler directly: the algorithm setting
+      // stops meaning anything on whichever path skips it.
+      srs: scheduleReview(card.srs, rating, loadSchedulingConfig(), reviewedAt),
     };
   });
   if (!reviewed) return store.cards;
@@ -367,6 +376,71 @@ export function reviewDeckCard(
   // one flashcard-deck event the city bridge's telemetry collector counts.
   emitCompanionEvent('flashcard');
   return store.cards;
+}
+
+export interface SchedulingSweepReport {
+  /** Cards whose stored schedule actually changed. */
+  changed: number;
+  /** Cards with no schedule at all: already new, nothing to convert or forget. */
+  unscheduled: number;
+  /** Cards the sweep looked at — the folder's size, not the deck's, when scoped. */
+  total: number;
+}
+
+/**
+ * Bring every scheduled card under `algorithm`, once, on request.
+ *
+ * Returns what it did as numbers, because "converted your deck" with no count
+ * is exactly the unverifiable claim this app keeps finding. Cards already under
+ * the algorithm are not rewritten, so running it twice reports zero the second
+ * time rather than churning the store.
+ */
+export function convertDeckSchedule(algorithm: LocalSrsAlgorithm): SchedulingSweepReport {
+  const store = readStore();
+  let changed = 0;
+  let unscheduled = 0;
+  store.cards = store.cards.map((card): DeckFlashcard => {
+    const current = migrateSrsState(card.srs);
+    if (!current) {
+      unscheduled += 1;
+      return card;
+    }
+    const adapted = adaptStateForAlgorithm(current, algorithm);
+    if (adapted === card.srs) return card;
+    changed += 1;
+    return { ...card, srs: adapted };
+  });
+  const report = { changed, unscheduled, total: store.cards.length };
+  if (changed > 0) writeStore(store);
+  return report;
+}
+
+/**
+ * Forget every schedule in the deck, or in one folder of it.
+ *
+ * Irreversible from this side — the review history lives nowhere else — so the
+ * caller confirms first. The cards, their audio and their text are untouched:
+ * only the schedule goes, which returns them to the unseen state every reader
+ * in the app already understands.
+ */
+export function resetDeckSchedule(folder?: string): SchedulingSweepReport {
+  const store = readStore();
+  let changed = 0;
+  let unscheduled = 0;
+  let considered = 0;
+  store.cards = store.cards.map((card): DeckFlashcard => {
+    if (folder !== undefined && card.folder !== folder) return card;
+    considered += 1;
+    if (card.srs === undefined) {
+      unscheduled += 1;
+      return card;
+    }
+    changed += 1;
+    return { ...card, srs: resetSrsState() };
+  });
+  const report = { changed, unscheduled, total: considered };
+  if (changed > 0) writeStore(store);
+  return report;
 }
 
 export function setBookGroupFolder(
