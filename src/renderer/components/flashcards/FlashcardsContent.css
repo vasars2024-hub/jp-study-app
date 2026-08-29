@@ -210,6 +210,18 @@
 }
 
 /*
+  What audio-only review will really do with this selection. A statement of
+  fact, not a failure, so it takes the muted setup voice rather than
+  `.flash-audio-error`'s red — even in the case where nothing is playable.
+*/
+.flash-view .flash-audio-pool-note {
+  flex-basis: 100%;
+  margin: 0;
+  max-width: 42rem;
+  font-size: 12px;
+}
+
+/*
   Honest state, not a warning: the clip is usable, its timestamps are estimated.
   Muted foreground on a bordered chip so it reads as a qualifier next to the
   replay button rather than as an error competing with `.flash-audio-error`.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planFlashcardReview } from '../flashcardReview';
+import { audioReviewPoolStatus, planFlashcardReview } from '../flashcardReview';
 
 const zero = () => 0;
 const cards = [
@@ -30,5 +30,35 @@ describe('planFlashcardReview', () => {
     for (let i = 1; i < plan.length; i += 1) {
       expect(plan[i].reviewGroup).not.toBe(plan[i - 1].reviewGroup);
     }
+  });
+});
+
+describe('what audio-only review says it will do', () => {
+  it('names the silent remainder instead of shrinking the sitting silently', () => {
+    // The defect this exists for: 40 selected, 5 with clips, and the only
+    // visible change was the number on the Start button.
+    expect(audioReviewPoolStatus(40, 5)).toEqual({ kind: 'partial', usable: 5, dropped: 35 });
+    expect(audioReviewPoolStatus(12, 12)).toEqual({ kind: 'all', usable: 12 });
+  });
+
+  it('distinguishes "nothing selected" from "nothing playable"', () => {
+    // A disabled Start with no reason was the same pixels for both, and only
+    // one of them has an action the user can take.
+    expect(audioReviewPoolStatus(0, 0)).toEqual({ kind: 'empty' });
+    expect(audioReviewPoolStatus(9, 0)).toEqual({ kind: 'none', total: 9 });
+  });
+
+  it('cannot report more playable cards than were selected', () => {
+    expect(audioReviewPoolStatus(3, 7)).toEqual({ kind: 'all', usable: 3 });
+    expect(audioReviewPoolStatus(3, -1)).toEqual({ kind: 'none', total: 3 });
+  });
+
+  it('agrees with the planner it describes', () => {
+    const plan = planFlashcardReview(cards, { mode: 'audio', random: zero });
+    expect(audioReviewPoolStatus(cards.length, plan.length)).toEqual({
+      kind: 'partial',
+      usable: plan.length,
+      dropped: cards.length - plan.length,
+    });
   });
 });

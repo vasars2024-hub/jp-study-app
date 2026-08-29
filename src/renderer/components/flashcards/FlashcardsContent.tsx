@@ -77,11 +77,13 @@ import {
   type LocalSrsRating,
 } from '../../../shared/localSrs';
 import {
+  audioReviewPoolStatus,
   planFlashcardReview,
   type FlashcardPromptKind,
   type FlashcardReviewMode,
 } from '../../../shared/flashcardReview';
 import { flashcardAudioErrorKey } from '../../../shared/flashcardAudioMessages';
+import { cardAudio } from '../../cardAudioPlayback';
 import { TranscriptionCardDeckStatus } from '../media/TranscriptionCardOptions';
 import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import { deckCardsToCsv } from '../../deckExport';
@@ -565,6 +567,9 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }
 
   function endReview(): void {
+    // Leaving the sitting silences it: an autoplayed listening prompt must not
+    // keep talking over the deck overview.
+    cardAudio.stop();
     setMode('overview');
     setSessionCards([]);
     setReviewIndex(0);
@@ -693,7 +698,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       setAudioError(t('flash.audioUnavailable'));
       return;
     }
-    await new Audio(dataUrl).play().catch(() => setAudioError(t('flash.audioPlaybackFailed')));
+    await cardAudio.play(dataUrl).catch(() => setAudioError(t('flash.audioPlaybackFailed')));
   }
 
   async function addAudioToCurrent(): Promise<void> {
@@ -716,7 +721,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
         candidate.id === card.id ? { ...candidate, audioPath: result.path } : candidate
       )));
       const data = await window.api.flashcardReadAudio(result.path);
-      if (data.ok && data.dataUrl) await new Audio(data.dataUrl).play().catch(() => undefined);
+      if (data.ok && data.dataUrl) await cardAudio.play(data.dataUrl).catch(() => undefined);
     } finally {
       setAudioBusy(false);
     }
@@ -1546,6 +1551,33 @@ const SAVED_LIST_MAX_HEIGHT = 560;
  */
 const ASK_AGENT_SAVED_LIMIT = 40;
 
+/**
+ * What audio-only review will really do with this selection.
+ *
+ * Without it, choosing "Audio only" either silently shrank the sitting to
+ * whichever cards happen to have clips, or greyed out Start with no stated
+ * reason — while the button that fixes it sits directly alongside.
+ */
+function AudioPoolNote({ state }: { state: FlashcardsState }) {
+  const { t } = useT();
+  const status = audioReviewPoolStatus(
+    state.epubReviewCandidates.length,
+    state.epubReviewSessionCandidates.length,
+  );
+  if (status.kind === 'empty') return null;
+
+  return (
+    <p className="flash-audio-pool-note muted" role="status">
+      {status.kind === 'none' && t('flash.audioPool.none', { total: status.total })}
+      {status.kind === 'partial' && t('flash.audioPool.partial', {
+        usable: status.usable,
+        dropped: status.dropped,
+      })}
+      {status.kind === 'all' && t('flash.audioPool.all', { usable: status.usable })}
+    </p>
+  );
+}
+
 export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   const { t } = useT();
   const {
@@ -1739,6 +1771,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   <option value="audio">{t('flash.reviewMode.audio')}</option>
                 </select>
               </label>
+              {reviewMode === 'audio' && <AudioPoolNote state={state} />}
               <button
                 type="button"
                 className="btn"

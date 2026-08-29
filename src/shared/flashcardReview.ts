@@ -18,6 +18,28 @@ export interface ReviewPlanOptions {
   random?: () => number;
 }
 
+/**
+ * What an audio-only sitting can actually do with the current selection.
+ *
+ * `planFlashcardReview` drops every card without audio in `audio` mode, which
+ * is correct and was invisible: a 40-card selection with 5 clips silently
+ * became a 5-card sitting, and a selection with none silently became a
+ * disabled button with no stated reason. The host renders one line from this.
+ */
+export type AudioReviewPoolStatus =
+  | { kind: 'empty' }
+  | { kind: 'none'; total: number }
+  | { kind: 'partial'; usable: number; dropped: number }
+  | { kind: 'all'; usable: number };
+
+export function audioReviewPoolStatus(total: number, withAudio: number): AudioReviewPoolStatus {
+  const usable = Math.max(0, Math.min(withAudio, total));
+  if (total <= 0) return { kind: 'empty' };
+  if (usable === 0) return { kind: 'none', total };
+  if (usable < total) return { kind: 'partial', usable, dropped: total - usable };
+  return { kind: 'all', usable };
+}
+
 function shuffle<T>(items: readonly T[], random: () => number): T[] {
   const next = [...items];
   for (let i = next.length - 1; i > 0; i -= 1) {
