@@ -33,6 +33,33 @@ export interface TranscriptionProgress {
   startedAt: number;
   etaMs?: number;
   error?: string;
+  /** The card work this transcription will perform after the subtitle is written. */
+  cardOptions?: TranscriptionCardOptions;
+}
+
+export interface TranscriptionCardOptions {
+  /** Create or replace the local Media deck batch after Japanese transcription. */
+  createCards: boolean;
+  /** Ask the available local translator for English backs. */
+  translateToEnglish: boolean;
+  /** Extract one managed ffmpeg clip per sentence. */
+  includeAudio: boolean;
+}
+
+export const DEFAULT_TRANSCRIPTION_CARD_OPTIONS: TranscriptionCardOptions = {
+  createCards: true,
+  translateToEnglish: true,
+  includeAudio: true,
+};
+
+export function normalizeTranscriptionCardOptions(
+  value?: Partial<TranscriptionCardOptions> | null,
+): TranscriptionCardOptions {
+  return {
+    createCards: value?.createCards !== false,
+    translateToEnglish: value?.translateToEnglish !== false,
+    includeAudio: value?.includeAudio !== false,
+  };
 }
 
 /**
@@ -66,6 +93,8 @@ export interface TranscriptionJob {
   kind?: TranscriptionKind;
   /** For `fuse-en-ja`: which subtitle record supplies the cue grid. */
   sourceSubtitleId?: string;
+  /** Optional for backward-compatible restoration of queues written before cards existed. */
+  cardOptions?: Partial<TranscriptionCardOptions>;
 }
 
 export interface TranscriptionRequest {
@@ -74,6 +103,7 @@ export interface TranscriptionRequest {
   kind?: TranscriptionKind;
   /** For `fuse-en-ja`: pin the source track instead of letting the job pick. */
   sourceSubtitleId?: string;
+  cardOptions?: Partial<TranscriptionCardOptions>;
 }
 
 /** Word/window-aligned cue returned by the local Whisper worker. */
@@ -113,6 +143,7 @@ export interface TranscriptionCardsReady {
   cards: TranscriptionCardDraft[];
   /** The batch's worst case — `chunk-estimated` if any card is estimated. */
   timing: TranscriptCardTiming;
+  cardOptions: TranscriptionCardOptions;
 }
 
 export interface TranscriptionResult {

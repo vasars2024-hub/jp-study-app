@@ -28,6 +28,7 @@ import {
   type TranscriptionCue,
   type TranscriptionChunkResult,
   type TranscriptionCardsReady,
+  normalizeTranscriptionCardOptions,
   type TranscriptCardTiming,
   type TranscriptionPhase,
   type TranscriptionProgress,
@@ -276,6 +277,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
   if (!item) return { ok: false, error: 'item-not-found' };
 
   const startedAt = Date.now();
+  const cardOptions = normalizeTranscriptionCardOptions(job.cardOptions);
   let total = 0;
   const emit = (phase: TranscriptionPhase, done: number, extra: Partial<TranscriptionProgress> = {}): void =>
     broadcast({
@@ -286,6 +288,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       total,
       startedAt,
       etaMs: estimateEtaMs(done, total, Date.now() - startedAt),
+      cardOptions,
       ...extra,
     });
 
@@ -373,7 +376,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
     // owns the local deck, so main prepares exact managed clips and broadcasts
     // a reversible batch instead of writing renderer storage from another
     // process.
-    if (/^ja\b/i.test(job.lang)) {
+    if (/^ja\b/i.test(job.lang) && cardOptions.createCards) {
       emit('aligning', total);
       // No cue windows means no alignment. The chunk grid still puts the sentence
       // in the right neighbourhood, which is worth a card — but every surface
@@ -387,12 +390,14 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
             text,
           }));
       const segments = segmentTranscriptSentences(sourceCues).slice(0, 250);
-      const translations = await translateWindowReferences(
-        segments.map((segment) => segment.text),
-        'ja',
-        'en',
-        () => cancelled.has(job.mediaId),
-      );
+      const translations = cardOptions.translateToEnglish
+        ? await translateWindowReferences(
+            segments.map((segment) => segment.text),
+            'ja',
+            'en',
+            () => cancelled.has(job.mediaId),
+          )
+        : segments.map(() => '');
       if (cancelled.has(job.mediaId)) {
         emit('cancelled', total);
         return { ok: false, error: 'cancelled' };
@@ -401,13 +406,15 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         let audioPath: string | undefined;
         try {
           if (cancelled.has(job.mediaId)) throw new Error('cancelled');
-          audioPath = await extractFlashcardAudioClip(
-            item.path,
-            job.mediaId,
-            segment.start,
-            segment.end,
-            segment.text,
-          );
+          if (cardOptions.includeAudio) {
+            audioPath = await extractFlashcardAudioClip(
+              item.path,
+              job.mediaId,
+              segment.start,
+              segment.end,
+              segment.text,
+            );
+          }
         } catch {
           // A malformed cue or one unreadable audio range must not discard the
           // sentence or fail an otherwise complete transcript.
@@ -434,6 +441,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
           batchId: `transcription:${job.mediaId}:ja`,
           cards,
           timing,
+          cardOptions,
         });
       }
     }
@@ -911,6 +919,7 @@ export function enqueueTranscription(request: TranscriptionRequest): Transcripti
     attempts: 0,
     ...(kind === 'transcribe' ? {} : { kind }),
     ...(request.sourceSubtitleId ? { sourceSubtitleId: request.sourceSubtitleId } : {}),
+    cardOptions: normalizeTranscriptionCardOptions(request.cardOptions),
   });
   saveQueue();
   broadcast({
@@ -920,6 +929,7 @@ export function enqueueTranscription(request: TranscriptionRequest): Transcripti
     done: 0,
     total: 0,
     startedAt: Date.now(),
+    cardOptions: normalizeTranscriptionCardOptions(request.cardOptions),
   });
   void drain();
   return { ok: true, mediaId: item.id };

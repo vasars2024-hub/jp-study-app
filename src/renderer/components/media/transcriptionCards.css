@@ -1,0 +1,85 @@
+/*
+ * Transcript-to-cards options and batch status.
+ *
+ * These two controls are hosted by three unrelated surfaces — the Media library
+ * detail drawer, Blanc's Media panel, and the Study OS Cards overview — so the
+ * rules are tokens-only and carry no host geometry: each host supplies the
+ * column, this file supplies the block. Anything dense (the checkbox rows, the
+ * counts) stays on an opaque anchor surface rather than glass, per the Liquid
+ * selectivity rule.
+ */
+
+.transcription-card-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.transcription-card-options > legend {
+  padding: 0 var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.transcription-card-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  /* The label is the hit target, not the 13px box inside it. */
+  min-height: var(--lq-hit-target, 32px);
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.transcription-card-options input[type='checkbox'] {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+/* A disabled dependent option must read as unavailable rather than as "off". */
+.transcription-card-options input:disabled,
+.transcription-card-options input:disabled + *,
+.transcription-card-options:disabled {
+  cursor: default;
+}
+
+.transcription-card-options input:disabled {
+  opacity: 0.55;
+}
+
+.transcription-card-options .muted {
+  margin: 0;
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+}
+
+.transcription-card-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.transcription-card-status > span {
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.transcription-card-status > button {
+  margin-left: auto;
+}

@@ -18,6 +18,11 @@ import MediaStatusPill from './MediaStatusPill';
 import MediaMatchDialog from './MediaMatchDialog';
 import NyaaSubtitleDialog from './NyaaSubtitleDialog';
 import { useMediaJobs } from './useMediaJobs';
+import {
+  TranscriptionCardDeckStatus,
+  TranscriptionCardOptionsControl,
+  useTranscriptionCardOptions,
+} from '../TranscriptionCardOptions';
 import { episodesBySeason, providerEpisodeTitle, type LibraryEntry } from '../../../../shared/mediaLibraryEntries';
 import { mediaSubtitleStatus } from '../../../../shared/mediaSubtitleStatus';
 import {
@@ -77,6 +82,7 @@ export default function MediaDetailPanel({
   const [matching, setMatching] = useState(false);
   const [searching, setSearching] = useState(false);
   const [nyaaOpen, setNyaaOpen] = useState(false);
+  const [cardOptions, setCardOptions] = useTranscriptionCardOptions();
   /** Which track has been armed for removal, and which one is in flight. */
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -382,6 +388,12 @@ export default function MediaDetailPanel({
 
         {tab === 'subtitles' && (
           <div className="medialib-drawer__section">
+            <TranscriptionCardOptionsControl
+              value={cardOptions}
+              onChange={setCardOptions}
+              disabled={transcribing.has(entry.primary.id)}
+            />
+            <TranscriptionCardDeckStatus mediaId={entry.primary.id} />
             <div className="medialib-drawer__review">
               <h4>{t('media.subtitles.forEpisode', { title: episodeLabel })}</h4>
               <Button size="sm" disabled={searching} onClick={() => void search()}>
@@ -394,7 +406,11 @@ export default function MediaDetailPanel({
                 size="sm"
                 disabled={transcribing.has(entry.primary.id)}
                 onClick={() => {
-                  void window.api.enqueueTranscription({ mediaId: entry.primary.id, lang: 'ja' });
+                  void window.api.enqueueTranscription({
+                    mediaId: entry.primary.id,
+                    lang: 'ja',
+                    cardOptions,
+                  });
                   showToast({ message: t('media.subtitles.transcribeQueued'), kind: 'default' });
                 }}
               >

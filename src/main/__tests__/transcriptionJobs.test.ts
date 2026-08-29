@@ -5,12 +5,16 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   __transcriptionTestables,
+  cancelTranscription,
   enqueueTranscription,
   onMainTranscriptionProgress,
   registerTranscriptionIpc,
   transcriptionQueue,
 } from '../transcriptionJobs';
-import { MAX_NO_WINDOW_ATTEMPTS } from '../../shared/transcriptionIpc';
+import {
+  MAX_NO_WINDOW_ATTEMPTS,
+  normalizeTranscriptionCardOptions,
+} from '../../shared/transcriptionIpc';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'transcribe-test-'));
 
@@ -152,6 +156,44 @@ describe('planNoWindowRetry', () => {
     const last = planNoWindowRetry(job({ noWindowAttempts: MAX_NO_WINDOW_ATTEMPTS - 1, kind: 'fuse-en-ja' }));
     expect(last.retire).toBe(true);
     expect(last.job.kind).toBe('fuse-en-ja');
+  });
+});
+
+describe('transcript card options', () => {
+  it('keeps old persisted jobs on the full card behavior by default', () => {
+    expect(normalizeTranscriptionCardOptions()).toEqual({
+      createCards: true,
+      translateToEnglish: true,
+      includeAudio: true,
+    });
+  });
+
+  it('persists an explicit no-card request and reports it with queued progress', () => {
+    const media = {
+      id: 'options-media',
+      title: 'Options source',
+      fileName: 'options.wav',
+      path: '/tmp/options.wav',
+      subtitles: [],
+    };
+    const seen: Array<ReturnType<typeof normalizeTranscriptionCardOptions> | undefined> = [];
+    const off = onMainTranscriptionProgress((progress) => seen.push(progress.cardOptions));
+    try {
+      registerTranscriptionIpc({ listItems: () => [media], patchItems: () => undefined } as never);
+      enqueueTranscription({
+        mediaId: media.id,
+        cardOptions: { createCards: false, translateToEnglish: false, includeAudio: false },
+      });
+      expect(transcriptionQueue()[0]?.cardOptions).toEqual({
+        createCards: false,
+        translateToEnglish: false,
+        includeAudio: false,
+      });
+      expect(seen[0]).toEqual(transcriptionQueue()[0]?.cardOptions);
+    } finally {
+      cancelTranscription(media.id);
+      off();
+    }
   });
 });
 

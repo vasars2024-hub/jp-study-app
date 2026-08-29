@@ -15,6 +15,7 @@
  * `BlancFlashcardsPanel` is still a `BlancViewHost` embed — the remaining
  * Pillar 0 violation in this stream.
  */
+import { useT } from '../../i18n';
 import {
   MediaEmptyLibrary,
   MediaFolderNav,
@@ -29,6 +30,12 @@ import {
   MediaYoutubeBar,
   useMedia,
 } from '../media/MediaContent';
+import MediaJobStrip from '../media/library/MediaJobStrip';
+import {
+  TranscriptionCardDeckStatus,
+  TranscriptionCardOptionsControl,
+  useTranscriptionCardOptions,
+} from '../media/TranscriptionCardOptions';
 import BlancStudyPlayer from './BlancStudyPlayer';
 import {
   FlashcardAiMode,
@@ -54,8 +61,10 @@ void import('../../theme/studyos-compat.css');
  * bounded height it needs to measure against.
  */
 export function BlancMediaPanel() {
+  const { t } = useT();
   const state = useMedia('full');
   const { items, current, cues, src, subName, genState, generating } = state;
+  const [cardOptions, setCardOptions] = useTranscriptionCardOptions();
 
   return (
     <div className="blanc-tool-detail">
@@ -88,11 +97,25 @@ export function BlancMediaPanel() {
       </fieldset>
 
       <fieldset>
-        <legend>Transcription</legend>
+        <legend>{t('media.transcriptCards.transcription')}</legend>
         <div className="blanc-command-row">
           <MediaTranscriptionControls state={state} />
+          <button
+            type="button"
+            disabled={!current}
+            onClick={() => current && void window.api.enqueueTranscription({
+              mediaId: current.id,
+              lang: 'ja',
+              cardOptions,
+            })}
+          >
+            {t('media.transcriptCards.queue')}
+          </button>
         </div>
+        <TranscriptionCardOptionsControl value={cardOptions} onChange={setCardOptions} />
+        <TranscriptionCardDeckStatus mediaId={current?.id} />
         <MediaGenerationStatus state={state} />
+        <MediaJobStrip />
       </fieldset>
 
       <fieldset>
