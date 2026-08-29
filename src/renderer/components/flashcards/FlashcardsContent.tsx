@@ -83,6 +83,7 @@ import {
 } from '../../../shared/flashcardReview';
 import { flashcardAudioErrorKey } from '../../../shared/flashcardAudioMessages';
 import { TranscriptionCardDeckStatus } from '../media/TranscriptionCardOptions';
+import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import { deckCardsToCsv } from '../../deckExport';
 import { loadSaved, onSavedChanged, removeSaved, type SavedWord } from '../../savedWords';
 import {
@@ -1637,6 +1638,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       </ContextualSurface>
 
       <TranscriptionCardDeckStatus />
+      <AutoAudioPreferencesPanel />
 
       <ContextualSurface className="flash-tabs">
         <button

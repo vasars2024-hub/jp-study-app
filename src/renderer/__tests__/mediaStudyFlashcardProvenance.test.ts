@@ -20,7 +20,17 @@ vi.mock('../flashcardDeck', () => ({
     deck.push(...entries);
     return entries;
   },
+  // The workflow needs the new rows back so automatic narration can run on
+  // exactly them, so it takes the tracked variant.
+  addDeckCardsTracked: (entries: Array<Record<string, unknown>>) => {
+    deck.push(...entries);
+    return entries;
+  },
 }));
+
+// Narration is a real side effect of a deck write and has its own suite; here it
+// is stubbed so this test keeps measuring provenance and nothing else.
+vi.mock('../flashcardAutoAudio', () => ({ narrateNewCards: () => Promise.resolve(null) }));
 
 const { addMediaStudyFlashcards } = await import('../mediaStudyWorkflow');
 

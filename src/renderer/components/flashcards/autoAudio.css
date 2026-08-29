@@ -1,0 +1,58 @@
+/*
+ * Automatic-narration preferences, in the deck overview.
+ *
+ * Tokens only, opaque anchor: this is a settings block inside a dense working
+ * surface, which the Liquid selectivity rule keeps off glass.
+ */
+
+.auto-audio-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.auto-audio-options > legend {
+  padding: 0 var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}
+
+.auto-audio-options > .muted {
+  margin: 0;
+  font-size: var(--font-size-2xs);
+  color: var(--muted);
+}
+
+.auto-audio-options label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--lq-hit-target, 32px);
+  cursor: pointer;
+}
+
+.auto-audio-options input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.auto-audio-options__cap input {
+  width: 5rem;
+  padding: var(--space-2xs, 2px) var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text);
+}
+
+.auto-audio-options__report {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--muted);
+}

@@ -4,7 +4,8 @@
 // localStorage-cache + IndexedDB-mirror pattern as flashcardDeck.ts.
 
 import { IDB_KEYS, LS_KEYS, mirrorToIdb } from './storage/storage';
-import { addDeckCards, type FlashcardSource } from './flashcardDeck';
+import { addDeckCardsTracked, type FlashcardSource } from './flashcardDeck';
+import { narrateNewCards } from './flashcardAutoAudio';
 
 export type ClipboardEntryType =
   | 'text'
@@ -213,7 +214,9 @@ export function clearOnExitIfConfigured(): void {
 
 /** Send clipboard entries into the existing Flashcard Collection (no duplicate storage). */
 export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: FlashcardSource = 'import'): void {
-  addDeckCards(
+  // Fire and forget: the clipboard panel stays responsive while the one OS
+  // voice device works through whatever the preference covers.
+  void narrateNewCards(addDeckCardsTracked(
     entries.map((e) => ({
       word: e.dictMeta?.expression ?? e.text.slice(0, 120),
       reading: e.dictMeta?.reading ?? '',
@@ -222,7 +225,7 @@ export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: Flash
       source,
       bookTitle: e.readerMeta?.book,
     })),
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

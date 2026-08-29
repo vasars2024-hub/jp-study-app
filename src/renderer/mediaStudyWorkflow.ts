@@ -20,7 +20,8 @@ import {
 } from '../shared/visualNovelStudyCards';
 import { estimateLevelFromText } from './bookLevelEstimate';
 import { scoreTextComprehensibility } from './comprehensibility';
-import { addDeckCards, loadDeck } from './flashcardDeck';
+import { addDeckCardsTracked, loadDeck } from './flashcardDeck';
+import { narrateNewCards } from './flashcardAutoAudio';
 import { matchGrammarPatterns, type GrammarMatchHit } from './grammarMatch';
 import { getLevel } from './knownWords';
 import { getSlotList } from './levelLists';
@@ -259,7 +260,8 @@ export function addMediaStudyFlashcards(
   // widening the draft would touch every other caller; the word is the key the
   // ranking already deduplicates on, so this recovers it without that churn.
   const firstSeen = new Map(analysis.vocabulary.map((entry) => [entry.word, entry.firstSeenAt]));
-  addDeckCards(drafts.map((draft) => {
+  // Fire and forget: mining must not wait on the one OS voice device.
+  void narrateNewCards(addDeckCardsTracked(drafts.map((draft) => {
     const at = firstSeen.get(draft.word);
     const located = options.segments && at !== undefined
       ? locateInSeason(options.segments, at)
@@ -283,7 +285,7 @@ export function addMediaStudyFlashcards(
         }
         : {}),
     };
-  }));
+  })));
   return drafts.length;
 }
 
@@ -325,13 +327,13 @@ export function addVisualNovelStudyFlashcards(
   };
   for (const draft of drafts) counts[draft.studyKind] += 1;
   if (drafts.length) {
-    addDeckCards(drafts.map((draft) => ({
+    void narrateNewCards(addDeckCardsTracked(drafts.map((draft) => ({
       ...draft,
       source: 'media' as const,
       bookId: item.id,
       bookTitle: item.title,
       folder: 'Media',
-    })));
+    }))));
   }
   return { total: drafts.length, counts };
 }
@@ -347,7 +349,9 @@ export function addMediaStudySentenceFlashcard(
   if (!japanese) return false;
   const duplicate = loadDeck().some((card) => card.bookId === item.id && card.sentence === japanese);
   if (duplicate) return false;
-  addDeckCards([{
+  // A card that already carries an aligned clip is skipped by the selection,
+  // so a captured cue keeps its real audio instead of gaining a synthetic one.
+  void narrateNewCards(addDeckCardsTracked([{
     word: japanese.slice(0, 80),
     reading: '',
     meaning: context,
@@ -361,6 +365,6 @@ export function addMediaStudySentenceFlashcard(
     studyKind: 'sentence',
     imagePath: imagePath || undefined,
     audioPath: audioPath || undefined,
-  }]);
+  }]));
   return true;
 }

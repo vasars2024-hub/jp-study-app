@@ -34,7 +34,8 @@ import FieldHint from './FieldHint';
 import { getActiveProfile } from '../profileState';
 import Icon from './Icons';
 import MiningProgressPanel from './MiningProgressPanel';
-import { addDeckCards } from '../flashcardDeck';
+import { addDeckCardsTracked } from '../flashcardDeck';
+import { narrateNewCards } from '../flashcardAutoAudio';
 import {
   formatChapterRange,
   miningDeckIdentity,
@@ -422,7 +423,8 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
 
   function saveDeckLocally(rows: EpubDeckRow[]): void {
     if (!analysis || !rows.length) return;
-    addDeckCards(
+    // Fire and forget: mining must not wait on the one OS voice device.
+    void narrateNewCards(addDeckCardsTracked(
       rows.map((row) => ({
         word: row.expression,
         reading: row.reading,
@@ -437,7 +439,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
         bookId: deckIdentity.bookId,
         bookTitle: deckLabel.trim() || deckIdentity.deckTitle,
       })),
-    );
+    ));
   }
 
   function applyCardLayout(next: {

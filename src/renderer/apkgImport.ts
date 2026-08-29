@@ -9,6 +9,7 @@ import { getTokenizer, tokenizeSync } from './tokenizer';
 import { deckLabel } from '../shared/apkgCards';
 import { deckBookId } from '../shared/deckImport';
 import { addDeckCardsTracked, type DeckFlashcard } from './flashcardDeck';
+import { narrateNewCards } from './flashcardAutoAudio';
 
 export interface ApkgLemmaResult {
   ok: boolean;
@@ -77,6 +78,10 @@ export async function importApkgCards(filePath?: string): Promise<ApkgCardImport
       bookTitle: deckName,
     })),
   );
+
+  // An import is the batch most likely to exceed the per-batch cap, which the
+  // run reports rather than quietly narrating a prefix of the deck.
+  void narrateNewCards(added);
 
   return { ok: true, added, noteCount: res.noteCount, deckName, fileName: res.fileName };
 }
