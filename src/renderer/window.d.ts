@@ -1735,6 +1735,9 @@ declare global {
       flashcardReadAudio(
         filePath: string,
       ): Promise<import('../main/flashcardAudio').FlashcardAudioResult>;
+      flashcardReleaseAudio(
+        paths: readonly string[],
+      ): Promise<{ removed: number; skipped: number }>;
       onTranscriptionChunkRequest(
         cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,
       ): () => void;

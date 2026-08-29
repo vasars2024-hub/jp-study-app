@@ -4,7 +4,7 @@ import {
   normalizeTranscriptionCardOptions,
   type TranscriptionCardOptions,
 } from '../../../shared/transcriptionIpc';
-import { loadDeck, type DeckFlashcard } from '../../flashcardDeck';
+import { loadDeck, removeDeckCards, type DeckFlashcard } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import './transcriptionCards.css';
 
@@ -110,20 +110,49 @@ function tFallbackTitle(card?: DeckFlashcard): string {
   return card?.bookId || '';
 }
 
+/**
+ * Which files the batch is the only reference to. `audioDataUrl` cards are
+ * excluded on purpose — they carry their audio inline and own no file, so
+ * passing one to the release channel would be a path that is not a path.
+ */
+export function transcriptBatchClipPaths(summary: TranscriptBatchSummary): string[] {
+  return summary.cards
+    .map((card) => card.audioPath)
+    .filter((clip): clip is string => Boolean(clip));
+}
+
 export function TranscriptionCardDeckStatus({ mediaId }: { mediaId?: string }) {
   const { t } = useT();
   const [cards, setCards] = useState(loadDeck);
+  const [armed, setArmed] = useState(false);
   useEffect(() => {
     const update = (): void => setCards(loadDeck());
     window.addEventListener('flashcard-deck-changed', update);
     return () => window.removeEventListener('flashcard-deck-changed', update);
   }, []);
   const summary = useMemo(() => summarizeLatestTranscriptBatch(cards, mediaId), [cards, mediaId]);
+  // A batch that has already gone leaves nothing to disarm against.
+  useEffect(() => {
+    if (!summary) setArmed(false);
+  }, [summary]);
   if (!summary) return null;
 
   const openCards = (): void => {
     window.dispatchEvent(new CustomEvent('os:open', { detail: 'flashcards' }));
     window.dispatchEvent(new CustomEvent('blanc:select-tab', { detail: 'flashcards' }));
+  };
+
+  /**
+   * The one exit from the add flow. Two steps rather than an undo window: the
+   * clips are deleted with the cards, so an undo could only restore silent
+   * ones — and re-running the same transcription rebuilds the batch exactly.
+   */
+  const removeBatch = (): void => {
+    const clips = transcriptBatchClipPaths(summary);
+    removeDeckCards(summary.cards.map((card) => card.id));
+    setArmed(false);
+    setCards(loadDeck());
+    if (clips.length) void window.api.flashcardReleaseAudio(clips);
   };
 
   return (
@@ -140,6 +169,21 @@ export function TranscriptionCardDeckStatus({ mediaId }: { mediaId?: string }) {
       <button type="button" className="btn small" onClick={openCards}>
         {t('media.transcriptCards.open')}
       </button>
+      {armed ? (
+        <span className="transcription-card-status__confirm">
+          <span>{t('media.transcriptCards.removeConfirm', { count: summary.cards.length })}</span>
+          <button type="button" className="btn small danger" onClick={removeBatch}>
+            {t('media.transcriptCards.removeYes')}
+          </button>
+          <button type="button" className="btn small" onClick={() => setArmed(false)}>
+            {t('common.cancel')}
+          </button>
+        </span>
+      ) : (
+        <button type="button" className="btn small" onClick={() => setArmed(true)}>
+          {t('media.transcriptCards.remove')}
+        </button>
+      )}
     </section>
   );
 }

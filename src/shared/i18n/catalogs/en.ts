@@ -1108,6 +1108,9 @@ export const en: Catalog = {
   'media.transcriptCards.contents': '{audio} with audio · {translated} translated',
   'media.transcriptCards.estimated': 'Timing is estimated from Whisper chunks, not exact cue alignment.',
   'media.transcriptCards.open': 'Open local cards',
+  'media.transcriptCards.remove': 'Remove this batch',
+  'media.transcriptCards.removeConfirm': 'Remove {count} cards and their audio clips?',
+  'media.transcriptCards.removeYes': 'Remove',
   'media.subtitles.search': 'Search now',
   'media.subtitles.searching': 'Searching...',
   'media.subtitles.searchDone': {

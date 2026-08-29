@@ -1008,6 +1008,9 @@ export const ja: Catalog = {
   'media.transcriptCards.contents': '音声付き {audio} 枚・英訳付き {translated} 枚',
   'media.transcriptCards.estimated': '時刻はWhisperのチャンクからの推定で、正確なキュー位置ではありません。',
   'media.transcriptCards.open': 'ローカルカードを開く',
+  'media.transcriptCards.remove': 'このカード一式を削除',
+  'media.transcriptCards.removeConfirm': 'カード {count} 枚と音声クリップを削除しますか？',
+  'media.transcriptCards.removeYes': '削除',
   'media.subtitles.search': '今すぐ検索',
   'media.subtitles.searching': '検索中…',
   'media.subtitles.searchDone': {

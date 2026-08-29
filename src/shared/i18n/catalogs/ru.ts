@@ -1122,6 +1122,9 @@ export const ru: Catalog = {
   'media.transcriptCards.contents': 'С аудио: {audio} · с переводом: {translated}',
   'media.transcriptCards.estimated': 'Время оценено по блокам Whisper, а не по точной привязке реплик.',
   'media.transcriptCards.open': 'Открыть локальные карточки',
+  'media.transcriptCards.remove': 'Удалить этот набор',
+  'media.transcriptCards.removeConfirm': 'Удалить карточек: {count} — вместе с аудиофрагментами?',
+  'media.transcriptCards.removeYes': 'Удалить',
   'media.subtitles.search': 'Искать сейчас',
   'media.subtitles.searching': 'Поиск…',
   'media.subtitles.searchDone': {

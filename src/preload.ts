@@ -2683,6 +2683,10 @@ const api = {
   flashcardReadAudio: (filePath: string):
     Promise<import('./main/flashcardAudio').FlashcardAudioResult> =>
     ipcRenderer.invoke('flashcards:readAudio', filePath),
+  /** Reclaim managed clips a removed card batch was the only reference to. */
+  flashcardReleaseAudio: (paths: readonly string[]):
+    Promise<{ removed: number; skipped: number }> =>
+    ipcRenderer.invoke('flashcards:releaseAudio', [...paths]),
   /** Main asks the renderer to run Whisper on one slice of audio. */
   onTranscriptionChunkRequest: (
     cb: (payload: { id: string; pcmBase64: string; lang: string }) => void,

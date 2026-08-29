@@ -67,7 +67,7 @@ import {
   segmentTranscriptSentences,
   transcriptTimingSource,
 } from '../shared/transcriptionSentenceCards';
-import { extractFlashcardAudioClip } from './flashcardAudio';
+import { extractFlashcardAudioClip, pruneMediaClips } from './flashcardAudio';
 
 export interface TranscriptionHost {
   listItems: () => MediaItem[];
@@ -435,6 +435,11 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         return { ok: false, error: 'cancelled' };
       }
       if (cards.length && !cancelled.has(job.mediaId)) {
+        // This batch replaces the previous one for the same media, so the clips
+        // it no longer references are unreachable from any card. Reclaim them
+        // here, where the keep-set is exact, rather than growing the directory
+        // by a full transcript on every re-run.
+        pruneMediaClips(job.mediaId, cards.map((card) => card.audioPath));
         broadcastCardsReady({
           mediaId: job.mediaId,
           title: job.title,

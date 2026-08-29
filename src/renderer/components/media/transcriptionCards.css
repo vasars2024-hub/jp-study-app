@@ -83,3 +83,14 @@
 .transcription-card-status > button {
   margin-left: auto;
 }
+
+/* The armed state replaces the remove button in place, so the row must not
+   reflow the counts above it while the user reads the question. */
+.transcription-card-status__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text);
+}

@@ -1006,6 +1006,9 @@ export const zh: Catalog = {
   'media.transcriptCards.contents': '{audio} 张有音频 · {translated} 张有翻译',
   'media.transcriptCards.estimated': '时间来自 Whisper 分块估算，并非精确的字幕对齐。',
   'media.transcriptCards.open': '打开本地卡片',
+  'media.transcriptCards.remove': '删除这批卡片',
+  'media.transcriptCards.removeConfirm': '要删除 {count} 张卡片及其音频片段吗？',
+  'media.transcriptCards.removeYes': '删除',
   'media.subtitles.search': '立即搜索',
   'media.subtitles.searching': '正在搜索…',
   'media.subtitles.searchDone': {

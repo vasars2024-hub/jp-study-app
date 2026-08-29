@@ -17,6 +17,8 @@ import {
   cultureForLanguage,
   extractFlashcardAudioClip,
   isManagedFlashcardAudioPath,
+  pruneMediaClips,
+  releaseFlashcardAudio,
   synthesizeFlashcardAudio,
 } from '../flashcardAudio';
 import { flashcardAudioErrorKey } from '../../shared/flashcardAudioMessages';
@@ -56,6 +58,44 @@ describe('flashcard audio safety', () => {
     expect(generated.status, generated.stderr.toString()).toBe(0);
     const clip = await extractFlashcardAudioClip(source, 'fixture', 0.4, 1.2, 'テストです。');
     expect(fs.statSync(clip).size).toBeGreaterThan(1_000);
+  });
+});
+
+describe('reclaiming clips a card batch no longer references', () => {
+  const clipDir = path.join(testRoot, 'flashcard-audio', 'media', 'reclaim');
+  const clip = (name: string): string => {
+    fs.mkdirSync(clipDir, { recursive: true });
+    const file = path.join(clipDir, name);
+    fs.writeFileSync(file, Buffer.alloc(64, 1));
+    return file;
+  };
+
+  it('deletes managed clips and REFUSES anything outside the managed root', () => {
+    const managed = clip('managed.mp3');
+    const outsider = path.join(testRoot, 'not-managed.mp3');
+    fs.writeFileSync(outsider, Buffer.alloc(8, 2));
+
+    // The negative control: an arbitrary path must survive the same call that
+    // deletes the managed one, because `paths` arrives from renderer storage.
+    expect(releaseFlashcardAudio([managed, outsider, '../escape.mp3', ''])).toEqual({
+      removed: 1,
+      skipped: 3,
+    });
+    expect(fs.existsSync(managed)).toBe(false);
+    expect(fs.existsSync(outsider)).toBe(true);
+    fs.rmSync(outsider, { force: true });
+  });
+
+  it('prunes one media directory down to exactly the batch that is current', () => {
+    const kept = clip('kept.mp3');
+    const stale = clip('stale.mp3');
+    const result = pruneMediaClips('reclaim', [kept, undefined]);
+
+    expect(result).toEqual({ removed: 1, bytes: 64 });
+    expect(fs.existsSync(kept)).toBe(true);
+    expect(fs.existsSync(stale)).toBe(false);
+    // A media that never produced audio is not an error and deletes nothing.
+    expect(pruneMediaClips('never-transcribed', [])).toEqual({ removed: 0, bytes: 0 });
   });
 });
 

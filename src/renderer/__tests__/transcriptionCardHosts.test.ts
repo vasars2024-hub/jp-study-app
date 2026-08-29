@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DeckFlashcard } from '../flashcardDeck';
-import { summarizeLatestTranscriptBatch } from '../components/media/TranscriptionCardOptions';
+import {
+  summarizeLatestTranscriptBatch,
+  transcriptBatchClipPaths,
+} from '../components/media/TranscriptionCardOptions';
 
 const SRC = resolve(__dirname, '..');
 const read = (path: string): string => readFileSync(resolve(SRC, path), 'utf8').replace(/\r\n/g, '\n');
@@ -44,5 +47,25 @@ describe('transcript card status across hosts', () => {
     expect(blanc).toContain('<TranscriptionCardOptionsControl');
     expect(blanc).toContain('<TranscriptionCardDeckStatus mediaId={current?.id} />');
     expect(blanc).toMatch(/enqueueTranscription\(\{[\s\S]*?cardOptions,/);
+  });
+
+  it('releases only the file-backed clips when a batch is removed', () => {
+    const summary = summarizeLatestTranscriptBatch([
+      card({ id: 'a', bookId: 'm1', studyActionId: 'transcription:m1:ja', textProvenance: 'transcript', audioPath: 'C:/p/flashcard-audio/media/m1/a.mp3', addedAt: 2 }),
+      // Inline audio owns no file: releasing it would send a data URL to a
+      // channel whose whole contract is a managed path.
+      card({ id: 'b', bookId: 'm1', studyActionId: 'transcription:m1:ja', textProvenance: 'transcript', audioDataUrl: 'data:audio/wav;base64,AA', addedAt: 1 }),
+    ], 'm1');
+
+    if (!summary) throw new Error('the batch summary is the subject of this test');
+    expect(summary.audio).toBe(2);
+    expect(transcriptBatchClipPaths(summary)).toEqual(['C:/p/flashcard-audio/media/m1/a.mp3']);
+  });
+
+  it('gives the add flow a two-step exit rather than an undo that cannot restore audio', () => {
+    const source = read('components/media/TranscriptionCardOptions.tsx');
+    expect(source).toContain("t('media.transcriptCards.removeConfirm'");
+    expect(source).toContain("t('common.cancel')");
+    expect(source).toContain('window.api.flashcardReleaseAudio(clips)');
   });
 });

@@ -41,6 +41,69 @@ export function isManagedFlashcardAudioPath(filePath: string, root = audioRoot()
   return Boolean(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
+/**
+ * Delete managed clips the deck no longer references.
+ *
+ * Two callers, one guard: the renderer removing a transcript batch, and a
+ * re-transcription whose sentences changed — a clip is named by a hash of its
+ * text and range, so changed text orphans the old file forever rather than
+ * overwriting it. Anything outside the managed root is counted as `skipped`,
+ * never unlinked: `paths` reaches here from renderer storage, and a bad row
+ * must not turn into an arbitrary delete.
+ */
+export function releaseFlashcardAudio(paths: readonly string[]): { removed: number; skipped: number } {
+  let removed = 0;
+  let skipped = 0;
+  for (const filePath of paths) {
+    if (typeof filePath !== 'string' || !filePath || !isManagedFlashcardAudioPath(filePath)) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+        removed += 1;
+      }
+    } catch {
+      // A clip held open by a playing <audio> is reclaimed on the next pass.
+      skipped += 1;
+    }
+  }
+  return { removed, skipped };
+}
+
+/**
+ * Reduce one media's clip directory to exactly the batch that is current.
+ *
+ * Called after a batch is built, so a re-run does not accumulate a directory of
+ * clips for sentences no card mentions any more.
+ */
+export function pruneMediaClips(
+  mediaId: string,
+  keep: readonly (string | undefined)[],
+): { removed: number; bytes: number } {
+  const directory = path.join(audioRoot(), 'media', mediaId.replace(/[^a-zA-Z0-9_-]/g, ''));
+  if (!fs.existsSync(directory)) return { removed: 0, bytes: 0 };
+  const kept = new Set(
+    keep.filter((entry): entry is string => Boolean(entry)).map((entry) => path.resolve(entry)),
+  );
+  let removed = 0;
+  let bytes = 0;
+  for (const name of fs.readdirSync(directory)) {
+    const filePath = path.join(directory, name);
+    if (kept.has(path.resolve(filePath))) continue;
+    try {
+      const size = fs.statSync(filePath).size;
+      fs.rmSync(filePath, { force: true });
+      removed += 1;
+      bytes += size;
+    } catch {
+      // Best effort: a locked file stays until the next prune.
+    }
+  }
+  return { removed, bytes };
+}
+
 /** A spawn failure that carries which classification the caller should report. */
 class SynthesizerError extends Error {
   constructor(message: string, readonly reason: FlashcardAudioFailure) {
@@ -227,6 +290,9 @@ export function registerFlashcardAudioIpc(): void {
   ));
   ipcMain.handle('flashcards:readAudio', (_event, filePath?: string) => (
     readManagedAudio(typeof filePath === 'string' ? filePath : '')
+  ));
+  ipcMain.handle('flashcards:releaseAudio', (_event, paths?: unknown) => (
+    releaseFlashcardAudio(Array.isArray(paths) ? paths.filter((entry): entry is string => typeof entry === 'string') : [])
   ));
 }
 
