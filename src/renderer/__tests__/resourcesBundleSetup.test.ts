@@ -201,6 +201,25 @@ describe('Resources bundle setup truthfulness', () => {
     expect(detail).not.toContain('One-click setup');
   });
 
+  it('limits the reversible Liquid seam to commands and bundle context', () => {
+    const view = readFileSync(
+      new URL('../views/ResourcesView.tsx', import.meta.url),
+      'utf8',
+    );
+    const detail = readFileSync(
+      new URL('../components/resources/BundleDetail.tsx', import.meta.url),
+      'utf8',
+    );
+
+    expect(view).toContain('<ContextualSurface className="res-command-surface">');
+    expect(detail).toContain(
+      '<ContextualSurface as="header" className="bundle-detail-head res-bundle-context">',
+    );
+    expect(detail).toContain('<section className="bundle-checklist">');
+    expect(detail).toContain('<section className="bundle-detail-links">');
+    expect(detail).not.toContain('<ContextualSurface as="section" className="bundle-checklist">');
+  });
+
   it('defines every changed UI claim in all four catalogs', async () => {
     const { CATALOGS } = await import('../../shared/i18n/catalogs/all');
     const keys = [

@@ -1,0 +1,41 @@
+/* Resources keeps its map, catalogue cards, checklists and link grids on the
+   opaque work canvas. Only navigation and the selected bundle's contextual
+   identity opt into the reversible Liquid seam. */
+.res-view {
+  container-type: inline-size;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface {
+  display: grid;
+  gap: var(--lq-space-3);
+  margin-bottom: var(--lq-space-4);
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface .view-head,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface .view-head > p,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface .res-controls,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-command-surface .res-refresh-hint {
+  margin-block: 0;
+}
+
+/* A selected bundle is still dense setup work. Its header becomes the
+   contextual inspector edge; checklist and resource sections stay opaque. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .res-bundle-context {
+  margin-bottom: var(--lq-space-5);
+}
+
+@container (max-width: 560px) {
+  .res-controls,
+  .res-controls-right {
+    align-items: stretch;
+    flex-direction: column;
+    max-width: none;
+    width: 100%;
+  }
+
+  .res-controls .gram-search {
+    flex-basis: auto;
+    max-width: none;
+    width: 100%;
+  }
+}

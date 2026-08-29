@@ -1,4 +1,5 @@
 import Icon, { type IconName } from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import type { Bundle } from '../../../shared/resourcesCatalog';
 import { useT } from '../../i18n';
 
@@ -39,7 +40,7 @@ export default function BundleDetail({
 
   return (
     <div className="bundle-detail" style={{ ['--bundle-accent' as string]: bundle.color }}>
-      <div className="bundle-detail-head">
+      <ContextualSurface as="header" className="bundle-detail-head res-bundle-context">
         <button className="bundle-back" onClick={onBack}>
           <Icon name="chevron" size={14} />
           {t('common.back')}
@@ -56,7 +57,7 @@ export default function BundleDetail({
             <p className="muted">{bundle.blurb}</p>
           </div>
         </div>
-      </div>
+      </ContextualSurface>
 
       {checklist.length > 0 ? (
         <section className="bundle-checklist">

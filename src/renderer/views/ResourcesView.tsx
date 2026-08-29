@@ -14,6 +14,8 @@ import {
   useAeroMaterials,
 } from '../components/ui';
 import WorldHeatMap from '../components/resources/WorldHeatMap';
+import { ContextualSurface } from '../components/liquid/LiquidSurface';
+import '../components/resources/resourcesLiquid.css';
 import {
   ResourceBundleDetail,
   ResourceBundles,
@@ -223,50 +225,52 @@ export default function ResourcesView() {
 
   return (
     <div className="res-view">
-      <div className="view-head">
-        <p className="muted">{t('resources.intro')}</p>
-      </div>
+      <ContextualSurface className="res-command-surface">
+        <div className="view-head">
+          <p className="muted">{t('resources.intro')}</p>
+        </div>
 
-      <div className="res-controls">
-        <div className="res-filter">
-          <button
-            className={`gram-level-btn ${filter === 'All' ? 'active' : ''}`}
-            onClick={() => setFilter('All')}
-          >
-            {t('resources.filter.all')}
-          </button>
-          {allCategories.map((cat) => (
+        <div className="res-controls">
+          <div className="res-filter">
             <button
-              key={cat.id}
-              className={`gram-level-btn ${filter === cat.id ? 'active' : ''}`}
-              onClick={() => setFilter(cat.id)}
-              title={cat.title}
+              className={`gram-level-btn ${filter === 'All' ? 'active' : ''}`}
+              onClick={() => setFilter('All')}
             >
-              {cat.title}
+              {t('resources.filter.all')}
             </button>
-          ))}
+            {allCategories.map((cat) => (
+              <button
+                key={cat.id}
+                className={`gram-level-btn ${filter === cat.id ? 'active' : ''}`}
+                onClick={() => setFilter(cat.id)}
+                title={cat.title}
+              >
+                {cat.title}
+              </button>
+            ))}
+          </div>
+          <div className="res-controls-right">
+            <button
+              className="gram-level-btn res-refresh"
+              onClick={() => void doRefresh()}
+              disabled={refreshState === 'refreshing'}
+              title="Fetch the latest catalogue"
+            >
+              <Icon name="refresh" size={12} />
+              {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
+            </button>
+            <input
+              className="gram-search"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('resources.search.placeholder')}
+            />
+          </div>
         </div>
-        <div className="res-controls-right">
-          <button
-            className="gram-level-btn res-refresh"
-            onClick={() => void doRefresh()}
-            disabled={refreshState === 'refreshing'}
-            title="Fetch the latest catalogue"
-          >
-            <Icon name="refresh" size={12} />
-            {refreshState === 'refreshing' ? t('resources.refreshing') : t('resources.refresh')}
-          </button>
-          <input
-            className="gram-search"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('resources.search.placeholder')}
-          />
-        </div>
-      </div>
 
-      {refreshLabel ? <div className="res-refresh-hint muted">{refreshLabel}</div> : null}
+        {refreshLabel ? <div className="res-refresh-hint muted">{refreshLabel}</div> : null}
+      </ContextualSurface>
 
       {showLanding ? <WorldHeatMap /> : null}
       {showLanding ? <ResourceBundles state={state} /> : null}
