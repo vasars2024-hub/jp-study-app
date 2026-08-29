@@ -8470,11 +8470,18 @@ mark.lookup-mark,
   color: var(--bundle-accent, var(--accent-2));
   background: color-mix(in srgb, var(--bundle-accent, var(--accent-2)) 16%, transparent);
 }
+/* The bundle accent is data (`catalogFallback.ts`), chosen to identify a bundle
+   in fills, borders and icon tints — where contrast is not a text concern. Used
+   RAW as label text it failed the 4.5 bar on four of the ten bundles measured on
+   the composited 26,41,32: Obsidian #475569 at 2.01, Sapphire 3.34, Ruby 3.43,
+   Opal 3.59. Mixing 55% accent into `--text` keeps the hue that identifies the
+   bundle and lifts the worst case to 5.12, and because it mixes toward `--text`
+   it follows the light themes instead of needing a second set of colours. */
 .bundle-card-gem {
   font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--bundle-accent, var(--accent-2));
+  color: color-mix(in srgb, var(--bundle-accent, var(--accent-2)) 55%, var(--text));
 }
 .bundle-card-gem em {
   font-style: normal;
@@ -8738,10 +8745,17 @@ mark.lookup-mark,
 .mytool-card {
   cursor: default;
 }
+/* Both My-tools controls were the only app-owned targets under the rubric's
+   32 px bar on this surface — the name button measured 154x20 and the remove
+   button 22x22. The name button keeps its zero padding on the inline axis so the
+   row does not reflow; only the block axis grows to the bar. */
 .mytool-name {
   background: none;
   border: none;
   padding: 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
   text-align: left;
   cursor: pointer;
   color: var(--text);
@@ -8754,8 +8768,8 @@ mark.lookup-mark,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: none;
