@@ -23,7 +23,7 @@ import {
   type TestQuestion,
   type TestResult,
 } from '../../../shared/flashcardTest';
-import { loadDeck } from '../../flashcardDeck';
+import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
@@ -40,7 +40,11 @@ const OUTCOME_KEY = {
   unanswered: 'flash.test.outcomeUnanswered',
 } as const;
 
-export default function TestMode({ onExit }: { onExit?: () => void }) {
+export default function TestMode({ onExit, deck = 'all' }: {
+  onExit?: () => void;
+  /** Which local deck this paper draws from. `all` is the whole collection. */
+  deck?: DeckFolderFilter;
+}) {
   const { t } = useT();
   const [paper, setPaper] = useState<TestPaper | null>(null);
   const [responses, setResponses] = useState<Record<string, string>>({});
@@ -51,12 +55,12 @@ export default function TestMode({ onExit }: { onExit?: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const begin = useCallback((): void => {
-    setPaper(buildTestPaper(loadDeck()));
+    setPaper(buildTestPaper(loadPracticeDeck(deck)));
     setResponses({});
     setAt(0);
     setResult(null);
     setConfirming(false);
-  }, []);
+  }, [deck]);
 
   useEffect(() => { begin(); }, [begin]);
 

@@ -1594,7 +1594,7 @@ function AudioPoolNote({ state }: { state: FlashcardsState }) {
 }
 
 export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const {
     saved,
     epubCards,
@@ -1629,6 +1629,31 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
   // piece of state, not one boolean each, so two modes can never be open at
   // once and every one of them exits back to the same place.
   const [practice, setPractice] = useState<PracticeMode>('none');
+
+  /**
+   * Which local deck a practice sitting draws from.
+   *
+   * Separate from `folderFilter`, which drives the deck EXPLORER above. Reusing
+   * that one would mean browsing a folder silently changed what the next round
+   * practises, and closing a search would silently change it back.
+   */
+  const [practiceDeck, setPracticeDeck] = useState<DeckFolderFilter>('all');
+  const practiceDeckChoices = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const card of state.deck) counts.set(card.folder ?? '', (counts.get(card.folder ?? '') ?? 0) + 1);
+    return [
+      { value: 'all', label: t('flash.practice.deckAll'), count: state.deck.length },
+      { value: 'unfiled', label: t('flash.practice.deckUnfiled'), count: counts.get('') ?? 0 },
+      ...folders.map((folder) => ({
+        value: folder,
+        label: folder,
+        count: counts.get(folder) ?? 0,
+      })),
+    ];
+    // `lang`, not `t`: a memo that depends on `t` goes stale across a language
+    // switch (CLAUDE.md §6).
+  }, [state.deck, folders, lang]);
+  const practiceDeckSize = practiceDeckChoices.find((c) => c.value === practiceDeck)?.count ?? 0;
 
   /**
    * The saved-word list, bounded, with the place it came from attached.
@@ -1698,24 +1723,46 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       <SchedulingPreferencesPanel />
       <DeckAudioExport />
 
-      {practice === 'match' && <MatchMode onExit={() => setPractice('none')} />}
-      {practice === 'write' && <WriteMode onExit={() => setPractice('none')} />}
-      {practice === 'learn' && <LearnMode onExit={() => setPractice('none')} />}
-      {practice === 'test' && <TestMode onExit={() => setPractice('none')} />}
+      {practice === 'match' && <MatchMode deck={practiceDeck} onExit={() => setPractice('none')} />}
+      {practice === 'write' && <WriteMode deck={practiceDeck} onExit={() => setPractice('none')} />}
+      {practice === 'learn' && <LearnMode deck={practiceDeck} onExit={() => setPractice('none')} />}
+      {practice === 'test' && <TestMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'none' && (
         <fieldset className="auto-reading-options">
           <legend>{t('flash.practice.title')}</legend>
           <p className="muted">{t('flash.practice.lead')}</p>
+          <label className="auto-reading-options__form">
+            {t('flash.practice.deck')}
+            {/* The count is on the option, not a footnote: a mode that refuses
+                a four-card deck is only honest if the four was visible first. */}
+            <select
+              value={practiceDeck}
+              onChange={(event) => setPracticeDeck(event.currentTarget.value)}
+            >
+              {practiceDeckChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {t('flash.practice.deckOption', { name: choice.label, count: choice.count })}
+                </option>
+              ))}
+            </select>
+          </label>
           <ul className="flash-practice-list">
             {PRACTICE_MODES.map((entry) => (
               <li key={entry.id}>
-                <button type="button" onClick={() => setPractice(entry.id)}>
+                <button
+                  type="button"
+                  disabled={practiceDeckSize === 0}
+                  onClick={() => setPractice(entry.id)}
+                >
                   {t(entry.startKey)}
                 </button>
                 <span className="muted">{t(entry.aboutKey)}</span>
               </li>
             ))}
           </ul>
+          {practiceDeckSize === 0 && (
+            <p className="auto-reading-options__report">{t('flash.practice.emptyDeck')}</p>
+          )}
         </fieldset>
       )}
 

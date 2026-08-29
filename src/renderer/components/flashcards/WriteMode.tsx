@@ -15,11 +15,15 @@ import {
   type WriteGrade,
   type WriteRound,
 } from '../../../shared/flashcardWrite';
-import { loadDeck } from '../../flashcardDeck';
+import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
-export default function WriteMode({ onExit }: { onExit?: () => void }) {
+export default function WriteMode({ onExit, deck = 'all' }: {
+  onExit?: () => void;
+  /** Which local deck this round draws from. `all` is the whole collection. */
+  deck?: DeckFolderFilter;
+}) {
   const { t } = useT();
   const [round, setRound] = useState<WriteRound | null>(null);
   const [index, setIndex] = useState(0);
@@ -32,7 +36,7 @@ export default function WriteMode({ onExit }: { onExit?: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const deal = useCallback((): void => {
-    setRound(buildWriteRound(loadDeck()));
+    setRound(buildWriteRound(loadPracticeDeck(deck)));
     setIndex(0);
     setTyped('');
     setGrade(null);
@@ -40,7 +44,7 @@ export default function WriteMode({ onExit }: { onExit?: () => void }) {
     setCorrect(0);
     setOverridden(0);
     setWrong(0);
-  }, []);
+  }, [deck]);
 
   useEffect(() => { deal(); }, [deal]);
 

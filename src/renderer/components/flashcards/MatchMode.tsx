@@ -14,11 +14,15 @@ import {
   type MatchRound,
   type MatchTile,
 } from '../../../shared/flashcardMatch';
-import { loadDeck } from '../../flashcardDeck';
+import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
-export default function MatchMode({ onExit }: { onExit?: () => void }) {
+export default function MatchMode({ onExit, deck = 'all' }: {
+  onExit?: () => void;
+  /** Which local deck this sitting draws from. `all` is the whole collection. */
+  deck?: DeckFolderFilter;
+}) {
   const { t } = useT();
   const [round, setRound] = useState<MatchRound | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -28,13 +32,13 @@ export default function MatchMode({ onExit }: { onExit?: () => void }) {
   const [misses, setMisses] = useState(0);
 
   const deal = useCallback((): void => {
-    setRound(buildMatchRound(loadDeck()));
+    setRound(buildMatchRound(loadPracticeDeck(deck)));
     setStartedAt(Date.now());
     setMatched([]);
     setPicked(null);
     setWrong(null);
     setMisses(0);
-  }, []);
+  }, [deck]);
 
   useEffect(() => { deal(); }, [deal]);
 

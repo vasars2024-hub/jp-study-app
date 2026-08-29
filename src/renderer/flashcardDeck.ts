@@ -529,6 +529,17 @@ export function importDeckFromEntries(entries: ImportDeckEntry[]): DeckFlashcard
   return replaceImportedDeck(bookId, bookTitle, entries);
 }
 
+/**
+ * The cards one practice sitting draws from.
+ *
+ * One seam rather than four call sites. A mode that forgot to apply the filter
+ * would quietly practise the whole deck, and a mode practising 3,000 cards
+ * looks exactly like a mode practising the 40 you chose until you count them.
+ */
+export function loadPracticeDeck(filter: DeckFolderFilter = 'all'): DeckFlashcard[] {
+  return filterDeckCards(loadDeck(), filter);
+}
+
 export function filterDeckCards(cards: DeckFlashcard[], filter: DeckFolderFilter): DeckFlashcard[] {
   if (filter === 'all') return cards;
   if (filter === 'unfiled') return cards.filter((c) => !c.folder);

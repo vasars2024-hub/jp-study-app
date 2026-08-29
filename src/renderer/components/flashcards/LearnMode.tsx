@@ -21,11 +21,15 @@ import {
   type LearnStep,
 } from '../../../shared/flashcardLearn';
 import { gradeWrittenAnswer, type WriteGrade } from '../../../shared/flashcardWrite';
-import { loadDeck } from '../../flashcardDeck';
+import { loadPracticeDeck, type DeckFolderFilter } from '../../flashcardDeck';
 import { useT } from '../../i18n';
 import './autoAudio.css';
 
-export default function LearnMode({ onExit }: { onExit?: () => void }) {
+export default function LearnMode({ onExit, deck = 'all' }: {
+  onExit?: () => void;
+  /** Which local deck this sitting draws from. `all` is the whole collection. */
+  deck?: DeckFolderFilter;
+}) {
   const { t } = useT();
   const [pool, setPool] = useState<ReturnType<typeof loadDeck>>([]);
   const [session, setSession] = useState<LearnSession | null>(null);
@@ -36,7 +40,7 @@ export default function LearnMode({ onExit }: { onExit?: () => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const begin = useCallback((): void => {
-    const cards = loadDeck();
+    const cards = loadPracticeDeck(deck);
     const fresh = startLearnSession(cards);
     setPool(cards);
     setSession(fresh);
@@ -44,7 +48,7 @@ export default function LearnMode({ onExit }: { onExit?: () => void }) {
     setPicked(null);
     setTyped('');
     setGrade(null);
-  }, []);
+  }, [deck]);
 
   useEffect(() => { begin(); }, [begin]);
 

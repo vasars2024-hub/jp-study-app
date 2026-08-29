@@ -27,7 +27,14 @@ vi.mock('../i18n', () => ({
 }));
 
 let deck: Array<Record<string, unknown>> = [];
-vi.mock('../flashcardDeck', () => ({ loadDeck: () => deck }));
+// The mock HONOURS the filter, so a mode that dropped the deck prop would
+// practise the whole fixture and be caught rather than quietly passing.
+vi.mock('../flashcardDeck', () => ({
+  loadDeck: () => deck,
+  loadPracticeDeck: (filter = 'all') => (filter === 'all'
+    ? deck
+    : deck.filter((card) => (filter === 'unfiled' ? !card.folder : card.folder === filter))),
+}));
 
 import WriteMode from '../components/flashcards/WriteMode';
 

@@ -28,7 +28,14 @@ vi.mock('../i18n', () => ({
 }));
 
 let deck: Array<Record<string, unknown>> = [];
-vi.mock('../flashcardDeck', () => ({ loadDeck: () => deck }));
+// The mock HONOURS the filter, so a mode that dropped the deck prop would
+// practise the whole fixture and be caught rather than quietly passing.
+vi.mock('../flashcardDeck', () => ({
+  loadDeck: () => deck,
+  loadPracticeDeck: (filter = 'all') => (filter === 'all'
+    ? deck
+    : deck.filter((card) => (filter === 'unfiled' ? !card.folder : card.folder === filter))),
+}));
 
 import TestMode from '../components/flashcards/TestMode';
 
@@ -36,11 +43,16 @@ let host: HTMLDivElement;
 let root: Root;
 let exited = 0;
 
-function mount(): void {
+function mount(deckFilter?: string): void {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  act(() => { root.render(createElement(TestMode, { onExit: () => { exited += 1; } })); });
+  act(() => {
+    root.render(createElement(TestMode, {
+      onExit: () => { exited += 1; },
+      ...(deckFilter ? { deck: deckFilter } : {}),
+    }));
+  });
 }
 
 function buttons(): HTMLButtonElement[] {
@@ -101,6 +113,21 @@ describe('TestMode', () => {
     expect(host.textContent).toContain('flash.test.noUsableCards');
     click('flash.test.exit');
     expect(exited).toBe(1);
+  });
+
+  it('draws from the chosen deck only, not the whole collection', () => {
+    deck = six.map((card, index) => ({ ...card, folder: index < 2 ? 'verbs' : 'other' }));
+    mount('verbs');
+    // Two cards, not six. A mode ignoring the prop would say total=6 here.
+    expect(host.textContent).toContain('flash.test.position(position=1,total=2)');
+    expect(host.textContent).toContain('flash.test.answered(answered=0,total=2)');
+  });
+
+  it('refuses honestly when the chosen deck is empty rather than falling back to all', () => {
+    deck = six.map((card) => ({ ...card, folder: 'verbs' }));
+    mount('nouns');
+    expect(host.textContent).toContain('flash.test.noUsableCards');
+    expect(host.textContent).not.toContain('flash.test.position');
   });
 
   it('opens on question one of a paper and says which kinds it asks', () => {
