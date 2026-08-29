@@ -1,11 +1,13 @@
 /*
- * Automatic-narration preferences, in the deck overview.
+ * Automatic-enrichment preferences, in the deck overview: narration, and the
+ * readings panel that shares this block's shape.
  *
  * Tokens only, opaque anchor: this is a settings block inside a dense working
  * surface, which the Liquid selectivity rule keeps off glass.
  */
 
-.auto-audio-options {
+.auto-audio-options,
+.auto-reading-options {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -18,19 +20,22 @@
   color: var(--text);
 }
 
-.auto-audio-options > legend {
+.auto-audio-options > legend,
+.auto-reading-options > legend {
   padding: 0 var(--space-xs);
   font-size: var(--font-size-xs);
   color: var(--muted);
 }
 
-.auto-audio-options > .muted {
+.auto-audio-options > .muted,
+.auto-reading-options > .muted {
   margin: 0;
   font-size: var(--font-size-2xs);
   color: var(--muted);
 }
 
-.auto-audio-options label {
+.auto-audio-options label,
+.auto-reading-options label {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -38,11 +43,14 @@
   cursor: pointer;
 }
 
-.auto-audio-options input[type='checkbox'] {
+.auto-audio-options input[type='checkbox'],
+.auto-reading-options input[type='checkbox'] {
   accent-color: var(--accent);
 }
 
-.auto-audio-options__cap input {
+.auto-audio-options__cap input,
+.auto-reading-options__cap input,
+.auto-reading-options__form select {
   width: 5rem;
   padding: var(--space-2xs, 2px) var(--space-xs);
   border: 1px solid var(--border);
@@ -51,7 +59,14 @@
   color: var(--text);
 }
 
-.auto-audio-options__report {
+/* The form names are words, not a two-digit number, so the cap's width is wrong. */
+.auto-reading-options__form select {
+  width: auto;
+  min-width: 9rem;
+}
+
+.auto-audio-options__report,
+.auto-reading-options__report {
   margin: 0;
   font-size: var(--font-size-xs);
   color: var(--muted);

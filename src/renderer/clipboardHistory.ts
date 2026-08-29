@@ -5,7 +5,7 @@
 
 import { IDB_KEYS, LS_KEYS, mirrorToIdb } from './storage/storage';
 import { addDeckCardsTracked, type FlashcardSource } from './flashcardDeck';
-import { narrateNewCards } from './flashcardAutoAudio';
+import { enrichNewCards } from './flashcardAutoEnrich';
 
 export type ClipboardEntryType =
   | 'text'
@@ -216,7 +216,7 @@ export function clearOnExitIfConfigured(): void {
 export function sendEntriesToFlashcards(entries: ClipboardEntry[], source: FlashcardSource = 'import'): void {
   // Fire and forget: the clipboard panel stays responsive while the one OS
   // voice device works through whatever the preference covers.
-  void narrateNewCards(addDeckCardsTracked(
+  void enrichNewCards(addDeckCardsTracked(
     entries.map((e) => ({
       word: e.dictMeta?.expression ?? e.text.slice(0, 120),
       reading: e.dictMeta?.reading ?? '',

@@ -21,7 +21,7 @@ import {
 import { estimateLevelFromText } from './bookLevelEstimate';
 import { scoreTextComprehensibility } from './comprehensibility';
 import { addDeckCardsTracked, loadDeck } from './flashcardDeck';
-import { narrateNewCards } from './flashcardAutoAudio';
+import { enrichNewCards } from './flashcardAutoEnrich';
 import { matchGrammarPatterns, type GrammarMatchHit } from './grammarMatch';
 import { getLevel } from './knownWords';
 import { getSlotList } from './levelLists';
@@ -261,7 +261,7 @@ export function addMediaStudyFlashcards(
   // ranking already deduplicates on, so this recovers it without that churn.
   const firstSeen = new Map(analysis.vocabulary.map((entry) => [entry.word, entry.firstSeenAt]));
   // Fire and forget: mining must not wait on the one OS voice device.
-  void narrateNewCards(addDeckCardsTracked(drafts.map((draft) => {
+  void enrichNewCards(addDeckCardsTracked(drafts.map((draft) => {
     const at = firstSeen.get(draft.word);
     const located = options.segments && at !== undefined
       ? locateInSeason(options.segments, at)
@@ -327,7 +327,7 @@ export function addVisualNovelStudyFlashcards(
   };
   for (const draft of drafts) counts[draft.studyKind] += 1;
   if (drafts.length) {
-    void narrateNewCards(addDeckCardsTracked(drafts.map((draft) => ({
+    void enrichNewCards(addDeckCardsTracked(drafts.map((draft) => ({
       ...draft,
       source: 'media' as const,
       bookId: item.id,
@@ -351,7 +351,7 @@ export function addMediaStudySentenceFlashcard(
   if (duplicate) return false;
   // A card that already carries an aligned clip is skipped by the selection,
   // so a captured cue keeps its real audio instead of gaining a synthetic one.
-  void narrateNewCards(addDeckCardsTracked([{
+  void enrichNewCards(addDeckCardsTracked([{
     word: japanese.slice(0, 80),
     reading: '',
     meaning: context,

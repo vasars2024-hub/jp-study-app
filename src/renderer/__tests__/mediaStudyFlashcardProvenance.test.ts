@@ -28,9 +28,13 @@ vi.mock('../flashcardDeck', () => ({
   },
 }));
 
-// Narration is a real side effect of a deck write and has its own suite; here it
-// is stubbed so this test keeps measuring provenance and nothing else.
+// Narration and automatic readings are real side effects of a deck write and
+// have their own suites; the seam that fires both is stubbed here so this test
+// keeps measuring provenance and nothing else.
 vi.mock('../flashcardAutoAudio', () => ({ narrateNewCards: () => Promise.resolve(null) }));
+vi.mock('../flashcardAutoEnrich', () => ({
+  enrichNewCards: () => Promise.resolve({ audio: null, reading: null }),
+}));
 
 const { addMediaStudyFlashcards } = await import('../mediaStudyWorkflow');
 

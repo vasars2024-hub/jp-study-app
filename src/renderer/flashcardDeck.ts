@@ -307,6 +307,30 @@ export function updateDeckCardAudioBatch(
   return store.cards;
 }
 
+/**
+ * Write generated readings onto many cards with one persisted deck write.
+ *
+ * Separate from the audio batch rather than a generic field patcher: a reading
+ * is the one field an import may already have authored, so this refuses to
+ * overwrite a non-empty one even if a caller asks. The selection in
+ * `shared/flashcardAutoReading` filters those out first; this is the guard that
+ * makes the rule true regardless of who calls.
+ */
+export function updateDeckCardReadingBatch(
+  updates: ReadonlyArray<{ id: string; reading: string }>,
+): DeckFlashcard[] {
+  if (!updates.length) return loadDeck();
+  const byId = new Map(updates.map((update) => [update.id, update.reading]));
+  const store = readStore();
+  store.cards = store.cards.map((card) => {
+    const reading = byId.get(card.id);
+    if (!reading || (card.reading ?? '').trim()) return card;
+    return { ...card, reading };
+  });
+  writeStore(store);
+  return store.cards;
+}
+
 export function setDeckCardFolder(id: string, folder: string | null): DeckFlashcard[] {
   const store = readStore();
   store.cards = store.cards.map((c) =>
