@@ -214,7 +214,8 @@
   Muted foreground on a bordered chip so it reads as a qualifier next to the
   replay button rather than as an error competing with `.flash-audio-error`.
 */
-.flash-view .flash-audio-estimated {
+.flash-view .flash-audio-estimated,
+.flash-view .flash-card-provenance {
   padding: 2px 8px;
   border: 1px solid var(--border, #d0d5dd);
   border-radius: 999px;

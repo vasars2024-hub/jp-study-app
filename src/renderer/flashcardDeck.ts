@@ -10,6 +10,23 @@ export type FlashcardSource =
   | 'extension'
   | 'media';
 
+/**
+ * Where a card's Japanese TEXT came from, which is a different question from
+ * which surface created it (`FlashcardSource`).
+ *
+ * A machine transcript and a human-authored subtitle line both arrive as
+ * `source: 'media'`, and one of them can be wrong about what was actually said.
+ * The vocabulary is the one the mining-unification work settled on, so the two
+ * do not diverge: human subs / auto captions / transcript / book text.
+ *
+ * Optional and additive. Absent means "not recorded", never "human".
+ */
+export type FlashcardTextProvenance =
+  | 'human-subs'
+  | 'auto-captions'
+  | 'transcript'
+  | 'book-text';
+
 import {
   scheduleLocalReview,
   type LocalSrsRating,
@@ -39,6 +56,8 @@ export interface DeckFlashcard {
    * `chunk-estimated` value as a claim, and says nothing when it is missing.
    */
   timingFidelity?: import('../shared/transcriptionIpc').TranscriptCardTiming;
+  /** Where the Japanese text itself came from. See `FlashcardTextProvenance`. */
+  textProvenance?: FlashcardTextProvenance;
   /** Exact media context retained by Study Mode and player handoffs. */
   sourceRef?: import('../shared/mediaStudyOrchestrator').StudyContextRef;
   /** Reversible Study action that created this card batch. */

@@ -126,7 +126,19 @@ export interface ReviewCard {
   srs?: LocalSrsState;
   /** Only ever set on transcript-derived cards; see `DeckFlashcard`. */
   timingFidelity?: DeckFlashcard['timingFidelity'];
+  textProvenance?: DeckFlashcard['textProvenance'];
 }
+
+/** Chip label for a recorded text provenance. Absent means "not recorded". */
+const TEXT_PROVENANCE_KEYS: Record<
+  NonNullable<DeckFlashcard['textProvenance']>,
+  string
+> = {
+  'human-subs': 'flash.provenance.humanSubs',
+  'auto-captions': 'flash.provenance.autoCaptions',
+  transcript: 'flash.provenance.transcript',
+  'book-text': 'flash.provenance.bookText',
+};
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -486,6 +498,7 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
       reviewGroup: `${c.bookId ?? c.source}:${c.bookTitle ?? c.folder ?? ''}`,
       srs: c.srs,
       timingFidelity: c.timingFidelity,
+      textProvenance: c.textProvenance,
     })), { mode: reviewMode });
   }
 
@@ -1245,6 +1258,11 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
             seconds were placed inside a fixed chunk window rather than measured. Say
             so where the audio controls are, not in a tooltip nobody opens.
           */}
+          {current.textProvenance && (
+            <span className="flash-card-provenance">
+              {t(TEXT_PROVENANCE_KEYS[current.textProvenance])}
+            </span>
+          )}
           {current.timingFidelity === 'chunk-estimated' && (
             <span className="flash-audio-estimated" title={t('flash.timing.estimated.detail')}>
               {t('flash.timing.estimated')}

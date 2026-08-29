@@ -407,6 +407,9 @@ export default function App() {
           ? `≈ ${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`
           : `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
         timingFidelity: card.timing,
+        // Machine-read speech, not an authored subtitle line. A card that can be
+        // wrong about what was said has to say where the text came from.
+        textProvenance: 'transcript' as const,
         studyActionId: payload.batchId,
       })));
       appendNotebookEvent({
