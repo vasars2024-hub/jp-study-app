@@ -145,7 +145,17 @@ export function writeMeaningText(card: WriteSourceCard): string {
   return (card.meaning || '').trim();
 }
 
-function buildQuestion(card: WriteSourceCard, direction: WriteDirection): WriteQuestion | null {
+/**
+ * One question from one card, or `null` when the card cannot ask anything.
+ *
+ * Exported because Learn's typed stage is the same question with the same
+ * accepted forms — a second grader would be a second set of rules about what
+ * counts as right, which is exactly how two modes come to disagree.
+ */
+export function buildWriteQuestion(
+  card: WriteSourceCard,
+  direction: WriteDirection,
+): WriteQuestion | null {
   const japanese = writeJapaneseText(card);
   const meaning = writeMeaningText(card);
   const reading = (card.reading || '').trim();
@@ -228,7 +238,7 @@ export function buildWriteRound(
   chosen.forEach((card, index) => {
     const direction = options.direction
       ?? (index % 2 === 0 ? 'meaning-to-jp' : 'jp-to-meaning');
-    const question = buildQuestion(card, direction);
+    const question = buildWriteQuestion(card, direction);
     if (question) questions.push(question);
   });
 

@@ -89,6 +89,7 @@ import AutoAudioPreferencesPanel from './AutoAudioPreferences';
 import AutoReadingPreferencesPanel from './AutoReadingPreferences';
 import CardVoicePicker from './CardVoicePicker';
 import DeckAudioExport from './DeckAudioExport';
+import LearnMode from './LearnMode';
 import MatchMode from './MatchMode';
 import WriteMode from './WriteMode';
 import { PRACTICE_MODES, type PracticeMode } from '../../../shared/flashcardPractice';
@@ -1696,6 +1697,7 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
 
       {practice === 'match' && <MatchMode onExit={() => setPractice('none')} />}
       {practice === 'write' && <WriteMode onExit={() => setPractice('none')} />}
+      {practice === 'learn' && <LearnMode onExit={() => setPractice('none')} />}
       {practice === 'none' && (
         <fieldset className="auto-reading-options">
           <legend>{t('flash.practice.title')}</legend>
