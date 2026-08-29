@@ -1,0 +1,195 @@
+{
+  "label": "l8-resources",
+  "app": "resources",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "liquid",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "toLanding",
+      "result": "{\"did\":\"clearedSearch\",\"groups\":7}"
+    },
+    {
+      "step": "openBundle",
+      "result": "{\"opened\":\"Sapphire · Whale\"}"
+    },
+    {
+      "step": "closeBundle",
+      "result": "{\"closed\":true,\"detailGone\":false}"
+    },
+    {
+      "step": "filterCategory",
+      "result": "{\"clicked\":\"Dictionaries & lookup\"}"
+    },
+    {
+      "step": "toLanding",
+      "result": "{\"did\":\"allCategories\",\"groups\":1}"
+    },
+    {
+      "step": "search",
+      "result": "{\"query\":\"anki\",\"count\":\"3 resources\"}"
+    },
+    {
+      "step": "toLanding",
+      "result": "{\"did\":\"clearedSearch\",\"groups\":7}"
+    },
+    {
+      "step": "scroll",
+      "result": "{\"scroller\":\"fwin-body\",\"top\":240,\"range\":5612}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "liquid": "8/8",
+    "standard": "8/8",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "liquid -> standard -> liquid",
+    "dirtiedField": "gram-search",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "categoryRail",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "active added to 1 of 1",
+        "reachable": "7/8",
+        "fellRows": [
+          "categoryRail"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"added-class\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "catalogueCount",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "catalogueCount"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "resourceCards",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "resourceCards"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "bundleGrid",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "bundleGrid"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "collectedSections",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "collectedSections"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "learnerHeatMap",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "fill set to \"var(--panel-2)\"",
+        "reachable": "7/8",
+        "fellRows": [
+          "learnerHeatMap"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"fill\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "landingAgreement",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "landingAgreement"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "aria-pressed stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"resources:scroll\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

@@ -112,6 +112,14 @@
   const statsState = specState('__LQP_STATS_ORIG');
   const calendarState = specState('__LQP_CAL_ORIG');
   const gamesState = specState('__LQP_GAMES_ORIG');
+  const resState = specState('__LQP_RES_ORIG');
+  // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
+  // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
+  // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
+  // are the ones inside a `.res-group`. Counting all 51 against a line that says 36 is
+  // the false failure this pair exists to prevent.
+  const resChips = (w) => qa(w, '.res-filter .gram-level-btn');
+  const groupCards = (w) => qa(w, '.res-group .res-card');
   // The Arena's typing game, which is also the one that owns the material-scope picker.
   // Named by its own four localized titles rather than by list position: the catalogue is
   // filtered by what the player has unlocked, so an index is not stable.
@@ -2962,6 +2970,299 @@
           'false',
           'no expanded group header',
         ),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    // L8's first surface. RULE 1's cost check: this is data, not a new probe file.
+    resources: {
+      titleRe: /Resources|リソース|资源|Ресурс/i,
+      rootSel: '.res-view',
+      features: [
+        {
+          // The rail must OFFER every group the list is showing. "One active chip" alone
+          // passes on a rail that has silently lost a category, which is the real defect
+          // — a category rendered below with no way to filter to it.
+          id: 'categoryRail',
+          f: (w) => {
+            const chips = resChips(w);
+            if (chips.length < 2) return { ok: false, ev: `only ${chips.length} filter chips` };
+            const active = chips.filter((c) => c.classList.contains('active'));
+            const labels = chips.map((c) => txt(c));
+            const groups = qa(w, '.res-group .res-group-head h2').map((h) => txt(h));
+            const offered = groups.filter((g) => labels.indexOf(g) >= 0);
+            return {
+              ok: active.length === 1 && groups.length > 0 && offered.length === groups.length,
+              ev: `chips=${chips.length} active=${active.length} groups=${groups.length} offeredAsChips=${offered.length}`,
+            };
+          },
+        },
+        {
+          // The footer count is the surface's own claim about the filtered catalogue, and
+          // it must equal what is painted. Scoped to `.res-group` on purpose: the New and
+          // My-tools strips also render `.res-card`, and counting those made the claim
+          // read 51 against a line that says 36.
+          id: 'catalogueCount',
+          f: (w) => {
+            const cards = groupCards(w);
+            const el = q(w, '.gram-count');
+            if (!el) return { ok: false, ev: 'no visible-count line' };
+            const claimed = Number(txt(el).replace(/[^\d]/g, ''));
+            return {
+              ok: cards.length > 0 && claimed === cards.length,
+              ev: `claimed=${claimed} renderedGroupCards=${cards.length}`,
+            };
+          },
+        },
+        {
+          // Content honesty per card: a name, a cost chip that says which of free/paid/
+          // freemium it is, the host it will actually open, and the external affordance.
+          // A card missing the cost chip is the "looks like a link, is a purchase" defect.
+          id: 'resourceCards',
+          f: (w) => {
+            const cards = groupCards(w);
+            if (!cards.length) return { ok: false, ev: 'no catalogue cards rendered' };
+            const named = cards.filter((c) => txt(q(c, '.res-name')).length > 0).length;
+            const costed = cards.filter((c) => txt(q(c, '.res-cost')).length > 0).length;
+            const hosted = cards.filter((c) => txt(q(c, '.res-host')).length > 0).length;
+            const opens = cards.filter((c) => q(c, '.res-open')).length;
+            return {
+              ok: named === cards.length && costed === cards.length
+                && hosted === cards.length && opens === cards.length,
+              ev: `cards=${cards.length} named=${named} costed=${costed} hosted=${hosted} external=${opens}`,
+            };
+          },
+        },
+        {
+          // Bundles, with the one piece of arithmetic they publish: a checklist tile may
+          // never claim more ticks than the checklist holds. `0/5` is fine; `6/5` is the
+          // fabricated-progress defect and is exactly what a stale localStorage list does.
+          id: 'bundleGrid',
+          f: (w) => {
+            const section = q(w, '.bundles-section');
+            if (!section) return { ok: false, ev: 'no bundles section on the landing view' };
+            const cards = qa(section, '.bundle-card');
+            if (!cards.length) return { ok: false, ev: 'bundles section rendered with no bundles' };
+            const gemmed = cards.filter((c) => txt(q(c, '.bundle-card-gem')).length > 0).length;
+            const titled = cards.filter((c) => txt(q(c, '.bundle-card-title')).length > 0).length;
+            const linked = cards.filter(
+              (c) => Number(txt(q(c, '.bundle-card-foot span')).replace(/[^\d]/g, '')) > 0,
+            ).length;
+            const progress = cards
+              .map((c) => txt(q(c, '.bundle-card-checkmark')))
+              .filter((s) => s.length > 0)
+              .map((s) => (s.match(/(\d+)\s*\/\s*(\d+)/) || []).slice(1).map(Number));
+            const sane = progress.filter((p) => p.length === 2 && p[0] <= p[1]).length;
+            return {
+              ok: gemmed === cards.length && titled === cards.length
+                && linked === cards.length && sane === progress.length,
+              ev: `bundles=${cards.length} gemmed=${gemmed} titled=${titled} withLinkCount=${linked} progressSane=${sane}/${progress.length}`,
+            };
+          },
+        },
+        {
+          // The two OPTIONAL strips. Both render `null` when empty, so absence is honest
+          // and is recorded as such rather than scored false — what is not allowed is a
+          // heading over an empty grid, or a collected tool with no way to remove it
+          // (the "enable with no working disable" defect in its list form).
+          id: 'collectedSections',
+          f: (w) => {
+            const parts = [];
+            let ok = true;
+            const mine = q(w, '.mytools-section');
+            if (mine) {
+              const cards = qa(mine, '.mytool-card');
+              const named = cards.filter((c) => txt(q(c, '.mytool-name')).length > 0).length;
+              const removable = cards.filter((c) => q(c, '.mytool-remove')).length;
+              ok = ok && cards.length > 0 && named === cards.length && removable === cards.length;
+              parts.push(`myTools=${cards.length} named=${named} removable=${removable}`);
+            } else {
+              parts.push('myTools=absent (nothing collected — section correctly unrendered)');
+            }
+            const fresh = q(w, '.new-section');
+            if (fresh) {
+              const cards = qa(fresh, '.new-card');
+              const named = cards.filter((c) => txt(q(c, '.res-name')).length > 0).length;
+              const hosted = cards.filter((c) => txt(q(c, '.res-host')).length > 0).length;
+              ok = ok && cards.length > 0 && named === cards.length && hosted === cards.length;
+              parts.push(`new=${cards.length} named=${named} hosted=${hosted}`);
+            } else {
+              parts.push('new=absent (no recent entries — section correctly unrendered)');
+            }
+            return { ok, ev: parts.join(' | ') };
+          },
+        },
+        {
+          // The choropleth's caption claims a number of countries; exactly that many map
+          // paths may be painted. `colorFor` returns `var(--panel-2)` for a zero count, so
+          // "painted" is a fact about the fill and not about the palette.
+          //
+          // THE FIRST NUMBER IN THE CAPTION IS `{count}` IN ALL FOUR CATALOGS — checked,
+          // not assumed: en/ja/zh/ru all order `{count}` before `{total}`. Reading the
+          // largest number instead would score the learner total against the path count.
+          id: 'learnerHeatMap',
+          f: (w) => {
+            const section = q(w, '.heatmap-section');
+            if (!section) {
+              return { ok: true, ev: 'no learner counts — section correctly not rendered' };
+            }
+            const caption = txt(q(section, '.heatmap-caption'));
+            const claimed = Number((caption.match(/\d[\d,.  ]*/) || ['0'])[0].replace(/[^\d]/g, ''));
+            const paths = qa(section, '.heatmap-svg path');
+            if (paths.length) {
+              const painted = paths.filter((p) => (p.getAttribute('fill') || '') !== 'var(--panel-2)').length;
+              return {
+                ok: claimed > 0 && painted === claimed,
+                ev: `choropleth paths=${paths.length} painted=${painted} captionCountries=${claimed}`,
+              };
+            }
+            const rows = qa(section, '.heatmap-bar-row');
+            if (!rows.length) return { ok: false, ev: `caption "${caption}" over neither a map nor bars` };
+            const counts = rows.map((r) => Number(txt(q(r, '.heatmap-bar-count')).replace(/[^\d]/g, '')));
+            const max = Math.max.apply(null, counts);
+            // The bar is painted by percentage of the largest country; the widest bar is
+            // therefore 100% by construction, and every other one must be its own share.
+            const honest = rows.filter((r, i) => {
+              const pct = Number(String(q(r, '.heatmap-bar-fill').style.width).replace('%', ''));
+              return max > 0 && Math.abs(pct - (counts[i] / max) * 100) <= 1;
+            }).length;
+            return {
+              ok: rows.length > 0 && honest === rows.length && claimed >= rows.length,
+              ev: `bars=${rows.length} widthsMatchShare=${honest} max=${max} captionCountries=${claimed}`,
+            };
+          },
+        },
+        {
+          // The landing sections and the command surface must AGREE. `showLanding` is
+          // `filter === 'All' && !query.trim()`, and the bundles strip is the one landing
+          // section with no data condition of its own, so it is the exact witness.
+          //
+          // This row is why the L8 doc's trap 1 cost a wrong score: a stale `"dict"` in the
+          // field made `showLanding` false and half the surface simply was not mounted.
+          // Scored here, that state is a FAILURE of nothing — it is the agreement holding —
+          // but the row publishes the query so no later reader mistakes it for the default.
+          id: 'landingAgreement',
+          f: (w) => {
+            const search = q(w, '.gram-search');
+            if (!search) return { ok: false, ev: 'no catalogue search field' };
+            const chips = resChips(w);
+            const allActive = !!(chips[0] && chips[0].classList.contains('active'));
+            const landing = search.value.trim() === '' && allActive;
+            const mounted = ['.heatmap-section', '.bundles-section', '.mytools-section', '.new-section']
+              .filter((s) => q(w, s)).length;
+            const bundles = !!q(w, '.bundles-section');
+            return {
+              ok: bundles === landing,
+              ev: `query="${search.value}" allChipActive=${allActive} showLanding=${landing} bundlesMounted=${bundles} landingSections=${mounted}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // ONE idempotent step rather than `showAll` + `clearSearch` + a conditional close.
+        // The driver dirties the first visible text field before it drives, and a bundle
+        // left open from a previous leg unmounts the whole list, so every leg of the drive
+        // has to be able to get back to the landing view without refusing.
+        toLanding: (w) => {
+          const done = [];
+          const back = q(w, '.bundle-back');
+          if (back) { back.click(); done.push('closedBundle'); }
+          const el = q(w, '.gram-search');
+          if (el && el.value !== '') { typeInto(el, ''); done.push('clearedSearch'); }
+          const all = resChips(w)[0];
+          if (all && !all.classList.contains('active')) { all.click(); done.push('allCategories'); }
+          return { did: done.join('+') || 'already on the landing view', groups: qa(w, '.res-group').length };
+        },
+        filterCategory: (w, index) => {
+          const chip = resChips(w).slice(1)[Number(index) || 0];
+          if (!chip) return { refused: 'no category chips' };
+          chip.click();
+          return { clicked: txt(chip) };
+        },
+        search: (w, query) => {
+          const el = q(w, '.gram-search');
+          if (!el) return { refused: 'no catalogue search field' };
+          typeInto(el, String(query == null ? '' : query));
+          return { query: el.value, count: txt(q(w, '.gram-count')) };
+        },
+        // The reversibility pair this surface owns: the bundle sub-screen REPLACES the
+        // whole list, so a back control that does not work strands the user on one bundle.
+        openBundle: (w, index) => {
+          const card = qa(w, '.bundle-card')[Number(index) || 0];
+          if (!card) return { refused: 'no bundle cards — not on the landing view' };
+          card.click();
+          return { opened: txt(q(card, '.bundle-card-gem')) };
+        },
+        closeBundle: (w) => {
+          const back = q(w, '.bundle-back');
+          if (!back) return { refused: 'no bundle detail open' };
+          back.click();
+          return { closed: true, detailGone: !q(w, '.bundle-detail') };
+        },
+        // The drive deliberately ends with the search box EMPTY, so scroll is the only
+        // user-entered state a bad presentation toggle can lose. Recorded once so `undo`
+        // puts the catalogue back where the user left it.
+        scroll: (w, px) => {
+          const el = scroller(w);
+          if (!el) return { refused: 'nothing scrollable — the catalogue fits its pane' };
+          const g = resState();
+          if (g.scrollKey == null) { g.scrollKey = keyOf(el); g.scrollTop = el.scrollTop; }
+          el.scrollTop = Number(px) || 240;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      drive: [
+        'toLanding',
+        ['openBundle', '0'],
+        'closeBundle',
+        ['filterCategory', '0'],
+        'toLanding',
+        ['search', 'anki'],
+        'toLanding',
+        ['scroll', '240'],
+      ],
+      undo: {
+        resources: (w) => {
+          const g = window.__LQP_RES_ORIG;
+          if (!g) return null;
+          const done = [];
+          const back = q(w, '.bundle-back');
+          if (back) { back.click(); done.push('bundle'); }
+          const el = q(w, '.gram-search');
+          if (el && el.value !== '') { typeInto(el, ''); done.push('search'); }
+          if (g.scrollKey != null) {
+            const home = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+            if (home && home.scrollTop !== g.scrollTop) { home.scrollTop = g.scrollTop; done.push('scroll'); }
+          }
+          window.__LQP_RES_ORIG = null;
+          return done.length ? `resources:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        // A SECOND active chip. `landingAgreement` reads chips[0] (All), which is the one
+        // already active, so this never touches it — the two rows stay independent.
+        categoryRail: (w) => {
+          const other = resChips(w).find((c) => !c.classList.contains('active'));
+          if (!other) return { refused: 'no inactive chip to falsify with' };
+          return addClassAll([other], 'active');
+        },
+        // Detach a CARD, not the count line. Removing the line only proves the row reads
+        // it; removing a card makes the published number wrong while every remaining card
+        // is still well-formed, so `resourceCards` correctly holds and this falls alone.
+        catalogueCount: (w) => detach(groupCards(w)[0], 'no catalogue cards'),
+        resourceCards: (w) => detach(q(w, '.res-group .res-card .res-name'), 'no catalogue cards'),
+        bundleGrid: (w) => detach(q(w, '.bundle-card .bundle-card-gem'), 'no bundle cards'),
+        collectedSections: (w) => detach(q(w, '.mytool-card .mytool-remove'), 'no collected tools'),
+        // LIE about one country's fill rather than detaching a path: detaching changes the
+        // path total too, and the row would fall for the wrong reason.
+        learnerHeatMap: (w) => setAttr(
+          qa(w, '.heatmap-svg path').find((p) => (p.getAttribute('fill') || '') !== 'var(--panel-2)'),
+          'fill',
+          'var(--panel-2)',
+          'no painted country on the heat map',
+        ),
+        landingAgreement: (w) => detach(q(w, '.gram-search'), 'no catalogue search field'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
