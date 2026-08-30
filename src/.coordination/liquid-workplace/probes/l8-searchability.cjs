@@ -50,6 +50,7 @@ const REGISTRIES = {
     // `{page === 'id' && <Component />}`
     routeRe: /page === '([a-z0-9-]+)' && <([A-Z][A-Za-z0-9]*)/g,
     cardRe: /<SettingsCard\b[^>]*?\bid="([^"{]+)"/gs,
+    cardPrimitive: 'SettingsCard.tsx',
   },
   scraper: {
     dir: 'src/renderer/components/scraper',
@@ -60,6 +61,7 @@ const REGISTRIES = {
     // `case 'id': return <Component />;`
     routeRe: /case '([a-z0-9-]+)':\s*\n?\s*return <([A-Z][A-Za-z0-9]*)/g,
     cardRe: /<ScrCard\b[^>]*?\bid="([^"{]+)"/gs,
+    cardPrimitive: 'ScrCard.tsx',
   },
 };
 
@@ -96,12 +98,24 @@ const add = (id, f) => {
   if (!consumers.has(id)) consumers.set(id, new Set());
   consumers.get(id).add(f);
 };
+/**
+ * Implicit anchoring is a CLAIM about the app's card primitive: that it derives
+ * `is-highlight` from its own `id`, so an id'd card is reachable by a registry
+ * entry of the same id with no `highlight` prop at the call site. That claim was
+ * true of SettingsCard and assumed of ScrCard, which did not implement it at all
+ * -- ScrCard only set `data-scr-card`, so 26 entries were credited as landing
+ * while `navigate('profiles','profile-history')` highlighted 0 of 11 cards live.
+ * So the primitive is now READ rather than assumed, and a run that cannot prove
+ * the contract refuses to credit implicit anchors instead of inflating `landed`.
+ */
+const primitiveSrc = src.get(REG.cardPrimitive) || '';
+const implicitCardAnchor =
+  /is-highlight/.test(primitiveSrc) && /focus\w*\s*===\s*id\b/.test(primitiveSrc);
+
 for (const [f, text] of src) {
   // Explicit anchor.
   for (const m of text.matchAll(/focusSettingId === '([^']+)'/g)) add(m[1], f);
-  // Implicit anchor: the app's card primitive derives `is-highlight` from its
-  // own `id`, so an id'd card is reachable by a registry entry of the same id
-  // even with no `highlight` prop at the call site.
+  if (!implicitCardAnchor) continue;
   for (const m of text.matchAll(REG.cardRe)) add(m[1], f);
 }
 
@@ -241,6 +255,7 @@ const result = {
   registry: REG.registryConst,
   scope: onlyPage || 'all-pages',
   control: plantMisroute,
+  implicitCardAnchor,
   pagesRouted: pageFiles.size,
   entries: rows.length,
   landed: count('landed'),

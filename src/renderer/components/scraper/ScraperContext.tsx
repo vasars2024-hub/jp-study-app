@@ -15,3 +15,13 @@ export function useScraper(): ScraperController {
   if (!value) throw new Error('useScraper() must be called inside <ScraperProvider>.');
   return value;
 }
+
+/**
+ * The deep-link target, or null. Deliberately does NOT throw: ScrCard is the one
+ * consumer, and it is a presentational primitive that must keep rendering in a
+ * test or harness that mounts a page without the shell around it. A card that
+ * simply never highlights there is the right failure.
+ */
+export function useScraperFocusId(): string | null {
+  return useContext(ScraperContext)?.focusSettingId ?? null;
+}

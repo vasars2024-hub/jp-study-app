@@ -3,8 +3,9 @@
 // Not settings/SettingsCard — that one calls useSettings() and throws outside
 // SettingsProvider, so it cannot be reused here.
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import StatusDot from './StatusDot';
+import { useScraperFocusId } from './ScraperContext';
 
 export default function ScrCard({
   id,
@@ -26,8 +27,27 @@ export default function ScrCard({
   bodyClassName?: string;
   children: ReactNode;
 }) {
+  // A card with an `id` anchors itself, matching settings/SettingsCard. Search
+  // navigates by SCRAPER_REGISTRY id and every registry id names a card, so
+  // deriving the highlight here means a searchable panel lands on itself rather
+  // than dumping the user at the top of a page with eleven cards on it. Measured
+  // before this existed: `navigate('profiles', 'profile-history')` scrolled
+  // nowhere and highlighted 0 of 11.
+  const focusId = useScraperFocusId();
+  const focused = id != null && focusId === id;
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!focused) return;
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [focused]);
+
   return (
-    <section className={`scr-card ${className}`} data-scr-card={id}>
+    <section
+      ref={ref}
+      className={`scr-card ${className}${focused ? ' is-highlight' : ''}`}
+      data-scr-card={id}
+    >
       {(title || trailing) && (
         <header className="scr-card-head">
           <div className="scr-card-heading">

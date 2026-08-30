@@ -1075,6 +1075,18 @@
   border-radius: var(--radius-lg);
   background: var(--surface-1, var(--panel));
   min-width: 0;
+  scroll-margin: var(--space-lg);
+}
+
+/*
+ * Where a search result lands. Same treatment as .scr-field.is-highlight, so a
+ * hit from the top bar and a hit from the settings drawer read as one gesture.
+ * An outline rather than a border: a border would change the card's box and
+ * reflow the grid around whichever panel the user searched for.
+ */
+.scr-card.is-highlight {
+  outline: 1px solid var(--accent);
+  outline-offset: var(--space-xs);
 }
 
 .scr-card--wide {
