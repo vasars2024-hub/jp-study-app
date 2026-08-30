@@ -574,3 +574,13 @@ TEXT / 37 shared / 0 missing / 0 extra**.
 
 `i18n-check` passes at **11,599** English keys and the focused suite passes **21/21**. Category 8
 remains open at 73.2%; 160 catalog keys still use the English `TEXT` fallback.
+
+### 2026-08-30 — Scraper i18n, batch 8: Export workflow complete
+
+**468 of 596 keys migrated (78.5%)**, +32 this batch. Every `exports.*` entry now resolves from
+the shared catalogs: builder scope and format choices, destination preview, locale-aware record
+counts, history tiles, and the saved export options. Mechanical comparison reports **32 TEXT /
+32 shared / 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,631** English keys and the focused suite passes **21/21**. Category 8
+remains open at 78.5%; 128 catalog keys still use the English `TEXT` fallback.
