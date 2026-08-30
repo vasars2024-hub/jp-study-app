@@ -113,6 +113,7 @@
   const calendarState = specState('__LQP_CAL_ORIG');
   const gamesState = specState('__LQP_GAMES_ORIG');
   const resState = specState('__LQP_RES_ORIG');
+  const musicState = specState('__LQP_MUSIC_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -2970,6 +2971,112 @@
           'false',
           'no expanded group header',
         ),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    // Music reuses the same category-6 engine as every prior surface. Its drive changes
+    // only filter/sort/import drafts; playback and local files are observed, never mutated.
+    music: {
+      titleRe: /Music|音楽|音乐|Музык/i,
+      rootSel: '.mc-music-layout',
+      features: [
+        { id: 'libraryRows', f: (w) => {
+          const rows = qa(w, '.music-song');
+          const complete = rows.filter((r) => q(r, '.music-song-title') && r.title).length;
+          return { ok: rows.length > 0 && complete === rows.length, ev: `rows=${rows.length} complete=${complete}` };
+        } },
+        { id: 'librarySearch', f: (w) => {
+          const g = musicState(); const input = q(w, '.music-search input');
+          const rows = qa(w, '.music-song').length;
+          return { ok: !!input && g.before > 0 && g.narrowed === 0 && rows === g.before,
+            ev: `input=${!!input} before=${g.before} narrowed=${g.narrowed} restored=${rows}` };
+        } },
+        { id: 'sortOrder', f: (w) => {
+          const s = q(w, '.mc-music-sort select');
+          const titles = qa(w, '.music-song-title').map(txt);
+          const ordered = JSON.stringify(titles) === JSON.stringify(titles.slice().sort((a, b) => a.localeCompare(b)));
+          return { ok: !!s && s.value === 'title' && titles.length > 1 && ordered,
+            ev: `sort=${s ? s.value : 'absent'} titles=${titles.length} ordered=${ordered}` };
+        } },
+        { id: 'playerSelection', f: (w) => {
+          const active = qa(w, '.music-song.active');
+          const selected = active[0] && txt(q(active[0], '.music-song-title'));
+          const now = txt(q(w, '.mc-album-copy h2'));
+          return { ok: active.length === 1 && !!selected && selected === now,
+            ev: `active=${active.length} selected="${selected || ''}" now="${now}"` };
+        } },
+        { id: 'transport', f: (w) => {
+          const controls = qa(w, '.music-controls button:not(:disabled)'); const play = q(w, '.music-play');
+          const seek = q(w, '.music-seek');
+          return { ok: !!play && !play.disabled && controls.length > 0 && !!seek && !seek.disabled && Number(seek.max) > 0,
+            ev: `play=${!!play && !play.disabled} enabled=${controls.length} seek=${!!seek && !seek.disabled} max=${seek ? seek.max : 'absent'}` };
+        } },
+        { id: 'lyricsRecovery', f: (w) => {
+          const lines = qa(w, '.music-line-text'); const hint = q(w, '.music-hint');
+          const recovery = hint ? qa(hint, '.music-hint-btns button:not(:disabled)').length : 0;
+          const ok = lines.length > 0 ? !!q(w, '.music-cue-nav') : !!hint && !!q(hint, 'p') && recovery >= 2;
+          return { ok, ev: `lines=${lines.length} hint=${!!hint} recovery=${recovery}` };
+        } },
+        { id: 'queueMirror', f: (w) => {
+          const songs = qa(w, '.music-song'); const queue = qa(w, '.mc-track-queue > button');
+          return { ok: songs.length > 0 && queue.length === songs.length
+              && activeOf(songs, 'active') === 1 && activeOf(queue, 'is-active') === 1,
+            ev: `songs=${songs.length} queue=${queue.length} active=${activeOf(songs, 'active')}/${activeOf(queue, 'is-active')}` };
+        } },
+        { id: 'youtubeDraft', f: (w) => {
+          const g = musicState(); const input = q(w, '.music-yt-input'); const action = q(w, '.music-yt button');
+          return { ok: !!input && input.value === g.youtubeTest && !!action && !action.disabled,
+            ev: `draft=${!!input && input.value === g.youtubeTest} actionEnabled=${!!action && !action.disabled}` };
+        } },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        searchNarrow: (w) => {
+          const g = musicState(); const input = q(w, '.music-search input');
+          if (!input) return { refused: 'no music search' };
+          if (g.search == null) { g.search = input.value; g.before = qa(w, '.mc-track-queue > button').length; }
+          typeInto(input, '__lqp_no_song__'); return { before: g.before };
+        },
+        searchRestore: (w) => {
+          const g = musicState(); const input = q(w, '.music-search input');
+          if (!input || g.search == null) return { refused: 'search original not captured' };
+          g.narrowed = qa(w, '.music-song').length; typeInto(input, g.search); return { narrowed: g.narrowed };
+        },
+        sort: (w) => {
+          const g = musicState(); const s = q(w, '.mc-music-sort select');
+          if (!s) return { refused: 'no music sort' };
+          if (g.sort == null) { g.sort = s.value; g.sortStorage = localStorage.getItem('jp-music-sort'); }
+          pickSelect(s, 'title'); return { was: g.sort, now: s.value };
+        },
+        youtube: (w) => {
+          const g = musicState(); const input = q(w, '.music-yt-input');
+          if (!input) return { refused: 'no YouTube import field' };
+          if (g.youtube == null) g.youtube = input.value;
+          g.youtubeTest = 'https://youtu.be/aaaaaaaaaaa'; typeInto(input, g.youtubeTest); return { drafted: true };
+        },
+      },
+      drive: ['searchNarrow', 'searchRestore', 'sort', 'youtube'],
+      undo: { music: (w) => {
+        const g = window.__LQP_MUSIC_ORIG; if (!g) return null;
+        const done = []; const search = q(w, '.music-search input'); const sort = q(w, '.mc-music-sort select');
+        const youtube = q(w, '.music-yt-input');
+        if (search && g.search != null && search.value !== g.search) { typeInto(search, g.search); done.push('search'); }
+        if (sort && g.sort != null && sort.value !== g.sort) { pickSelect(sort, g.sort); done.push('sort'); }
+        if (youtube && g.youtube != null && youtube.value !== g.youtube) { typeInto(youtube, g.youtube); done.push('youtube'); }
+        setTimeout(() => { if (g.sortStorage == null) localStorage.removeItem('jp-music-sort');
+          else localStorage.setItem('jp-music-sort', g.sortStorage); }, 0);
+        window.__LQP_MUSIC_ORIG = null; return done.length ? `music:${done.join('+')}` : null;
+      } },
+      mutations: {
+        libraryRows: (w) => stripAttr(q(w, '.music-song'), 'title', 'no song rows'),
+        librarySearch: (w) => detach(q(w, '.music-search input'), 'no music search'),
+        sortOrder: (w) => detach(q(w, '.mc-music-sort select'), 'no music sort'),
+        playerSelection: (w) => detach(q(w, '.mc-album-copy h2'), 'no now-playing title'),
+        transport: (w) => detach(q(w, '.music-play'), 'no play control'),
+        lyricsRecovery: (w) => detach(q(w, '.music-hint p, .music-line-text'), 'no lyric state'),
+        queueMirror: (w) => detach(q(w, '.mc-track-queue > button'), 'no queue rows'),
+        youtubeDraft: (w) => detach(q(w, '.music-yt button'), 'no YouTube action'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

@@ -1,0 +1,194 @@
+{
+  "label": "l8-music",
+  "app": "music",
+  "win": "main",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "1080x700",
+  "driven": [
+    {
+      "step": "searchNarrow",
+      "result": "{\"before\":2}"
+    },
+    {
+      "step": "searchRestore",
+      "result": "{\"narrowed\":0}"
+    },
+    {
+      "step": "sort",
+      "result": "{\"was\":\"recent\",\"now\":\"title\"}"
+    },
+    {
+      "step": "youtube",
+      "result": "{\"drafted\":true}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "9/9",
+    "liquid": "9/9",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "INPUT",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1080x700"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "libraryRows",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "title stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "libraryRows"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "librarySearch",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "librarySearch"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "sortOrder",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "sortOrder"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "playerSelection",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "playerSelection"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "transport",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "transport"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "lyricsRecovery",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "lyricsRecovery"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "queueMirror",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "queueMirror"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "youtubeDraft",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "youtubeDraft"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "aria-pressed stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"music:sort+youtube\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

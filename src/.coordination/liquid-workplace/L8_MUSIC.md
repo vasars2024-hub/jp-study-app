@@ -94,3 +94,17 @@ Controlled shared-harness result: clipped/overlaps/horizontal scrollers/hidden o
 **0/0/0/0** at **1080×700, 260×170, 1264×765**; dead region **4.7/0.5/8.0%**; chrome
 **62.1→55.9%** while canvas **94.8→95.3%**. Injected clip **0→1→0**, geometry restored.
 Guard `musicCompactLayout.test.ts`: **2/2**. Evidence: `baselines/cat4-l8-music.json`.
+
+## 2026-08-30 — category 6 PASS 10/10; Music is 49/80
+
+The shared category-6 engine gained one Music spec, not a new runner. It drove populated local
+library search **2→0→2**, title sort, and a non-submitted YouTube draft; playback and files were
+observed only. Standard and Liquid each reach **9/9** rows with zero unequal rows. The
+Standard→Liquid→Standard trip preserves fields and shell with **0 diffs**.
+
+The first run was VOID and not banked: generic dirtying made search's before-count zero, while
+search and transport mutations removed elements their predicates did not require. The one allowed
+harness repair derives the full library count from the independent queue and makes both controls
+load-bearing. Re-run: every one of **9** mutations fell exactly its own row, unexpected rows **0**,
+and returned **9/9**. Search/YouTube drafts are empty, sort/storage are `recent`, presentation is
+Standard after restore. Evidence: `baselines/cat6-l8-music.json`.
