@@ -28,55 +28,64 @@ export default function SettingsNav({
   // and `.scr-rail-list` did: a `<ul>` of 8 navigation buttons satisfies the classifier's
   // dense-work test, so leaving them undeclared would put four "dense work" regions on the
   // rail's own material the moment it starts painting. They take the role and no material.
+  //
+  // `.os-set-nav-scroll` is the rail's own scroller, so the Advanced footer can sit OUTSIDE
+  // it. The footer used to stay visible by being `position: sticky` over the scrolled
+  // groups, which is a real collision: measured 2026-08-30 the category-4 harness read the
+  // whole 179x88 footer overlapping a group at maximized and two more pairs at 960x680.
+  // Same structure the Scraper rail uses (`.scr-rail-scroll`), and the footer is still
+  // always visible without painting over anything.
   return (
     <ContextualSurface as="nav" className="os-set-nav-v2" aria-label={t('settings.nav.ariaCategories')}>
-      <button
-        type="button"
-        className={`os-set-nav-item ${page === 'home' ? 'active' : ''}`}
-        onClick={() => onNavigate('home')}
-        aria-current={page === 'home' ? 'page' : undefined}
-      >
-        <Icon name={home.icon} size={16} />
-        <span>{t(home.labelKey)}</span>
-      </button>
+      <ContextualSurface className="os-set-nav-scroll">
+        <button
+          type="button"
+          className={`os-set-nav-item ${page === 'home' ? 'active' : ''}`}
+          onClick={() => onNavigate('home')}
+          aria-current={page === 'home' ? 'page' : undefined}
+        >
+          <Icon name={home.icon} size={16} />
+          <span>{t(home.labelKey)}</span>
+        </button>
 
-      {groups.map((group) => {
-        const pages = SETTINGS_NAV.filter(
-          (p) => p.group === group && (advancedMode || !p.advanced),
-        );
-        if (!pages.length) return null;
-        const groupLabel = t(groupLabelKey(group));
-        return (
-          <ContextualSurface key={group} className="os-set-nav-group">
-            <div className="os-set-nav-group-label" id={`set-nav-${group}`}>
-              {groupLabel}
-            </div>
-            <ContextualSurface
-              as="ul"
-              className="os-set-nav-list"
-              aria-labelledby={`set-nav-${group}`}
-            >
-              {pages.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className={`os-set-nav-item ${page === p.id ? 'active' : ''}`}
-                    onClick={() => onNavigate(p.id)}
-                    aria-current={page === p.id ? 'page' : undefined}
-                    title={p.descKey ? t(p.descKey) : undefined}
-                  >
-                    <Icon name={p.icon} size={16} />
-                    <span>{t(p.labelKey)}</span>
-                    {p.advanced && (
-                      <span className="os-set-adv-dot" title={t('settings.nav.advanced')} />
-                    )}
-                  </button>
-                </li>
-              ))}
+        {groups.map((group) => {
+          const pages = SETTINGS_NAV.filter(
+            (p) => p.group === group && (advancedMode || !p.advanced),
+          );
+          if (!pages.length) return null;
+          const groupLabel = t(groupLabelKey(group));
+          return (
+            <ContextualSurface key={group} className="os-set-nav-group">
+              <div className="os-set-nav-group-label" id={`set-nav-${group}`}>
+                {groupLabel}
+              </div>
+              <ContextualSurface
+                as="ul"
+                className="os-set-nav-list"
+                aria-labelledby={`set-nav-${group}`}
+              >
+                {pages.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className={`os-set-nav-item ${page === p.id ? 'active' : ''}`}
+                      onClick={() => onNavigate(p.id)}
+                      aria-current={page === p.id ? 'page' : undefined}
+                      title={p.descKey ? t(p.descKey) : undefined}
+                    >
+                      <Icon name={p.icon} size={16} />
+                      <span>{t(p.labelKey)}</span>
+                      {p.advanced && (
+                        <span className="os-set-adv-dot" title={t('settings.nav.advanced')} />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ContextualSurface>
             </ContextualSurface>
-          </ContextualSurface>
-        );
-      })}
+          );
+        })}
+      </ContextualSurface>
 
       <div className="os-set-nav-footer">
         <button

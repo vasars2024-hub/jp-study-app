@@ -4,8 +4,8 @@
   "win": "main",
   "depth": 12,
   "raised": "already-on-top",
-  "presentationAsFound": "liquid",
-  "presentationDriven": false,
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
   "box": "960x680",
   "presentation": "liquid",
   "windowOwnPaint": {
@@ -14,20 +14,20 @@
     "image": null,
     "opacity": 1
   },
-  "regions": 39,
+  "regions": 40,
   "controlsSkipped": 40,
   "byRole": {
     "Work": 2,
-    "Liquid-eligible": 10,
+    "Liquid-eligible": 11,
     "Anchor": 21,
     "Anchor(holds work)": 6,
     "Ambient": 0
   },
   "denseWorkOnTranslucent": 0,
   "denseWorkOnTranslucentList": [],
-  "liquidTreatedEligible": 10,
-  "sharedPrimitiveEligible": 10,
-  "eligibleTotal": 10,
+  "liquidTreatedEligible": 11,
+  "sharedPrimitiveEligible": 11,
+  "eligibleTotal": 11,
   "theme": "forest-night",
   "materials": null,
   "viewport": "1264x821",
@@ -50,30 +50,30 @@
     "counts": {
       "base": [
         0,
-        10,
-        10,
-        10,
+        11,
+        11,
+        11,
         2
       ],
       "oneRegionGlass": [
         1,
-        10,
-        10,
-        10,
+        11,
+        11,
+        11,
         2
       ],
       "allGlass": [
         2,
-        10,
-        10,
-        10,
+        11,
+        11,
+        11,
         2
       ],
       "restored": [
         0,
-        10,
-        10,
-        10,
+        11,
+        11,
+        11,
         2
       ]
     },

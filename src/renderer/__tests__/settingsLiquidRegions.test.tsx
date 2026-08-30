@@ -84,6 +84,7 @@ describe('Settings — Liquid region roles', () => {
     // Still the landmark: the role is declared on the semantics, not instead of them.
     expect(nav?.getAttribute('aria-label'), 'rail keeps its accessible name').toBeTruthy();
 
+    expectContextual(host.querySelector('.os-set-nav-scroll'), '.os-set-nav-scroll');
     const groups = [...host.querySelectorAll('.os-set-nav-group')];
     expect(groups.length, 'nav groups rendered').toBeGreaterThan(0);
     groups.forEach((group, i) => expectContextual(group, `.os-set-nav-group[${i}]`));
@@ -162,5 +163,38 @@ describe('Settings — Liquid region roles', () => {
     );
     expect(inner, 'rail wrappers have a no-material exception').not.toBeNull();
     expect(inner?.[1]).toMatch(/background:\s*none/);
+    expect(sheet, 'the rail scroller is in the same no-material exception')
+      .toMatch(/\.os-set-nav-scroll\.lq-contextual,/);
+  });
+
+  it('keeps the Advanced footer outside the rail scroller', async () => {
+    // Category 4 read the whole 179x88 footer overlapping a nav group at maximized, and two
+    // more pairs at 960x680, because the footer stayed visible by being `position: sticky`
+    // over the scrolled rail. Structure, not paint, is what removes a collision.
+    const host = await mountNav();
+    const scroller = host.querySelector('.os-set-nav-scroll');
+    const footer = host.querySelector('.os-set-nav-footer');
+    expect(scroller, 'rail has its own scroller').not.toBeNull();
+    expect(footer, 'rail has its footer').not.toBeNull();
+    expect(scroller?.contains(footer as Node), 'footer is outside the scroller').toBe(false);
+    expect(scroller?.querySelectorAll('.os-set-nav-group').length, 'groups scroll')
+      .toBeGreaterThan(0);
+
+    const app = read('styles.css');
+    expect(app, 'the rail itself no longer scrolls').toMatch(
+      /\.os-set-nav-v2 \{\s*\n\s*overflow: hidden;\s*\n\}/,
+    );
+    const footerRule = app.match(/\.os-set-nav-v2 \.os-set-nav-footer \{([^}]*)\}/);
+    expect(footerRule, 'footer is un-stuck').not.toBeNull();
+    expect(footerRule?.[1]).toMatch(/position:\s*static/);
+  });
+
+  it('lets the settings body use the whole window width', () => {
+    // `.os-settings` sets `align-items: flex-start` for its v1 ROW layout; v2 flips to column,
+    // where the same declaration shrinks every child to its content width. Measured: maximized
+    // to 1264x765 the root grew to 1226 px and `.os-set-body` stayed 685 px — a 568x730 dead
+    // column, 39.9% of the viewport against category 4's 15% ceiling.
+    const rule = read('styles.css').match(/\.os-settings-v2 \{\s*\n\s*align-items: stretch;\s*\n\}/);
+    expect(rule, 'v2 restores cross-axis stretch').not.toBeNull();
   });
 });

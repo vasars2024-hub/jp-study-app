@@ -281,6 +281,7 @@
  * case. A second tint inside the rail's own would read as a darker slab down the middle of
  * it, so they take the role and no material at all, and keep their `styles.css` spacing.
  */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-scroll.lq-contextual,
 :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-group.lq-contextual,
 :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-list.lq-contextual {
   background: none;

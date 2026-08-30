@@ -791,3 +791,39 @@ restored. Window returned to Standard, the presentation it was found in.
 Regression: `settingsLiquidRegions.test.tsx`, 5 tests, pins both traps. Evidence:
 `baselines/cat3-l8-settings.json`, `baselines/cat1-l8-settings.json`,
 `baselines/cat1-l8-settings-liquid.json`.
+
+## 2026-08-30 · primary — Settings category 4 is PARKED at 2 of 4 bars, not closed
+
+`cat4-use-of-space.cjs` reused unchanged, `--control`, three sizes. First run FAILED four
+bars. Two are fixed and re-measured here; two remain and are the next turn's opening slice.
+
+FIXED — overlaps, 2 pairs at 960×680 and the whole `179x88` footer over a nav group at
+maximized. The footer stayed visible by being `position: sticky` over the scrolled rail, and
+its 92%-opaque fill plus blur existed to hide that. It now sits OUTSIDE a new
+`.os-set-nav-scroll`, the same structure `.scr-rail-scroll` uses. Structure, not paint,
+removes a collision. Measured after: **0 overlaps at all three sizes**.
+
+FIXED — dead region. `.os-settings` sets `align-items: flex-start`, correct for the v1 ROW
+layout and wrong for v2, which flips to column and turns it into "shrink every child to its
+content width". Maximized to 1264×765 the root grew to 1226 px and `.os-set-body` stayed
+**685 px** — Settings never used more than 685 px of any window. `deadPctViewport` against
+the 15% ceiling: default **16.4 → 4.8**, maximized **39.9 → 7.0**, compact 0.6 unchanged.
+
+OPEN — `clipped` and `horizontal`, and ONLY at the harness's 260×170 compact leg. The rail is
+a fixed 204 px against an 18 px gap, so at 260 the pane measures `184>0`: `.os-set-pane-v2`
+has zero client width and the Home status chips clip. 108 clipped before the two fixes, **71**
+now. The fix is a narrow-width reflow — collapse the rail to icons under a container query and
+let `.os-set-home-status` / `.os-set-quick-grid` fall to one column via `minmax(min(N, 100%),
+1fr)`. Not started; it must keep the accessible names (`.os-set-nav-item > span` is the name,
+so visually-hidden, never `display: none`) or it trades category 4 for category 1.
+
+Control: injected clip moved `clipped 0 → 1 → 0` with removal proven; the sub-minimum
+200×140 shrink restored exactly; no proven pager exists on this surface so that leg reports
+`applicable: false` rather than a number. Every size restored its geometry.
+
+Categories 1 and 3 re-measured at this tree after the layout changes, not inherited:
+cat1 Standard **PASS 10/10** (64 text records, 5.47:1, 45/45 hit, 0 below floor, 0 stolen,
+0 occluded, 0 unreachable, control restored); cat3 Liquid **PASS 10/10** (now 11 of 11
+eligible treated and shared, `denseWorkOnTranslucent` 0 of 2 Work, control 0→1→2→0,
+CONTROL FAILED AS REQUIRED). Settings stands at **1, 2, 3 closed; 4 parked; 5–8 unmeasured**.
+Evidence: `baselines/cat4-l8-settings.json`.

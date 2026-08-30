@@ -15228,6 +15228,43 @@ html[data-taskbar-size='large'] .os-tray-btn {
   /* Extra bottom pad so last card isn't flush against scroll edge / taskbar */
   scroll-padding-bottom: 24px;
 }
+/* Every rule in this block restates a declaration made above it at the same or higher
+   specificity and wins on source order; `styles.css` carries another track's unstaged hunks,
+   so an appended block is what can be committed here without absorbing them.
+
+   `.os-settings` sets `align-items: flex-start`, which is right for the v1 ROW layout it was
+   written for (top-align the rail against the pane) and wrong for v2, which flips the
+   direction to column and turns that same declaration into "shrink every child to its
+   content width". Measured 2026-08-30: maximized to 1264x765 the root grew to 1226 px and
+   `.os-set-body` stayed 685 px, so Settings never used more than 685 px of any window — a
+   568x730 dead column, 39.9% of the viewport against the category-4 ceiling of 15%. */
+.os-settings-v2 {
+  align-items: stretch;
+}
+/* The rail scrolls in its own child so the Advanced footer can sit outside the scroller. The
+   footer used to stay visible by being `position: sticky` over the scrolled groups, which is
+   a real collision and not a measurement artifact: the category-4 harness read the whole
+   179x88 footer overlapping a group at maximized and two more pairs at 960x680, and the
+   92%-opaque fill plus blur existed to hide exactly that. Outside the scroller it is still
+   always visible and paints over nothing. Same structure as `.scr-rail-scroll`. */
+.os-set-nav-v2 {
+  overflow: hidden;
+}
+.os-set-nav-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.os-set-nav-v2 .os-set-nav-footer {
+  position: static;
+  margin-top: 0;
+  flex-shrink: 0;
+  backdrop-filter: none;
+}
 .reduce-motion .os-set-pane-anim,
 .os-set-pane-anim {
   animation: os-set-page-in 0.18s ease;

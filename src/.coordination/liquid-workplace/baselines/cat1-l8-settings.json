@@ -146,8 +146,8 @@
     "disclosedForRun": 0,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "nav.os-set-nav-v2.lq-contextual 0,0 -> 385,0",
-      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 696,0"
+      "div.lq-contextual.os-set-nav-scroll 0,0 -> 385,0",
+      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 523,0"
     ],
     "deferredRestore": {
       "first": {
