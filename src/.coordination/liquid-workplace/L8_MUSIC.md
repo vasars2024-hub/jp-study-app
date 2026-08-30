@@ -256,3 +256,18 @@ presentation and 1080x700 geometry restore exactly. Negative controls move all t
 
 Music is now **50/80 banked**: categories 2, 3, 4, 5 and 6 are each controlled 10/10. Category 1
 remains the recorded shared-chrome target-floor finding; categories 7 and 8 are next.
+
+## 2026-08-30 — category 7 PASS 10/10; Music is 60/80
+
+The shared runner gained one `music` spec. Its heaviest repeatable non-destructive operation cycles
+all four library sort modes **48 times (12/12/12/12)**, rebuilding order/queue/folder branches,
+then restores both the control and persisted `recent` preference. The first 3s run reached 44/48
+and was correctly VOID; the one repair made the declared coverage window 4s. Re-run receipt:
+**48/48, restored recent**.
+
+Two-window scene: **1,160 fwin elements / 1,290 document elements**, Music **268 elements**. Session
+ceiling p50/p95 **16.7/16.8ms**. Drag **16.7/16.9**, resize **16.7/16.8**, theme **16.7/16.8**;
+all closed-loop and scene-stable, zero >100ms in scored legs. Theme apply/restore **49.0/47.3ms**.
+Sort load main p50/p95/max **2.5/4.0/12.1ms** vs 500ms bar; idle max 20.1ms. Main RSS
+**129.3 -> 128.9MB**. Jank control produced **12 >100ms frames**. Findings **0**, voids **0**.
+Evidence: `baselines/cat7-l8-music.json`. Music is **60/80**; category 8 is next, then category 1.

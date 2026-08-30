@@ -1,0 +1,570 @@
+{
+  "surface": "music",
+  "title": "Music",
+  "root": ".mc-music-page",
+  "at": "2026-08-30T13:41:37.184Z",
+  "scene": {
+    "fwins": 2,
+    "fwinElements": 1160,
+    "root": null,
+    "rootElements": null,
+    "documentElements": 1290,
+    "titles": [
+      "Flashcards",
+      "Music"
+    ],
+    "theme": "forest-night",
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 269
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "elements": 268,
+    "deskWindows": 2,
+    "titles": [
+      "Flashcards",
+      "Music"
+    ]
+  },
+  "process": {
+    "pid": 37592,
+    "uptimeSecAtStart": 25008,
+    "mainRssMbBefore": 129.3,
+    "mainRssMbAfter": 128.9,
+    "mainHeapUsedMbAfter": 298.8
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "frames": 112,
+    "runs": [
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17,
+        "over100": 0,
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 110
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 18.2,
+        "over100": 0,
+        "frames": 111
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 18.2,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 265
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 266
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1315
+      },
+      "jank_blocks": null,
+      "frames": 112,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 17,
+      "frames_over_16": 50,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1828,
+      "main_p50_ms": 2.5,
+      "main_p95_ms": 5,
+      "main_max_ms": 13.4
+    },
+    "ceilingRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17,
+        "over100": 0,
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17.1,
+        "over100": 0,
+        "frames": 110
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 18.2,
+        "over100": 0,
+        "frames": 111
+      }
+    ],
+    "themeControlRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 33.4,
+        "over100": 0,
+        "mainMax": 17.9
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 33.6,
+        "over100": 0,
+        "mainMax": 11.1
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 269
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 272
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 110,
+      "frame_min_ms": 16.4,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 17,
+      "frames_over_16": 48,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1801,
+      "main_p50_ms": 2.5,
+      "main_p95_ms": 4.2,
+      "main_max_ms": 13.3,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 17,
+          "over100": 0,
+          "mainMax": 13.3,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 17.4,
+          "over100": 0,
+          "mainMax": 20.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 263
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 263
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 110,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 16.9,
+      "frames_over_16": 47,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1816,
+      "main_p50_ms": 2.5,
+      "main_p95_ms": 4.3,
+      "main_max_ms": 14.1,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 150.4,
+          "over100": 1,
+          "mainMax": 68.8,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 16.9,
+          "over100": 0,
+          "mainMax": 14.1,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 17,
+          "over100": 0,
+          "mainMax": 89.5,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 17.1,
+          "over100": 0,
+          "mainMax": 11.2,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 16.9,
+          "over100": 0,
+          "mainMax": 13.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 261
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 261
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 49,
+        "restorePaintedMs": 47.3,
+        "restoredTo": "forest-night"
+      },
+      "jank_blocks": null,
+      "frames": 108,
+      "frame_min_ms": 16.1,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 33.5,
+      "frames_over_16": 49,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1815,
+      "main_p50_ms": 2.6,
+      "main_p95_ms": 4.5,
+      "main_max_ms": 22.2,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 22.2,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 33.4,
+          "over100": 0,
+          "mainMax": 16.5,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "music: cycle all four library sort modes (DURING -DuringJs)",
+      "samples": 130,
+      "span_ms": 4021,
+      "min_ms": 1.9,
+      "p50_ms": 2.5,
+      "p95_ms": 4,
+      "max_ms": 12.1
+    },
+    "heavyProof": "cycled 48 sorts (12/12/12/12), restored recent",
+    "idle": {
+      "label": "music: idle",
+      "samples": 129,
+      "span_ms": 4018,
+      "min_ms": 2.1,
+      "p50_ms": 3.5,
+      "p95_ms": 5.8,
+      "max_ms": 20.1
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 264
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 1160,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1290,
+        "titles": [
+          "Flashcards",
+          "Music"
+        ],
+        "theme": "forest-night",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 266
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 12,
+      "frames": 67,
+      "frame_min_ms": 14.8,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 117,
+      "frame_max_ms": 133.7,
+      "frames_over_16": 35,
+      "frames_over_33": 13,
+      "frames_over_100": 12,
+      "main_samples": 58,
+      "main_span_ms": 1809,
+      "main_p50_ms": 3.6,
+      "main_p95_ms": 9.6,
+      "main_max_ms": 22.8
+    }
+  },
+  "findings": [],
+  "voided": [],
+  "environment": [],
+  "score": 10,
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}

@@ -332,6 +332,50 @@ const SPECS = {
     },
     collection: { container: '.res-view', row: '.res-card' },
   },
+  music: {
+    title: 'Music',
+    root: '.mc-music-page',
+    heavy: {
+      // Sorting rebuilds the browsable order, queue and folder-tree branch without playing
+      // audio or changing library data. Cycle every mode repeatedly and restore both the
+      // control and its persisted value, so the load leaves no user preference behind.
+      label: 'cycle all four library sort modes',
+      // The 50 ms timer is renderer-scheduled and measured live at ~68 ms under the
+      // concurrent health sampler; four seconds covers all 48 ticks plus restoration.
+      durationMs: 4000,
+      js: `(() => {
+        delete window.__lqMusicLoad;
+        const select = document.querySelector('.mc-music-sort select');
+        if (!select || select.options.length !== 4) return 'REFUSE: expected four Music sort modes';
+        const start = select.value;
+        const values = Array.from(select.options, (o) => o.value);
+        const rec = { start, values, ticks: 0, visits: values.map(() => 0), restored: false };
+        window.__lqMusicLoad = rec;
+        const timer = setInterval(() => {
+          const index = rec.ticks % values.length;
+          select.value = values[index];
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          rec.visits[index] += 1;
+          rec.ticks += 1;
+          if (rec.ticks >= 48) {
+            clearInterval(timer);
+            select.value = start;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            setTimeout(() => { rec.restored = select.value === start && localStorage.getItem('jp-music-sort') === start; }, 160);
+          }
+        }, 50);
+        return 'cycling four Music sort modes from ' + start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqMusicLoad;
+        if (!r) return 'REFUSE: Music load never armed';
+        if (r.ticks < 48 || r.visits.some((n) => n < 12)) return 'REFUSE: incomplete Music cycle ' + JSON.stringify(r);
+        if (!r.restored) return 'REFUSE: Music did not restore sort mode ' + r.start;
+        return 'cycled ' + r.ticks + ' sorts (' + r.visits.join('/') + '), restored ' + r.start;
+      })()`,
+    },
+    collection: { container: '.music-vlist', row: '.music-song' },
+  },
   games: {
     title: 'Game Arena',
     root: '.game-arena',
