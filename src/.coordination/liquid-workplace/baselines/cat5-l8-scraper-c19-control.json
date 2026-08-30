@@ -2,7 +2,7 @@
   "surface": "@.fwin:has(.scr-shell)",
   "label": "l8-scraper-c19",
   "control": true,
-  "at": "2026-08-30T17:28:56.460Z",
+  "at": "2026-08-30T17:40:41.699Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -30,10 +30,9 @@
     "clutterSelfGuard": "cat5-ctl-self declares itself its own disclosure; the guard must refuse it",
     "primaryFound": "input.scr-search-input",
     "primaryFromPin": true,
-    "primariesMoved": 2,
-    "primariesFromPin": 2,
+    "primariesMoved": 1,
+    "primariesFromPin": 1,
     "primaryList": [
-      "input.scr-search-input",
       "input.scr-search-input"
     ],
     "titlesBlanked": 2,
@@ -58,7 +57,7 @@
     "restoredTo": "standard"
   },
   "unplanted": {
-    "restoredMoved": 2,
+    "restoredMoved": 1,
     "restoredTitles": 1,
     "residue": 0
   },
@@ -95,10 +94,9 @@
       "numbers": {
         "titleText": "",
         "titleFrom": "span.fwin-title",
-        "backAffordances": 2,
+        "backAffordances": 1,
         "backList": [
-          "×",
-          "Close"
+          "×"
         ]
       }
     },
@@ -119,24 +117,19 @@
       "verdict": "NO",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 1,
-        "scannedControls": 32,
+        "collapsedDisclosures": 2,
+        "scannedControls": 34,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 73,
+        "chromeControlsRaw": 35,
         "summaryHeaders": 1,
-        "behindDisclosure": 40,
+        "behindDisclosure": 0,
         "disclosures": {
           "total": 0,
           "open": 0
         },
-        "ariaDisclosures": [
-          {
-            "region": "aside.lq-contextual",
-            "controlsTaken": 40
-          }
-        ],
+        "ariaDisclosures": [],
         "scannedList": [
           "Toggle navigation",
           "Search the scraper",
@@ -145,6 +138,8 @@
           "Advanced settings",
           "Advanced controls shown",
           "Switch to compact window",
+          "Torrent settings",
+          "qBittorrent settings",
           "Idle",
           "Last scrape: 19d ago",
           "Next scheduled: Disabled",
@@ -155,9 +150,7 @@
           "card 4",
           "clutter 0",
           "clutter 1",
-          "clutter 2",
-          "clutter 3",
-          "clutter 4"
+          "clutter 2"
         ]
       }
     },
@@ -171,7 +164,7 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 96,
+            "measured": 599,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -185,7 +178,7 @@
           },
           {
             "theme": "classic-light",
-            "measured": 96,
+            "measured": 599,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 3,
@@ -245,21 +238,20 @@
           "measuredIn": "liquid",
           "restoredTo": "standard"
         },
-        "liquidRegions": 4,
+        "liquidRegions": 3,
         "byBackdropFilter": 0,
-        "byContextualPaint": 4,
-        "carryingATransition": 4,
+        "byContextualPaint": 3,
+        "carryingATransition": 3,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 4,
+        "liquidMaterialTotal": 3,
         "decoratedLeaves": [],
         "regionList": [
           "header.lq-contextual",
           "nav.lq-contextual",
-          "aside.lq-contextual",
           "footer.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 4
+        "inStandardPresentation": 3
       }
     },
     {
@@ -310,7 +302,7 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "scr:106"
+          "scr:305"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
@@ -319,6 +311,12 @@
         "cardHost": "div. cards=6",
         "cardHostDetail": "47% of body",
         "cardHosts": [
+          {
+            "host": "div.scr-page cards=4",
+            "uniformity": 0.25,
+            "signatures": 4,
+            "detail": "655% of body"
+          },
           {
             "host": "div. cards=6",
             "uniformity": 1,
@@ -340,7 +338,7 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 95,
+    "controlsPainted": 143,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -349,24 +347,19 @@
       "inputList": []
     },
     "q4": {
-      "collapsedDisclosures": 1,
-      "scannedControls": 32,
+      "collapsedDisclosures": 2,
+      "scannedControls": 34,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 73,
+      "chromeControlsRaw": 35,
       "summaryHeaders": 1,
-      "behindDisclosure": 40,
+      "behindDisclosure": 0,
       "disclosures": {
         "total": 0,
         "open": 0
       },
-      "ariaDisclosures": [
-        {
-          "region": "aside.lq-contextual",
-          "controlsTaken": 40
-        }
-      ],
+      "ariaDisclosures": [],
       "scannedList": [
         "Toggle navigation",
         "Search the scraper",
@@ -375,6 +368,8 @@
         "Advanced settings",
         "Advanced controls shown",
         "Switch to compact window",
+        "Torrent settings",
+        "qBittorrent settings",
         "Idle",
         "Last scrape: 19d ago",
         "Next scheduled: Disabled",
@@ -385,29 +380,25 @@
         "card 4",
         "clutter 0",
         "clutter 1",
-        "clutter 2",
-        "clutter 3",
-        "clutter 4"
+        "clutter 2"
       ]
     },
     "q6": {
-      "liquidRegions": 4,
+      "liquidRegions": 3,
       "byBackdropFilter": 0,
-      "byContextualPaint": 4,
+      "byContextualPaint": 3,
       "carryingATransition": 0,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 4,
+      "liquidMaterialTotal": 3,
       "decoratedLeaves": [],
       "regionList": [
         "header.lq-contextual",
         "nav.lq-contextual",
-        "aside.lq-contextual",
         "footer.lq-contextual"
       ],
       "withoutTransition": [
         "header.lq-contextual",
         "nav.lq-contextual",
-        "aside.lq-contextual",
         "footer.lq-contextual"
       ]
     },
@@ -423,7 +414,7 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "scr:106"
+        "scr:305"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
@@ -432,6 +423,12 @@
       "cardHost": "div. cards=6",
       "cardHostDetail": "47% of body",
       "cardHosts": [
+        {
+          "host": "div.scr-page cards=4",
+          "uniformity": 0.25,
+          "signatures": 4,
+          "detail": "655% of body"
+        },
         {
           "host": "div. cards=6",
           "uniformity": 1,
@@ -442,7 +439,7 @@
       "dashboardHosts": 1
     }
   },
-  "controlsPaintedA": 95,
+  "controlsPaintedA": 143,
   "controlResult": {
     "Q2": true,
     "Q3": true,
@@ -451,15 +448,10 @@
     "Q10": true
   },
   "controlQ4": {
-    "scannedControls": 32,
+    "scannedControls": 34,
     "bar": 12,
-    "behindDisclosure": 40,
-    "ariaDisclosures": [
-      {
-        "region": "aside.lq-contextual",
-        "controlsTaken": 40
-      }
-    ]
+    "behindDisclosure": 0,
+    "ariaDisclosures": []
   },
   "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10",
   "score": "CONTROL-OK"

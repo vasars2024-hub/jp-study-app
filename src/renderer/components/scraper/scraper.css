@@ -2667,8 +2667,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.scr-seed.is-low { color: var(--status-error); }
-.scr-seed.is-high { color: var(--status-success); }
+/* A seed count has no fill to carry its tone, so the colour IS the signal and it
+   has to be readable. Same remap as `.scr-pill--good` above: `--status-success`
+   put every healthy count at 2.71:1 on classic-light. */
+.scr-seed.is-low { color: var(--danger-text); }
+.scr-seed.is-high { color: var(--success-text); }
 
 .scr-table-empty {
   padding: var(--space-2xl);
@@ -3669,19 +3672,26 @@
   border-color: var(--border);
 }
 
+/* The `--status-*` tokens are FILL colours and are kept as the border, which is
+   where the tone lives. The readable copy takes the `--*-text` family from
+   styles.css, which is the same colour on every dark palette and is remapped on
+   the light ones by a documented recipe — `--status-success` as text measured
+   2.71:1 on `section.scr-card` in classic-light against a 4.5 bar. All three
+   tones move together rather than leaving two known-bad ones behind the one a
+   probe happened to catch, which is the note that recipe already carries. */
 .scr-pill--good {
   border-color: color-mix(in srgb, var(--status-success) 40%, transparent);
-  color: var(--status-success);
+  color: var(--success-text);
 }
 
 .scr-pill--warn {
   border-color: color-mix(in srgb, var(--status-warning) 40%, transparent);
-  color: var(--status-warning);
+  color: var(--warning-text);
 }
 
 .scr-pill--bad {
   border-color: color-mix(in srgb, var(--status-error) 40%, transparent);
-  color: var(--status-error);
+  color: var(--danger-text);
 }
 
 /* ------------------------------------------- advanced settings drawer ------ */

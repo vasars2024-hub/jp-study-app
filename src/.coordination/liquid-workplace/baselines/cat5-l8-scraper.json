@@ -2,7 +2,7 @@
   "surface": "@.fwin:has(.scr-shell)",
   "label": "l8-scraper",
   "control": false,
-  "at": "2026-08-30T17:29:13.203Z",
+  "at": "2026-08-30T17:40:28.559Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -60,12 +60,11 @@
       "verdict": "YES",
       "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
       "numbers": {
-        "entryPoints": 2,
-        "primaryInputs": 2,
+        "entryPoints": 1,
+        "primaryInputs": 1,
         "accentButtons": 0,
         "accentList": [],
         "inputList": [
-          "input.scr-search-input",
           "input.scr-search-input"
         ]
       }
@@ -78,10 +77,9 @@
       "numbers": {
         "titleText": "Scraper",
         "titleFrom": "span.fwin-title",
-        "backAffordances": 2,
+        "backAffordances": 1,
         "backList": [
-          "×",
-          "Close"
+          "×"
         ]
       }
     },
@@ -102,24 +100,19 @@
       "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
-        "collapsedDisclosures": 1,
-        "scannedControls": 10,
+        "collapsedDisclosures": 2,
+        "scannedControls": 12,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 50,
+        "chromeControlsRaw": 12,
         "summaryHeaders": 0,
-        "behindDisclosure": 40,
+        "behindDisclosure": 0,
         "disclosures": {
           "total": 0,
           "open": 0
         },
-        "ariaDisclosures": [
-          {
-            "region": "aside.lq-contextual",
-            "controlsTaken": 40
-          }
-        ],
+        "ariaDisclosures": [],
         "scannedList": [
           "Toggle navigation",
           "Search the scraper",
@@ -128,6 +121,8 @@
           "Advanced settings",
           "Advanced controls shown",
           "Switch to compact window",
+          "Torrent settings",
+          "qBittorrent settings",
           "Idle",
           "Last scrape: 19d ago",
           "Next scheduled: Disabled"
@@ -144,30 +139,30 @@
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 73,
+            "measured": 576,
             "unmeasurable": 0,
-            "minRatio": 5.56,
+            "minRatio": 5.3,
             "failingCount": 0,
             "worst": {
-              "el": "kbd.scr-search-shortcut",
-              "ratio": 5.56,
+              "el": "div.scr-th",
+              "ratio": 5.3,
               "bar": 4.5,
-              "bg": "kbd.scr-search-shortcut@4% over div.lq-anchor@100%",
-              "text": "Ctrl K"
+              "bg": "div.scr-thead@100%",
+              "text": "Name"
             }
           },
           {
             "theme": "classic-light",
-            "measured": 73,
+            "measured": 576,
             "unmeasurable": 0,
-            "minRatio": 5.86,
+            "minRatio": 5.71,
             "failingCount": 0,
             "worst": {
-              "el": "kbd.scr-search-shortcut",
-              "ratio": 5.86,
+              "el": "div.scr-th",
+              "ratio": 5.71,
               "bar": 4.5,
-              "bg": "kbd.scr-search-shortcut@4% over div.lq-anchor@100%",
-              "text": "Ctrl K"
+              "bg": "div.scr-thead@100%",
+              "text": "Name"
             }
           }
         ],
@@ -189,21 +184,20 @@
           "measuredIn": "liquid",
           "restoredTo": "standard"
         },
-        "liquidRegions": 4,
+        "liquidRegions": 3,
         "byBackdropFilter": 0,
-        "byContextualPaint": 4,
-        "carryingATransition": 4,
+        "byContextualPaint": 3,
+        "carryingATransition": 3,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 4,
+        "liquidMaterialTotal": 3,
         "decoratedLeaves": [],
         "regionList": [
           "header.lq-contextual",
           "nav.lq-contextual",
-          "aside.lq-contextual",
           "footer.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 4
+        "inStandardPresentation": 3
       }
     },
     {
@@ -264,15 +258,22 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": false,
         "bespokePrefixes": [
-          "scr:106"
+          "scr:304"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
-        "cardUniformity": 0,
-        "cardControlSignatures": 0,
-        "cardHost": null,
-        "cardHostDetail": null,
-        "cardHosts": [],
+        "cardUniformity": 0.25,
+        "cardControlSignatures": 4,
+        "cardHost": "div.scr-page cards=4",
+        "cardHostDetail": "664% of body",
+        "cardHosts": [
+          {
+            "host": "div.scr-page cards=4",
+            "uniformity": 0.25,
+            "signatures": 4,
+            "detail": "664% of body"
+          }
+        ],
         "dashboardHosts": 0
       }
     }
@@ -287,36 +288,30 @@
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 72,
+    "controlsPainted": 120,
     "q1": {
-      "entryPoints": 2,
-      "primaryInputs": 2,
+      "entryPoints": 1,
+      "primaryInputs": 1,
       "accentButtons": 0,
       "accentList": [],
       "inputList": [
-        "input.scr-search-input",
         "input.scr-search-input"
       ]
     },
     "q4": {
-      "collapsedDisclosures": 1,
-      "scannedControls": 10,
+      "collapsedDisclosures": 2,
+      "scannedControls": 12,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 50,
+      "chromeControlsRaw": 12,
       "summaryHeaders": 0,
-      "behindDisclosure": 40,
+      "behindDisclosure": 0,
       "disclosures": {
         "total": 0,
         "open": 0
       },
-      "ariaDisclosures": [
-        {
-          "region": "aside.lq-contextual",
-          "controlsTaken": 40
-        }
-      ],
+      "ariaDisclosures": [],
       "scannedList": [
         "Toggle navigation",
         "Search the scraper",
@@ -325,29 +320,29 @@
         "Advanced settings",
         "Advanced controls shown",
         "Switch to compact window",
+        "Torrent settings",
+        "qBittorrent settings",
         "Idle",
         "Last scrape: 19d ago",
         "Next scheduled: Disabled"
       ]
     },
     "q6": {
-      "liquidRegions": 4,
+      "liquidRegions": 3,
       "byBackdropFilter": 0,
-      "byContextualPaint": 4,
+      "byContextualPaint": 3,
       "carryingATransition": 0,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 4,
+      "liquidMaterialTotal": 3,
       "decoratedLeaves": [],
       "regionList": [
         "header.lq-contextual",
         "nav.lq-contextual",
-        "aside.lq-contextual",
         "footer.lq-contextual"
       ],
       "withoutTransition": [
         "header.lq-contextual",
         "nav.lq-contextual",
-        "aside.lq-contextual",
         "footer.lq-contextual"
       ]
     },
@@ -363,19 +358,26 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": false,
       "bespokePrefixes": [
-        "scr:106"
+        "scr:304"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
-      "cardUniformity": 0,
-      "cardControlSignatures": 0,
-      "cardHost": null,
-      "cardHostDetail": null,
-      "cardHosts": [],
+      "cardUniformity": 0.25,
+      "cardControlSignatures": 4,
+      "cardHost": "div.scr-page cards=4",
+      "cardHostDetail": "664% of body",
+      "cardHosts": [
+        {
+          "host": "div.scr-page cards=4",
+          "uniformity": 0.25,
+          "signatures": 4,
+          "detail": "664% of body"
+        }
+      ],
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 72,
+  "controlsPaintedA": 120,
   "findings": [],
   "voided": [],
   "score": 10,
