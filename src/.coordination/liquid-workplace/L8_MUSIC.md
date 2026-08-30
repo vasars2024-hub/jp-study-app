@@ -271,3 +271,15 @@ all closed-loop and scene-stable, zero >100ms in scored legs. Theme apply/restor
 Sort load main p50/p95/max **2.5/4.0/12.1ms** vs 500ms bar; idle max 20.1ms. Main RSS
 **129.3 -> 128.9MB**. Jank control produced **12 >100ms frames**. Findings **0**, voids **0**.
 Evidence: `baselines/cat7-l8-music.json`. Music is **60/80**; category 8 is next, then category 1.
+
+## 2026-08-30 — category 8 PASS 10/10; Music is 70/80
+
+The existing harness drove `.music-search input` to a guaranteed miss and restored it. The adverse
+state renders **No songs match "zzqqxxnosuchthing"**; states named **1/1 observable**. Resting and
+driven states both have raw keys **0**, placeholders **0**, mute pairs **0**; three disabled controls
+all carry explanations. EN/JA/ZH/RU render **4 distinct hashes**, 75 runs each, zero raw keys, and
+restore `htmlLang` plus `ui-lang` to English exactly. Negative controls move raw-key / placeholder /
+mute-pair counts **0,0,0 -> 1,1,1 -> 0,0,0**. Evidence: `baselines/cat8-l8-music.json`.
+
+Music is **70/80**. Category 1 is the only open cell: re-run it against the current 41-control
+surface before acting on the older launcher/shared-chrome finding.
