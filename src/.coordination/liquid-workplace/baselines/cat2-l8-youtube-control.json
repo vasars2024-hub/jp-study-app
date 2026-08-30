@@ -1,0 +1,193 @@
+{
+  "label": "l8-youtube",
+  "surface": "@.fwin:has(.yt-root)",
+  "win": "(focused)",
+  "task": "click:.yt-plan-item >> wait:500 >> click:.yt-folder .yt-pl-item >> wait:500",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 89,
+    "controlCount": 65,
+    "box": "980x640",
+    "results": 16
+  },
+  "inputCost": {
+    "clicks": 2,
+    "keystrokes": 0,
+    "total": 2
+  },
+  "latencyMs": {
+    "clickRecv": [
+      17.1,
+      74.4
+    ],
+    "inputRecv": [],
+    "worstRecv": 74.4,
+    "overBar100": 0,
+    "n": 2,
+    "clickStampUnscored": [
+      35.1,
+      92.7
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 92.7
+  },
+  "steps": [
+    {
+      "step": "click:.yt-plan-item",
+      "target": {
+        "sel": ".yt-plan-item",
+        "label": "Plan to watch0",
+        "disabled": false,
+        "at": "199,200"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.yt-folder .yt-pl-item",
+      "target": {
+        "sel": ".yt-folder .yt-pl-item",
+        "label": "オノマトペゆる言語学ラジオ",
+        "disabled": false,
+        "at": "199,303"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": null,
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "UNMEASURED",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - costParity; drive the surface with --task or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "costParity"
+  ],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      1.3
+    ]
+  }
+}

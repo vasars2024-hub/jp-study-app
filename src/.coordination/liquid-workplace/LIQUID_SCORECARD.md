@@ -1223,3 +1223,61 @@ mutation-checked rather than merely run: putting `var(--fg, #eee)` back took it 
 
 **YouTube 40/80 → 50/80.** Remaining: categories 2, 7, 8. Evidence:
 `baselines/cat5-l8-youtube.json`, `cat5-l8-youtube-control.json`, `cat6-l8-youtube.json`.
+
+## 2026-08-30 · backup — YouTube categories 2 and 7 both close at a controlled 10/10
+
+**Category 2 — clunkiness. PASS 10/10**, five bars, on the first run. Zero new probes: two
+RUNs of `cat2-clunkiness.cjs` (measurement + `--control`), the surface named as data.
+
+    --task "click:.yt-plan-item >> wait:500 >> click:.yt-folder .yt-pl-item >> wait:500
+            >> click:.yt-prefs-disclosure > summary >> wait:400"
+    --undo "click:.yt-prefs-disclosure > summary"   --result ".yt-row"   --both-presentations
+
+The dominant task is picking what to study — swap to the Plan-to-watch queue, back to the
+playlist, then open its settings. **Refresh, Channel, Log and Download all are deliberately
+NOT driven**: each calls `window.api` and reaches the network or writes user data, and the
+rubric's dominant task never means "cause a side effect the score does not need".
+
+| bar | number |
+| --- | --- |
+| input cost | **3 clicks, 0 keystrokes** |
+| dead ends | **0 of 3** driven steps |
+| modal traps | **0** |
+| scroll traps | **0** |
+| latency, scored `recvMs` | 19.8 / 66.8 / 3.2 — worst **66.8** against the 100 ms bar, **over100 = 0** |
+| latency, `stampMs` unscored | 34.6 / 81.6 / 30.6 — recorded so the main→renderer hop stays visible |
+| cost parity | standard **3**, liquid **3**, restored to standard, box 980x640 both |
+| undo | `restored` true, `baseHash === afterHash` (`1psfto3`) |
+| idle leg | resting and after-task both `rawChurns` false — nothing on this surface moves on its own, so no `--churn` exclusion was taken |
+
+Control: `deadEnd/modalTrap/scrollTrap` **0/0/0 → 1/1/1 → 0/0/0**, `backToBaseline` true, and
+the inert-click latency floor measured **1.3 ms** — three orders under the bar, so the floor
+does not straddle it.
+
+**Category 7 — performance under real load. PASS 10/10.** `cat7-perf.cjs` gained a `youtube`
+SPECS entry; that is DATA, and it is the only thing this surface contributed.
+
+**Why navigation and not scrolling, measured rather than preferred:** `.yt-list` is the only
+overflowing box here and it overflows by **603 px**. `scrollProof` REFUSES below 1000 px
+reached, so a scroll leg would have VOIDed rather than scored. What this surface does at scale
+is swap destinations — each rail click unmounts a `<header>`, the fourteen-control preference
+form and a virtualised list, and mounts the next one's. The load runs 12 round trips.
+
+| leg | p50 | p95 | max | frames over 100 | main max |
+| --- | --- | --- | --- | --- | --- |
+| ceiling (3 runs) | 16.7 | 16.8 | 17.9 | 0 | 10.9 |
+| drag | 16.7 | 16.8 | 17.5 | **0** | 12.6 |
+| resize | 16.7 | 33.5 | 50.0 | **0** | 10.9 |
+| theme switch | 16.7 | 16.8 | 16.9 | **0** | 9.0 |
+| heavy (24 swaps) | — | — | — | — | main p95 **3.2**, max **28.1** against a 500 ms bar |
+| idle | 1.9 | 2.8 | 7.0 | — | — |
+
+`heavyProof`: **"2 destinations x12 = 24 swaps, restored to オノマトペ"** — the rail agreed it
+got back, so the leg is not scored on a load that half-ran. This display's ceiling p50 is 16.7
+against L0's 10.0, so only the RATIO to this session's own ceiling is read, never the L0 ms.
+
+Control: `--jank` takes the drag leg's p95 **16.8 → 100.4** and frames over 100 **0 → 12** with
+12 injected blocks — the recorder is seeing the frames it claims to.
+
+**YouTube 50/80 → 70/80.** Remaining: category 8. Evidence:
+`baselines/cat2-l8-youtube.json`, `cat2-l8-youtube-control.json`, `cat7-youtube-perf.json`.

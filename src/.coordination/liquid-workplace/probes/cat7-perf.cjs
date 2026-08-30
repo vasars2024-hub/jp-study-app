@@ -536,6 +536,64 @@ const SPECS = {
     },
     collection: { container: '.os-set-pane-v2', row: '.os-set-quick-card' },
   },
+  youtube: {
+    title: 'YouTube',
+    root: '.yt-root',
+    heavy: {
+      /*
+       * NAVIGATION, not scrolling, and the reason is measured rather than preferred.
+       * `.yt-list` is the only overflowing box on this surface and it overflows by 603 px;
+       * `scrollProof` REFUSES below 1000 px reached, so a scroll leg here would VOID rather
+       * than score. What this surface actually does at scale is swap destinations: each rail
+       * click unmounts a `<header>`, a fourteen-control preference form and a virtualised
+       * list, and mounts the next destination's. Twelve round trips is 24 mounts.
+       *
+       * Nothing here reaches the network or writes user data. Refresh, Channel, Log and
+       * Download all every call `window.api` and are deliberately not driven — the rubric's
+       * "heaviest real operation" never means "cause a side effect the score does not need".
+       *
+       * The selected destination is persisted state, so the load returns to the one it
+       * started on and the proof REFUSES unless the rail agrees it got there.
+       */
+      label: 'swap every rail destination, twelve times',
+      // 24 ticks at 110 ms is ~2.6 s, plus a 250 ms settle for the restore check.
+      durationMs: 3500,
+      js: `(() => {
+        delete window.__lqYtLoad;
+        const tree = document.querySelector('.yt-tree');
+        if (!tree) return 'REFUSE: no playlist rail';
+        const btns = Array.from(tree.querySelectorAll('.yt-pl-item'));
+        if (btns.length < 2) return 'REFUSE: the rail has ' + btns.length + ' destination(s); a swap needs two';
+        const label = (b) => { const s = b.querySelector('.yt-pl-item-title'); return ((s && s.textContent) || '').trim(); };
+        const activeIndex = btns.findIndex((b) => b.classList.contains('active'));
+        const startIndex = activeIndex < 0 ? 0 : activeIndex;
+        const rec = { dests: btns.length, start: label(btns[startIndex]), ticks: 0, restored: false };
+        window.__lqYtLoad = rec;
+        const total = btns.length * 12;
+        const timer = setInterval(() => {
+          btns[rec.ticks % btns.length].click();
+          rec.ticks += 1;
+          if (rec.ticks >= total) {
+            clearInterval(timer);
+            btns[startIndex].click();
+            setTimeout(() => {
+              const back = document.querySelector('.yt-tree .yt-pl-item.active');
+              rec.restored = !!back && label(back) === rec.start;
+            }, 250);
+          }
+        }, 110);
+        return 'swapping ' + btns.length + ' destinations x12 from ' + rec.start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqYtLoad;
+        if (!r) return 'REFUSE: the load never armed';
+        if (r.ticks < r.dests * 12) return 'REFUSE: only ' + r.ticks + ' of ' + (r.dests * 12) + ' swaps ran';
+        if (!r.restored) return 'REFUSE: the rail did not return to ' + r.start;
+        return r.dests + ' destinations x12 = ' + r.ticks + ' swaps, restored to ' + r.start;
+      })()`,
+    },
+    collection: { container: '.yt-list', row: '.yt-row' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',

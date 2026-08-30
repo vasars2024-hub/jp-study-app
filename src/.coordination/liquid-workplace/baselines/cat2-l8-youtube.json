@@ -1,0 +1,239 @@
+{
+  "label": "l8-youtube",
+  "surface": "@.fwin:has(.yt-root)",
+  "win": "(focused)",
+  "task": "click:.yt-plan-item >> wait:500 >> click:.yt-folder .yt-pl-item >> wait:500 >> click:.yt-prefs-disclosure > summary >> wait:400",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 89,
+    "controlCount": 65,
+    "box": "980x640",
+    "results": 16
+  },
+  "inputCost": {
+    "clicks": 3,
+    "keystrokes": 0,
+    "total": 3
+  },
+  "latencyMs": {
+    "clickRecv": [
+      19.8,
+      66.8,
+      3.2
+    ],
+    "inputRecv": [],
+    "worstRecv": 66.8,
+    "overBar100": 0,
+    "n": 3,
+    "clickStampUnscored": [
+      34.6,
+      81.6,
+      30.6
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 81.6
+  },
+  "steps": [
+    {
+      "step": "click:.yt-plan-item",
+      "target": {
+        "sel": ".yt-plan-item",
+        "label": "Plan to watch0",
+        "disabled": false,
+        "at": "199,200"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.yt-folder .yt-pl-item",
+      "target": {
+        "sel": ".yt-folder .yt-pl-item",
+        "label": "オノマトペゆる言語学ラジオ",
+        "disabled": false,
+        "at": "199,303"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.yt-prefs-disclosure > summary",
+      "target": {
+        "sel": ".yt-prefs-disclosure > summary",
+        "label": "Playlist settings",
+        "disabled": false,
+        "at": "670,199"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.yt-prefs-disclosure > summary",
+    "steps": [
+      "click:.yt-prefs-disclosure > summary"
+    ],
+    "restored": true,
+    "baseHash": "1psfto3",
+    "afterHash": "1psfto3",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "1psfto3",
+      "after": "1psfto3"
+    }
+  },
+  "stepsDriven": 3,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "980x640",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 66.8
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "980x640",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 60.8
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "980x640"
+    },
+    "liquidTotal": 3,
+    "standardTotal": 3
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ]
+}
