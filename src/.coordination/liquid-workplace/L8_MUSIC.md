@@ -240,3 +240,19 @@ The first live run began from an inherited maximized window and therefore revers
 maximize legs; it was not scored. Restoring the product's recorded 1080x700 geometry before the
 rerun produced the passing evidence in `baselines/cat4-l8-music.json`. Honest total is now
 **40/80 banked + category 2 pending**: cat3 + cat4 + cat5 + cat6 are 10 each.
+
+## 2026-08-30 — category 2 re-earned on the current shell; Music is 50/80
+
+The inherited diagnosis was stale: the click snapshot now sees the React commit. The real mismatch
+was the declared churn region — deleting the duplicate transport also deleted `.music-time` and
+`.music-seek`; the surviving clock/seek state lives in `.mc-player-progress`. The idle proof earns
+that selector: raw text/control churn is true in both phases, net churn is false, excluding exactly
+**2 text runs + 1 control**. No harness code changed.
+
+Existing category-2 harness: **PASS 10/10** on **41 controls**. Standard and Liquid each take one
+click, worst receive-to-paint **1.0/1.3ms**, dead ends / modal traps / scroll traps **0/0/0**,
+presentation and 1080x700 geometry restore exactly. Negative controls move all three defect counts
+**0 -> 1 -> 0**. Evidence: `baselines/cat2-l8-music.json`.
+
+Music is now **50/80 banked**: categories 2, 3, 4, 5 and 6 are each controlled 10/10. Category 1
+remains the recorded shared-chrome target-floor finding; categories 7 and 8 are next.
