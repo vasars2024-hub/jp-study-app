@@ -1,0 +1,165 @@
+{
+  "label": "l8-music",
+  "surface": "@.fwin:has(.mc-root)",
+  "win": "main",
+  "task": "click:.music-song:not(.active)",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 76,
+    "controlCount": 51,
+    "box": "1080x700",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      1.3
+    ],
+    "inputRecv": [],
+    "worstRecv": 1.3,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      26.8
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 26.8
+  },
+  "steps": [
+    {
+      "step": "click:.music-song:not(.active)",
+      "target": {
+        "sel": ".music-song:not(.active)",
+        "label": "e2e-audio-jaTemp",
+        "disabled": false,
+        "at": "431,442"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": true,
+      "rawChannels": [
+        "text",
+        "controls"
+      ],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 4,
+        "controls": 2
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": true,
+      "rawChannels": [
+        "text",
+        "controls"
+      ],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 4,
+        "controls": 2
+      }
+    }
+  ],
+  "churn": ".music-time,.music-seek,.mc-player-progress",
+  "undo": null,
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "1080x700",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 1.3
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "1080x700",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 1
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "1080x700"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.6
+    ]
+  }
+}

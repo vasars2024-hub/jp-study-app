@@ -29,7 +29,6 @@ import {
   onLyricsSettingsChanged,
   toggleUseAlbumInSearch,
 } from '../../lyricsSettings';
-import { useDebouncedValue } from '../../hooks';
 import {
   buildMusicTree,
   buildSearchIndex,
@@ -194,7 +193,10 @@ export function useMusic(): MusicState {
     () => buildSearchIndex(baseSongs, (s) => metaMap.get(s.id) ?? guessSongMeta(s)),
     [baseSongs, metaMap],
   );
-  const debouncedQuery = useDebouncedValue(query, 80);
+  // MusicSearchBox commits its lightweight draft after the user pauses, so the library/lyrics/
+  // transport tree does not re-render for every character. Keep the effective query named here
+  // because it is part of MusicState's public shape and downstream search logic reads it.
+  const debouncedQuery = query;
   const searchActive = debouncedQuery.trim().length > 0;
   const searchResults = useMemo(
     () => (searchActive ? searchSongs(searchIndex, debouncedQuery) : []),
@@ -430,6 +432,29 @@ export function MusicSongList({ state }: { state: MusicState }) {
 /** Search field above the list. */
 export function MusicSearchBox({ state }: { state: MusicState }) {
   const { t } = useT();
+  const [draft, setDraft] = useState(state.query);
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+  }, []);
+
+  const updateDraft = (value: string): void => {
+    setDraft(value);
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      commitTimer.current = null;
+      state.setQuery(value);
+    }, 80);
+  };
+
+  const clearDraft = (): void => {
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = null;
+    setDraft('');
+    state.setQuery('');
+  };
+
   return (
     // Filtering the library is a contextual tool over it, not dense work in it,
     // so it takes the Liquid role. Inert until the window is Liquid.
@@ -437,15 +462,15 @@ export function MusicSearchBox({ state }: { state: MusicState }) {
       <Icon name="search" size={13} />
       <input
         type="text"
-        value={state.query}
-        onChange={(e) => state.setQuery(e.target.value)}
+        value={draft}
+        onChange={(e) => updateDraft(e.target.value)}
         placeholder={t('music.search.placeholder')}
         aria-label={t('music.search.ariaLabel')}
       />
-      {state.query && (
+      {draft && (
         <button
           className="music-search-clear"
-          onClick={() => state.setQuery('')}
+          onClick={clearDraft}
           title={t('music.search.clear')}
         >
           ×

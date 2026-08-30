@@ -1,4 +1,4 @@
-# L8 — Music (Media Center), categories 1 and 3
+# L8 — Music (Media Center)
 
 Surface argument for every category harness: `--surface "@.fwin:has(.mc-root)" --win main`.
 Opened from Start → "Music · Media Center · Music". `MediaCenterView` renders the same shell
@@ -22,7 +22,21 @@ Resources recorded both as false-finding generators.
 | --- | --- | --- | --- |
 | 1 accessibility | **PASS 10/10** at `3c460684` | belowFloorByHit 11 → 0, 35 of 37 controls, minRatio 5.00 / 0 failing of 73, WCAG 2.5.8 fails 0, unreachable 0, motion 0 | moved all 5 legs, back to baseline, rectDrift 0 |
 | 3 liquid utilization | **PASS 10/10** | denseWorkOnTranslucent 4 → 0, eligible 6 → 10, treated 10/10, sharedPrimitive 10/10 | one-region and all-glass legs both "FAILED AS REQUIRED" |
-| 2, 4, 5, 6, 7, 8 | not yet scored | — | — |
+| 2 clunkiness | **PASS 10/10** | Standard/Liquid task cost 1:1, worst receive-to-paint 1.3/1.0 ms, dead ends/modal traps/scroll traps 0/0/0 | injected all three defects, then restored 0/0/0 |
+| 4, 5, 6, 7, 8 | not yet scored | — | — |
+
+## 2026-08-30 — category 2 recovered and closed
+
+The interrupted run exposed a real harness false-pass risk: playback advances `.music-time`,
+`.music-seek`, and `.mc-player-progress` without input. The reusable harness now excludes a
+caller-declared churn set only after idle samples prove it moves and prove nothing undeclared
+still moves. Its control restoration also measures native state directly instead of replaying an
+idempotent task. Controlled two-presentation result: **PASS 10/10**.
+
+The first search run separately measured 121.8 ms receive-to-paint. `MusicSearchBox` now owns the
+fast draft and commits once after 80 ms, so the library/lyrics/transport tree no longer re-renders
+per character; the same four-character live run measured **9.6 ms** worst. The scored dominant
+task selects a non-active real song, alternating deterministically across presentations.
 
 ### Three traps, each of which produced a wrong number here first
 

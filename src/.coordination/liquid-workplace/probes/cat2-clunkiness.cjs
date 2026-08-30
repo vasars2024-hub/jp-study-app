@@ -17,7 +17,8 @@
  *   node src/.coordination/liquid-workplace/probes/cat2-clunkiness.cjs \
  *     --surface "Library" [--win main] [--label l6-library] [--out <file>] [--control] \
  *     --task "click:.chip-manga >> wait:400 >> click:.card" \
- *     [--undo "click:.chip-all"] [--result ".card"] [--compare "@.reader"]
+ *     [--undo "click:.chip-all"] [--result ".card"] [--compare "@.reader"] \
+ *     [--churn ".music-time,.music-seek"] [--idle 1600]
  *
  * --surface takes the same two forms as the category-1, -4 and -8 harnesses, deliberately, so a
  * surface is named identically in all four: a leading `@` is a CSS SELECTOR (a section of the main
@@ -101,6 +102,17 @@
  *     target sat above the fold and `POINT` correctly refused it as occluded, so the surface could
  *     not be scored at all. `scroll:` is the second restore primitive: it puts a container back,
  *     and like `clear:` it is UNCOUNTED, because a restore is not a gesture the user spends.
+ * 19. A SURFACE THAT CHANGES ON ITS OWN SCORES EVERY STEP AS LIVE, so it reports zero dead ends
+ *     no matter what you drive at it. Music's transport is the first one here: once a track plays,
+ *     the elapsed-time text ticks once a second and the seek slider's own `value` advances, so two
+ *     snapshots taken a second apart with NOTHING driven already differ on both the text and the
+ *     control channel. That is a false-pass generator, not a nuisance - correction 3 says a dead
+ *     end is a driven result, and this makes every driven result look alive. `--churn "<css,...>"`
+ *     names the self-changing regions and they are dropped from textHash, stateHash and
+ *     controlHash (still counted in textRuns/controlCount, so an empty surface cannot hide behind
+ *     it). The exclusion is never taken on trust: the IDLE LEG samples the surface twice `--idle`
+ *     ms apart with no input, at rest AND after the task, and VOIDs the run if anything UNDECLARED
+ *     still moves, or if `--churn` excluded regions that never moved in either phase.
  * 10. A COMMENT INSIDE THE IN-PAGE TEMPLATE LITERAL MUST CONTAIN NO BACKTICK AND NO DOLLAR-BRACE.
  *     Both are a SyntaxError in the harness rather than in the browser, so the failure names the
  *     wrong file. Same trap the category-8 harness records.
@@ -136,6 +148,11 @@ const RESULT_SEL = arg('result', '');
 const COMPARE = arg('compare', '');
 // Correction 12: drive the same task in BOTH presentations of the same window.
 const BOTH = has('both-presentations');
+// Correction 19: the self-changing regions of this surface, as a CSS selector list. Declared by
+// the caller, PROVEN by the idle leg - never taken on trust, and never a free exclusion.
+const CHURN = arg('churn', '');
+// Long enough that a once-a-second clock is certain to tick inside the window.
+const IDLE_MS = Number(arg('idle', '1600')) || 1600;
 const SETTLE = Number(arg('settle', '600')) || 600;
 
 if (!SURFACE) {
@@ -222,11 +239,26 @@ const ARM = (surface) => `(function(){
  * One snapshot. Correction 4: the change signal is wider than text, because a step that opens a
  * dialog, moves focus, scrolls, or only greys a button changes no text at all.
  */
-const SNAP = (surface) => `(function(){
+const SNAP = (surface, churn = CHURN) => `(function(){
   var root = ${rootExpr(surface)};
   if (!root) return JSON.stringify({ rootGone: true });
   var WR = root.getBoundingClientRect();
   if (!WR.width || !WR.height) return JSON.stringify({ refuse: 'surface is 0x0 - refusing to record zeros' });
+
+  // Correction 19: A SURFACE THAT CHANGES ON ITS OWN SCORES EVERY STEP AS LIVE. Anything the
+  // churn set names is dropped from the text, state and control accumulators. The set is never
+  // taken on trust - the idle leg in measure() proves each declared selector really does churn
+  // and that nothing UNDECLARED still churns, and VOIDs the run otherwise.
+  var churnSel = ${JSON.stringify(churn)};
+  var churnEls = new Set();
+  if (churnSel) {
+    var cq = root.querySelectorAll(churnSel);
+    for (var ci = 0; ci < cq.length; ci++) churnEls.add(cq[ci]);
+  }
+  function inChurn(e){
+    for (var a = e; a && a !== root.parentElement; a = a.parentElement) if (churnEls.has(a)) return true;
+    return false;
+  }
 
   function painted(e){
     return typeof e.checkVisibility === 'function'
@@ -258,23 +290,30 @@ const SNAP = (surface) => `(function(){
     return null;
   }
 
-  var textAcc = [], stateAcc = [], liveAcc = [], runs = 0;
+  var textAcc = [], stateAcc = [], liveAcc = [], runs = 0, churnRuns = 0;
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (var t = tw.nextNode(); t; t = tw.nextNode()) {
     var s = t.nodeValue && t.nodeValue.trim();
     if (!s || !t.parentElement || !painted(t.parentElement)) continue;
-    runs++; textAcc.push(s);
+    runs++;
+    // Counted in textRuns - the surface is not empty just because part of it ticks - but kept
+    // out of every hash, so a clock cannot make a dead end look live.
+    if (inChurn(t.parentElement)) { churnRuns++; continue; }
+    textAcc.push(s);
     var owner = liveOwner(t.parentElement);
     if (owner) liveAcc.push(name(owner) + '|' + s.slice(0, 80));
     else stateAcc.push(s);
   }
 
-  var ctrlAcc = [], ctrlCount = 0;
+  var ctrlAcc = [], ctrlCount = 0, churnCtrls = 0;
   var ctrls = root.querySelectorAll('button,a[href],input,select,textarea,[role="button"],[role="tab"],[role="switch"],[role="menuitem"]');
   for (var i = 0; i < ctrls.length; i++) {
     var c = ctrls[i];
     if (!painted(c)) continue;
     ctrlCount++;
+    // Correction 19 again, on the control channel: a seek slider's own \`value\` advances with
+    // playback, so a control inventory taken a second apart differs with nothing driven.
+    if (inChurn(c)) { churnCtrls++; continue; }
     var dis = c.disabled === true || c.getAttribute('aria-disabled') === 'true';
     ctrlAcc.push(name(c) + '|' + (c.textContent || '').trim().slice(0, 24) + '|' + (dis ? 'D' : 'E')
       + '|' + (c.getAttribute('aria-selected') || '') + '|' + (c.getAttribute('aria-expanded') || '')
@@ -323,6 +362,8 @@ const SNAP = (surface) => `(function(){
   var ae = document.activeElement;
   return JSON.stringify({
     textRuns: runs,
+    churnTextRuns: churnRuns,
+    churnControls: churnCtrls,
     textHash: hash(textAcc.join('\\u0001')),
     stateHash: hash(stateAcc.join('\\u0001')),
     liveRegions: liveAcc,
@@ -552,7 +593,7 @@ async function raise(surface) {
 
 const parseSteps = (spec) => (spec ? spec.split('>>').map((s) => s.trim()).filter(Boolean) : []);
 
-const snapOf = async (surface) => JSON.parse(await ev(SNAP(surface)));
+const snapOf = async (surface, churn = CHURN) => JSON.parse(await ev(SNAP(surface, churn)));
 
 /**
  * Correction 4: a step is live if ANY channel moved. Reported per channel so a next worker can see
@@ -733,7 +774,47 @@ async function modalLeg(surface, snap) {
   return { traps, closedByEscape: closed };
 }
 
-async function measure(surface, taskSpec, undoSpec = UNDO) {
+/**
+ * Correction 19's proof, and the reason `--churn` is not a licence to exclude whatever is
+ * inconvenient. Two snapshots `IDLE_MS` apart with NOTHING driven between them:
+ *   raw  - churn set ignored. If this moves, the surface genuinely changes on its own.
+ *   net  - churn set applied. If this still moves, something UNDECLARED changes on its own and
+ *          the dead-end signal is not valid on this surface, so the run VOIDs.
+ * An exclusion is EARNED only if `raw` moved in at least one phase; a `--churn` that never
+ * excluded a real change is a silent widening of the pass band and VOIDs the run too.
+ */
+async function idleLeg(surface, phase) {
+  const rawA = await snapOf(surface, '');
+  await sleep(IDLE_MS);
+  const rawB = await snapOf(surface, '');
+  if (rawA.refuse || rawB.refuse || rawA.rootGone || rawB.rootGone) {
+    return { phase, refuse: rawA.refuse || rawB.refuse || 'root gone during idle sample' };
+  }
+  const raw = movedBetween(rawA, rawB);
+  let net = raw;
+  let excluded = { textRuns: 0, controls: 0 };
+  if (CHURN) {
+    const a = await snapOf(surface);
+    await sleep(IDLE_MS);
+    const b = await snapOf(surface);
+    if (a.refuse || b.refuse || a.rootGone || b.rootGone) {
+      return { phase, refuse: a.refuse || b.refuse || 'root gone during idle sample' };
+    }
+    net = movedBetween(a, b);
+    excluded = { textRuns: a.churnTextRuns, controls: a.churnControls };
+  }
+  return {
+    phase,
+    idleMs: IDLE_MS,
+    rawChurns: raw.any,
+    rawChannels: Object.keys(raw).filter((k) => k !== 'any' && raw[k]),
+    netChurns: net.any,
+    netChannels: Object.keys(net).filter((k) => k !== 'any' && net[k]),
+    excluded,
+  };
+}
+
+async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   const raised = await raise(surface);
   const armed = JSON.parse(await ev(ARM(surface)));
   if (armed.refuse) return { refuse: armed.refuse };
@@ -759,6 +840,10 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
   // Correction 8's sibling: an empty surface has not been measured; the rubric caps it at 0.
   if (base.textRuns === 0) return { refuse: '0 rendered text runs; an empty surface scores 0, not 10' };
 
+  // Correction 19: sampled at rest AND after the task, because a surface can be still until the
+  // task starts something - a transport clock only ticks once a track is playing.
+  const idle = withIdle ? [await idleLeg(surface, 'resting')] : [];
+
   const task = taskSpec ? await runTask(surface, taskSpec) : { steps: [], last: base };
   if (task.refuse) { await ev(DISARM); return { refuse: `task: ${task.refuse}`, partial: task.steps }; }
 
@@ -766,6 +851,7 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
   const modal = await modalLeg(surface, end);
   // Read the cost BEFORE the undo, or the restore's own clicks land in the measured total.
   const cost = JSON.parse(await ev(READ));
+  if (withIdle) idle.push(await idleLeg(surface, 'after-task'));
 
   // Correction 13: the undo runs UNMEASURED, after the cost is banked, and its success is asserted
   // on the surface's own base text hash. The presentation leg drives the same task twice by
@@ -792,6 +878,7 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
   return {
     raised,
     normalisedBeforeBaseline: normalised,
+    idle,
     undo,
     presentation: base.presentation,
     base: { textRuns: base.textRuns, controlCount: base.controlCount, box: base.box, results: base.results },
@@ -810,13 +897,25 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
 /* --------------------------------------------------------------------- main */
 
 (async () => {
-  const m = await measure(SURFACE, TASK);
+  const m = await measure(SURFACE, TASK, UNDO, true);
   if (m.refuse) {
     console.error(`REFUSE - ${m.refuse}${m.partial ? ` (drove ${m.partial.length} step(s))` : ''}`);
     process.exit(2);
   }
   if (m.undo && !m.undo.restored) {
     console.error(`VOID - undo did not restore the surface: ${JSON.stringify(m.undo)}`);
+    process.exit(3);
+  }
+  // Correction 19's two verdicts, both of which VOID rather than quietly score.
+  const idleBad = (m.idle || []).filter((p) => p.refuse || p.netChurns);
+  if (idleBad.length) {
+    console.error(`VOID - the surface changes with no input and the change is not declared; `
+      + `every step reads as live and no dead end can be seen: ${JSON.stringify(idleBad)}`);
+    process.exit(3);
+  }
+  if (CHURN && !(m.idle || []).some((p) => p.rawChurns)) {
+    console.error(`VOID - --churn "${CHURN}" excluded regions that never changed on their own in `
+      + `either idle phase; an unearned exclusion widens the pass band: ${JSON.stringify(m.idle)}`);
     process.exit(3);
   }
 
@@ -902,6 +1001,8 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
       worstStampUnscored: m.cost.worstStampUnscored,
     },
     steps: m.steps,
+    idle: m.idle,
+    churn: CHURN || null,
     undo: m.undo,
     stepsDriven: drove,
     deadEndCount: m.deadEnds.length,
@@ -936,10 +1037,12 @@ async function measure(surface, taskSpec, undoSpec = UNDO) {
     // here. On a disclosure path it inverted the surface: clicking the injected dead-end changed
     // nothing, then `click:.collapse-header` opened the workbench and stranded it there while the
     // control still reported `backToBaseline: true`. Removing the injected nodes is this sub-run's
-    // restore; the real task+undo is driven again below and proves the surface round trip.
+    // restore. The real task+undo was already driven by the scored run above. Replaying TASK from
+    // its post-task state manufactures a dead end on idempotent paths (for example typing the same
+    // Music search twice), so the restoration leg measures the unchanged native state directly.
     const dirty = await measure(SURFACE, 'click:[data-lqcat2-deadend]', '');
     await ev(CONTROL_REMOVE);
-    const restored = await measure(SURFACE, TASK);
+    const restored = await measure(SURFACE, '', '');
     const moved = {
       // (a) the handler-less button must come back as a dead end
       deadEnd: !dirty.refuse && dirty.deadEnds.length > m.deadEnds.length,
