@@ -25,6 +25,7 @@ import SettingsCard from './SettingsCard';
 import PreviewStage from './PreviewStage';
 import { THEMES } from '../../theme';
 import { DEFAULT_THEME_ID } from '../../theme/engine';
+import { firstReason } from '../../../shared/disabledReason';
 import {
   ACCENT_PRESETS,
   personalizationVisuals,
@@ -141,6 +142,11 @@ export default function AppearancePreviewCard({
     return translated === key ? fallback : translated;
   };
 
+  // Category 8, "honest states". Reset and Apply are off until the draft diverges, and
+  // an untouched draft looks exactly like a live one — so without this the pair reads as
+  // two broken buttons. The reason IS the disabled value, so they cannot disagree.
+  const whyNothingToApply = firstReason([!touched, t('settings.preview.why.noChanges')]);
+
   return (
     <SettingsCard
       id="appearance-preview"
@@ -217,7 +223,8 @@ export default function AppearancePreviewCard({
             <button
               type="button"
               className="btn small"
-              disabled={!touched}
+              disabled={!!whyNothingToApply}
+              title={whyNothingToApply}
               onClick={() => {
                 setTouched(false);
                 setDraft(look);
@@ -229,7 +236,8 @@ export default function AppearancePreviewCard({
             <button
               type="button"
               className="btn small primary"
-              disabled={!touched}
+              disabled={!!whyNothingToApply}
+              title={whyNothingToApply}
               onClick={() => {
                 onApply(draft, draftTheme);
                 setTouched(false);

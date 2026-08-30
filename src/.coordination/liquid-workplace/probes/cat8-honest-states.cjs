@@ -578,11 +578,40 @@ async function driveLeg(base) {
   if (driven.refuse) { await ev(setInput(DRIVE_INPUT, set.was)); return { refuse: `driven: ${driven.refuse}` }; }
   const back = JSON.parse(await ev(setInput(DRIVE_INPUT, set.was)));
   await sleep(600);
-  const restored = await run();
+  let restored = await run();
+  /*
+   * CORRECTION 21 — RESTORING AN INPUT'S VALUE IS NOT RESTORING THE SURFACE.
+   *
+   * A combobox opens its listbox on input and closes it on blur. This driver never blurs
+   * (it writes `.value` and dispatches `input`), so on Settings the panel was still open
+   * with an empty query after the value came back: 258 painted runs against a 257-run
+   * baseline, `restored: false`, and the whole run VOIDed on a surface with no defect.
+   * The state it had just measured — a real "No matching settings" empty message — was
+   * thrown away with it.
+   *
+   * Escape is the one gesture every disclosure in this app honours (`SettingsSearch`,
+   * `.scr-search`, the command palette), and it is synchronous. It is sent ONLY when the
+   * surface has not already come back, so a run that never opened anything is byte-identical
+   * to every baseline taken before this correction, and the second reading is reported as
+   * `restoredAfterEscape` rather than folded into `restored` — if Escape is what fixed it,
+   * the record says so.
+   */
+  let restoredAfterEscape = null;
+  if (restored.textHash !== base.textHash) {
+    await ev(`(function(){var e=document.querySelector(${JSON.stringify(DRIVE_INPUT)});`
+      + 'if(!e)return "absent";'
+      + 'e.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,cancelable:true,key:"Escape"}));'
+      + 'return "escaped"})()');
+    await sleep(600);
+    const second = await run();
+    restoredAfterEscape = second.textHash === base.textHash;
+    if (restoredAfterEscape) restored = second;
+  }
   return {
     input: DRIVE_INPUT,
     value: DRIVE_VALUE,
     originalValue: set.was,
+    restoredAfterEscape,
     // A drive that changed nothing has not driven anything; scoring its states would be fabrication.
     surfaceChanged: driven.textHash !== base.textHash,
     restored: restored.textHash === base.textHash && back.now === set.was,

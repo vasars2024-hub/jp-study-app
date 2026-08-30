@@ -38,6 +38,10 @@ import {
   onUiCustomizationChanged,
   saveUiCustomizationDocument,
 } from '../../../uiCustomizationStore';
+// Rubric category 8: a disabled control must be able to say what would turn it back
+// on. `firstReason` makes the reason and the `disabled` value one expression, so they
+// cannot drift — every site below spends it as `disabled={!!why} title={why}`.
+import { firstReason } from '../../../../shared/disabledReason';
 
 const TOKEN_GROUPS: UiTokenGroup[] = ['color', 'typography', 'spacing', 'radius', 'shadow', 'motion', 'density'];
 const COMPONENTS: UiComponentId[] = ['mediaCard', 'subtitlePanel', 'vocabularyCard'];
@@ -66,6 +70,19 @@ export default function ThemeStudioPanel() {
 
   const cssReview = useMemo(() => reviewCustomCss(cssDraft), [cssDraft]);
   const generatedCss = useMemo(() => profileToCss(profile), [profile]);
+
+  // Category 8, "honest states": every control that can be off says what would turn it
+  // back on, and the reason IS the disabled value so the two cannot disagree. Measured
+  // before this landed — six of this panel's controls were mute, and the harness could
+  // not tell them from a broken feature.
+  const whyNoPreview = firstReason([!request.trim(), t('theme.why.noRequest')]);
+  const whyNoApplyPlan = firstReason([!plan || !plan.intents.length, t('theme.why.noPlan')]);
+  const whyNoCreate = firstReason([!newThemeName.trim(), t('theme.why.noName')]);
+  const whyNoUndo = firstReason([!profile.history.length, t('theme.why.noHistory')]);
+  const whyNoDelete = firstReason([profile.builtIn, t('theme.why.builtIn')]);
+  const whyNoCssToggle = firstReason([!profile.customCss, t('theme.why.noCustomCss')]);
+  const whyNoCssSave = firstReason([!cssReview.safe, t('theme.why.cssUnsafe')]);
+  const whyNoImport = firstReason([!portableJson.trim(), t('theme.why.noPortable')]);
 
   const commit = (next: UiCustomizationDocument, note?: string) => {
     setMessage(note ?? null);
@@ -96,7 +113,8 @@ export default function ThemeStudioPanel() {
           />
           <button
             type="button"
-            disabled={!request.trim()}
+            disabled={!!whyNoPreview}
+            title={whyNoPreview}
             onClick={() => {
               const next = interpretUiRequest(request, profile.tokens);
               setPlan(next);
@@ -132,7 +150,8 @@ export default function ThemeStudioPanel() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={!plan.intents.length}
+                disabled={!!whyNoApplyPlan}
+                title={whyNoApplyPlan}
                 onClick={() => {
                   const next = applyUiPlan(document_, plan, { now: nowIso(), versionId: nextUiId('v') });
                   setPlan(null);
@@ -187,7 +206,8 @@ export default function ThemeStudioPanel() {
           />
           <button
             type="button"
-            disabled={!newThemeName.trim()}
+            disabled={!!whyNoCreate}
+            title={whyNoCreate}
             onClick={() => guard(() => {
               // A new theme starts from what is on screen now, so "create a custom
               // theme" keeps the look the user already tuned instead of resetting it.
@@ -208,7 +228,8 @@ export default function ThemeStudioPanel() {
           <button
             type="button"
             className="sp-seg-btn"
-            disabled={!profile.history.length}
+            disabled={!!whyNoUndo}
+            title={whyNoUndo}
             onClick={() => guard(
               () => undoUiChange(document_, profile.id, { now: nowIso(), versionId: nextUiId('v') }),
               t('theme.msg.undone'),
@@ -229,7 +250,8 @@ export default function ThemeStudioPanel() {
           <button
             type="button"
             className="sp-seg-btn"
-            disabled={profile.builtIn}
+            disabled={!!whyNoDelete}
+            title={whyNoDelete}
             onClick={() => guard(() => deleteUiProfile(document_, profile.id), t('theme.msg.deleted'))}
           >
             {t('theme.deleteTheme')}
@@ -364,7 +386,8 @@ export default function ThemeStudioPanel() {
           <input
             type="checkbox"
             checked={profile.customCssEnabled}
-            disabled={!profile.customCss}
+            disabled={!!whyNoCssToggle}
+            title={whyNoCssToggle}
             onChange={(event) => guard(
               () => setUiCustomCssEnabled(document_, profile.id, event.currentTarget.checked, nowIso()),
             )}
@@ -388,7 +411,8 @@ export default function ThemeStudioPanel() {
         <button
           type="button"
           className="btn primary"
-          disabled={!cssReview.safe}
+          disabled={!!whyNoCssSave}
+          title={whyNoCssSave}
           onClick={() => {
             const result = setUiCustomCss(document_, profile.id, cssDraft, {
               now: nowIso(),
@@ -459,7 +483,8 @@ export default function ThemeStudioPanel() {
           <button
             type="button"
             className="btn primary"
-            disabled={!portableJson.trim()}
+            disabled={!!whyNoImport}
+            title={whyNoImport}
             onClick={() => {
               try {
                 const result = importUiTheme(document_, JSON.parse(portableJson), {

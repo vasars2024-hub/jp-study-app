@@ -921,3 +921,49 @@ is one app, Appearance is a real state of it, and it is the denser page.
 Settings stands at **1, 3, 4, 5, 6, 7 closed; 2 banked before this tree; 8 open** — 70/80.
 Evidence: `baselines/cat5-l8-settings.json`, `cat5-l8-settings-control.json`,
 `cat6-l8-settings.json`, `cat7-settings-perf.json`, `cat8-l8-settings.json`.
+
+## 2026-08-30 · primary — Settings CLOSES at 80/80: category 8 repaired, category 2 re-earned
+
+**Category 8 — FAIL → PASS 10/10, and the fix is product code.** `mutePairs` **8 → 0**. Every
+disabled control on Appearance and Theme Studio now derives its reason from the first failing
+clause and spends it as both `disabled` and `title`, so the two cannot drift: Reset/Apply
+(`!touched`), Preview, Apply-plan, Create, Undo, Delete, the custom-CSS toggle, Save-CSS and
+Import — 10 sites, 8 of them painted and counted. `firstReason` moved out of
+`scraper/disabledReason.ts` into `shared/disabledReason.ts` (pure, no strings) and the Scraper
+module re-exports it, so there is one implementation and every Scraper import is unchanged.
+9 new keys in EN/JA/ZH/RU; `i18n-check` **11,769** exit 0.
+
+Other cat8 numbers: `rawKeys` **0**, `placeholders` **0**, 257 painted runs, four languages
+with **4 distinct hashes** and `diffShare` **0.611**, language restored to `en`. `statesNamed`
+**1 of 1 observable** — the empty state is DRIVEN (`--drive-input .os-set-search-input
+--drive-value zzzqqqxyzzy`) and renders "No matching settings"; loading/error/offline are
+`notObservable` on this surface and correctly excluded from the denominator. Control:
+rawKeys/placeholders/mutePairs **0/0/0 → 1/1/1 → 0/0/0**, returned.
+
+HARNESS CORRECTION 21, and it VOIDed a clean run before it landed: **restoring an input's value
+is not restoring the surface.** `SettingsSearch` opens its listbox on input and closes it on
+blur; this driver writes `.value` and dispatches `input`, so it never blurs. The panel stayed
+open with an empty query — 258 painted runs against a 257-run baseline, `restored: false`, and
+the real "No matching settings" measurement was discarded with it. Escape is now sent ONLY when
+the surface has not already come back, and the second reading is reported as
+`restoredAfterEscape` rather than folded into `restored`, so every baseline taken before this
+correction is bit-identical and a reader can see when Escape is what fixed it.
+
+Also measured, and it is why the title form was abandoned mid-run: `--surface "Settings"` cannot
+survive its own four-language leg, because the window title localizes. Scored on
+`@.fwin:has(.os-settings-v2)`.
+
+**Category 2 — PASS 10/10, re-run at this tree per Carry 19, not inherited.** Task is the
+dominant one, search → open a result: `deadEnds` **0**, `modalTraps` **0**, `scrollTraps` **0**,
+worst renderer-side latency **35.6 ms** over 7 measured inputs with **0 over the 100 ms bar**.
+`costParity` measured with `--both-presentations` on the same window and geometry: Standard
+**7** inputs, Liquid **7**, dead ends 0 in both, worst 35.6 vs 31.9 ms, presentation restored
+to `standard` at an identical `960x680`. Control moved all three counts 0→1→0 and returned;
+the inert-click floor read **0.4 ms**.
+
+**Settings is 80/80 — 1, 2, 3, 4, 5, 6, 7, 8 all closed and all measured at this tree.**
+Surface left as found: Home, Standard presentation, search collapsed, `960x680`.
+Regression: `settingsLiquidRegions.test.tsx` **10/10** — the new case parses both sources and
+fails any `disabled={...}` not immediately followed by `title={sameWhy}`.
+Evidence: `baselines/cat8-l8-settings.json`, `cat8-l8-settings-control.json`,
+`cat2-l8-settings.json`.

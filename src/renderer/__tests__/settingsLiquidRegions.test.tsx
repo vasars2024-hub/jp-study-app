@@ -31,6 +31,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SettingsNav from '../components/settings/SettingsNav';
+import { firstReason } from '../../shared/disabledReason';
 
 const RENDERER = resolve(__dirname, '..');
 const read = (...parts: string[]) => readFileSync(resolve(RENDERER, ...parts), 'utf8');
@@ -232,6 +233,35 @@ describe('Settings — Liquid region roles', () => {
       expect(b.getAttribute('aria-label'), 'no aria-label overrides the span').toBeNull();
       expect((b.querySelector('span:not([class])')?.textContent ?? '').length).toBeGreaterThan(0);
     }
+  });
+
+  it('never leaves a settings control disabled without saying why', () => {
+    // Category 8, "honest states". Measured 2026-08-30 on Settings > Appearance: 8 painted
+    // disabled controls, none of them explaining itself, and the harness cannot tell a mute
+    // pair from a broken feature. `firstReason` makes the reason and the `disabled` value one
+    // expression; this pins that every site spends both halves.
+    for (const rel of [
+      'components/settings/pages/ThemeStudioPanel.tsx',
+      'components/settings/AppearancePreviewCard.tsx',
+    ]) {
+      const src = read(...rel.split('/'));
+      const lines = src.split('\n');
+      const offenders: string[] = [];
+      lines.forEach((line, i) => {
+        const m = line.match(/^\s*disabled=\{(.+)\}\s*$/);
+        if (!m) return;
+        // The honest shape is `disabled={!!whyX}` immediately followed by `title={whyX}`.
+        const why = m[1].startsWith('!!') ? m[1].slice(2) : null;
+        const next = (lines[i + 1] ?? '').trim();
+        if (!why || next !== `title={${why}}`) offenders.push(`${rel}:${i + 1} ${line.trim()}`);
+      });
+      expect(offenders, `${rel} has a disabled control with no reason`).toEqual([]);
+    }
+
+    expect(firstReason([false, 'a'], [false, 'b']), 'nothing blocking reads undefined')
+      .toBeUndefined();
+    expect(firstReason([false, 'a'], [true, 'b'], [true, 'c']), 'the FIRST blocking clause wins')
+      .toBe('b');
   });
 
   it('lets the home grids fall below their fixed track width', () => {

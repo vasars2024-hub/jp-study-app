@@ -1,43 +1,57 @@
 {
   "label": "l8-settings",
-  "surface": "Settings",
+  "surface": "@.fwin:has(.os-settings-v2)",
   "win": "main",
-  "task": "click:.os-set-nav-list .os-set-nav-item",
+  "task": "click:.os-set-search-input >> type:.os-set-search-input=theme >> wait:500 >> click:.os-set-search-item",
   "presentation": "standard",
-  "raised": "already-on-top",
+  "raised": "root surface - no taskbar button",
   "base": {
     "textRuns": 72,
     "controlCount": 45,
     "box": "960x680",
-    "results": null
+    "results": 0
   },
   "inputCost": {
-    "clicks": 1,
-    "keystrokes": 0,
-    "total": 1
+    "clicks": 2,
+    "keystrokes": 5,
+    "total": 7
   },
   "latencyMs": {
     "clickRecv": [
-      97.1
+      0.3,
+      22.8
     ],
-    "inputRecv": [],
-    "worstRecv": 97.1,
+    "inputRecv": [
+      35.6,
+      25.1,
+      13.8,
+      6.1,
+      3.3
+    ],
+    "worstRecv": 35.6,
     "overBar100": 0,
-    "n": 1,
+    "n": 7,
     "clickStampUnscored": [
-      200.3
+      58.1,
+      61.1
     ],
-    "inputStampUnscored": [],
-    "worstStampUnscored": 200.3
+    "inputStampUnscored": [
+      35.9,
+      25.5,
+      13.9,
+      6.2,
+      3.4
+    ],
+    "worstStampUnscored": 61.1
   },
   "steps": [
     {
-      "step": "click:.os-set-nav-list .os-set-nav-item",
+      "step": "click:.os-set-search-input",
       "target": {
-        "sel": ".os-set-nav-list .os-set-nav-item",
-        "label": "Appearance",
+        "sel": ".os-set-search-input",
+        "label": "",
         "disabled": false,
-        "at": "169,262"
+        "at": "540,94"
       },
       "counted": true,
       "moved": {
@@ -46,6 +60,63 @@
         "results": false,
         "dialogs": false,
         "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "type:.os-set-search-input=theme",
+      "target": {
+        "sel": ".os-set-search-input",
+        "text": "theme",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.os-set-search-item",
+      "target": {
+        "sel": ".os-set-search-item",
+        "label": "ThemePersonalization · Light, dark, and ",
+        "disabled": false,
+        "at": "540,150"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": true,
         "focus": false,
         "box": false,
         "any": true
@@ -81,21 +152,23 @@
   ],
   "churn": null,
   "undo": {
-    "spec": "click:.os-set-nav-v2 > .os-set-nav-item",
+    "spec": "clear:.os-set-search-input >> key:Escape >> click:.os-set-nav-item",
     "steps": [
-      "click:.os-set-nav-v2 > .os-set-nav-item"
+      "clear:.os-set-search-input",
+      "key:Escape",
+      "click:.os-set-nav-item"
     ],
     "restored": true,
-    "baseHash": "1nrxrif",
-    "afterHash": "1nrxrif",
+    "baseHash": "asyftl",
+    "afterHash": "asyftl",
     "liveRegionsBefore": [],
     "liveRegionsAfter": [],
     "textHashRoundTrip": {
-      "base": "1nrxrif",
-      "after": "1nrxrif"
+      "base": "asyftl",
+      "after": "asyftl"
     }
   },
-  "stepsDriven": 1,
+  "stepsDriven": 3,
   "deadEndCount": 0,
   "deadEnds": [],
   "scrollTrapCount": 0,
@@ -108,16 +181,16 @@
     "first": {
       "presentation": "standard",
       "box": "960x680",
-      "total": 1,
+      "total": 7,
       "deadEnds": 0,
-      "worstRecv": 97.1
+      "worstRecv": 35.6
     },
     "second": {
       "presentation": "liquid",
       "box": "960x680",
-      "total": 1,
+      "total": 7,
       "deadEnds": 0,
-      "worstRecv": 31.6
+      "worstRecv": 31.9
     },
     "restored": true,
     "restoredTo": {
@@ -125,8 +198,8 @@
       "pressed": "false",
       "box": "960x680"
     },
-    "liquidTotal": 1,
-    "standardTotal": 1
+    "liquidTotal": 7,
+    "standardTotal": 7
   },
   "bars": {
     "deadEnds": true,

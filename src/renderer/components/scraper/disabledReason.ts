@@ -14,17 +14,11 @@
 import type { AcquisitionSubsystemStatus } from '../../../shared/acquisition';
 import { sx, sxss } from './strings';
 
-/** A guard clause: whether it is blocking, and what to say when it is. */
-export type ReasonCheck = readonly [blocked: boolean, reason: string];
-
-/**
- * The first blocking clause, in the order the call site lists them — so the
- * order IS the precedence, and the most actionable cause goes first.
- */
-export function firstReason(...checks: ReasonCheck[]): string | undefined {
-  for (const [blocked, reason] of checks) if (blocked) return reason;
-  return undefined;
-}
+// `firstReason` moved to `shared/disabledReason.ts` when Settings needed the same
+// expression: it is pure and carries no strings, so one implementation serves both
+// surfaces. Re-exported here so every Scraper call site keeps its import.
+export { firstReason } from '../../../shared/disabledReason';
+export type { ReasonCheck } from '../../../shared/disabledReason';
 
 /**
  * The Seanime sidecar already reports its own message per engine, and that is a
