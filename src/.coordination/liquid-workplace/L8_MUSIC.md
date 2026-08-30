@@ -183,3 +183,44 @@ collapsed `<details>` — which also closes the `collapsedDisclosures >= 1` term
 the number Q4 should be scored on, with the shell reported separately the way `.fwin-bar`
 already is, or Q4 is PARKED at 9/10 with this arithmetic attached. **Decide it with the
 numbers in hand, do not re-derive them.** Do not silently move the bar to 40.
+
+## 2026-08-30 — Q4 closes 10/10; category 4 REGRESSES; the honest total drops 49 -> 30 + 1 pending
+
+Commit `da07ac39`. The duplicated transport is gone: `.music-controls` no longer renders in the
+Media Center, Like moved onto `.mc-playerbar`, link import is a collapsed `<details>`, queue rows
+take `mc-track-row`. Unflagged harness, live, at rest: **scanned 40 -> 28, collapsed 0 -> 1**
+(`baselines/cat5-l8-music-q4raw.json`).
+
+**The Q4 decision, made with the numbers and not silently.** 25 of the 28 are `.mc-sidebar`,
+`.mc-topbar`, `.mc-playerbar`. The harness already refuses to charge a surface for `.fwin-bar`;
+`--shell-chrome` extends that same rule to selectors a run NAMES. Default empty, so all 17 earlier
+baselines are bit-identical under it, `shellControls`/`shellChromeSelector` land in the snapshot so
+a reader can add them back, and `<=12` does not move. **Category 5 PASS 10/10**, ten YES, page-
+scanned **8**, shell **25** reported separately; control fired on Q2/Q3/Q5/Q10, store identical,
+scroll 0.
+
+**Category 6 re-run, not inherited** — its `transport` row addressed the deleted element. Same
+question, surviving elements, plus a NEW `like` row: **10/10 both presentations, 10 mutations each
+falling exactly its own row, 0 unexpected, round trip 0 diffs.** One row stronger than the 9.
+
+**Category 4 now FAILS and this commit caused it.** `deadRegionPctOfViewport` bar is `<=15`.
+Maximized 1264x765: **8 -> 17**, dead box `252x329 at grid 21,0` -> **`1073x164 at grid 6,23`**.
+Default: 4.7 -> 8.5 (passing). Removing a ~50px row from `.mc-music-now` let the empty lyric frame,
+the 2-row library and the 2-row queue line up into ONE full-width band. Measured, not argued: the
+live box chain has no structural gap — layout 234-659, page ends 675, bar 675-753. The fix is a
+design slice, not a patch: **give the now-playing pane something to do with the space the transport
+vacated** (the album stage is a fixed 66px at every size). That is the next slice.
+
+**Category 2 is PENDING RE-MEASURE, not banked.** Its committed 10/10 measured a surface with 51
+controls; this one has 41. Two re-runs: `wait:800` in the task fixed latency (232.8 -> 49.3 ms,
+overBar100 1 -> 0), but `deadEnds` stays 1 and it is an INSTRUMENT artifact. Driven by hand through
+the same synthetic `.click()`, selecting a song moves three fields — `.mc-album-copy h2`,
+`.mc-player-info strong`, `.music-song.active` — hana13 -> e2e-audio-ja on all three. The probe's
+`after` shot lands before React commits. One repair attempt was spent; do not re-argue it, fix the
+snapshot timing. The committed baseline was restored so nothing false is banked either way.
+
+**The total, with the arithmetic, because 49 was the flattering number.** Was 49 = cat2 10 + cat3
+10 + cat4 10 + cat5 9 + cat6 10. Now **30 = cat3 10 + cat5 10 + cat6 10**; cat2's 10 moved to
+PENDING, cat4's 10 went to 0. cat1 stays FAIL (`targets32`, 15 controls under 32px, five of them
+`button.fwin-b` at 24px — shared window chrome). cat7/cat8 unmeasured. **Music: 30/80 banked, 10
+pending, 40 not yet earned.**
