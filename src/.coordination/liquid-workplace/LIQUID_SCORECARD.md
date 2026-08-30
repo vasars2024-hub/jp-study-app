@@ -726,3 +726,17 @@ Restart before main-process measurement: yes — the unchanged main had a real l
 Lowest category: tied at 10/10. The last product failure was category 1's **26.5 px** disclosure
 button; fixed to 32 px in `b6e55253`. Instruments: shared `css-measure`, `jp-bridge`, parity,
 performance, and honest-state harnesses. Receipts are the `cat*-l7-games*.json` baselines.
+## 2026-08-30 · codexB — Settings category 1 closes at 10/10
+
+Reused `cat1-accessibility.cjs` unchanged against the real `Settings` floating window at
+960×680, `forest-night`, standard presentation. The first measured run was 4/5 bars: the
+Ask Agent button's effective target was 52.5×26 px. The product correction uses the shared
+medium Button geometry instead of the compact variant; the re-run measured 64 text records,
+46 keyboard controls, 45 pointer targets, minimum contrast 5.47:1, 0 unreachable controls,
+0 targets below the 32 px pointer floor, and 0 motion durations above 0.01 s under reduced
+motion. Category result: **PASS 10/10**.
+
+Negative control moved contrast/target-rect/WCAG-2.5.8/keyboard/pointer counts from
+`0/5/0/0/0` to `1/7/2/1/2`, then restored all scored counts. Disclosures, scroll positions,
+deferred styles, reduced-motion emulation, and the surface state restored. Evidence:
+`baselines/cat1-l8-settings.json`; checkpoint commit: this entry's product commit.

@@ -500,7 +500,6 @@ export default function SettingsApp(props: SettingsWallProps) {
               is the one the Agent itself opens.
             */}
             <Button
-              size="sm"
               className="os-set-ask-agent"
               leftIcon={<Icon name="sparkle" size={14} />}
               onClick={askAgent}
