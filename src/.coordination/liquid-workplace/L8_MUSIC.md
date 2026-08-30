@@ -137,3 +137,49 @@ The guard caps them so the count can only fall; a blanket ban would have forced 
 rewrite of surfaces whose contrast nobody has measured.
 
 Q4 remains the only open question and it is structural, not cosmetic — see the next entry.
+
+## 2026-08-30 — category 4 (Q4 clutter) is STRUCTURAL; the numbers, so the next turn does not re-derive them
+
+**Measured, not argued.** Q4's bar is `>=1 collapsed disclosure AND <=12 controls scanned in
+the default state`. Music reads **collapsedDisclosures 0, scannedControls 40**, against a
+1080x700 window. Every one of the other 17 scored surfaces cleared it: Library 6/11,
+Resources 1/10, Immersion 2/12, Games 1/1. **They are all single-app windows.** Music is the
+first surface scored on a SHELL — `@.fwin:has(.mc-root)` is the whole Media Center, and cat
+1/2/3/4/6 are already banked on that root, so narrowing it now would void five banked cells.
+
+The 40, listed live from the harness's own predicate (`probes/cat5-ui-clarity.cjs` Q4 block):
+
+| group | n | note |
+| --- | --- | --- |
+| `.mc-nav` + `.mc-settings-link` | 6 | shell nav rail, identical on all six sections |
+| `.mc-history-buttons` | 2 | shell |
+| `.mc-global-search`, `Open media` | 2 | shell topbar |
+| `.mc-playerbar` | 9 | shell footer: info, 5 transport, seek, volume, detach |
+| `.mc-music-window-actions` | 2 | detach player / detach mini |
+| `.mc-panel-actions` | 2 | album-in-search, liked-only |
+| `.music-search`, `.mc-music-sort` | 2 | |
+| `.music-yt` | 2 | link field + Get audio |
+| `.music-hint-btns` | 2 | Search again / Load .lrc — only painted when lyrics are missing |
+| `.music-controls` | 9 | **duplicates `.mc-playerbar` control for control** |
+| `.mc-track-queue` | 2 | repeating rows; carry no class the harness's `repeatingRow` matches |
+
+**Shell alone is 19 of the 40, and it is 19 on every Media Center section.** So even an empty
+Music page cannot reach 12 while the rail and the player bar are both expanded, and collapsing
+either one hides navigation or the transport — the dominant task. The bar is not reachable by
+any honest page-level design. That is the finding.
+
+The genuinely-cluttering half, and it is real: **two complete transports**, `.music-controls`
+inside the page and `.mc-playerbar` beneath it, showing the same track with the same
+shuffle/prev/play/next/repeat/seek/volume. Cat 4 already flagged this pair when it made the
+compact one a single grid row. The inline copy adds exactly two things the bar lacks — Like,
+and an open-widget button the bar duplicates as detach-mini.
+
+**Next turn opens here, and the slice is bounded:** drop the duplicated `.music-controls` from
+`MediaCenterView`'s `MusicPanel` only (the shared component stays for the detached window, the
+widget and Blanc), move Like onto the player bar, give `.mc-track-queue`'s rows a
+`-row`/`-item` class they honestly are, and put detach x2 + the YouTube grab behind one
+collapsed `<details>` — which also closes the `collapsedDisclosures >= 1` term. That is
+**40 -> 22 scanned**, of which **19 is shell**. Then either the residual 3 page controls are
+the number Q4 should be scored on, with the shell reported separately the way `.fwin-bar`
+already is, or Q4 is PARKED at 9/10 with this arithmetic attached. **Decide it with the
+numbers in hand, do not re-derive them.** Do not silently move the bar to 40.
