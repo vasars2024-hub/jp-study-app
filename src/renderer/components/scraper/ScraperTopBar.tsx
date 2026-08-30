@@ -35,9 +35,14 @@ export default function ScraperTopBar() {
       <ScraperSearch />
 
       <div className="scr-topbar-actions">
+        {/* `scr-topbar-nav` marks the three actions that are a second route to a
+            page the left rail already lists. Below 460px of shell the bar has
+            188px for 255px of controls, and these are the three that can go
+            without taking a destination with them. */}
         <Button
           variant="primary"
           size="sm"
+          className="scr-topbar-nav"
           leftIcon={<Icon name="sparkle" size={14} />}
           onClick={() => ctl.navigate('new-scrape')}
         >
@@ -46,13 +51,19 @@ export default function ScraperTopBar() {
 
         <Button
           size="sm"
+          className="scr-topbar-nav"
           rightIcon={<Icon name="chevron" size={12} />}
           onClick={() => ctl.navigate('profiles')}
         >
           {sx('app.profiles')}
         </Button>
 
-        <IconButton label={sx('app.history')} size="sm" onClick={() => ctl.navigate('history')}>
+        <IconButton
+          label={sx('app.history')}
+          size="sm"
+          className="scr-topbar-nav"
+          onClick={() => ctl.navigate('history')}
+        >
           <Icon name="calendar" size={16} />
         </IconButton>
 
