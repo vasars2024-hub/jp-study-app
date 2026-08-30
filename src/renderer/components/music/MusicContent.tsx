@@ -739,7 +739,12 @@ export function MusicControls({
   const { ps } = state;
 
   return (
-    <div className="music-controls">
+    // `lq-hit-scope` raises the transport buttons to the 32px pointer floor via a
+    // transparent `::after`, so it changes no pixel and no layout. Applied on the
+    // shared component rather than only in Media Center because these are the same
+    // six buttons in the widget and in Blanc, and a bigger target cannot regress a
+    // host that has not been scored yet.
+    <div className="music-controls lq-hit-scope">
       <button
         className={`btn small ${ps.shuffle ? 'primary' : ''}`}
         onClick={player.toggleShuffle}

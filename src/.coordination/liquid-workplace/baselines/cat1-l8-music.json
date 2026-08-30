@@ -1,0 +1,287 @@
+{
+  "label": "music",
+  "surface": "@.fwin:has(.mc-root)",
+  "win": "main",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "1080x700",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 73,
+    "unmeasurable": 0,
+    "minRatio": 5,
+    "minOwner": "small \"2 tracks\" 11px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 1,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 50,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 21,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button",
+        "min": 25,
+        "nearest": 33
+      },
+      {
+        "el": "button",
+        "min": 25,
+        "nearest": 33
+      },
+      {
+        "el": "button.btn",
+        "min": 25,
+        "nearest": 47
+      },
+      {
+        "el": "button.btn",
+        "min": 25,
+        "nearest": 44.3
+      },
+      {
+        "el": "button.btn",
+        "min": 25,
+        "nearest": 47
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 50,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 1,
+    "focusHosts": [
+      {
+        "el": "div.mc-root",
+        "why": "tabindex=-1"
+      }
+    ],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 28,
+    "beforeLongest": {
+      "el": "div.fwin-bar",
+      "dur": 0.14
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 28,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".fwin:has(.mc-root)",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "1080x700",
+    "deferredVisibilityOwners": 0,
+    "controls": 37,
+    "measured": 35,
+    "belowFloorByRect": 14,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 2,
+    "occluded": [
+      {
+        "el": "input",
+        "rect": "86x32",
+        "by": "button.seanime-host-launcher"
+      },
+      {
+        "el": "button",
+        "rect": "26x26",
+        "by": "button.seanime-host-launcher"
+      }
+    ],
+    "disabledCount": 12,
+    "disabled": [
+      {
+        "el": "button",
+        "rect": "32x32"
+      },
+      {
+        "el": "button",
+        "rect": "32x32"
+      },
+      {
+        "el": "button.btn.small",
+        "rect": "101x33"
+      },
+      {
+        "el": "button.btn.small",
+        "rect": "37x25"
+      },
+      {
+        "el": "button.btn.primary.music-play",
+        "rect": "46x34"
+      },
+      {
+        "el": "button.btn.small",
+        "rect": "37x25"
+      },
+      {
+        "el": "button.btn.small",
+        "rect": "37x25"
+      },
+      {
+        "el": "input.music-seek",
+        "rect": "148x32"
+      }
+    ],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "nav.mc-nav 0,0 -> 27,0"
+    ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 2
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

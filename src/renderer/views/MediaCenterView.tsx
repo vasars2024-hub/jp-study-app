@@ -968,7 +968,7 @@ function MusicPanel({ state }: { state: MusicState }) {
     <div className="mc-page mc-music-page">
       <div className="mc-music-head">
         <div><span className="mc-eyebrow">{t('mediaCenter.music.eyebrow')}</span><h1>{state.currentMeta?.title ?? t('mediaCenter.nav.music')}</h1><p>{state.currentMeta?.artist ?? t('mediaCenter.music.libraryCount', { count: state.baseSongs.length })}</p></div>
-        <div className="mc-music-window-actions">
+        <div className="mc-music-window-actions lq-hit-scope">
           <button type="button" className="mc-button" onClick={() => void window.api.popOut('music')}>
             <Icon name="window" size={13} /> {t('mediaCenter.music.detachPlayer')}
           </button>
@@ -982,7 +982,7 @@ function MusicPanel({ state }: { state: MusicState }) {
         <aside className="mc-music-library">
           <div className="mc-panel-title">
             <div><strong>{t('mediaCenter.music.library')}</strong><small>{t('mediaCenter.music.trackCount', { count: state.baseSongs.length })}</small></div>
-            <div className="mc-panel-actions">
+            <div className="mc-panel-actions lq-hit-scope">
               <button
                 type="button"
                 title={state.useAlbumInSearch ? t('mediaCenter.music.albumSearchOn') : t('mediaCenter.music.albumSearchOff')}
@@ -1458,7 +1458,7 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
         </span>
         <span><strong>{currentMeta?.title ?? t('mediaCenter.player.nothing')}</strong><small>{currentMeta?.artist ?? t('mediaCenter.player.chooseMusic')}</small></span>
       </button>
-      <div className="mc-player-transport">
+      <div className="mc-player-transport lq-hit-scope">
         <button type="button" onClick={player.toggleShuffle} className={ps.shuffle ? 'is-active' : ''} title={t('mediaCenter.player.shuffle')}><Icon name="shuffle" size={14} /></button>
         <button type="button" onClick={player.prev} disabled={!ps.current} title={t('mediaCenter.player.previous')}><Icon name="skip-back" size={15} /></button>
         <button type="button" className="mc-player-play" onClick={player.toggle} disabled={!ps.current} title={ps.playing ? t('mediaCenter.player.pause') : t('mediaCenter.player.play')}>
@@ -1472,7 +1472,7 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
         <input type="range" min={0} max={ps.duration || 1} step={0.1} value={Math.min(ps.time, ps.duration || 1)} onChange={(event) => player.seek(Number(event.target.value))} disabled={!ps.current} aria-label={t('a11y.slider.trackPosition')} />
         <span>{fmt(ps.duration)}</span>
       </div>
-      <div className="mc-player-volume">
+      <div className="mc-player-volume lq-hit-scope">
         <Icon name="volume" size={14} />
         <input type="range" min={0} max={1} step={0.05} value={ps.volume} onChange={(event) => player.setVolume(Number(event.target.value))} aria-label={t('music.controls.volume')} />
         <button type="button" title={t('mediaCenter.music.detachMini')} onClick={() => void window.api.popOut('musicwidget')}><Icon name="window" size={14} /></button>

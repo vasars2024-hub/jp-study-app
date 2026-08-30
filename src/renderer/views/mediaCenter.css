@@ -602,7 +602,9 @@
    so the field is aimed at as 290x30, and 30 is under the 32px floor. */
 .mc-global-search {
   width: min(290px, 38%);
-  height: var(--lq-hit-target);
+  /* `min-height`, not `height`: the wrapper's 1px border otherwise leaves the
+     stretched input a 30px content box, 2px under the floor it looks like it met. */
+  min-height: var(--lq-hit-target);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -622,6 +624,11 @@
 .mc-global-search input {
   min-width: 0;
   flex: 1;
+  /* The wrapper is already `--lq-hit-target` tall, but category 1 measures the
+     INPUT, and a bare `<input>` sits at its 19px intrinsic height inside it.
+     Stretching it is what actually moves the pointer target. */
+  align-self: stretch;
+  min-height: var(--lq-hit-target);
   border: 0;
   outline: 0;
   background: transparent;
@@ -1568,7 +1575,12 @@
 .mc-panel-actions {
   display: flex !important;
   flex-direction: row !important;
-  gap: 5px;
+  /* Two 25px buttons each expand to a 32px pointer target, i.e. 3.5px past each
+     edge. At `gap: 5px` those two areas overlapped by 2px and `elementFromPoint`
+     handed the strip to the neighbour, so both measured a 30px-wide hit and the
+     scope read as applied while the floor was still missed. 7px is the exact
+     width the two halves need; 8 keeps a pixel of slack. */
+  gap: 8px;
 }
 
 .mc-panel-actions > button {
@@ -1593,6 +1605,25 @@
   margin: 9px;
 }
 
+/* The legacy `.music-*` controls are shared with the Music widget and Blanc, and
+   their own rules live in `styles.css`, which another track currently has open.
+   Category 1 scores THIS surface, so the pointer floor is applied scoped to the
+   Media Center — the same way `.music-search` and `.music-controls` are already
+   adjusted here — rather than by reaching into a file being edited elsewhere.
+   The other two hosts keep today's sizes until their own surfaces are scored. */
+.mc-music-library .music-search input {
+  min-height: var(--lq-hit-target);
+}
+
+/* Replaced elements again: content box unchanged so the track still paints at
+   its native 16px, border box raised to the floor. See `.mc-player-progress`. */
+.mc-music-now .music-seek,
+.mc-music-now .music-volume {
+  box-sizing: content-box;
+  height: 16px;
+  padding-block: calc((var(--lq-hit-target) - 16px) / 2);
+}
+
 .mc-music-sort {
   display: flex;
   align-items: center;
@@ -1605,7 +1636,7 @@
 .mc-music-sort select {
   min-width: 0;
   flex: 1;
-  height: 25px;
+  height: var(--lq-hit-target);
   padding: 0 25px 0 8px;
   border: 1px solid var(--mc-line);
   border-radius: 7px;
@@ -2726,7 +2757,11 @@
 .mc-player-volume {
   display: flex;
   align-items: center;
-  gap: 3px;
+  /* Same arithmetic as `.mc-panel-actions`: a 26px button reaches its 32px
+     pointer target by growing 3px past each edge, so neighbours need 6px
+     between them or they take bites out of each other's hit area. Was 3px,
+     which measured a 29px-wide target on every transport button. */
+  gap: 7px;
 }
 
 .mc-player-transport button,
@@ -2768,10 +2803,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A range input is a REPLACED element: `::after` generates no box on it, so
+   `.lq-hit-scope` cannot reach these and the floor has to live on the control
+   itself (`theme/liquid-controls.css` says so, and this is the case it means).
+   `min-height` would stretch the native track and repaint the bar. Padding on a
+   `content-box` does not: the CONTENT box stays 3px, so the rendered track and
+   thumb are byte-identical, while the BORDER box — which is the pointer target —
+   reaches `--lq-hit-target`. Measured live: input 3 -> 32, `.mc-playerbar`
+   58 -> 58, i.e. the row does not reflow. */
 .mc-player-progress input,
 .mc-player-volume input {
   min-width: 0;
+  box-sizing: content-box;
   height: 3px;
+  padding-block: calc((var(--lq-hit-target) - 3px) / 2);
   accent-color: var(--mc-accent);
 }
 
