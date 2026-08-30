@@ -35,6 +35,11 @@ export default function SettingsNav({
   // whole 179x88 footer overlapping a group at maximized and two more pairs at 960x680.
   // Same structure the Scraper rail uses (`.scr-rail-scroll`), and the footer is still
   // always visible without painting over anything.
+  //
+  // Below 420px of `.os-set-body` the rail collapses to icons. No `aria-label` here on
+  // purpose: the bare `<span>` IS each button's accessible name, so the narrow tier in
+  // `styles.css` clips it to 1x1 rather than using `display: none` the way `.scr-rail-label`
+  // does. Give any new item a `descKey` so the `title` still names it in icon mode.
   return (
     <ContextualSurface as="nav" className="os-set-nav-v2" aria-label={t('settings.nav.ariaCategories')}>
       <ContextualSurface className="os-set-nav-scroll">
@@ -43,6 +48,7 @@ export default function SettingsNav({
           className={`os-set-nav-item ${page === 'home' ? 'active' : ''}`}
           onClick={() => onNavigate('home')}
           aria-current={page === 'home' ? 'page' : undefined}
+          title={home.descKey ? t(home.descKey) : undefined}
         >
           <Icon name={home.icon} size={16} />
           <span>{t(home.labelKey)}</span>

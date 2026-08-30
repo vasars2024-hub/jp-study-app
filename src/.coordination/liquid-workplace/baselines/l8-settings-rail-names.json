@@ -1,0 +1,234 @@
+{
+ "label": "l8-settings-rail-names",
+ "wide": {
+  "fwin": "960x680",
+  "railWidth": 204,
+  "paneWidth": 700,
+  "paneClientWidth": 690,
+  "paneScrollWidth": 690,
+  "total": 20,
+  "named": 20,
+  "unnamed": [],
+  "titled": 20,
+  "sample": [
+   {
+    "cls": "os-set-nav-item",
+    "name": "Home",
+    "w": 179,
+    "h": 34,
+    "title": "Quick actions and status"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Appearance",
+    "w": 179,
+    "h": 34,
+    "title": "Themes, colors, fonts"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Wallpaper",
+    "w": 179,
+    "h": 34,
+    "title": "Desktop background"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Companions",
+    "w": 179,
+    "h": 34,
+    "title": "Desktop pets"
+   }
+  ]
+ },
+ "narrow": {
+  "fwin": "260x170",
+  "railWidth": 52,
+  "paneWidth": 142,
+  "paneClientWidth": 132,
+  "paneScrollWidth": 132,
+  "total": 20,
+  "named": 20,
+  "unnamed": [],
+  "titled": 20,
+  "sample": [
+   {
+    "cls": "os-set-nav-item",
+    "name": "Home",
+    "w": 35,
+    "h": 34,
+    "title": "Quick actions and status"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Appearance",
+    "w": 35,
+    "h": 34,
+    "title": "Themes, colors, fonts"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Wallpaper",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop background"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Companions",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop pets"
+   }
+  ]
+ },
+ "control": {
+  "fwin": "260x170",
+  "railWidth": 52,
+  "paneWidth": 142,
+  "paneClientWidth": 132,
+  "paneScrollWidth": 132,
+  "total": 20,
+  "named": 0,
+  "unnamed": [
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-nav-item",
+   "os-set-advanced-btn"
+  ],
+  "titled": 20,
+  "sample": [
+   {
+    "cls": "os-set-nav-item",
+    "name": "",
+    "w": 35,
+    "h": 34,
+    "title": "Quick actions and status"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "",
+    "w": 35,
+    "h": 34,
+    "title": "Themes, colors, fonts"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop background"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop pets"
+   }
+  ]
+ },
+ "afterControl": {
+  "fwin": "260x170",
+  "railWidth": 52,
+  "paneWidth": 142,
+  "paneClientWidth": 132,
+  "paneScrollWidth": 132,
+  "total": 20,
+  "named": 20,
+  "unnamed": [],
+  "titled": 20,
+  "sample": [
+   {
+    "cls": "os-set-nav-item",
+    "name": "Home",
+    "w": 35,
+    "h": 34,
+    "title": "Quick actions and status"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Appearance",
+    "w": 35,
+    "h": 34,
+    "title": "Themes, colors, fonts"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Wallpaper",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop background"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Companions",
+    "w": 35,
+    "h": 34,
+    "title": "Desktop pets"
+   }
+  ]
+ },
+ "restored": {
+  "style": "left: 60px; top: 24px; width: 960px; height: 680px; z-index: 56;",
+  "byteIdentical": true
+ },
+ "back": {
+  "fwin": "960x680",
+  "railWidth": 204,
+  "paneWidth": 700,
+  "paneClientWidth": 690,
+  "paneScrollWidth": 690,
+  "total": 20,
+  "named": 20,
+  "unnamed": [],
+  "titled": 20,
+  "sample": [
+   {
+    "cls": "os-set-nav-item",
+    "name": "Home",
+    "w": 179,
+    "h": 34,
+    "title": "Quick actions and status"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Appearance",
+    "w": 179,
+    "h": 34,
+    "title": "Themes, colors, fonts"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Wallpaper",
+    "w": 179,
+    "h": 34,
+    "title": "Desktop background"
+   },
+   {
+    "cls": "os-set-nav-item",
+    "name": "Companions",
+    "w": 179,
+    "h": 34,
+    "title": "Desktop pets"
+   }
+  ]
+ },
+ "verdict": "PASS"
+}

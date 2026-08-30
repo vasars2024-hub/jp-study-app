@@ -197,4 +197,48 @@ describe('Settings — Liquid region roles', () => {
     const rule = read('styles.css').match(/\.os-settings-v2 \{\s*\n\s*align-items: stretch;\s*\n\}/);
     expect(rule, 'v2 restores cross-axis stretch').not.toBeNull();
   });
+
+  it('collapses the rail to icons without deleting its accessible names', async () => {
+    // Category 4's compact leg: at 260x170 the fixed 204px rail left `.os-set-pane-v2` a 0px
+    // client width against 184px of content and 71 descendants read clipped. The rail now
+    // collapses under a container query on `.os-set-body`.
+    const app = read('styles.css');
+    const body = app.match(/\.os-set-body \{\s*\n\s*container-type: inline-size;\s*\n\s*container-name: os-set-body;\s*\n\}/);
+    expect(body, '.os-set-body is the query container').not.toBeNull();
+
+    const tier = app.match(/@container os-set-body \(max-width: 420px\) \{([\s\S]*?)\n\}\n/);
+    expect(tier, 'a narrow tier exists').not.toBeNull();
+    const css = tier![1];
+    expect(css, 'the rail collapses to an icon column').toMatch(/\.os-set-nav-v2 \{\s*\n\s*width: 52px;/);
+
+    // THE TRAP this pins. `.os-set-nav-item` carries no `aria-label`, so its bare `<span>` IS
+    // the button's accessible name. `display: none` — what `.scr-rail-label` does — would leave
+    // every category button unnamed and trade category 4 for category 1. Falsified live at
+    // 260x170: clipped 20 of 20 named, forced to `display: none` 0 of 20.
+    expect(css, 'the label is clipped, never removed from the box tree').toMatch(
+      /clip-path: inset\(50%\)/,
+    );
+    expect(css, 'nothing in the narrow tier hides a label outright').not.toMatch(/display:\s*none/);
+
+    // And every item must carry a `title`, which is the only label a pointer user keeps here.
+    const host = await mountNav();
+    const items = [...host.querySelectorAll('.os-set-nav-item')];
+    expect(items.length, 'the rail has items').toBeGreaterThan(0);
+    expect(
+      items.filter((b) => !b.getAttribute('title')).map((b) => b.textContent),
+      'every nav item names itself on hover',
+    ).toEqual([]);
+    for (const b of items) {
+      expect(b.getAttribute('aria-label'), 'no aria-label overrides the span').toBeNull();
+      expect((b.querySelector('span:not([class])')?.textContent ?? '').length).toBeGreaterThan(0);
+    }
+  });
+
+  it('lets the home grids fall below their fixed track width', () => {
+    // `repeat(auto-fit, minmax(170px, 1fr))` cannot produce a track under 170px, so six of the
+    // compact leg's clipped rects were status chips overflowing a pane narrower than one track.
+    const app = read('styles.css');
+    expect(app).toMatch(/\.os-set-home-status \{\s*\n\s*grid-template-columns: repeat\(auto-fit, minmax\(min\(170px, 100%\), 1fr\)\);\s*\n\}/);
+    expect(app).toMatch(/\.os-set-quick-grid \{\s*\n\s*grid-template-columns: repeat\(auto-fill, minmax\(min\(180px, 100%\), 1fr\)\);\s*\n\}/);
+  });
 });

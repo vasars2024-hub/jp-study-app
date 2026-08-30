@@ -26871,3 +26871,84 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
   gap: 6px;
   margin-top: 12px;
 }
+
+/* --------------------------------------------------------------------------
+   Settings category 4, the compact leg: the rail is a fixed 204px and the window
+   is not. Measured 2026-08-30 on a 260x170 `.fwin`, `.os-set-body` hands
+   `.os-set-nav-v2` all 204 of its ~234px, `.os-set-pane-v2` is left with a 0px
+   client width against 184px of content (`hiddenOverflowX 184>0`) and 71
+   descendants read clipped. Below 420px of body the rail collapses to icons.
+
+   `display: none` on the label is what `.scr-rail-label` does and it is WRONG
+   here: `.os-set-nav-item` carries no `aria-label`, so its bare `<span>` IS the
+   button's accessible name (`SettingsNav.tsx:48,77`). Removing it from the box
+   tree would leave every category button unnamed for the category-1 harness.
+   Clipped to 1x1 the name survives in the accessibility tree, and the category-4
+   reader drops any rect under 2px so it is not counted as clipped either. The
+   `title` on each item already carries the same text for a pointer user.
+
+   The container goes on `.os-set-body` because the rail's own width is what the
+   query decides, and a container cannot match its own query. `inline-size`
+   containment is safe here: the body's width comes from the column above it, and
+   Settings' overlays (search results, modals, toasts) render outside it. */
+.os-set-body {
+  container-type: inline-size;
+  container-name: os-set-body;
+}
+@container os-set-body (max-width: 420px) {
+  .os-set-nav-v2 {
+    width: 52px;
+    padding-right: 6px;
+  }
+  .os-set-nav-v2 .os-set-nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 8px 4px;
+  }
+  .os-set-nav-v2 .os-set-nav-item > span:not([class]),
+  .os-set-nav-v2 .os-set-nav-group-label,
+  .os-set-nav-v2 .os-set-advanced-label,
+  .os-set-nav-v2 .os-set-advanced-hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .os-set-nav-v2 .os-set-nav-group {
+    margin-top: 6px;
+  }
+  .os-set-nav-v2 .os-set-nav-footer {
+    padding: 10px 2px 6px;
+  }
+  .os-set-nav-v2 .os-set-advanced-btn {
+    justify-content: center;
+    gap: 0;
+    padding: 4px;
+  }
+  .os-set-body > .os-set-pane-v2 {
+    padding-left: 0;
+    padding-right: 2px;
+  }
+  .os-set-body {
+    gap: 10px;
+  }
+}
+/* `repeat(auto-fit, minmax(170px, 1fr))` cannot produce a track under 170px, so the
+   home status chips overflowed any pane narrower than that no matter how much room
+   the rail gave back - six of the compact leg's clipped rects were these. `min()`
+   lets the track fall to the pane's own width; the chips stack instead. */
+.os-set-home-status {
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+}
+.os-set-status-chip {
+  min-width: 0;
+}
+/* Same fixed-track defect as `.os-set-home-status`, one row down the Home page. */
+.os-set-quick-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+}
