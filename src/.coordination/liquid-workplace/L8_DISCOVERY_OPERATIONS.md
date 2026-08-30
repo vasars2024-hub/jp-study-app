@@ -584,3 +584,13 @@ counts, history tiles, and the saved export options. Mechanical comparison repor
 
 `i18n-check` passes at **11,631** English keys and the focused suite passes **21/21**. Category 8
 remains open at 78.5%; 128 catalog keys still use the English `TEXT` fallback.
+
+### 2026-08-30 — Scraper i18n, batch 9: New Scrape workflow complete
+
+**496 of 596 keys migrated (83.2%)**, +28 this batch. Every `scrape.*` entry now resolves from
+the shared catalogs: URL/title input, proxy and profile choices, reversible start options,
+preflight honesty, provider state, progress, and run statistics. Mechanical comparison reports
+**28 TEXT / 28 shared / 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,659** English keys and the focused suite passes **21/21**. Category 8
+remains open at 83.2%; 100 catalog keys still use the English `TEXT` fallback.
