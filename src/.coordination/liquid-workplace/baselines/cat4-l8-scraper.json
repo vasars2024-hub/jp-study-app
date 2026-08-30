@@ -1,7 +1,7 @@
 {
   "label": "l8-scraper",
   "surface": "@.fwin:has(.scr-shell)",
-  "win": "main",
+  "win": "(focused)",
   "rootKind": "section inside a floating window",
   "viewport": "1264x821",
   "sizes": [
@@ -26,19 +26,19 @@
     },
     {
       "kind": "compact",
-      "box": "260x170",
-      "clipped": 20,
-      "overlaps": 5,
-      "horizontalScrollers": 1,
-      "hiddenOverflowX": 1,
-      "deadPctViewport": 0.6,
+      "box": "400x248",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 1.8,
       "deadRegionBasis": "visible surface",
-      "chromePct": 68.7,
-      "dominantCanvasPct": 78.8,
+      "chromePct": 83.5,
+      "dominantCanvasPct": 85.5,
       "bars": {
-        "clipped": false,
-        "overlaps": false,
-        "horizontal": false,
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
         "deadRegion": true
       },
       "restored": true
@@ -47,16 +47,16 @@
       "kind": "maximized",
       "box": "1264x765",
       "clipped": 0,
-      "overlaps": 1,
-      "horizontalScrollers": 3,
-      "hiddenOverflowX": 1,
+      "overlaps": 0,
+      "horizontalScrollers": 2,
+      "hiddenOverflowX": 0,
       "deadPctViewport": 4.3,
       "deadRegionBasis": "visible surface",
       "chromePct": 63.1,
       "dominantCanvasPct": 95.3,
       "bars": {
         "clipped": true,
-        "overlaps": false,
+        "overlaps": true,
         "horizontal": false,
         "deadRegion": true
       },
@@ -90,33 +90,16 @@
     {
       "kind": "compact",
       "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
-      "requested": "260x170",
+      "requested": "400x248",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
-      "restoredTo": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
-      "clippedList": [
-        "div.scr-topbar-actions",
-        "button.ui-icon-btn",
-        "svg.[object",
-        "button.ui-icon-btn",
-        "svg.[object",
-        "path.[object"
-      ],
-      "overlapList": [
-        "div.lq-contextual x div.scr-rail-status (51x24)",
-        "div.lq-contextual x footer.lq-contextual (51x11)",
-        "div.scr-rail-status x footer.lq-contextual (51x41)",
-        "header.scr-drawer-head x footer.lq-contextual (159x41)",
-        "div.scr-drawer-body x footer.scr-drawer-foot (329x24)"
-      ],
-      "horizontalScrollerList": [
-        "div.scr-drawer-pane 167>100"
-      ],
-      "hiddenOverflowXList": [
-        "div.fwin-body 400>248"
-      ],
-      "deadRegionBox": "258x24 at grid 0,0",
+      "restoredFrom": "left: 60px; top: 24px; width: 820px; height: 580px; z-index: 24;",
+      "restoredTo": "left: 60px; top: 24px; width: 820px; height: 580px; z-index: 24;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "249x75 at grid 0,0",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -132,20 +115,15 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
-      "restoredTo": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 141;",
+      "restoredFrom": "left: 60px; top: 24px; width: 820px; height: 580px; z-index: 24;",
+      "restoredTo": "left: 60px; top: 24px; width: 820px; height: 580px; z-index: 28;",
       "clippedList": [],
-      "overlapList": [
-        "div.scr-page x footer.lq-contextual (632x41)"
-      ],
+      "overlapList": [],
       "horizontalScrollerList": [
         "main.scr-main 1611>664",
-        "div. 876>606",
-        "div. 1628>606"
+        "div. 876>606"
       ],
-      "hiddenOverflowXList": [
-        "div.scr-td 103>96"
-      ],
+      "hiddenOverflowXList": [],
       "deadRegionBox": "410x110 at grid 10,19",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
@@ -163,8 +141,8 @@
     }
   ],
   "bars": {
-    "clipped": false,
-    "overlaps": false,
+    "clipped": true,
+    "overlaps": true,
     "horizontal": false,
     "deadRegion": true,
     "contentGrowsNotChrome": true,
@@ -173,8 +151,6 @@
   },
   "verdict": "FAIL",
   "failedBars": [
-    "clipped",
-    "overlaps",
     "horizontal"
   ],
   "unmeasuredBars": [],

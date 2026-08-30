@@ -382,13 +382,44 @@ const READ = (surface) => `(function(){
     }
     return null;
   };
+  // CORRECTION 18. AN ELEMENT CLIPPED BY A SCROLLING ANCESTOR DOES NOT COLLIDE OUTSIDE IT.
+  // Every region was paired by its RAW rect, so any pane taller (or wider) than the scroller
+  // holding it reported a collision with whatever chrome sits past the scroller - pixels that
+  // scroller never paints. Measured on Scraper maximized: div.scr-page is 4182px tall inside a
+  // 598px main.scr-main (overflow: auto), so its raw rect ran straight through the 41px status
+  // bar and the surface failed the overlaps bar on a box no user can see. Left uncorrected this
+  // is not a Scraper quirk - it fires on EVERY surface whose scrolling pane holds more than one
+  // screen of content, which is most of them. Corrections 2 and 15 in a third shape: a box that
+  // exists where it is not painted. The clip is the intersection with every non-visible-overflow
+  // ancestor up to the surface root, which is precisely the region that scroller does paint, so
+  // a box genuinely escaping its container still reports.
+  var visibleRect = function(el){
+    var b = el.getBoundingClientRect();
+    var l = b.left, t = b.top, r = b.right, bt = b.bottom;
+    var n = el.parentElement;
+    while (n) {
+      var cs = getComputedStyle(n);
+      var c = null;
+      if (cs.overflowX !== 'visible') {
+        c = n.getBoundingClientRect();
+        l = Math.max(l, c.left); r = Math.min(r, c.right);
+      }
+      if (cs.overflowY !== 'visible') {
+        c = c || n.getBoundingClientRect();
+        t = Math.max(t, c.top); bt = Math.min(bt, c.bottom);
+      }
+      if (n === win) break;
+      n = n.parentElement;
+    }
+    return { left: l, top: t, right: r, bottom: bt };
+  };
   var overlaps = [];
   for (var i = 0; i < regions.length; i += 1) {
     for (var j = i + 1; j < regions.length; j += 1) {
       var a = regions[i], b2 = regions[j];
       if (a.contains(b2) || b2.contains(a)) continue;
       if (coverOf(a) !== coverOf(b2)) continue;
-      var ra = a.getBoundingClientRect(), rb = b2.getBoundingClientRect();
+      var ra = visibleRect(a), rb = visibleRect(b2);
       var ox = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
       var oy = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
       if (ox > 4 && oy > 4) overlaps.push(name(a) + ' x ' + name(b2) + ' (' + Math.round(ox) + 'x' + Math.round(oy) + ')');
