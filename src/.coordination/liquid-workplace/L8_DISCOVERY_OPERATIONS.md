@@ -564,3 +564,13 @@ remains open at 66.9%; 197 catalog keys still fall back to `TEXT` and are not re
 `Object.keys()` returns **596**, while the handoff's 588 was copied forward without a runtime count.
 Therefore batches 1–2 were 76/596 = 12.8% and 148/596 = 24.8%, not 12.9%/25.2%. Runtime
 intersection with `SCRAPER_UI_EN` confirms **399 migrated / 197 fallback / 0 ambiguous** now.
+
+### 2026-08-30 — Scraper i18n, batch 7: Script Console complete
+
+**436 of 596 keys migrated (73.2%)**, +37 this batch. Every `console.*` entry now resolves from
+the shared catalogs: read-only sandbox states, command execution feedback, unlock guidance, live
+log states, and all ten allow-listed command descriptions. Mechanical comparison reports **37
+TEXT / 37 shared / 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,599** English keys and the focused suite passes **21/21**. Category 8
+remains open at 73.2%; 160 catalog keys still use the English `TEXT` fallback.
