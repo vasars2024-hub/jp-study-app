@@ -692,3 +692,46 @@ vacuity assertion for the same reason.
 
 Gates: vitest **12,094 passed / 6 skipped exit 0**; i18n **11,776** exit 0; architecture nothing
 new exit 0; touched-path ESLint 0 errors.
+
+## 2026-08-30 19:15 — the coverage half closes on both registries (54 → 1)
+
+`d8ecc1bc` `3fc33fd4` `3bcbf770` `66026a46`. The previous turn measured the gap and named it:
+Settings 130 destinations / 103 indexed, Scraper 28 / 1. Both are now indexed from their own
+cards' keys — no new strings, no new translations, in either app.
+
+    Scraper    28 destinations, 27 indexed, 1 conditional, 0 unsearchable, 0 misrouted/unanchored
+    Settings  130 destinations, 129 indexed, 1 conditional, 0 unsearchable, 0 misrouted/unanchored
+
+**Three instrument defects, all found by using it rather than reading it.**
+
+1. **`ScrCard` never implemented the contract the probe assumed.** The implicit-anchor rule —
+   "the card primitive derives `is-highlight` from its own id" — was made true of `SettingsCard`
+   by `6e5ebb57` and *assumed* of `ScrCard`, which set `data-scr-card` and nothing else.
+   `focusSettingId` had exactly one consumer in the whole app, the settings drawer's field paths.
+   Measured live before the fix: click "Revision history" → `profile-history` present, `.scr-card.is-highlight` **0 of 11**.
+   Fixed in the primitive (+ scroll-into-view, + a non-throwing `useScraperFocusId`), and the probe
+   now **reads** `cardPrimitive` for both `is-highlight` and `focus… === id` instead of assuming.
+   Control, run against HEAD's ScrCard: `implicitCardAnchor false`, landed **27 → 0**, unanchored **0 → 27**.
+2. **The registry parser skipped every entry opening with a comment.** `\{\s*\n\s*id:` missed three
+   *already indexed* Settings entries and reported them as gaps — one of them `mal-sync`, the entry
+   the pin names as the canonical search defect and which a previous turn had already fixed.
+   Entries **111 → 114**; the inherited "27 unsearchable" was inflated by three.
+3. **A selection-gated card is not a destination.** `history-detail` renders only inside `{open && (`.
+   Classified from the guard preceding the tag, not a hard-coded id, and reported by name under
+   `cardDestinationsConditional`.
+
+**Kept open, deliberately, and it is the next slice.** `companions-leave-secret` is indexed with
+`pageId: 'companions'`, but that card renders only under Aero/Wired. The probe checks *file-closure*
+reachability, not render conditions, so it reads as landed. A registry `themes?:` gate — the shape
+`advanced` already has — indexes it honestly and lets `secret-os-leave` in too (currently excluded
+on purpose; see its comment at `settingsRegistry.ts:1211`). Until then L8's two bullets stay open
+on one named entry rather than closing on a number I would have had to look away from.
+
+**Trap (Carry 26).** `settingsRegistry.ts` is **CRLF in the worktree while its HEAD blob is LF**.
+A HEAD+region splice must normalise or it lands 194 CRLF lines in an LF file, which stops
+`core.autocrlf` normalising the path and makes the next commit read as a whole-file rewrite.
+Sibling files in the same tree (`types.ts`, `scraper.css`) are LF — do not assume per-tree.
+
+Gates: vitest **12,101 passed / 6 skipped**, 1 failed — `scraperSources` "caps the stored history",
+`ENOTEMPTY` rmdir on a temp dir, passes alone 13/13, touches nothing here. i18n **11,776** exit 0;
+architecture nothing new exit 0; ESLint over all eight touched paths, 0 errors.
