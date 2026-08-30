@@ -260,12 +260,29 @@ describe('listIntegrity — the honesty requirement', () => {
 });
 
 describe('the real catalog', () => {
-  it('pins exactly the one immutable URL, and it is the comic-text-detector', () => {
+  it('pins only immutable URLs, whichever assets happen to be pinned', () => {
+    // This used to assert the census `['comic-text-detector']`, which was true
+    // when exactly one asset was pinned and became false the moment the
+    // Supertonic 3 voice bundle landed as 16 sha256-pinned artifacts. The
+    // invariant was never the count — it is that a pin is only sound when the
+    // URL cannot change underneath it, so that is what is asserted now.
     const pinned = ASSET_CATALOG.filter((s) => s.sha256);
-    expect(pinned.map((s) => s.id)).toEqual(['comic-text-detector']);
-    // The pin is only sound because the URL names an immutable release tag.
-    expect(pinned[0].url).toContain('/releases/download/beta-0.2.1/');
-    expect(pinned[0].sha256).toBe('1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f');
+    expect(pinned.length).toBeGreaterThan(0);
+    for (const asset of pinned) {
+      // An immutable reference: a release tag, or a resolve/raw path naming a
+      // full 40-char commit sha rather than a branch.
+      const immutable = /\/releases\/download\/[^/]+\//.test(asset.url)
+        || /\/(?:resolve|raw)\/[0-9a-f]{40}\//.test(asset.url);
+      expect(immutable, `${asset.id} is pinned to a mutable URL: ${asset.url}`).toBe(true);
+      expect(asset.sha256, `${asset.id} sha256`).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it('still pins the comic-text-detector to its exact known release and digest', () => {
+    const ctd = ASSET_CATALOG.find((s) => s.id === 'comic-text-detector');
+    expect(ctd, 'comic-text-detector is still in the catalog').toBeDefined();
+    expect(ctd!.url).toContain('/releases/download/beta-0.2.1/');
+    expect(ctd!.sha256).toBe('1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f');
   });
 
   it('leaves every mutable URL unpinned, so a legitimate release is not a hard failure', () => {
