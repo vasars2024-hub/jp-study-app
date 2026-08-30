@@ -6,11 +6,27 @@
 // feature remains findable by its English name after the i18n sweep.
 
 import { SCRAPER_NAV } from './scraperPages';
-import type { ScraperRegistryEntry } from './types';
+import type { ScraperEntryTextKey, ScraperRegistryEntry } from './types';
 import type { ScraperPageId } from '../../../shared/scraperShell';
 import { sx, type ScraperTextKey } from './strings';
+import { catalogFor, en as SHARED_EN } from '../../../shared/i18n/catalogs';
+import { translate } from '../../../shared/i18n/core';
+import { getUiLang } from '../../i18n';
 
 const MAX_RESULTS = 24;
+
+/**
+ * Resolve a registry key from whichever catalog owns it. The Scraper is
+ * mid-migration out of strings.ts, so an entry can name either side; the prefix
+ * says which. Kept here rather than in strings.ts because strings.ts resolves
+ * only its OWN keys (plus their `scrApp.`-prefixed migrations) and widening it
+ * would make every sx() call site look up two catalogs for no reason.
+ */
+export function resolveEntryText(key: ScraperEntryTextKey): string {
+  if (!key.startsWith('scraperMgmt.')) return sx(key as ScraperTextKey);
+  const lang = getUiLang();
+  return translate(key, undefined, { lang, catalog: catalogFor(lang), fallback: SHARED_EN });
+}
 
 export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
   {
@@ -308,6 +324,71 @@ export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
     pageId: 'exports',
     group: 'Data',
   },
+  // Profiles and Scheduled finished the i18n migration first, so these eight
+  // name shared-catalog keys. See ScraperSharedTextKey in types.ts.
+  {
+    id: 'profile-identity',
+    titleKey: 'scraperMgmt.identity.title',
+    descKey: 'scraperMgmt.identity.description',
+    keywords: ['profile', 'active', 'rename', 'reset', 'delete', 'create', 'identity'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'profile-presets',
+    titleKey: 'scraperMgmt.presets.title',
+    descKey: 'scraperMgmt.presets.description',
+    keywords: ['preset', 'library', 'fast', 'balanced', 'thorough', 'apply', 'template'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'profile-comparison',
+    titleKey: 'scraperMgmt.compare.title',
+    descKey: 'scraperMgmt.compare.description',
+    keywords: ['compare', 'comparison', 'difference', 'concurrency', 'timeout', 'retry', 'delay'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'profile-site-overrides',
+    titleKey: 'scraperMgmt.overrides.title',
+    descKey: 'scraperMgmt.overrides.description',
+    keywords: ['override', 'per-site', 'host', 'domain', 'exception', 'pin'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'profile-history',
+    titleKey: 'scraperMgmt.history.title',
+    descKey: 'scraperMgmt.history.description',
+    keywords: ['revision', 'history', 'restore', 'rollback', 'undo', 'previous', 'version'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'profile-portable',
+    titleKey: 'scraperMgmt.portable.title',
+    descKey: 'scraperMgmt.portable.description',
+    keywords: ['import', 'export', 'backup', 'restore', 'json', 'portable', 'transfer'],
+    pageId: 'profiles',
+    group: 'Scraper',
+  },
+  {
+    id: 'scheduled-list',
+    titleKey: 'scraperMgmt.sched.listTitle',
+    keywords: ['schedules', 'list', 'enabled', 'paused', 'cron', 'recurring'],
+    pageId: 'scheduled',
+    group: 'Scraper',
+  },
+  {
+    id: 'schedule-editor',
+    titleKey: 'scraperMgmt.sched.editorTitle',
+    descKey: 'scraperMgmt.sched.editorDescription',
+    keywords: ['schedule', 'editor', 'cron', 'expression', 'edit', 'add', 'new'],
+    pageId: 'scheduled',
+    group: 'Scraper',
+  },
 ];
 
 /**
@@ -316,7 +397,7 @@ export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
  */
 export function searchScraper(
   query: string,
-  resolve: (key: ScraperTextKey) => string = sx,
+  resolve: (key: ScraperEntryTextKey) => string = resolveEntryText,
   opts?: { advanced?: boolean },
 ): ScraperRegistryEntry[] {
   const q = query.trim().toLowerCase();

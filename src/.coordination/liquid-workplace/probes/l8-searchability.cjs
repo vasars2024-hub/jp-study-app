@@ -210,11 +210,31 @@ if (plantMisroute && rows.length) {
  * could reasonably search for; one that no registry entry names is unreachable
  * by search no matter how well the landing works. */
 const cardIds = new Set();
+/* A card that exists only after the user has selected something is not a search
+ * DESTINATION: navigating to its page shows the list it hangs off, not the card,
+ * so indexing it would manufacture exactly the misroute this probe exists to
+ * catch. Detected from the guard that immediately precedes the tag — `{open && (`
+ * — rather than from a hard-coded id, so the next one classifies itself.
+ *
+ * This is a SEPARATE count, never folded into `indexed`, because the bucket
+ * holds two different things and only one of them is settled. `history-detail`
+ * is an instance view of a selected row and is genuinely not a destination.
+ * `secret-os-leave` and `companions-leave-secret` are real destinations gated on
+ * the active theme — indexing those needs a theme gate in the registry, the way
+ * `advanced: true` gates BuildStatusPanel. Reported by name so neither is
+ * excused by silence. */
+const conditionalCards = new Set();
 for (const text of src.values()) {
-  for (const m of text.matchAll(REG.cardRe)) cardIds.add(m[1]);
+  for (const m of text.matchAll(REG.cardRe)) {
+    cardIds.add(m[1]);
+    if (/(?:&&|\?)\s*\(\s*$/.test(text.slice(0, m.index))) conditionalCards.add(m[1]);
+  }
 }
 const indexedIds = new Set(entries.map((e) => e.id));
-const uncovered = [...cardIds].filter((id) => !indexedIds.has(id)).sort();
+const uncovered = [...cardIds]
+  .filter((id) => !indexedIds.has(id) && !conditionalCards.has(id))
+  .sort();
+const conditionalOnly = [...conditionalCards].filter((id) => !indexedIds.has(id)).sort();
 
 const count = (s) => rows.filter((r) => r.state === s).length;
 const result = {
@@ -228,8 +248,10 @@ const result = {
   misrouted: count('misrouted'),
   unanchored: count('unanchored'),
   cardDestinations: cardIds.size,
-  cardDestinationsIndexed: cardIds.size - uncovered.length,
+  cardDestinationsIndexed: [...cardIds].filter((id) => indexedIds.has(id)).length,
+  cardDestinationsConditional: conditionalOnly.length,
   cardDestinationsUnsearchable: uncovered.length,
+  conditionalIds: conditionalOnly,
   unsearchableIds: uncovered,
   misroutedIds: rows.filter((r) => r.state === 'misrouted').map((r) => `${r.id} -> page '${r.pageId}' but anchored in ${r.owners.join(',')}`),
   unanchoredIds: rows.filter((r) => r.state === 'unanchored').map((r) => `${r.id} -> page '${r.pageId}'`),

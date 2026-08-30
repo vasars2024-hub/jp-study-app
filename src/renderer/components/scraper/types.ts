@@ -29,10 +29,27 @@ export interface ScraperNavPage {
   advanced?: boolean;
 }
 
+/**
+ * A key into the shared i18n catalogs rather than strings.ts. The Profiles and
+ * Scheduled pages finished their migration first, so their card headings live
+ * under `scraperMgmt.*` in shared/i18n/scraperUi/ in all four languages. The
+ * search registry admits those directly instead of re-declaring eight strings
+ * in strings.ts, which would leave two sources of truth for one heading and
+ * would have to be un-forked again when the rest of the app follows.
+ *
+ * The prefix is all the type system can check — `Catalog` is a Record, so there
+ * is no literal key union to intersect with. Existence is a test's job
+ * (scraperRegistry.test.ts resolves every entry key to real text).
+ */
+export type ScraperSharedTextKey = `scraperMgmt.${string}`;
+
+/** Either catalog: strings.ts while it lasts, shared for what has moved. */
+export type ScraperEntryTextKey = ScraperTextKey | ScraperSharedTextKey;
+
 export interface ScraperRegistryEntry {
   id: string;
-  titleKey: ScraperTextKey;
-  descKey?: ScraperTextKey;
+  titleKey: ScraperEntryTextKey;
+  descKey?: ScraperEntryTextKey;
   /**
    * Search terms, deliberately literal English rather than text keys — search
    * matches the resolved title/description plus these, so a feature stays

@@ -3,6 +3,8 @@ import { SCRAPER_REGISTRY, searchScraper } from '../components/scraper/scraperRe
 import { SCRAPER_NAV, scraperGroupOrder, scraperPageMeta } from '../components/scraper/scraperPages';
 import { SCRAPER_PAGE_IDS } from '../../shared/scraperShell';
 import { SCRAPER_TEXT, type ScraperTextKey } from '../components/scraper/strings';
+import type { ScraperEntryTextKey } from '../components/scraper/types';
+import { en as SHARED_EN } from '../../shared/i18n/catalogs';
 import {
   countFeatureStatuses,
   featureStatusEntries,
@@ -10,9 +12,17 @@ import {
   statusOf,
 } from '../components/scraper/featureStatus';
 
-/** Count-bearing entries are functions; a title key never is. */
-const literalText = (key: ScraperTextKey): string => {
-  const value = SCRAPER_TEXT[key];
+/**
+ * English text for either catalog, without going through sx()/translate(): the
+ * point of these tests is the registry, not the i18n layer's current migration
+ * state. Count-bearing entries are functions; a title key never is.
+ */
+const literalText = (key: ScraperEntryTextKey): string => {
+  if (key.startsWith('scraperMgmt.')) {
+    const shared = SHARED_EN[key];
+    return typeof shared === 'string' ? shared : '';
+  }
+  const value = SCRAPER_TEXT[key as ScraperTextKey];
   return typeof value === 'function' ? '' : value;
 };
 
@@ -101,9 +111,9 @@ describe('searchScraper', () => {
 
   it('resolves every entry title and description to real text', () => {
     for (const entry of SCRAPER_REGISTRY) {
-      expect(SCRAPER_TEXT[entry.titleKey], `${entry.id}: ${entry.titleKey}`).toBeTruthy();
+      expect(literalText(entry.titleKey), `${entry.id}: ${entry.titleKey}`).toBeTruthy();
       if (entry.descKey) {
-        expect(SCRAPER_TEXT[entry.descKey], `${entry.id}: ${entry.descKey}`).toBeTruthy();
+        expect(literalText(entry.descKey), `${entry.id}: ${entry.descKey}`).toBeTruthy();
       }
     }
   });

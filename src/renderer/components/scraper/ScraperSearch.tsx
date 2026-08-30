@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icons';
 import { AnchorSurface } from '../liquid/LiquidSurface';
 import StatusDot from './StatusDot';
-import { searchScraper } from './scraperRegistry';
+import { resolveEntryText, searchScraper } from './scraperRegistry';
 import {
   clearRecentScraperQueries,
   getRecentScraperQueries,
@@ -221,9 +221,9 @@ export default function ScraperSearch() {
               >
                 <StatusDot id={`page.${hit.pageId}`} />
                 <span className="scr-search-hit-main">
-                  <span className="scr-search-hit-title">{sx(hit.titleKey)}</span>
+                  <span className="scr-search-hit-title">{resolveEntryText(hit.titleKey)}</span>
                   {hit.descKey && (
-                    <span className="scr-search-hit-desc">{sx(hit.descKey)}</span>
+                    <span className="scr-search-hit-desc">{resolveEntryText(hit.descKey)}</span>
                   )}
                 </span>
                 <span className="scr-search-hit-group">{hit.group}</span>
