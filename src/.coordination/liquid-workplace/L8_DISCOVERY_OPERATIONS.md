@@ -594,3 +594,13 @@ preflight honesty, provider state, progress, and run statistics. Mechanical comp
 
 `i18n-check` passes at **11,659** English keys and the focused suite passes **21/21**. Category 8
 remains open at 83.2%; 100 catalog keys still use the English `TEXT` fallback.
+
+### 2026-08-30 — Scraper i18n, batch 10: Page and history chrome complete
+
+**532 of 596 keys migrated (89.3%)**, +36 this batch. All 19 `page.*` and 17 `history.*` entries
+now resolve from the shared catalogs: every page title/description plus job filters, empty and
+missing-detail states, reverse actions, and table columns. Mechanical comparison reports **19/19
+page keys and 17/17 history keys, with 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,695** English keys and the focused suite passes **21/21**. Category 8
+remains open at 89.3%; the operational-prefix tail contains 64 English `TEXT` fallbacks.
