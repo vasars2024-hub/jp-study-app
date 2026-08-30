@@ -4364,6 +4364,8 @@ export const zh: Catalog = {
   'library.toolbar.youtube': 'YouTube',
   'yt.link.extension': '配对 Chrome 扩展',
   'yt.link.inbox': '阅读器收件箱',
+  'yt.side.tools': '播放列表工具',
+  'yt.prefs.summary': '播放列表设置',
   'library.btn.importFiles': '+ 导入文件',
   'library.btn.moreImports': '更多添加方式',
   'library.btn.importFolder': '导入图片文件夹',

@@ -4860,6 +4860,8 @@ export const ru: Catalog = {
   'library.toolbar.youtube': 'YouTube',
   'yt.link.extension': 'Привязать расширение Chrome',
   'yt.link.inbox': 'Входящие Reader',
+  'yt.side.tools': 'Инструменты плейлиста',
+  'yt.prefs.summary': 'Настройки плейлиста',
   'library.btn.importFiles': '+ Импорт файла(ов)',
   'library.btn.moreImports': 'Другие способы добавить',
   'library.btn.importFolder': 'Импорт папки с изображениями',

@@ -23987,8 +23987,15 @@ html.lockscreen-widget-root #root {
   height: 100%;
   min-height: 0;
   gap: 0;
-  background: var(--bg, #121212);
-  color: var(--fg, #eee);
+  background: var(--bg);
+  /* `--fg` IS NOT A TOKEN IN THIS REPO — the fallback was the whole declaration. Every
+     palette defines `--text`; `--fg` is defined by none of them, so this surface painted
+     a hardcoded `#eee` on all twelve. On the dark themes that coincided with the intent
+     (6.52:1 in forest-night); in `classic-light` it is near-white on `--bg: #ffffff`, and
+     category 5 measured 75 of 106 painted text runs failing, minimum ratio 1.00 — text
+     the exact colour of its own background. `.fwin` already sets `--bg`/`--text`, so this
+     pair now agrees with the window instead of overriding half of it. */
+  color: var(--text);
 }
 .yt-tabs {
   display: flex;
@@ -24025,8 +24032,14 @@ html.lockscreen-widget-root #root {
   font-size: 12px;
   margin-bottom: 6px;
 }
+/* Secondary text is a COLOUR here, not an opacity. `--text` at 0.65-0.7 alpha over
+   `classic-light`'s white composites to roughly rgb(150) and still fails the 4.5 bar after
+   the `--fg` repair above; `--muted` is the token the palettes already tune per theme
+   (#5f5f66 on white, 6.5:1). It also stops the dimming leaking onto icons and buttons that
+   happen to sit inside these rows — the folder head's delete control was being dimmed with
+   its label. Seven sites, all of them dimmed text. */
 .yt-download-bar-title {
-  opacity: 0.7;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -24085,8 +24098,45 @@ html.lockscreen-widget-root #root {
 .yt-hint {
   margin: 0;
   font-size: 11px;
-  opacity: 0.65;
+  color: var(--muted);
   line-height: 1.35;
+}
+/* The two progressive disclosures. The native `<summary>` marker is kept deliberately —
+   it is the platform's own affordance, needs no glyph of ours, and stays correct in every
+   theme and at every zoom. `min-height` is category 1's 32px pointer floor: `.lq-hit-scope`
+   on `.yt-root` reaches buttons and links, and a `summary` is neither. */
+.yt-side-tools > summary,
+.yt-prefs-disclosure > summary {
+  min-height: var(--lq-hit-target);
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.yt-side-tools-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.yt-side-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* `.yt-prefs` is the wrapping flex row; the disclosure is its only item and has to take the
+   full width, and the form's own wrap moves down to the body so the collapsed state is one
+   line rather than an empty band. */
+.yt-prefs-disclosure {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.yt-prefs-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  padding-top: 4px;
 }
 .yt-tree {
   flex: 1;
@@ -24108,7 +24158,7 @@ html.lockscreen-widget-root #root {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  opacity: 0.7;
+  color: var(--muted);
   margin-bottom: 4px;
 }
 .yt-folder-head span {
@@ -24142,7 +24192,7 @@ html.lockscreen-widget-root #root {
 }
 .yt-pl-item-meta {
   font-size: 11px;
-  opacity: 0.65;
+  color: var(--muted);
 }
 .yt-main {
   display: flex;
@@ -24175,7 +24225,7 @@ html.lockscreen-widget-root #root {
 }
 .yt-header-channel {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--muted);
   margin-top: 2px;
 }
 .yt-header-actions {
@@ -24314,7 +24364,7 @@ html.lockscreen-widget-root #root {
   display: flex;
   gap: 10px;
   font-size: 11px;
-  opacity: 0.65;
+  color: var(--muted);
   margin-top: 2px;
   /* The title ellipsises itself, but this row did not: a flex item's `min-width` is `auto`,
      so the three spans held the body open at their full text width and the whole row measured
@@ -24335,11 +24385,14 @@ html.lockscreen-widget-root #root {
 .yt-empty {
   padding: 28px 16px;
   text-align: center;
-  opacity: 0.7;
+  color: var(--muted);
   font-size: 13px;
 }
 .yt-status-err {
-  color: #f88;
+  /* `#f88` is a light-theme failure by construction: ~2.3:1 on white. `--danger-text` is
+     the family the palettes already remap for exactly this (30% danger into --text on the
+     six light themes). */
+  color: var(--danger-text);
 }
 /* `MIN_W`/`MIN_H` in `DesktopShell.tsx` are 260x170, so the smallest this window goes is a
    size a user can actually reach, and category 4 measured 44 clipped elements there: a 200px

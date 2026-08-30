@@ -4382,6 +4382,8 @@ export const ja: Catalog = {
   'library.toolbar.youtube': 'YouTube',
   'yt.link.extension': 'Chrome 拡張をペアリング',
   'yt.link.inbox': 'Reader 受信箱',
+  'yt.side.tools': 'プレイリストツール',
+  'yt.prefs.summary': 'プレイリスト設定',
   'library.btn.importFiles': '+ ファイルをインポート',
   'library.btn.moreImports': '他の追加方法',
   'library.btn.importFolder': '画像フォルダをインポート',

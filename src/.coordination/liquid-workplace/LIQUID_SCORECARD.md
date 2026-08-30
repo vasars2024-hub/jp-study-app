@@ -1169,3 +1169,57 @@ with zero rows and silently restores nothing.
 Surface returned to what it was found in: presentation `standard`, playlist tab active, both
 drafts empty, 0 rows selected, 16 rows painted. Evidence: `baselines/cat6-youtube.json`.
 **YouTube 30/80 → 40/80.**
+
+## 2026-08-30 · backup — YouTube category 5 closes at a controlled 10/10
+
+**Category 5 — UI clarity. 7/10 → PASS 10/10.** Three of the ten questions answered NO on the
+first run, and all three were real product defects rather than instrument problems. Zero new
+probes: two RUNs of `cat5-ui-clarity.cjs` plus its `--control`, and one re-RUN each of
+categories 1, 3, 4 and 6 after the structural edits (Carry 19).
+
+**Q5 — `--fg` IS NOT A TOKEN IN THIS REPO, and the fallback was the whole declaration.**
+`.yt-root` read `color: var(--fg, #eee)`. No `:root` block in the 700 KB stylesheet defines
+`--fg`, so every one of the twelve palettes painted the literal `#eee`. On the six dark themes
+that coincided with the intent; in `classic-light` it is near-white on `--bg: #ffffff`.
+
+| theme | measured runs | minimum ratio | failing |
+| --- | --- | --- | --- |
+| forest-night, before | 106 | 6.52 | 0 |
+| classic-light, before | 106 | **1.00** | **75** |
+| forest-night, after | 89 | 5.12 | 0 |
+| classic-light, after | 89 | **5.46** | **0** |
+
+A ratio of 1.00 is text the exact colour of its own background. `themeAxisMoved` true both
+times, so the two cells are a real stability answer and not one number reported twice.
+Repairing the token alone was NOT enough: seven rules dimmed secondary text with
+`opacity: 0.65`/`0.7`, and `--text` at 0.65 alpha over white composites to about rgb(150) and
+still misses the 4.5 bar. Those seven move to `--muted`, which the palettes already tune
+(#5f5f66 on white). `.yt-status-err`'s hardcoded `#f88` (~2.3:1 on white) moves to
+`--danger-text`. Dropping the opacity also stopped the dimming leaking onto controls: the
+folder head's delete button was being greyed with its own label.
+
+**Q4 — 29 controls to scan in the default state, against a ceiling of 12, and 0 disclosures.**
+Two native `<details>`: the rail's secondary tools (extension pairing, Reader Inbox, Surprise
+me, new folder) and the fourteen-control playlist preference form. **scannedControls 29 → 10,
+collapsedDisclosures 0 → 2.** Paste-a-URL deliberately stays outside, because it is the rail's
+one obvious way in. Nothing is removed and nothing is controlled by React state — a `<details>`
+is native, keyboard-reachable and reversible, and the resting state is the same every time.
+
+**Q1 — 8 entry points against a bar of 1-3.** Not fixed separately: with the two disclosures
+closed, `primaryInputs` 5 → 1 and `accentButtons` 3 → 2 (`Add` and `Log`; the `JA` sub-language
+chip is inside the prefs form). **entryPoints 8 → 3.**
+
+Category 6 gained a tenth row, `progressiveDisclosure`, so a disclosure that stops opening
+cannot pass unnoticed, plus an `openTools` drive step and its own mutation — parity
+**10/10 in both presentations**, round trip `diffs []`, all ten mutations `exactlyOwnRow`.
+
+Re-runs after the structural edits, none inherited: **cat1 10/10, cat3 10/10 (liquid
+presentation), cat4 10/10, cat6 10/10.** Control: `CONTROL FAILED AS REQUIRED on Q2, Q3, Q4,
+Q5, Q10`, with the Q4 plant taking scanned 10 → 32 past the bar of 12.
+
+Guard `youtubeClarityGuards.test.ts` (7 cases) pins all three repairs at source, and it was
+mutation-checked rather than merely run: putting `var(--fg, #eee)` back took it **7 passed →
+2 failed**, and the stylesheet was restored byte-identical to the staged region afterwards.
+
+**YouTube 40/80 → 50/80.** Remaining: categories 2, 7, 8. Evidence:
+`baselines/cat5-l8-youtube.json`, `cat5-l8-youtube-control.json`, `cat6-l8-youtube.json`.

@@ -580,31 +580,44 @@ export default function YouTubePlaylistsView() {
                 {t('yt.add.submit')}
               </button>
             </AnchorSurface>
-            <p className="yt-hint">{t('yt.add.extensionHint')}</p>
-            <div className="yt-side-links" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
-                {t('yt.link.extension')}
-              </button>
-              <button type="button" className="btn small" onClick={() => openLibraryInbox()}>
-                {t('yt.link.inbox')}
-              </button>
-              <button type="button" className="btn small" disabled={!!busy} onClick={() => surpriseMe()}>
-                {t('yt.action.surprise')}
-              </button>
-            </div>
+            {/* Progressive disclosure, and it is the rubric's own words rather than a
+                preference: category 5 asks for at least one collapsed disclosure AND no more
+                than 12 controls to scan in the default state, and this surface presented 29.
+                Paste-a-URL stays out here because it is the rail's one obvious way in;
+                extension pairing, the inbox, Surprise me and folder creation are setup and
+                management, done rarely, and they are what buried it. Nothing is removed —
+                `<details>` is a native, keyboard-reachable, reversible disclosure, and the
+                panel remembers nothing, so it opens the same way every time. */}
+            <details className="yt-side-tools">
+              <summary>{t('yt.side.tools')}</summary>
+              <div className="yt-side-tools-body">
+                <p className="yt-hint">{t('yt.add.extensionHint')}</p>
+                <div className="yt-side-links">
+                  <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
+                    {t('yt.link.extension')}
+                  </button>
+                  <button type="button" className="btn small" onClick={() => openLibraryInbox()}>
+                    {t('yt.link.inbox')}
+                  </button>
+                  <button type="button" className="btn small" disabled={!!busy} onClick={() => surpriseMe()}>
+                    {t('yt.action.surprise')}
+                  </button>
+                </div>
 
-            <AnchorSurface bare className="yt-folder-add">
-              <input
-                className="gram-search"
-                value={folderName}
-                onChange={(e) => setFolderName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
-                placeholder={t('yt.folder.placeholder')}
-              />
-              <button type="button" className="btn small" onClick={() => void addFolder()}>
-                <Icon name="folder" size={14} />
-              </button>
-            </AnchorSurface>
+                <AnchorSurface bare className="yt-folder-add">
+                  <input
+                    className="gram-search"
+                    value={folderName}
+                    onChange={(e) => setFolderName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
+                    placeholder={t('yt.folder.placeholder')}
+                  />
+                  <button type="button" className="btn small" onClick={() => void addFolder()}>
+                    <Icon name="folder" size={14} />
+                  </button>
+                </AnchorSurface>
+              </div>
+            </details>
 
             <div className="yt-tree">
               <button
@@ -836,6 +849,14 @@ export default function YouTubePlaylistsView() {
 
                 {side?.kind === 'playlist' && playlist ? (
                   <AnchorSurface bare className="yt-prefs">
+                    {/* Fourteen controls that configure a playlist once and are then read
+                        rather than used. They sat between the header and the video list in
+                        the default state, which is category 5's clutter term exactly. The
+                        anchor stays where it is so category 3's "dense work on an opaque
+                        surface" is unchanged; only the default openness moves. */}
+                    <details className="yt-prefs-disclosure">
+                      <summary>{t('yt.prefs.summary')}</summary>
+                      <div className="yt-prefs-body">
                     {playlist.channelId ? (
                       <div className="yt-pref yt-channel-card">
                         <span>Channel tracking</span>
@@ -970,6 +991,8 @@ export default function YouTubePlaylistsView() {
                       />
                       {t('yt.pref.unloggedOnly')}
                     </label>
+                      </div>
+                    </details>
                   </AnchorSurface>
                 ) : null}
 

@@ -9,6 +9,10 @@
   "box": "980x640",
   "driven": [
     {
+      "step": "openTools",
+      "result": "{\"was\":false,\"now\":true}"
+    },
+    {
       "step": "draftFolder",
       "result": "{\"was\":\"\",\"now\":\"lqp-folder-draft\"}"
     },
@@ -27,8 +31,8 @@
   ],
   "drivenRefusals": 0,
   "parity": {
-    "standard": "9/9",
-    "liquid": "9/9",
+    "standard": "10/10",
+    "liquid": "10/10",
     "na": 0,
     "equal": true,
     "rowsAgree": true,
@@ -49,136 +53,151 @@
       {
         "mutation": "playlistRail",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "playlistRail"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "folderTree",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "folderTree"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "addPlaylist",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "addPlaylist"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "tabSwitching",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "active removed from 1 of 1",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "tabSwitching"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"removed-class\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"removed-class\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "videoRows",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "videoRows"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "rowActions",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "disabled stripped",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "rowActions"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"disabled\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"disabled\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "selectionActions",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "selectionActions"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "playlistPreferences",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "playlistPreferences"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "progressiveDisclosure",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "progressiveDisclosure"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "windowLifecycle",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "aria-pressed stripped",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "windowLifecycle"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"aria-pressed\",\"youtube:folder\"]",
-        "afterRestore": "9/9",
+        "restored": "[\"aria-pressed\",\"youtube:folder+tools\"]",
+        "afterRestore": "10/10",
         "returned": true
       }
     ],

@@ -4648,6 +4648,8 @@ export const en: Catalog = {
   'library.toolbar.youtube': 'YouTube',
   'yt.link.extension': 'Pair Chrome extension',
   'yt.link.inbox': 'Reader Inbox',
+  'yt.side.tools': 'Playlist tools',
+  'yt.prefs.summary': 'Playlist settings',
   'library.btn.importFiles': '+ Import file(s)',
   'library.btn.moreImports': 'More ways to add',
   'library.btn.importFolder': 'Import image folder',

@@ -3907,9 +3907,41 @@
             };
           },
         },
+        {
+          // The two disclosures added for category 5 are FEATURES, so they enter the ledger
+          // the moment they ship: a surface that tucks tools away and cannot get them back is
+          // the enable-with-no-disable-path defect in miniature. The row is deliberately
+          // INDEPENDENT of whether they are open — the drive opens one and the undo closes
+          // it, and a row that flipped with that would report drive residue as a regression.
+          // What it asserts is that each one names itself and still HOLDS its controls in the
+          // DOM whatever its state, i.e. the tools were tucked away and not deleted.
+          id: 'progressiveDisclosure',
+          f: (w) => {
+            const all = qa(w, '.yt-side-tools, .yt-prefs-disclosure');
+            const summaried = all.filter((d) => txt(q(d, 'summary')).length > 0);
+            const held = all.filter((d) => qa(d, 'button,input,select').length > 0);
+            const real = all.filter((d) => typeof d.open === 'boolean');
+            return {
+              ok: all.length === 2 && summaried.length === 2
+                && held.length === 2 && real.length === 2,
+              ev: `disclosures=${all.length} summaried=${summaried.length} controlsHeld=${held.length} open=${all.filter((d) => d.open).length}`,
+            };
+          },
+        },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        // Opened FIRST, because the folder field lives inside it. Typing into a field the user
+        // cannot see would still have passed — `typeInto` does not care — and the drive would
+        // then have proved nothing about the disclosure it was reaching through.
+        openTools: (w) => {
+          const g = ytState();
+          const d = q(w, '.yt-side-tools');
+          if (!d) return { refused: 'no side-tools disclosure' };
+          if (g.tools == null) g.tools = d.open;
+          d.open = true;
+          return { was: g.tools, now: d.open };
+        },
         // The FOLDER-name draft, not the add-URL field, and that is not a preference:
         // `cat6-feature-parity.cjs` dirties the first editable text input on the surface —
         // which is the add field — and afterwards hunts for its own mark to put it back.
@@ -3955,7 +3987,7 @@
       // News first and the playlist tab LAST, so the run ends on the populated pane. The
       // product opens on News, which is empty on this profile, and an empty harness caps a
       // category at 0 — the same trap that scored this surface's other categories.
-      drive: ['draftFolder', 'openNews', 'openPlaylist', 'selectRow'],
+      drive: ['openTools', 'draftFolder', 'openNews', 'openPlaylist', 'selectRow'],
       undo: {
         youtube: (w) => {
           const g = window.__LQP_YT_ORIG;
@@ -3984,6 +4016,14 @@
             const now = tabs.findIndex((b) => b.classList.contains('active'));
             if (tabs[g.tab] && now !== g.tab) { tabs[g.tab].click(); done.push('tab'); }
           }
+          // LAST, and after the folder field has been put back: closing the disclosure first
+          // would restore a value into a field this sweep can no longer see, which is the
+          // same ordering bug the selection/tab pair above records.
+          const tools = q(w, '.yt-side-tools');
+          if (tools && g.tools != null && tools.open !== g.tools) {
+            tools.open = g.tools;
+            done.push('tools');
+          }
           window.__LQP_YT_ORIG = null;
           return done.length ? `youtube:${done.join('+')}` : null;
         },
@@ -4011,6 +4051,9 @@
         ),
         selectionActions: (w) => detach(q(w, '.yt-header-actions button.primary'), 'no batch log action'),
         playlistPreferences: (w) => detach(q(w, '.yt-prefs .yt-chips'), 'no sub-language chip group'),
+        // The prefs summary's own element, not the disclosure: detaching a whole `<details>`
+        // would take `playlistPreferences` with it and the control would prove two rows.
+        progressiveDisclosure: (w) => detach(q(w, '.yt-prefs-disclosure > summary'), 'no prefs disclosure summary'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
