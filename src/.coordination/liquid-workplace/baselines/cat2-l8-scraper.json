@@ -1,0 +1,189 @@
+{
+  "label": "l8-scraper",
+  "surface": "@.fwin:has(.scr-shell)",
+  "win": "main",
+  "task": "click:.scr-drawer-cat:nth-child(1) >> wait:500",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 74,
+    "controlCount": 72,
+    "box": "820x580",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      3
+    ],
+    "inputRecv": [],
+    "worstRecv": 3,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      102.7
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 102.7
+  },
+  "steps": [
+    {
+      "step": "click:.scr-drawer-cat:nth-child(1)",
+      "target": {
+        "sel": ".scr-drawer-cat:nth-child(1)",
+        "label": "Network",
+        "disabled": false,
+        "at": "333,342"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.scr-drawer-cat:nth-child(7)",
+    "steps": [
+      "click:.scr-drawer-cat:nth-child(7)"
+    ],
+    "restored": true,
+    "baseHash": "1jck6th",
+    "afterHash": "1jck6th",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "1jck6th",
+      "after": "1jck6th"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 3
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 1,
+      "deadEnds": 0,
+      "worstRecv": 1.2
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 1,
+    "standardTotal": 1
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      1.1
+    ]
+  }
+}

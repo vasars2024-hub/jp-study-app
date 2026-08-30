@@ -5,7 +5,7 @@
 // the Settings app's copy of the same document stays in step; writing to
 // localStorage directly here would desync both the UI and the change event.
 
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Toggle } from '../../ui';
 import StatusDot from '../StatusDot';
@@ -270,7 +270,10 @@ export default function ScraperSettingsDrawer() {
                 aria-current={active ? 'true' : undefined}
                 onClick={() => {
                   setQuery('');
-                  ctl.openDrawer(group.id);
+                  // Changing the shared shell category also re-renders the mounted
+                  // Scraper page behind the drawer. Keep that non-urgent tree swap
+                  // interruptible so the category click receives a paint first.
+                  startTransition(() => ctl.openDrawer(group.id));
                 }}
               >
                 <Icon name={group.icon} size={15} />

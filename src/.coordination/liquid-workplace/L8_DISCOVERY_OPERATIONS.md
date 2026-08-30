@@ -144,3 +144,13 @@ search now stays open within its composite and closes when focus leaves it.
 
 Evidence: `baselines/cat1-l8-scraper.json`; regression `scraperSearchFocus.test.tsx`
 **1/1**. Scraper is **10/80**; next run is the existing category-2 harness.
+
+## 2026-08-30 — Scraper category 2 closes at 10/10
+
+Dominant task: qBittorrent → Network → qBittorrent, one click each way. First run found
+receive-to-paint **218.0 / 171.5 ms** in Standard/Liquid (inert control **0.5 ms**). Marking
+the shared-shell category swap as a React transition makes the re-render interruptible;
+the controlled re-run is **3.0 / 1.2 ms**, cost **1:1**, dead ends/modal traps/scroll traps
+**0/0/0**, idle churn **0**, and the state hash restores exactly. The negative control moved
+each defect **0→1→0**. Evidence: `baselines/cat2-l8-scraper.json`; focused tests **4/4**.
+Scraper is **20/80**; next run is the existing category-3 harness.
