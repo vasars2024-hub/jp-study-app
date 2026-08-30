@@ -2897,6 +2897,19 @@
   width: min(86px, 55%);
 }
 
+/* The wide three-pane composition has enough room for the cover to become part
+   of the workspace rather than stay a 66px thumbnail. This also prevents the
+   three short lists from aligning into one empty full-width band at maximized
+   size; default and compact geometry keep the smaller artwork. */
+@container mc (min-width: 1160px) {
+  .mc-album-art,
+  .mc-album-art > img,
+  .mc-album-art > div {
+    width: 132px;
+    height: 132px;
+  }
+}
+
 @container mc (max-width: 1040px) {
   .mc-sidebar {
     width: 174px;

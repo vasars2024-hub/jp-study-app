@@ -54,6 +54,13 @@ const ruleBody = (selector: string): string => {
 };
 
 describe('Media Center theme ink and material tokens', () => {
+  it('lets the album stage use the extra space in a wide three-pane workspace', () => {
+    const wide = ruleBody('@container mc (min-width: 1160px) {');
+    expect(wide).toContain('.mc-album-art');
+    expect(wide).toContain('width: 132px');
+    expect(wide).toContain('height: 132px');
+  });
+
   it('sources every ink and material the Music surface paints from a token', () => {
     expect(ruleBody('.mc-music-head h1 {')).toMatch(/color:\s*var\(--mc-hero-ink/);
     expect(ruleBody('.mc-album-copy h2 {')).toMatch(/color:\s*var\(--mc-album-ink/);

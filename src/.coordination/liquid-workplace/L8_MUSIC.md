@@ -224,3 +224,19 @@ snapshot timing. The committed baseline was restored so nothing false is banked 
 PENDING, cat4's 10 went to 0. cat1 stays FAIL (`targets32`, 15 controls under 32px, five of them
 `button.fwin-b` at 24px — shared window chrome). cat7/cat8 unmeasured. **Music: 30/80 banked, 10
 pending, 40 not yet earned.**
+
+## 2026-08-30 — wide artwork repairs category 4; Music returns to 40/80 + 10 pending
+
+The now-playing cover grows **66px -> 132px only above 1160px**, where the three-pane workspace
+has room for it; default and compact keep the thumbnail. That breaks the empty full-width band
+created when the duplicated transport left, without inventing chrome or hiding content.
+
+Existing parameterised category-4 harness: **PASS 10/10**. Default/compact/maximized dead region
+is **8.5/0.5/10%** (max was 17%, bar <=15); clips, overlaps, horizontal scrollers and hidden
+overflow are all **0** at all three sizes; chrome **62.1 -> 55.9%**, canvas **94.8 -> 95.3%**.
+Injected clip moved **0 -> 1 -> 0** and geometry restored. Focused guard: **6/6**.
+
+The first live run began from an inherited maximized window and therefore reversed the default /
+maximize legs; it was not scored. Restoring the product's recorded 1080x700 geometry before the
+rerun produced the passing evidence in `baselines/cat4-l8-music.json`. Honest total is now
+**40/80 banked + category 2 pending**: cat3 + cat4 + cat5 + cat6 are 10 each.
