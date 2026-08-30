@@ -324,6 +324,13 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'System',
   },
   {
+    // Deliberately ungated. Its card renders under `(wired || isWiredDiscovered)`
+    // and `wired` is `useWiredMaterials()` — a `data-materials` attribute, not a
+    // theme id, so it cannot be resolved to a theme list from source. Gating it
+    // on discovery alone would hide it from someone running a WIRED-material
+    // shell who has not tripped the lyrics discovery, which is a live user.
+    // `l8-searchability.cjs` names it under `conditionalOtherAxis` rather than
+    // counting it covered.
     id: 'wired-archive',
     titleKey: 'search.wiredArchive',
     descKey: 'search.wiredArchive.desc',
@@ -338,6 +345,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['wired finding', 'navi terminal', 'lyrics', 'shimeji', 'radar', 'surveillance', 'hacker terminal', 'fateburn'],
     pageId: 'special',
     group: 'System',
+    discovered: 'wired',
   },
   {
     id: 'aero-gadget-lab',
@@ -346,6 +354,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['aero gadget lab', 'xp', 'vista', 'windows media player', 'msn', 'cmd', 'legacy'],
     pageId: 'special',
     group: 'System',
+    discovered: 'aero',
   },
 
   // Wallpaper
@@ -1302,6 +1311,12 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Study',
   },
   {
+    // Deliberately ungated, and this one is a product call rather than a limit
+    // of the derivation. The card is the placeholder that says "nothing here
+    // yet"; it renders only for a user who has discovered nothing. Sending a
+    // discoverer who searches "secret" to the Special page shows them the
+    // modules they unlocked, which is a better answer than no result — the
+    // opposite of the misroute this gate exists for.
     id: 'special-locked',
     titleKey: 'search.specialLocked',
     descKey: 'search.specialLocked.desc',
@@ -1316,6 +1331,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['wired games', 'wired arcade', 'micro games', 'minigames', 'arcade'],
     pageId: 'special',
     group: 'System',
+    discovered: 'wired',
   },
   {
     id: 'aero-arcade',
@@ -1324,6 +1340,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     keywords: ['aero games', 'aero arcade', 'xp', 'vista', 'arcade', 'launcher'],
     pageId: 'special',
     group: 'System',
+    discovered: 'aero',
   },
   {
     id: 'monitors-list',
@@ -1601,27 +1618,36 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
 ];
 
 /**
- * `themeId` is the theme the searching window is actually running, and it gates
- * entries carrying `themes`. Omitting it drops every gated entry rather than
- * admitting them all: a gated card renders under a minority of themes, so the
- * unknown-theme guess that is right more often is "not rendered", and a missing
- * result costs a user less than one that navigates to a page and highlights
- * nothing.
+ * `themeId` is the theme the searching window is actually running and
+ * `discovered` is which secret shells this profile has found; together they gate
+ * entries whose cards do not render for everyone. Omitting them drops every
+ * gated entry rather than admitting them all: a gated card renders for a
+ * minority, so the unknown-state guess that is right more often is "not
+ * rendered", and a missing result costs a user less than one that navigates to a
+ * page and highlights nothing.
+ *
+ * Declared gates are OR-ed, because the guards they model are.
  */
 export function searchSettings(
   query: string,
   t: (key: string) => string,
-  opts?: { advanced?: boolean; themeId?: string },
+  opts?: { advanced?: boolean; themeId?: string; discovered?: { aero?: boolean; wired?: boolean } },
 ): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const advanced = opts?.advanced ?? false;
   const themeId = opts?.themeId;
+  const discovered = opts?.discovered;
   const words = q.split(/\s+/).filter(Boolean);
   const scored: { e: SettingsRegistryEntry; score: number; title: string }[] = [];
   for (const e of SETTINGS_REGISTRY) {
     if (e.advanced && !advanced) continue;
-    if (e.themes && (!themeId || !e.themes.includes(themeId))) continue;
+    if (e.themes || e.discovered) {
+      const renders =
+        (e.themes ? !!themeId && e.themes.includes(themeId) : false) ||
+        (e.discovered ? !!discovered?.[e.discovered] : false);
+      if (!renders) continue;
+    }
     const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
     if (page?.advanced && !advanced) continue;
     const title = e.titleKey ? t(e.titleKey) : '';

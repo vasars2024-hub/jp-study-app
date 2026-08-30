@@ -6,6 +6,8 @@ import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { loadSettingsAdvanced } from '../../settingsAdvanced';
 import { loadThemeId, onThemeChanged } from '../../theme/engine';
+import { hasDiscoveredAero, onAeroDiscoveryChanged } from '../../aeroDiscovery';
+import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../../wiredDiscovery';
 
 const SettingsSearch = forwardRef<
   HTMLInputElement,
@@ -27,10 +29,21 @@ const SettingsSearch = forwardRef<
   // `onThemeChanged` subscription the pages that render those cards use.
   const [themeId, setThemeId] = useState(loadThemeId);
   useEffect(() => onThemeChanged(setThemeId), []);
+  // Discovery can happen in another window against the same profile, which is
+  // why both modules broadcast a `storage` event as well as their own.
+  const [aeroFound, setAeroFound] = useState(hasDiscoveredAero);
+  const [wiredFound, setWiredFound] = useState(hasDiscoveredWired);
+  useEffect(() => onAeroDiscoveryChanged(setAeroFound), []);
+  useEffect(() => onWiredDiscoveryChanged(setWiredFound), []);
   const listId = useId();
   const results = useMemo(
-    () => searchSettings(query, t, { advanced: advancedMode, themeId }),
-    [query, lang, advancedMode, themeId, t],
+    () =>
+      searchSettings(query, t, {
+        advanced: advancedMode,
+        themeId,
+        discovered: { aero: aeroFound, wired: wiredFound },
+      }),
+    [query, lang, advancedMode, themeId, aeroFound, wiredFound, t],
   );
   const recent = useMemo(() => (query.trim() ? [] : getRecentQueries()), [query, open]);
 

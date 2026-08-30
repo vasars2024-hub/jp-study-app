@@ -297,44 +297,65 @@ for (const [f, text] of src) {
  * test with anything else (`wired || isWiredDiscovered`) is NOT pure: that card
  * renders for a discoverer under any theme, so gating its entry would hide a
  * live destination -- the same error in the other direction. */
-function themesRequiredBy(guard, text) {
+function themeIdOfConstant(name) {
+  for (const t2 of src.values()) {
+    const hit = t2.match(new RegExp(`${name} = '([^']+)'`));
+    if (hit) return hit[1];
+  }
+  for (const p of ['src/renderer/theme/frutiger-aero.ts', 'src/renderer/theme/wired-archive.ts']) {
+    const hit = fs.readFileSync(path.join(ROOT, p), 'utf8').match(new RegExp(`${name} = '([^']+)'`));
+    if (hit) return hit[1];
+  }
+  return null;
+}
+
+/* A discovery flag is a `useState(hasDiscoveredAero)` binding rather than a
+ * `const x =` one, so the alias resolver cannot see it -- which is exactly how
+ * the four Special-page modules stayed ungated after the theme pass closed. */
+function discoveryOf(name, text) {
+  const decl = text.match(
+    new RegExp(`const \\[${name}[^\\]]*\\]\\s*=\\s*useState\\(\\s*hasDiscovered(Aero|Wired)\\s*\\)`),
+  );
+  return decl ? decl[1].toLowerCase() : null;
+}
+
+function gateRequiredBy(guard, text) {
   let expr = guard.replace(/^\{\s*/, '').replace(/&&\s*\($/, '').trim();
   const bare = expr.match(/^([A-Za-z_$][\w$]*)$/);
   if (bare) {
     const decl = text.match(new RegExp(`const ${bare[1]}\\s*=\\s*([^;\\n]+)`));
-    if (!decl) return null;
-    expr = decl[1].trim();
+    if (decl) expr = decl[1].trim();
+    else if (!discoveryOf(bare[1], text)) return null;
   }
   expr = expr.replace(/^\((.*)\)$/s, '$1').trim();
   if (expr.includes('&&') || expr.includes('?')) return null;
-  const out = [];
-  for (const term of expr.split('||')) {
-    const eq = term.replace(/^\(|\)$/g, '').trim().match(/^[\w$.]+\s*===\s*([A-Z_][A-Z0-9_]*)$/);
-    if (!eq) return null;
-    // The constant's value lives in whichever theme module declares it.
-    let value = null;
-    for (const t2 of src.values()) {
-      const hit = t2.match(new RegExp(`${eq[1]} = '([^']+)'`));
-      if (hit) { value = hit[1]; break; }
+  const gate = { themes: [], discovered: null };
+  for (const raw of expr.split('||')) {
+    const term = raw.replace(/^\(|\)$/g, '').trim();
+    const eq = term.match(/^[\w$.]+\s*===\s*([A-Z_][A-Z0-9_]*)$/);
+    if (eq) {
+      const value = themeIdOfConstant(eq[1]);
+      if (!value) return null;
+      gate.themes.push(value);
+      continue;
     }
-    if (!value) {
-      for (const p of ['src/renderer/theme/frutiger-aero.ts', 'src/renderer/theme/wired-archive.ts']) {
-        const hit = fs.readFileSync(path.join(ROOT, p), 'utf8').match(new RegExp(`${eq[1]} = '([^']+)'`));
-        if (hit) { value = hit[1]; break; }
-      }
-    }
-    if (!value) return null;
-    out.push(value);
+    const found = /^[A-Za-z_$][\w$]*$/.test(term) ? discoveryOf(term, text) : null;
+    if (!found) return null;
+    gate.discovered = found;
   }
-  return out.length ? out : null;
+  return gate.themes.length || gate.discovered ? gate : null;
 }
 
-const themeGuarded = new Map(); // card id -> theme ids its render guard requires
+const themeGuarded = new Map(); // card id -> theme ids, for guards that are ONLY themes
+const discoveryGuarded = new Map(); // card id -> 'aero' | 'wired', for guards that are ONLY discovery
+const mixedAxisGuards = []; // theme OR discovery — named, never auto-gated
 const otherAxisGuards = [];
 for (const [id, { guard, file }] of cardGuard) {
-  const themes = themesRequiredBy(guard, src.get(file) || '');
-  if (themes) themeGuarded.set(id, themes);
-  else otherAxisGuards.push(`${id} <- ${guard}`);
+  const gate = gateRequiredBy(guard, src.get(file) || '');
+  if (!gate) otherAxisGuards.push(`${id} <- ${guard}`);
+  else if (gate.themes.length && gate.discovered) mixedAxisGuards.push(`${id} <- ${guard}`);
+  else if (gate.discovered) discoveryGuarded.set(id, gate.discovered);
+  else themeGuarded.set(id, gate.themes);
 }
 const indexedIds = new Set(entries.map((e) => e.id));
 const uncovered = [...cardIds]
@@ -360,6 +381,24 @@ const themeOverGated = [...themeGated.keys()]
   .filter((id) => cardIds.has(id) && !themeGuarded.has(id))
   .map((id) => `${id} declares themes: but its card renders under every theme`);
 
+/* The discovery axis, same two directions. `discovered:` is read from the entry
+ * body the same way `themes:` is. */
+const discoveryGated = new Map();
+for (const m of regBody.matchAll(/id: '([^']+)',([\s\S]*?)\n {2}\},/g)) {
+  const decl = m[2].match(/discovered: '(aero|wired)'/);
+  if (decl) discoveryGated.set(m[1], decl[1]);
+}
+const discoveryUngated = [];
+for (const [id, shell] of discoveryGuarded) {
+  if (!indexedIds.has(id)) continue;
+  const declared = discoveryGated.get(id);
+  if (!declared) discoveryUngated.push(`${id} renders only once ${shell} is discovered, entry has no discovered:`);
+  else if (declared !== shell) discoveryUngated.push(`${id} declares ${declared} but its guard requires ${shell}`);
+}
+const discoveryOverGated = [...discoveryGated.keys()]
+  .filter((id) => cardIds.has(id) && !discoveryGuarded.has(id))
+  .map((id) => `${id} declares discovered: but its card renders for everyone`);
+
 const count = (s) => rows.filter((r) => r.state === s).length;
 const result = {
   registry: REG.registryConst,
@@ -382,6 +421,13 @@ const result = {
   themeOverGated: themeOverGated.length,
   themeUngatedIds: themeUngated,
   themeOverGatedIds: themeOverGated,
+  discoveryGuardedCards: discoveryGuarded.size,
+  discoveryGatedEntries: discoveryGated.size,
+  discoveryUngated: discoveryUngated.length,
+  discoveryOverGated: discoveryOverGated.length,
+  discoveryUngatedIds: discoveryUngated,
+  discoveryOverGatedIds: discoveryOverGated,
+  conditionalMixedAxis: mixedAxisGuards,
   conditionalOtherAxis: otherAxisGuards,
   conditionalIds: conditionalOnly,
   unsearchableIds: uncovered.map((id) => `${id} -> page '${cardPage.get(id) ?? 'UNROUTED'}'`),
@@ -392,4 +438,6 @@ const result = {
 console.log(JSON.stringify(result, null, 2));
 const out = opt('--out', null);
 if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(result, null, 2));
-process.exit((result.misrouted > 0 || result.themeUngated > 0 || result.themeOverGated > 0) && !plantMisroute ? 1 : 0);
+const gateFailures =
+  result.themeUngated + result.themeOverGated + result.discoveryUngated + result.discoveryOverGated;
+process.exit((result.misrouted > 0 || gateFailures > 0) && !plantMisroute ? 1 : 0);

@@ -87,6 +87,16 @@ export interface SettingsRegistryEntry {
    * would count the example as a real destination.)
    */
   themes?: string[];
+  /**
+   * The secret shell whose DISCOVERY this entry's card is behind — the other
+   * render axis on the Special page, and independent of `themes`: a user who
+   * found WIRED keeps its modules under every theme.
+   *
+   * When both are declared they are OR-ed, matching the guards they model
+   * (`{(wired || isWiredDiscovered) && …}`). Not declaring either means the card
+   * renders for everyone.
+   */
+  discovered?: 'aero' | 'wired';
 }
 
 export interface UserWallThumb {

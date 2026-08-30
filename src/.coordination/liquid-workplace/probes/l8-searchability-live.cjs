@@ -14,12 +14,17 @@
  *
  *   node l8-searchability-live.cjs --query pillarbox --theme frutiger-aero \
  *                                  --control wallpaper
+ *   node l8-searchability-live.cjs --query "wired arcade" --discover wired \
+ *                                  --control "aero arcade"
+ *
+ * `--discover` swaps the moved axis from the active theme to a secret shell's
+ * discovery flag, which is the OTHER thing a Special-page card renders behind.
  *
  * Reported numbers (never adjectives):
- *   underCurrent   result titles for --query under the theme the app is in
- *   underTheme     the same query after the shell moves to --theme
- *   backUnderCurrent  the same query after moving back  (the reversal)
- *   control*       the same three readings for --control, which must NOT move
+ *   queryBefore    result titles for --query in the state the app is already in
+ *   queryAfter     the same query after the moved axis changes
+ *   queryBack      the same query after it is put back  (the reversal)
+ *   control*       the same readings for --control, which must NOT move
  *
  * A run whose control moves is VOID: it proves the search box changed, not that
  * the gate did. A run whose `--query` reading is identical under both themes is
@@ -90,17 +95,36 @@ const read =
 const moveTheme = (id) =>
   `(()=>{window.dispatchEvent(new CustomEvent('jp-theme-changed',{detail:${JSON.stringify(id)}}));return 1})()`;
 
-/* One typed query, read under three theme states. Separate /eval calls: a single
+/* The DISCOVERY axis. Unlike the theme, this one has no event that carries the
+ * value -- the modules re-read localStorage when notified -- so the key really
+ * is written. It is therefore captured first and restored to the exact prior
+ * value (including "absent", which is not the same as ''), and the restore is
+ * re-read before the run reports anything. */
+const DISCOVERY_KEYS = { aero: 'jp-aero-discovered', wired: 'jp-wired-discovered-v1' };
+const DISCOVERY_EVENTS = { aero: 'jp-aero-discovered-changed', wired: 'jp-wired-discovered-changed' };
+const setDiscovery = (shell, value) =>
+  `(()=>{const k=${JSON.stringify(DISCOVERY_KEYS[shell])};` +
+  (value === null ? `localStorage.removeItem(k);` : `localStorage.setItem(k,${JSON.stringify(value)});`) +
+  `window.dispatchEvent(new CustomEvent(${JSON.stringify(DISCOVERY_EVENTS[shell])}));` +
+  `return localStorage.getItem(k)})()`;
+
+const SHELL = opt('--discover', null);
+if (SHELL && !DISCOVERY_KEYS[SHELL]) {
+  console.error(`unknown --discover; expected one of ${Object.keys(DISCOVERY_KEYS).join(', ')}`);
+  process.exit(2);
+}
+
+/* One typed query read on both sides of the move. Separate /eval calls: a single
  * batched call would type and read inside one React flush and always report the
  * pre-render DOM. */
-async function sweep(query) {
+async function sweep(query, move) {
   await evalJs(type(query));
   await sleep(250);
-  const underCurrent = await evalJs(read);
-  await evalJs(moveTheme(THEME));
+  const before = await evalJs(read);
+  await evalJs(move);
   await sleep(250);
-  const underTheme = await evalJs(read);
-  return { underCurrent, underTheme };
+  const after = await evalJs(read);
+  return { before, after };
 }
 
 (async () => {
@@ -110,15 +134,29 @@ async function sweep(query) {
     await evalJs(`(()=>{document.documentElement.classList.add('settings-advanced');return 1})()`);
   }
 
-  const gated = await sweep(QUERY);
-  await evalJs(moveTheme(currentTheme));
-  await sleep(250);
-  gated.backUnderCurrent = await evalJs(read);
+  // What the run moves, and what puts it back. The discovery leg flips whatever
+  // the profile currently holds, so it always restores to the truth.
+  let priorDiscovery = null;
+  let move;
+  let restore;
+  if (SHELL) {
+    priorDiscovery = await evalJs(`localStorage.getItem(${JSON.stringify(DISCOVERY_KEYS[SHELL])})`);
+    move = setDiscovery(SHELL, priorDiscovery === '1' ? null : '1');
+    restore = setDiscovery(SHELL, priorDiscovery);
+  } else {
+    move = moveTheme(THEME);
+    restore = moveTheme(currentTheme);
+  }
 
-  const control = await sweep(CONTROL);
-  await evalJs(moveTheme(currentTheme));
+  const gated = await sweep(QUERY, move);
+  await evalJs(restore);
   await sleep(250);
-  control.backUnderCurrent = await evalJs(read);
+  gated.back = await evalJs(read);
+
+  const control = await sweep(CONTROL, move);
+  await evalJs(restore);
+  await sleep(250);
+  control.back = await evalJs(read);
 
   await evalJs(type(''));
   if (!advancedWasOn) {
@@ -128,28 +166,35 @@ async function sweep(query) {
   const restored = await evalJs(
     `({theme:document.documentElement.getAttribute('data-theme'),` +
       `adv:document.documentElement.classList.contains('settings-advanced'),` +
-      `query:(document.querySelector(${JSON.stringify(SURFACE.input)})||{}).value})`,
+      `query:(document.querySelector(${JSON.stringify(SURFACE.input)})||{}).value,` +
+      (SHELL ? `discovery:localStorage.getItem(${JSON.stringify(DISCOVERY_KEYS[SHELL])})` : `discovery:null`) +
+      `})`,
   );
 
   const same = (a, b) => a.titles.join('|') === b.titles.join('|');
   const result = {
     surface: opt('--surface', 'settings'),
+    axis: SHELL ? `discovery:${SHELL}` : `theme:${THEME}`,
     currentTheme,
-    movedTo: THEME,
+    priorDiscovery,
     query: QUERY,
-    queryUnderCurrent: gated.underCurrent.titles.length,
-    queryUnderTheme: gated.underTheme.titles.length,
-    queryBackUnderCurrent: gated.backUnderCurrent.titles.length,
-    queryTitlesUnderTheme: gated.underTheme.titles,
-    gateMoves: !same(gated.underCurrent, gated.underTheme),
-    gateReverses: same(gated.underCurrent, gated.backUnderCurrent),
+    queryBefore: gated.before.titles.length,
+    queryAfter: gated.after.titles.length,
+    queryBack: gated.back.titles.length,
+    queryTitlesBefore: gated.before.titles,
+    queryTitlesAfter: gated.after.titles,
+    gateMoves: !same(gated.before, gated.after),
+    gateReverses: same(gated.before, gated.back),
     control: CONTROL,
-    controlUnderCurrent: control.underCurrent.titles.length,
-    controlUnderTheme: control.underTheme.titles.length,
-    controlHeld: same(control.underCurrent, control.underTheme),
+    controlBefore: control.before.titles.length,
+    controlAfter: control.after.titles.length,
+    controlHeld: same(control.before, control.after),
     restored,
     restoredClean:
-      restored.theme === currentTheme && restored.adv === advancedWasOn && restored.query === '',
+      restored.theme === currentTheme &&
+      restored.adv === advancedWasOn &&
+      restored.query === '' &&
+      (!SHELL || restored.discovery === priorDiscovery),
   };
   console.log(JSON.stringify(result, null, 2));
   const out = opt('--out', null);

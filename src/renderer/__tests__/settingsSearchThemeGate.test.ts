@@ -58,41 +58,69 @@ function sourceFiles(dir: string, out: Record<string, string> = {}): Record<stri
  * deliberately NOT pure, because a user who has discovered WIRED sees that card
  * under any theme and gating its search entry would hide a live destination.
  */
-function themesRequiredBy(guard: string, fileText: string): string[] | null {
+type Gate = { themes: string[]; discovered: 'aero' | 'wired' | null };
+
+function gateRequiredBy(guard: string, fileText: string): Gate | null {
   let expr = guard.replace(/^\{\s*/, '').replace(/&&\s*\($/, '').trim();
   // Resolve one alias level: a bare identifier defined in the same file.
   const bare = expr.match(/^!?([A-Za-z_$][\w$]*)$/);
   if (bare) {
-    const decl = fileText.match(new RegExp(`const ${bare[1]}\\s*=\\s*([^;\\n]+)`));
-    if (!decl) return null;
     if (expr.startsWith('!')) return null;
-    expr = decl[1].trim();
+    const decl = fileText.match(new RegExp(`const ${bare[1]}\\s*=\\s*([^;\\n]+)`));
+    if (decl) expr = decl[1].trim();
+    else if (!discoveryOf(bare[1], fileText)) return null;
   }
   expr = expr.replace(/^\((.*)\)$/s, '$1').trim();
   if (expr.includes('&&') || expr.includes('?')) return null;
-  const terms = expr.split('||').map((s) => s.trim());
-  const themes: string[] = [];
-  for (const term of terms) {
-    const eq = term.replace(/^\(|\)$/g, '').trim().match(/^[\w$.]+\s*===\s*([A-Z_][A-Z0-9_]*)$/);
-    if (!eq || !(eq[1] in THEME_CONSTANTS)) return null;
-    themes.push(THEME_CONSTANTS[eq[1]]);
+  const gate: Gate = { themes: [], discovered: null };
+  for (const raw of expr.split('||')) {
+    const term = raw.replace(/^\(|\)$/g, '').trim();
+    const eq = term.match(/^[\w$.]+\s*===\s*([A-Z_][A-Z0-9_]*)$/);
+    if (eq && eq[1] in THEME_CONSTANTS) {
+      gate.themes.push(THEME_CONSTANTS[eq[1]]);
+      continue;
+    }
+    const found = /^[A-Za-z_$][\w$]*$/.test(term) ? discoveryOf(term, fileText) : null;
+    if (!found) return null;
+    gate.discovered = found;
   }
-  return themes.length ? themes : null;
+  return gate.themes.length || gate.discovered ? gate : null;
 }
 
-/** card id → the theme ids its render guard requires (pure theme guards only). */
-function themeGuardedCards(): Map<string, string[]> {
-  const found = new Map<string, string[]>();
+/**
+ * A discovery flag is a `useState(hasDiscoveredAero)` binding, not a `const x =`
+ * one, so the alias resolver above cannot see it — which is the whole reason the
+ * four Special-page modules stayed ungated through the theme pass.
+ */
+function discoveryOf(name: string, fileText: string): 'aero' | 'wired' | null {
+  const decl = fileText.match(
+    new RegExp(`const \\[${name}[^\\]]*\\]\\s*=\\s*useState\\(\\s*hasDiscovered(Aero|Wired)\\s*\\)`),
+  );
+  return decl ? (decl[1].toLowerCase() as 'aero' | 'wired') : null;
+}
+
+/** card id → the render gate its guard requires (pure theme/discovery guards). */
+function gatedCards(): Map<string, Gate> {
+  const found = new Map<string, Gate>();
   for (const text of Object.values(sourceFiles(SETTINGS_DIR))) {
     for (const m of text.matchAll(/<SettingsCard\b[^>]*?\bid="([^"{]+)"/gs)) {
       const lines = text.slice(0, m.index).split('\n');
       const guard = (lines[lines.length - 2] ?? '').trim();
       if (!/&&\s*\($/.test(guard)) continue;
-      const themes = themesRequiredBy(guard, text);
-      if (themes) found.set(m[1], themes);
+      const gate = gateRequiredBy(guard, text);
+      if (gate) found.set(m[1], gate);
     }
   }
   return found;
+}
+
+/** The subset with a pure theme requirement and nothing else. */
+function themeGuardedCards(): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const [id, gate] of gatedCards()) {
+    if (gate.themes.length && !gate.discovered) out.set(id, gate.themes);
+  }
+  return out;
 }
 
 describe('settings search theme gate', () => {
@@ -156,6 +184,43 @@ describe('settings search theme gate', () => {
         .sort();
     expect(ids(DEFAULT_THEME_ID)).toEqual(ids(AERO_THEME_ID));
     expect(ids(DEFAULT_THEME_ID).length).toBeGreaterThan(0);
+  });
+
+  it('gives every indexed discovery-guarded card the shell its guard names', () => {
+    const gated = gatedCards();
+    const ungated: string[] = [];
+    for (const [id, gate] of gated) {
+      if (!gate.discovered || gate.themes.length) continue; // mixed axes are named, not gated
+      const entry = SETTINGS_REGISTRY.find((e) => e.id === id);
+      if (!entry) continue; // not indexed at all is a coverage question, not this one
+      if (entry.discovered !== gate.discovered) ungated.push(`${id}: ${entry.discovered} vs ${gate.discovered}`);
+    }
+    expect(ungated).toEqual([]);
+    // Same vacuity guard as above: the derivation must still be finding them.
+    expect([...gated.values()].filter((g) => g.discovered).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('hides an undiscovered module from search and shows it once discovered', () => {
+    const hits = (discovered?: { aero?: boolean; wired?: boolean }) =>
+      searchSettings('aero arcade', t, { advanced: true, themeId: DEFAULT_THEME_ID, discovered }).map(
+        (e) => e.id,
+      );
+    expect(hits({ aero: false, wired: false })).not.toContain('aero-arcade');
+    expect(hits({ aero: true, wired: false })).toContain('aero-arcade');
+    // The two shells are independent — finding WIRED must not unlock Aero's row.
+    expect(hits({ aero: false, wired: true })).not.toContain('aero-arcade');
+    expect(hits()).not.toContain('aero-arcade');
+  });
+
+  it('keeps a discovered module visible under a theme that is not its shell', () => {
+    // `discovered` and `themes` are different axes: WIRED's modules stay in
+    // search for someone who found them and then went back to Study OS.
+    const hits = searchSettings('wired arcade', t, {
+      advanced: true,
+      themeId: DEFAULT_THEME_ID,
+      discovered: { wired: true },
+    });
+    expect(hits.map((e) => e.id)).toContain('wired-arcade');
   });
 
   it('still hides a gated entry from a matching theme when Advanced Mode is off', () => {

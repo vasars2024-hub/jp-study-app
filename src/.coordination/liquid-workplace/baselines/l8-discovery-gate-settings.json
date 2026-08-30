@@ -1,0 +1,41 @@
+{
+  "surface": "settings",
+  "axis": "discovery:wired",
+  "currentTheme": "forest-night",
+  "priorDiscovery": null,
+  "query": "wired arcade",
+  "queryBefore": 6,
+  "queryAfter": 8,
+  "queryBack": 6,
+  "queryTitlesBefore": [
+    "WIRED archive",
+    "Aero gadget lab",
+    "Aero games",
+    "Special",
+    "Special modules",
+    "Special modules locked"
+  ],
+  "queryTitlesAfter": [
+    "WIRED games",
+    "WIRED archive",
+    "Aero gadget lab",
+    "Aero games",
+    "NAVI terminal",
+    "Special",
+    "Special modules",
+    "Special modules locked"
+  ],
+  "gateMoves": true,
+  "gateReverses": true,
+  "control": "wallpaper",
+  "controlBefore": 10,
+  "controlAfter": 10,
+  "controlHeld": true,
+  "restored": {
+    "theme": "forest-night",
+    "adv": false,
+    "query": "",
+    "discovery": null
+  },
+  "restoredClean": true
+}
