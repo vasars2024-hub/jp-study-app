@@ -967,3 +967,50 @@ Regression: `settingsLiquidRegions.test.tsx` **10/10** — the new case parses b
 fails any `disabled={...}` not immediately followed by `title={sameWhy}`.
 Evidence: `baselines/cat8-l8-settings.json`, `cat8-l8-settings-control.json`,
 `cat2-l8-settings.json`.
+
+## 2026-08-30 · primary — YouTube category 1 closes at a controlled 10/10
+
+L8's last unscored surface. Opened it from Start > YouTube; `.yt-root`, so every harness
+runs on `@.fwin:has(.yt-root)` — NOT `--surface "YouTube"`, for the reason Settings
+recorded (a window title localizes and cannot survive its own four-language leg).
+
+**Scored state, stated because Carry 22 says an unstated one is a fabricated number.** The
+product opens on the News tab, and News here holds **0 rows** ("No new videos since last
+check") — a category measured on an empty harness is capped at 0. The honest surface is the
+playlist pane with a real playlist selected: **16 video rows, 111 painted text runs, 65
+hit-tested controls, 84 focusable**. That is the state every number below was taken in.
+
+**Category 1 — PASS 10/10.** `belowFloorByHit` **54 → 0**, `stolen` 0, `occluded` 0,
+`minRatio` **6.52** over 106 records with 0 failing, WCAG 2.5.8 fails **0**, unreachable
+**0 of 84**, reduced-motion durations over threshold **0**. Box 980x640, standard
+presentation, forest-night.
+
+The 54 were families, not one-offs: 34 row-action buttons at hit 22.5, 6 side links at 26.5,
+4 `select` and 6 `input` reached through `label.yt-pref` at 19.5–25.5, 4 sub-language chips at
+21.5. So the floor went on containers, in the idiom this repo already owns:
+- `lq-hit-scope` on `.yt-root` — the transparent centred `::after`, no chrome growth.
+- `min-height: var(--lq-hit-target)` on `.yt-pref`. The scope deliberately omits `input` and
+  `select`: they are replaced elements, `::after` generates no box on them, and a scope that
+  looked like it covered them would have left every pref control at 21px while reading fixed.
+  A control's pointer target is the control PLUS its labels, and the label is the bigger box.
+
+**One control survived the first fix at 31 of 32, and the reason is worth keeping.**
+`button.btn.ghost.small` in `div.yt-folder-head` had its scope expander already applied. The
+row was 22px tall and the first `.yt-pl-item` sits 4px below it, so the downward pointer walk
+left the header at 15px and entered the neighbour — the expander was correct and the
+ROW was too short to hold it. `min-height` on `.yt-folder-head` closed it. Generalisation:
+a scope expander is bounded by whatever is painted next, so on a tight vertical stack the
+floor has to exist on the row as well as on the control.
+
+Control (`--control`, same root, same run): contrast, targets-by-pointer, targets-by-rect,
+WCAG 2.5.8 and keyboard **all five moved** — counts `[0,78,0,0,0] → [1,80,2,1,2] →
+[0,78,0,0]`, `backToBaseline: true`, `rectDrift: 0`.
+
+`under32Count` stays **78** by RECT and that is not a failing bar — the rubric's floor is the
+pointer region, and this surface is deliberately compact chrome (11–12px chips and prefs).
+Growing the boxes is what category 4's dead-region number exists to punish.
+
+Regression: `youtubeLiquidHitFloor.test.ts` **3/3** — it fails if `.yt-root` loses the scope,
+if either `min-height` leaves its rule, or if `.lq-hit-scope`'s `:is()` ever grows `input`/
+`select` (which would make the `.yt-pref` rule dead while the test still passed).
+Evidence: `baselines/cat1-l8-youtube.json`. Zero new probes — one RUN of `cat1-accessibility.cjs`.

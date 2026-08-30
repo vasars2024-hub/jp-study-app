@@ -537,7 +537,14 @@ export default function YouTubePlaylistsView() {
         </>
       }
     >
-      <div className="yt-root">
+      {/* `lq-hit-scope`: rubric category 1 measured 54 of this surface's 84 controls under
+          the 32px pointer floor — the row-action buttons at 22.5, the sub-language chips at
+          21.5, the side links at 26.5 — and they arrive in families, so the floor goes on the
+          container rather than on ~40 call sites. The expander is transparent and centred, so
+          no chrome grows (category 4's dead region is what pays for growth). `select` and
+          `input` are replaced elements the scope cannot reach; their floor is the `min-height`
+          on `.yt-pref`, which is the label a pointer actually aims at. */}
+      <div className="yt-root lq-hit-scope">
         <aside className="yt-side">
           <div className="yt-add">
             <input

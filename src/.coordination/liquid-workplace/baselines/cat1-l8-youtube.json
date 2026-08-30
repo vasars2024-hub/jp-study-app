@@ -1,0 +1,304 @@
+{
+  "label": "youtube",
+  "surface": "@.fwin:has(.yt-root)",
+  "win": "(focused)",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "980x640",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 106,
+    "unmeasurable": 0,
+    "minRatio": 6.52,
+    "minOwner": "button.yt-tab \"News\" 14px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 3,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 84,
+    "smallest": "input 13px",
+    "smallestPx": 13,
+    "under32Count": 78,
+    "under32": [
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 40.6
+      },
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 51.8
+      },
+      {
+        "el": "button.yt-chip",
+        "min": 21,
+        "nearest": 34.4
+      },
+      {
+        "el": "button.yt-chip",
+        "min": 21,
+        "nearest": 34.4
+      },
+      {
+        "el": "button.yt-chip",
+        "min": 21,
+        "nearest": 35.9
+      },
+      {
+        "el": "button.yt-chip",
+        "min": 21,
+        "nearest": 36
+      },
+      {
+        "el": "input",
+        "min": 21,
+        "nearest": 51.2
+      },
+      {
+        "el": "input",
+        "min": 21,
+        "nearest": 42.6
+      },
+      {
+        "el": "input",
+        "min": 21,
+        "nearest": 55.7
+      },
+      {
+        "el": "input",
+        "min": 21,
+        "nearest": 59.4
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 84,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 66,
+    "beforeLongest": {
+      "el": "div.fwin-bar",
+      "dur": 0.14
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 66,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".fwin:has(.yt-root)",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "980x640",
+    "deferredVisibilityOwners": 0,
+    "controls": 65,
+    "measured": 65,
+    "belowFloorByRect": 49,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 19,
+    "disabled": [
+      {
+        "el": "button.btn.small.primary",
+        "rect": "45x26"
+      },
+      {
+        "el": "button.btn.small.primary",
+        "rect": "65x26"
+      },
+      {
+        "el": "button.btn.small",
+        "rect": "141x26"
+      },
+      {
+        "el": "button.btn.ghost.small",
+        "rect": "36x24"
+      },
+      {
+        "el": "button.btn.ghost.small",
+        "rect": "36x24"
+      },
+      {
+        "el": "button.btn.ghost.small",
+        "rect": "36x24"
+      },
+      {
+        "el": "button.btn.ghost.small",
+        "rect": "36x24"
+      },
+      {
+        "el": "button.btn.ghost.small",
+        "rect": "36x24"
+      }
+    ],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "div.yt-list 0,0 -> 760,0"
+    ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        78,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        80,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        78,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

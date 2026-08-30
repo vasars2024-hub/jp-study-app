@@ -24075,6 +24075,11 @@ html.lockscreen-widget-root #root {
   gap: 10px;
 }
 .yt-folder-head {
+  /* The delete button's `.lq-hit-scope` expander is 32px, but this row was 22px tall and the
+     first playlist button sits 4px under it — so the pointer walk downward left the header and
+     entered the neighbour at 15px, and the button measured 31. The row itself takes the floor,
+     which keeps the expander inside its own header instead of reaching over the list. */
+  min-height: var(--lq-hit-target);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -24159,6 +24164,12 @@ html.lockscreen-widget-root #root {
   align-items: center;
 }
 .yt-pref {
+  /* Category 1's 32px pointer floor. `.lq-hit-scope` on `.yt-root` covers the buttons, but
+     `select` and `input` are replaced elements — `::after` generates no box on them, so a
+     scope that appeared to cover them would leave them under the floor while reading as
+     fixed. A form control's pointer target is the control PLUS its labels, and this label is
+     the larger box, so the floor belongs here and the control keeps its compact height. */
+  min-height: var(--lq-hit-target);
   display: inline-flex;
   align-items: center;
   gap: 6px;
