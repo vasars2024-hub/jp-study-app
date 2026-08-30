@@ -510,3 +510,19 @@ failure set (only `flashcardAudio` in both). Every suite checked passes in isola
 `i18nSplit`, `sourceNulBytes`, `scraperSources`, `dictionaryDb` all green alone, 41/41. Nothing
 under `scraper/`, `scraperUi/` or the new guard failed in either run. Two runs, two different
 answers, is the shared tree's known flake and not a regression to bisect.
+
+### 2026-08-30 — Scraper i18n, batch 3: Result workflow complete
+
+**249 of 588 keys migrated (42.3%)**, +101 this batch. Every `result.*` entry now resolves
+from the shared EN/JA/ZH/RU catalogs: tabs, filters, selection and export feedback, playback
+refusals, stored-result recovery, empty states, columns, detail summaries and provenance.
+Mechanical comparison reports **101 TEXT / 101 shared / 0 missing / 0 extra**.
+
+`node tools/i18n-check.cjs` passes at **11,412** English keys; the focused i18n suite passes
+**21/21**. The first check caught five byte-identical labels; they were translated rather than
+bulk-baselined. Category 8 remains open because 42.3% is coverage progress, not completion.
+
+Live acceptance was attempted with the existing parameterised category-8 harness. The inherited
+Scraper was absent; reopening it through the debug bridge produced a visible 803.6×568.4 shell,
+but its parent `.fwin` remained at computed `opacity: 0`, so the harness correctly VOIDed on
+0 painted runs and wrote no evidence file. Per the one-repair rule, no further retry this turn.
