@@ -482,3 +482,31 @@ times** this turn; a replay of the same drive in isolation restored cleanly **3 
 Not repaired here — one harness repair per turn, and corrections 20 and 21 were spent.
 Workaround used: `--langs` without `--drive-input`, which measures the language bar honestly
 and leaves `mutePairs` scored on the resting probe only.
+
+### 2026-08-30 — Scraper i18n, batch 2: the always-visible chrome, and why diffShare barely moved
+
+**148 of 588 keys migrated (25.2%)**, +72 this batch: the left rail's 45 nav labels and
+descriptions, the 11 status-bar strings, the 5 health words and the 11 job-stage names.
+Chosen because they render on all 17 pages rather than on one.
+
+**diffShare 0.0287 → 0.0310** (37 of 1,192 runs). A small rise for 72 keys, and the reason is
+worth carrying rather than smoothing: **the shell's persisted state has `railCollapsed: true`**,
+so 45 of the 72 keys — every nav label and description — are not painted on the measured
+surface at all. The number understates the migration; it does not measure it wrongly. A later
+turn scoring with the rail expanded will see a step change from keys that landed here.
+
+**The gate caught one thing worth keeping.** `i18n-check` rejected `scrApp.nav.cpu` in ja as
+byte-identical to English (`CPU: {n}%`) — a key that *presence* checks pass and that renders
+English under a Japanese UI. Translated to `CPU 使用率: {n}%` rather than baselined; the tool's
+own warning against bulk-baselining is the reason. zh escaped it only because it uses a
+fullwidth colon. 11,239 → **11,311** English keys, all four languages complete, exit 0.
+
+Evidence: `baselines/cat8-l8-scraper-i18n-b2.json`, `--control` moved all three counts and
+returned to baseline. Category 8 still not claimed closed at 25.2%.
+
+**Full-suite note, so the next turn does not chase it.** `npx vitest run` twice on this tree:
+**13 failed / 11,886 passed**, then **6 failed / 12,007 passed**, with a largely DISJOINT
+failure set (only `flashcardAudio` in both). Every suite checked passes in isolation —
+`i18nSplit`, `sourceNulBytes`, `scraperSources`, `dictionaryDb` all green alone, 41/41. Nothing
+under `scraper/`, `scraperUi/` or the new guard failed in either run. Two runs, two different
+answers, is the shared tree's known flake and not a regression to bisect.

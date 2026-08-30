@@ -1,0 +1,244 @@
+{
+  "label": "l8-scraper-i18n-b2",
+  "surface": "@.fwin:has(.scr-shell)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "820x580",
+  "textRuns": 1192,
+  "textHash": -1608234366,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 6,
+  "states": {
+    "empty": {
+      "hosts": 1,
+      "messages": [
+        "qBittorrent has no transfers."
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9727,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9727 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 1192,
+        "textHash": -1608234366,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 1192,
+        "textHash": -1170423577,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 37,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "スクレイパー"
+          },
+          {
+            "i": 9,
+            "was": "Idle",
+            "now": "待機中"
+          },
+          {
+            "i": 12,
+            "was": "Torrent settings",
+            "now": "トレント設定"
+          },
+          {
+            "i": 13,
+            "was": "qBittorrent settings",
+            "now": "qBittorrent 設定"
+          },
+          {
+            "i": 14,
+            "was": "qBittorrent connection",
+            "now": "qBittorrent 接続"
+          },
+          {
+            "i": 15,
+            "was": "Where the client lives, and wh",
+            "now": "クライアントの所在と、スクレイパーから到達できるかどうか。"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 1192,
+        "textHash": 2017638544,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 37,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "抓取器"
+          },
+          {
+            "i": 9,
+            "was": "Idle",
+            "now": "空闲"
+          },
+          {
+            "i": 12,
+            "was": "Torrent settings",
+            "now": "种子设置"
+          },
+          {
+            "i": 13,
+            "was": "qBittorrent settings",
+            "now": "qBittorrent 设置"
+          },
+          {
+            "i": 14,
+            "was": "qBittorrent connection",
+            "now": "qBittorrent 连接"
+          },
+          {
+            "i": 15,
+            "was": "Where the client lives, and wh",
+            "now": "客户端的位置，以及抓取器能否连接到它。"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 1192,
+        "textHash": -883035279,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 37,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "Скрапер"
+          },
+          {
+            "i": 9,
+            "was": "Idle",
+            "now": "Простой"
+          },
+          {
+            "i": 12,
+            "was": "Torrent settings",
+            "now": "Настройки торрентов"
+          },
+          {
+            "i": 13,
+            "was": "qBittorrent settings",
+            "now": "Настройки qBittorrent"
+          },
+          {
+            "i": 14,
+            "was": "qBittorrent connection",
+            "now": "Подключение к qBittorrent"
+          },
+          {
+            "i": 15,
+            "was": "Where the client lives, and wh",
+            "now": "Где находится клиент и может л"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 37,
+    "baseRuns": 1192,
+    "diffShare": 0.031
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}
