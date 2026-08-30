@@ -251,3 +251,52 @@ dashboard's tables force `main.scr-main` to **1611>664** and `.scr-page` runs 41
 status bar. Evidence: `baselines/cat4-l8-scraper.json`; regression
 `scraperRailCollapse.test.tsx` **2/2**. Next category-4 slice: the compact reflow, because
 it is the larger of the two and the drawer/rail/footer stacking is its root cause.
+
+## 2026-08-30 — Scraper category 4 closes at 10/10; the harness was scoring a phantom
+
+Recovery turn. `backup` died holding a complete, tested, staged category-4 slice; it was
+re-derived and banked unchanged as `50c9b2c2`, not rebuilt. It closes the compact leg
+outright — 400x248 goes from clipped 6 / overlaps 5 / hscroll 1 / hiddenX 1 to **0/0/0/0**.
+
+Two findings remained, and only one was product.
+
+**The overlaps bar was measuring a box nobody paints.** `div.scr-page x footer.lq-contextual
+(632x41)` is `.scr-page` at 4182px tall inside a 598px `main.scr-main` (`overflow: auto`):
+the harness paired regions by their RAW `getBoundingClientRect()`, so the page's rect ran
+straight through the status bar. This is not a Scraper quirk — uncorrected it fires on every
+surface whose scrolling pane holds more than one screen, which is most of them. Correction 18
+clips each region to its non-visible-overflow ancestors first (`0ccb762c`). Its own negative
+control, because `--control` only ever planted a *clipped* box: a translucent unclipped
+469x462 div planted in `.scr-shell` produced **6 overlaps at all three sizes**, verdict FAIL;
+removed, and the shell's inline style asserted back to empty; without it the same legs read
+**0**.
+
+**The real defect was one shape in two tables** (`cf698db0`). `main.scr-main` measured
+**1611>664**: the mirror's 15 columns have a 1582px min-content and the indexer's 9 have 909,
+both inside a 606px card, and nothing between the row and `.scr-main` scrolls — so the whole
+page scrolled sideways. No tier could ever have reached them: the track lists were inline
+`gridTemplateColumns`, which outranks a container query. They now come from `--scr-cols` set
+in CSS, queried against `.scr-main` rather than the shell, because the pane is what a table
+actually gets once the rail and an open drawer are paid off the shell.
+
+**No column deletes a value.** Every column a tier hides is re-rendered as `.scr-t-fold` in
+its own row — load-bearing for the indexer, which has no per-row inspector at all, and for
+the mirror's speeds/size/category/tags/completion, which its inspector does not carry.
+
+| leg | box | clipped | overlaps | hscroll | hiddenX | dead |
+| --- | --- | --- | --- | --- | --- | --- |
+| default | 820x580 | 0 | 0 | 0 | 0 | 3.2% |
+| compact | 400x248 | 0 | 0 | 0 | 0 | 1.8% |
+| maximized | 1264x765 | 0 | 0 | 0 | 0 | 4.3% |
+
+contentGrowsNotChrome holds: chrome **90 → 63.1** while the canvas rises **93.7 → 95.3**.
+Control: injected clip **0 → 1 → 0**, removal proven. Every leg restored.
+
+**Trap — the harness labels legs by ORDER, not by measured size.** Run it with the window
+already maximized and `default` records 1264x765 while `maximized` records 820x580; the
+surface then fails contentGrowsNotChrome on nothing but its starting state. That exact false
+FAIL cost a run here. Restore the window before measuring.
+
+Regression `scraperTableReflow.test.tsx` **5/5** + `scraperNarrowReflow.test.tsx` **3/3**.
+Pre-existing, not introduced: `MIRROR_COLUMNS` labels are raw English literals, not `sx()`
+keys. Evidence: `baselines/cat4-l8-scraper.json`. Scraper is **50/80**; open: 5, 7, 8.
