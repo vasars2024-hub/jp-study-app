@@ -102,3 +102,36 @@ describe('L8 YouTube — category 3 roles', () => {
     expect(ruleBody(css, '.yt-main .lq-anchor.yt-prefs')).toContain('padding: 10px 12px;');
   });
 });
+
+describe('L8 YouTube — category 4 narrow layout', () => {
+  it('queries a wrapper, because a container cannot answer its own condition', () => {
+    const src = read('views', 'YouTubePlaylistsView.tsx');
+    expect(src).toContain('<div className="yt-shell">');
+    const css = read('styles.css');
+    expect(ruleBody(css, '.yt-shell')).toContain('container-type: inline-size;');
+    expect(ruleBody(css, '.yt-shell')).toContain('container-name: yt-shell;');
+  });
+
+  it('places the query AFTER the rules it overrides', () => {
+    // A `@container` block adds no specificity. Written above `.yt-row`/`.yt-side` it lost on
+    // source order and moved nothing — measured: the row stayed 330px wide in a 202px list
+    // while the block was live and matching.
+    const css = read('styles.css');
+    const query = css.indexOf('@container yt-shell (max-width: 560px)');
+    expect(query).toBeGreaterThan(-1);
+    for (const sel of ['\n.yt-row {', '\n.yt-side {', '\n.yt-thumb {', '\n.yt-row-actions {']) {
+      expect(css.indexOf(sel), `${sel.trim()} must precede the container query`).toBeLessThan(query);
+    }
+  });
+
+  it('narrows without deleting anything', () => {
+    const css = read('styles.css');
+    // The `@media (max-width: 720px)` block this replaced set `display: none` on the status
+    // chips — and never fired anyway, because a media query reads the OS viewport while this
+    // surface lives in a floating window.
+    expect(css).not.toMatch(/@media \(max-width: 720px\) \{\s*\.yt-root/);
+    const block = css.slice(css.indexOf('@container yt-shell (max-width: 560px)'));
+    const body = block.slice(0, block.indexOf('\n}\n') + 2);
+    expect(body).not.toContain('display: none');
+  });
+});

@@ -538,6 +538,11 @@ export default function YouTubePlaylistsView() {
         </>
       }
     >
+      {/* The wrapper exists only to be the query container. `.yt-root` is the grid whose
+          columns have to change, and an element cannot answer a `@container` condition against
+          itself — the same reason `.jiten-novels-shell` and `.os-set-body` are wrappers. A
+          media query is wrong here: this lives in a floating window, so the OS viewport says
+          1264 while the window is 260. */}
       {/* `lq-hit-scope`: rubric category 1 measured 54 of this surface's 84 controls under
           the 32px pointer floor — the row-action buttons at 22.5, the sub-language chips at
           21.5, the side links at 26.5 — and they arrive in families, so the floor goes on the
@@ -545,450 +550,452 @@ export default function YouTubePlaylistsView() {
           no chrome grows (category 4's dead region is what pays for growth). `select` and
           `input` are replaced elements the scope cannot reach; their floor is the `min-height`
           on `.yt-pref`, which is the label a pointer actually aims at. */}
-      <div className="yt-root lq-hit-scope">
-        {/* The playlist rail and the two headers are navigation and contextual tools, which
-            §2.3 says is what Liquid is FOR. `ContextualSurface` declares the role and paints
-            nothing until the window opts into Liquid, so the conventional window is unchanged
-            and reversal costs no component state. Dense work does NOT go here: the playlist
-            preference form moved out of the header onto its own anchor below. */}
-        <ContextualSurface as="aside" className="yt-side">
-          {/* The two field rows in the rail are forms, so they anchor rather than ride the
-              rail's material — §2.3 keeps editing on stable opaque surfaces, and an input
-              floating on glass is the exact case it names. `bare` because the rail already
-              draws the box; the fill and radius restore below. */}
-          <AnchorSurface bare className="yt-add">
-            <input
-              className="gram-search"
-              value={addUrl}
-              onChange={(e) => setAddUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void addPlaylist()}
-              placeholder={t('yt.add.placeholder')}
-              disabled={!!busy}
-            />
-            <button
-              type="button"
-              className="btn small primary"
-              disabled={!!busy || !addUrl.trim()}
-              onClick={() => void addPlaylist()}
-            >
-              {t('yt.add.submit')}
-            </button>
-          </AnchorSurface>
-          <p className="yt-hint">{t('yt.add.extensionHint')}</p>
-          <div className="yt-side-links" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
-              {t('yt.link.extension')}
-            </button>
-            <button type="button" className="btn small" onClick={() => openLibraryInbox()}>
-              {t('yt.link.inbox')}
-            </button>
-            <button type="button" className="btn small" disabled={!!busy} onClick={() => surpriseMe()}>
-              {t('yt.action.surprise')}
-            </button>
-          </div>
-
-          <AnchorSurface bare className="yt-folder-add">
-            <input
-              className="gram-search"
-              value={folderName}
-              onChange={(e) => setFolderName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
-              placeholder={t('yt.folder.placeholder')}
-            />
-            <button type="button" className="btn small" onClick={() => void addFolder()}>
-              <Icon name="folder" size={14} />
-            </button>
-          </AnchorSurface>
-
-          <div className="yt-tree">
-            <button
-              type="button"
-              className={`yt-pl-item yt-plan-item${side?.kind === 'plan' ? ' active' : ''}`}
-              onClick={() => {
-                setSide({ kind: 'plan' });
-                setMainTab('playlist');
-                setSelectedVideoIds(new Set());
-              }}
-            >
-              <span className="yt-pl-item-title">{t('yt.plan.title')}</span>
-              <span className="yt-pl-item-meta">{planVideos.length}</span>
-            </button>
-
-            {folders.map((f) => (
-              <div key={f.id} className="yt-folder">
-                <div className="yt-folder-head">
-                  <Icon name="folder" size={14} />
-                  <span>{f.name}</span>
-                  <button
-                    type="button"
-                    className="btn ghost small"
-                    title={t('yt.folder.delete')}
-                    onClick={() => void window.api.ytDeleteFolder(f.id).then(applyStore)}
-                  >
-                    <Icon name="close" size={12} />
-                  </button>
-                </div>
-                {(playlistsByFolder.byFolder.get(f.id) ?? []).map(renderPlaylistBtn)}
-              </div>
-            ))}
-            <div className="yt-folder">
-              <div className="yt-folder-head">
-                <span>{t('yt.folder.unfiled')}</span>
-              </div>
-              {playlistsByFolder.root.map(renderPlaylistBtn)}
-            </div>
-          </div>
-        </ContextualSurface>
-
-        <section className="yt-main">
-          <div className="yt-tabs">
-            <button
-              type="button"
-              className={`yt-tab${mainTab === 'news' ? ' active' : ''}`}
-              onClick={() => setMainTab('news')}
-            >
-              {t('yt.tab.news')}
-            </button>
-            <button
-              type="button"
-              className={`yt-tab${mainTab === 'playlist' ? ' active' : ''}`}
-              onClick={() => setMainTab('playlist')}
-            >
-              {side?.kind === 'plan' ? t('yt.plan.title') : t('yt.tab.playlist')}
-            </button>
-          </div>
-
-          {(dlProgress || refreshProgress) && (
-            <div className="yt-download-bar" role="status">
-              {dlProgress ? (
-                <>
-                  <div className="yt-download-bar-meta">
-                    <span>
-                      {t('yt.download.bar', {
-                        current: dlProgress.index + 1,
-                        total: dlProgress.total,
-                        percent: Math.round(dlProgress.percent),
-                      })}
-                    </span>
-                    <span className="yt-download-bar-title">{dlVideoTitle}</span>
-                  </div>
-                  <div className="yt-download-track">
-                    <div
-                      className="yt-download-fill"
-                      style={{ width: `${Math.min(100, Math.max(0, dlProgress.percent))}%` }}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="yt-download-bar-meta">
-                    <span>
-                      {t('yt.news.refreshProgress', {
-                        current: Math.min(
-                          (refreshProgress?.index ?? 0) + 1,
-                          refreshProgress?.total || 1,
-                        ),
-                        total: refreshProgress?.total || 1,
-                      })}
-                    </span>
-                    <span className="yt-download-bar-title">{refreshProgress?.title}</span>
-                  </div>
-                  <div className="yt-download-track">
-                    <div
-                      className="yt-download-fill"
-                      style={{
-                        width: `${
-                          refreshProgress?.total
-                            ? Math.round(
-                                (((refreshProgress.index ?? 0) + 0.35) / refreshProgress.total) * 100,
-                              )
-                            : 10
-                        }%`,
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {mainTab === 'news' ? (
-            <>
-              <ContextualSurface as="header" className="yt-header">
-                <div className="yt-header-top">
-                  <div className="yt-header-titles">
-                    <div className="yt-header-title">{t('yt.tab.news')}</div>
-                    <div className="yt-header-channel">
-                      {store.lastNewsCheckedAt
-                        ? t('yt.news.lastChecked', {
-                            time: new Date(store.lastNewsCheckedAt).toLocaleString(),
-                          })
-                        : t('yt.news.neverChecked')}
-                    </div>
-                  </div>
-                  <div className="yt-header-actions">
-                    <button
-                      type="button"
-                      className="btn small"
-                      disabled={!!busy}
-                      onClick={() => void runNewsRefresh()}
-                    >
-                      <Icon name="refresh" size={14} /> {t('yt.news.refreshAll')}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn small primary"
-                      disabled={!!busy || selectedVideoIds.size === 0}
-                      onClick={() => void addToPlan([...selectedVideoIds])}
-                    >
-                      {t('yt.plan.add')}
-                    </button>
-                  </div>
-                </div>
-              </ContextualSurface>
-              <VirtualList
-                className="yt-list"
-                items={displayedNews}
-                itemHeight={ROW_H}
-                getKey={(v) => v.id}
-                listRole="list"
-                itemRole="listitem"
-                emptyState={<div className="yt-empty">{t('yt.news.empty')}</div>}
-                renderItem={(v) => renderVideoRow(v, { showPlaylist: true })}
+      <div className="yt-shell">
+        <div className="yt-root lq-hit-scope">
+          {/* The playlist rail and the two headers are navigation and contextual tools, which
+              §2.3 says is what Liquid is FOR. `ContextualSurface` declares the role and paints
+              nothing until the window opts into Liquid, so the conventional window is unchanged
+              and reversal costs no component state. Dense work does NOT go here: the playlist
+              preference form moved out of the header onto its own anchor below. */}
+          <ContextualSurface as="aside" className="yt-side">
+            {/* The two field rows in the rail are forms, so they anchor rather than ride the
+                rail's material — §2.3 keeps editing on stable opaque surfaces, and an input
+                floating on glass is the exact case it names. `bare` because the rail already
+                draws the box; the fill and radius restore below. */}
+            <AnchorSurface bare className="yt-add">
+              <input
+                className="gram-search"
+                value={addUrl}
+                onChange={(e) => setAddUrl(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void addPlaylist()}
+                placeholder={t('yt.add.placeholder')}
+                disabled={!!busy}
               />
-            </>
-          ) : showEmptyPlaylist ? (
-            <div className="yt-empty">{t('yt.empty')}</div>
-          ) : showPlaylistPane ? (
-            <>
-              <ContextualSurface as="header" className="yt-header">
-                <div className="yt-header-top">
-                  <div className="yt-header-titles">
-                    <div className="yt-header-title">
-                      {side?.kind === 'plan' ? t('yt.plan.title') : playlist?.title ?? ''}
-                    </div>
-                    {side?.kind === 'playlist' && playlist?.channelTitle ? (
-                      <div className="yt-header-channel">{playlist.channelTitle}</div>
-                    ) : side?.kind === 'plan' ? (
-                      <div className="yt-header-channel">{t('yt.plan.subtitle')}</div>
-                    ) : null}
-                  </div>
-                  <div className="yt-header-actions">
-                    {side?.kind === 'playlist' ? (
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={!!busy}
-                        onClick={() => void refresh()}
-                      >
-                        <Icon name="refresh" size={14} /> {t('yt.action.refresh')}
-                      </button>
-                    ) : null}
-                    {side?.kind === 'playlist' && playlist?.channelId ? (
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={!!busy}
-                        onClick={() => void refreshChannel()}
-                      >
-                        <Icon name="refresh" size={14} /> Channel
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn small primary"
-                      disabled={!!busy || selectedVideoIds.size === 0}
-                      onClick={() => void logSelected()}
-                    >
-                      <Icon name="download" size={14} /> {t('yt.action.log')}
-                    </button>
-                    {side?.kind === 'playlist' ? (
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={!!busy}
-                        onClick={() => void downloadAll()}
-                      >
-                        {t('yt.action.downloadAll')}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn small"
-                      disabled={!!busy || selectedVideoIds.size === 0}
-                      onClick={() =>
-                        void (side?.kind === 'plan'
-                          ? removeFromPlan([...selectedVideoIds])
-                          : addToPlan([...selectedVideoIds]))
-                      }
-                    >
-                      {side?.kind === 'plan' ? t('yt.plan.remove') : t('yt.plan.add')}
-                    </button>
-                  </div>
-                </div>
-              </ContextualSurface>
+              <button
+                type="button"
+                className="btn small primary"
+                disabled={!!busy || !addUrl.trim()}
+                onClick={() => void addPlaylist()}
+              >
+                {t('yt.add.submit')}
+              </button>
+            </AnchorSurface>
+            <p className="yt-hint">{t('yt.add.extensionHint')}</p>
+            <div className="yt-side-links" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
+                {t('yt.link.extension')}
+              </button>
+              <button type="button" className="btn small" onClick={() => openLibraryInbox()}>
+                {t('yt.link.inbox')}
+              </button>
+              <button type="button" className="btn small" disabled={!!busy} onClick={() => surpriseMe()}>
+                {t('yt.action.surprise')}
+              </button>
+            </div>
 
-              {side?.kind === 'playlist' && playlist ? (
-                <AnchorSurface bare className="yt-prefs">
-                  {playlist.channelId ? (
-                    <div className="yt-pref yt-channel-card">
-                      <span>Channel tracking</span>
-                      <div className="yt-channel-card-body">
-                        <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
-                        <div>{playlist.subscriptionStatus}</div>
-                        <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
+            <AnchorSurface bare className="yt-folder-add">
+              <input
+                className="gram-search"
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void addFolder()}
+                placeholder={t('yt.folder.placeholder')}
+              />
+              <button type="button" className="btn small" onClick={() => void addFolder()}>
+                <Icon name="folder" size={14} />
+              </button>
+            </AnchorSurface>
+
+            <div className="yt-tree">
+              <button
+                type="button"
+                className={`yt-pl-item yt-plan-item${side?.kind === 'plan' ? ' active' : ''}`}
+                onClick={() => {
+                  setSide({ kind: 'plan' });
+                  setMainTab('playlist');
+                  setSelectedVideoIds(new Set());
+                }}
+              >
+                <span className="yt-pl-item-title">{t('yt.plan.title')}</span>
+                <span className="yt-pl-item-meta">{planVideos.length}</span>
+              </button>
+
+              {folders.map((f) => (
+                <div key={f.id} className="yt-folder">
+                  <div className="yt-folder-head">
+                    <Icon name="folder" size={14} />
+                    <span>{f.name}</span>
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      title={t('yt.folder.delete')}
+                      onClick={() => void window.api.ytDeleteFolder(f.id).then(applyStore)}
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                  {(playlistsByFolder.byFolder.get(f.id) ?? []).map(renderPlaylistBtn)}
+                </div>
+              ))}
+              <div className="yt-folder">
+                <div className="yt-folder-head">
+                  <span>{t('yt.folder.unfiled')}</span>
+                </div>
+                {playlistsByFolder.root.map(renderPlaylistBtn)}
+              </div>
+            </div>
+          </ContextualSurface>
+
+          <section className="yt-main">
+            <div className="yt-tabs">
+              <button
+                type="button"
+                className={`yt-tab${mainTab === 'news' ? ' active' : ''}`}
+                onClick={() => setMainTab('news')}
+              >
+                {t('yt.tab.news')}
+              </button>
+              <button
+                type="button"
+                className={`yt-tab${mainTab === 'playlist' ? ' active' : ''}`}
+                onClick={() => setMainTab('playlist')}
+              >
+                {side?.kind === 'plan' ? t('yt.plan.title') : t('yt.tab.playlist')}
+              </button>
+            </div>
+
+            {(dlProgress || refreshProgress) && (
+              <div className="yt-download-bar" role="status">
+                {dlProgress ? (
+                  <>
+                    <div className="yt-download-bar-meta">
+                      <span>
+                        {t('yt.download.bar', {
+                          current: dlProgress.index + 1,
+                          total: dlProgress.total,
+                          percent: Math.round(dlProgress.percent),
+                        })}
+                      </span>
+                      <span className="yt-download-bar-title">{dlVideoTitle}</span>
+                    </div>
+                    <div className="yt-download-track">
+                      <div
+                        className="yt-download-fill"
+                        style={{ width: `${Math.min(100, Math.max(0, dlProgress.percent))}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="yt-download-bar-meta">
+                      <span>
+                        {t('yt.news.refreshProgress', {
+                          current: Math.min(
+                            (refreshProgress?.index ?? 0) + 1,
+                            refreshProgress?.total || 1,
+                          ),
+                          total: refreshProgress?.total || 1,
+                        })}
+                      </span>
+                      <span className="yt-download-bar-title">{refreshProgress?.title}</span>
+                    </div>
+                    <div className="yt-download-track">
+                      <div
+                        className="yt-download-fill"
+                        style={{
+                          width: `${
+                            refreshProgress?.total
+                              ? Math.round(
+                                  (((refreshProgress.index ?? 0) + 0.35) / refreshProgress.total) * 100,
+                                )
+                              : 10
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {mainTab === 'news' ? (
+              <>
+                <ContextualSurface as="header" className="yt-header">
+                  <div className="yt-header-top">
+                    <div className="yt-header-titles">
+                      <div className="yt-header-title">{t('yt.tab.news')}</div>
+                      <div className="yt-header-channel">
+                        {store.lastNewsCheckedAt
+                          ? t('yt.news.lastChecked', {
+                              time: new Date(store.lastNewsCheckedAt).toLocaleString(),
+                            })
+                          : t('yt.news.neverChecked')}
                       </div>
                     </div>
-                  ) : null}
-                  <label className="yt-pref">
-                    <span>{t('yt.pref.lang')}</span>
-                    <select
-                      value={playlist.lang}
-                      onChange={(e) => void setLang(e.target.value as YtStudyLang)}
-                    >
-                      {LANG_OPTS.map((l) => (
-                        <option key={l} value={l}>
-                          {t(`yt.lang.${l}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="yt-pref">
-                    <span>{t('yt.pref.subs')}</span>
-                    <div className="yt-chips">
-                      {SUB_OPTS.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className={`yt-chip${(playlist.preferSubs ?? []).includes(s) ? ' active' : ''}`}
-                          onClick={() => void toggleSub(s)}
-                        >
-                          {s.toUpperCase()}
-                        </button>
-                      ))}
+                    <div className="yt-header-actions">
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={!!busy}
+                        onClick={() => void runNewsRefresh()}
+                      >
+                        <Icon name="refresh" size={14} /> {t('yt.news.refreshAll')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn small primary"
+                        disabled={!!busy || selectedVideoIds.size === 0}
+                        onClick={() => void addToPlan([...selectedVideoIds])}
+                      >
+                        {t('yt.plan.add')}
+                      </button>
                     </div>
                   </div>
-                  <label className="yt-pref yt-pref-check">
-                    <input
-                      type="checkbox"
-                      checked={playlist.autoUpdate}
-                      onChange={(e) => void setAutoUpdate(e.target.checked)}
-                    />
-                    {t('yt.pref.autoUpdate')}
-                  </label>
-                  <label className="yt-pref">
-                    <span>Channel id</span>
-                    <input
-                      value={playlist.channelId ?? ''}
-                      onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
-                      placeholder="UC..."
-                    />
-                  </label>
-                  <label className="yt-pref">
-                    <span>Channel title</span>
-                    <input
-                      value={playlist.channelTitle ?? ''}
-                      onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
-                      placeholder="Channel name"
-                    />
-                  </label>
-                  <label className="yt-pref">
-                    <span>Channel icon URL</span>
-                    <input
-                      value={playlist.channelIconUrl ?? ''}
-                      onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
-                      placeholder="https://..."
-                    />
-                  </label>
-                  <label className="yt-pref">
-                    <span>Subscription status</span>
-                    <select
-                      value={playlist.subscriptionStatus}
-                      onChange={(e) =>
-                        void setPlaylistField({
-                          subscriptionStatus: e.currentTarget.value as YtSubscriptionStatus,
-                        })
-                      }
-                    >
-                      {SUB_STATUS_OPTS.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="yt-pref">
-                    <span>Update frequency (hours)</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={playlist.updateFrequencyHours}
-                      onChange={(e) =>
-                        void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
-                      }
-                    />
-                  </label>
-                  <label className="yt-pref">
-                    <span>{t('yt.pref.folder')}</span>
-                    <select
-                      value={playlist.folderId ?? ''}
-                      onChange={(e) => void moveToFolder(e.target.value || null)}
-                    >
-                      <option value="">{t('yt.folder.unfiled')}</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="yt-pref">
-                    <span>{t('yt.pref.sort')}</span>
-                    <select
-                      value={sort}
-                      onChange={(e) => void setSortPref(e.target.value as YtPlaylistSort)}
-                    >
-                      {SORT_OPTS.map((s) => (
-                        <option key={s} value={s}>
-                          {t(`yt.sort.${s}`)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="yt-pref yt-pref-check">
-                    <input
-                      type="checkbox"
-                      checked={onlyUnlogged}
-                      onChange={(e) => setOnlyUnlogged(e.target.checked)}
-                    />
-                    {t('yt.pref.unloggedOnly')}
-                  </label>
-                </AnchorSurface>
-              ) : null}
-
-              <VirtualList
-                className="yt-list"
-                items={listVideos}
-                itemHeight={ROW_H}
-                getKey={(v) => v.id}
-                listRole="list"
-                itemRole="listitem"
-                emptyState={
-                  <div className="yt-empty">
-                    {side?.kind === 'plan' ? t('yt.plan.empty') : t('yt.list.empty')}
+                </ContextualSurface>
+                <VirtualList
+                  className="yt-list"
+                  items={displayedNews}
+                  itemHeight={ROW_H}
+                  getKey={(v) => v.id}
+                  listRole="list"
+                  itemRole="listitem"
+                  emptyState={<div className="yt-empty">{t('yt.news.empty')}</div>}
+                  renderItem={(v) => renderVideoRow(v, { showPlaylist: true })}
+                />
+              </>
+            ) : showEmptyPlaylist ? (
+              <div className="yt-empty">{t('yt.empty')}</div>
+            ) : showPlaylistPane ? (
+              <>
+                <ContextualSurface as="header" className="yt-header">
+                  <div className="yt-header-top">
+                    <div className="yt-header-titles">
+                      <div className="yt-header-title">
+                        {side?.kind === 'plan' ? t('yt.plan.title') : playlist?.title ?? ''}
+                      </div>
+                      {side?.kind === 'playlist' && playlist?.channelTitle ? (
+                        <div className="yt-header-channel">{playlist.channelTitle}</div>
+                      ) : side?.kind === 'plan' ? (
+                        <div className="yt-header-channel">{t('yt.plan.subtitle')}</div>
+                      ) : null}
+                    </div>
+                    <div className="yt-header-actions">
+                      {side?.kind === 'playlist' ? (
+                        <button
+                          type="button"
+                          className="btn small"
+                          disabled={!!busy}
+                          onClick={() => void refresh()}
+                        >
+                          <Icon name="refresh" size={14} /> {t('yt.action.refresh')}
+                        </button>
+                      ) : null}
+                      {side?.kind === 'playlist' && playlist?.channelId ? (
+                        <button
+                          type="button"
+                          className="btn small"
+                          disabled={!!busy}
+                          onClick={() => void refreshChannel()}
+                        >
+                          <Icon name="refresh" size={14} /> Channel
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn small primary"
+                        disabled={!!busy || selectedVideoIds.size === 0}
+                        onClick={() => void logSelected()}
+                      >
+                        <Icon name="download" size={14} /> {t('yt.action.log')}
+                      </button>
+                      {side?.kind === 'playlist' ? (
+                        <button
+                          type="button"
+                          className="btn small"
+                          disabled={!!busy}
+                          onClick={() => void downloadAll()}
+                        >
+                          {t('yt.action.downloadAll')}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={!!busy || selectedVideoIds.size === 0}
+                        onClick={() =>
+                          void (side?.kind === 'plan'
+                            ? removeFromPlan([...selectedVideoIds])
+                            : addToPlan([...selectedVideoIds]))
+                        }
+                      >
+                        {side?.kind === 'plan' ? t('yt.plan.remove') : t('yt.plan.add')}
+                      </button>
+                    </div>
                   </div>
-                }
-                renderItem={(v) =>
-                  renderVideoRow(v, {
-                    planMode: side?.kind === 'plan',
-                    showPlaylist: side?.kind === 'plan',
-                  })
-                }
-              />
-            </>
-          ) : null}
-        </section>
+                </ContextualSurface>
+
+                {side?.kind === 'playlist' && playlist ? (
+                  <AnchorSurface bare className="yt-prefs">
+                    {playlist.channelId ? (
+                      <div className="yt-pref yt-channel-card">
+                        <span>Channel tracking</span>
+                        <div className="yt-channel-card-body">
+                          <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
+                          <div>{playlist.subscriptionStatus}</div>
+                          <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
+                        </div>
+                      </div>
+                    ) : null}
+                    <label className="yt-pref">
+                      <span>{t('yt.pref.lang')}</span>
+                      <select
+                        value={playlist.lang}
+                        onChange={(e) => void setLang(e.target.value as YtStudyLang)}
+                      >
+                        {LANG_OPTS.map((l) => (
+                          <option key={l} value={l}>
+                            {t(`yt.lang.${l}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="yt-pref">
+                      <span>{t('yt.pref.subs')}</span>
+                      <div className="yt-chips">
+                        {SUB_OPTS.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className={`yt-chip${(playlist.preferSubs ?? []).includes(s) ? ' active' : ''}`}
+                            onClick={() => void toggleSub(s)}
+                          >
+                            {s.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="yt-pref yt-pref-check">
+                      <input
+                        type="checkbox"
+                        checked={playlist.autoUpdate}
+                        onChange={(e) => void setAutoUpdate(e.target.checked)}
+                      />
+                      {t('yt.pref.autoUpdate')}
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel id</span>
+                      <input
+                        value={playlist.channelId ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
+                        placeholder="UC..."
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel title</span>
+                      <input
+                        value={playlist.channelTitle ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
+                        placeholder="Channel name"
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Channel icon URL</span>
+                      <input
+                        value={playlist.channelIconUrl ?? ''}
+                        onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
+                        placeholder="https://..."
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>Subscription status</span>
+                      <select
+                        value={playlist.subscriptionStatus}
+                        onChange={(e) =>
+                          void setPlaylistField({
+                            subscriptionStatus: e.currentTarget.value as YtSubscriptionStatus,
+                          })
+                        }
+                      >
+                        {SUB_STATUS_OPTS.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="yt-pref">
+                      <span>Update frequency (hours)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={playlist.updateFrequencyHours}
+                        onChange={(e) =>
+                          void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
+                        }
+                      />
+                    </label>
+                    <label className="yt-pref">
+                      <span>{t('yt.pref.folder')}</span>
+                      <select
+                        value={playlist.folderId ?? ''}
+                        onChange={(e) => void moveToFolder(e.target.value || null)}
+                      >
+                        <option value="">{t('yt.folder.unfiled')}</option>
+                        {folders.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="yt-pref">
+                      <span>{t('yt.pref.sort')}</span>
+                      <select
+                        value={sort}
+                        onChange={(e) => void setSortPref(e.target.value as YtPlaylistSort)}
+                      >
+                        {SORT_OPTS.map((s) => (
+                          <option key={s} value={s}>
+                            {t(`yt.sort.${s}`)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="yt-pref yt-pref-check">
+                      <input
+                        type="checkbox"
+                        checked={onlyUnlogged}
+                        onChange={(e) => setOnlyUnlogged(e.target.checked)}
+                      />
+                      {t('yt.pref.unloggedOnly')}
+                    </label>
+                  </AnchorSurface>
+                ) : null}
+
+                <VirtualList
+                  className="yt-list"
+                  items={listVideos}
+                  itemHeight={ROW_H}
+                  getKey={(v) => v.id}
+                  listRole="list"
+                  itemRole="listitem"
+                  emptyState={
+                    <div className="yt-empty">
+                      {side?.kind === 'plan' ? t('yt.plan.empty') : t('yt.list.empty')}
+                    </div>
+                  }
+                  renderItem={(v) =>
+                    renderVideoRow(v, {
+                      planMode: side?.kind === 'plan',
+                      showPlaylist: side?.kind === 'plan',
+                    })
+                  }
+                />
+              </>
+            ) : null}
+          </section>
+        </div>
       </div>
     </AppChrome>
   );

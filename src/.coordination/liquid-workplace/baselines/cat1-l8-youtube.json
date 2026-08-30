@@ -25,7 +25,7 @@
     "total": 84,
     "smallest": "input 13px",
     "smallestPx": 13,
-    "under32Count": 78,
+    "under32Count": 57,
     "under32": [
       {
         "el": "input",
@@ -35,47 +35,47 @@
       {
         "el": "input",
         "min": 13,
-        "nearest": 51.8
+        "nearest": 51.1
       },
       {
-        "el": "button.yt-chip",
-        "min": 21,
-        "nearest": 34.4
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
       },
       {
-        "el": "button.yt-chip",
-        "min": 21,
-        "nearest": 34.4
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
       },
       {
-        "el": "button.yt-chip",
-        "min": 21,
-        "nearest": 35.9
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
       },
       {
-        "el": "button.yt-chip",
-        "min": 21,
-        "nearest": 36
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
       },
       {
-        "el": "input",
-        "min": 21,
-        "nearest": 51.2
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
       },
       {
-        "el": "input",
-        "min": 21,
-        "nearest": 42.6
+        "el": "button.btn",
+        "min": 24,
+        "nearest": 38
       },
       {
-        "el": "input",
-        "min": 21,
-        "nearest": 55.7
+        "el": "button.btn",
+        "min": 24,
+        "nearest": 38
       },
       {
-        "el": "input",
-        "min": 21,
-        "nearest": 59.4
+        "el": "button.btn",
+        "min": 24,
+        "nearest": 38
       }
     ],
     "wcag258FailCount": 0,
@@ -138,7 +138,7 @@
     "deferredVisibilityOwners": 0,
     "controls": 65,
     "measured": 65,
-    "belowFloorByRect": 49,
+    "belowFloorByRect": 39,
     "belowFloorByHit": 0,
     "belowFloor": [],
     "smallestHit": {
@@ -165,15 +165,15 @@
     "disabled": [
       {
         "el": "button.btn.small.primary",
-        "rect": "45x26"
+        "rect": "45x32"
       },
       {
         "el": "button.btn.small.primary",
-        "rect": "65x26"
+        "rect": "65x32"
       },
       {
         "el": "button.btn.small",
-        "rect": "141x26"
+        "rect": "141x32"
       },
       {
         "el": "button.btn.ghost.small",
@@ -199,7 +199,7 @@
     "disclosedForRun": 0,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "div.yt-list 0,0 -> 760,0"
+      "div.yt-list 0,0 -> 783,0"
     ],
     "deferredRestore": {
       "first": {
@@ -265,39 +265,6 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
-  "control": {
-    "moved": {
-      "contrast": true,
-      "targetsByPointer": true,
-      "targetsByRect": true,
-      "wcag258": true,
-      "keyboard": true
-    },
-    "backToBaseline": true,
-    "rectDrift": 0,
-    "counts": {
-      "base": [
-        0,
-        78,
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        80,
-        2,
-        1,
-        2
-      ],
-      "restored": [
-        0,
-        78,
-        0,
-        0
-      ]
-    }
-  },
   "ariaRestored": {
     "skipped": "nothing was opened"
   }

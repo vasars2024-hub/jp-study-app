@@ -1065,3 +1065,56 @@ Regression: `youtubeLiquidHitFloor.test.ts` **7/7** (4 new cases pin the roles, 
 the raw landmarks, the flex compensation, and the three-class restores).
 Evidence: `baselines/cat3-l8-youtube.json`. Zero new probes — two RUNs of
 `cat3-liquid-utilization.cjs`, one re-RUN of `cat1-accessibility.cjs`.
+
+## 2026-08-30 · primary — YouTube category 4 closes at a controlled 10/10
+
+Opened FAIL on two bars. `default` 980x640 and `maximized` 1264x765 were already clean
+(0/0/0/0, dead 3.5% and 6.2%); the whole finding was the **compact** leg, and it is a real
+product state — `MIN_W`/`MIN_H` in `DesktopShell.tsx:296` are **260x170**, so 260x170 is a
+size a user can drag to, not a probe artifact.
+
+At 260px the `minmax(200px, 240px)` rail left the video list a **0px** column: **44 clipped**,
+1 horizontal scroller (`div.yt-list` **330 > 202**), 1 `hiddenOverflowX`
+(`div.fwin-body 477 > 248`). Final: **0 / 0 / 0 / 0 at all three sizes**, dead 3.5 / 0.5 / 6.2%,
+chrome 33.5 / 57.2 / 27.5%, dominant canvas 94.3 / 78.8 / 95.3%, every leg restored.
+
+Three fixes, in the order the harness forced them:
+
+1. **The rail stops being a column below 560px** and becomes a band above the list that
+   scrolls inside itself. `grid-template-rows: minmax(0, 0.45fr) minmax(0, 1fr)` — fractional,
+   not a fixed cap, because the query is on WIDTH and the same rule has to hold at 260x170
+   and 520x820 (53px of 170, 254px of 820). `cqb` was the obvious spelling and is wrong:
+   block-size container units need `container-type: size`, and this container is `inline-size`.
+   **44 → 2 clipped.**
+2. **Two families were refusing to shrink, not being clipped.** A flex item's `min-width` is
+   `auto`, so `.yt-row-meta`'s three spans held the row open at their full text width and
+   `.yt-pref`'s label held the preference form open. `min-width: 0` plus ellipsis on both.
+   **2 → 0 clipped, `hiddenOverflowX` 1 → 0.**
+3. **The row could not hold four columns at 260px.** Measured live: thumbnail 96 + status
+   chips 80 + three actions 112 = 288 before the title gets a pixel. Under the query the
+   badges move to a second line under the title and the row keeps its fixed 64px, because
+   `ROW_H` is what `VirtualList` measures with. **Scroller 330 → 0.**
+
+**THE TRAP THAT COST TWO FULL RUNS, and it is not specificity as usually stated: `@container`
+adds NO specificity, so it is decided by SOURCE ORDER.** The block was first written next to
+`.yt-root` near the top of the section, ~290 lines above `.yt-row`, `.yt-side` and `.yt-thumb`.
+It matched, it was live, and it moved nothing — the row still measured 330 in a 202px list
+across two re-runs. Moving the same bytes below the rules it overrides took the score from
+FAIL to 10/10 with no other change. A container query that appears to do nothing is in the
+wrong place in the file before it is wrong in its conditions.
+
+**A dead `@media (max-width: 720px)` block was doing this job and could never fire**, because
+a media query reads the OS viewport (1264px) while this surface lives in a 260px floating
+window — the same defect `.jiten-novels-shell` records. It was not merely dead: it set
+`display: none` on `.yt-status-chips`, i.e. it deleted a feature at narrow widths. It is
+replaced by the container query, which hides nothing.
+
+Control: injected clip `clipped` **0 → 1 → 0**, `removalProven` true, `backToBaseline` true.
+Sub-minimum shrink (200x140, below the product's own floor) recorded factually: clipped 0,
+overlaps 0, 1 horizontal scroller, restored. Proven-pager leg not applicable here.
+
+**Categories 1 and 3 RE-RUN at this tree per Carry 19:** cat1 **10/10** (belowFloorByHit 0,
+stolen 0, minRatio 6.52, unreachable 0), cat3 **10/10** (84 regions, dense 0, treated 2 of 2,
+shared 2 of 2). Guard `youtubeLiquidHitFloor.test.ts` **10/10**.
+Evidence: `baselines/cat4-l8-youtube.json`. Zero new probes — four RUNs of
+`cat4-use-of-space.cjs`, one re-RUN each of cat1 and cat3.

@@ -23970,6 +23970,17 @@ html.lockscreen-widget-root #root {
 }
 
 /* YouTube immersion playlist manager */
+/* The query container. `.yt-root` is the grid whose columns have to change and an element
+   cannot answer a `@container` condition against itself, so this wrapper exists for that and
+   nothing else — the same shape as `.os-set-body` and `.jiten-novels-shell`. A media query
+   would read the OS viewport (1264px) while this window is 260px wide. */
+.yt-shell {
+  container-type: inline-size;
+  container-name: yt-shell;
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
 .yt-root {
   display: grid;
   grid-template-columns: minmax(200px, 240px) 1fr;
@@ -24202,6 +24213,21 @@ html.lockscreen-widget-root #root {
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  /* Same shrink problem as `.yt-row-meta`: at the 260px minimum window "Update frequency
+     (hours)" plus its input is wider than the wrapped row, and the pair was measured clipped
+     rather than narrowed. A preference never exceeds the form it wraps in. */
+  max-width: 100%;
+  min-width: 0;
+}
+.yt-pref > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yt-pref input,
+.yt-pref select {
+  min-width: 0;
 }
 .yt-pref select {
   background: color-mix(in srgb, #fff 6%, transparent);
@@ -24290,6 +24316,17 @@ html.lockscreen-widget-root #root {
   font-size: 11px;
   opacity: 0.65;
   margin-top: 2px;
+  /* The title ellipsises itself, but this row did not: a flex item's `min-width` is `auto`,
+     so the three spans held the body open at their full text width and the whole row measured
+     330px inside a 202px list. Category 4 read that as a horizontal scroller on the video
+     list — the row was never clipped, it was refusing to shrink. */
+  min-width: 0;
+}
+.yt-row-meta > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .yt-row-actions {
   display: flex;
@@ -24304,23 +24341,57 @@ html.lockscreen-widget-root #root {
 .yt-status-err {
   color: #f88;
 }
-@media (max-width: 720px) {
+/* `MIN_W`/`MIN_H` in `DesktopShell.tsx` are 260x170, so the smallest this window goes is a
+   size a user can actually reach, and category 4 measured 44 clipped elements there: a 200px
+   minimum rail out of 260px leaves the video list a 0px column. Below 560px the rail stops
+   being a column and becomes a capped band above the list. Nothing is hidden — the rail
+   scrolls, and every control it held is still in it. */
+@container yt-shell (max-width: 560px) {
   .yt-root {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    /* Fractional, not a fixed cap: this query is on WIDTH, so the same rule has to hold at
+       260x170 and at 520x820. `0.45fr` against `1fr` gives the band 31% of whatever height
+       there is — 53px of 170, 254px of 820 — and it scrolls inside that either way.
+       `cqb` is not available: block-size container units need `container-type: size`, and
+       this container is `inline-size`. */
+    grid-template-rows: minmax(0, 0.45fr) minmax(0, 1fr);
   }
   .yt-side {
-    max-height: 220px;
-    border-right: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-right: 0;
     border-bottom: 1px solid var(--border, #333);
+    padding: 6px 8px;
+    gap: 6px;
   }
+  /* Measured at 260px: thumbnail 96 + status chips 80 + three row actions 112 is 288 before
+     the title gets a pixel, so the row reported a 330px scrollWidth in a 202px list. One line
+     cannot hold four columns here. The badges move under the title instead — still painted,
+     still in the same row, and the row keeps its fixed 64px because `ROW_H` is what the
+     virtual list measures with. */
   .yt-row {
-    grid-template-columns: 72px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 2px 6px;
+    padding: 3px 8px;
+  }
+  .yt-thumb {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    width: 44px;
+    height: 26px;
+  }
+  .yt-row-body {
+    grid-column: 2;
+    grid-row: 1;
   }
   .yt-status-chips {
-    display: none;
+    grid-column: 2;
+    grid-row: 2;
   }
   .yt-row-actions {
-    display: flex;
+    grid-column: 3;
+    grid-row: 1 / -1;
   }
 }
 
