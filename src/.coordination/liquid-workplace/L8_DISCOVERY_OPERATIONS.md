@@ -735,3 +735,80 @@ Sibling files in the same tree (`types.ts`, `scraper.css`) are LF — do not ass
 Gates: vitest **12,101 passed / 6 skipped**, 1 failed — `scraperSources` "caps the stored history",
 `ENOTEMPTY` rmdir on a temp dir, passes alone 13/13, touches nothing here. i18n **11,776** exit 0;
 architecture nothing new exit 0; ESLint over all eight touched paths, 0 errors.
+
+## 2026-08-30 20:10 — the GATE's own sentence, measured on both halves (`747dd78d`, `8da9b91e`)
+
+The last turn left one named entry. Generalising it found **six**, in two axes, and the second
+axis was invisible to the instrument built for the first.
+
+**Axis 1 — theme.** `pillarbox` and `app-border` render under `{aeroActive && (` where
+`const aeroActive = theme === AERO_THEME_ID`; `companions-leave-secret` under an Aero-or-WIRED
+guard. All three passed every reachability check — found, routed to the right page, anchor in a
+file that page's closure contains — and were still not on screen. `SettingsRegistryEntry.themes`
+gates them. The registry comment already claimed `advanced` did this; it never could, because
+Advanced Mode is a preference and not a shell.
+
+**Axis 2 — discovery.** `wired-arcade`, `wired-finding-terminal`, `aero-arcade`,
+`aero-gadget-lab` render behind `{isWiredDiscovered && (` / `{isAeroDiscovered && (`. An
+undiscovered user searching "arcade" landed on Special, saw nothing, and was told a secret exists
+in the same click. `discovered: 'aero' | 'wired'` gates them; it OR-s with `themes`, as the guards
+do. **The theme derivation could not see any of the four** — a discovery flag is a
+`useState(hasDiscoveredWired)` binding, not a `const x =` one, so the alias resolver returned null
+and all four sat in `conditionalOtherAxis` looking settled.
+
+**Two entries stay ungated and say so in the table.** `wired-archive`'s guard mixes
+`useWiredMaterials()` — a `data-materials` attribute, not a theme id — with discovery, so no theme
+list is derivable and gating on discovery alone would hide it from a live user. `special-locked`
+is the "nothing here yet" placeholder; sending a discoverer to the modules they unlocked beats no
+result. Both are product calls, recorded where the next worker meets them.
+
+**Live, on pid 22388 / bridge 39273**, Advanced asserted by class and each axis moved by the
+mechanism the app itself uses, never by writing a preference:
+
+    "pillarbox"      forest-night 0 → aero 1 ("Pillarbox style") → forest-night 0
+    "wired arcade"   undiscovered 6 → discovered 8 ("WIRED games", "NAVI terminal") → 6
+    control "wallpaper"  10 both sides of both moves
+    restored: theme forest-night, advanced off, jp-wired-discovered-v1 absent — all re-read
+
+**The first control run is the entry worth keeping.** `--control "aero arcade"` MOVED with the
+axis (shared keywords) and the harness exited 1 rather than scoring it. A control that answers the
+same query family as the measurement proves nothing; `wallpaper` does.
+
+**Instrument controls.** Stripping the three `themes:` lines takes `themeUngated` 0 → 3; stripping
+the four `discovered:` lines takes `discoveryUngated` 0 → 4; both name exactly the right cards and
+exit 1. Both blobs restored SHA-identical. One self-inflicted false positive caught and fixed: a
+doc comment in `types.ts` containing a literal `<SettingsCard id="…"` was counted as a 131st
+destination — prose now, with the reason.
+
+**GATE — "every setting and scraper action remains searchable and keyboard reachable".**
+
+    searchable  Settings  130 destinations / 129 indexed / 1 duplicate rendering / 0 unsearchable
+                Scraper    28 / 27 / 1 selection-gated instance view / 0 unsearchable
+                both       0 misrouted, 0 unanchored, 0 ungated and 0 over-gated on BOTH axes
+    keyboard    Settings  cat1 PASS 10/10 — contrast 5.47, 62 targets, 0 WCAG 2.5.8 fails,
+                          unreachable 0, motion 41 → 0 under emulation, released
+                Scraper   cat1 PASS 10/10 — contrast 5.55, 32 targets, 0 fails, unreachable 0
+                control   all five bars moved 0/5/0/0/0 → 1/7/2/1/2 → restored, rectDrift 0
+
+The Scraper leg of both halves cost a **RUN** of an existing parameterised harness. Zero new
+single-use probes; the one new file is `l8-searchability-live.cjs`, the live half of the l8
+harness, `--surface` and `--discover` parameterised (`--surface scraper` drives the Scraper box).
+
+**Why the two bullets still do NOT close, and it is one bounded slice.** They rest on the
+scorecard's "Resources, Scraper, Settings, YouTube and Music all hold 80/80". Counting the
+baseline files rather than reading that sentence: **Settings and YouTube have no `cat7-l8-*.json`
+at all, and Resources has no cat1, cat3 or cat4.** Those five cells may well be recorded under
+other names or in prose, but I did not derive them this turn, and closing two bullets on another
+turn's summary is the flattering close the pin forbids. Next turn opens there.
+
+Gates: `npx vitest run` **12,066 passed / 44 skipped, 8 failed across 12 files** — and **7 of
+those 8 pass alone**, in two re-runs totalling 60/60 (`i18n.test.ts` + `sourceNulBytes` 23/23;
+`deletedPlayerDependents` + `blancStudyPlayerRouting` + `mediaSurfaceImportGraph` +
+`readingCapturesHandoff` 37/37). The cause was mine and is worth carrying: **I ran the full suite
+concurrently with two `cat1-accessibility.cjs` runs driving the live Electron app**, and six of
+those failures are 20–40 s case timeouts. The eighth is `flashcardAudio` "generates Japanese
+speech with an installed offline voice", environment-dependent. The five `readingLens*` /
+`visualNovel*` files are the `node_modules`-junction pdfjs `Denied ID` artifact the boss audit
+already named. Nothing failing imports `settingsRegistry`. `i18n-check` **11,776** exit 0;
+`architecture-audit` nothing new exit 0; touched-path ESLint 0 errors. Carry 26 (CRLF worktree /
+LF HEAD on `settingsRegistry.ts`) held both times — HEAD+region blobs, diffed before staging.

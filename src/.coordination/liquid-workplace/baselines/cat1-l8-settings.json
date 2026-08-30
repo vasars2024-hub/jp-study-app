@@ -12,7 +12,7 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 64,
+    "measured": 82,
     "unmeasurable": 0,
     "minRatio": 5.47,
     "minOwner": "span.os-set-advanced-label \"Advanced\" 12px",
@@ -22,7 +22,7 @@
     "inactiveWorst": []
   },
   "targets": {
-    "total": 46,
+    "total": 62,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
     "under32Count": 5,
@@ -57,7 +57,7 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 46,
+    "controls": 62,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 1,
@@ -90,7 +90,7 @@
     },
     "restored": true
   },
-  "raised": "already-on-top",
+  "raised": "raised",
   "ariaDisclosed": {
     "clicked": 0,
     "sel": []
@@ -213,39 +213,6 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
-  "control": {
-    "moved": {
-      "contrast": true,
-      "targetsByPointer": true,
-      "targetsByRect": true,
-      "wcag258": true,
-      "keyboard": true
-    },
-    "backToBaseline": true,
-    "rectDrift": 0,
-    "counts": {
-      "base": [
-        0,
-        5,
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        7,
-        2,
-        1,
-        2
-      ],
-      "restored": [
-        0,
-        5,
-        0,
-        0
-      ]
-    }
-  },
   "ariaRestored": {
     "skipped": "nothing was opened"
   }

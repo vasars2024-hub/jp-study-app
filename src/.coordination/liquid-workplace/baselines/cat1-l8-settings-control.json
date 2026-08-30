@@ -1,10 +1,10 @@
 {
-  "label": "l8-scraper",
-  "surface": "Scraper",
+  "label": "l8-settings-control",
+  "surface": "Settings",
   "win": "main",
   "theme": "forest-night",
   "presentation": "standard",
-  "box": "820x580",
+  "box": "960x680",
   "deferredVisibilityOwners": 0,
   "parserSelfTest": {
     "ok": true,
@@ -12,17 +12,17 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 12,
+    "measured": 64,
     "unmeasurable": 0,
-    "minRatio": 5.55,
-    "minOwner": "kbd.scr-search-shortcut \"Ctrl K\" 13px",
+    "minRatio": 5.47,
+    "minOwner": "span.os-set-advanced-label \"Advanced\" 12px",
     "failingCount": 0,
     "worst": [],
     "inactiveSkipped": 0,
     "inactiveWorst": []
   },
   "targets": {
-    "total": 32,
+    "total": 46,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
     "under32Count": 5,
@@ -57,11 +57,16 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 32,
+    "controls": 46,
     "unreachableCount": 0,
     "unreachable": [],
-    "focusHostCount": 0,
-    "focusHosts": [],
+    "focusHostCount": 1,
+    "focusHosts": [
+      {
+        "el": "div.os-set-pane-v2",
+        "why": "tabindex=-1"
+      }
+    ],
     "roving": []
   },
   "deferredRestore": {
@@ -87,43 +92,32 @@
   },
   "raised": "raised",
   "ariaDisclosed": {
-    "clicked": 1,
-    "sel": [
-      "ui-icon-btn.ui-focusable.ui-icon-btn--sm"
-    ],
-    "settle": {
-      "nodes": 419,
-      "controls": 78,
-      "text": 105,
-      "expanded": 1,
-      "samples": 8,
-      "stable": 7,
-      "elapsedMs": 2275
-    }
+    "clicked": 0,
+    "sel": []
   },
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 31,
+    "beforeOverThreshold": 41,
     "beforeLongest": {
-      "el": "div.scr-body",
-      "dur": 0.24
+      "el": "span.os-set-advanced-glyph",
+      "dur": 0.35
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 31,
+    "afterOverThreshold": 41,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
   "hit": {
-    "title": "Scraper",
+    "title": "Settings",
     "floor": 32,
     "presentation": "standard",
     "theme": "forest-night",
-    "box": "820x580",
+    "box": "960x680",
     "deferredVisibilityOwners": 0,
-    "controls": 32,
-    "measured": 32,
+    "controls": 45,
+    "measured": 45,
     "belowFloorByRect": 5,
     "belowFloorByHit": 0,
     "belowFloor": [],
@@ -152,7 +146,8 @@
     "disclosedForRun": 0,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "div.lq-contextual.scr-rail-scroll 0,0 -> 267,0"
+      "div.lq-contextual.os-set-nav-scroll 0,0 -> 385,0",
+      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 523,0"
     ],
     "deferredRestore": {
       "first": {
@@ -218,19 +213,40 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
-  "ariaRestored": {
-    "clicked": 1,
-    "sel": [
-      "ui-icon-btn.ui-focusable.ui-icon-btn--sm"
-    ],
-    "settle": {
-      "nodes": 419,
-      "controls": 78,
-      "text": 1201,
-      "expanded": 0,
-      "samples": 8,
-      "stable": 7,
-      "elapsedMs": 2246
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        5,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        7,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        5,
+        0,
+        0
+      ]
     }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
   }
 }
