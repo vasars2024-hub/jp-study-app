@@ -361,3 +361,35 @@ correct. Check the BLOB, not the file you edited.
 
 Evidence: `baselines/cat5-l8-scraper.json`, `cat5-l8-scraper-c19-control.json`,
 `cat7-l8-scraper.json`, `cat8-l8-scraper.json`.
+
+### Decision — the Scraper's i18n deferral is LIFTED (2026-08-30, primary, standing auto-approval)
+
+Recorded so the next turn executes rather than deliberates. `strings.ts:3` defers i18n
+for this app, and its stated reason is explicit: *"~400 strings x 4 languages is not
+worth paying while these surfaces are still shells."* **That precondition is now false.**
+The Scraper is a 17-page application scoring **70/80**, with category 6 feature parity
+at 7/7 in both presentations, live qBittorrent and MAL integration, and 1,215 rendered
+text runs. It is not a shell, and CLAUDE.md's i18n policy puts application chrome in the
+shared catalogs. Category 8 cannot reach 10 while `languagesDiffer` is false, and no
+harness change can honestly make it true — the surface really does render identical
+English in all four languages.
+
+So: migrate. The module's own comment already names the shape and it is mechanical —
+move the map into `catalogs/{en,ja,zh,ru}.ts` and swap `sx()` for `useT()`'s `t()`.
+Tradeoff accepted: this is ~588 keys x 3 languages, clearly more than one turn's tail.
+It is a multi-turn slice, not a blocker, and it is what the turn after the mute-pair fix
+opens on.
+
+Two things measured now so that turn does not rediscover them:
+- **58 of the 588 keys are FUNCTIONS**, not strings (`sxn(key, n)`, e.g.
+  `'acq.episode': (n) => \`episode ${n}\``). The shared `t()` contract has to carry these
+  or they need restructuring into interpolated keys first. Settle that before the bulk
+  move, because it decides the shape of all 588.
+- **Adding English-only keys to `catalogs/en.ts` is not a staging step.** The
+  catalog-hygiene test in `shared/__tests__/i18n.test.ts` fails on any `en` key without a
+  ja/zh/ru pair, so each batch lands complete in four languages or not at all. Migrate in
+  key-prefix batches (`app.*`, `nav.*`, `acq.*`, …), running `node tools/i18n-check.cjs`
+  per batch, rather than in one 588-key commit.
+
+Not deferred by this decision: study **content** stays literal — series names, episode
+titles, release groups — per CLAUDE.md i18n rule 4 and `strings.ts:16`.
