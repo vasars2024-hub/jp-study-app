@@ -513,14 +513,14 @@ answers, is the shared tree's known flake and not a regression to bisect.
 
 ### 2026-08-30 — Scraper i18n, batch 3: Result workflow complete
 
-**249 of 588 keys migrated (42.3%)**, +101 this batch. Every `result.*` entry now resolves
+**249 of 596 keys migrated (41.8%)**, +101 this batch. Every `result.*` entry now resolves
 from the shared EN/JA/ZH/RU catalogs: tabs, filters, selection and export feedback, playback
 refusals, stored-result recovery, empty states, columns, detail summaries and provenance.
 Mechanical comparison reports **101 TEXT / 101 shared / 0 missing / 0 extra**.
 
 `node tools/i18n-check.cjs` passes at **11,412** English keys; the focused i18n suite passes
 **21/21**. The first check caught five byte-identical labels; they were translated rather than
-bulk-baselined. Category 8 remains open because 42.3% is coverage progress, not completion.
+bulk-baselined. Category 8 remains open because 41.8% is coverage progress, not completion.
 
 Live acceptance was attempted with the existing parameterised category-8 harness. The inherited
 Scraper was absent; reopening it through the debug bridge produced a visible 803.6×568.4 shell,
@@ -529,18 +529,18 @@ but its parent `.fwin` remained at computed `opacity: 0`, so the harness correct
 
 ### 2026-08-30 — Scraper i18n, batch 4: Dashboard workflow complete
 
-**302 of 588 keys migrated (51.4%)**, +53 this batch. Every `dash.*` entry now resolves from
+**302 of 596 keys migrated (50.7%)**, +53 this batch. Every `dash.*` entry now resolves from
 the shared catalogs: hero and quick actions, series/stat summaries, backend honesty, active and
 cancelled jobs, source health, runtime, scheduling and the study handoff. Mechanical comparison:
 **53 TEXT / 53 shared / 0 missing / 0 extra**.
 
 `i18n-check` passes at **11,465** English keys and the focused suite passes **21/21**. No second
 live harness run was made after batch 3's one allowed repair still left the parent window at
-opacity 0; category 8 remains open at 51.4% coverage.
+opacity 0; category 8 remains open at 50.7% coverage.
 
 ### 2026-08-30 — Scraper i18n, batch 5: app chrome and advanced settings
 
-**357 of 588 keys migrated (60.7%)**, +55 this batch: all 22 `app.*` keys and all 33 `set.*`
+**357 of 596 keys migrated (59.9%)**, +55 this batch: all 22 `app.*` keys and all 33 `set.*`
 keys. Search, compact/advanced mode, menus, saved/reset feedback, tracker ordering, encrypted
 credential states and qBittorrent connection feedback now use the shared catalogs.
 Mechanical comparison: **55 TEXT / 55 shared / 0 missing / 0 extra**.
@@ -548,14 +548,19 @@ Mechanical comparison: **55 TEXT / 55 shared / 0 missing / 0 extra**.
 The only byte-identical values are the two deliberate `{value}` pass-through templates for
 backend connection/error detail. They were added individually to the format-string baseline in
 all three locales; no user-facing English was waived. `i18n-check` passes at **11,520** keys and
-the focused suite passes **21/21**. Category 8 remains open at 60.7% coverage.
+the focused suite passes **21/21**. Category 8 remains open at 59.9% coverage.
 
 ### 2026-08-30 — Scraper i18n, batch 6: Source Manager complete
 
-**399 of 588 keys migrated (67.9%)**, +42 this batch. Every `sources.*` entry now resolves from
+**399 of 596 keys migrated (66.9%)**, +42 this batch. Every `sources.*` entry now resolves from
 the shared catalogs: acquisition mode and its consequences, provider inventory/state/kind and
 capabilities, priority order, tests, subtitle/auth badges, and fallback honesty.
 Mechanical comparison: **42 TEXT / 42 shared / 0 missing / 0 extra**.
 
 `i18n-check` passes at **11,562** English keys and the focused suite passes **21/21**. Category 8
-remains open at 67.9%; 189 catalog keys still fall back to `TEXT` and are not represented as done.
+remains open at 66.9%; 197 catalog keys still fall back to `TEXT` and are not represented as done.
+
+**Denominator correction, measured rather than inherited:** importing `SCRAPER_TEXT` and counting
+`Object.keys()` returns **596**, while the handoff's 588 was copied forward without a runtime count.
+Therefore batches 1–2 were 76/596 = 12.8% and 148/596 = 24.8%, not 12.9%/25.2%. Runtime
+intersection with `SCRAPER_UI_EN` confirms **399 migrated / 197 fallback / 0 ambiguous** now.
