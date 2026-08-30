@@ -2,7 +2,7 @@
   "surface": "@.fwin:has(.yt-root)",
   "label": "l8-youtube",
   "control": false,
-  "at": "2026-08-30T21:54:12.733Z",
+  "at": "2026-08-30T22:14:50.063Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -13,8 +13,8 @@
     "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-youtube.json",
     "verdict": "PASS 10/10",
     "parity": {
-      "standard": "9/9",
-      "liquid": "9/9",
+      "standard": "10/10",
+      "liquid": "10/10",
       "na": 0,
       "equal": true,
       "rowsAgree": true,
@@ -208,8 +208,8 @@
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "parity": {
-          "standard": "9/9",
-          "liquid": "9/9",
+          "standard": "10/10",
+          "liquid": "10/10",
           "na": 0,
           "equal": true,
           "rowsAgree": true,

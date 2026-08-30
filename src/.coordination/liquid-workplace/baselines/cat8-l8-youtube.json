@@ -1,0 +1,253 @@
+{
+  "label": "l8-youtube",
+  "surface": "@.fwin:has(.yt-root)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "980x640",
+  "textRuns": 89,
+  "textHash": 1340342290,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 19,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9743,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9743 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 89,
+        "textHash": 1340342290,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 89,
+        "textHash": -1843844564,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 28,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Add",
+            "now": "追加"
+          },
+          {
+            "i": 7,
+            "was": "Playlist tools",
+            "now": "プレイリストツール"
+          },
+          {
+            "i": 8,
+            "was": "Plan to watch",
+            "now": "視聴予定"
+          },
+          {
+            "i": 14,
+            "was": "Unfiled",
+            "now": "未分類"
+          },
+          {
+            "i": 15,
+            "was": "News",
+            "now": "ニュース"
+          },
+          {
+            "i": 16,
+            "was": "Playlist",
+            "now": "プレイリスト"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 89,
+        "textHash": -1689175532,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 28,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Add",
+            "now": "添加"
+          },
+          {
+            "i": 7,
+            "was": "Playlist tools",
+            "now": "播放列表工具"
+          },
+          {
+            "i": 8,
+            "was": "Plan to watch",
+            "now": "计划观看"
+          },
+          {
+            "i": 14,
+            "was": "Unfiled",
+            "now": "未分类"
+          },
+          {
+            "i": 15,
+            "was": "News",
+            "now": "动态"
+          },
+          {
+            "i": 16,
+            "was": "Playlist",
+            "now": "播放列表"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 89,
+        "textHash": 696322882,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 28,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Add",
+            "now": "Добавить"
+          },
+          {
+            "i": 7,
+            "was": "Playlist tools",
+            "now": "Инструменты плейлиста"
+          },
+          {
+            "i": 8,
+            "was": "Plan to watch",
+            "now": "К просмотру"
+          },
+          {
+            "i": 14,
+            "was": "Unfiled",
+            "now": "Без папки"
+          },
+          {
+            "i": 15,
+            "was": "News",
+            "now": "Новости"
+          },
+          {
+            "i": 16,
+            "was": "Playlist",
+            "now": "Плейлист"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 28,
+    "baseRuns": 89,
+    "diffShare": 0.3146
+  },
+  "drive": {
+    "click": ".yt-plan-item",
+    "clickedLabel": "Plan to watch0",
+    "undo": ".yt-folder .yt-pl-item",
+    "undoLabel": "オノマトペゆる言語学ラジオ",
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 22,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "Nothing in Plan to watch yet. Select videos and add them."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

@@ -1281,3 +1281,49 @@ Control: `--jank` takes the drag leg's p95 **16.8 → 100.4** and frames over 10
 
 **YouTube 50/80 → 70/80.** Remaining: category 8. Evidence:
 `baselines/cat2-l8-youtube.json`, `cat2-l8-youtube-control.json`, `cat7-youtube-perf.json`.
+
+## 2026-08-30 · backup — YouTube category 8 closes, and YouTube CLOSES at 80/80
+
+**Category 8 — honest states. FAIL → PASS 10/10.** The first run failed one bar and left two
+UNMEASURED; all three are closed here. Zero new probes — four RUNs of `cat8-honest-states.cjs`.
+
+**`mutePairs` 6 → 0.** Six disabled controls said nothing about why, and every one guards on
+more than one condition, so a fixed caption per button would name the wrong cause whenever the
+other clause is biting. They now spend `firstReason` from `shared/disabledReason.ts` as BOTH
+`disabled` and `title`, which is one expression and cannot drift. Eleven controls in total,
+including the two on the News header the resting probe never saw:
+
+| control | reasons, in precedence order |
+| --- | --- |
+| Add playlist | busy · `yt.why.needUrl` |
+| Log / Add to Plan (both headers) | busy · `yt.why.needSelection` |
+| row Log | busy · `yt.why.alreadyLogged` |
+| row Open in Video | `yt.why.notLogged` · `yt.why.noMedia` |
+| Refresh, Channel, Download all, Surprise me, the URL field | busy |
+
+`busy` is already a translated status sentence, so it IS the reason verbatim rather than a
+second string somebody would have to keep in step with it.
+
+**`statesNamed` UNMEASURED → 1 of 1 observable.** Driven, not read:
+`--drive-click ".yt-plan-item" --drive-undo ".yt-folder .yt-pl-item"` empties the pane to the
+Plan-to-watch queue (0 videos), which renders a named `yt.plan.empty`. `surfaceChanged` true,
+`restored` true. `loading`, `error` and `offline` are recorded NOT OBSERVABLE on this surface
+rather than scored — correction 6's denominator.
+
+**`languagesDiffer` UNMEASURED → true.** Driven through Settings > Appearance, the
+`[data-setting-id="ui-language"]` card, and restored: **4 distinct hashes**, 89 text runs in
+each language, **28 differing runs = diffShare 0.3146**, `rawKeyCountMax` **0**, and the
+language returned to `{ html: 'en', stored: 'en' }` exactly. `rawKeys` 0, `placeholders` 0.
+
+Control: `rawKeys/placeholders/mutePairs` **0/0/0 → 1/1/1 → 0/0/0**, `backToBaseline` true.
+Re-runs after the edits: **cat5 10/10, cat1 10/10** — the reasons are attributes, and both
+categories were re-measured rather than assumed.
+
+Guard `youtubeClarityGuards.test.ts` grows an eighth case that forbids the shape itself:
+`disabled={!!busy…}` and `disabled={!v.downloaded…}` may not appear, and at least 11
+`disabled={!!why*}` sites must each carry the matching `title`.
+
+# **YouTube CLOSES at 80/80.** All eight categories, each with its own passing negative control:
+1 · 2 · 3 · 4 · 5 · 6 · 7 · 8. That is **L8's fifth and last surface** — Resources, Scraper,
+Settings, YouTube and Music now all hold 80/80. Evidence: `baselines/cat8-l8-youtube.json`,
+`cat8-l8-youtube-control.json`.

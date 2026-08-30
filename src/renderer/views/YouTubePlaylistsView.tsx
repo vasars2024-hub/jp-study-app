@@ -9,6 +9,7 @@ import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSur
 import { useT } from '../i18n';
 import { setStudyLang } from '../studyEnvironment';
 import { openExtensionSettings, openLibraryInbox } from '../extensionBridgeUi';
+import { firstReason } from '../../shared/disabledReason';
 import {
   diffNewVideos,
   emptyYtStore,
@@ -453,9 +454,28 @@ export default function YouTubePlaylistsView() {
     return m;
   }, [channels]);
 
+  // Rubric category 8, honest states. This surface had SIX disabled controls that said
+  // nothing about why — the harness's `mutePairs` term — and every one of them guards on more
+  // than one condition, so a fixed caption per button would name the wrong cause whenever the
+  // other clause is the one biting. `firstReason` returns the first failing clause and the
+  // call site spends the SAME expression as both `disabled` and `title`, so they cannot drift.
+  // `busy` is already a translated status sentence, so it is the reason verbatim rather than a
+  // second string that would have to be kept in step with it.
+  const whyBusy = firstReason([!!busy, busy]);
+  const whyAdd = firstReason([!!busy, busy], [!addUrl.trim(), t('yt.why.needUrl')]);
+  const whyBatch = firstReason([!!busy, busy], [selectedVideoIds.size === 0, t('yt.why.needSelection')]);
+
   const renderVideoRow = (v: YtVideo, opts?: { showPlaylist?: boolean; planMode?: boolean }) => {
     const selected = selectedVideoIds.has(v.id);
     const inPlan = planToWatchIds.includes(v.id);
+    const planLabel = opts?.planMode || inPlan ? t('yt.plan.remove') : t('yt.plan.add');
+    const whyLog = firstReason([!!busy, busy], [v.downloaded, t('yt.why.alreadyLogged')]);
+    // Order is precedence: "log it first" is the actionable cause, and a video with no local
+    // file has nothing to open regardless of what the row's chips claim.
+    const whyOpen = firstReason(
+      [!v.downloaded, t('yt.why.notLogged')],
+      [!v.mediaItemId, t('yt.why.noMedia')],
+    );
     return (
       <div
         className={`yt-row${selected ? ' selected' : ''}${isVideoUnlogged(v) ? ' unlogged' : ''}${highlightId === v.id ? ' yt-row-highlight' : ''}`}
@@ -483,8 +503,8 @@ export default function YouTubePlaylistsView() {
           <button
             type="button"
             className="btn ghost small"
-            title={opts?.planMode || inPlan ? t('yt.plan.remove') : t('yt.plan.add')}
-            disabled={!!busy}
+            title={whyBusy ?? planLabel}
+            disabled={!!whyBusy}
             onClick={() => void (opts?.planMode || inPlan ? removeFromPlan([v.id]) : addToPlan([v.id]))}
           >
             <Icon name="bookmark" size={14} />
@@ -492,8 +512,8 @@ export default function YouTubePlaylistsView() {
           <button
             type="button"
             className="btn ghost small"
-            title={t('yt.action.log')}
-            disabled={!!busy || v.downloaded}
+            title={whyLog ?? t('yt.action.log')}
+            disabled={!!whyLog}
             onClick={() => void downloadIds([v.id])}
           >
             <Icon name="download" size={14} />
@@ -501,8 +521,8 @@ export default function YouTubePlaylistsView() {
           <button
             type="button"
             className="btn ghost small"
-            title={t('yt.action.open')}
-            disabled={!v.downloaded || !v.mediaItemId}
+            title={whyOpen ?? t('yt.action.open')}
+            disabled={!!whyOpen}
             onClick={() => v.mediaItemId && openInVideoPlayer(v.mediaItemId, playlist?.lang)}
           >
             <Icon name="player" size={14} />
@@ -569,12 +589,14 @@ export default function YouTubePlaylistsView() {
                 onChange={(e) => setAddUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void addPlaylist()}
                 placeholder={t('yt.add.placeholder')}
-                disabled={!!busy}
+                disabled={!!whyBusy}
+                title={whyBusy}
               />
               <button
                 type="button"
                 className="btn small primary"
-                disabled={!!busy || !addUrl.trim()}
+                disabled={!!whyAdd}
+                title={whyAdd}
                 onClick={() => void addPlaylist()}
               >
                 {t('yt.add.submit')}
@@ -599,7 +621,7 @@ export default function YouTubePlaylistsView() {
                   <button type="button" className="btn small" onClick={() => openLibraryInbox()}>
                     {t('yt.link.inbox')}
                   </button>
-                  <button type="button" className="btn small" disabled={!!busy} onClick={() => surpriseMe()}>
+                  <button type="button" className="btn small" disabled={!!whyBusy} title={whyBusy} onClick={() => surpriseMe()}>
                     {t('yt.action.surprise')}
                   </button>
                 </div>
@@ -749,7 +771,8 @@ export default function YouTubePlaylistsView() {
                       <button
                         type="button"
                         className="btn small"
-                        disabled={!!busy}
+                        disabled={!!whyBusy}
+                        title={whyBusy}
                         onClick={() => void runNewsRefresh()}
                       >
                         <Icon name="refresh" size={14} /> {t('yt.news.refreshAll')}
@@ -757,7 +780,8 @@ export default function YouTubePlaylistsView() {
                       <button
                         type="button"
                         className="btn small primary"
-                        disabled={!!busy || selectedVideoIds.size === 0}
+                        disabled={!!whyBatch}
+                        title={whyBatch}
                         onClick={() => void addToPlan([...selectedVideoIds])}
                       >
                         {t('yt.plan.add')}
@@ -797,7 +821,8 @@ export default function YouTubePlaylistsView() {
                         <button
                           type="button"
                           className="btn small"
-                          disabled={!!busy}
+                          disabled={!!whyBusy}
+                          title={whyBusy}
                           onClick={() => void refresh()}
                         >
                           <Icon name="refresh" size={14} /> {t('yt.action.refresh')}
@@ -807,7 +832,8 @@ export default function YouTubePlaylistsView() {
                         <button
                           type="button"
                           className="btn small"
-                          disabled={!!busy}
+                          disabled={!!whyBusy}
+                          title={whyBusy}
                           onClick={() => void refreshChannel()}
                         >
                           <Icon name="refresh" size={14} /> Channel
@@ -816,7 +842,8 @@ export default function YouTubePlaylistsView() {
                       <button
                         type="button"
                         className="btn small primary"
-                        disabled={!!busy || selectedVideoIds.size === 0}
+                        disabled={!!whyBatch}
+                        title={whyBatch}
                         onClick={() => void logSelected()}
                       >
                         <Icon name="download" size={14} /> {t('yt.action.log')}
@@ -825,7 +852,8 @@ export default function YouTubePlaylistsView() {
                         <button
                           type="button"
                           className="btn small"
-                          disabled={!!busy}
+                          disabled={!!whyBusy}
+                          title={whyBusy}
                           onClick={() => void downloadAll()}
                         >
                           {t('yt.action.downloadAll')}
@@ -834,7 +862,8 @@ export default function YouTubePlaylistsView() {
                       <button
                         type="button"
                         className="btn small"
-                        disabled={!!busy || selectedVideoIds.size === 0}
+                        disabled={!!whyBatch}
+                        title={whyBatch}
                         onClick={() =>
                           void (side?.kind === 'plan'
                             ? removeFromPlan([...selectedVideoIds])

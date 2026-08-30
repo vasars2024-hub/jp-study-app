@@ -90,6 +90,21 @@ describe('L8 YouTube — category 5 clarity guards', () => {
     expect(tools).toBeGreaterThan(add);
   });
 
+  it('never disables a control on a bare condition — the reason and the disabled value are one expression', () => {
+    const view = read('views', 'YouTubePlaylistsView.tsx');
+    // `disabled={!!busy…}` is the shape category 8 counted six of: a control that goes off
+    // and says nothing. Every one now spends a `why*` from `firstReason`, so a clause added
+    // later cannot go off without also naming itself.
+    expect(view).not.toMatch(/disabled=\{!!busy/);
+    expect(view).not.toMatch(/disabled=\{!v\.downloaded/);
+    expect(view).toContain("import { firstReason } from '../../shared/disabledReason';");
+    const guarded = view.match(/disabled=\{!!why[A-Za-z]*\}/g) ?? [];
+    expect(guarded.length).toBeGreaterThanOrEqual(11);
+    // Each of those has a `title` carrying the same expression, so they cannot drift apart.
+    const titled = view.match(/title=\{why[A-Za-z]*( \?\? [^}]+)?\}/g) ?? [];
+    expect(titled.length).toBeGreaterThanOrEqual(guarded.length);
+  });
+
   it('gives both summaries the 32px pointer floor the hit scope cannot reach', () => {
     const body = ruleBody(read('styles.css'), '.yt-side-tools > summary,\n.yt-prefs-disclosure > summary');
     expect(body).toContain('min-height: var(--lq-hit-target)');
