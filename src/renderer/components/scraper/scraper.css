@@ -3635,7 +3635,10 @@
 
 .scr-drawer-cat.is-active {
   background: var(--accent-weak);
-  color: var(--accent);
+  /* The accent token is intentionally vivid, not a text token; on classic-light
+     it measured 2.19:1 over the selected-row tint. Keep selection in the fill
+     and use the surface's readable foreground for the category name. */
+  color: var(--text);
 }
 
 /* Scoped to the label, not every span: `.scr-drawer-cat span` also matched the
@@ -3845,7 +3848,9 @@
    configured-over-an-empty-store is a setup the user believes is finished. */
 .scr-conn--cred-good {
   border-color: var(--status-success);
-  color: var(--status-success);
+  /* Status-success remains the semantic border. Its classic-light foreground
+     is only 2.71:1 on this anchor, so the status copy uses normal readable text. */
+  color: var(--text);
 }
 
 .scr-conn--cred-warn {

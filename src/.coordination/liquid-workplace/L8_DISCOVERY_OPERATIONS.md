@@ -177,3 +177,15 @@ limit prevents tuning their instruments or product twice in this turn. Next cate
 must use nested opaque anchors inside contextual parents; next category-4 slice needs a true
 compact drawer composition without widening the chrome ratio. Evidence:
 `baselines/cat6-l8-scraper.json`. Scraper is **30/80** with categories 3, 4, 5, 7 and 8 open.
+
+## 2026-08-30 — Scraper category 5 contrast repair; cell remains open
+
+The first category-5 run found the active drawer label at **2.19:1** and the stored-credential
+status at **2.71:1** in classic-light. Selection and credential state remain encoded by their
+accent/status fills and borders; their readable copy now uses the theme text foreground.
+The one allowed post-repair run measured forest-night **5.56** minimum and classic-light
+**5.86**, 73 runs per theme and **0** failures.
+
+Category 5 does not close: Q4 counted **50** controls because the live persisted settings
+drawer is open, and Q6 is correctly NO-SUBJECT until category 3 provides Liquid regions.
+Evidence: `baselines/cat5-l8-scraper.json` (VOID, with Q5 repaired and the two blockers named).
