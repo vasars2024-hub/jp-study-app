@@ -1,0 +1,172 @@
+{
+  "label": "l8-settings",
+  "app": "settings",
+  "win": "main",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "960x680",
+  "driven": [
+    {
+      "step": "toHome",
+      "result": "{\"did\":\"clearedSearch\",\"from\":\"home\"}"
+    },
+    {
+      "step": "openPage",
+      "result": "{\"clicked\":\"Appearance\"}"
+    },
+    {
+      "step": "toHome",
+      "result": "{\"did\":\"navigatedHome\",\"from\":\"home\"}"
+    },
+    {
+      "step": "search",
+      "result": "{\"query\":\"theme\",\"expanded\":\"true\"}"
+    },
+    {
+      "step": "search",
+      "result": "{\"query\":\"\",\"expanded\":\"true\"}"
+    },
+    {
+      "step": "scroll",
+      "result": "{\"scroller\":\"os-set-pane-v2\",\"top\":120,\"range\":523}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "7/7",
+    "liquid": "7/7",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "os-set-search-input",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "960x680"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "categoryRail",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-current stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "categoryRail"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-current\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "groupedNavigation",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-labelledby stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "groupedNavigation"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-labelledby\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "settingsSearch",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-controls stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "settingsSearch"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-controls\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "advancedDisclosure",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-pressed stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "advancedDisclosure"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "pageRegion",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-label stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "pageRegion"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-label\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "homeOverview",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "element detached",
+        "reachable": "6/7",
+        "fellRows": [
+          "homeOverview"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "7/7",
+        "applied": "aria-pressed stripped",
+        "reachable": "6/7",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"settings:scroll\"]",
+        "afterRestore": "7/7",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

@@ -115,6 +115,7 @@
   const resState = specState('__LQP_RES_ORIG');
   const musicState = specState('__LQP_MUSIC_ORIG');
   const scraperState = specState('__LQP_SCRAPER_ORIG');
+  const settingsState = specState('__LQP_SETTINGS_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -3499,6 +3500,230 @@
           'no painted country on the heat map',
         ),
         landingAgreement: (w) => detach(q(w, '.gram-search'), 'no catalogue search field'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    // L8's third surface. Data, not a new probe file — same RULE 1 cost check as `resources`.
+    settings: {
+      titleRe: /^(Settings|設定|设置|Настройки)$/i,
+      rootSel: '.os-settings-v2',
+      features: [
+        {
+          // The rail is the only route to 18 of the 19 pages, so "one active item" alone is
+          // not the row: an item whose label was deleted is unreachable to a screen reader
+          // and, since 2026-08-30, invisible to a pointer user too — below 420px of
+          // `.os-set-body` the label is clipped and `title` is the only text left. Both are
+          // counted, so the narrow tier cannot silently strand an item.
+          id: 'categoryRail',
+          f: (w) => {
+            const items = qa(w, '.os-set-nav-item');
+            const current = items.filter((b) => b.getAttribute('aria-current') === 'page');
+            const named = items.filter((b) => txt(q(b, 'span:not([class])')).length > 0);
+            const titled = items.filter((b) => (b.title || '').trim().length > 0);
+            return {
+              ok: items.length >= 10 && current.length === 1
+                && named.length === items.length && titled.length === items.length,
+              ev: `items=${items.length} current=${current.length} named=${named.length} titled=${titled.length}`,
+            };
+          },
+        },
+        {
+          // Grouping is what keeps 19 destinations navigable. Each group must publish a
+          // label AND wire its list to it — an unlabelled `<ul>` of buttons is the "dense
+          // work" shape category 3 also refuses.
+          id: 'groupedNavigation',
+          f: (w) => {
+            const groups = qa(w, '.os-set-nav-group');
+            const labelled = groups.filter((g) => txt(q(g, '.os-set-nav-group-label')).length > 0);
+            const lists = qa(w, '.os-set-nav-list');
+            const wired = lists.filter((l) => {
+              const id = l.getAttribute('aria-labelledby');
+              return !!id && !!q(w, `#${id}`);
+            });
+            return {
+              ok: groups.length >= 3 && labelled.length === groups.length
+                && lists.length === groups.length && wired.length === lists.length,
+              ev: `groups=${groups.length} labelled=${labelled.length} lists=${lists.length} wired=${wired.length}`,
+            };
+          },
+        },
+        {
+          // Settings search is the second route in, and the one the command palette uses.
+          // Collapsed at rest is part of the contract: an `aria-expanded` that never says
+          // false is the dishonest-state shape.
+          id: 'settingsSearch',
+          f: (w) => {
+            const input = q(w, '.os-set-search-input');
+            const controls = input && input.getAttribute('aria-controls');
+            const expanded = input && input.getAttribute('aria-expanded');
+            return {
+              ok: !!input && !input.disabled && !!controls && /^(true|false)$/.test(String(expanded)),
+              ev: `input=${!!input} controls=${controls || 'absent'} expanded=${expanded}`,
+            };
+          },
+        },
+        {
+          // Advanced mode is this surface's own progressive disclosure. The row is the
+          // AGREEMENT, not the button: `aria-pressed` must be a real boolean and the rail
+          // must actually be showing advanced destinations when it says true, and none when
+          // it says false. A toggle whose claim and rail disagree is the defect.
+          id: 'advancedDisclosure',
+          f: (w) => {
+            const btn = q(w, '.os-set-advanced-btn');
+            const pressed = btn && btn.getAttribute('aria-pressed');
+            const dots = qa(w, '.os-set-adv-dot').length;
+            const agrees = pressed === 'true' ? dots > 0 : dots === 0;
+            return {
+              ok: !!btn && /^(true|false)$/.test(String(pressed)) && agrees
+                && (btn.title || '').trim().length > 0,
+              ev: `pressed=${pressed} advancedItemsInRail=${dots} agrees=${agrees}`,
+            };
+          },
+        },
+        {
+          // The pane is the app's `main` landmark and names itself after the destination the
+          // rail says is current. A stale or blank name is how a keyboard user loses track of
+          // which page they are on after a rail click.
+          id: 'pageRegion',
+          f: (w) => {
+            const pane = q(w, '.os-set-pane-v2');
+            const label = pane && (pane.getAttribute('aria-label') || '').trim();
+            const page = pane && pane.getAttribute('data-settings-page');
+            const current = q(w, '.os-set-nav-item[aria-current="page"]');
+            const currentLabel = txt(q(current || w, 'span:not([class])'));
+            return {
+              ok: !!pane && pane.getAttribute('role') === 'main' && !!label
+                && !!page && label === currentLabel,
+              ev: `role=${pane && pane.getAttribute('role')} page=${page} label=${label} rail=${currentLabel}`,
+            };
+          },
+        },
+        {
+          // The Home overview is real content, not a splash: every status chip publishes a
+          // labelled value and every quick card is a working destination.
+          id: 'homeOverview',
+          f: (w) => {
+            const chips = qa(w, '.os-set-status-chip');
+            const valued = chips.filter((c) => txt(q(c, 'strong')).length > 0 && txt(q(c, '.muted')).length > 0);
+            const cards = qa(w, '.os-set-quick-card');
+            const live = cards.filter((c) => txt(c).length > 0 && !c.disabled);
+            return {
+              ok: chips.length >= 3 && valued.length === chips.length
+                && cards.length >= 4 && live.length === cards.length,
+              ev: `chips=${chips.length} valued=${valued.length} quickCards=${cards.length} live=${live.length}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // Every leg has to be able to get back to Home: the drive dirties the search box and
+        // scrolls the pane, and both are page-scoped, so a leg that ran from a deep page would
+        // measure a different scroller than the one `undo` restores.
+        toHome: (w) => {
+          const g = settingsState();
+          const pane = q(w, '.os-set-pane-v2');
+          if (g.page == null) {
+            g.page = pane ? pane.getAttribute('data-settings-page') : null;
+            // The rail is clicked by LABEL on the way back, because `data-settings-page`
+            // is not on the button. Recorded in the same breath as the page id so the two
+            // can never disagree.
+            g.pageLabel = txt(q(q(w, '.os-set-nav-item[aria-current="page"]') || w, 'span:not([class])'));
+          }
+          const el = q(w, '.os-set-search-input');
+          const done = [];
+          if (el && el.value !== '') { typeInto(el, ''); done.push('clearedSearch'); }
+          const home = qa(w, '.os-set-nav-item')[0];
+          if (!home) return { refused: 'no rail items' };
+          if (home.getAttribute('aria-current') !== 'page') { home.click(); done.push('navigatedHome'); }
+          return { did: done.join('+') || 'already on Home', from: g.page };
+        },
+        openPage: (w, index) => {
+          const items = qa(w, '.os-set-nav-item').slice(1);
+          const item = items[Number(index) || 0];
+          if (!item) return { refused: 'no rail destinations' };
+          item.click();
+          return { clicked: txt(q(item, 'span:not([class])')) };
+        },
+        search: (w, query) => {
+          const el = q(w, '.os-set-search-input');
+          if (!el) return { refused: 'no settings search field' };
+          typeInto(el, String(query == null ? '' : query));
+          return { query: el.value, expanded: el.getAttribute('aria-expanded') };
+        },
+        // MANDATORY after any `search` leg, and it is not politeness. `SettingsSearch` opens
+        // its panel `onFocus` and closes it on a 140 ms `onBlur` timer; React's onBlur is
+        // `focusout`, so a synthetic blur commits nothing and the panel stays open with an
+        // EMPTY query. That is not a product state — it is drive residue, and it cost a
+        // category-5 run: Q4 counts `[aria-expanded="false"]` as the surface's one collapsed
+        // disclosure, so a left-open panel scored a real 10 as a 9. Escape is synchronous.
+        closeSearch: (w) => {
+          const el = q(w, '.os-set-search-input');
+          if (!el) return { refused: 'no settings search field' };
+          el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+          return { expanded: el.getAttribute('aria-expanded') };
+        },
+        // The drive ends with the search box EMPTY on purpose, so the pane's scroll offset is
+        // the only user-entered state left for a bad presentation toggle to lose.
+        scroll: (w, px) => {
+          const el = q(w, '.os-set-pane-v2') || scroller(w);
+          if (!el || el.scrollHeight - el.clientHeight < 8) {
+            return { refused: 'the settings pane fits its window — nothing to scroll' };
+          }
+          const g = settingsState();
+          if (g.scrollTop == null) g.scrollTop = el.scrollTop;
+          el.scrollTop = Number(px) || 120;
+          return { scroller: keyOf(el), top: el.scrollTop, range: el.scrollHeight - el.clientHeight };
+        },
+      },
+      drive: [
+        'toHome',
+        ['openPage', '0'],
+        'toHome',
+        ['search', 'theme'],
+        ['search', ''],
+        'closeSearch',
+        ['scroll', '120'],
+      ],
+      undo: {
+        settings: (w) => {
+          const g = window.__LQP_SETTINGS_ORIG;
+          if (!g) return null;
+          const done = [];
+          const el = q(w, '.os-set-search-input');
+          if (el && el.value !== '') { typeInto(el, ''); done.push('search'); }
+          if (el && el.getAttribute('aria-expanded') === 'true') {
+            el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+            done.push('searchPanel');
+          }
+          if (g.page != null) {
+            const pane = q(w, '.os-set-pane-v2');
+            if (pane && pane.getAttribute('data-settings-page') !== g.page && g.pageLabel) {
+              const back = qa(w, '.os-set-nav-item')
+                .find((b) => txt(q(b, 'span:not([class])')) === g.pageLabel);
+              if (back) { back.click(); done.push('page'); }
+            }
+          }
+          const pane2 = q(w, '.os-set-pane-v2');
+          if (pane2 && g.scrollTop != null && pane2.scrollTop !== g.scrollTop) {
+            pane2.scrollTop = g.scrollTop; done.push('scroll');
+          }
+          window.__LQP_SETTINGS_ORIG = null;
+          return done.length ? `settings:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        categoryRail: (w) => stripAttr(q(w, '.os-set-nav-item[aria-current="page"]'), 'aria-current', 'no current rail item'),
+        groupedNavigation: (w) => stripAttr(q(w, '.os-set-nav-list'), 'aria-labelledby', 'no rail lists'),
+        settingsSearch: (w) => stripAttr(q(w, '.os-set-search-input'), 'aria-controls', 'no settings search'),
+        // Strip the button's OWN pressed state. `windowLifecycle` reads `.fwin-b-liquid`, a
+        // different element, so the two rows stay independent.
+        advancedDisclosure: (w) => stripAttr(q(w, '.os-set-advanced-btn'), 'aria-pressed', 'no advanced toggle'),
+        // Detach the pane's LABEL, not the pane: removing the pane takes `homeOverview` with
+        // it and the row would fall for the wrong reason.
+        pageRegion: (w) => stripAttr(q(w, '.os-set-pane-v2'), 'aria-label', 'no settings pane'),
+        homeOverview: (w) => detach(q(w, '.os-set-status-chip strong'), 'no home status chips'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

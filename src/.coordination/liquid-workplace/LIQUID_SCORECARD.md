@@ -874,3 +874,50 @@ was restored byte-identically to the staged blob.
 
 Settings stands at **1, 3, 4 closed; 2 banked from before this tree; 5–8 unmeasured** — 40/80.
 Evidence: `baselines/cat4-l8-settings.json`, `baselines/l8-settings-rail-names.json`.
+
+## 2026-08-30 · primary — Settings categories 5, 6 and 7 close; category 8 scored to an honest FAIL
+
+Three RUNs and three surface SPECS, no new probe file. Categories 6 and 7 had no `settings`
+entry, which is the parameterisation RULE 1 asks for — `l6-parity.js` gains a 7-feature spec
+and `cat7-perf.cjs` a heavy-load spec, both data in an existing harness.
+
+**Category 6 — PASS 10/10.** Parity **7/7 in Standard and 7/7 in Liquid**, `equal: true`,
+`na: 0`. Round trip standard → liquid → standard with `os-set-search-input` dirtied first:
+**0 diffs**, fields and shell both held. Control: all **7 of 7** mutations fell **exactly their
+own row** with no unexpected row, and 7/7 returned after each restore. The rows are
+`categoryRail`, `groupedNavigation`, `settingsSearch`, `advancedDisclosure`, `pageRegion`,
+`homeOverview`, `windowLifecycle`. `categoryRail` counts the `<span>` name AND the `title`
+because since this morning the narrow tier clips the span — a rail item that loses both is
+unreachable at 260 px and the old one-count row would not have seen it.
+
+**Category 5 — PASS 10/10** (Q1–Q10 all YES). Q4 `collapsedDisclosures` 1 / `scannedControls`
+**3** against a bar of 12; Q5 forest-night min **5.48**, classic-light min **5.81**, 64 runs
+each, 0 failing, the two minima differ so the theme axis moved. Control run separately at the
+same state: **CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10**, residue 0.
+
+CARRY 22 AGAIN, and this one cost a run. The first category-5 pass scored **9/10** on Q4 with
+`collapsedDisclosures: 0`. Cause: `SettingsSearch` opens its panel `onFocus` and closes it on a
+140 ms `onBlur` timer, and the category-6 drive had typed into the box. React's onBlur is
+`focusout`, so nothing closed it — the panel sat open with an EMPTY query, and Q4 counts
+`[aria-expanded="false"]` as this surface's one collapsed disclosure. A real 10 read as a 9 on
+drive residue. The settings spec now ends its drive with a `closeSearch` (Escape is
+synchronous) and its `undo` closes the panel too.
+
+**Category 7 — PASS 10/10.** Heavy load is **19 pages × 2 = 38 navigations, restored to Home**
+— navigation, not scrolling, because Settings has no collection (`scrollAll` would have picked
+the 204 px rail). Ceiling p50 **16.7**; drag/resize/theme frame max 33.3/33.6/33.5 with
+**0 frames over 100** each; heavy main max **44.5 ms** against the 500 ms bar. `--jank`
+sensitivity control: drag p95 **16.9 → 116.9**, max **33.3 → 117.1**, so the recorder does see
+the frames it reports.
+
+**Category 8 — FAIL, one bar, named.** `rawKeys` **0**, `placeholders` **0**, four-language
+sweep 257 runs per language, 4 distinct hashes, `diffRuns` 156 of 257 = **diffShare 0.607**,
+language restored to `en`. `mutePairs` **8** — eight disabled controls that never say why.
+`statesNamed` is **UNMEASURED**: 0 of empty/loading/error/offline are observable on this page.
+Scored on **Appearance**, not Home, and that is recorded rather than smoothed: the four-language
+leg needs `[data-setting-id="ui-language"]` on screen, which only Appearance renders. Settings
+is one app, Appearance is a real state of it, and it is the denser page.
+
+Settings stands at **1, 3, 4, 5, 6, 7 closed; 2 banked before this tree; 8 open** — 70/80.
+Evidence: `baselines/cat5-l8-settings.json`, `cat5-l8-settings-control.json`,
+`cat6-l8-settings.json`, `cat7-settings-perf.json`, `cat8-l8-settings.json`.

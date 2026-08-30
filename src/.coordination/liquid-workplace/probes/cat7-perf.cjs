@@ -478,6 +478,64 @@ const SPECS = {
     },
     collection: { container: '.scr-main', row: '.scr-row' },
   },
+  settings: {
+    title: 'Settings',
+    root: '.os-settings-v2',
+    heavy: {
+      /*
+       * NAVIGATION IS THIS SURFACE'S LOAD, for the same measured reason the Scraper's is:
+       * there is no collection to scroll. Home is the largest page and renders 5 status
+       * chips and 10 quick cards; `scrollAll('.os-settings-v2')` would have picked the
+       * 204 px rail, which is 19 buttons and not this app's work.
+       *
+       * What Settings does at scale is swap pages. Each rail click unmounts one settings
+       * panel and mounts another into `.os-set-pane-v2`, and the panels are the heavy
+       * part — Appearance builds the theme/font pickers, Display the monitor matrix,
+       * Scraper the whole MAL/source console. 19 pages twice is 38 mounts, the heaviest
+       * real work this surface performs without touching the network or user data.
+       *
+       * The page is persisted state, so the load restores the page it started on and the
+       * proof REFUSES unless the rail came back to it.
+       */
+      label: 'navigate every settings page, twice',
+      // 38 ticks at 110 ms is ~4.2 s plus a 200 ms settle for the restore check.
+      durationMs: 5000,
+      js: `(() => {
+        delete window.__lqSettingsLoad;
+        const rail = document.querySelector('nav.os-set-nav-v2');
+        if (!rail) return 'REFUSE: no settings rail';
+        const btns = Array.from(rail.querySelectorAll('.os-set-nav-item'));
+        if (btns.length < 10) return 'REFUSE: expected the full rail, found ' + btns.length + ' pages';
+        const label = (b) => { const s = b.querySelector('span:not([class])'); return ((s && s.textContent) || '').trim(); };
+        const activeIndex = btns.findIndex((b) => b.getAttribute('aria-current') === 'page');
+        const startIndex = activeIndex < 0 ? 0 : activeIndex;
+        const rec = { pages: btns.length, start: label(btns[startIndex]), ticks: 0, restored: false };
+        window.__lqSettingsLoad = rec;
+        const total = btns.length * 2;
+        const timer = setInterval(() => {
+          btns[rec.ticks % btns.length].click();
+          rec.ticks += 1;
+          if (rec.ticks >= total) {
+            clearInterval(timer);
+            btns[startIndex].click();
+            setTimeout(() => {
+              const back = rail.querySelector('.os-set-nav-item[aria-current="page"]');
+              rec.restored = !!back && label(back) === rec.start;
+            }, 200);
+          }
+        }, 110);
+        return 'cycling ' + btns.length + ' pages twice from ' + rec.start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqSettingsLoad;
+        if (!r) return 'REFUSE: the load never armed';
+        if (r.ticks < r.pages * 2) return 'REFUSE: only ' + r.ticks + ' of ' + (r.pages * 2) + ' navigations ran';
+        if (!r.restored) return 'REFUSE: the rail did not return to ' + r.start;
+        return r.pages + ' pages x2 = ' + r.ticks + ' navigations, restored to ' + r.start;
+      })()`,
+    },
+    collection: { container: '.os-set-pane-v2', row: '.os-set-quick-card' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',

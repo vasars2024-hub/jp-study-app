@@ -1,0 +1,340 @@
+{
+  "label": "l8-settings",
+  "surface": "Settings",
+  "win": "main",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "960x680",
+  "textRuns": 257,
+  "textHash": 588043138,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 8,
+  "mutePairs": [
+    {
+      "el": "button.btn",
+      "label": "Reset",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.os-set-btns",
+        "div.os-preview-controls",
+        "div.os-preview-card-split"
+      ],
+      "childIndex": 0,
+      "box": "323,660 53x26",
+      "ownText": "Reset"
+    },
+    {
+      "el": "button.btn",
+      "label": "Apply",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.os-set-btns",
+        "div.os-preview-controls",
+        "div.os-preview-card-split"
+      ],
+      "childIndex": 1,
+      "box": "384,660 55x26",
+      "ownText": "Apply"
+    },
+    {
+      "el": "button.",
+      "label": "Preview",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.field-row",
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 2,
+      "box": "323,2271 644x23",
+      "ownText": "Preview"
+    },
+    {
+      "el": "button.",
+      "label": "Create",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.field-row",
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 2,
+      "box": "323,2554 644x23",
+      "ownText": "Create"
+    },
+    {
+      "el": "button.sp-seg-btn",
+      "label": "Undo last change",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.sp-seg",
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 0,
+      "box": "324,2602 114x32",
+      "ownText": "Undo last change"
+    },
+    {
+      "el": "button.sp-seg-btn",
+      "label": "Delete theme",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.sp-seg",
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 2,
+      "box": "546,2602 93x32",
+      "ownText": "Delete theme"
+    },
+    {
+      "el": "input.",
+      "label": "",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "label.os-set-toggle-row",
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 1,
+      "box": "728,6600 13x13",
+      "ownText": ""
+    },
+    {
+      "el": "button.btn",
+      "label": "Import theme",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.os-set-card-body",
+        "section.os-set-card"
+      ],
+      "childIndex": 1,
+      "box": "444,7239 115x35",
+      "ownText": "Import theme"
+    }
+  ],
+  "disabledTotal": 8,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9727,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9727 catalog keys / 105 namespaces",
+  "raised": "already-on-top",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 257,
+        "textHash": 588043138,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 257,
+        "textHash": -649556344,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 156,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "エージェントに聞く"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "ホーム"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "個人設定"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "外観"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "壁紙"
+          },
+          {
+            "i": 11,
+            "was": "Companions",
+            "now": "コンパニオン"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 257,
+        "textHash": -1127951304,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 156,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "询问助手"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "主页"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "个性化"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "外观"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "壁纸"
+          },
+          {
+            "i": 11,
+            "was": "Companions",
+            "now": "伙伴"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 257,
+        "textHash": 874996836,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 156,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "Спросить агента"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "Главная"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "Персонализация"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "Внешний вид"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "Обои"
+          },
+          {
+            "i": 11,
+            "was": "Companions",
+            "now": "Компаньоны"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 156,
+    "baseRuns": 257,
+    "diffShare": 0.607
+  },
+  "statesObservable": [],
+  "statesNotObservable": [
+    "empty",
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "0 of 0 observable",
+  "mutePairCountWorst": 8,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": false,
+    "statesNamed": "UNMEASURED",
+    "languagesDiffer": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "mutePairs"
+  ],
+  "unmeasuredBars": [
+    "statesNamed"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}
