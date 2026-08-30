@@ -100,6 +100,22 @@ import {
 } from './agentSettingsNavigation';
 import { handOffToAgent, settingsRouteAgentContext } from '../../agentContextHandoff';
 
+/**
+ * Appearance is the heaviest Settings page: its isolated preview and complete theme grid mount
+ * together. Let the destination header and navigation state paint first, then fill the page on
+ * the following frame. This keeps the click acknowledgement immediate without removing or
+ * simplifying any controls, and unmounting before that frame cancels the deferred work.
+ */
+function DeferredAppearancePage() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return ready ? <AppearancePage /> : null;
+}
 
 function applyMotion(reduce: boolean): void {
   document.documentElement.classList.toggle('reduce-motion', reduce);
@@ -583,7 +599,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                 </header>
               )}
               {page === 'home' && <SettingsHome />}
-              {page === 'appearance' && <AppearancePage />}
+              {page === 'appearance' && <DeferredAppearancePage />}
               {page === 'wallpaper' && <WallpaperPage />}
               {page === 'atmosphere' && <AtmospherePage />}
               {page === 'companions' && <CompanionsPage />}

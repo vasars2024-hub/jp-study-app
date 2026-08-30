@@ -740,3 +740,18 @@ Negative control moved contrast/target-rect/WCAG-2.5.8/keyboard/pointer counts f
 `0/5/0/0/0` to `1/7/2/1/2`, then restored all scored counts. Disclosures, scroll positions,
 deferred styles, reduced-motion emulation, and the surface state restored. Evidence:
 `baselines/cat1-l8-settings.json`; checkpoint commit: this entry's product commit.
+
+## 2026-08-30 · codexB — Settings category 2 closes at 10/10
+
+Reused `cat2-clunkiness.cjs` unchanged for the dominant Home → Appearance navigation and
+its Home reverse path, in the same 960×680 window across Standard and Liquid. The first run
+failed only latency: Standard 1136.7 ms and Liquid 320.7 ms to the first renderer paint, while
+the inert control was 1.9 ms. Appearance mounted its isolated preview and full theme grid before
+the destination could paint. The bounded repair defers only that heavy body until the following
+frame; the header and selected navigation state paint immediately, without deleting controls.
+
+The re-run measured one click in each presentation, Standard 97.1 ms and Liquid 31.6 ms,
+0 dead ends, 0 modal traps, 0 scroll traps, and an exact Home and presentation/geometry reverse
+transition. Negative control moved dead-end/modal/scroll counts `0/0/0 → 1/1/1 → 0/0/0`;
+its inert click was 0.4 ms. Category result: **PASS 10/10**. Evidence:
+`baselines/cat2-l8-settings.json`; checkpoint commit: this entry's product commit.
