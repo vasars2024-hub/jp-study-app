@@ -27,6 +27,7 @@ import type {
   ScraperSortDir,
 } from '../../../shared/scraperShell';
 import { sx } from './strings';
+import { useT } from '../../i18n';
 import './scraper.css';
 
 import DashboardPage from './pages/DashboardPage';
@@ -87,6 +88,17 @@ function writeAdvancedMode(on: boolean): void {
 
 export default function ScraperApp() {
   const aero = useAeroMaterials();
+  // `sx()` is a plain function, not a hook, so nothing under this root would
+  // otherwise notice a language switch: the catalog changes and the tree keeps
+  // its English render until something unrelated happens to re-render it. One
+  // subscription here re-renders the whole app, the same shape the theme uses.
+  //
+  // Only the subscription is wanted, not the returned `t`. No memo under this
+  // root caches resolved text today — checked across all 40 `useMemo` bodies in
+  // `scraper/`, none calls `sx*()` — and the nav/settings registries store KEYS
+  // and resolve at render (`scraperPages.ts:3`). Any memo added later that does
+  // cache text must take `lang` as a dependency, per CLAUDE.md's i18n rule.
+  useT();
   const [shell, setShell] = useState(() => loadScraperShellState());
   const [advancedMode, setAdvancedModeState] = useState(readAdvancedMode);
   const [focusSettingId, setFocusSettingId] = useState<string | null>(null);

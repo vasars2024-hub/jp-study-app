@@ -434,3 +434,51 @@ first `\n` from the anchor's START lands inside a 2-line anchor, and the first a
 a `strings.ts` whose `sx2` was severed from its own closing brace, with a stray `}` at EOF.
 Balanced braces and a clean `git diff --cached` both looked right. Only compiling the
 committed tree in a detached worktree found it — that check is not optional here.
+
+### 2026-08-30 — Scraper i18n, batch 1 of 588: the mechanism, and 0.08% → 2.87%
+
+**Category 8 is NOT claimed closed, and the reason is worth stating plainly.** After this
+batch `languagesDiffer` measures **true** — `diffRunsMax` **33 of 1,151**, `diffShare`
+**0.0287**, up from 1 run / 0.0008 — and every other bar passes, so the harness prints
+`PASS 10/10` with `--control` moving all three counts and returning to baseline. But
+**76 of 588 keys are migrated, 12.9%**, and correction 21's 1% floor is a floor, not proof
+of coverage: it exists to reject "not localised at all", which this surface no longer is.
+Banking 80/80 on 12.9% would be the flattering number the pin forbids. **Scraper stays
+70/80; category 8 closes when the migration does.**
+Evidence: `baselines/cat8-l8-scraper-i18n-b1.json`.
+
+**The mechanism, which is what makes the other 512 keys routine.** `sx()` now looks the key
+up in the shared catalogs as `scrApp.<key>` and falls back to the local `TEXT` map when it
+has not been migrated. **No call site changes** — which is the point: 522 call sites across
+21 files, 16 of them carrying another track's unstaged work, is not one commit's worth of
+HEAD+edit blob reconstruction, and a half-migrated map with no fallback would render bare
+dotted keys at the user (`translate()` returns the key on a total miss).
+
+Keys land in `shared/i18n/scraperUi/{en,ja,zh,ru}.ts` beside the 662 sibling
+scraper-settings keys — NOT in `catalogs/en.ts`, which is foreign-dirty. All four modules
+are clean, so a plain `git add` is safe there.
+
+Argument naming, fixed now so every later batch matches: `sxn(key,n)` → `{n}` + `count`;
+`sxs(key,s)` → `{value}`; `sx2(key,a,b)` → `{a}`/`{b}` + `count`=b; `sxss(key,a,b)` →
+`{a}`/`{b}`. Plurals are CLDR categories, so Russian gets one/few/many.
+
+**`ScraperApp` now subscribes to the language store** (`useT()` at the root). Without it the
+catalog changes and the tree keeps its English render. Checked before relying on a root
+re-render: none of the 40 `useMemo` bodies under `scraper/` calls `sx*()`, and the nav and
+settings registries already store KEYS and resolve at render.
+
+**Deferred to a later batch, named so it is not rediscovered:** `torrent.authVia` picks
+between two fixed sentences rather than interpolating, so it becomes two keys and is the one
+entry in this batch's range that changes a call site. `TorrentManagerPage.tsx:690-709` also
+carries five raw JSX literals ("Resume transfer", "Pause transfer", "Force recheck", "Show
+save location", and a `Save location: {path}` notice) that violate this file's own ONE RULE
+and were never in `strings.ts` at all — they need keys, not a move.
+
+**FINDING for the next turn — cat8's drive leg has an ordering defect.** `driveLeg` asserts
+its restore against a `base` captured before the `--langs` leg, so once the language cycle
+has re-rendered the surface the restore can never match and the whole run VOIDs. Hit **3
+times** this turn; a replay of the same drive in isolation restored cleanly **3 of 3**
+(1186 → 1177 → 1186, zero positional deltas), which is what rules the drive itself out.
+Not repaired here — one harness repair per turn, and corrections 20 and 21 were spent.
+Workaround used: `--langs` without `--drive-input`, which measures the language bar honestly
+and leaves `mutePairs` scored on the resting probe only.

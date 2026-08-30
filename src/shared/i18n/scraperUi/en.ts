@@ -805,4 +805,103 @@ export const SCRAPER_UI_EN: Catalog = {
   'trackingMgmt.removeMark': 'Remove mark',
   'trackingMgmt.addMark': 'Add episode mark',
   'trackingMgmt.removeEntry': 'Remove tracking entry',
+
+  // ---- Scraper app chrome (scrApp.*) — batch 1 of the strings.ts migration ----
+  // Moved out of renderer/components/scraper/strings.ts on 2026-08-30, which had
+  // deferred i18n for the whole app on the grounds that its surfaces were shells.
+  // They are not: the Scraper scores 70/80 and rubric category 8 measured ONE
+  // differing text run of 1,186 across four languages. `sx()` reads these first
+  // and falls back to its own map for keys not yet migrated, so this lands in
+  // batches rather than as one 588-key commit across 21 files.
+  // This batch is the Torrent Manager page plus the shared vocabulary it uses.
+
+  // qBittorrent connection and the indexer/mirror tables
+  'scrApp.torrent.addToLibrary': 'Add to library',
+  'scrApp.torrent.addToLibraryBusy': 'Adding…',
+  'scrApp.torrent.addToLibraryIncomplete': 'This transfer has not finished downloading yet.',
+  'scrApp.torrent.addNoMedia': 'Nothing was added: no playable media file is at the save location.',
+  'scrApp.torrent.addMissing': 'Nothing was added: the save location no longer exists on disk.',
+  'scrApp.torrent.addFailed': 'Could not add to the library: {value}',
+  'scrApp.torrent.settings': 'Torrent settings',
+  'scrApp.torrent.qbitSettings': 'qBittorrent settings',
+  'scrApp.torrent.connection': 'qBittorrent connection',
+  'scrApp.torrent.connectionDesc': 'Where the client lives, and whether the scraper can reach it.',
+  'scrApp.torrent.test': 'Test Connection',
+  'scrApp.torrent.testing': 'Testing…',
+  'scrApp.torrent.credChecking': 'checking password…',
+  'scrApp.torrent.credStored': 'password stored',
+  'scrApp.torrent.credMissing': 'no password',
+  'scrApp.torrent.credOrphaned': 'password missing from OS storage',
+  'scrApp.torrent.credOrphanedHint': 'Settings name a password, but nothing is stored under it. Open qBittorrent settings and enter it again.',
+  'scrApp.torrent.credUnknown': 'password unverified',
+  'scrApp.torrent.credUnknownHint': 'The secret store could not be reached, so whether a credential exists is unknown.',
+  'scrApp.torrent.keyChecking': 'checking API key…',
+  'scrApp.torrent.keyStored': 'API key stored',
+  'scrApp.torrent.keyMissing': 'no API key',
+  'scrApp.torrent.keyOrphaned': 'API key missing from OS storage',
+  'scrApp.torrent.keyOrphanedHint': 'Settings name an API key, but nothing is stored under it. Open qBittorrent settings and enter it again.',
+  'scrApp.torrent.keyUnknown': 'API key unverified',
+  'scrApp.torrent.search': 'Indexer search',
+  'scrApp.torrent.searchDesc': 'Results across every enabled torrent source.',
+  'scrApp.torrent.searchPlaceholder': 'Search releases…',
+  'scrApp.torrent.minSeeders': 'Min seeders',
+  'scrApp.torrent.send': 'Send {n} to qBittorrent',
+  'scrApp.torrent.mirror': 'qBittorrent mirror',
+  'scrApp.torrent.mirrorDesc': 'Every transfer, with the peer, availability and piece detail the client’s own list leaves out.',
+  'scrApp.torrent.activeTransfers': '{n} active',
+  'scrApp.torrent.noTransfers': 'qBittorrent has no transfers.',
+  'scrApp.torrent.pieces': 'Piece progress',
+  'scrApp.torrent.matches': { one: '{count} matching release', other: '{count} matching releases' },
+  'scrApp.torrent.alreadyInLibrary': {
+    one: 'Already in the library — the {count} media file was there.',
+    other: 'Already in the library — all {count} media files were there.',
+  },
+  'scrApp.torrent.addedToLibrary': {
+    one: 'Added {a} of {b} media file to the library.',
+    other: 'Added {a} of {b} media files to the library.',
+  },
+
+  // Seanime acquisition engines
+  'scrApp.acq.title': 'Seanime acquisition engines',
+  'scrApp.acq.desc': 'Torrent client, debrid, and auto-downloader state from the supervised sidecar.',
+  'scrApp.acq.refresh': 'Refresh',
+  'scrApp.acq.sidecar': 'Sidecar',
+  'scrApp.acq.loading': 'loading',
+  'scrApp.acq.torrentClient': 'Torrent client',
+  'scrApp.acq.debrid': 'Debrid',
+  'scrApp.acq.autoDownloader': 'Auto-downloader',
+  'scrApp.acq.off': 'Off',
+  'scrApp.acq.transfers': '{n} active',
+  'scrApp.acq.queued': '{n} queued',
+  'scrApp.acq.destinationPlaceholder': 'Seanime destination (optional)',
+  'scrApp.acq.destinationLabel': 'Seanime download destination',
+  'scrApp.acq.sendTorrentClient': 'Send selected to Seanime',
+  'scrApp.acq.sendDebrid': 'Send selected to debrid',
+  'scrApp.acq.runAutoDownloader': 'Run auto-downloader',
+  'scrApp.acq.simulateRules': 'Simulate enabled rules',
+  'scrApp.acq.queueTitle': 'Auto-downloader queue',
+  'scrApp.acq.episode': 'episode {n}',
+  'scrApp.acq.download': 'Download',
+  'scrApp.acq.score': 'score {n}',
+  'scrApp.acq.debridItems': { one: '{count} item', other: '{count} items' },
+  'scrApp.acq.rules': { one: '{count} rule', other: '{count} rules' },
+
+  // Why a control is disabled
+  'scrApp.why.busy': 'An acquisition action is still running. Wait for it to finish.',
+  'scrApp.why.testing': 'The connection test is still running.',
+  'scrApp.why.noneSelected': 'Nothing is selected. Tick at least one torrent row first.',
+  'scrApp.why.noSidecar': 'The Seanime sidecar has not answered yet. Use Refresh to ask it again.',
+  'scrApp.why.subsystem': '{a} is not ready — {b}. Fix it in Seanime, then Refresh.',
+  'scrApp.why.noRules': 'There are no auto-downloader rules to simulate yet.',
+  'scrApp.why.alreadyDownloaded': 'This queued episode has already been downloaded.',
+  'scrApp.why.delayed': 'This queued episode is delayed by its rule and cannot be fetched yet.',
+  'scrApp.why.notComplete': 'The transfer has to finish downloading before it can be added to the library.',
+  'scrApp.why.addingToLibrary': 'This transfer is already being added to the library.',
+
+  // Shared vocabulary
+  'scrApp.common.retry': 'Retry',
+  'scrApp.common.close': 'Close',
+  'scrApp.common.cancel': 'Cancel',
+  'scrApp.common.clear': 'Clear',
+  'scrApp.common.episodes': { one: '{count} episode', other: '{count} episodes' },
 };

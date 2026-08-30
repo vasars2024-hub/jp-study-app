@@ -16,6 +16,10 @@
 // Study *content* is exempt and stays literal — series names, episode titles,
 // release groups (CLAUDE.md i18n rule 4). Only chrome goes through this file.
 
+import { catalogFor, en as SHARED_EN } from '../../../shared/i18n/catalogs';
+import { translate, type TVars } from '../../../shared/i18n/core';
+import { getUiLang } from '../../i18n';
+
 const TEXT = {
   // ---- App chrome ----
   'app.title': 'Anime Scraper',
@@ -654,26 +658,72 @@ export type ScraperTextKey = keyof typeof TEXT;
 
 export const SCRAPER_TEXT = TEXT;
 
+/**
+ * THE MIGRATION OUT OF THIS FILE, batch by batch — decided 2026-08-30.
+ *
+ * The deferral at the top of this file gave a reason that has expired: the
+ * Scraper is a 17-page application at 70/80, not a shell, and rubric category 8
+ * cannot pass while the surface renders identical English in all four languages
+ * (measured: 1 differing text run of 1,186, and that one is the window title).
+ *
+ * The keys move into `shared/i18n/scraperUi/{en,ja,zh,ru}.ts` under `scrApp.`,
+ * which is where the 662 sibling scraper-settings keys already live. What does
+ * NOT move is the call sites: `sx()` looks the key up in the shared catalog
+ * first and falls back to `TEXT` below when it has not been migrated yet. That
+ * is what makes this landable in batches — 522 call sites across 21 files, 16 of
+ * them carrying another track's unstaged work, is not one commit's worth of
+ * blob reconstruction, and a half-migrated map would otherwise render bare
+ * dotted keys at the user (`translate()` returns the key on a total miss).
+ *
+ * Argument naming, so a template knows what to expect:
+ *   sxn(key, n)     -> {n}, and `count` for plural selection
+ *   sxs(key, s)     -> {value}
+ *   sx2(key, a, b)  -> {a} {b}, and `count` = b for plural selection
+ *   sxss(key, a, b) -> {a} {b}
+ * Plural forms are CLDR categories, so Russian gets one/few/many rather than a
+ * singular-vs-plural split (see `PluralForms` in shared/i18n/core.ts).
+ *
+ * A component reading these must re-render on a language switch. `ScraperApp`
+ * subscribes once at the root for the whole tree; a memo that caches resolved
+ * text still needs `lang` in its deps, per CLAUDE.md's i18n policy.
+ */
+const SHARED_PREFIX = 'scrApp.';
+
+function shared(key: ScraperTextKey, vars?: TVars): string | null {
+  const sharedKey = SHARED_PREFIX + key;
+  if (SHARED_EN[sharedKey] === undefined) return null;
+  const lang = getUiLang();
+  return translate(sharedKey, vars, { lang, catalog: catalogFor(lang), fallback: SHARED_EN });
+}
+
 /** Resolve a plain string. Count-bearing keys should use sxn() instead. */
 export function sx(key: ScraperTextKey): string {
+  const migrated = shared(key);
+  if (migrated !== null) return migrated;
   const value = TEXT[key];
   return typeof value === 'function' ? value(0 as never) : value;
 }
 
 /** Resolve a count- or value-bearing string. */
 export function sxn(key: ScraperTextKey, value: number): string {
+  const migrated = shared(key, { n: value, count: value });
+  if (migrated !== null) return migrated;
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (n: number) => string)(value) : entry;
 }
 
 /** Resolve a string-interpolating entry (stage names, timestamps, page names). */
 export function sxs(key: ScraperTextKey, value: string): string {
+  const migrated = shared(key, { value });
+  if (migrated !== null) return migrated;
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (s: string) => string)(value) : entry;
 }
 
 /** Resolve a two-argument entry. */
 export function sx2(key: ScraperTextKey, a: number, b: number): string {
+  const migrated = shared(key, { a, b, count: b });
+  if (migrated !== null) return migrated;
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (x: number, y: number) => string)(a, b) : entry;
 }
@@ -685,6 +735,8 @@ export function sx2(key: ScraperTextKey, a: number, b: number): string {
  * literal in product code, which is what THE ONE RULE forbids.
  */
 export function sxss(key: ScraperTextKey, a: string, b: string): string {
+  const migrated = shared(key, { a, b });
+  if (migrated !== null) return migrated;
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (x: string, y: string) => string)(a, b) : entry;
 }
