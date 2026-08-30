@@ -171,7 +171,15 @@ for (const [pageId, comp] of pageComponent) {
 const regSrc = src.get(REG.registryFile) || '';
 const regBody = regSrc.slice(regSrc.indexOf(`export const ${REG.registryConst}`));
 const entries = [];
-for (const m of regBody.matchAll(/\{\s*\n\s*id: '([^']+)',([\s\S]*?)pageId: '([^']+)'/g)) {
+/* `{\n id:` was too tight. Entries in this repo routinely open with several
+ * lines of comment explaining why they exist -- `mal-sync` is one, and it is the
+ * entry the pin names as the canonical search defect. Skipping them made the
+ * probe report an INDEXED destination as a coverage gap, which is the same
+ * failure as reporting a gap as covered, in the other direction. */
+const OPENING_COMMENTS = /\{\s*(?:(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)\s*)*/.source;
+for (const m of regBody.matchAll(
+  new RegExp(`${OPENING_COMMENTS}id: '([^']+)',([\\s\\S]*?)pageId: '([^']+)'`, 'g'),
+)) {
   entries.push({
     id: m[1],
     pageId: m[3],
@@ -224,6 +232,11 @@ if (plantMisroute && rows.length) {
  * could reasonably search for; one that no registry entry names is unreachable
  * by search no matter how well the landing works. */
 const cardIds = new Set();
+/* Which page renders each card. `pageFiles` already holds every page's import
+ * closure, so this is a lookup, not new machinery — and without it a coverage
+ * gap is a list of ids with nowhere to put them, which is the difference
+ * between a finding and an actionable one. */
+const cardPage = new Map();
 /* A card that exists only after the user has selected something is not a search
  * DESTINATION: navigating to its page shows the list it hangs off, not the card,
  * so indexing it would manufacture exactly the misroute this probe exists to
@@ -238,10 +251,14 @@ const cardIds = new Set();
  * `advanced: true` gates BuildStatusPanel. Reported by name so neither is
  * excused by silence. */
 const conditionalCards = new Set();
-for (const text of src.values()) {
+for (const [f, text] of src) {
   for (const m of text.matchAll(REG.cardRe)) {
     cardIds.add(m[1]);
     if (/(?:&&|\?)\s*\(\s*$/.test(text.slice(0, m.index))) conditionalCards.add(m[1]);
+    if (!cardPage.has(m[1])) {
+      const owner = [...pageFiles].find(([, files]) => files.has(f));
+      cardPage.set(m[1], owner ? owner[0] : null);
+    }
   }
 }
 const indexedIds = new Set(entries.map((e) => e.id));
@@ -267,7 +284,7 @@ const result = {
   cardDestinationsConditional: conditionalOnly.length,
   cardDestinationsUnsearchable: uncovered.length,
   conditionalIds: conditionalOnly,
-  unsearchableIds: uncovered,
+  unsearchableIds: uncovered.map((id) => `${id} -> page '${cardPage.get(id) ?? 'UNROUTED'}'`),
   misroutedIds: rows.filter((r) => r.state === 'misrouted').map((r) => `${r.id} -> page '${r.pageId}' but anchored in ${r.owners.join(',')}`),
   unanchoredIds: rows.filter((r) => r.state === 'unanchored').map((r) => `${r.id} -> page '${r.pageId}'`),
 };
