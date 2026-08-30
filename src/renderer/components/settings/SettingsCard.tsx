@@ -26,8 +26,15 @@ export default function SettingsCard({
   highlight?: boolean;
   advancedOnly?: boolean;
 }) {
-  const { advancedMode } = useSettings();
+  const { advancedMode, focusSettingId } = useSettings();
   const { t } = useT();
+  // A card with an `id` anchors itself: settings search navigates by
+  // `SettingsRegistryEntry.id`, and every registry id is meant to name a card.
+  // Deriving it here means a searchable setting lands on its own card without
+  // each page repeating `highlight={focusSettingId === '...'}` — the drift this
+  // gate exists to catch. ORed, never defaulted, so the ~109 explicit call sites
+  // keep working and a card that highlights on some *other* id keeps doing so.
+  const focused = Boolean(highlight) || (id != null && focusSettingId === id);
   const advLabel = advancedLabel ?? t('settings.nav.advanced');
   const [openAdv, setOpenAdv] = useState(false);
   const ref = useRef<HTMLElement>(null);
@@ -38,16 +45,16 @@ export default function SettingsCard({
   }, [advancedMode]);
 
   useEffect(() => {
-    if (!highlight || !ref.current) return;
+    if (!focused || !ref.current) return;
     ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [highlight]);
+  }, [focused]);
 
   if (advancedOnly && !advancedMode) return null;
 
   return (
     <section
       ref={ref}
-      className={`os-set-card${highlight ? ' is-highlight' : ''}${advancedOnly ? ' os-set-card-adv' : ''}`}
+      className={`os-set-card${focused ? ' is-highlight' : ''}${advancedOnly ? ' os-set-card-adv' : ''}`}
       data-setting-id={id}
       aria-labelledby={titleId}
     >

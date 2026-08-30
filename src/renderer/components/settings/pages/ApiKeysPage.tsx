@@ -47,7 +47,7 @@ const draftKey = (id: string, field: string): string => `${id}.${field}`;
 
 export default function ApiKeysPage() {
   const { t, lang } = useT();
-  const { navigate } = useSettings();
+  const { navigate, focusSettingId } = useSettings();
 
   const [canStore, setCanStore] = useState(true);
   const [vaultStatuses, setVaultStatuses] = useState<CredentialStatus[]>([]);
@@ -361,6 +361,9 @@ export default function ApiKeysPage() {
     <>
       <SettingsCard
         id="api-keys-overview"
+        // The `api-keys` search entry names the page's subject, not a card, so
+        // land it on the overview rather than leaving the result unanchored.
+        highlight={focusSettingId === 'api-keys'}
         title={t('apiKeys.overview.title')}
         description={t('apiKeys.overview.desc', {
           configured: configuredCount,

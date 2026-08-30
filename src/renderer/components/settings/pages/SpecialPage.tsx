@@ -341,6 +341,19 @@ export default function SpecialPage() {
   };
 
   const showLockedState = !wired && !isWiredDiscovered && !isAeroDiscovered;
+  // The `special-modules` search entry ("Special modules — WIRED and Aero
+  // terminals, overlays, and secret feature labs") has no card of its own,
+  // because which module cards exist depends on what has been discovered.
+  // Resolve it to whichever card is genuinely the first module surface in the
+  // current state, so the search result lands on something real and exactly one
+  // card highlights rather than none or two.
+  const modulesAnchor: string = showLockedState
+    ? 'special-locked'
+    : wired || isWiredDiscovered
+      ? 'wired-archive'
+      : 'aero-gadget-lab';
+  const anchorsModules = (cardId: string): boolean =>
+    focusSettingId === 'special-modules' && modulesAnchor === cardId;
   const openArenaGame = (gameId: ArcadeGameId, theme: 'wired' | 'aero') => {
     window.dispatchEvent(new CustomEvent('os:open', { detail: 'games' }));
     window.setTimeout(() => {
@@ -404,7 +417,7 @@ export default function SpecialPage() {
           id="special-locked"
           title="Special modules locked"
           description="WIRED and Aero modules appear here after those modes are discovered."
-          highlight={focusSettingId === 'special-locked'}
+          highlight={focusSettingId === 'special-locked' || anchorsModules('special-locked')}
         >
           <p className="muted os-set-hint">
             Find synced lyrics in WIRED mode to unlock the NAVI terminal. Secret Aero unlocks its matching XP/Vista gadget lab.
@@ -417,7 +430,7 @@ export default function SpecialPage() {
           id="wired-archive"
           title="WIRED ARCHIVE service"
           description="CRT signal, boot replay, and terminal sensory controls."
-          highlight={focusSettingId === 'wired-archive'}
+          highlight={focusSettingId === 'wired-archive' || anchorsModules('wired-archive')}
         >
           <div className="os-viz-row">
             <span className="os-viz-label muted">{t('special.crtIntensity')}</span>
@@ -617,7 +630,7 @@ export default function SpecialPage() {
           id="aero-gadget-lab"
           title="Aero gadget lab"
           description="XP/Vista-era alternatives for the lyric finding modules."
-          highlight={focusSettingId === 'aero-gadget-lab'}
+          highlight={focusSettingId === 'aero-gadget-lab' || anchorsModules('aero-gadget-lab')}
         >
           <label className="os-toggle">
             <input
