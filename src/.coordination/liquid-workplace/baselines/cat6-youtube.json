@@ -1,0 +1,194 @@
+{
+  "label": "l8-youtube",
+  "app": "youtube",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "980x640",
+  "driven": [
+    {
+      "step": "draftFolder",
+      "result": "{\"was\":\"\",\"now\":\"lqp-folder-draft\"}"
+    },
+    {
+      "step": "openNews",
+      "result": "{\"from\":1,\"clicked\":\"News\"}"
+    },
+    {
+      "step": "openPlaylist",
+      "result": "{\"clicked\":\"Playlist\"}"
+    },
+    {
+      "step": "selectRow",
+      "result": "{\"was\":0,\"clicked\":\"What's the difference between \\\"Para\\\" and\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "9/9",
+    "liquid": "9/9",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "gram-search",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "980x640"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "playlistRail",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "playlistRail"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "folderTree",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "folderTree"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "addPlaylist",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "addPlaylist"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "tabSwitching",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "active removed from 1 of 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "tabSwitching"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "videoRows",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "videoRows"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "rowActions",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "disabled stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "rowActions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"disabled\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "selectionActions",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "selectionActions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "playlistPreferences",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "playlistPreferences"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "aria-pressed stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"youtube:folder\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

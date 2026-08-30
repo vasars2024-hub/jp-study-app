@@ -1118,3 +1118,54 @@ stolen 0, minRatio 6.52, unreachable 0), cat3 **10/10** (84 regions, dense 0, tr
 shared 2 of 2). Guard `youtubeLiquidHitFloor.test.ts` **10/10**.
 Evidence: `baselines/cat4-l8-youtube.json`. Zero new probes — four RUNs of
 `cat4-use-of-space.cjs`, one re-RUN each of cat1 and cat3.
+
+## 2026-08-30 · backup — YouTube category 6 closes at a controlled 10/10
+
+**Category 6 — feature parity and reversibility. PASS 10/10**, all three bars.
+Category 5 VOIDed on `no category-6 baseline at baselines/cat6-youtube.json`, so this is
+what unblocks it. **Zero new probes and zero new harness lines**: a `youtube` SPEC added to
+`l6-parity.js` (9 rows, 4 drive steps, 9 mutations) and one RUN of `cat6-feature-parity.cjs`.
+
+| bar | number |
+| --- | --- |
+| features reachable, Standard | **9 of 9** |
+| features reachable, Liquid | **9 of 9**, `rowsAgree` true, `onlyInOne` [] |
+| round trip standard → liquid → standard | `fieldsHeld` true, `shellHeld` true, **diffs []** |
+| drive refusals | **0 of 4** steps |
+| negative control | **9 of 9** mutations, `exactlyOwnRow` true on every one |
+
+Rows, with the number that earned each: `playlistRail` items=2/titled=2/active=1/planBadge=0 ·
+`folderTree` folders=3/headed=3/playlists=1/filed=1 · `addPlaylist` submitDisabled=true
+agreeing with an empty field · `tabSwitching` tabs=2/active=1 · `videoRows`
+rows=16/titled=16/thumbed=16/meta=16/listitems=16 · `rowActions`
+threeActions=16/titled=16/openImpliesDownloaded=16 · `selectionActions` selected=0 with both
+batch actions disabled · `playlistPreferences` prefs=11/named=11/controls=10/valued=10/subChips=4
+· `windowLifecycle` chrome 5/4, `aria-pressed` false.
+
+**Three decisions recorded, because each could have manufactured a score:**
+
+1. **The menu bar and status strip are NOT scored.** Measured live rather than assumed:
+   `.fwin-body` has exactly one child, `.yt-shell`, and `.ui-statusbar__field` and menu
+   buttons both count **0** in this host. `AppChrome` renders them elsewhere. Scoring an
+   absent host affordance as a missing feature would have invented a regression.
+2. **The drive touches only view-local state** — folder-name draft, active tab, row
+   selection. Every preference control (`setLang`, `toggleSub`, `setPlaylistField`,
+   `setSortPref`, `setAutoUpdate`, `moveToFolder`) writes through
+   `window.api.ytSetPlaylistPrefs` into the user's real store, and refresh/downloadAll reach
+   the network. A run that dies halfway now persists nothing.
+3. **Three rows are one-way or two-way AGREEMENTS, not presence counts** — `addPlaylist`
+   (submit disabled ⇔ field blank), `selectionActions` (batch actions disabled ⇔ nothing
+   selected), `rowActions` (Open enabled ⇒ the row really has a file; stated one-way because
+   the product also, honestly, disables it for a downloaded row with no `mediaItemId`).
+
+**TRAP for the next spec author:** do NOT drive the add-URL field. `cat6-feature-parity.cjs`
+dirties the first editable text input on the surface with its own `lqp-roundtrip-食` mark and
+afterwards hunts for that exact value to put it back. Typing over it makes `undirtyField`
+refuse and leaves the mark in the user's running app. The folder-name field is the second
+input and is free. Second trap: the undo must restore SELECTION BEFORE THE TAB — `restore()`
+is one synchronous call, so a tab click that unmounts the list leaves the selection sweep
+with zero rows and silently restores nothing.
+
+Surface returned to what it was found in: presentation `standard`, playlist tab active, both
+drafts empty, 0 rows selected, 16 rows painted. Evidence: `baselines/cat6-youtube.json`.
+**YouTube 30/80 → 40/80.**

@@ -116,6 +116,7 @@
   const musicState = specState('__LQP_MUSIC_ORIG');
   const scraperState = specState('__LQP_SCRAPER_ORIG');
   const settingsState = specState('__LQP_SETTINGS_ORIG');
+  const ytState = specState('__LQP_YT_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -3724,6 +3725,292 @@
         // it and the row would fall for the wrong reason.
         pageRegion: (w) => stripAttr(q(w, '.os-set-pane-v2'), 'aria-label', 'no settings pane'),
         homeOverview: (w) => detach(q(w, '.os-set-status-chip strong'), 'no home status chips'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    // L8's fourth surface, and the last one with no category-6 spec at all: the run VOIDed on
+    // `no category-6 baseline at baselines/cat6-youtube.json`. Data, not a new probe file —
+    // same RULE 1 cost check as `resources` and `settings`.
+    //
+    // What this spec deliberately does NOT score: the AppChrome menu bar and status strip.
+    // Measured live on this window rather than assumed — `.fwin-body` has exactly one child,
+    // `.yt-shell`, and `.ui-statusbar__field` and menu buttons both count 0 — so in this host
+    // they are not rendered at all. Scoring an absent host affordance as a missing feature
+    // would invent a regression against the app.
+    //
+    // What it will not TOUCH: `setLang`, `toggleSub`, `setPlaylistField`, `setSortPref`,
+    // `setAutoUpdate` and `moveToFolder` all write through `window.api.ytSetPlaylistPrefs`
+    // into the user's real store, and `refresh`/`downloadAll` reach the network. The drive is
+    // confined to state that lives in the view — the folder-name draft, the active tab and the
+    // row selection — so a run that dies halfway leaves nothing persisted behind it.
+    youtube: {
+      titleRe: /YouTube|ユーチューブ/i,
+      rootSel: '.yt-root',
+      features: [
+        {
+          // The rail is the only route to a playlist and Plan to watch the only route to the
+          // cross-playlist queue. Scored as AGREEMENTS rather than counts: exactly one entry
+          // may claim `active`, and the plan entry's badge has to be a real number — a badge
+          // that says nothing is how an empty queue and a broken queue look alike.
+          id: 'playlistRail',
+          f: (w) => {
+            const items = qa(w, '.yt-pl-item');
+            const titled = items.filter((b) => txt(q(b, '.yt-pl-item-title')).length > 0);
+            const active = items.filter((b) => b.classList.contains('active'));
+            const plan = q(w, '.yt-plan-item');
+            const badge = plan ? txt(q(plan, '.yt-pl-item-meta')) : '';
+            return {
+              ok: items.length >= 2 && titled.length === items.length
+                && active.length === 1 && !!plan && /^\d+$/.test(badge),
+              ev: `items=${items.length} titled=${titled.length} active=${active.length} planBadge=${badge || 'absent'}`,
+            };
+          },
+        },
+        {
+          // Folders are this surface's filing system. Every group publishes a head with a
+          // name, and every playlist button lives inside one — an orphan `.yt-pl-item` is a
+          // playlist the user can open but can never file, which is the parity gap. Unfiled
+          // is itself a `.yt-folder`, so "filed" here means placed, not non-empty.
+          id: 'folderTree',
+          f: (w) => {
+            const folders = qa(w, '.yt-folder');
+            const headed = folders.filter((f) => txt(q(f, '.yt-folder-head')).length > 0);
+            const all = qa(w, '.yt-tree .yt-pl-item:not(.yt-plan-item)');
+            const filed = all.filter((b) => !!b.closest('.yt-folder'));
+            return {
+              ok: folders.length >= 1 && headed.length === folders.length
+                && all.length > 0 && filed.length === all.length,
+              ev: `folders=${folders.length} headed=${headed.length} playlists=${all.length} filed=${filed.length}`,
+            };
+          },
+        },
+        {
+          // Add-by-URL, scored as the agreement rather than as presence: the submit is
+          // disabled exactly when the field is blank. `cat6-feature-parity.cjs` dirties this
+          // field with its own round-trip mark before the drive, so a run exercises BOTH
+          // sides of the agreement instead of only the resting empty one.
+          id: 'addPlaylist',
+          f: (w) => {
+            const input = q(w, '.yt-add input');
+            const submit = q(w, '.yt-add button');
+            const empty = !input || input.value.trim().length === 0;
+            return {
+              ok: !!input && !!submit && !input.disabled && submit.disabled === empty,
+              ev: `field="${input ? input.value : ''}" submitDisabled=${submit && submit.disabled} expected=${empty}`,
+            };
+          },
+        },
+        {
+          // Two panes, one strip. Exactly one tab claims `active` and the pane it claims is
+          // the one that mounted — the preference form only ever renders under the playlist
+          // tab, so a strip that says News with `.yt-prefs` on screen is the stale-nav defect.
+          id: 'tabSwitching',
+          f: (w) => {
+            const tabs = qa(w, '.yt-tab');
+            const active = tabs.filter((b) => b.classList.contains('active'));
+            const onNews = active.length === 1 && active[0] === tabs[0];
+            const list = q(w, '.yt-list');
+            const prefs = q(w, '.yt-prefs');
+            const agrees = onNews ? !prefs : !!list;
+            return {
+              ok: tabs.length === 2 && active.length === 1 && agrees,
+              ev: `tabs=${tabs.length} active=${active.length} onNews=${onNews} list=${!!list} prefs=${!!prefs}`,
+            };
+          },
+        },
+        {
+          // The list is virtualised, so this counts what is PAINTED and requires every painted
+          // row to carry all three things a user picks a video by — title, a real thumbnail
+          // URL, and the duration/view meta — plus its list semantics. A row with a blank
+          // title is the fabricated-row shape category 8 also refuses.
+          id: 'videoRows',
+          f: (w) => {
+            const rows = qa(w, '.yt-list .yt-row');
+            const titled = rows.filter((r) => txt(q(r, '.yt-row-title')).length > 0);
+            const thumbed = rows.filter((r) => {
+              const img = q(r, '.yt-thumb');
+              return !!img && (img.getAttribute('src') || '').length > 0;
+            });
+            const meta = rows.filter((r) => txt(q(r, '.yt-row-meta')).length > 0);
+            const items = qa(w, '.yt-list [role="listitem"]');
+            return {
+              ok: rows.length > 0 && titled.length === rows.length
+                && thumbed.length === rows.length && meta.length === rows.length
+                && items.length === rows.length,
+              ev: `rows=${rows.length} titled=${titled.length} thumbed=${thumbed.length} meta=${meta.length} listitems=${items.length}`,
+            };
+          },
+        },
+        {
+          // Three per-row actions — plan, log, open in the player — and the third is scored as
+          // an agreement in ONE direction only: it may be enabled only for a row that really
+          // has a downloaded file. Stated one-way on purpose, because the product also
+          // disables it for a downloaded row with no `mediaItemId`, which is honest; an
+          // always-enabled Open is the dishonest control this row exists to catch.
+          id: 'rowActions',
+          f: (w) => {
+            const rows = qa(w, '.yt-list .yt-row');
+            const triples = rows.filter((r) => qa(r, '.yt-row-actions button').length === 3);
+            const titledAll = rows.filter((r) => qa(r, '.yt-row-actions button')
+              .every((b) => (b.title || '').trim().length > 0));
+            const agrees = rows.filter((r) => {
+              const open = qa(r, '.yt-row-actions button')[2];
+              return !!open && (open.disabled || !!q(r, '.yt-chip.dl'));
+            });
+            return {
+              ok: rows.length > 0 && triples.length === rows.length
+                && titledAll.length === rows.length && agrees.length === rows.length,
+              ev: `rows=${rows.length} threeActions=${triples.length} titled=${titledAll.length} openImpliesDownloaded=${agrees.length}`,
+            };
+          },
+        },
+        {
+          // The header's batch actions are gated on a selection, and the gate IS the row: Log
+          // and the plan button must be disabled exactly when nothing is selected. The drive
+          // ctrl-clicks a row first, so this is measured with the gate open rather than only
+          // in its resting closed state. `selected` counts PAINTED rows — the virtual list is
+          // fully painted at this size, and the evidence prints the count either way.
+          id: 'selectionActions',
+          f: (w) => {
+            const actions = qa(w, '.yt-header-actions button');
+            const primary = actions.find((b) => b.classList.contains('primary'));
+            const plan = actions[actions.length - 1];
+            const selected = qa(w, '.yt-list .yt-row.selected').length;
+            const want = selected === 0;
+            return {
+              ok: actions.length >= 3 && !!primary && !!plan && primary !== plan
+                && primary.disabled === want && plan.disabled === want,
+              ev: `actions=${actions.length} selected=${selected} logDisabled=${primary && primary.disabled} planDisabled=${plan && plan.disabled} expected=${want}`,
+            };
+          },
+        },
+        {
+          // The preference form is the playlist's whole configuration surface and every row
+          // must be both LABELLED and LIVE: a named control whose value is blank and whose
+          // placeholder is blank too is indistinguishable from one that never loaded. The
+          // sub-language chips are counted apart because they are a chip group, not a control.
+          id: 'playlistPreferences',
+          f: (w) => {
+            const prefs = qa(w, '.yt-prefs .yt-pref');
+            const named = prefs.filter((p) => txt(p).length > 0);
+            const controls = qa(w, '.yt-prefs select, .yt-prefs input');
+            const valued = controls.filter((c) => (c.type === 'checkbox'
+              ? typeof c.checked === 'boolean'
+              : String(c.value).length > 0 || (c.placeholder || '').length > 0));
+            const chips = qa(w, '.yt-prefs .yt-chip');
+            return {
+              ok: prefs.length >= 8 && named.length === prefs.length
+                && controls.length >= 8 && valued.length === controls.length
+                && chips.length >= 2,
+              ev: `prefs=${prefs.length} named=${named.length} controls=${controls.length} valued=${valued.length} subChips=${chips.length}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        // The FOLDER-name draft, not the add-URL field, and that is not a preference:
+        // `cat6-feature-parity.cjs` dirties the first editable text input on the surface —
+        // which is the add field — and afterwards hunts for its own mark to put it back.
+        // Typing over it makes that hunt refuse and leaves the driver's mark unrestored in
+        // the user's running app.
+        draftFolder: (w, name) => {
+          const g = ytState();
+          const el = q(w, '.yt-folder-add input');
+          if (!el) return { refused: 'no folder-name field' };
+          if (g.folder == null) g.folder = el.value;
+          typeInto(el, String(name == null ? 'lqp-folder-draft' : name));
+          return { was: g.folder, now: el.value };
+        },
+        openNews: (w) => {
+          const g = ytState();
+          const tabs = qa(w, '.yt-tab');
+          if (tabs.length < 2) return { refused: 'no tab strip' };
+          if (g.tab == null) g.tab = tabs.findIndex((b) => b.classList.contains('active'));
+          tabs[0].click();
+          return { from: g.tab, clicked: txt(tabs[0]) };
+        },
+        openPlaylist: (w) => {
+          const tabs = qa(w, '.yt-tab');
+          if (tabs.length < 2) return { refused: 'no tab strip' };
+          tabs[1].click();
+          return { clicked: txt(tabs[1]) };
+        },
+        // CTRL-click, because a plain click on a downloaded row calls `onRowActivate` and
+        // opens it in the video player — a probe that starts playback is not a measurement.
+        // React reads `ctrlKey` off the native event, so the modifier has to be on the
+        // dispatched event; setting it on the element afterwards produces a plain click.
+        selectRow: (w) => {
+          const g = ytState();
+          const rows = qa(w, '.yt-list .yt-row');
+          if (!rows.length) return { refused: 'no painted rows to select' };
+          if (g.selected == null) {
+            g.selected = qa(w, '.yt-list .yt-row.selected').map((r) => txt(q(r, '.yt-row-title')));
+          }
+          rows[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }));
+          return { was: g.selected.length, clicked: txt(q(rows[0], '.yt-row-title')).slice(0, 40) };
+        },
+      },
+      // News first and the playlist tab LAST, so the run ends on the populated pane. The
+      // product opens on News, which is empty on this profile, and an empty harness caps a
+      // category at 0 — the same trap that scored this surface's other categories.
+      drive: ['draftFolder', 'openNews', 'openPlaylist', 'selectRow'],
+      undo: {
+        youtube: (w) => {
+          const g = window.__LQP_YT_ORIG;
+          if (!g) return null;
+          const done = [];
+          const folder = q(w, '.yt-folder-add input');
+          if (folder && g.folder != null && folder.value !== g.folder) {
+            typeInto(folder, g.folder);
+            done.push('folder');
+          }
+          // Selection BEFORE the tab, and the order is load-bearing: `restore()` is one
+          // synchronous call, so a tab click that unmounts the list leaves the following
+          // selection sweep with zero rows to walk and silently restores nothing.
+          if (g.selected != null) {
+            const want = new Set(g.selected);
+            qa(w, '.yt-list .yt-row').forEach((r) => {
+              const title = txt(q(r, '.yt-row-title'));
+              if (r.classList.contains('selected') !== want.has(title)) {
+                r.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }));
+                done.push('selection');
+              }
+            });
+          }
+          if (g.tab != null) {
+            const tabs = qa(w, '.yt-tab');
+            const now = tabs.findIndex((b) => b.classList.contains('active'));
+            if (tabs[g.tab] && now !== g.tab) { tabs[g.tab].click(); done.push('tab'); }
+          }
+          window.__LQP_YT_ORIG = null;
+          return done.length ? `youtube:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        // The plan BADGE, not the rail: detaching a rail item moves `folderTree`'s playlist
+        // count too and the control would prove two rows instead of one.
+        playlistRail: (w) => detach(q(w, '.yt-plan-item .yt-pl-item-meta'), 'no plan badge'),
+        // The first folder head's own label. `.yt-plan-item` sits outside every `.yt-folder`
+        // and is excluded from `folderTree`'s count, so `playlistRail` cannot move with it.
+        folderTree: (w) => detach(q(w, '.yt-folder-head span'), 'no folder head label'),
+        addPlaylist: (w) => detach(q(w, '.yt-add button'), 'no add-playlist submit'),
+        // Strip the strip's `active`, which no other row reads — `playlistRail` scores
+        // `.yt-pl-item.active`, a different element family.
+        tabSwitching: (w) => removeClassAll(qa(w, '.yt-tab.active'), 'active'),
+        videoRows: (w) => detach(q(w, '.yt-list .yt-row .yt-row-title'), 'no video rows'),
+        // LIE rather than delete, and on a row that is NOT downloaded: enabling its Open
+        // control is exactly the dishonest state the row claims cannot exist. Detaching a
+        // button instead would also fall `videoRows`' sibling counts.
+        rowActions: (w) => stripAttr(
+          qa(w, '.yt-list .yt-row').filter((r) => !q(r, '.yt-chip.dl'))
+            .map((r) => qa(r, '.yt-row-actions button')[2])[0],
+          'disabled',
+          'every painted row is already downloaded — no undownloaded row to falsify',
+        ),
+        selectionActions: (w) => detach(q(w, '.yt-header-actions button.primary'), 'no batch log action'),
+        playlistPreferences: (w) => detach(q(w, '.yt-prefs .yt-chips'), 'no sub-language chip group'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
