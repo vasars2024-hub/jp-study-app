@@ -611,6 +611,37 @@ function mergeStates(a, b) {
 }
 
 /**
+ * Correction 21: HOW MANY runs moved between languages, not merely whether the hash did.
+ *
+ * Stashes the first language's ordered runs on the page and, for each later language, counts the
+ * positions whose text changed. Kept on the page rather than shipped back per language because
+ * four arrays of ~1,200 strings through `/eval` is the payload this harness is meant not to send.
+ */
+const langRuns = (isBase) => `(function(){
+  var r = ${ROOT_EXPR};
+  if (!r) return JSON.stringify({ diffRuns: null, examples: [] });
+  var acc = [];
+  var w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+  for (var t = w.nextNode(); t; t = w.nextNode()) {
+    var s = t.nodeValue && t.nodeValue.trim();
+    if (!s || !t.parentElement) continue;
+    if (typeof t.parentElement.checkVisibility === 'function'
+      && !t.parentElement.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })) continue;
+    acc.push(s);
+  }
+  if (${isBase ? 'true' : 'false'}) { window.__cat8LangBase = acc; return JSON.stringify({ diffRuns: 0, examples: [] }); }
+  var base = window.__cat8LangBase || [];
+  var n = Math.max(base.length, acc.length), diff = 0, ex = [];
+  for (var i = 0; i < n; i++) {
+    if (base[i] !== acc[i]) {
+      diff++;
+      if (ex.length < 6) ex.push({ i: i, was: String(base[i] || '').slice(0, 30), now: String(acc[i] || '').slice(0, 30) });
+    }
+  }
+  return JSON.stringify({ diffRuns: diff, examples: ex });
+})()`;
+
+/**
  * Correction 3: run the surface in all four languages and compare RENDERED TEXT, not key counts.
  *
  * A per-language key count catches a missing catalog entry. It cannot catch an untranslated
@@ -647,9 +678,12 @@ async function langLeg() {
       if (r.storedLang !== l.stored) {
         return { refuse: `language did not take: asked ${l.stored}, storage says ${r.storedLang} - the previous language would have been measured twice` };
       }
+      // Correction 21: HOW MANY runs moved, not merely whether the hash did. See the bar below.
+      const moved = JSON.parse(await ev(langRuns(perLang.length === 0)));
       perLang.push({
         lang: l.stored, htmlLang: r.lang, textRuns: r.textRuns, textHash: r.textHash,
         rawKeyCount: r.rawKeyCount, rawKeys: r.rawKeys,
+        diffRuns: moved.diffRuns, diffExamples: moved.examples,
       });
     }
   } finally {
@@ -661,6 +695,10 @@ async function langLeg() {
     "JSON.stringify({html:document.documentElement.lang,stored:localStorage.getItem('ui-lang')})",
   ));
   const hashes = perLang.map((p) => p.textHash);
+  // Correction 21: the SHARE of runs that moved. The best case across the three non-base
+  // languages, so a surface is judged on the language it localises best, not its worst.
+  const baseRuns = perLang[0] ? perLang[0].textRuns : 0;
+  const diffRunsMax = Math.max(0, ...perLang.map((p) => p.diffRuns || 0));
   return {
     perLang,
     before,
@@ -669,6 +707,9 @@ async function langLeg() {
     rawKeyCountMax: Math.max(...perLang.map((p) => p.rawKeyCount)),
     // Distinct hashes are the evidence that the surface actually re-rendered per language.
     distinctHashes: new Set(hashes).size,
+    diffRunsMax,
+    baseRuns,
+    diffShare: baseRuns ? Number((diffRunsMax / baseRuns).toFixed(4)) : 0,
   };
 }
 
@@ -720,7 +761,23 @@ async function langLeg() {
     // Correction 9: zero observable states is UNMEASURED, not a fail and not a 10.
     statesNamed: observable.length === 0 ? 'UNMEASURED' : named.length === observable.length,
     // Correction 3: with --langs, the surface must demonstrably differ between languages.
-    languagesDiffer: !LANGS || base.languages.distinctHashes > 1,
+    // Correction 20: WITHOUT --langs this read `!LANGS || …`, i.e. vacuously TRUE, so a run
+    // that never opened Settings printed `PASS 10/10` with one of its five bars unmeasured.
+    // Measured on the Scraper, 2026-08-30: the surface renders ONE text hash across all four
+    // languages (588 English-only keys in `scraper/strings.ts`), and a no-`--langs` run scored
+    // it 10/10 anyway. That is the fabricated 10 the rubric exists to catch, produced by the
+    // instrument itself. It is UNMEASURED now, which the verdict already knows how to report.
+    // Correction 21: DISTINCT HASHES ALONE IS SATISFIED BY ONE LABEL. Measured on the Scraper,
+    // 2026-08-30: four distinct hashes, and the diff was exactly ONE run of 1,186 — the `.fwin`
+    // title, "Scraper" -> "スクレイパー", which is shared window chrome outside the app's own
+    // content. The other 1,180 runs are the 588 English-only keys in `scraper/strings.ts` and
+    // never moved. So the bar read 10/10 on a surface that is not localised at all.
+    // The share floor is 1%: low enough that a Japanese-content-heavy surface (Dictionary, the
+    // reader) is not failed for having little chrome, high enough that no single chrome label
+    // can carry it. It is a floor, not proof of coverage — 0.08% is what it exists to reject.
+    languagesDiffer: LANGS
+      ? base.languages.distinctHashes > 1 && base.languages.diffShare > 0.01
+      : 'UNMEASURED',
   };
   const unmeasured = Object.entries(bars).filter(([, v]) => v === 'UNMEASURED').map(([k]) => k);
   const pass = Object.values(bars).every((v) => v === true);
@@ -738,7 +795,7 @@ async function langLeg() {
     verdict: pass
       ? 'PASS 10/10'
       : (unmeasured.length && !Object.values(bars).some((v) => v === false)
-        ? `UNMEASURED - ${unmeasured.join(',')}; drive the surface with --drive-input or score 0, never 10`
+        ? `UNMEASURED - ${unmeasured.join(',')}; drive the surface with --drive-input and --langs, or score 0, never 10`
         : 'FAIL'),
     failedBars: Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k),
     unmeasuredBars: unmeasured,

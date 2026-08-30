@@ -1,0 +1,206 @@
+{
+  "label": "l8-scraper-mutefix",
+  "surface": "@.fwin:has(.scr-shell)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "820x580",
+  "textRuns": 1186,
+  "textHash": 287854877,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 6,
+  "states": {
+    "empty": {
+      "hosts": 1,
+      "messages": [
+        "qBittorrent has no transfers."
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9727,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9727 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 1186,
+        "textHash": 287854877,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 1186,
+        "textHash": 1950363352,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 1,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "スクレイパー"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 1186,
+        "textHash": 115792228,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 1,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "抓取器"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 1186,
+        "textHash": 720252896,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 1,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Scraper",
+            "now": "Скрапер"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 1,
+    "baseRuns": 1186,
+    "diffShare": 0.0008
+  },
+  "drive": {
+    "input": ".scr-topbar .scr-search-input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 1177,
+      "states": {
+        "empty": {
+          "hosts": 2,
+          "messages": [
+            "qBittorrent has no transfers."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": false
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "languagesDiffer"
+  ],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

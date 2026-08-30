@@ -393,3 +393,44 @@ Two things measured now so that turn does not rediscover them:
 
 Not deferred by this decision: study **content** stays literal — series names, episode
 titles, release groups — per CLAUDE.md i18n rule 4 and `strings.ts:16`.
+
+### 2026-08-30 — Scraper category 8: mute pairs CLOSED, and two instrument defects that hid it
+
+**Category 8 = FAIL, one bar, measured.** `mutePairs` **6 → 0**, rawKeys 0, placeholders 0,
+`statesNamed` 1 of 1 observable, negative control moved all three counts and returned to
+baseline. The one failing bar is `languagesDiffer`, which is the 588-key English-only
+deferral `c1f2d76c` already decided to lift. Scraper stays **70/80**; the bar that moved is
+inside category 8, which does not close until the i18n migration lands.
+Evidence: `baselines/cat8-l8-scraper-mutefix.json`. Fix `f8a4a80e` → amended `1a2b195f`.
+
+**The fix.** `disabledReason.ts`: `firstReason(...checks)` returns the first failing clause
+and the call site spends the same value as `disabled={!!why}` and `title={why}`, so the two
+cannot drift. `engineReason` quotes the sidecar's own per-engine message. Ordering decided
+here (standing auto-approval): **engine before selection** — "tick a torrent first" is true
+and useless when the engine is stopped, because the user selects a row and the button stays
+off. All **10** disabled controls in the page are covered, not the 6 a resting probe saw.
+Live after: *"Torrent client is not ready — Seanime sidecar is stopped. Fix it in Seanime,
+then Refresh."*
+
+**Instrument defect 1 — correction 20.** `languagesDiffer: !LANGS || …` made the bar
+vacuously TRUE without `--langs`, so a run that never opened Settings printed **PASS 10/10**
+with a fifth of the category unmeasured. Now `'UNMEASURED'`, which the verdict already knows
+how to report.
+
+**Instrument defect 2 — correction 21.** `distinctHashes > 1` is satisfied by ONE label.
+Measured here: 4 distinct hashes and the en→ja diff was **1 run of 1,186** — the `.fwin`
+title, `Scraper` → `スクレイパー`, shared window chrome outside the app. The other 1,180 runs
+never moved. The bar now also needs `diffShare > 0.01`; the Scraper measures **0.0008** and
+correctly FAILS. The floor is low enough not to punish a Japanese-content-heavy surface for
+having little chrome, high enough that no single chrome label carries it.
+**Any cat8 score banked from a run without `--langs` is worth re-deriving.**
+
+**Trap — `git commit --only <paths>` DESTROYS a HEAD+edit blob.** It re-stages those paths
+from the worktree; `f8a4a80e` landed with another track's 71 `dash.*` lines (390 insertions
+against the intended 319). Stage the blob, then a bare `git commit` with NO pathspec.
+
+**Trap — a multi-line insertion anchor splits the function it aims after.** Seeking the
+first `\n` from the anchor's START lands inside a 2-line anchor, and the first amend shipped
+a `strings.ts` whose `sx2` was severed from its own closing brace, with a stray `}` at EOF.
+Balanced braces and a clean `git diff --cached` both looked right. Only compiling the
+committed tree in a detached worktree found it — that check is not optional here.
