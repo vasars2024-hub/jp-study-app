@@ -1,4 +1,5 @@
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { groupLabelKey, groupOrder, SETTINGS_NAV } from './settingsRegistry';
 import type { SettingsPageId } from './types';
 import { useT } from '../../i18n';
@@ -18,8 +19,17 @@ export default function SettingsNav({
   const home = SETTINGS_NAV.find((p) => p.id === 'home')!;
   const groups = groupOrder();
 
+  // The category rail is navigation, so it takes the contextual role rather than a local
+  // translucent copy. `ContextualSurface` is inert outside a Liquid window: the material
+  // arrives only under `.fwin-liquid` in `theme/liquid-window.css`, so conventional
+  // Settings keeps its exact pixels and the toggle back is pure cascade.
+  //
+  // The group and list wrappers below adopt the same role for the reason `.scr-rail-group`
+  // and `.scr-rail-list` did: a `<ul>` of 8 navigation buttons satisfies the classifier's
+  // dense-work test, so leaving them undeclared would put four "dense work" regions on the
+  // rail's own material the moment it starts painting. They take the role and no material.
   return (
-    <nav className="os-set-nav-v2" aria-label={t('settings.nav.ariaCategories')}>
+    <ContextualSurface as="nav" className="os-set-nav-v2" aria-label={t('settings.nav.ariaCategories')}>
       <button
         type="button"
         className={`os-set-nav-item ${page === 'home' ? 'active' : ''}`}
@@ -37,11 +47,15 @@ export default function SettingsNav({
         if (!pages.length) return null;
         const groupLabel = t(groupLabelKey(group));
         return (
-          <div key={group} className="os-set-nav-group">
+          <ContextualSurface key={group} className="os-set-nav-group">
             <div className="os-set-nav-group-label" id={`set-nav-${group}`}>
               {groupLabel}
             </div>
-            <ul className="os-set-nav-list" aria-labelledby={`set-nav-${group}`}>
+            <ContextualSurface
+              as="ul"
+              className="os-set-nav-list"
+              aria-labelledby={`set-nav-${group}`}
+            >
               {pages.map((p) => (
                 <li key={p.id}>
                   <button
@@ -59,8 +73,8 @@ export default function SettingsNav({
                   </button>
                 </li>
               ))}
-            </ul>
-          </div>
+            </ContextualSurface>
+          </ContextualSurface>
         );
       })}
 
@@ -85,6 +99,6 @@ export default function SettingsNav({
             : t('settings.nav.advancedHint')}
         </p>
       </div>
-    </nav>
+    </ContextualSurface>
   );
 }

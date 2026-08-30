@@ -1,9 +1,9 @@
 {
-  "label": "l8-settings",
+  "label": "l8-settings-liquid-guard",
   "surface": "Settings",
   "win": "main",
   "theme": "forest-night",
-  "presentation": "standard",
+  "presentation": "liquid",
   "box": "960x680",
   "deferredVisibilityOwners": 0,
   "parserSelfTest": {
@@ -14,7 +14,7 @@
   "text": {
     "measured": 64,
     "unmeasurable": 0,
-    "minRatio": 5.47,
+    "minRatio": 5.46,
     "minOwner": "span.os-set-advanced-label \"Advanced\" 12px",
     "failingCount": 0,
     "worst": [],
@@ -98,21 +98,21 @@
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 41,
+    "beforeOverThreshold": 51,
     "beforeLongest": {
       "el": "span.os-set-advanced-glyph",
       "dur": 0.35
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 41,
+    "afterOverThreshold": 51,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
   "hit": {
     "title": "Settings",
     "floor": 32,
-    "presentation": "standard",
+    "presentation": "liquid",
     "theme": "forest-night",
     "box": "960x680",
     "deferredVisibilityOwners": 0,
@@ -131,8 +131,8 @@
       "shrunkBy": 0,
       "blockers": [
         "div.fwin-bar",
-        "button.fwin-b.lq-hit.fwin-b-liquid",
-        "section.fwin.focused",
+        "button.fwin-b.lq-hit.fwin-b-liquid.is-liquid",
+        "section.fwin.focused.fwin-liquid",
         "div.fwin-bar"
       ]
     },
@@ -147,7 +147,7 @@
     "disclosuresRestored": true,
     "scrollLeaks": [
       "nav.os-set-nav-v2.lq-contextual 0,0 -> 385,0",
-      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 696,0"
+      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 701,0"
     ],
     "deferredRestore": {
       "first": {

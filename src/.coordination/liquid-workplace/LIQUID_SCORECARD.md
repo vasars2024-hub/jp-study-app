@@ -755,3 +755,39 @@ The re-run measured one click in each presentation, Standard 97.1 ms and Liquid 
 transition. Negative control moved dead-end/modal/scroll counts `0/0/0 → 1/1/1 → 0/0/0`;
 its inert click was 0.4 ms. Category result: **PASS 10/10**. Evidence:
 `baselines/cat2-l8-settings.json`; checkpoint commit: this entry's product commit.
+
+## 2026-08-30 · primary — Settings category 3 closes at 10/10
+
+codexB left `baselines/cat3-l8-settings.json` measured and unfixed (FAIL: `contextualTreated`,
+`sharedPrimitives`; 2 eligible, 0 treated, 0 shared) when its usage ran out. Re-derived and
+finished here. Reused `cat3-liquid-utilization.cjs` unchanged, `--presentation liquid`.
+
+The migration is `SettingsNav.tsx` + both `header.os-set-page-head` hosts (`SettingsApp.tsx`
+renders it for 22 pages, `SettingsHome.tsx` for Home — migrating one and not the other passes
+on Home only). The rail declares the role at nav, all 4 groups and all 4 lists, because a
+`ul.os-set-nav-list` of 8 buttons reads as dense work the moment the rail paints and
+`div.os-set-nav-group` inherits that the instant the list stops. Geometry exceptions in
+`liquid-window.css` keep the rail a flush column and the head a flush strip.
+
+TRAP, and it cost the round trip: `liquid-surfaces.css` gives every primitive `min-height: 0`
+UNCONDITIONALLY. Inside the rail's scrolling flex column that collapsed the four groups
+129/164/129/304 → 61/77/61/143 px with overlapping buttons, in BOTH presentations. Category 1
+caught it — 45 controls but only 36 measurable, 9 occluded, 1 hit area stolen (4.5 px),
+`targets32` FAIL. The compensation is in `styles.css`, not `liquid-window.css`, because
+`liquidWindowPresentation.test.ts:250` requires every selector in that sheet to name
+`.fwin-liquid`. Staged as a HEAD+edit blob; `styles.css` carries another track's hunks.
+
+Numbers after the fix, 960×680, `forest-night`, viewport 1264×821, 39 regions:
+`denseWorkOnTranslucent` **0** of 2 Work, `liquidTreatedEligible` **10 of 10**,
+`sharedPrimitiveEligible` **10 of 10**. Control A one region → glass moved 0→1; control B
+all-glass moved 0→2 = every Work region; both restored to `[0,10,10,10,2]` with the inline
+style and the injected sheet gone — **CONTROL FAILED AS REQUIRED**.
+
+Category 1 re-run in BOTH presentations at this tree, not inherited: Liquid 45/45 measured,
+0 below the hit floor, 0 stolen, 0 occluded, min contrast 5.46:1; Standard 64 text records,
+5.47:1, 45/45, 0 unreachable — both **PASS 10/10**, control moved all five counts and
+restored. Window returned to Standard, the presentation it was found in.
+
+Regression: `settingsLiquidRegions.test.tsx`, 5 tests, pins both traps. Evidence:
+`baselines/cat3-l8-settings.json`, `baselines/cat1-l8-settings.json`,
+`baselines/cat1-l8-settings-liquid.json`.

@@ -248,6 +248,48 @@
   padding: var(--space-md) var(--space-sm);
 }
 
+/*
+ * L8 Settings — the category rail and the page header.
+ *
+ * Same shape as the Scraper block above and for the same measured reason. The rail is a
+ * flush 204px column that meets the window body on three sides and already draws the one
+ * border it needs (`styles.css` `.os-set-nav-v2`, `border-right`), so the shared card
+ * geometry would round it against a seam nothing can see and re-pad a column that sets its
+ * own `padding-right: 14px`. It is adopted for the MATERIAL; the geometry stays its own.
+ *
+ * The page header is a breadcrumb/title strip at the top of the scrolling pane, so it takes
+ * the flush `.scr-topbar` treatment rather than a floating card: a bottom rule and the
+ * material, no radius and no shadow. It keeps `styles.css`'s 4px bottom margin.
+ */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-v2.lq-contextual {
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  padding: 0 14px 0 0;
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-page-head.lq-contextual {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  padding: 0 0 var(--lq-space-2);
+  box-shadow: none;
+}
+
+/*
+ * The rail's group and list wrappers declare the contextual role only so a classifier stops
+ * calling a `<ul>` of eight navigation buttons dense work — exactly the `.scr-rail-list`
+ * case. A second tint inside the rail's own would read as a darker slab down the middle of
+ * it, so they take the role and no material at all, and keep their `styles.css` spacing.
+ */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-group.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-list.lq-contextual {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
 /* The toggle itself. `aria-pressed` carries the state for assistive tech; this
    is the matching visible affordance, not a decoration.
  *

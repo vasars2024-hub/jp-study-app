@@ -8,6 +8,7 @@ import type { SettingsPageId } from './types';
 import { useT } from '../../i18n';
 import { LANG_LABELS, LANG_TAGS } from '../../../shared/i18n/core';
 import { useAeroMaterials } from '../ui';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { requestWiredArchiveEntry } from '../../wiredArchiveLifecycle';
 
 const QUICK: {
@@ -52,10 +53,10 @@ export default function SettingsHome() {
 
   return (
     <div className="os-set-home">
-      <header className="os-set-page-head">
+      <ContextualSurface as="header" className="os-set-page-head">
         <h2 className="os-set-page-title">{t('settings.appTitle')}</h2>
         <p className="os-set-page-intro muted">{t('settings.home.intro')}</p>
-      </header>
+      </ContextualSurface>
 
       <section className="os-set-home-status" aria-label={t('settings.home.statusAria')}>
         <div className="os-set-status-chip">

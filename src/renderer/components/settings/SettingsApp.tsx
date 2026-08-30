@@ -32,6 +32,7 @@ import { applyTheme, loadThemeId, onThemeChanged } from '../../theme';
 import { bumpZoom, loadZoom, onZoomChanged, setZoom } from '../../appZoom';
 import { loadCustomCss, onCustomCssChanged } from '../../customCss';
 import { registerCommandHandler } from '../../keyboardShortcuts';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { SettingsProvider } from './SettingsContext';
 import SettingsNav from './SettingsNav';
 import SettingsSearch from './SettingsSearch';
@@ -581,7 +582,7 @@ export default function SettingsApp(props: SettingsWallProps) {
               aria-label={meta ? t(meta.labelKey) : t('settings.appTitle')}
             >
               {page !== 'home' && meta && (
-                <header className="os-set-page-head">
+                <ContextualSurface as="header" className="os-set-page-head">
                   <p className="os-set-breadcrumb muted">
                     {meta.group ? (
                       <>
@@ -596,7 +597,7 @@ export default function SettingsApp(props: SettingsWallProps) {
                   </p>
                   <h2 className="os-set-page-title">{t(meta.labelKey)}</h2>
                   {meta.descKey && <p className="os-set-page-intro muted">{t(meta.descKey)}</p>}
-                </header>
+                </ContextualSurface>
               )}
               {page === 'home' && <SettingsHome />}
               {page === 'appearance' && <DeferredAppearancePage />}

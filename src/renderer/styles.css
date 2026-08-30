@@ -15187,6 +15187,20 @@ html[data-taskbar-size='large'] .os-tray-btn {
   flex-direction: column;
   gap: 1px;
 }
+/* The rail's groups and lists carry the shared contextual role (`SettingsNav.tsx`), and
+   `theme/liquid-surfaces.css` gives every Liquid primitive `min-height: 0` so it can be
+   used as a scroll container. That reset is wrong for a flex item inside this scrolling
+   column: measured 2026-08-30, the four groups collapsed from 129/164/129/304 px to
+   61/77/61/143 and their buttons overlapped each other, which the category-1 harness read
+   as nine occluded nav items and one whose hit area had been stolen. The rail scrolls; its
+   groups do not compress. Ungated on purpose — the primitive's reset is unconditional, so
+   this compensation has to be too, and `liquid-window.css` may only carry `.fwin-liquid`
+   rules. */
+.os-set-nav-v2 .os-set-nav-group,
+.os-set-nav-v2 .os-set-nav-list {
+  min-height: auto;
+  flex-shrink: 0;
+}
 .os-set-nav-v2 .os-set-nav-item {
   width: 100%;
   min-height: 34px;
