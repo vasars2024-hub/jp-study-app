@@ -640,3 +640,55 @@ The negative control moved raw/placeholder/mute counts **0/0/0 → 1/1/1 → 0/0
 → Appearance was not visible; after that documented setup, the one allowed retry passed. The
 opening `.fwin` briefly reported opacity 0 during `fwinIn`, then settled to 1 with no stuck
 animation, so no product or harness repair was made.
+
+## 2026-08-30 — L8 GATE, the searchable half (`6e5ebb57`, `6a951ada`)
+
+L8's gate is "every setting and scraper action remains searchable and keyboard reachable". The
+eight rubric harnesses cover the keyboard half (cat1 tab-walks and hit-tests). NOTHING covered
+the searchable half, which is why the previous turn held both L8 bullets open at 40 of 40 rubric
+cells rather than closing on adjacent evidence. That was the right call.
+
+**Instrument.** `probes/l8-searchability.cjs`, parameterised by `--registry settings|scraper` and
+`--page <id>`. One harness, two apps: a new surface costs a RUN. It derives the contract from
+source — `pick()` → `navigate(pageId, id)` → `focusSettingId` → the page must contain something
+answering to that id.
+
+**Settings, measured then fixed.** 111 entries, **104 landed, 7 not**: `unified-search`,
+`media-providers`, `subtitle-providers`, `connection-profiles`, `scraper-network` (five of them
+scraper actions), plus `special-modules` and `api-keys`. Each navigated to the right page and then
+highlighted nothing. Fixed by ONE shared change instead of seven call sites: `SettingsCard` already
+calls `useSettings()`, so it now derives `is-highlight` from its own `id`, ORed with the explicit
+prop so all ~109 existing call sites keep working. That also repairs `scraper-network` without
+touching `ScraperPage.tsx`, which is mid-rewrite on another track. Result **111 of 111**, control
+moves misrouted 0→1 and unanchored 0→1.
+
+**Live acceptance**, pid 22388 / bridge 39273, Settings → scraper page, 17 cards: `unified-search`
+→ `hi: ["unified-search"]`; `scraper-network` → `["scraper-network"]` (the file I never edited, so
+the shared primitive is doing the work); `media-providers` → `["media-providers"]`; **control**, a
+bogus id → `hi: []`. Exactly one highlight each time, never two.
+
+**Scraper: a first number that was wrong, and is recorded as such.** The run read **1 landed of
+18**. 17 of those entries carry a page's own nav labelKey — they name a whole page, so navigating
+there IS the answer and no card anchor is owed. `landedByPage` now counts them separately. Both
+registries corrected read **0 misrouted, 0 unanchored**.
+
+**What that exposed instead — coverage, and it is the real gap.** Counting id'd card destinations
+against the search index: Settings **130 destinations / 103 indexed / 27 unsearchable**; Scraper
+**28 / 1 / 27**. 27 named Scraper destinations (`qbit-connection`, `torrent-search`,
+`export-builder`, `source-health`, `profile-presets`, +22) are unreachable by search. Its registry
+is a page index, not an action index. NOT fixed this turn: `scraperRegistry.ts` and `strings.ts`
+are both mid-migration on the i18n track. **This is the next turn's opening slice.**
+
+**Trap for the next worker.** `grep -o '<ScrCard[^>]*id="..."'` finds **4** id'd cards; the real
+count is **28**. grep is line-based and these ids sit on the line after the tag. It cost a wrong
+premise here — "only 4 cards carry an id" — before a multiline node scan corrected it. Count JSX
+attributes in node with the `s` flag, never with grep.
+
+**Guard.** `settingsSearchReachability.test.ts`, 6 cases. Its first version was VACUOUS: deleting
+the self-anchor left all three source-derived tests green, because a source scan cannot see whether
+`SettingsCard` still honours an id. It now mounts a real card under a stub provider; re-running that
+mutation fails on `expected 'os-set-card' to contain 'is-highlight'`. The scraper leg carries a
+vacuity assertion for the same reason.
+
+Gates: vitest **12,094 passed / 6 skipped exit 0**; i18n **11,776** exit 0; architecture nothing
+new exit 0; touched-path ESLint 0 errors.
