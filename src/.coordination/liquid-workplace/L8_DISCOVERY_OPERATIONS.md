@@ -154,3 +154,26 @@ the controlled re-run is **3.0 / 1.2 ms**, cost **1:1**, dead ends/modal traps/s
 **0/0/0**, idle churn **0**, and the state hash restores exactly. The negative control moved
 each defect **0→1→0**. Evidence: `baselines/cat2-l8-scraper.json`; focused tests **4/4**.
 Scraper is **20/80**; next run is the existing category-3 harness.
+
+## 2026-08-30 — Scraper category 6 closes; categories 3 and 4 remain measured findings
+
+The existing surface-parameterised category-6 harness now carries Scraper as its eighteenth
+spec: **7/7 Standard = 7/7 Liquid**, zero drive refusals, exact field/shell round trip, and
+seven mutations each flipped exactly its own row and restored to 7/7. It changes only local
+drawer/rail/search state; it never starts a scrape or network request. The first run's search
+row was void because the instrument required a closed combobox's unmounted popup node; the
+one allowed harness repair now measures its retained `aria-controls` contract instead.
+
+| leg | measured result |
+| --- | --- |
+| cat6 parity | **PASS 10/10**, 7/7 both presentations, round-trip diffs **0** |
+| cat3 initial | contextual treatment **0/8**, dense Work on translucency **1** (`.scr-tags`) |
+| cat3 repair | treatment **8/8**, but dense Work regressed to **23** and control did not move |
+| cat4 initial | default overlap **7**; compact clipped/overlap **180/10**; maximized hscroll **3** |
+| cat4 repair | default/maximized geometry cleared, but compact remained **119/5/1** and growth regressed |
+
+The category-3 and category-4 repair attempts were fully reverted: the one-repair-per-harness
+limit prevents tuning their instruments or product twice in this turn. Next category-3 slice
+must use nested opaque anchors inside contextual parents; next category-4 slice needs a true
+compact drawer composition without widening the chrome ratio. Evidence:
+`baselines/cat6-l8-scraper.json`. Scraper is **30/80** with categories 3, 4, 5, 7 and 8 open.

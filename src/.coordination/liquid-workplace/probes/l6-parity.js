@@ -114,6 +114,7 @@
   const gamesState = specState('__LQP_GAMES_ORIG');
   const resState = specState('__LQP_RES_ORIG');
   const musicState = specState('__LQP_MUSIC_ORIG');
+  const scraperState = specState('__LQP_SCRAPER_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -3093,6 +3094,118 @@
         lyricsRecovery: (w) => detach(q(w, '.music-hint p, .music-line-text'), 'no lyric state'),
         queueMirror: (w) => detach(q(w, '.mc-track-queue > button'), 'no queue rows'),
         youtubeDraft: (w) => detach(q(w, '.music-yt button'), 'no YouTube action'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    // Scraper's parity contract is the shell that reaches every provider, the settings
+    // editor that configures them, and explicit reverse controls. Network work is never
+    // triggered by this harness: it only changes and restores local navigation state.
+    scraper: {
+      titleRe: /Scraper|スクレイパー|抓取器|Скрапер/i,
+      rootSel: '.scr-shell',
+      features: [
+        { id: 'railNavigation', f: (w) => {
+          const items = qa(w, '.scr-rail-item');
+          const current = items.filter((b) => b.getAttribute('aria-current') === 'page');
+          const named = items.filter((b) => (b.title || '').trim().length > 0);
+          return { ok: items.length >= 10 && current.length === 1 && named.length === items.length,
+            ev: `items=${items.length} current=${current.length} named=${named.length}` };
+        } },
+        { id: 'drawerCategories', f: (w) => {
+          const cats = qa(w, '.scr-drawer-cat');
+          const current = cats.filter((b) => b.getAttribute('aria-current') === 'true');
+          const fields = qa(w, '.scr-field');
+          return { ok: cats.length >= 10 && current.length === 1 && fields.length > 0,
+            ev: `categories=${cats.length} current=${current.length} fields=${fields.length}` };
+        } },
+        { id: 'settingsFields', f: (w) => {
+          const fields = qa(w, '.scr-field');
+          const complete = fields.filter((field) => q(field, '.scr-field-label') && q(field, '.scr-field-control'));
+          return { ok: fields.length > 0 && complete.length === fields.length,
+            ev: `fields=${fields.length} labelledControls=${complete.length}` };
+        } },
+        { id: 'shellSearch', f: (w) => {
+          const input = q(w, '.scr-search > .scr-search-input');
+          const controls = input && input.getAttribute('aria-controls');
+          return { ok: !!input && input.getAttribute('role') === 'combobox' && !!controls
+              && input.getAttribute('aria-expanded') === 'false',
+            ev: `input=${!!input} role=${input && input.getAttribute('role')} controls=${controls || 'absent'} expanded=${input && input.getAttribute('aria-expanded')}` };
+        } },
+        { id: 'statusActions', f: (w) => {
+          const actions = qa(w, '.scr-statusbar button');
+          const ready = actions.filter((b) => !b.disabled && (b.title || '').trim().length > 0);
+          return { ok: actions.length >= 3 && ready.length === actions.length,
+            ev: `actions=${actions.length} enabledAndNamed=${ready.length}` };
+        } },
+        { id: 'reverseControls', f: (w) => {
+          const close = q(w, '.scr-drawer-head .ui-icon-btn');
+          const opener = qa(w, '.scr-topbar-actions button[aria-pressed="true"]');
+          return { ok: !!close && !close.disabled && opener.length > 0,
+            ev: `drawerClose=${!!close && !close.disabled} pressedOpeners=${opener.length}` };
+        } },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        switchDrawer: (w) => {
+          const g = scraperState();
+          const current = q(w, '.scr-drawer-cat[aria-current="true"]');
+          const other = qa(w, '.scr-drawer-cat').find((b) => b !== current);
+          if (!current || !other) return { refused: 'drawer categories unavailable' };
+          if (g.drawer == null) g.drawer = txt(current);
+          other.click();
+          return { from: g.drawer, to: txt(other) };
+        },
+        restoreDrawer: (w) => {
+          const g = scraperState();
+          const original = qa(w, '.scr-drawer-cat').find((b) => txt(b) === g.drawer);
+          if (!original) return { refused: 'original drawer category unavailable' };
+          if (original.getAttribute('aria-current') !== 'true') original.click();
+          return { restored: g.drawer };
+        },
+        toggleRail: (w) => {
+          const g = scraperState(); const shell = q(w, '.scr-shell');
+          const button = q(w, '.scr-topbar-hamburger');
+          if (!shell || !button) return { refused: 'rail toggle unavailable' };
+          if (g.railCollapsed == null) g.railCollapsed = shell.classList.contains('is-rail-collapsed');
+          button.click();
+          return { wasCollapsed: g.railCollapsed };
+        },
+        restoreRail: (w) => {
+          const g = scraperState(); const shell = q(w, '.scr-shell');
+          const button = q(w, '.scr-topbar-hamburger');
+          if (!shell || !button || g.railCollapsed == null) return { refused: 'rail original unavailable' };
+          if (shell.classList.contains('is-rail-collapsed') !== g.railCollapsed) button.click();
+          return { restoredCollapsed: g.railCollapsed };
+        },
+        closeSearch: (w) => {
+          const input = q(w, '.scr-search > .scr-search-input');
+          if (!input) return { refused: 'shell search unavailable' };
+          input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+          return { expanded: input.getAttribute('aria-expanded') };
+        },
+      },
+      drive: ['switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch'],
+      undo: { scraper: (w) => {
+        const g = window.__LQP_SCRAPER_ORIG; if (!g) return null;
+        const done = [];
+        const original = qa(w, '.scr-drawer-cat').find((b) => txt(b) === g.drawer);
+        if (original && original.getAttribute('aria-current') !== 'true') { original.click(); done.push('drawer'); }
+        const shell = q(w, '.scr-shell'); const rail = q(w, '.scr-topbar-hamburger');
+        if (shell && rail && g.railCollapsed != null
+            && shell.classList.contains('is-rail-collapsed') !== g.railCollapsed) { rail.click(); done.push('rail'); }
+        const input = q(w, '.scr-search > .scr-search-input');
+        if (input) input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+        window.__LQP_SCRAPER_ORIG = null;
+        return done.length ? `scraper:${done.join('+')}` : null;
+      } },
+      mutations: {
+        railNavigation: (w) => stripAttr(q(w, '.scr-rail-item[aria-current="page"]'), 'aria-current', 'no current rail item'),
+        drawerCategories: (w) => stripAttr(q(w, '.scr-drawer-cat[aria-current="true"]'), 'aria-current', 'no current drawer category'),
+        settingsFields: (w) => detach(q(w, '.scr-field .scr-field-control'), 'no settings field control'),
+        shellSearch: (w) => stripAttr(q(w, '.scr-search > .scr-search-input'), 'aria-controls', 'no shell search'),
+        statusActions: (w) => stripAttr(q(w, '.scr-statusbar button'), 'title', 'no status action'),
+        reverseControls: (w) => detach(q(w, '.scr-drawer-head .ui-icon-btn'), 'no drawer close control'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
