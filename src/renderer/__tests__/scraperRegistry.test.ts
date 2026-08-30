@@ -10,6 +10,12 @@ import {
   statusOf,
 } from '../components/scraper/featureStatus';
 
+/** Count-bearing entries are functions; a title key never is. */
+const literalText = (key: ScraperTextKey): string => {
+  const value = SCRAPER_TEXT[key];
+  return typeof value === 'function' ? '' : value;
+};
+
 describe('scraper rail', () => {
   it('lists every page exactly once', () => {
     const ids = SCRAPER_NAV.map((p) => p.id);
@@ -85,6 +91,33 @@ describe('searchScraper', () => {
   it('points every entry at a page that exists', () => {
     for (const entry of SCRAPER_REGISTRY) {
       expect(SCRAPER_NAV.some((p) => p.id === entry.pageId), entry.id).toBe(true);
+    }
+  });
+
+  it('names each destination exactly once', () => {
+    const ids = SCRAPER_REGISTRY.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('resolves every entry title and description to real text', () => {
+    for (const entry of SCRAPER_REGISTRY) {
+      expect(SCRAPER_TEXT[entry.titleKey], `${entry.id}: ${entry.titleKey}`).toBeTruthy();
+      if (entry.descKey) {
+        expect(SCRAPER_TEXT[entry.descKey], `${entry.id}: ${entry.descKey}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('finds every entry by its own title', () => {
+    // The L8 gate is "every scraper action remains searchable". Typing a card's
+    // own heading is the least imaginative thing a user can do, so an entry that
+    // fails this is not reachable by search at all. Resolved through SCRAPER_TEXT
+    // rather than sx() on purpose: sx() prefers the shared catalog, so a test
+    // against it would drift as the i18n migration moves keys out of strings.ts.
+    for (const entry of SCRAPER_REGISTRY) {
+      const title = literalText(entry.titleKey);
+      const hits = searchScraper(title, literalText, { advanced: true });
+      expect(hits.map((h) => h.id), `${entry.id} searched as "${title}"`).toContain(entry.id);
     }
   });
 });

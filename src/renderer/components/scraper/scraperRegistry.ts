@@ -28,6 +28,10 @@ export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
     keywords: ['build', 'status', 'shell', 'implemented', 'done', 'progress', 'red', 'yellow', 'green'],
     pageId: 'dashboard',
     group: 'Scraper',
+    // The panel itself renders only under Advanced (DashboardPage.tsx). Without
+    // this flag the search would happily send a non-advanced user to a dashboard
+    // that does not contain what they searched for.
+    advanced: true,
   },
   {
     id: 'start-scrape',
@@ -156,6 +160,153 @@ export const SCRAPER_REGISTRY: ScraperRegistryEntry[] = [
     keywords: ['script', 'console', 'javascript', 'eval', 'developer'],
     pageId: 'script-console',
     group: 'Tools',
+  },
+
+  // ---- In-page destinations ------------------------------------------------
+  // Everything above names a PAGE, and navigating there is the whole answer.
+  // The entries below name a CARD inside a page: ScrCard derives `is-highlight`
+  // from its own `id`, so an entry whose id equals a card's id both routes to
+  // the page and highlights the card, with no wiring at the call site.
+  //
+  // Measured before this block existed (probes/l8-searchability.cjs
+  // --registry scraper): 28 card destinations, 1 indexed, 27 reachable only by
+  // knowing which page hides them.
+  {
+    id: 'active-jobs',
+    titleKey: 'dash.activeJobs',
+    keywords: ['active', 'jobs', 'running', 'current', 'progress', 'cancel'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'recent-scrapes',
+    titleKey: 'dash.recent',
+    keywords: ['recent', 'scrapes', 'latest', 'last', 'activity'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'source-health',
+    titleKey: 'dash.sourceHealth',
+    descKey: 'dash.sourceHealthDesc',
+    keywords: ['source', 'health', 'uptime', 'success', 'rate', 'reachable', 'blocked'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'runtime',
+    titleKey: 'dash.runtime',
+    keywords: ['runtime', 'memory', 'cpu', 'usage', 'resources', 'performance'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'next-scheduled',
+    titleKey: 'dash.nextScheduled',
+    keywords: ['next', 'scheduled', 'upcoming', 'due', 'cron', 'timer'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'learning',
+    titleKey: 'dash.learning',
+    descKey: 'dash.learningDesc',
+    keywords: ['study', 'learning', 'handoff', 'mining', 'vocabulary', 'grammar', 'japanese'],
+    pageId: 'dashboard',
+    group: 'Scraper',
+  },
+  {
+    id: 'history-list',
+    titleKey: 'history.jobs',
+    keywords: ['history', 'jobs', 'past', 'previous', 'runs', 'log'],
+    pageId: 'history',
+    group: 'Scraper',
+  },
+  {
+    id: 'source-mode',
+    titleKey: 'sources.mode',
+    descKey: 'sources.modeDesc',
+    keywords: ['mode', 'streaming', 'torrent', 'both', 'switch', 'where'],
+    pageId: 'sources',
+    group: 'Scraper',
+  },
+  {
+    id: 'source-order',
+    titleKey: 'sources.chain',
+    descKey: 'sources.chainDesc',
+    keywords: ['priority', 'chain', 'order', 'rank', 'fallback', 'sequence', 'reorder'],
+    pageId: 'sources',
+    group: 'Scraper',
+  },
+  {
+    id: 'provider-inventory',
+    titleKey: 'sources.providers',
+    descKey: 'sources.providersDesc',
+    keywords: ['provider', 'extensions', 'seanime', 'inventory', 'installed', 'available'],
+    pageId: 'sources',
+    group: 'Scraper',
+  },
+  {
+    id: 'qbit-connection',
+    titleKey: 'torrent.connection',
+    descKey: 'torrent.connectionDesc',
+    keywords: ['qbittorrent', 'qbit', 'connection', 'host', 'port', 'webui', 'password', 'login'],
+    pageId: 'torrents',
+    group: 'Scraper',
+  },
+  {
+    id: 'torrent-search',
+    titleKey: 'torrent.search',
+    descKey: 'torrent.searchDesc',
+    keywords: ['indexer', 'search', 'nyaa', 'magnet', 'release', 'seeders', 'torrent'],
+    pageId: 'torrents',
+    group: 'Scraper',
+  },
+  {
+    id: 'qbit-mirror',
+    titleKey: 'torrent.mirror',
+    descKey: 'torrent.mirrorDesc',
+    keywords: ['mirror', 'transfers', 'peers', 'pieces', 'availability', 'ratio', 'qbittorrent'],
+    pageId: 'torrents',
+    group: 'Scraper',
+  },
+  {
+    id: 'seanime-acquisition',
+    titleKey: 'acq.title',
+    descKey: 'acq.desc',
+    keywords: ['seanime', 'acquisition', 'sidecar', 'debrid', 'auto', 'downloader', 'engine'],
+    pageId: 'torrents',
+    group: 'Scraper',
+  },
+  {
+    id: 'download-queue',
+    titleKey: 'downloads.queue',
+    keywords: ['queue', 'download', 'transfer', 'pause', 'resume', 'speed'],
+    pageId: 'downloads',
+    group: 'Data',
+  },
+  {
+    id: 'external-player',
+    titleKey: 'downloads.player',
+    descKey: 'downloads.playerDesc',
+    keywords: ['player', 'external', 'open', 'playback', 'handoff', 'watch'],
+    pageId: 'downloads',
+    group: 'Data',
+  },
+  {
+    id: 'export-builder',
+    titleKey: 'exports.builder',
+    descKey: 'exports.builderDesc',
+    keywords: ['export', 'builder', 'format', 'scope', 'preview', 'csv', 'json', 'anki'],
+    pageId: 'exports',
+    group: 'Data',
+  },
+  {
+    id: 'export-history',
+    titleKey: 'exports.history',
+    keywords: ['export', 'history', 'written', 'previous', 'files', 'reveal'],
+    pageId: 'exports',
+    group: 'Data',
   },
 ];
 
