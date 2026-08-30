@@ -614,3 +614,15 @@ Mechanical comparison reports **14/14 + 13/13 + 13/13, with 0 missing / 0 extra*
 
 `i18n-check` passes at **11,735** English keys and the focused suite passes **21/21**. Category 8
 remains open at 96.0%; 24 fallbacks remain in downloads/schedule/export/media-type/torrent chrome.
+
+### 2026-08-30 — Scraper i18n, batch 12: Catalog migration complete
+
+**597 of 597 keys migrated (100%)**, +25 shared keys and a +1 denominator change. Downloads,
+scheduler holds, export outcomes, and media types moved 23 keys. The conditional `torrent.authVia`
+fallback became explicit API-key/password keys at both consumers, so each credential mode has a
+real translation instead of interpolating the internal `apiKey` identifier.
+
+Runtime comparison reports **597 TEXT / 597 shared / 0 missing / 0 extra**. `i18n-check` passes at
+**11,760** English keys; focused i18n, Liquid-region, disclosure, and disabled-reason suites pass
+**43/43**. Category 8 remains open until the parameterised live language/restore run produces
+painted evidence; catalog coverage alone does not score the rubric.

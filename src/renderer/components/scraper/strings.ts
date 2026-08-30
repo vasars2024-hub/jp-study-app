@@ -415,8 +415,8 @@ const TEXT = {
   // Which credential the test actually used. Shown on failures too: with both a
   // password and a key stored, "unauthorized" alone sends the user to change the
   // one that was never consulted.
-  'torrent.authVia': (mode: string) =>
-    (mode === 'apiKey' ? 'via API key' : 'via username and password'),
+  'torrent.authViaApiKey': 'via API key',
+  'torrent.authViaPassword': 'via username and password',
   'torrent.search': 'Indexer search',
   'torrent.searchDesc': 'Results across every enabled torrent source.',
   'torrent.searchPlaceholder': 'Search releases…',

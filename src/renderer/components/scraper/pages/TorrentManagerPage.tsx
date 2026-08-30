@@ -346,7 +346,9 @@ export default function TorrentManagerPage() {
           {status?.version && <Pill tone="outline">v{status.version}</Pill>}
           {status && <span className="scr-muted">{status.message}</span>}
           {status?.authMode && (
-            <Pill tone="outline">{sxs('torrent.authVia', status.authMode)}</Pill>
+            <Pill tone="outline">
+              {sx(status.authMode === 'apiKey' ? 'torrent.authViaApiKey' : 'torrent.authViaPassword')}
+            </Pill>
           )}
           {/* No secret is ever shown or stored here — only whether one exists,
               and only for the mode actually in force. Reading `passwordRef` in

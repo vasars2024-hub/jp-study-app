@@ -116,7 +116,9 @@ export default function ScraperSettingsDrawer() {
       const version = report.version ? ` · v${report.version}` : '';
       // Which credential answered. Without it, a user holding both a password
       // and a key cannot tell which one this result is about.
-      const via = report.authMode ? ` · ${sxs('torrent.authVia', report.authMode)}` : '';
+      const via = report.authMode
+        ? ` · ${sx(report.authMode === 'apiKey' ? 'torrent.authViaApiKey' : 'torrent.authViaPassword')}`
+        : '';
       setNote(sxs('set.qbitTestResult', `${report.message}${version}${timing}${via}`));
     } catch {
       setNote(sx('set.qbitTestFailed'));
