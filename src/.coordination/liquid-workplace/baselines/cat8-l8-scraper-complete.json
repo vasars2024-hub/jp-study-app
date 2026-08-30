@@ -1,0 +1,244 @@
+{
+  "label": "l8-scraper-complete",
+  "surface": "@.scr-shell",
+  "win": "main",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "782x513",
+  "textRuns": 1190,
+  "textHash": 1493480898,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 6,
+  "states": {
+    "empty": {
+      "hosts": 1,
+      "messages": [
+        "qBittorrent has no transfers."
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9727,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9727 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 1190,
+        "textHash": 1493480898,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 1190,
+        "textHash": 365390884,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 119,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Anime Scraper",
+            "now": "アニメスクレイパー"
+          },
+          {
+            "i": 2,
+            "was": "New Scrape",
+            "now": "新しいスクレイプ"
+          },
+          {
+            "i": 3,
+            "was": "Idle",
+            "now": "待機中"
+          },
+          {
+            "i": 4,
+            "was": "Torrent Manager",
+            "now": "トレントマネージャー"
+          },
+          {
+            "i": 5,
+            "was": "Search indexers, and watch wha",
+            "now": "インデクサーを検索し、qBittorrent の動作を本体よ"
+          },
+          {
+            "i": 6,
+            "was": "Torrent settings",
+            "now": "トレント設定"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 1190,
+        "textHash": -677353755,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 119,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Anime Scraper",
+            "now": "动漫抓取器"
+          },
+          {
+            "i": 2,
+            "was": "New Scrape",
+            "now": "新建抓取"
+          },
+          {
+            "i": 3,
+            "was": "Idle",
+            "now": "空闲"
+          },
+          {
+            "i": 4,
+            "was": "Torrent Manager",
+            "now": "种子管理器"
+          },
+          {
+            "i": 5,
+            "was": "Search indexers, and watch wha",
+            "now": "搜索索引站，并以比 qBittorrent 本身更详细的方式"
+          },
+          {
+            "i": 6,
+            "was": "Torrent settings",
+            "now": "种子设置"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 1190,
+        "textHash": -1762267226,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 119,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Anime Scraper",
+            "now": "Сборщик аниме"
+          },
+          {
+            "i": 2,
+            "was": "New Scrape",
+            "now": "Новый сбор"
+          },
+          {
+            "i": 3,
+            "was": "Idle",
+            "now": "Простой"
+          },
+          {
+            "i": 4,
+            "was": "Torrent Manager",
+            "now": "Менеджер торрентов"
+          },
+          {
+            "i": 5,
+            "was": "Search indexers, and watch wha",
+            "now": "Ищите по индексаторам и следит"
+          },
+          {
+            "i": 6,
+            "was": "Torrent settings",
+            "now": "Настройки торрентов"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 119,
+    "baseRuns": 1190,
+    "diffShare": 0.1
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

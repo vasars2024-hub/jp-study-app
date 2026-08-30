@@ -626,3 +626,17 @@ Runtime comparison reports **597 TEXT / 597 shared / 0 missing / 0 extra**. `i18
 **11,760** English keys; focused i18n, Liquid-region, disclosure, and disabled-reason suites pass
 **43/43**. Category 8 remains open until the parameterised live language/restore run produces
 painted evidence; catalog coverage alone does not score the rubric.
+
+### 2026-08-30 — Scraper category 8 closes; surface is 80/80
+
+**Category 8 = PASS 10/10; Scraper = 80/80.** The existing surface-parameterised harness ran
+against `@.scr-shell` with `--langs --control`: **1,190** painted text runs, raw keys **0**,
+placeholders **0**, mute pairs **0**, and named states **1 of 1 observable**. EN/JA/ZH/RU produced
+four distinct hashes; each non-English render changed **119 runs**, diffShare **0.1000**, with
+`ui-lang` and `html.lang` restored to English exactly.
+
+The negative control moved raw/placeholder/mute counts **0/0/0 → 1/1/1 → 0/0/0**. Evidence:
+`baselines/cat8-l8-scraper-complete.json`. The first invocation correctly refused because Settings
+→ Appearance was not visible; after that documented setup, the one allowed retry passed. The
+opening `.fwin` briefly reported opacity 0 during `fwinIn`, then settled to 1 with no stuck
+animation, so no product or harness repair was made.
