@@ -3093,6 +3093,39 @@
   }
 }
 
+/* The floating-window floor is 260x170. At that size the player bar's old
+   `120px + auto` grid demanded 312px from a 200px workspace and clipped the
+   transport, while the shared hint kept 32px of padding inside a 108px pane.
+   Keep every transport action present, but let it own one compact row and make
+   the library's two contextual buttons use real 32px boxes instead of hit-area
+   overhang that a narrow panel has nowhere to paint. */
+@container mc (max-width: 360px) {
+  .mc-playerbar {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 4px;
+  }
+
+  .mc-player-info {
+    display: none;
+  }
+
+  .mc-player-transport {
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .mc-music-library .mc-panel-actions > button {
+    width: var(--lq-hit-target);
+    height: var(--lq-hit-target);
+  }
+
+  .mc-lyrics-frame .music-hint {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mc-root *,
   .mc-root *::before,

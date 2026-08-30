@@ -38,6 +38,18 @@ fast draft and commits once after 80 ms, so the library/lyrics/transport tree no
 per character; the same four-character live run measured **9.6 ms** worst. The scored dominant
 task selects a non-active real song, alternating deterministically across presentations.
 
+## 2026-08-30 — category 4 repair attempt checkpointed; still open
+
+Controlled baseline at 260×170: clipped **10**, hidden horizontal overflow **2** (`.mc-root`
+370>258, `.music-hint` 153>108). One responsive repair made the duplicate player transport a
+single compact grid row, used real 32px library-action boxes, and removed hint side padding.
+Re-measurement: clipped **0**, hidden overflow **1** (`.music-hint` 137>108); injected clip
+**0→1→0**, all size restores exact. Category remains **FAIL**, so no score was banked.
+
+Next attempt opens on the hint's remaining intrinsic width and the sidebar disclosure's overlap
+with spacer/library (default/maximized). The experimental `.mc-nav { flex: 1 1 0 }` worsened that
+count from 1 to 2 and was removed; do not repeat it. Per RULE 1, no second harness repair this turn.
+
 ### Three traps, each of which produced a wrong number here first
 
 **1. A rect probe cannot see the hit floor, and reported the fix as a no-op.** After adding
