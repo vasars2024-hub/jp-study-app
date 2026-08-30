@@ -126,3 +126,21 @@ is what then makes that score arguable rather than asserted.
 `baselines/cat5-l8-resources.json` + `-control.json`; guard `resourcesBundleSetup.test.ts` **8/8**.
 Next surface in L8's order: **Scraper**, then Settings, YouTube, Music. Every category harness
 now exists, so each is a RUN, not a BUILD.
+
+## 2026-08-30 — Scraper category 1 closes at 10/10
+
+The handoff selector `.scraper-app` does not exist; the live product root is
+`@.fwin:has(.scr-shell)`. The first controlled run exposed **69** pointer footprints below
+32px, one WCAG 2.5.8 spacing failure, and an unfocused search popover occluding **18** controls.
+The repair keeps dense passive rows while giving buttons, fields and selects a 32px floor;
+search now stays open within its composite and closes when focus leaves it.
+
+| leg | controlled result |
+| --- | --- |
+| contrast | 73 measured, minimum **5.28**, failures **0** |
+| targets | 72 controls, below-floor-by-hit **0**, WCAG 2.5.8 failures **0** |
+| keyboard / motion | unreachable **0**; reduced-motion overruns **0** |
+| negative control | all five legs moved; scored counts restored **0 / 0 / 0 / 0** |
+
+Evidence: `baselines/cat1-l8-scraper.json`; regression `scraperSearchFocus.test.tsx`
+**1/1**. Scraper is **10/80**; next run is the existing category-2 harness.

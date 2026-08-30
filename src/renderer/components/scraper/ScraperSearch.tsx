@@ -78,7 +78,17 @@ export default function ScraperSearch() {
   const idle = query.trim().length === 0;
 
   return (
-    <div className="scr-search" ref={boxRef}>
+    <div
+      className="scr-search"
+      ref={boxRef}
+      onBlur={(event) => {
+        // The popover is a composite with the field, so moving focus to one of its
+        // results keeps it open. Tabbing anywhere else must dismiss it; otherwise
+        // keyboard navigation leaves an unfocused popover covering the drawer and
+        // turns the next controls into partially occluded pointer targets.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
       <span className="scr-search-icon" aria-hidden>
         <Icon name="search" size={14} />
       </span>

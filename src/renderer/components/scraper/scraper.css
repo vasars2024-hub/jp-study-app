@@ -34,6 +34,18 @@
   font-size: var(--font-size-sm);
 }
 
+/* Scraper is intentionally dense, but density must not shrink the interactive
+   footprint. Keep labels and table rows compact while every operable control
+   retains the shared Liquid 32px pointer floor. Width is only forced for icon
+   buttons; text controls already have a wider semantic label. */
+.scr-shell :is(button, input:not([type='checkbox']):not([type='radio']), select) {
+  min-height: 32px;
+}
+
+.scr-shell .ui-icon-btn {
+  min-width: 32px;
+}
+
 .scr-body {
   display: grid;
   grid-template-columns: 205px minmax(0, 1fr);
