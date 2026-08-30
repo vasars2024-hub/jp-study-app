@@ -2,6 +2,7 @@
 
 import Icon from '../Icons';
 import { Button, IconButton } from '../ui';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import ScraperSearch from './ScraperSearch';
 import { useScraper } from './ScraperContext';
 import { sx } from './strings';
@@ -10,7 +11,10 @@ export default function ScraperTopBar() {
   const ctl = useScraper();
 
   return (
-    <header className="scr-topbar">
+    // Toolbar chrome, not work: identity, rail toggle, search and the primary
+    // actions. `ContextualSurface` is inert until the window is in Liquid
+    // presentation, so the conventional top bar paints exactly what it did.
+    <ContextualSurface as="header" className="scr-topbar">
       <div className="scr-topbar-identity">
         <span className="scr-topbar-mark" aria-hidden>
           <Icon name="logo" size={18} />
@@ -79,6 +83,6 @@ export default function ScraperTopBar() {
           <Icon name="window" size={16} />
         </IconButton>
       </div>
-    </header>
+    </ContextualSurface>
   );
 }

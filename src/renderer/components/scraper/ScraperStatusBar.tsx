@@ -1,6 +1,7 @@
 // Bottom status strip: current state on the left, schedule facts on the right.
 
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { sx, sxn, sxs } from './strings';
 import { useScraper } from './ScraperContext';
 
@@ -20,7 +21,8 @@ export default function ScraperStatusBar({
   const ctl = useScraper();
 
   return (
-    <footer className="scr-statusbar">
+    // Transport/status chrome: every child navigates somewhere, none of it is data.
+    <ContextualSurface as="footer" className="scr-statusbar">
       <button
         type="button"
         className={`scr-statusbar-state scr-statusbar-action${running ? ' is-running' : ''}`}
@@ -60,6 +62,6 @@ export default function ScraperStatusBar({
       >
         {sxs('status.nextScheduled', nextScheduled ?? sx('status.disabled'))}
       </button>
-    </footer>
+    </ContextualSurface>
   );
 }

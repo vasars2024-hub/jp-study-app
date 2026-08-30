@@ -187,6 +187,67 @@
   }
 }
 
+/*
+ * L8 — the Scraper shell is four FLUSH EDGES and one layout wrapper, so all five
+ * take the material and none of them takes the card.
+ *
+ * `.scr-shell` is a grid: a top bar across the full width, a rail down the left, a
+ * settings drawer down the right and a status strip across the bottom, each meeting
+ * three edges of the window. The shared contextual geometry would round every one of
+ * them against a seam nothing can see, drop a shadow into it, and re-pad strips that
+ * already set their own. That is the `.medialib-rail` / `.agent-rail` exception three
+ * more times, for the same reason: the primitive is adopted for the MATERIAL, and the
+ * geometry stays the region's own. The single separating border stays on the edge the
+ * region actually shares with the work canvas.
+ *
+ * `.scr-rail-list` takes the fuller `.reader-seek-wrap` exception — no material at
+ * all. It is a `<ul>` of navigation buttons inside `nav.scr-rail`, and it declares the
+ * contextual role only so a classifier stops calling a 17-item nav list dense work. A
+ * second tint inside the rail's own would read as a darker slab down the middle of it.
+ */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-topbar.lq-contextual {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  padding: var(--space-sm) var(--space-md);
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail.lq-contextual {
+  border-radius: 0;
+  border-width: 0 1px 0 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-statusbar.lq-contextual {
+  border-radius: 0;
+  border-width: 1px 0 0;
+  padding: var(--space-xs) var(--space-md);
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-drawer.lq-contextual {
+  border-radius: 0;
+  border-width: 0 0 0 1px;
+  padding: 0;
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-scroll.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-group.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-list.lq-contextual {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+/* The scroller keeps its own inset; only its box goes. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-scroll.lq-contextual {
+  padding: var(--space-md) var(--space-sm);
+}
+
 /* The toggle itself. `aria-pressed` carries the state for assistive tech; this
    is the matching visible affordance, not a decoration.
  *

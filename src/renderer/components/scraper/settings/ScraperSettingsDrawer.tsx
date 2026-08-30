@@ -8,6 +8,7 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Toggle } from '../../ui';
+import { AnchorSurface, ContextualSurface } from '../../liquid/LiquidSurface';
 import StatusDot from '../StatusDot';
 import FieldRow from './FieldRow';
 import {
@@ -236,7 +237,12 @@ export default function ScraperSettingsDrawer() {
   if (!ctl.drawerOpen) return null;
 
   return (
-    <aside className="scr-drawer" aria-label={sx('app.settings')}>
+    // A temporary inspector over the page behind it — §2.3's canonical Liquid
+    // region. Only the DRAWER takes the material: its head, category rail, pane
+    // head and footer read it through their own transparent boxes, and the field
+    // body below is an opaque anchor, because editing is work and work never goes
+    // on glass.
+    <ContextualSurface as="aside" className="scr-drawer" aria-label={sx('app.settings')}>
       <header className="scr-drawer-head">
         <h2 className="scr-drawer-title">{sx('set.title')}</h2>
         <IconButton label={sx('common.close')} size="sm" onClick={ctl.closeDrawer}>
@@ -244,7 +250,7 @@ export default function ScraperSettingsDrawer() {
         </IconButton>
       </header>
 
-      <div className="scr-drawer-search">
+      <AnchorSurface bare className="scr-drawer-search">
         <span className="scr-search-icon" aria-hidden>
           <Icon name="search" size={14} />
         </span>
@@ -256,7 +262,7 @@ export default function ScraperSettingsDrawer() {
           aria-label={sx('set.search')}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </div>
+      </AnchorSurface>
 
       <div className="scr-drawer-body">
         <nav className="scr-drawer-rail" aria-label={sx('set.categories')}>
@@ -302,7 +308,7 @@ export default function ScraperSettingsDrawer() {
             </header>
           )}
 
-          <div className="scr-fields">
+          <AnchorSurface bare className="scr-fields">
             {fields.map((field) => (
               <FieldRow
                 key={`${field.path}-${field.label}`}
@@ -408,7 +414,7 @@ export default function ScraperSettingsDrawer() {
               </div>
             )}
             {!fields.length && category !== 'profiles' && category !== 'ui' && <p className="scr-muted">{sx('app.searchEmpty')}</p>}
-          </div>
+          </AnchorSurface>
         </div>
       </div>
 
@@ -671,6 +677,6 @@ export default function ScraperSettingsDrawer() {
           </section>
         </div>
       )}
-    </aside>
+    </ContextualSurface>
   );
 }

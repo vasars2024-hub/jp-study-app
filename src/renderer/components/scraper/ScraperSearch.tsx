@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../Icons';
+import { AnchorSurface } from '../liquid/LiquidSurface';
 import StatusDot from './StatusDot';
 import { searchScraper } from './scraperRegistry';
 import {
@@ -24,7 +25,9 @@ export default function ScraperSearch() {
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [recentQueries, setRecentQueries] = useState(getRecentScraperQueries);
-  const boxRef = useRef<HTMLDivElement>(null);
+  // `HTMLElement`, not `HTMLDivElement`: the surface primitives forward a generic
+  // element ref because `as` can change the tag. Only `contains` is used here.
+  const boxRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(
@@ -78,7 +81,13 @@ export default function ScraperSearch() {
   const idle = query.trim().length === 0;
 
   return (
-    <div
+    // An editable field is dense work, so it keeps an opaque anchor even when the
+    // top bar around it becomes Liquid. `bare` because the field draws its own box
+    // inside chrome somebody else already framed; the fill is `--lq-anchor-bg`,
+    // which is the `--panel` the top bar already paints, so conventional
+    // presentation is pixel-identical.
+    <AnchorSurface
+      bare
       className="scr-search"
       ref={boxRef}
       onBlur={(event) => {
@@ -223,6 +232,6 @@ export default function ScraperSearch() {
           )}
         </div>
       )}
-    </div>
+    </AnchorSurface>
   );
 }

@@ -189,3 +189,37 @@ The one allowed post-repair run measured forest-night **5.56** minimum and class
 Category 5 does not close: Q4 counted **50** controls because the live persisted settings
 drawer is open, and Q6 is correctly NO-SUBJECT until category 3 provides Liquid regions.
 Evidence: `baselines/cat5-l8-scraper.json` (VOID, with Q5 repaired and the two blockers named).
+
+## 2026-08-30 — Scraper category 3 closes at 10/10
+
+The previous turn's attempt was reverted after contextual treatment reached 8/8 but dense
+Work regressed to **23**: glass on the chrome puts every field inside it on glass. This slice
+takes the ledger's own prescription — nested opaque anchors inside contextual parents.
+
+`.scr-topbar`, `.scr-rail`, `.scr-statusbar` and `.scr-drawer` adopt `ContextualSurface`; the
+drawer's head, category rail, pane head and footer need no class of their own because they
+read the drawer's material through transparent boxes. `.scr-search`, `.scr-drawer-search` and
+`.scr-fields` become `AnchorSurface bare` — the fill is `--lq-anchor-bg` = `--panel`, which is
+exactly what each already sat on, so conventional pixels are unchanged.
+
+| leg | measured result |
+| --- | --- |
+| base | dense work on translucent **0**, treated **13/13**, shared primitive **13/13** |
+| control A | one Work region blurred: **0 → 1**, restored to 0, material returned |
+| control B | all-glass: **22 of 22** Work regions failed, then restored |
+| presentation | standard↔liquid geometry diffs **0** on 10 regions; round trip diffs **0** |
+
+**The trap.** Marking only `ul.scr-rail-list` did not remove the misclassification, it moved
+it up one wrapper: `div.scr-rail-group` then read as dense work for the same reason — three or
+more `<li>` descendants and no landmark tag — because the instrument demotes a container to
+`Anchor(holds work)` only while a DESCENDANT is still Work. The rail therefore declares the
+navigation role at all three levels (`-scroll`, `-group`, `-list`), each painting nothing.
+
+Second product defect, independent of Liquid: `.scr-tags` painted `--surface-input`, measured
+`rgba(0, 0, 0, 0.28)`. Every other consumer of that token is a lone `input` on an opaque panel;
+this one is a region, and it was the surface's only pre-existing dense-work-on-translucent
+finding. The tint moved to the image layer over an opaque `--panel` base — same composited
+colour, real anchor. Regression: `scraperLiquidRegions.test.tsx` **5/5**; the flush-edge
+exceptions are pinned by `liquidWindowPresentation.test.ts` **38/38** (a two-line selector
+failed its `anchoredOn` check — every exception must start with the interior host on one line).
+Evidence: `baselines/cat3-l8-scraper.json`. Scraper is **40/80**; open: 4, 5, 7, 8.

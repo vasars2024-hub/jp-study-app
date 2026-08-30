@@ -3591,6 +3591,16 @@
   padding: var(--space-md) var(--space-md) 0;
 }
 
+/* The drawer's search field is an anchor (`AnchorSurface bare`), and the shared
+   `.lq-anchor[data-bare]` rule zeroes padding so a migrated region does not gain a
+   box inside chrome that already draws one. This field's inset is its own layout,
+   not a box, and `.scr-search-icon` is positioned against it — dropping it moves
+   the icon. Three classes so the restore wins on specificity rather than on which
+   stylesheet happens to be imported last. Same for `.scr-fields` below. */
+.scr-drawer .lq-anchor.scr-drawer-search {
+  padding: var(--space-md) var(--space-md) 0;
+}
+
 .scr-drawer-search .scr-search-icon {
   left: calc(var(--space-md) + var(--space-sm));
   top: calc(50% + var(--space-xs));
@@ -3712,6 +3722,10 @@
 .scr-fields {
   display: grid;
   gap: var(--space-md);
+  padding-bottom: var(--space-lg);
+}
+
+.scr-drawer-pane .lq-anchor.scr-fields {
   padding-bottom: var(--space-lg);
 }
 
@@ -3874,7 +3888,17 @@
   padding: var(--space-xs);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface-input, var(--control-bg));
+  /* `--surface-input` is a TINT, not a fill — measured `rgba(0, 0, 0, 0.28)` in
+     forest-night. Every other consumer is a lone `input`, which sits on an opaque
+     panel and composites to the intended colour. This one is a REGION of chips and
+     an input, and it was the surface's only dense-work-on-translucent finding: put
+     the drawer in Liquid presentation and it becomes a 28% tint over a 72% material
+     over the desktop. The tint moves to the image layer over an opaque `--panel`
+     base, so the composited colour is byte-for-byte what it already was on the
+     conventional drawer and the region is now genuinely anchored. */
+  background:
+    linear-gradient(var(--surface-input, var(--control-bg)), var(--surface-input, var(--control-bg)))
+    var(--panel);
 }
 
 .scr-tag {
