@@ -464,6 +464,24 @@ const TEXT = {
   'acq.download': 'Download',
   'acq.score': (n: number) => `score ${n}`,
 
+  // ---- Why a control is disabled ----
+  // A disabled control is honest only when the surface says what would re-enable
+  // it. Every condition on the Torrent Manager is compound (busy OR nothing
+  // selected OR the engine is down), so the reason is derived from the FIRST
+  // failing clause at the call site rather than written once per button — a
+  // single generic hint would name the wrong cause most of the time.
+  'why.busy': 'An acquisition action is still running. Wait for it to finish.',
+  'why.testing': 'The connection test is still running.',
+  'why.noneSelected': 'Nothing is selected. Tick at least one torrent row first.',
+  'why.noSidecar': 'The Seanime sidecar has not answered yet. Use Refresh to ask it again.',
+  'why.subsystem': (engine: string, detail: string) =>
+    `${engine} is not ready — ${detail}. Fix it in Seanime, then Refresh.`,
+  'why.noRules': 'There are no auto-downloader rules to simulate yet.',
+  'why.alreadyDownloaded': 'This queued episode has already been downloaded.',
+  'why.delayed': 'This queued episode is delayed by its rule and cannot be fetched yet.',
+  'why.notComplete': 'The transfer has to finish downloading before it can be added to the library.',
+  'why.addingToLibrary': 'This transfer is already being added to the library.',
+
   // ---- Data pages ----
   'page.results.title': 'Results',
   'page.results.subtitle': 'Everything collected so far, grouped by series and ready for review.',
@@ -658,4 +676,15 @@ export function sxs(key: ScraperTextKey, value: string): string {
 export function sx2(key: ScraperTextKey, a: number, b: number): string {
   const entry = TEXT[key];
   return typeof entry === 'function' ? (entry as (x: number, y: number) => string)(a, b) : entry;
+}
+
+/**
+ * Resolve a two-string entry. Kept separate from sx2() rather than widened,
+ * because the connective words between the two halves belong in this file with
+ * the rest of the sentence — a call site that joined them itself would be a
+ * literal in product code, which is what THE ONE RULE forbids.
+ */
+export function sxss(key: ScraperTextKey, a: string, b: string): string {
+  const entry = TEXT[key];
+  return typeof entry === 'function' ? (entry as (x: string, y: string) => string)(a, b) : entry;
 }

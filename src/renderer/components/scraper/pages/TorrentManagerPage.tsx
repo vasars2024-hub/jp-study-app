@@ -25,6 +25,7 @@ import {
   type VaultAnswer,
 } from '../data/credentialPresence';
 import { sx, sx2, sxn, sxs } from '../strings';
+import { engineReason, firstReason, type ReasonCheck } from '../disabledReason';
 import {
   loadScraperSettingsDocument,
   onScraperSettingsChanged,
@@ -56,6 +57,7 @@ const STATE_TONE: Record<QbitTransferRow['state'], 'good' | 'warn' | 'bad' | 'ne
 function speed(bps: number): string {
   return bps > 0 ? `${formatBytes(bps)}/s` : '—';
 }
+
 
 /**
  * Piece map, downsampled to 60 cells. qBittorrent shows this too, but only as a
@@ -270,6 +272,33 @@ export default function TorrentManagerPage() {
     setTransferNotice(`${transfer.name} removed from the local mirror. Downloaded files were kept.`);
   };
 
+  // Each of these IS the disabled condition, not a caption written beside one:
+  // `disabled` reads the same value the tooltip does, so a control can never go
+  // off without the surface being able to say which clause turned it off.
+  const busy: ReasonCheck = [backendBusy, sx('why.busy')];
+  const unselected: ReasonCheck = [!selected.size, sx('why.noneSelected')];
+  const whyRefresh = firstReason(busy);
+  // Engine before selection, deliberately: "tick a torrent first" is true but is
+  // a dead end when the engine behind the button is stopped — the user selects a
+  // row and the button stays off. The durable blocker is the honest one to name.
+  const whySendClient = firstReason(busy, [
+    backend?.torrentClient.state !== 'ready',
+    engineReason(sx('acq.torrentClient'), backend?.torrentClient),
+  ], unselected);
+  const whySendDebrid = firstReason(busy, [
+    backend?.debrid.state !== 'ready',
+    engineReason(sx('acq.debrid'), backend?.debrid),
+  ], unselected);
+  const whyRunAuto = firstReason(busy, [
+    backend?.autoDownloader.state !== 'ready',
+    engineReason(sx('acq.autoDownloader'), backend?.autoDownloader),
+  ]);
+  const whySimulate = firstReason(busy, [
+    !backend?.autoDownloader.rules.length,
+    sx('why.noRules'),
+  ]);
+  const whyClearSelection = firstReason(unselected);
+
   return (
     <div className="scr-page scr-page--torrents">
       <header className="scr-page-head">
@@ -296,7 +325,12 @@ export default function TorrentManagerPage() {
         description={sx('torrent.connectionDesc')}
         statusId="set.qbittorrent"
         trailing={
-          <Button size="sm" disabled={testing} onClick={() => void test()}>
+          <Button
+            size="sm"
+            disabled={testing}
+            title={testing ? sx('why.testing') : undefined}
+            onClick={() => void test()}
+          >
             {testing ? sx('torrent.testing') : sx('torrent.test')}
           </Button>
         }
@@ -344,7 +378,12 @@ export default function TorrentManagerPage() {
         description={sx('acq.desc')}
         statusId="page.torrents.acquisition"
         trailing={
-          <Button size="sm" disabled={backendBusy} onClick={() => void refreshBackend()}>
+          <Button
+            size="sm"
+            disabled={!!whyRefresh}
+            title={whyRefresh}
+            onClick={() => void refreshBackend()}
+          >
             {sx('acq.refresh')}
           </Button>
         }
@@ -383,11 +422,8 @@ export default function TorrentManagerPage() {
           />
           <Button
             size="sm"
-            disabled={
-              backendBusy
-              || !selected.size
-              || backend?.torrentClient.state !== 'ready'
-            }
+            disabled={!!whySendClient}
+            title={whySendClient}
             onClick={() => void runBackendAction({
               kind: 'send-torrents',
               target: 'torrent-client',
@@ -400,7 +436,8 @@ export default function TorrentManagerPage() {
           </Button>
           <Button
             size="sm"
-            disabled={backendBusy || !selected.size || backend?.debrid.state !== 'ready'}
+            disabled={!!whySendDebrid}
+            title={whySendDebrid}
             onClick={() => void runBackendAction({
               kind: 'send-torrents',
               target: 'debrid',
@@ -414,14 +451,16 @@ export default function TorrentManagerPage() {
           <Button
             size="sm"
             variant="primary"
-            disabled={backendBusy || backend?.autoDownloader.state !== 'ready'}
+            disabled={!!whyRunAuto}
+            title={whyRunAuto}
             onClick={() => void runBackendAction({ kind: 'run-auto-downloader' })}
           >
             {sx('acq.runAutoDownloader')}
           </Button>
           <Button
             size="sm"
-            disabled={backendBusy || !backend?.autoDownloader.rules.length}
+            disabled={!!whySimulate}
+            title={whySimulate}
             onClick={() => void runBackendAction({
               kind: 'simulate-auto-downloader',
               ruleIds: backend?.autoDownloader.rules
@@ -437,24 +476,32 @@ export default function TorrentManagerPage() {
           <div className="scr-send-report">
             <b>{sx('acq.queueTitle')}</b>
             <ul>
-              {backend.autoDownloader.queue.slice(0, 8).map((item) => (
-                <li key={item.id}>
-                  <Pill tone={item.delayed ? 'warn' : item.downloaded ? 'good' : 'neutral'}>
-                    {sxn('acq.episode', item.episode)}
-                  </Pill>
-                  <span className="scr-t-plain">{item.torrentName}</span>
-                  <Button
-                    size="sm"
-                    disabled={backendBusy || item.downloaded || item.delayed}
-                    onClick={() => void runBackendAction({
-                      kind: 'download-queued-item',
-                      itemId: item.id,
-                    })}
-                  >
-                    {sx('acq.download')}
-                  </Button>
-                </li>
-              ))}
+              {backend.autoDownloader.queue.slice(0, 8).map((item) => {
+                const whyQueued = firstReason(
+                  busy,
+                  [item.downloaded, sx('why.alreadyDownloaded')],
+                  [item.delayed, sx('why.delayed')],
+                );
+                return (
+                  <li key={item.id}>
+                    <Pill tone={item.delayed ? 'warn' : item.downloaded ? 'good' : 'neutral'}>
+                      {sxn('acq.episode', item.episode)}
+                    </Pill>
+                    <span className="scr-t-plain">{item.torrentName}</span>
+                    <Button
+                      size="sm"
+                      disabled={!!whyQueued}
+                      title={whyQueued}
+                      onClick={() => void runBackendAction({
+                        kind: 'download-queued-item',
+                        itemId: item.id,
+                      })}
+                    >
+                      {sx('acq.download')}
+                    </Button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : null}
@@ -495,12 +542,18 @@ export default function TorrentManagerPage() {
             <Button
               size="sm"
               variant="primary"
-              disabled={!selected.size}
+              disabled={!!whyClearSelection}
+              title={whyClearSelection}
               onClick={() => void send()}
             >
               {sxn('torrent.send', selected.size)}
             </Button>
-            <Button size="sm" disabled={!selected.size} onClick={() => setSelected(new Set())}>
+            <Button
+              size="sm"
+              disabled={!!whyClearSelection}
+              title={whyClearSelection}
+              onClick={() => setSelected(new Set())}
+            >
               {sx('result.clearSelection')}
             </Button>
           </div>
@@ -694,6 +747,10 @@ export default function TorrentManagerPage() {
               <Button
                 size="sm"
                 disabled={activeTransfer.progress < 1 || addingHash === activeTransfer.hash}
+                title={firstReason(
+                  [activeTransfer.progress < 1, sx('why.notComplete')],
+                  [addingHash === activeTransfer.hash, sx('why.addingToLibrary')],
+                )}
                 onClick={() => void addTransferToLibrary(activeTransfer)}
               >
                 {addingHash === activeTransfer.hash
