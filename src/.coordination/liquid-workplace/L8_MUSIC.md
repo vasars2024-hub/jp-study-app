@@ -283,3 +283,22 @@ mute-pair counts **0,0,0 -> 1,1,1 -> 0,0,0**. Evidence: `baselines/cat8-l8-music
 
 Music is **70/80**. Category 1 is the only open cell: re-run it against the current 41-control
 surface before acting on the older launcher/shared-chrome finding.
+
+## 2026-08-30 — category 1 re-closes; Music is 80/80
+
+Fresh re-run found exactly one effective target failure, not the 16 sub-32 rects: the global fixed
+Seanime launcher stole **21.5px** from the volume slider and reduced detach to a **24.5px** hit.
+Wide Media Center player bars now reserve the launcher's 200px footprint only while it exists;
+compact windows do not enter the >=900px branch.
+
+Category 1 **PASS 10/10**: 74 text runs, minimum contrast **4.62**, failing **0**; 42 controls,
+effective floor failures **1 -> 0**, WCAG 2.5.8 failures **0**, unreachable **0**; reduced-motion
+durations **22 -> 0 -> 22**, class/emulation restored. Negative controls all moved and restored,
+rect drift **0**. Focused guard **7/7**.
+
+Mandatory structural re-run: category 4 remains **PASS 10/10**, dead region **8.5/0.5/10%**,
+all clip/overlap/scroll counts zero, injected clip **0 -> 1 -> 0**, geometry restored. Evidence:
+`baselines/cat1-l8-music.json`, `baselines/cat4-l8-music.json`.
+
+**Music closes 80/80**: eight categories at controlled 10/10. This closes the Music surface, not
+the whole L8 gate; other discovery/operations/configuration surfaces remain independently counted.

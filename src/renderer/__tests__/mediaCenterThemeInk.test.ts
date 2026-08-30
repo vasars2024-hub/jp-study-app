@@ -61,6 +61,12 @@ describe('Media Center theme ink and material tokens', () => {
     expect(wide).toContain('height: 132px');
   });
 
+  it('reserves the shell launcher footprint only on a wide player bar', () => {
+    const safe = ruleBody('@container mc (min-width: 900px) {');
+    expect(safe).toContain('body:has(.seanime-host-launcher) .mc-playerbar');
+    expect(safe).toContain('padding-right: 200px');
+  });
+
   it('sources every ink and material the Music surface paints from a token', () => {
     expect(ruleBody('.mc-music-head h1 {')).toMatch(/color:\s*var\(--mc-hero-ink/);
     expect(ruleBody('.mc-album-copy h2 {')).toMatch(/color:\s*var\(--mc-album-ink/);

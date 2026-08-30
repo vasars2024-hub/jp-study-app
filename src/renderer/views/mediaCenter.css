@@ -2910,6 +2910,16 @@
   }
 }
 
+/* The shell-owned Seanime launcher is fixed over the desktop's bottom-right
+   corner. On a wide Media Center it otherwise steals the volume slider and
+   detach target from the player bar. Reserve exactly its footprint only when
+   it exists and the bar has room; compact windows never reach this branch. */
+@container mc (min-width: 900px) {
+  body:has(.seanime-host-launcher) .mc-playerbar {
+    padding-right: 200px;
+  }
+}
+
 @container mc (max-width: 1040px) {
   .mc-sidebar {
     width: 174px;

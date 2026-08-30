@@ -1,7 +1,7 @@
 {
-  "label": "music",
+  "label": "l8-music",
   "surface": "@.fwin:has(.mc-root)",
-  "win": "main",
+  "win": "(focused)",
   "theme": "forest-night",
   "presentation": "standard",
   "box": "1080x700",
@@ -12,20 +12,20 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 73,
+    "measured": 74,
     "unmeasurable": 0,
-    "minRatio": 5,
-    "minOwner": "small \"2 tracks\" 11px",
+    "minRatio": 4.62,
+    "minOwner": "span.mc-track-index \"02\" 11px",
     "failingCount": 0,
     "worst": [],
-    "inactiveSkipped": 1,
+    "inactiveSkipped": 0,
     "inactiveWorst": []
   },
   "targets": {
-    "total": 50,
+    "total": 42,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
-    "under32Count": 15,
+    "under32Count": 16,
     "under32": [
       {
         "el": "button.fwin-b",
@@ -82,7 +82,7 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 50,
+    "controls": 42,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 1,
@@ -123,14 +123,14 @@
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 28,
+    "beforeOverThreshold": 22,
     "beforeLongest": {
       "el": "div.fwin-bar",
       "dur": 0.14
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 28,
+    "afterOverThreshold": 22,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
@@ -141,66 +141,32 @@
     "theme": "forest-night",
     "box": "1080x700",
     "deferredVisibilityOwners": 0,
-    "controls": 37,
-    "measured": 37,
-    "belowFloorByRect": 12,
-    "belowFloorByHit": 1,
-    "belowFloor": [
-      {
-        "sel": "button",
-        "n": 1,
-        "rect": "26x32",
-        "hit": "32.5x24.5",
-        "hitMin": 24.5,
-        "blockers": [
-          "div.lq-contextual.mc-player-volume.lq-hit-scope",
-          "footer.lq-contextual.mc-playerbar"
-        ]
-      }
-    ],
+    "controls": 40,
+    "measured": 40,
+    "belowFloorByRect": 16,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
     "smallestHit": {
-      "el": "button",
-      "rect": "26x32",
-      "rectMin": 26,
-      "hit": "32.5x24.5",
-      "hitMin": 24.5,
-      "shrunk": true,
-      "shrunkBy": 7,
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
       "blockers": [
-        "div.lq-contextual.mc-player-volume.lq-hit-scope",
-        "footer.lq-contextual.mc-playerbar",
-        "div.lq-contextual.mc-player-volume.lq-hit-scope",
-        "button.seanime-host-launcher"
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
       ]
     },
-    "stolenCount": 2,
-    "stolen": [
-      {
-        "sel": "input",
-        "n": 1,
-        "rect": "86x61",
-        "hit": "52.5x34",
-        "shrunkBy": 21.5,
-        "blockers": [
-          "button.seanime-host-launcher"
-        ]
-      },
-      {
-        "sel": "button",
-        "n": 1,
-        "rect": "26x32",
-        "hit": "32.5x24.5",
-        "shrunkBy": 7,
-        "blockers": [
-          "div.lq-contextual.mc-player-volume.lq-hit-scope",
-          "footer.lq-contextual.mc-playerbar"
-        ]
-      }
-    ],
-    "worstShrunkBy": 21.5,
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
     "occludedCount": 0,
     "occluded": [],
-    "disabledCount": 12,
+    "disabledCount": 3,
     "disabled": [
       {
         "el": "button",
@@ -213,32 +179,13 @@
       {
         "el": "button.btn.small",
         "rect": "101x33"
-      },
-      {
-        "el": "button.btn.small",
-        "rect": "37x32"
-      },
-      {
-        "el": "button.btn.primary.music-play",
-        "rect": "46x34"
-      },
-      {
-        "el": "button.btn.small",
-        "rect": "37x32"
-      },
-      {
-        "el": "button.btn.small",
-        "rect": "37x32"
-      },
-      {
-        "el": "input.music-seek",
-        "rect": "150x48"
       }
     ],
-    "disclosedForRun": 0,
+    "disclosedForRun": 1,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "nav.lq-contextual.mc-nav 0,0 -> 37,0"
+      "details.mc-nav-group 0,0 -> 39,0",
+      "div.music-lyrics 0,0 -> 4,0"
     ],
     "deferredRestore": {
       "first": {
@@ -290,22 +237,53 @@
     },
     "stable": true,
     "firstRun": {
-      "belowFloorByHit": 1,
-      "stolenCount": 2,
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
       "occludedCount": 0
     }
   },
   "bars": {
     "contrast": true,
-    "targets32": false,
+    "targets32": true,
     "wcag258": true,
     "keyboard": true,
     "motion": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "targets32"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        16,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        18,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        16,
+        0,
+        0
+      ]
+    }
+  },
   "ariaRestored": {
     "skipped": "nothing was opened"
   }
