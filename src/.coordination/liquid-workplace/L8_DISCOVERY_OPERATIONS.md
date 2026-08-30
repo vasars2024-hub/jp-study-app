@@ -537,3 +537,15 @@ cancelled jobs, source health, runtime, scheduling and the study handoff. Mechan
 `i18n-check` passes at **11,465** English keys and the focused suite passes **21/21**. No second
 live harness run was made after batch 3's one allowed repair still left the parent window at
 opacity 0; category 8 remains open at 51.4% coverage.
+
+### 2026-08-30 — Scraper i18n, batch 5: app chrome and advanced settings
+
+**357 of 588 keys migrated (60.7%)**, +55 this batch: all 22 `app.*` keys and all 33 `set.*`
+keys. Search, compact/advanced mode, menus, saved/reset feedback, tracker ordering, encrypted
+credential states and qBittorrent connection feedback now use the shared catalogs.
+Mechanical comparison: **55 TEXT / 55 shared / 0 missing / 0 extra**.
+
+The only byte-identical values are the two deliberate `{value}` pass-through templates for
+backend connection/error detail. They were added individually to the format-string baseline in
+all three locales; no user-facing English was waived. `i18n-check` passes at **11,520** keys and
+the focused suite passes **21/21**. Category 8 remains open at 60.7% coverage.
