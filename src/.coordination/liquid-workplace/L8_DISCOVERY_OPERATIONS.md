@@ -549,3 +549,13 @@ The only byte-identical values are the two deliberate `{value}` pass-through tem
 backend connection/error detail. They were added individually to the format-string baseline in
 all three locales; no user-facing English was waived. `i18n-check` passes at **11,520** keys and
 the focused suite passes **21/21**. Category 8 remains open at 60.7% coverage.
+
+### 2026-08-30 — Scraper i18n, batch 6: Source Manager complete
+
+**399 of 588 keys migrated (67.9%)**, +42 this batch. Every `sources.*` entry now resolves from
+the shared catalogs: acquisition mode and its consequences, provider inventory/state/kind and
+capabilities, priority order, tests, subtitle/auth badges, and fallback honesty.
+Mechanical comparison: **42 TEXT / 42 shared / 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,562** English keys and the focused suite passes **21/21**. Category 8
+remains open at 67.9%; 189 catalog keys still fall back to `TEXT` and are not represented as done.
