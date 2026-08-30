@@ -1,0 +1,186 @@
+{
+  "label": "l8-scraper",
+  "surface": "@.fwin:has(.scr-shell)",
+  "win": "main",
+  "rootKind": "section inside a floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "820x580",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 3.2,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 90,
+      "dominantCanvasPct": 93.7,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 20,
+      "overlaps": 5,
+      "horizontalScrollers": 1,
+      "hiddenOverflowX": 1,
+      "deadPctViewport": 0.6,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 68.7,
+      "dominantCanvasPct": 78.8,
+      "bars": {
+        "clipped": false,
+        "overlaps": false,
+        "horizontal": false,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x765",
+      "clipped": 0,
+      "overlaps": 1,
+      "horizontalScrollers": 3,
+      "hiddenOverflowX": 1,
+      "deadPctViewport": 4.3,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 63.1,
+      "dominantCanvasPct": 95.3,
+      "bars": {
+        "clipped": true,
+        "overlaps": false,
+        "horizontal": false,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "409x82 at grid 20,16",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "nav.lq-contextual",
+        "aside.lq-contextual",
+        "footer.lq-contextual"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
+      "restoredTo": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
+      "clippedList": [
+        "div.scr-topbar-actions",
+        "button.ui-icon-btn",
+        "svg.[object",
+        "button.ui-icon-btn",
+        "svg.[object",
+        "path.[object"
+      ],
+      "overlapList": [
+        "div.lq-contextual x div.scr-rail-status (51x24)",
+        "div.lq-contextual x footer.lq-contextual (51x11)",
+        "div.scr-rail-status x footer.lq-contextual (51x41)",
+        "header.scr-drawer-head x footer.lq-contextual (159x41)",
+        "div.scr-drawer-body x footer.scr-drawer-foot (329x24)"
+      ],
+      "horizontalScrollerList": [
+        "div.scr-drawer-pane 167>100"
+      ],
+      "hiddenOverflowXList": [
+        "div.fwin-body 400>248"
+      ],
+      "deadRegionBox": "258x24 at grid 0,0",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "nav.lq-contextual",
+        "aside.lq-contextual",
+        "footer.lq-contextual"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 137;",
+      "restoredTo": "left: 162px; top: 114px; width: 820px; height: 580px; z-index: 141;",
+      "clippedList": [],
+      "overlapList": [
+        "div.scr-page x footer.lq-contextual (632x41)"
+      ],
+      "horizontalScrollerList": [
+        "main.scr-main 1611>664",
+        "div. 876>606",
+        "div. 1628>606"
+      ],
+      "hiddenOverflowXList": [
+        "div.scr-td 103>96"
+      ],
+      "deadRegionBox": "410x110 at grid 10,19",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "header.lq-contextual",
+        "nav.lq-contextual",
+        "header.scr-page-head",
+        "header.scr-card-head",
+        "header.scr-card-head",
+        "header.scr-card-head",
+        "header.scr-card-head",
+        "aside.lq-contextual",
+        "footer.lq-contextual"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": false,
+    "overlaps": false,
+    "horizontal": false,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "clipped",
+    "overlaps",
+    "horizontal"
+  ],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ]
+}

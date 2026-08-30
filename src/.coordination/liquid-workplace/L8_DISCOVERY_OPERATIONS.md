@@ -223,3 +223,31 @@ colour, real anchor. Regression: `scraperLiquidRegions.test.tsx` **5/5**; the fl
 exceptions are pinned by `liquidWindowPresentation.test.ts` **38/38** (a two-line selector
 failed its `anchoredOn` check — every exception must start with the interior host on one line).
 Evidence: `baselines/cat3-l8-scraper.json`. Scraper is **40/80**; open: 4, 5, 7, 8.
+
+## 2026-08-30 — Scraper category 4: the default size is clean, two sizes are not
+
+Category 4 is a RUN of the existing harness, no new probe. First run FAILED all three
+geometry bars at all three sizes. One product defect accounted for the whole DEFAULT leg:
+`.scr-rail` is 52px collapsed but `.scr-rail-scroll` and `.scr-rail-status` measured **70px**.
+The rail is a single-column grid, a column's automatic minimum is the largest min-content of
+its items, and the running/idle LABEL is the only item still rendering text when collapsed —
+so it floored the track at 70, `overflow: hidden` hid the 18px spill, and both rail rows
+overlapped the drawer beside them (`18x352`, `18x71`) at every size. The label goes
+`sr-only`, not `display: none`: the state is the one thing that block exists to say. The
+harness already excludes a 1x1 absolutely-positioned node from `hiddenOverflowX`, so this
+does not trade one finding for another.
+
+| leg | before | after |
+| --- | --- | --- |
+| default 820x580 | overlaps **6**, hiddenOverflowX **1** | **0 / 0 / 0 / 0** |
+| compact 400x248 | clipped 6, overlaps 6, hscroll 1, hiddenX 2 | clipped **6**, overlaps **5**, hscroll **1**, hiddenX **1** |
+| maximized | overlaps 2, hscroll 3, hiddenX 2 | overlaps **1**, hscroll **3**, hiddenX **1** |
+
+Category 4 does NOT close and is not parked — two measured findings remain, both real and
+neither caused by this slice. (a) At 400x248 the shell does not reflow: `div.fwin-body`
+hides 400px of content in 248, `.scr-topbar-actions` clips six controls, and the drawer,
+rail and footer stack on top of each other. (b) Maximized with the drawer open, the
+dashboard's tables force `main.scr-main` to **1611>664** and `.scr-page` runs 41px under the
+status bar. Evidence: `baselines/cat4-l8-scraper.json`; regression
+`scraperRailCollapse.test.tsx` **2/2**. Next category-4 slice: the compact reflow, because
+it is the larger of the two and the drawer/rail/footer stacking is its root cause.

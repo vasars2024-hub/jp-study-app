@@ -79,7 +79,15 @@ export default function ScraperNav({ stats }: { stats: ScraperSystemStats }) {
         <div className="scr-rail-group-label">{sx('nav.status')}</div>
         <div className="scr-rail-state">
           <span className={`scr-state-dot${busy ? ' is-busy' : ''}`} aria-hidden />
-          <span>{busy ? sx('nav.statusRunning') : sx('nav.statusIdle')}</span>
+          {/* Collapsed, this label is the widest thing in the rail: measured, its
+              min-content floored the single grid column at 70px inside a 52px rail,
+              so `.scr-rail`'s `overflow: hidden` clipped 18px and both rail rows
+              geometrically overlapped the settings drawer beside them. It goes
+              screen-reader-only rather than `display: none` — the running/idle state
+              is the one thing this block exists to say. */}
+          <span className={ctl.railCollapsed ? 'sr-only' : undefined}>
+            {busy ? sx('nav.statusRunning') : sx('nav.statusIdle')}
+          </span>
         </div>
         <p className="scr-rail-tasks">
           {busy ? sxn('nav.activeTasks', stats.activeJobs) : sx('nav.noActiveTasks')}
