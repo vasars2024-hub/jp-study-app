@@ -22,6 +22,7 @@ import {
   type ScraperSettingsGroupId,
 } from './fields';
 import { useScraper } from '../ScraperContext';
+import { SCRAPER_SETTINGS_DRAWER_ID } from '../drawerId';
 import { sx, sxs } from '../strings';
 import { useScraperPort } from '../data/scraperPort';
 import {
@@ -242,7 +243,12 @@ export default function ScraperSettingsDrawer() {
     // head and footer read it through their own transparent boxes, and the field
     // body below is an opaque anchor, because editing is work and work never goes
     // on glass.
-    <ContextualSurface as="aside" className="scr-drawer" aria-label={sx('app.settings')}>
+    <ContextualSurface
+      as="aside"
+      id={SCRAPER_SETTINGS_DRAWER_ID}
+      className="scr-drawer"
+      aria-label={sx('app.settings')}
+    >
       <header className="scr-drawer-head">
         <h2 className="scr-drawer-title">{sx('set.title')}</h2>
         <IconButton label={sx('common.close')} size="sm" onClick={ctl.closeDrawer}>

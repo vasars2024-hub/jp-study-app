@@ -450,10 +450,53 @@ const SNAP = `(function(){
   var notPageControls = controls.filter(function(e){ return !repeatingRow(e) && !e.closest('.fwin-bar'); });
   var shellControls = notPageControls.filter(shellChrome);
   var chromeControls = notPageControls.filter(function(e){ return !shellChrome(e); });
+  /*
+   * CORRECTION 19 — the <details> exclusion had an ARIA half it never applied.
+   *
+   * collapsed already counts [aria-expanded="false"] as a disclosure, so the harness
+   * ALREADY treats the ARIA pattern as equivalent to <details> on the closed side. It
+   * did not on the open side: inDisclosure excluded the contents of every <details>,
+   * OPEN ONES INCLUDED, but charged an aria-controls region's contents in full. A
+   * surface using the APG disclosure pattern instead of <details> was therefore scored
+   * on a rule its markup could not satisfy — Scraper's settings drawer put 41 of 50
+   * controls into scanned, and only because the drawer was open in the live app.
+   *
+   * The extension is exactly symmetric, not a loosening: a region is tucked away when a
+   * PAINTED control on this surface names it through aria-controls and declares its
+   * state with aria-expanded. Two guards keep it from becoming the general escape hatch
+   * --shell-chrome is documented not to be:
+   *   - a region that CONTAINS its own toggle is ignored, so a surface cannot mark its
+   *     own wrapper (or the root) and empty the count;
+   *   - the toggle itself is never excluded, exactly as SUMMARY is not.
+   * ariaDisclosures lands in the snapshot with each region and how many controls it
+   * took, so a reader can add them back and disagree with the rule rather than the
+   * verdict. The bar stays at 12.
+   */
+  var ariaRegions = [];
+  [].slice.call(root.querySelectorAll('[aria-expanded][aria-controls]')).filter(painted).forEach(function(tog){
+    // .split(' ') and not /\\s+/: this block is inside a template literal, where a
+    // lone backslash-s collapses to a bare "s" and the id splits on its own letters.
+    // aria-controls is space-separated by spec, so the plain split is also correct.
+    (tog.getAttribute('aria-controls') || '').split(' ').forEach(function(id){
+      if (!id) return;
+      var region = null;
+      try { region = root.querySelector('#' + CSS.escape(id)); } catch (e) { region = null; }
+      if (!region || region === root || region.contains(root) || region.contains(tog)) return;
+      if (ariaRegions.indexOf(region) < 0) ariaRegions.push(region);
+    });
+  });
+  function inAriaDisclosure(e){
+    for (var i = 0; i < ariaRegions.length; i++) if (ariaRegions[i].contains(e)) return true;
+    return false;
+  }
   // The clutter term is controls the user must SCAN in the default state: chrome, minus the
   // contents of any <details> (tucked away by definition) and minus the summary headers
   // (counted once by collapsedDisclosures, not charged twice). The bar stays at 12.
-  function inDisclosure(e){ return !!e.closest('details') && e.tagName !== 'SUMMARY'; }
+  function inDisclosure(e){
+    if (e.tagName === 'SUMMARY') return false;
+    if (e.closest('details')) return true;
+    return inAriaDisclosure(e);
+  }
   var summaryHeaders = chromeControls.filter(function(e){ return e.tagName === 'SUMMARY'; });
   var behindDisclosure = chromeControls.filter(inDisclosure);
   var scanned = chromeControls.filter(function(e){ return !inDisclosure(e) && e.tagName !== 'SUMMARY'; });
@@ -695,6 +738,8 @@ const SNAP = `(function(){
           chromeControlsRaw: chromeControls.length, summaryHeaders: summaryHeaders.length,
           behindDisclosure: behindDisclosure.length,
           disclosures: { total: allDetails.length, open: allDetails.filter(function(d){ return d.open; }).length },
+          ariaDisclosures: ariaRegions.map(function(r){
+            return { region: name(r), controlsTaken: chromeControls.filter(function(e){ return r.contains(e); }).length }; }),
           scannedList: scanned.slice(0,20).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0,28); }) },
     q5: { measured: seen.length, unmeasurable: unmeasurable,
@@ -826,7 +871,52 @@ const PLANT_JS = `(function(){
   });
   body.appendChild(grid);
 
+  /*
+   * Q4 — the control for CORRECTION 19, and the only reason that correction is a rule
+   * rather than an excuse. It plants TWO panels of 8 controls each:
+   *
+   *   #cat5-ctl-open  unmarked. Nothing claims to disclose it, so every one of its 8
+   *                   controls must still be SCANNED. If it is not, the aria exclusion
+   *                   is blanket and Q4 is unfalsifiable on any surface that has one.
+   *   #cat5-ctl-self  carries its own aria-expanded/aria-controls toggle pointing at
+   *                   ITSELF. This is the escape hatch the guard exists to refuse — a
+   *                   surface marking its own wrapper would otherwise empty the count.
+   *                   Its 8 controls plus the toggle must also still be scanned.
+   *
+   * Together they take scanned past the bar of 12 from any starting point at or below
+   * 12, so Q4 must read NO. Both panels are plant-attributed and removed by unplantJs
+   * with the contrast and dashboard nodes.
+   */
+  function ctlPanel(id, selfMark){
+    var p = document.createElement('div');
+    p.id = id;
+    p.setAttribute(${A(PLANT)}, 'clutter');
+    p.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:#181818';
+    if (selfMark) {
+      var tog = document.createElement('button');
+      tog.type = 'button';
+      tog.className = 'cat5ctl-selftoggle';
+      tog.setAttribute('aria-expanded', 'true');
+      tog.setAttribute('aria-controls', id);
+      tog.textContent = 'self toggle';
+      p.appendChild(tog);
+    }
+    for (var i = 0; i < 8; i++) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cat5ctl-clutter-' + i;
+      b.textContent = 'clutter ' + i;
+      p.appendChild(b);
+    }
+    body.appendChild(p);
+    return p;
+  }
+  var clutterOpen = ctlPanel('cat5-ctl-open', false);
+  var clutterSelf = ctlPanel('cat5-ctl-self', true);
+
   return JSON.stringify({ savedTitle: savedTitle, savedTransform: savedTransform,
+    clutterPlanted: clutterOpen.querySelectorAll('button').length + clutterSelf.querySelectorAll('button').length,
+    clutterSelfGuard: 'cat5-ctl-self declares itself its own disclosure; the guard must refuse it',
     primaryFound: primary ? primary.tagName.toLowerCase() + '.' + String(primary.className||'').split(' ')[0] : null,
     primaryFromPin: !!pinnedPrimary,
     // How many branches of the disjunction the plant actually attacked, and which. A control
@@ -839,7 +929,7 @@ const PLANT_JS = `(function(){
     // of two title-shaped nodes measured nothing, so the count is stated rather than assumed.
     titlesBlanked: titleEls.length,
     titleList: titleEls.map(function(e){ return e.tagName.toLowerCase() + '.' + String(e.className||'').split(' ')[0]; }),
-    dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q5: 'NO', Q10: 'NO' } });
+    dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q4: 'NO', Q5: 'NO', Q10: 'NO' } });
 })()`;
 
 const unplantJs = (savedTitle) => `(function(){
@@ -870,7 +960,7 @@ const unplantJs = (savedTitle) => `(function(){
     m.removeAttribute('${PLANT}-transform');
     m.removeAttribute(${A(PLANT)});
   });
-  [].slice.call(document.querySelectorAll('[${PLANT}="contrast"],[${PLANT}="dashboard"]')).forEach(function(n){ n.remove(); });
+  [].slice.call(document.querySelectorAll('[${PLANT}="contrast"],[${PLANT}="dashboard"],[${PLANT}="clutter"]')).forEach(function(n){ n.remove(); });
   return JSON.stringify({ restoredMoved: moved.length, restoredTitles: titles.length,
     // The whole marker family, including \`-html\`. A residue count that does not sweep every
     // attribute the plant writes reports 0 while the app still carries one, which is the
@@ -1097,14 +1187,21 @@ function scoreSnapshot(s) {
   if (drift.length) voided.push(`verdicts drift with the theme (${drift.join(', ')}); a §10.4 answer that depends on the palette is not an answer`);
 
   if (CONTROL) {
-    // The control must move all four. A control that does not fail voids the score rather
-    // than passing it — the rubric's words.
-    const moved = { Q2: live.q2 === 'NO', Q3: live.q3 === 'NO', Q5: q5.verdict === 'NO', Q10: live.q10 === 'NO' };
+    // The control must move all five. A control that does not fail voids the score rather
+    // than passing it — the rubric's words. Q4 joined the set with CORRECTION 19: its two
+    // clutter panels are the falsification of the aria-disclosure exclusion, so a run where
+    // Q4 stays YES means that exclusion swallowed a panel nothing disclosed.
+    const moved = { Q2: live.q2 === 'NO', Q3: live.q3 === 'NO', Q4: live.q4 === 'NO',
+      Q5: q5.verdict === 'NO', Q10: live.q10 === 'NO' };
     out.controlResult = moved;
+    // The component numbers, so a reader can see WHICH panel survived the exclusion rather
+    // than only that the total cleared the bar.
+    out.controlQ4 = { scannedControls: A_CELL.q4.scannedControls, bar: 12,
+      behindDisclosure: A_CELL.q4.behindDisclosure, ariaDisclosures: A_CELL.q4.ariaDisclosures };
     const missed = Object.keys(moved).filter((k) => !moved[k]);
     out.verdict = missed.length
       ? `CONTROL DID NOT FAIL on ${missed.join(', ')} — those terms cannot return NO and measure nothing`
-      : 'CONTROL FAILED AS REQUIRED on Q2, Q3, Q5, Q10';
+      : 'CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10';
     out.score = missed.length ? 'CONTROL-VOID' : 'CONTROL-OK';
   } else {
     out.findings = findings;

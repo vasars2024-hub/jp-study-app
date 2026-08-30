@@ -5,6 +5,7 @@ import { Button, IconButton } from '../ui';
 import { ContextualSurface } from '../liquid/LiquidSurface';
 import ScraperSearch from './ScraperSearch';
 import { useScraper } from './ScraperContext';
+import { SCRAPER_SETTINGS_DRAWER_ID } from './drawerId';
 import { sx } from './strings';
 
 export default function ScraperTopBar() {
@@ -67,10 +68,18 @@ export default function ScraperTopBar() {
           <Icon name="calendar" size={16} />
         </IconButton>
 
+        {/* A disclosure, not a toggle button. The drawer this reveals is a
+            temporary inspector holding ~40 controls, so `aria-pressed` was the
+            wrong contract twice over: a screen reader announced "not pressed"
+            for a panel that is closed, and nothing in the DOM linked the
+            control to the region it opens. `aria-expanded` + `aria-controls`
+            is the APG disclosure pattern and is what makes the drawer's
+            contents legible as tucked-away rather than as default clutter. */}
         <IconButton
           label={sx('app.settings')}
           size="sm"
-          aria-pressed={ctl.drawerOpen}
+          aria-expanded={ctl.drawerOpen}
+          aria-controls={SCRAPER_SETTINGS_DRAWER_ID}
           onClick={() => (ctl.drawerOpen ? ctl.closeDrawer() : ctl.openDrawer())}
         >
           <Icon name="settings" size={16} />
