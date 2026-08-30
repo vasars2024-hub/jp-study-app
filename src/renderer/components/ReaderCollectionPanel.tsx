@@ -4,6 +4,8 @@
 // Anki deck target + per-card export status; selective export when auto is off.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import {
   addDeckCards,
   loadDeck,
@@ -45,11 +47,12 @@ const TARGETS: { id: TargetLang; label: string }[] = [
   { id: 'ru', label: 'RU' },
   { id: 'zh', label: 'ZH' },
 ];
-const STUDY_KIND_LABELS: Record<VisualNovelStudyCardKind, string> = {
-  vocabulary: 'Vocabulary',
-  sentence: 'Sentence',
-  kanji: 'Kanji',
-  grammar: 'Grammar',
+/** Module-level, so it holds i18n keys and the consumer resolves them (CLAUDE.md §7). */
+const STUDY_KIND_KEYS: Record<VisualNovelStudyCardKind, string> = {
+  vocabulary: 'readerCollection.kind.vocabulary',
+  sentence: 'readerCollection.kind.sentence',
+  kanji: 'readerCollection.kind.kanji',
+  grammar: 'readerCollection.kind.grammar',
 };
 
 interface CollectionPrefs {
@@ -112,6 +115,7 @@ export default function ReaderCollectionPanel({
   pendingAdd,
   onPendingConsumed,
 }: Props) {
+  const { t, lang } = useT();
   const [cards, setCards] = useState<DeckFlashcard[]>(() => loadDeck());
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<SortMode>('newest');
@@ -169,7 +173,7 @@ export default function ReaderCollectionPanel({
     }
     const id = ++txReqRef.current;
     setTxStatus('loading');
-    setTxMsg('Loading translator…');
+    setTxMsg(t('readerCollection.msg.loadingTranslator'));
     // Per-subscription, so a Translate view or a sentence popup loading the same model at the
     // same time keeps its own progress. This used to be one global slot.
     offModelRef.current?.();
@@ -306,7 +310,7 @@ export default function ReaderCollectionPanel({
           } else {
             updateDeckCard(c.id, {
               ankiExported: false,
-              ankiExportError: res.error ?? 'Export failed',
+              ankiExportError: res.error ?? t('readerCollection.msg.exportFailed'),
               ankiDeck: deck,
             });
           }
@@ -343,7 +347,7 @@ export default function ReaderCollectionPanel({
 
     void (async () => {
       setStatusKind('busy');
-      setStatusMsg(seedMeaning ? 'Saving…' : 'Translating…');
+      setStatusMsg(seedMeaning ? t('readerCollection.msg.saving') : t('readerCollection.translating'));
 
       let meaning = seedMeaning;
       if (!meaning || meaning === word) {
@@ -401,8 +405,9 @@ export default function ReaderCollectionPanel({
       if (seq !== addSeqRef.current) return;
       setStatusKind(ankiFail ? 'error' : 'ok');
       const parts: string[] = [];
-      if (saveToDeck) parts.push(autoFlashcards ? 'Flashcards' : 'Collection');
-      if (autoAnki) parts.push(ankiOk ? `Anki${ankiDeck ? ` (${ankiDeck})` : ''}` : 'Anki failed');
+      if (saveToDeck) parts.push(autoFlashcards ? t('readerCollection.flashcards') : t('readerCollection.title'));
+      // The deck name is the user's own data; only the stem is translated.
+      if (autoAnki) parts.push(ankiOk ? `${t('readerCollection.anki')}${ankiDeck ? ` (${ankiDeck})` : ''}` : t('readerCollection.msg.ankiFailed'));
       setStatusMsg(parts.length ? `Saved → ${parts.join(' · ')}` : 'Saved');
       if (card) {
         const cardId = card.id;
@@ -525,7 +530,7 @@ export default function ReaderCollectionPanel({
     setCards(loadDeck());
     closeEdit();
     setStatusKind('ok');
-    setStatusMsg('Card updated');
+    setStatusMsg(t('readerCollection.msg.cardUpdated'));
   }, [edit, closeEdit]);
 
   const toggle = (id: string) => {
@@ -559,14 +564,14 @@ export default function ReaderCollectionPanel({
     setStatusMsg(
       known.length
         ? `Removed ${known.length} familiar or known vocabulary card${known.length === 1 ? '' : 's'}.`
-        : 'No familiar or known vocabulary cards found.',
+        : t('readerCollection.msg.noKnownVocab'),
     );
   };
 
   const exportAnki = async () => {
     const targets = mine.filter((c) => selected.has(c.id));
     if (!targets.length) {
-      setExportMsg('Select cards to export (checkboxes).');
+      setExportMsg(t('readerCollection.msg.selectToExport'));
       setExportState('error');
       return;
     }
@@ -604,77 +609,78 @@ export default function ReaderCollectionPanel({
   if (!open) return null;
 
   const busy = txStatus === 'loading' || txStatus === 'translating' || statusKind === 'busy';
-  const frontLabel = edit?.swapped ? 'Front · translation' : 'Front · Japanese';
-  const backLabel = edit?.swapped ? 'Back · Japanese' : 'Back · translation';
+  const frontLabel = edit?.swapped ? t('readerCollection.frontTranslation') : t('readerCollection.frontJapanese');
+  const backLabel = edit?.swapped ? t('readerCollection.backJapanese') : t('readerCollection.backTranslation');
   const selectedCount = selected.size;
 
   return (
-    <aside className="reader-collection" aria-label="Collection">
+    <aside className="reader-collection" aria-label={t('readerCollection.title')}>
       <div className="reader-collection-head">
         <div className="reader-collection-head-text">
-          <span className="reader-collection-title">Collection</span>
+          <span className="reader-collection-title">{t('readerCollection.title')}</span>
           <span className="reader-collection-count muted">{mine.length}</span>
         </div>
-        <button type="button" className="btn small icon-btn" title="Close" onClick={onClose}>
+        <button type="button" className="btn small icon-btn" title={t('common.close')} onClick={onClose}>
           <Icon name="close" size={14} />
         </button>
       </div>
 
       <div className="reader-collection-settings">
         <div className="reader-collection-settings-row">
-          <span className="reader-collection-compose-label">Translate to</span>
-          <div className="reader-collection-lang" role="group" aria-label="Translation language">
-            {TARGETS.map((t) => (
+          <span className="reader-collection-compose-label">{t('readerCollection.translateTo')}</span>
+          <div className="reader-collection-lang" role="group" aria-label={t('readerCollection.aria.lang')}>
+            {/* Named `target`, not `t` — `t` is the translator in this scope now. */}
+            {TARGETS.map((target) => (
               <button
-                key={t.id}
+                key={target.id}
                 type="button"
-                className={`reader-collection-lang-btn${prefs.targetLang === t.id ? ' active' : ''}`}
+                className={`reader-collection-lang-btn${prefs.targetLang === target.id ? ' active' : ''}`}
                 disabled={busy}
-                onClick={() => patchPrefs({ targetLang: t.id })}
+                onClick={() => patchPrefs({ targetLang: target.id })}
               >
-                {t.label}
+                {target.label}
               </button>
             ))}
           </div>
-          <label className="reader-collection-check" title="New cards: translation on front, Japanese on back">
+          <label className="reader-collection-check" title={t('readerCollection.swapTitle')}>
             <input
               type="checkbox"
               checked={prefs.swapDefault}
               onChange={(e) => patchPrefs({ swapDefault: e.target.checked })}
             />
-            <span>Swap faces</span>
+            <span>{t('readerCollection.swapFaces')}</span>
           </label>
         </div>
 
         <div className="reader-collection-settings-row reader-collection-import-row">
-          <label className="reader-collection-check" title="Save into the Flashcards app deck when collecting">
+          <label className="reader-collection-check" title={t('readerCollection.flashcardsTitle')}>
             <input
               type="checkbox"
               checked={prefs.autoFlashcards}
               onChange={(e) => patchPrefs({ autoFlashcards: e.target.checked })}
             />
-            <span>Flashcards</span>
+            <span>{t('readerCollection.flashcards')}</span>
           </label>
-          <label className="reader-collection-check" title="Also send each new card to Anki">
+          <label className="reader-collection-check" title={t('readerCollection.ankiTitle')}>
             <input
               type="checkbox"
               checked={prefs.autoAnki}
               onChange={(e) => patchPrefs({ autoAnki: e.target.checked })}
             />
-            <span>Anki</span>
+            <span>{t('readerCollection.anki')}</span>
           </label>
-          <span className="muted reader-collection-settings-hint">Auto on collect</span>
+          <span className="muted reader-collection-settings-hint">{t('readerCollection.autoOnCollect')}</span>
         </div>
 
         <div className="reader-collection-settings-row reader-collection-deck-row">
-          <span className="reader-collection-compose-label">Anki deck</span>
+          <span className="reader-collection-compose-label">{t('readerCollection.ankiDeck')}</span>
           <select
             className="reader-collection-deck"
-            title={ankiConnected ? 'Deck for auto/manual Anki export' : 'Connect AnkiConnect to list decks'}
+            title={ankiConnected ? t('readerCollection.deckTitleConnected') : t('readerCollection.deckTitleDisconnected')}
             value={prefs.ankiDeck}
             onChange={(e) => patchPrefs({ ankiDeck: e.target.value })}
           >
-            <option value="">Profile default</option>
+            <option value="">{t('readerCollection.profileDefault')}</option>
             {prefs.ankiDeck && !ankiDecks.includes(prefs.ankiDeck) && (
               <option value={prefs.ankiDeck}>{prefs.ankiDeck}</option>
             )}
@@ -690,16 +696,16 @@ export default function ReaderCollectionPanel({
       {edit && (
         <div className="reader-collection-compose">
           <div className="reader-collection-compose-row">
-            <span className="reader-collection-compose-label">Edit card</span>
+            <span className="reader-collection-compose-label">{t('readerCollection.editCard')}</span>
             <button type="button" className="btn small reader-collection-swap" disabled={busy} onClick={swapEditFaces}>
-              Swap faces
+              {t('readerCollection.swapFaces')}
             </button>
           </div>
 
           {editImageDataUrl && (
             <figure className="reader-collection-context-image">
-              <img src={editImageDataUrl} alt="Visual novel scene context" />
-              <figcaption>Captured scene context · included with Anki export</figcaption>
+              <img src={editImageDataUrl} alt={t('readerCollection.sceneAlt')} />
+              <figcaption>{t('readerCollection.sceneCaption')}</figcaption>
             </figure>
           )}
 
@@ -721,29 +727,29 @@ export default function ReaderCollectionPanel({
               lang={edit.swapped ? 'ja' : undefined}
               value={edit.back}
               rows={3}
-              placeholder={busy ? 'Translating…' : 'Translation'}
+              placeholder={busy ? t('readerCollection.translating') : t('readerCollection.translation')}
               onChange={(e) => setEdit((d) => (d ? { ...d, back: e.target.value } : d))}
             />
           </label>
 
           <div className="reader-collection-field-grid">
             <label className="reader-collection-field">
-              <span className="reader-collection-field-label">Reading</span>
+              <span className="reader-collection-field-label">{t('readerCollection.reading')}</span>
               <input
                 lang="ja"
                 value={edit.reading}
-                placeholder="Optional"
+                placeholder={t('readerCollection.optional')}
                 onChange={(e) => setEdit((d) => (d ? { ...d, reading: e.target.value } : d))}
               />
             </label>
             <label className="reader-collection-field">
-              <span className="reader-collection-field-label">Sentence</span>
+              <span className="reader-collection-field-label">{t('readerCollection.sentence')}</span>
               <textarea
                 className="reader-collection-sentence"
                 lang="ja"
                 rows={2}
                 value={edit.sentence}
-                placeholder="Context (Japanese)"
+                placeholder={t('readerCollection.contextJa')}
                 onChange={(e) => setEdit((d) => (d ? { ...d, sentence: e.target.value } : d))}
               />
             </label>
@@ -760,13 +766,13 @@ export default function ReaderCollectionPanel({
               disabled={busy || (!edit.front.trim() && !edit.back.trim())}
               onClick={saveEdit}
             >
-              Save
+              {t('common.save')}
             </button>
             <button type="button" className="btn small" disabled={busy} onClick={() => void retranslateEdit()}>
-              Retranslate
+              {t('readerCollection.retranslate')}
             </button>
             <button type="button" className="btn small" onClick={closeEdit}>
-              Close
+              {t('common.close')}
             </button>
           </div>
         </div>
@@ -775,15 +781,15 @@ export default function ReaderCollectionPanel({
       <div className="reader-collection-toolbar">
         <input
           className="reader-collection-search"
-          placeholder="Search collection…"
+          placeholder={t('readerCollection.search')}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         {Object.values(studyKindCounts).some(Boolean) && (
-          <div className="reader-collection-kind-counts" aria-label="Visual novel card counts">
-            {(Object.keys(STUDY_KIND_LABELS) as VisualNovelStudyCardKind[]).map((kind) => (
+          <div className="reader-collection-kind-counts" aria-label={t('readerCollection.aria.kindCounts')}>
+            {(Object.keys(STUDY_KIND_KEYS) as VisualNovelStudyCardKind[]).map((kind) => (
               <span key={kind}>
-                {STUDY_KIND_LABELS[kind]} <strong>{studyKindCounts[kind]}</strong>
+                {t(STUDY_KIND_KEYS[kind])} <strong>{studyKindCounts[kind]}</strong>
               </span>
             ))}
           </div>
@@ -791,34 +797,34 @@ export default function ReaderCollectionPanel({
         <div className="reader-collection-actions">
           <div className="reader-collection-actions-left">
             <button type="button" className="btn small" onClick={selectAll}>
-              All
+              {t('readerCollection.all')}
             </button>
-            <button type="button" className="btn small" onClick={selectUnexported} title="Select cards not yet in Anki">
-              Unexported
+            <button type="button" className="btn small" onClick={selectUnexported} title={t('readerCollection.unexportedTitle')}>
+              {t('readerCollection.unexported')}
             </button>
             <button type="button" className="btn small" onClick={clearSel}>
-              Clear
+              {t('readerCollection.clear')}
             </button>
             {studyKindCounts.vocabulary > 0 && (
               <button
                 type="button"
                 className="btn small"
-                title="Remove vocabulary already marked Familiar or Known"
+                title={t('readerCollection.removeKnownTitle')}
                 onClick={removeKnownVocabulary}
               >
-                Remove known
+                {t('readerCollection.removeKnown')}
               </button>
             )}
             <select
               className="reader-collection-sort"
-              title="Sort"
+              title={t('readerCollection.sortTitle')}
               value={sort}
               onChange={(e) => setSort(e.target.value as SortMode)}
             >
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-              <option value="word">Word A–Z</option>
-              <option value="frequency">Most repeated</option>
+              <option value="newest">{t('readerCollection.sort.newest')}</option>
+              <option value="oldest">{t('readerCollection.sort.oldest')}</option>
+              <option value="word">{t('readerCollection.sort.word')}</option>
+              <option value="frequency">{t('readerCollection.sort.frequency')}</option>
             </select>
           </div>
           <div className="reader-collection-actions-right">
@@ -828,18 +834,20 @@ export default function ReaderCollectionPanel({
               disabled={exportState === 'busy' || selectedCount === 0}
               title={
                 prefs.autoAnki
-                  ? 'Manual export (also runs when auto Anki is on)'
-                  : 'Export selected cards to Anki'
+                  ? t('readerCollection.exportTitleAuto')
+                  : t('readerCollection.exportTitle')
               }
               onClick={() => void exportAnki()}
             >
-              Export{selectedCount ? ` (${selectedCount})` : ''} → Anki
+              {selectedCount
+                ? t('readerCollection.exportN', { count: selectedCount })
+                : t('readerCollection.export')}
             </button>
           </div>
         </div>
         {!prefs.autoAnki && (
           <p className="muted reader-collection-export-hint">
-            Auto Anki is off — tick cards, then Export.
+            {t('readerCollection.autoOffHint')}
           </p>
         )}
       </div>
@@ -857,19 +865,20 @@ export default function ReaderCollectionPanel({
       <ul className="reader-collection-list" ref={listRef}>
         {mine.length === 0 && (
           <li className="muted reader-collection-empty">
-            No cards yet. Select a word or sentence and press Collect.
+            {t('readerCollection.empty')}
           </li>
         )}
         {mine.map((c) => {
           const exported = !!c.ankiExported;
           const failed = !exported && !!c.ankiExportError;
+          // The deck name and timestamp are data, appended to the translated stem.
           const badgeTitle = exported
-            ? `Exported to Anki${c.ankiDeck ? ` · ${c.ankiDeck}` : ''}${
-                c.ankiExportedAt ? ` · ${new Date(c.ankiExportedAt).toLocaleString()}` : ''
+            ? `${t('readerCollection.badge.exported')}${c.ankiDeck ? ` · ${c.ankiDeck}` : ''}${
+                c.ankiExportedAt ? ` · ${new Date(c.ankiExportedAt).toLocaleString(LANG_TAGS[lang])}` : ''
               }`
             : failed
-              ? `Anki export failed: ${c.ankiExportError}`
-              : 'Not exported to Anki';
+              ? t('readerCollection.badge.failed', { error: c.ankiExportError ?? '' })
+              : t('readerCollection.badge.notExported');
           return (
             <li
               key={c.id}
@@ -896,15 +905,15 @@ export default function ReaderCollectionPanel({
               <button
                 type="button"
                 className="reader-collection-entry"
-                title="Open to edit"
+                title={t('readerCollection.openToEdit')}
                 onClick={() => openEdit(c)}
               >
                 {c.studyKind && (
                   <span className="reader-collection-card-meta">
                     <span className={`reader-collection-kind-badge kind-${c.studyKind}`}>
-                      {STUDY_KIND_LABELS[c.studyKind]}
+                      {t(STUDY_KIND_KEYS[c.studyKind])}
                     </span>
-                    {c.frequency != null && <span>Frequency {c.frequency}</span>}
+                    {c.frequency != null && <span>{t('readerCollection.frequency', { value: c.frequency })}</span>}
                     {c.jlptLevel && <span>{c.jlptLevel.toUpperCase()}</span>}
                     {c.sceneReference && <span>{c.sceneReference}</span>}
                   </span>
@@ -925,7 +934,7 @@ export default function ReaderCollectionPanel({
                 <button
                   type="button"
                   className="btn small icon-btn"
-                  title="Play attached audio"
+                  title={t('readerCollection.playAudio')}
                   onClick={async (e) => {
                     e.stopPropagation();
                     let dataUrl = c.audioDataUrl;
@@ -940,14 +949,14 @@ export default function ReaderCollectionPanel({
                 </button>
               )}
               {c.imagePath && (
-                <span className="reader-collection-media-badge" title="Includes captured scene context">
+                <span className="reader-collection-media-badge" title={t('readerCollection.hasScene')}>
                   <Icon name="image" size={12} />
                 </span>
               )}
               <button
                 type="button"
                 className="btn small icon-btn"
-                title="Remove"
+                title={t('common.remove')}
                 onClick={() => {
                   if (edit?.id === c.id) closeEdit();
                   removeDeckCard(c.id);

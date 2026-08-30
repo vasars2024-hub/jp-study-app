@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../../i18n';
+import { LANG_TAGS } from '../../../shared/i18n/core';
 import type {
   VisualNovelCapturePatch,
   VisualNovelDatabase,
@@ -8,6 +10,7 @@ import type {
 } from '../../../shared/visualNovel';
 import { analyzeMediaStudyCues, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
 import VisualNovelAgentHandoffButton from './VisualNovelAgentHandoffButton';
+import { openGrammarPractice } from '../../extensionBridgeUi';
 
 function draftFromCapture(capture: VisualNovelTextCapture): Required<VisualNovelCapturePatch> {
   return {
@@ -34,6 +37,7 @@ export default function VisualNovelSentenceAssist({
   onStatus: (message: string, error?: boolean) => void;
   onSaveCard: () => void;
 }) {
+  const { t, lang } = useT();
   const [draft, setDraft] = useState(() => draftFromCapture(capture));
   const [analysis, setAnalysis] = useState<MediaStudyAnalysis | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,11 +74,11 @@ export default function VisualNovelSentenceAssist({
   const persist = async (patch: VisualNovelCapturePatch = draft): Promise<boolean> => {
     const response = await window.api.visualNovelUpdateCapture(capture.id, patch);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'The captured line could not be updated.', true);
+      onStatus(response.error ?? t('vnAssist.msg.updateFailed'), true);
       return false;
     }
     onDatabase(response.database);
-    onStatus('Sentence details saved.');
+    onStatus(t('vnAssist.msg.saved'));
     return true;
   };
 
@@ -89,7 +93,7 @@ export default function VisualNovelSentenceAssist({
     });
     setBusy(false);
     if (!response.ok || !response.text) {
-      onStatus(response.error ?? 'Translation is unavailable.', true);
+      onStatus(response.error ?? t('vnAssist.msg.translateUnavailable'), true);
       return;
     }
     const translation = response.text.trim();
@@ -106,7 +110,7 @@ export default function VisualNovelSentenceAssist({
         text: draft.japanese,
       }]);
       setAnalysis(result);
-      onStatus('Sentence grammar and difficulty analyzed.');
+      onStatus(t('vnAssist.msg.analyzed'));
     } catch (reason) {
       onStatus(reason instanceof Error ? reason.message : String(reason), true);
     } finally {
@@ -120,7 +124,7 @@ export default function VisualNovelSentenceAssist({
       return;
     }
     onDatabase(await window.api.visualNovelRemoveCapture(capture.id));
-    onStatus('Captured sentence removed.');
+    onStatus(t('vnAssist.msg.removed'));
   };
 
   const attachAudio = async (): Promise<void> => {
@@ -129,11 +133,11 @@ export default function VisualNovelSentenceAssist({
     setAudioBusy(false);
     if (response.canceled) return;
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'The voice clip could not be attached.', true);
+      onStatus(response.error ?? t('vnAssist.msg.attachFailed'), true);
       return;
     }
     onDatabase(response.database);
-    onStatus('Voice clip attached to the sentence.');
+    onStatus(t('vnAssist.msg.attached'));
   };
 
   const playAudio = async (): Promise<void> => {
@@ -142,9 +146,9 @@ export default function VisualNovelSentenceAssist({
     const response = await window.api.visualNovelReadCaptureAudio(capture.audioPath);
     if (response.ok && response.dataUrl) {
       await new Audio(response.dataUrl).play().catch(() => undefined);
-      onStatus('Playing the attached voice clip.');
+      onStatus(t('vnAssist.msg.playing'));
     } else {
-      onStatus(response.error ?? 'The voice clip could not be played.', true);
+      onStatus(response.error ?? t('vnAssist.msg.playFailed'), true);
     }
     setAudioBusy(false);
   };
@@ -152,11 +156,11 @@ export default function VisualNovelSentenceAssist({
   const removeAudio = async (): Promise<void> => {
     const response = await window.api.visualNovelRemoveCaptureAudio(capture.id);
     if (!response.ok || !response.database) {
-      onStatus(response.error ?? 'The voice clip could not be removed.', true);
+      onStatus(response.error ?? t('vnAssist.msg.removeAudioFailed'), true);
       return;
     }
     onDatabase(response.database);
-    onStatus('Voice clip removed from the sentence.');
+    onStatus(t('vnAssist.msg.audioRemoved'));
   };
 
   const lookupKanji = (character: string): void => {
@@ -164,65 +168,66 @@ export default function VisualNovelSentenceAssist({
   };
 
   const openGrammarApp = (): void => {
-    window.dispatchEvent(new CustomEvent('os:open', { detail: 'grammar' }));
+    // Via `openGrammarPractice`, which writes a one-shot handoff before opening
+    // the section. The hand-rolled `os:open` + `setTimeout(80)` here raced
+    // `GrammarView`'s lazy chunk and lost the link on first use (audit F22).
     const levels = [...new Set(analysis?.grammar.map((item) => item.level).filter(Boolean) ?? [])];
-    window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('grammar:open-practice', { detail: { levels, lang: 'ja' } }));
-    }, 80);
+    openGrammarPractice({ levels, lang: 'ja' });
   };
 
   return (
-    <section className="visual-novel-sentence-assist" aria-label="Selected sentence reading assist">
+    <section className="visual-novel-sentence-assist" aria-label={t('vnAssist.aria')}>
       <div className="visual-novel-reading-head">
-        <strong>Sentence details</strong>
-        <span>{capture.source} · {new Date(capture.capturedAt).toLocaleString()}</span>
+        <strong>{t('vnAssist.title')}</strong>
+        <span>{capture.source} · {new Date(capture.capturedAt).toLocaleString(LANG_TAGS[lang])}</span>
       </div>
       <div className="visual-novel-sentence-fields">
-        <label className="is-wide">Japanese<textarea value={draft.japanese} onChange={(event) => field('japanese', event.target.value)} /></label>
-        <label className="is-wide">Translation<textarea value={draft.translation} onChange={(event) => field('translation', event.target.value)} placeholder="Add or generate an English translation" /></label>
-        <label>Speaker<input value={draft.speaker} onChange={(event) => field('speaker', event.target.value)} /></label>
-        <label>Kind<select value={draft.kind} onChange={(event) => field('kind', event.target.value as VisualNovelTextKind)}><option value="dialogue">Dialogue</option><option value="narration">Narration</option><option value="choice">Choice</option><option value="character-name">Character name</option><option value="system">System text</option></select></label>
-        <label>Route<select value={draft.routeId} onChange={(event) => field('routeId', event.target.value)}><option value="">No route</option>{entry.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}</select></label>
-        <label>Chapter<input value={draft.chapter} onChange={(event) => field('chapter', event.target.value)} /></label>
-        <label>Scene<input value={draft.scene} onChange={(event) => field('scene', event.target.value)} /></label>
+        <label className="is-wide">{t('vnAssist.japanese')}<textarea value={draft.japanese} onChange={(event) => field('japanese', event.target.value)} /></label>
+        <label className="is-wide">{t('vnAssist.translation')}<textarea value={draft.translation} onChange={(event) => field('translation', event.target.value)} placeholder={t('vnAssist.translationPlaceholder')} /></label>
+        <label>{t('vnAssist.speaker')}<input value={draft.speaker} onChange={(event) => field('speaker', event.target.value)} /></label>
+        <label>{t('vnAssist.kindLabel')}<select value={draft.kind} onChange={(event) => field('kind', event.target.value as VisualNovelTextKind)}><option value="dialogue">{t('vnAssist.kind.dialogue')}</option><option value="narration">{t('vnAssist.kind.narration')}</option><option value="choice">{t('vnAssist.kind.choice')}</option><option value="character-name">{t('vnAssist.kind.characterName')}</option><option value="system">{t('vnAssist.kind.system')}</option></select></label>
+        {/* Route names are the user's own data. */}
+        <label>{t('vnAssist.route')}<select value={draft.routeId} onChange={(event) => field('routeId', event.target.value)}><option value="">{t('vnAssist.noRoute')}</option>{entry.routes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}</select></label>
+        <label>{t('vnAssist.chapter')}<input value={draft.chapter} onChange={(event) => field('chapter', event.target.value)} /></label>
+        <label>{t('vnAssist.scene')}<input value={draft.scene} onChange={(event) => field('scene', event.target.value)} /></label>
       </div>
       {screenshotDataUrl && (
         <figure className="visual-novel-sentence-screenshot">
-          <img src={screenshotDataUrl} alt="Captured visual novel scene" />
-          <figcaption>This scene will be attached when the sentence is saved as a card.</figcaption>
+          <img src={screenshotDataUrl} alt={t('vnAssist.screenshotAlt')} />
+          <figcaption>{t('vnAssist.screenshotCaption')}</figcaption>
         </figure>
       )}
       <div className="visual-novel-sentence-actions">
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void persist()}>Save details</button>
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void translate()}>{busy ? 'Working…' : 'Translate'}</button>
-        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void analyze()}>Analyze sentence</button>
-        <button type="button" onClick={onSaveCard}>Save card</button>
+        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void persist()}>{t('vnAssist.saveDetails')}</button>
+        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void translate()}>{busy ? t('vnAssist.working') : t('vnAssist.translate')}</button>
+        <button type="button" disabled={busy || !draft.japanese.trim()} onClick={() => void analyze()}>{t('vnAssist.analyze')}</button>
+        <button type="button" onClick={onSaveCard}>{t('vnAssist.saveCard')}</button>
         <VisualNovelAgentHandoffButton capture={capture} screenshotDataUrl={screenshotDataUrl} />
         {capture.audioPath ? (
           <>
             <button type="button" disabled={audioBusy} onClick={() => void playAudio()}>
-              {audioBusy ? 'Loading audio…' : 'Play voice clip'}
+              {audioBusy ? t('vnAssist.loadingAudio') : t('vnAssist.playClip')}
             </button>
-            <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>Replace voice clip</button>
-            <button type="button" disabled={audioBusy} onClick={() => void removeAudio()}>Remove voice clip</button>
+            <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>{t('vnAssist.replaceClip')}</button>
+            <button type="button" disabled={audioBusy} onClick={() => void removeAudio()}>{t('vnAssist.removeClip')}</button>
           </>
         ) : (
           <button type="button" disabled={audioBusy} onClick={() => void attachAudio()}>
-            {audioBusy ? 'Attaching…' : 'Attach voice clip'}
+            {audioBusy ? t('vnAssist.attaching') : t('vnAssist.attachClip')}
           </button>
         )}
         <button type="button" className={confirmDelete ? 'is-confirming' : ''} onClick={() => void remove()}>
-          {confirmDelete ? 'Confirm remove' : 'Remove sentence'}
+          {confirmDelete ? t('vnAssist.confirmRemove') : t('vnAssist.removeSentence')}
         </button>
       </div>
       {analysis && (
         <div className="visual-novel-sentence-analysis">
-          <span>{analysis.level?.label ?? 'Unrated'} difficulty</span>
-          <span>{Math.round(analysis.comprehensibility.knownRatio * 100)}% known vocabulary</span>
-          <span>{analysis.vocabulary.length} unique words</span>
-          <span>{analysis.kanji.length} kanji</span>
+          <span>{t('vnAssist.difficulty', { level: analysis.level?.label ?? t('vnAssist.unrated') })}</span>
+          <span>{t('vnAssist.knownVocab', { percent: Math.round(analysis.comprehensibility.knownRatio * 100) })}</span>
+          <span>{t('vnAssist.uniqueWords', { count: analysis.vocabulary.length })}</span>
+          <span>{t('vnAssist.kanjiCount', { count: analysis.kanji.length })}</span>
           {analysis.kanji.length > 0 && (
-            <div className="visual-novel-kanji-links" aria-label="Kanji dictionary links">
+            <div className="visual-novel-kanji-links" aria-label={t('vnAssist.aria.kanjiLinks')}>
               {analysis.kanji.slice(0, 24).map((item) => (
                 <button key={item.character} type="button" onClick={() => lookupKanji(item.character)}>
                   {item.character}
@@ -232,7 +237,7 @@ export default function VisualNovelSentenceAssist({
           )}
           {analysis.grammar.length > 0 && (
             <div>
-              <button type="button" onClick={openGrammarApp}>Practice in Grammar app</button>
+              <button type="button" onClick={openGrammarApp}>{t('vnAssist.practiceGrammar')}</button>
               {analysis.grammar.map((grammar) => (
                 <article key={grammar.id}>
                   <strong>{grammar.title}</strong>
