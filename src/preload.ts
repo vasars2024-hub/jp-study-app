@@ -2691,6 +2691,7 @@ const api = {
     text: string;
     fileName: string;
     media: ReadonlyArray<import('./shared/deckMediaExport').DeckMediaItem>;
+    rows?: string[][];
   }): Promise<import('./main/flashcardAudio').DeckExportResult> =>
     ipcRenderer.invoke('flashcards:exportDeck', request),
   /** Open a folder this app wrote under userData/exports. Refuses anything else. */

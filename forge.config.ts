@@ -217,6 +217,12 @@ const config: ForgeConfig = {
           config: 'vite.main.config.ts',
           target: 'main',
         },
+        {
+          // Local-deck APKG authoring performs SQLite and zip work off main.
+          entry: 'src/main/anki/localDeckApkgWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {

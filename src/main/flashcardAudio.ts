@@ -28,6 +28,7 @@ import {
   shutdownSupertonicHost,
   synthesizeWithSupertonic,
 } from './flashcardTtsHost';
+import { writeLocalDeckApkgOffMain } from './anki/localDeckApkgHost';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -244,6 +245,9 @@ export interface DeckExportResult {
   written?: number;
   /** Files whose source was gone or outside the managed root; named, never hidden. */
   failed?: number;
+  /** Ready-to-import package written beside the text backup. */
+  packagePath?: string;
+  packageVerified?: boolean;
   error?: string;
 }
 
@@ -263,6 +267,7 @@ export async function exportDeckWithAudio(
   text: string,
   fileName: string,
   media: ReadonlyArray<{ fileName: string; sourcePath?: string; dataUrl?: string }>,
+  rows?: string[][],
 ): Promise<DeckExportResult> {
   const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '') || 'deck.csv';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -277,6 +282,7 @@ export async function exportDeckWithAudio(
 
   let written = 0;
   let failed = 0;
+  const packagedMedia: Array<{ fileName: string; filePath: string }> = [];
   for (const item of media) {
     const target = path.join(mediaDirectory, path.basename(item.fileName));
     try {
@@ -295,11 +301,37 @@ export async function exportDeckWithAudio(
         continue;
       }
       written += 1;
+      packagedMedia.push({ fileName: path.basename(item.fileName), filePath: target });
     } catch {
       failed += 1;
     }
   }
-  return { ok: true, directory, written, failed };
+  let packagePath: string | undefined;
+  let packageVerified = false;
+  if (rows && rows.length > 1) {
+    packagePath = path.join(directory, safeName.replace(/\.[^.]+$/, '') + '.apkg');
+    try {
+      await writeLocalDeckApkgOffMain({
+        kind: 'write',
+        id: crypto.randomUUID(),
+        outputPath: packagePath,
+        deckName: safeName.replace(/\.[^.]+$/, '') || 'JP Study deck',
+        rows,
+        media: packagedMedia,
+        nowMs: Date.now(),
+      });
+      packageVerified = true;
+    } catch (error) {
+      return {
+        ok: false,
+        directory,
+        written,
+        failed,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+  return { ok: true, directory, written, failed, packagePath, packageVerified };
 }
 
 /** A spawn failure that carries which classification the caller should report. */
@@ -800,6 +832,7 @@ export function registerFlashcardAudioIpc(): void {
       text?: unknown;
       fileName?: unknown;
       media?: unknown;
+      rows?: unknown;
     };
     return exportDeckWithAudio(
       typeof request.text === 'string' ? request.text : '',
@@ -810,6 +843,9 @@ export function registerFlashcardAudioIpc(): void {
             typeof item?.fileName === 'string' && item.fileName.length > 0,
         )
         : [],
+      Array.isArray(request.rows)
+        ? request.rows.filter((row): row is string[] => Array.isArray(row) && row.every((field) => typeof field === 'string'))
+        : undefined,
     );
   });
   ipcMain.handle('flashcards:revealExport', (_event, directory?: unknown) => {

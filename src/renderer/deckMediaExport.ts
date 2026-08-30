@@ -20,6 +20,8 @@ export interface DeckMediaExportOutcome {
   failed: number;
   /** Cards with no audio at all. Not a failure; the row is still exported. */
   withoutAudio: number;
+  packagePath?: string;
+  packageVerified?: boolean;
   error?: string;
 }
 
@@ -41,7 +43,7 @@ export async function runDeckAudioExport(
     .map((row) => row.map((field) => escapeCsvField(field, delimiter)).join(delimiter))
     .join('\n');
 
-  const result = await window.api.flashcardExportDeck({ text, fileName, media: built.media });
+  const result = await window.api.flashcardExportDeck({ text, fileName, media: built.media, rows: built.rows });
   return {
     ok: result.ok === true,
     directory: result.directory,
@@ -49,6 +51,8 @@ export async function runDeckAudioExport(
     written: result.written ?? 0,
     failed: result.failed ?? 0,
     withoutAudio: built.withoutAudio,
+    packagePath: result.packagePath,
+    packageVerified: result.packageVerified,
     error: result.error,
   };
 }

@@ -1742,6 +1742,7 @@ declare global {
         text: string;
         fileName: string;
         media: ReadonlyArray<import('../shared/deckMediaExport').DeckMediaItem>;
+        rows?: string[][];
       }): Promise<import('../main/flashcardAudio').DeckExportResult>;
       flashcardRevealExport(directory: string): Promise<boolean>;
       flashcardReadAudio(
