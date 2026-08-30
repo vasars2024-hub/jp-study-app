@@ -1,0 +1,335 @@
+{
+  "label": "l8-scraper",
+  "surface": "@.fwin:has(.scr-shell)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "820x580",
+  "textRuns": 1215,
+  "textHash": 746643145,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 6,
+  "mutePairs": [
+    {
+      "el": "button.ui-btn",
+      "label": "Send selected to Seanime",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-torrent-filters",
+        "div.scr-card-body",
+        "section.scr-card"
+      ],
+      "childIndex": 1,
+      "box": "491,531 167x32",
+      "ownText": "Send selected to Seanime"
+    },
+    {
+      "el": "button.ui-btn",
+      "label": "Send selected to debrid",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-torrent-filters",
+        "div.scr-card-body",
+        "section.scr-card"
+      ],
+      "childIndex": 2,
+      "box": "666,531 156x32",
+      "ownText": "Send selected to debrid"
+    },
+    {
+      "el": "button.ui-btn",
+      "label": "Run auto-downloader",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-torrent-filters",
+        "div.scr-card-body",
+        "section.scr-card"
+      ],
+      "childIndex": 3,
+      "box": "160,571 146x32",
+      "ownText": "Run auto-downloader"
+    },
+    {
+      "el": "button.ui-btn",
+      "label": "Simulate enabled rules",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-torrent-filters",
+        "div.scr-card-body",
+        "section.scr-card"
+      ],
+      "childIndex": 4,
+      "box": "314,571 151x32",
+      "ownText": "Simulate enabled rules"
+    },
+    {
+      "el": "button.ui-btn",
+      "label": "Send 0 to qBittorrent",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-page-actions",
+        "div.scr-card-trailing",
+        "header.scr-card-head"
+      ],
+      "childIndex": 0,
+      "box": "570,645 142x32",
+      "ownText": "Send 0 to qBittorrent"
+    },
+    {
+      "el": "button.ui-btn",
+      "label": "Clear Selection",
+      "ariaLabel": null,
+      "title": null,
+      "icon": null,
+      "ancestors": [
+        "div.scr-page-actions",
+        "div.scr-card-trailing",
+        "header.scr-card-head"
+      ],
+      "childIndex": 1,
+      "box": "716,645 106x32",
+      "ownText": "Clear Selection"
+    }
+  ],
+  "disabledTotal": 6,
+  "states": {
+    "empty": {
+      "hosts": 1,
+      "messages": [
+        "qBittorrent has no transfers."
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9727,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9727 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 1215,
+        "textHash": 746643145,
+        "rawKeyCount": 0,
+        "rawKeys": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 1215,
+        "textHash": 746643145,
+        "rawKeyCount": 0,
+        "rawKeys": []
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 1215,
+        "textHash": 746643145,
+        "rawKeyCount": 0,
+        "rawKeys": []
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 1215,
+        "textHash": 746643145,
+        "rawKeyCount": 0,
+        "rawKeys": []
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 1
+  },
+  "drive": {
+    "input": ".scr-topbar .scr-search-input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 1206,
+      "states": {
+        "empty": {
+          "hosts": 2,
+          "messages": [
+            "qBittorrent has no transfers."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 6,
+      "mutePairs": [
+        {
+          "el": "button.ui-btn",
+          "label": "Send selected to Seanime",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-torrent-filters",
+            "div.scr-card-body",
+            "section.scr-card"
+          ],
+          "childIndex": 1,
+          "box": "491,531 167x32",
+          "ownText": "Send selected to Seanime"
+        },
+        {
+          "el": "button.ui-btn",
+          "label": "Send selected to debrid",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-torrent-filters",
+            "div.scr-card-body",
+            "section.scr-card"
+          ],
+          "childIndex": 2,
+          "box": "666,531 156x32",
+          "ownText": "Send selected to debrid"
+        },
+        {
+          "el": "button.ui-btn",
+          "label": "Run auto-downloader",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-torrent-filters",
+            "div.scr-card-body",
+            "section.scr-card"
+          ],
+          "childIndex": 3,
+          "box": "160,571 146x32",
+          "ownText": "Run auto-downloader"
+        },
+        {
+          "el": "button.ui-btn",
+          "label": "Simulate enabled rules",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-torrent-filters",
+            "div.scr-card-body",
+            "section.scr-card"
+          ],
+          "childIndex": 4,
+          "box": "314,571 151x32",
+          "ownText": "Simulate enabled rules"
+        },
+        {
+          "el": "button.ui-btn",
+          "label": "Send 0 to qBittorrent",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-page-actions",
+            "div.scr-card-trailing",
+            "header.scr-card-head"
+          ],
+          "childIndex": 0,
+          "box": "570,645 142x32",
+          "ownText": "Send 0 to qBittorrent"
+        },
+        {
+          "el": "button.ui-btn",
+          "label": "Clear Selection",
+          "ariaLabel": null,
+          "title": null,
+          "icon": null,
+          "ancestors": [
+            "div.scr-page-actions",
+            "div.scr-card-trailing",
+            "header.scr-card-head"
+          ],
+          "childIndex": 1,
+          "box": "716,645 106x32",
+          "ownText": "Clear Selection"
+        }
+      ],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 6,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": false,
+    "statesNamed": true,
+    "languagesDiffer": false
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "mutePairs",
+    "languagesDiffer"
+  ],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

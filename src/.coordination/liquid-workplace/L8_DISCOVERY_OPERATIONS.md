@@ -300,3 +300,64 @@ FAIL cost a run here. Restore the window before measuring.
 Regression `scraperTableReflow.test.tsx` **5/5** + `scraperNarrowReflow.test.tsx` **3/3**.
 Pre-existing, not introduced: `MIRROR_COLUMNS` labels are raw English literals, not `sx()`
 keys. Evidence: `baselines/cat4-l8-scraper.json`. Scraper is **50/80**; open: 5, 7, 8.
+
+## 2026-08-30 — Scraper categories 5 and 7 close; category 8 is the last cell (primary)
+
+`e8bfa3ef` `1b330e8e` `3a49bdae`. Scraper **50/80 → 70/80**. Open: **8 only**.
+
+**Category 5 — 10/10, and the first 10/10 was measured on a hidden page.** Q4 read
+50 scanned against a bar of 12; 40 were the settings drawer, open as probe residue.
+The product half is the defect that number found: the top bar's settings control was
+`aria-pressed`, so a screen reader announced "not pressed" for a closed panel and
+nothing linked the control to the region it opens. It is now `aria-expanded` +
+`aria-controls` (APG disclosure), with the id in `drawerId.ts` because the drawer is
+`lazy()`-loaded and a direct import would undo the split.
+
+**Harness correction 19**, symmetric: `collapsed` already counted
+`[aria-expanded="false"]`, so ARIA was already `<details>`-equivalent on the closed
+side. `inDisclosure` excluded every `<details>`' contents INCLUDING OPEN ONES, but
+charged an `aria-controls` region in full. Guards: a region containing its own toggle
+is ignored; the toggle is never excluded. Its control lives in `--control` now — two
+8-control panels, one unmarked and one self-declaring, both still counted; scanned
+**12 → 34**, `CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10`, residue 0.
+
+**Then the state itself was wrong.** `@container scr-shell (max-width: 1100px)` sets
+`.scr-shell.is-drawer-open .scr-main { display: none }` — correct, documented. At
+820px with the drawer open, `main.scr-main` is 0x0, so cat5 and cat8 were scoring the
+DRAWER. Re-run in the product default (`drawerOpen: false`): 73 text runs → **576**,
+and 17 classic-light runs failed at **2.71:1**. `.scr-pill--good` and every
+`.scr-seed.is-high` used a `--status-*` FILL token as text — same root cause as
+`2a7082f5`, one page over. Repaired with the existing `--success-text`/`--warning-text`/
+`--danger-text` family; border keeps the tone. classic-light min **2.71 → 5.71**,
+failing **17 → 0**, forest-night 5.30. Q4 on the true default: **12 against a bar of
+12**, `ariaDisclosures: []` — with the drawer closed the 10/10 does not rest on
+correction 19 at all.
+
+**Category 7 — 10/10, a SPEC not a probe.** Load is navigation, measured not assumed:
+all 17 pages swept live, largest Dashboard 551 elements / 61 rows, Results/Downloads/
+Site Rules/Plugins/three testers **0 rows** (last scrape 19d ago), so
+`scrollAll('.scr-shell')` would have picked `scr-drawer-pane` (1,315 px, the largest)
+and measured the drawer. Ceiling p50 **16.7** (60 Hz), scene 1 fwin / 892 elements.
+drag 16.7/16.9/17.0/0, resize 16.7/16.8/16.9/0, theme 16.7/16.8/66.9/0; heavy main max
+**67.5 ms** vs a 500 ms bar, idle 8.7, span 4,518 of 4,500. Proof: `17 pages x2 = 34
+navigations, restored to Torrent Manager`. `--jank`: p95 16.9 → **116.9**, over-100
+**0 → 12**.
+
+**Category 8 — FAIL, two named bars, and neither is a mystery.** 1,215 text runs,
+rawKeys **0**, placeholders **0**, `statesNamed` **1 of 1** ("qBittorrent has no
+transfers."). Failing: (a) `mutePairs` **6** — six disabled buttons on Torrent Manager
+with no title/description: Send selected to Seanime, Send selected to debrid, Run
+auto-downloader, Simulate enabled rules, Send 0 to qBittorrent, Clear Selection. Their
+conditions are compound (`backendBusy || !selected.size || state !== 'ready'`), so the
+explanation must be derived, not one fixed string. (b) `languagesDiffer` **false** —
+one hash `746643145` across all four languages, `htmlLang` correctly en/ja/zh-Hans/ru,
+`restored: true`. Not a defect discovered here: `strings.ts:3` documents a DELIBERATE
+i18n deferral, 588 keys English-only. That is a decision to revisit, not a bug to patch.
+
+**Trap.** Building a HEAD+edit blob for `scraper.css`, reading HEAD as `latin1` and
+writing `Buffer.from(s,'latin1')` truncated the em dash in the replacement to the low
+byte **0x14**. A control character was in the staged blob while the worktree file was
+correct. Check the BLOB, not the file you edited.
+
+Evidence: `baselines/cat5-l8-scraper.json`, `cat5-l8-scraper-c19-control.json`,
+`cat7-l8-scraper.json`, `cat8-l8-scraper.json`.
