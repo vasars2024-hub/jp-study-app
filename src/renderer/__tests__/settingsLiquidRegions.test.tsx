@@ -209,7 +209,7 @@ describe('Settings — Liquid region roles', () => {
 
     const tier = app.match(/@container os-set-body \(max-width: 420px\) \{([\s\S]*?)\n\}\n/);
     expect(tier, 'a narrow tier exists').not.toBeNull();
-    const css = tier![1];
+    const css = tier?.[1] ?? '';
     expect(css, 'the rail collapses to an icon column').toMatch(/\.os-set-nav-v2 \{\s*\n\s*width: 52px;/);
 
     // THE TRAP this pins. `.os-set-nav-item` carries no `aria-label`, so its bare `<span>` IS
