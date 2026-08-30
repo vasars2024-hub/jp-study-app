@@ -25,7 +25,7 @@
     "total": 50,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
-    "under32Count": 21,
+    "under32Count": 15,
     "under32": [
       {
         "el": "button.fwin-b",
@@ -63,19 +63,19 @@
         "nearest": 33
       },
       {
-        "el": "button.btn",
-        "min": 25,
-        "nearest": 47
+        "el": "button",
+        "min": 26,
+        "nearest": 33
       },
       {
-        "el": "button.btn",
-        "min": 25,
-        "nearest": 44.3
+        "el": "button",
+        "min": 26,
+        "nearest": 33
       },
       {
-        "el": "button.btn",
-        "min": 25,
-        "nearest": 47
+        "el": "button",
+        "min": 26,
+        "nearest": 33
       }
     ],
     "wcag258FailCount": 0,
@@ -142,41 +142,64 @@
     "box": "1080x700",
     "deferredVisibilityOwners": 0,
     "controls": 37,
-    "measured": 35,
-    "belowFloorByRect": 14,
-    "belowFloorByHit": 0,
-    "belowFloor": [],
-    "smallestHit": {
-      "el": "button.fwin-b.lq-hit",
-      "rect": "30x24",
-      "rectMin": 24,
-      "hit": "32x32.5",
-      "hitMin": 32,
-      "shrunk": false,
-      "shrunkBy": 0,
-      "blockers": [
-        "div.fwin-bar",
-        "button.fwin-b.lq-hit.fwin-b-liquid",
-        "section.fwin.focused",
-        "div.fwin-bar"
-      ]
-    },
-    "stolenCount": 0,
-    "stolen": [],
-    "worstShrunkBy": 0,
-    "occludedCount": 2,
-    "occluded": [
+    "measured": 37,
+    "belowFloorByRect": 12,
+    "belowFloorByHit": 1,
+    "belowFloor": [
       {
-        "el": "input",
-        "rect": "86x32",
-        "by": "button.seanime-host-launcher"
-      },
-      {
-        "el": "button",
-        "rect": "26x26",
-        "by": "button.seanime-host-launcher"
+        "sel": "button",
+        "n": 1,
+        "rect": "26x32",
+        "hit": "32.5x24.5",
+        "hitMin": 24.5,
+        "blockers": [
+          "div.lq-contextual.mc-player-volume.lq-hit-scope",
+          "footer.lq-contextual.mc-playerbar"
+        ]
       }
     ],
+    "smallestHit": {
+      "el": "button",
+      "rect": "26x32",
+      "rectMin": 26,
+      "hit": "32.5x24.5",
+      "hitMin": 24.5,
+      "shrunk": true,
+      "shrunkBy": 7,
+      "blockers": [
+        "div.lq-contextual.mc-player-volume.lq-hit-scope",
+        "footer.lq-contextual.mc-playerbar",
+        "div.lq-contextual.mc-player-volume.lq-hit-scope",
+        "button.seanime-host-launcher"
+      ]
+    },
+    "stolenCount": 2,
+    "stolen": [
+      {
+        "sel": "input",
+        "n": 1,
+        "rect": "86x61",
+        "hit": "52.5x34",
+        "shrunkBy": 21.5,
+        "blockers": [
+          "button.seanime-host-launcher"
+        ]
+      },
+      {
+        "sel": "button",
+        "n": 1,
+        "rect": "26x32",
+        "hit": "32.5x24.5",
+        "shrunkBy": 7,
+        "blockers": [
+          "div.lq-contextual.mc-player-volume.lq-hit-scope",
+          "footer.lq-contextual.mc-playerbar"
+        ]
+      }
+    ],
+    "worstShrunkBy": 21.5,
+    "occludedCount": 0,
+    "occluded": [],
     "disabledCount": 12,
     "disabled": [
       {
@@ -193,7 +216,7 @@
       },
       {
         "el": "button.btn.small",
-        "rect": "37x25"
+        "rect": "37x32"
       },
       {
         "el": "button.btn.primary.music-play",
@@ -201,21 +224,21 @@
       },
       {
         "el": "button.btn.small",
-        "rect": "37x25"
+        "rect": "37x32"
       },
       {
         "el": "button.btn.small",
-        "rect": "37x25"
+        "rect": "37x32"
       },
       {
         "el": "input.music-seek",
-        "rect": "148x32"
+        "rect": "150x48"
       }
     ],
     "disclosedForRun": 0,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "nav.mc-nav 0,0 -> 27,0"
+      "nav.lq-contextual.mc-nav 0,0 -> 37,0"
     ],
     "deferredRestore": {
       "first": {
@@ -267,20 +290,22 @@
     },
     "stable": true,
     "firstRun": {
-      "belowFloorByHit": 0,
-      "stolenCount": 0,
-      "occludedCount": 2
+      "belowFloorByHit": 1,
+      "stolenCount": 2,
+      "occludedCount": 0
     }
   },
   "bars": {
     "contrast": true,
-    "targets32": true,
+    "targets32": false,
     "wcag258": true,
     "keyboard": true,
     "motion": true
   },
-  "verdict": "PASS 10/10",
-  "failedBars": [],
+  "verdict": "FAIL",
+  "failedBars": [
+    "targets32"
+  ],
   "ariaRestored": {
     "skipped": "nothing was opened"
   }

@@ -1529,6 +1529,17 @@
   min-height: 0;
   border: 1px solid var(--mc-line);
   border-radius: 12px;
+}
+
+/* The library and the queue are contextual panels, so 0.78 is the point of them.
+   `.mc-music-now` is deliberately NOT in this list: it holds the lyrics and the
+   transport, i.e. dense work, so it takes its fill from `--lq-anchor-bg` via
+   `AnchorSurface`. This sheet loads after `theme/liquid-surfaces.css`, so leaving
+   it in the shared rule silently beat the anchor role at equal specificity and
+   category 3 scored it `alpha 0.78 on main.lq-anchor` — the role was declared and
+   overpainted, which is worse than not declaring it. */
+.mc-music-library,
+.mc-music-queue {
   background: rgba(19, 22, 31, 0.78);
 }
 

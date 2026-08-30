@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import Icon from '../Icons';
 import VirtualList from '../VirtualList';
+import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import type { MediaItem } from '../../../shared/types';
 import { guessSongMeta, type SongMeta } from '../../lyrics';
 import { useLiveLyrics } from '../../liveLyrics';
@@ -430,7 +431,9 @@ export function MusicSongList({ state }: { state: MusicState }) {
 export function MusicSearchBox({ state }: { state: MusicState }) {
   const { t } = useT();
   return (
-    <div className="music-search">
+    // Filtering the library is a contextual tool over it, not dense work in it,
+    // so it takes the Liquid role. Inert until the window is Liquid.
+    <ContextualSurface className="music-search">
       <Icon name="search" size={13} />
       <input
         type="text"
@@ -448,7 +451,7 @@ export function MusicSearchBox({ state }: { state: MusicState }) {
           ×
         </button>
       )}
-    </div>
+    </ContextualSurface>
   );
 }
 
@@ -457,7 +460,9 @@ export function MusicYoutubeRow({ state }: { state: MusicState }) {
   const { t } = useT();
   const { yt, ytError } = state;
   return (
-    <div className="music-yt">
+    // A URL the user types is data ENTRY, so this stays an opaque anchor rather
+    // than becoming glass — literally the "toolbar's URL field" case `bare` names.
+    <AnchorSurface bare className="music-yt">
       <input
         type="text"
         className="music-yt-input"
@@ -476,7 +481,7 @@ export function MusicYoutubeRow({ state }: { state: MusicState }) {
         {yt ? `${yt.stage} ${Math.round(yt.percent)}%` : t('music.yt.getAudio')}
       </button>
       {ytError && <div className="lib-import-err music-yt-err">{ytError}</div>}
-    </div>
+    </AnchorSurface>
   );
 }
 
@@ -744,7 +749,7 @@ export function MusicControls({
     // shared component rather than only in Media Center because these are the same
     // six buttons in the widget and in Blanc, and a bigger target cannot regress a
     // host that has not been scored yet.
-    <div className="music-controls lq-hit-scope">
+    <ContextualSurface className="music-controls lq-hit-scope">
       <button
         className={`btn small ${ps.shuffle ? 'primary' : ''}`}
         onClick={player.toggleShuffle}
@@ -817,7 +822,7 @@ export function MusicControls({
           <Icon name="window" size={15} />
         </button>
       )}
-    </div>
+    </ContextualSurface>
   );
 }
 

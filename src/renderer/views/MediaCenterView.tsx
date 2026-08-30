@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { MediaItem } from '../../shared/types';
 import { MEDIA_STUDY_EVENT } from '../../shared/mediaStudyIntegration';
 import Icon, { type IconName } from '../components/Icons';
+import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import {
   AppChrome,
   StatusBarField,
@@ -979,7 +980,7 @@ function MusicPanel({ state }: { state: MusicState }) {
       </div>
 
       <div className="mc-music-layout">
-        <aside className="mc-music-library">
+        <ContextualSurface as="aside" className="mc-music-library">
           <div className="mc-panel-title">
             <div><strong>{t('mediaCenter.music.library')}</strong><small>{t('mediaCenter.music.trackCount', { count: state.baseSongs.length })}</small></div>
             <div className="mc-panel-actions lq-hit-scope">
@@ -1008,9 +1009,9 @@ function MusicPanel({ state }: { state: MusicState }) {
           </label>
           <div className="mc-music-list"><MusicSongList state={state} /></div>
           <MusicYoutubeRow state={state} />
-        </aside>
+        </ContextualSurface>
 
-        <main className="mc-music-now">
+        <AnchorSurface as="main" bare className="mc-music-now">
           <div className="mc-album-stage">
             <div className="mc-album-art">
               {state.art ? <img src={state.art} alt="" /> : <div><Icon name="music" size={54} /></div>}
@@ -1026,9 +1027,9 @@ function MusicPanel({ state }: { state: MusicState }) {
           <div className="mc-lyrics-frame"><MusicLyricsPane state={state} /></div>
           <MusicControls state={state} onOpenWidget={() => void window.api.popOut('musicwidget')} />
           <MusicNowPlaying state={state} />
-        </main>
+        </AnchorSurface>
 
-        <aside className="mc-music-queue">
+        <ContextualSurface as="aside" className="mc-music-queue">
           <div className="mc-panel-title">
             <div><strong>{t('mediaCenter.common.upNext')}</strong><small>{t('mediaCenter.music.playbackQueue')}</small></div>
             <Icon name="music" size={15} />
@@ -1048,7 +1049,7 @@ function MusicPanel({ state }: { state: MusicState }) {
             <span><strong>{state.baseSongs.length}</strong> {t('mediaCenter.music.tracks')}</span>
             <span><strong>{state.baseSongs.reduce((sum, item) => sum + (item.listenCount ?? 0), 0)}</strong> {t('mediaCenter.music.plays')}</span>
           </div>
-        </aside>
+        </ContextualSurface>
       </div>
     </div>
   );
@@ -1451,7 +1452,7 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
   const { t } = useT();
   const { ps, currentMeta } = state;
   return (
-    <footer className="mc-playerbar">
+    <ContextualSurface as="footer" className="mc-playerbar">
       <button type="button" className="mc-player-info" onClick={onMusic}>
         <span className="mc-player-thumb">
           {state.art ? <img src={state.art} alt="" /> : <Icon name="music" size={16} />}
@@ -1467,17 +1468,20 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
         <button type="button" onClick={player.next} disabled={!ps.current} title={t('mediaCenter.player.next')}><Icon name="skip-forward" size={15} /></button>
         <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={`Repeat: ${ps.repeat}`}><Icon name="repeat" size={14} /></button>
       </div>
-      <div className="mc-player-progress">
+      {/* Transport, which §2.3 names as what Liquid is FOR. The seek row holds a
+          range input, so without the role it classifies as dense work sitting on
+          the player bar's own backdrop-filter and reads as a category-3 failure. */}
+      <ContextualSurface className="mc-player-progress">
         <span>{fmt(ps.time)}</span>
         <input type="range" min={0} max={ps.duration || 1} step={0.1} value={Math.min(ps.time, ps.duration || 1)} onChange={(event) => player.seek(Number(event.target.value))} disabled={!ps.current} aria-label={t('a11y.slider.trackPosition')} />
         <span>{fmt(ps.duration)}</span>
-      </div>
-      <div className="mc-player-volume lq-hit-scope">
+      </ContextualSurface>
+      <ContextualSurface className="mc-player-volume lq-hit-scope">
         <Icon name="volume" size={14} />
         <input type="range" min={0} max={1} step={0.05} value={ps.volume} onChange={(event) => player.setVolume(Number(event.target.value))} aria-label={t('music.controls.volume')} />
         <button type="button" title={t('mediaCenter.music.detachMini')} onClick={() => void window.api.popOut('musicwidget')}><Icon name="window" size={14} /></button>
-      </div>
-    </footer>
+      </ContextualSurface>
+    </ContextualSurface>
   );
 }
 
@@ -1768,7 +1772,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           });
         }}
       >
-        <aside className="mc-sidebar">
+        <ContextualSurface as="aside" className="mc-sidebar">
           <div className="mc-brand">
             <span className="mc-brand-mark"><Icon name="player" size={16} /></span>
             <span><strong>Media Center</strong><small>日本語 immersion</small></span>
@@ -1784,7 +1788,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             item renders into, because the `Ctrl+N` hint has to keep naming the shortcut
             `NAV[index]` actually binds (`onKey` above indexes `NAV`, not this list).
           */}
-          <nav className="mc-nav" aria-label={t('mediaCenter.nav.label')}>
+          <ContextualSurface as="nav" className="mc-nav" aria-label={t('mediaCenter.nav.label')}>
             <span className="mc-nav-label">{t('mediaCenter.shell.browse')}</span>
             {nav.filter((item) => PRIMARY_NAV.includes(item.id)).map((item) => navLink(item))}
 
@@ -1826,7 +1830,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 <span><strong>{t('mediaWorkspace.launcher')}</strong><small>{t('mediaWorkspace.viewLibrary')}</small></span>
               </button>
             </details>
-          </nav>
+          </ContextualSurface>
 
           <div className="mc-sidebar-spacer" />
 
@@ -1838,10 +1842,10 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
           <button type="button" className={`mc-settings-link${tab === 'settings' ? ' is-active' : ''}`} onClick={() => setTab('settings')}>
             <Icon name="settings" size={15} /><span><strong>{t('mediaCenter.nav.settings')}</strong><small>{t('mediaCenter.nav.settingsHint')}</small></span>
           </button>
-        </aside>
+        </ContextualSurface>
 
         <div className="mc-workspace">
-          <header className="mc-topbar">
+          <ContextualSurface as="header" className="mc-topbar">
             {/* Both are icon-only and disabled on a fresh trail, so `title="Back"` named the
                 button and never explained the grey. The title carries the REASON while
                 disabled and the label while enabled; unlike Immersion's pair these already
@@ -1901,7 +1905,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
               that is the one carrying the active state.
             */}
             <button type="button" className="mc-top-action" title={t('mediaCenter.action.openMedia')} aria-label={t('mediaCenter.action.openMedia')} onClick={() => void media.openFile()}><Icon name="plus" size={14} /></button>
-          </header>
+          </ContextualSurface>
 
           <main className="mc-content">{body}</main>
           {/*
