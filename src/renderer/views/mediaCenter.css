@@ -61,6 +61,8 @@
      on the light themes' rgb(255, 255, 255) sidebar, about 2.1:1, and grey instead
      of #ffff00 under high-contrast. Same values as before for the dark palettes. */
   --mc-nav-ink: #aaaebb;
+  --mc-nav-hover-ink: #e8e9ed;
+  --mc-nav-active-sub-ink: #969bab;
   --mc-nav-badge-bg: rgba(255, 255, 255, 0.08);
   --mc-nav-badge-text: #c9cbd3;
 
@@ -77,6 +79,29 @@
   --mc-nav-active-ink: #fff;
   --mc-ring-ink: #ececf1;
   --mc-crumb-ink: #c9ccd6;
+
+  /* Page ink and panel material — the round of literals the two passes above
+     missed, found the same way one step later. Measured 2026-08-30 through the
+     bridge on the MUSIC window at `data-theme='classic-light'`, with the theme
+     remap at the bottom of this file already applied: `.mc-music-head h1` painted
+     rgb(246, 246, 249) on the now-white shell (**1.23:1**), `.mc-album-copy h2`
+     rgb(240, 241, 244) (**1.01:1**), `.mc-button` rgb(218, 220, 228) (**1.04:1**),
+     and the two contextual asides kept their rgba(19, 22, 31, 0.78) dark slab under
+     text that had correctly turned rgb(30, 30, 30) — dark on dark, 1.57–1.67:1.
+     Twenty-four failing runs in one window. Same shape as before: a token that
+     re-sources the SURFACE cannot help text that writes its own hex, and a token
+     that re-sources the TEXT cannot help a surface that writes its own rgba.
+     Values unchanged for the dark palettes, so nothing repaints there. */
+  --mc-hero-ink: #f6f6f9;
+  --mc-title-ink: #e8e9ee;
+  --mc-row-ink: #d9dbe1;
+  --mc-inset-glass: rgba(8, 10, 15, 0.4);
+  --mc-inset-glass-soft: rgba(8, 10, 15, 0.35);
+  --mc-album-ink: #f0f1f4;
+  --mc-btn-ink: #dadce4;
+  --mc-panel-glass: rgba(19, 22, 31, 0.78);
+  --mc-panel-glass-mid: rgba(19, 22, 31, 0.76);
+  --mc-panel-glass-soft: rgba(19, 22, 31, 0.74);
 
   /*
    * The one type scale for Media Center.
@@ -418,7 +443,7 @@
 .mc-settings-link:hover,
 .mc-seanime-link:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.035);
-  color: #e8e9ed;
+  color: var(--mc-nav-hover-ink, #e8e9ed);
 }
 
 .mc-nav button.is-active,
@@ -426,6 +451,19 @@
   border-color: rgba(255, 106, 131, 0.18);
   background: linear-gradient(90deg, rgba(216, 74, 104, 0.2), rgba(216, 74, 104, 0.07));
   color: var(--mc-nav-active-ink);
+}
+
+/* The active row is tinted by its own accent gradient, and that tint costs about
+   a sixth of a step: `--mc-dim` measured 4.46:1 on the Music row against the 5.2:1
+   it holds on `--mc-bg`, under the 4.5 floor by one percent, and `--mc-muted`
+   measured 4.40:1 in classic-light for the same reason. An emphasised row takes
+   its own secondary ink, for the same reason its <strong> already takes
+   `--mc-nav-active-ink` rather than the plain nav ink; the light remap pulls it a
+   step toward the body ink so the accent tint cannot eat the whole margin, while
+   keeping it visibly below <strong>. */
+.mc-nav button.is-active small,
+.mc-settings-link.is-active small {
+  color: var(--mc-nav-active-sub-ink, var(--mc-muted));
 }
 
 .mc-nav button.is-active::before,
@@ -677,7 +715,7 @@
   border: 1px solid var(--mc-line-strong);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
-  color: #dadce4;
+  color: var(--mc-btn-ink, #dadce4);
   font-size: var(--mc-fs-body, 13px);
   font-weight: 600;
   cursor: pointer;
@@ -739,7 +777,7 @@
 .mc-settings-head h1,
 .mc-music-head h1 {
   margin: 0;
-  color: #f6f6f9;
+  color: var(--mc-hero-ink, #f6f6f9);
   font-size: clamp(20px, 2.4vw, 30px);
   font-weight: 650;
   letter-spacing: -0.035em;
@@ -914,7 +952,7 @@
 .mc-inspector-block h2,
 .mc-settings-section h2 {
   margin: 0;
-  color: #e8e9ee;
+  color: var(--mc-title-ink, #e8e9ee);
   font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.015em;
@@ -1544,7 +1582,7 @@
    overpainted, which is worse than not declaring it. */
 .mc-music-library,
 .mc-music-queue {
-  background: rgba(19, 22, 31, 0.78);
+  background: var(--mc-panel-glass, rgba(19, 22, 31, 0.78));
 }
 
 .mc-music-library,
@@ -1775,7 +1813,7 @@
 .mc-album-copy h2 {
   margin: 0;
   overflow: hidden;
-  color: #f0f1f4;
+  color: var(--mc-album-ink, #f0f1f4);
   font-size: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1815,12 +1853,12 @@
 .mc-music-now .music-controls {
   border-top: 1px solid var(--mc-line);
   padding: 9px 10px;
-  background: rgba(8, 10, 15, 0.4);
+  background: var(--mc-inset-glass, rgba(8, 10, 15, 0.4));
 }
 
 .mc-music-now .music-nowplaying {
   padding: 0 12px 8px;
-  background: rgba(8, 10, 15, 0.4);
+  background: var(--mc-inset-glass, rgba(8, 10, 15, 0.4));
 }
 
 .mc-track-queue {
@@ -1874,7 +1912,7 @@
 }
 
 .mc-track-queue strong {
-  color: #d9dbe1;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -1889,7 +1927,7 @@
   grid-template-columns: 1fr 1fr;
   padding: 9px;
   border-top: 1px solid var(--mc-line);
-  background: rgba(8, 10, 15, 0.35);
+  background: var(--mc-inset-glass-soft, rgba(8, 10, 15, 0.35));
 }
 
 .mc-queue-summary span {
@@ -1901,7 +1939,7 @@
 }
 
 .mc-queue-summary strong {
-  color: #cfd1d8;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -1963,7 +2001,7 @@
   padding: 13px;
   border: 1px solid var(--mc-line);
   border-radius: 12px;
-  background: rgba(19, 22, 31, 0.74);
+  background: var(--mc-panel-glass-soft, rgba(19, 22, 31, 0.74));
 }
 
 .mc-study-row {
@@ -2216,7 +2254,7 @@
 
 .mc-discover-posters > button > strong {
   margin-top: 5px;
-  color: #d9dbe1;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -2256,7 +2294,7 @@
   overflow: hidden;
   border: 1px solid var(--mc-line);
   border-radius: 12px;
-  background: rgba(19, 22, 31, 0.76);
+  background: var(--mc-panel-glass-mid, rgba(19, 22, 31, 0.76));
 }
 
 .mc-settings-section > header {
@@ -2308,7 +2346,7 @@
 
 .mc-setting-row strong,
 .mc-toggle strong {
-  color: #d9dbe1;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
   font-weight: 600;
 }
@@ -2327,7 +2365,7 @@
   border: 1px solid var(--mc-line);
   border-radius: 7px;
   background: #12151f;
-  color: #cfd1d8;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-meta, 12px);
 }
 
@@ -2500,7 +2538,7 @@
 }
 
 .mc-source-row strong {
-  color: #d9dbe1;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -2562,7 +2600,7 @@
 }
 
 .mc-subtitle-provider-heading strong {
-  color: #d9dbe1;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -2586,7 +2624,7 @@
   border: 1px solid var(--mc-line);
   border-radius: 6px;
   background: #12151f;
-  color: #cfd1d8;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-meta, 12px);
 }
 
@@ -2758,7 +2796,7 @@
 }
 
 .mc-player-info strong {
-  color: #dddfe5;
+  color: var(--mc-row-ink, #d9dbe1);
   font-size: var(--mc-fs-body, 13px);
 }
 
@@ -6321,11 +6359,34 @@
   --mc-glass-topbar: color-mix(in srgb, var(--panel) 82%, transparent);
   --mc-glass-player: color-mix(in srgb, var(--panel-2) 94%, transparent);
   --mc-nav-ink: var(--muted);
+  --mc-nav-hover-ink: var(--text);
   --mc-nav-badge-bg: color-mix(in srgb, var(--text) 8%, transparent);
   --mc-nav-badge-text: var(--text);
   --mc-nav-active-ink: var(--text);
+  --mc-nav-active-sub-ink: color-mix(in srgb, var(--muted) 55%, var(--text));
   --mc-ring-ink: var(--text);
   --mc-crumb-ink: var(--text);
+  --mc-hero-ink: var(--text);
+  --mc-title-ink: var(--text);
+  --mc-row-ink: var(--text);
+  --mc-album-ink: var(--text);
+  --mc-btn-ink: var(--text);
+  --mc-inset-glass: color-mix(in srgb, var(--panel-2) 40%, transparent);
+  --mc-inset-glass-soft: color-mix(in srgb, var(--panel-2) 35%, transparent);
+  /* Same alphas, light tint, so the two Music asides stay the translucent
+     contextual material category 3 scored — they simply stop being a dark slab
+     under text that has correctly gone dark.
+
+     Same `color-mix(…, transparent)` form as the four glass tokens above. Note for
+     anyone measuring this: it computes to `color(srgb 0.95 0.95 0.95 / 0.78)`, not
+     to `rgba()`, and so does `rgb(from var(--panel-2) r g b / 0.78)` under Chromium
+     148 — the product cannot express this in `rgba()` at all. A probe whose colour
+     parser only matches `rgba?(…)` will skip this panel and score its text against
+     whatever paints BENEATH it. `cat5-ui-clarity.cjs` reads both forms already;
+     a new instrument must too. */
+  --mc-panel-glass: color-mix(in srgb, var(--panel-2) 78%, transparent);
+  --mc-panel-glass-mid: color-mix(in srgb, var(--panel-2) 76%, transparent);
+  --mc-panel-glass-soft: color-mix(in srgb, var(--panel-2) 74%, transparent);
 }
 
 /* High contrast is the one theme that must not blur or tint anything: the
@@ -6353,11 +6414,25 @@
   --mc-glass-player: var(--panel);
   --mc-glass-player-blur: none;
   --mc-nav-ink: var(--text);
+  --mc-nav-hover-ink: var(--text);
   --mc-nav-badge-bg: transparent;
   --mc-nav-badge-text: var(--text);
   --mc-nav-active-ink: var(--text);
+  --mc-nav-active-sub-ink: var(--text);
   --mc-ring-ink: var(--text);
   --mc-crumb-ink: var(--text);
+  --mc-hero-ink: var(--text);
+  --mc-title-ink: var(--text);
+  --mc-row-ink: var(--text);
+  --mc-album-ink: var(--text);
+  --mc-btn-ink: var(--text);
+  --mc-inset-glass: var(--panel);
+  --mc-inset-glass-soft: var(--panel);
+  /* Opaque here, for the same reason the glass tokens above are: translucency IS
+     the defect under high contrast. */
+  --mc-panel-glass: var(--panel);
+  --mc-panel-glass-mid: var(--panel);
+  --mc-panel-glass-soft: var(--panel);
 }
 
 /* A user who has asked the OS for less transparency gets the same treatment in

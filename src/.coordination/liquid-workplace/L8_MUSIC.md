@@ -108,3 +108,32 @@ harness repair derives the full library count from the independent queue and mak
 load-bearing. Re-run: every one of **9** mutations fell exactly its own row, unexpected rows **0**,
 and returned **9/9**. Search/YouTube drafts are empty, sort/storage are `recent`, presentation is
 Standard after restore. Evidence: `baselines/cat6-l8-music.json`.
+
+## 2026-08-30 — category 5 contrast closes; Q4 still open, Music is 49/80 + 1 pending
+
+Recovered the interrupted turn's category-5 run (`8/10`, findings Q4 and Q5) and reproduced it
+exactly before touching anything. Q5's classic-light cell was **24 failing runs, min 1.01**.
+
+Cause, third round of one defect: a token that re-sources the SURFACE cannot help text that
+writes its own hex, and a token that re-sources the TEXT cannot help a surface that writes its
+own rgba. Measured live at `data-theme='classic-light'`: `.mc-music-head h1` rgb(246,246,249)
+**1.23**, `.mc-album-copy h2` **1.01**, `.mc-button` **1.04**, `.mc-panel-title strong` **1.05**,
+`.mc-player-info strong` **1.19**, and `.mc-music-library`/`.mc-music-queue` still painting
+`rgba(19,22,31,0.78)` under text that had correctly turned rgb(30,30,30) — **1.57–1.67**.
+
+Nine new `--mc-*` tokens (hero/title/row/album/btn/nav-hover/nav-active-sub ink; panel-glass ×3;
+inset-glass ×2), dark defaults unchanged so every dark palette is pixel-identical, remapped in
+both the six-light-palette block and the high-contrast block. Result across three measured
+rounds: **24 → 13 → 6 → 0** failing in classic-light and **1 → 0** in forest-night; minima
+**4.55 / 4.77**, so the theme axis still moves and the cell is not frozen. **Q5 YES; score 8 → 9.**
+
+Guard `mediaCenterThemeInk.test.ts`, **5/5**, negative control fired: un-tokenising `.mc-button`
+failed two of the five (the named rule and the sheet ceiling). Evidence:
+`baselines/cat5-l8-music.json`.
+
+**The ceiling is a real finding, not a threshold.** The Media Center's other five sections carry
+**44** near-white ink literals and **16** dark slabs of exactly this shape, none driven live yet.
+The guard caps them so the count can only fall; a blanket ban would have forced a sheet-wide
+rewrite of surfaces whose contrast nobody has measured.
+
+Q4 remains the only open question and it is structural, not cosmetic — see the next entry.
