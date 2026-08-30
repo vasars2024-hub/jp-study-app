@@ -27,8 +27,8 @@
   ],
   "drivenRefusals": 0,
   "parity": {
-    "standard": "9/9",
-    "liquid": "9/9",
+    "standard": "10/10",
+    "liquid": "10/10",
     "na": 0,
     "equal": true,
     "rowsAgree": true,
@@ -49,136 +49,151 @@
       {
         "mutation": "libraryRows",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "title stripped",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "libraryRows"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"title\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "librarySearch",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "librarySearch"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "sortOrder",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "sortOrder"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "playerSelection",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "playerSelection"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "transport",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "transport"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "like",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "aria-pressed stripped",
+        "reachable": "9/10",
+        "fellRows": [
+          "like"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "lyricsRecovery",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "lyricsRecovery"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "queueMirror",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "queueMirror"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "youtubeDraft",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "element detached",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "youtubeDraft"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"detached\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       },
       {
         "mutation": "windowLifecycle",
         "declaredCascade": [],
-        "preBaseline": "9/9",
+        "preBaseline": "10/10",
         "applied": "aria-pressed stripped",
-        "reachable": "8/9",
+        "reachable": "9/10",
         "fellRows": [
           "windowLifecycle"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
         "restored": "[\"aria-pressed\",\"music:sort+youtube\"]",
-        "afterRestore": "9/9",
+        "afterRestore": "10/10",
         "returned": true
       }
     ],

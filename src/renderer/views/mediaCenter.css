@@ -1668,14 +1668,6 @@
   min-height: var(--lq-hit-target);
 }
 
-/* Replaced elements again: content box unchanged so the track still paints at
-   its native 16px, border box raised to the floor. See `.mc-player-progress`. */
-.mc-music-now .music-seek,
-.mc-music-now .music-volume {
-  box-sizing: content-box;
-  height: 16px;
-  padding-block: calc((var(--lq-hit-target) - 16px) / 2);
-}
 
 .mc-music-sort {
   display: flex;
@@ -1709,12 +1701,43 @@
   height: 100%;
 }
 
+/*
+ * The link importer is a disclosure now, so the border that used to separate the
+ * `.music-yt` row from the list belongs on the `<details>`; leaving it on the row
+ * drew a second line under the closed summary.
+ */
+.mc-music-import {
+  flex: none;
+  border-top: 1px solid var(--mc-line);
+}
+
+.mc-music-import > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: var(--mc-dim);
+  font-size: var(--mc-fs-small, 12px);
+  cursor: pointer;
+  list-style: none;
+  /* Pointer floor, same 32px the rest of this surface was raised to. */
+  min-height: 32px;
+}
+
+.mc-music-import > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mc-music-import > summary:hover,
+.mc-music-import[open] > summary {
+  color: var(--mc-row-ink, #e7e9f0);
+}
+
 .mc-music-library .music-yt {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 5px;
-  padding: 8px;
-  border-top: 1px solid var(--mc-line);
+  padding: 0 8px 8px;
 }
 
 .mc-music-library .music-yt-input {
@@ -1731,7 +1754,9 @@
 .mc-music-now {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(110px, 1fr) auto auto;
+  /* Three rows since the duplicated inline transport left: stage, lyrics, now-playing.
+     An inline error adds an implicit auto row, exactly as it did with four. */
+  grid-template-rows: auto minmax(110px, 1fr) auto;
   overflow: hidden;
 }
 
@@ -1740,17 +1765,12 @@
 }
 
 /*
- * The shared `.music-controls` transport row is `flex-wrap: nowrap` and needs
- * 593px; inside this pane it gets 476px at a narrow window, so the volume and
- * queue controls on its right end were cut off. Allowing it to wrap here keeps
- * every transport control reachable without editing the shared rule, which the
- * standalone music window and the mini-player also use at their own widths.
+ * `.mc-music-now .music-controls` used to be reflowed and re-inked here — the pane
+ * hosted a second full transport that duplicated `.mc-playerbar`. The duplicate is
+ * gone, so its wrap rule, its pointer-floor rule for `.music-seek`/`.music-volume`
+ * and its inset slab went with it; nothing in the Media Center renders
+ * `.music-controls` any more (Blanc and the mini widget still do, from `styles.css`).
  */
-.mc-music-now .music-controls {
-  flex-wrap: wrap;
-  row-gap: 8px;
-}
-
 .mc-album-stage {
   display: flex;
   align-items: center;
@@ -1850,14 +1870,9 @@
   overflow-wrap: anywhere;
 }
 
-.mc-music-now .music-controls {
-  border-top: 1px solid var(--mc-line);
-  padding: 9px 10px;
-  background: var(--mc-inset-glass, rgba(8, 10, 15, 0.4));
-}
-
 .mc-music-now .music-nowplaying {
-  padding: 0 12px 8px;
+  border-top: 1px solid var(--mc-line);
+  padding: 8px 12px;
   background: var(--mc-inset-glass, rgba(8, 10, 15, 0.4));
 }
 

@@ -64,9 +64,11 @@ describe('Media Center theme ink and material tokens', () => {
     expect(ruleBody('.mc-queue-summary strong {')).toMatch(/color:\s*var\(--mc-row-ink/);
     expect(ruleBody('.mc-music-library,\n.mc-music-queue {\n  background'))
       .toMatch(/background:\s*var\(--mc-panel-glass/);
-    // Two rules share this selector — the base one and cat 4's compact reflow inside
-    // `@container mc`. Anchor on the base rule's own first declaration.
-    expect(ruleBody('.mc-music-now .music-controls {\n  border-top'))
+    // Was anchored on `.mc-music-now .music-controls`, the inline transport that
+    // duplicated `.mc-playerbar`. That element no longer renders in the Media Center,
+    // so the guard follows the surviving inset slab on the same pane rather than
+    // certifying a rule nothing can match.
+    expect(ruleBody('.mc-music-now .music-nowplaying {'))
       .toMatch(/background:\s*var\(--mc-inset-glass/);
     expect(ruleBody('.mc-queue-summary {')).toMatch(/background:\s*var\(--mc-inset-glass-soft/);
   });

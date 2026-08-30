@@ -3006,11 +3006,26 @@
           return { ok: active.length === 1 && !!selected && selected === now,
             ev: `active=${active.length} selected="${selected || ''}" now="${now}"` };
         } },
+        /*
+         * The row's question is unchanged — can playback be driven from this window:
+         * an enabled play control, other enabled transport controls, and a seek that is
+         * a real range with a duration. Only the elements it resolves on moved. The
+         * Media Center used to render TWO complete transports, the page's
+         * `.music-controls` and the shell's `.mc-playerbar`; the duplicate was deleted
+         * and this row addressed the deleted one. `like` is a new row, not a relaxation:
+         * Like was the single capability the page transport had that the bar lacked, so
+         * it is asserted explicitly rather than assumed to have survived.
+         */
         { id: 'transport', f: (w) => {
-          const controls = qa(w, '.music-controls button:not(:disabled)'); const play = q(w, '.music-play');
-          const seek = q(w, '.music-seek');
+          const controls = qa(w, '.mc-player-transport button:not(:disabled)'); const play = q(w, '.mc-player-play');
+          const seek = q(w, '.mc-player-seek');
           return { ok: !!play && !play.disabled && controls.length > 0 && !!seek && !seek.disabled && Number(seek.max) > 0,
             ev: `play=${!!play && !play.disabled} enabled=${controls.length} seek=${!!seek && !seek.disabled} max=${seek ? seek.max : 'absent'}` };
+        } },
+        { id: 'like', f: (w) => {
+          const like = qa(w, '.mc-player-like')[0];
+          return { ok: !!like && !like.disabled && like.getAttribute('aria-pressed') !== null,
+            ev: `like=${!!like} enabled=${!!like && !like.disabled} pressed=${like ? like.getAttribute('aria-pressed') : 'absent'}` };
         } },
         { id: 'lyricsRecovery', f: (w) => {
           const lines = qa(w, '.music-line-text'); const hint = q(w, '.music-hint');
@@ -3073,7 +3088,8 @@
         librarySearch: (w) => detach(q(w, '.music-search input'), 'no music search'),
         sortOrder: (w) => detach(q(w, '.mc-music-sort select'), 'no music sort'),
         playerSelection: (w) => detach(q(w, '.mc-album-copy h2'), 'no now-playing title'),
-        transport: (w) => detach(q(w, '.music-play'), 'no play control'),
+        transport: (w) => detach(q(w, '.mc-player-play'), 'no play control'),
+        like: (w) => stripAttr(q(w, '.mc-player-like'), 'aria-pressed', 'no like control'),
         lyricsRecovery: (w) => detach(q(w, '.music-hint p, .music-line-text'), 'no lyric state'),
         queueMirror: (w) => detach(q(w, '.mc-track-queue > button'), 'no queue rows'),
         youtubeDraft: (w) => detach(q(w, '.music-yt button'), 'no YouTube action'),

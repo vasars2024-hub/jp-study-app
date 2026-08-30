@@ -1,8 +1,8 @@
 {
   "surface": "@.fwin:has(.mc-root)",
-  "label": "l8-music",
+  "label": "l8-music-q4raw",
   "control": false,
-  "at": "2026-08-30T11:44:52.702Z",
+  "at": "2026-08-30T11:41:20.300Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -10,20 +10,8 @@
   "bodyScrollTop": 0,
   "presentationAsFound": "standard",
   "cat6": {
-    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-music.json",
-    "verdict": "PASS 10/10",
-    "parity": {
-      "standard": "10/10",
-      "liquid": "10/10",
-      "na": 0,
-      "equal": true,
-      "rowsAgree": true,
-      "failing": [],
-      "onlyInOne": []
-    },
-    "roundTrip": {
-      "diffs": []
-    }
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-music-q4raw.json",
+    "missing": true
   },
   "axes": {
     "theme": [
@@ -99,47 +87,32 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 1,
-        "scannedControls": 8,
-        "shellChromeSelector": ".mc-sidebar,.mc-topbar,.mc-playerbar",
-        "shellControls": 25,
-        "shellList": [
-          "HomeYour media at a glan",
-          "LibraryAll local media",
-          "VideoImmersion player",
-          "MusicListening room",
-          "Study ModeMine and revie",
-          "Study tools",
-          "ReadinessUnified library",
-          "ReviewWatch to review",
-          "DiscoverMAL + AniList",
-          "Media workspaceLibrary",
-          "Media SettingsPlayback a",
-          "Back",
-          "Forward",
-          "Search songs, artists, a",
-          "Open media",
-          "e2e-audio-jaTemp",
-          "Shuffle",
-          "Previous",
-          "Play",
-          "Next",
-          "Repeat: off",
-          "Add to Liked",
-          "Track position",
-          "Volume"
-        ],
-        "chromeControlsRaw": 9,
-        "summaryHeaders": 1,
-        "behindDisclosure": 0,
+        "scannedControls": 28,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "chromeControlsRaw": 34,
+        "summaryHeaders": 2,
+        "behindDisclosure": 4,
         "disclosures": {
           "total": 2,
           "open": 1
         },
         "scannedList": [
+          "HomeYour media at a glance",
+          "LibraryAll local media",
+          "VideoImmersion player",
+          "MusicListening room",
+          "Study ModeMine and review",
+          "Media SettingsPlayback and s",
+          "Back",
+          "Forward",
+          "Search songs, artists, album",
+          "Open media",
           "Detach player",
           "Detach mini-player",
           "BUTTON",
@@ -147,7 +120,9 @@
           "Search songs",
           "Recently playedTitleArtistFo",
           "Search again",
-          "Load .lrc file…"
+          "Load .lrc file…",
+          "e2e-audio-jaTemp",
+          "BUTTON"
         ]
       }
     },
@@ -231,41 +206,31 @@
       "id": 7,
       "q": "standard mode remains fully normal",
       "bar": "category 6's parity: the same features reachable in standard as in Liquid",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "parity": {
-          "standard": "10/10",
-          "liquid": "10/10",
-          "na": 0,
-          "equal": true,
-          "rowsAgree": true,
-          "failing": [],
-          "onlyInOne": []
-        }
+        "parity": null
       }
     },
     {
       "id": 8,
       "q": "Liquid can be turned off without losing state",
       "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "roundTrip": {
-          "diffs": []
-        }
+        "roundTrip": null
       }
     },
     {
       "id": 9,
       "q": "all pre-migration features reachable and functional",
       "bar": "category 6's row agreement: no row reachable in only one presentation",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
-        "rowsAgree": true,
-        "onlyInOne": []
+        "rowsAgree": null,
+        "onlyInOne": null
       }
     },
     {
@@ -303,7 +268,7 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "YES",
+    "q4": "NO",
     "q6": "NO",
     "q10": "YES"
   },
@@ -322,43 +287,28 @@
     },
     "q4": {
       "collapsedDisclosures": 1,
-      "scannedControls": 8,
-      "shellChromeSelector": ".mc-sidebar,.mc-topbar,.mc-playerbar",
-      "shellControls": 25,
-      "shellList": [
-        "HomeYour media at a glan",
-        "LibraryAll local media",
-        "VideoImmersion player",
-        "MusicListening room",
-        "Study ModeMine and revie",
-        "Study tools",
-        "ReadinessUnified library",
-        "ReviewWatch to review",
-        "DiscoverMAL + AniList",
-        "Media workspaceLibrary",
-        "Media SettingsPlayback a",
-        "Back",
-        "Forward",
-        "Search songs, artists, a",
-        "Open media",
-        "e2e-audio-jaTemp",
-        "Shuffle",
-        "Previous",
-        "Play",
-        "Next",
-        "Repeat: off",
-        "Add to Liked",
-        "Track position",
-        "Volume"
-      ],
-      "chromeControlsRaw": 9,
-      "summaryHeaders": 1,
-      "behindDisclosure": 0,
+      "scannedControls": 28,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "chromeControlsRaw": 34,
+      "summaryHeaders": 2,
+      "behindDisclosure": 4,
       "disclosures": {
         "total": 2,
         "open": 1
       },
       "scannedList": [
+        "HomeYour media at a glance",
+        "LibraryAll local media",
+        "VideoImmersion player",
+        "MusicListening room",
+        "Study ModeMine and review",
+        "Media SettingsPlayback and s",
+        "Back",
+        "Forward",
+        "Search songs, artists, album",
+        "Open media",
         "Detach player",
         "Detach mini-player",
         "BUTTON",
@@ -366,7 +316,9 @@
         "Search songs",
         "Recently playedTitleArtistFo",
         "Search again",
-        "Load .lrc file…"
+        "Load .lrc file…",
+        "e2e-audio-jaTemp",
+        "BUTTON"
       ]
     },
     "q6": {
@@ -418,8 +370,14 @@
     }
   },
   "controlsPaintedA": 43,
-  "findings": [],
-  "voided": [],
-  "score": 10,
-  "verdict": "PASS 10/10"
+  "findings": [
+    "Q4 advanced tools discoverable without cluttering"
+  ],
+  "voided": [
+    "Q7 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-music-q4raw.json",
+    "Q8 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-music-q4raw.json",
+    "Q9 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-music-q4raw.json"
+  ],
+  "score": "VOID",
+  "verdict": "VOID"
 }

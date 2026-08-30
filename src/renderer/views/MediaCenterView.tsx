@@ -42,8 +42,8 @@ import {
 import type { DiscoveryFeedProvenance } from '../../shared/mediaDiscovery';
 import { loadExternalPlayerPreferences } from '../externalPlayerStore';
 import { loadVideoServerProfilesDocument } from '../videoServerProfilesStore';
+import { isLiked, toggleLiked } from '../likedSongs';
 import {
-  MusicControls,
   MusicLyricsPane,
   MusicNowPlaying,
   MusicSearchBox,
@@ -1008,7 +1008,18 @@ function MusicPanel({ state }: { state: MusicState }) {
             </select>
           </label>
           <div className="mc-music-list"><MusicSongList state={state} /></div>
-          <MusicYoutubeRow state={state} />
+          {/*
+            Importing audio from a link is an occasional tool, not part of browsing a
+            library you already have, so it is the "advanced tools tucked away" half of
+            §10.4's Q4 rather than a default-state control. Uncontrolled `<details>`:
+            nothing here is persisted, so opening it is not a settings write, and the
+            field and its action stay in the DOM either way — a disclosure hides, it
+            does not unmount.
+          */}
+          <details className="mc-music-import">
+            <summary><Icon name="download" size={12} /> {t('music.yt.getAudio')}</summary>
+            <MusicYoutubeRow state={state} />
+          </details>
         </ContextualSurface>
 
         <AnchorSurface as="main" bare className="mc-music-now">
@@ -1025,7 +1036,18 @@ function MusicPanel({ state }: { state: MusicState }) {
           </div>
           {state.error && <div className="mc-inline-error">{state.error}</div>}
           <div className="mc-lyrics-frame"><MusicLyricsPane state={state} /></div>
-          <MusicControls state={state} onOpenWidget={() => void window.api.popOut('musicwidget')} />
+          {/*
+            The inline `MusicControls` transport used to sit here and it duplicated
+            `.mc-playerbar` control for control — same track, same shuffle/prev/play/
+            next/repeat/seek/volume — one above the other in the same window. Two
+            complete transports for one player is the clutter category 4 flagged and
+            category 5's Q4 measured; the shell's persistent bar is the one that
+            follows the user to Library, Video and Settings, so it is the survivor.
+            The only capability the bar lacked was Like, which moved onto it (see
+            `PersistentPlayer`), so nothing is reachable-from-fewer-places than before.
+            The shared component itself is untouched: Blanc and the mini widget host it
+            without any player bar of their own and still need it.
+          */}
           <MusicNowPlaying state={state} />
         </AnchorSurface>
 
@@ -1036,7 +1058,9 @@ function MusicPanel({ state }: { state: MusicState }) {
           </div>
           <div className="mc-track-queue">
             {queue.length > 0 ? queue.map((item, index) => (
-              <button type="button" key={item.id} className={ps.current?.id === item.id ? 'is-active' : ''} onClick={() => void state.play(item)}>
+              // `mc-track-row` is the same admission the library list already makes with
+              // `music-row`: these are repeating rows of one kind of thing, not chrome.
+              <button type="button" key={item.id} className={`mc-track-row${ps.current?.id === item.id ? ' is-active' : ''}`} onClick={() => void state.play(item)}>
                 <span className="mc-track-index">{ps.current?.id === item.id && ps.playing ? <Icon name="volume" size={11} /> : String(index + 1).padStart(2, '0')}</span>
                 <div><strong>{state.metaMap.get(item.id)?.title ?? item.title}</strong><small>{state.metaMap.get(item.id)?.artist ?? item.artist ?? t('mediaCenter.music.unknownArtist')}</small></div>
                 <span>{item.durationSec ? fmt(item.durationSec) : '—'}</span>
@@ -1451,6 +1475,10 @@ function SettingsPanel({ state, provenance }: { state: MediaState; provenance: D
 function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () => void }) {
   const { t } = useT();
   const { ps, currentMeta } = state;
+  // Same idiom as the library filter at MusicContent.tsx:157 — `likedSongs` is module
+  // state, so the tick is what makes a heart toggle repaint rather than go stale.
+  void state.likedTick;
+  const liked = !!ps.current && isLiked(ps.current.id);
   return (
     <ContextualSurface as="footer" className="mc-playerbar">
       <button type="button" className="mc-player-info" onClick={onMusic}>
@@ -1467,13 +1495,31 @@ function PersistentPlayer({ state, onMusic }: { state: MusicState; onMusic: () =
         </button>
         <button type="button" onClick={player.next} disabled={!ps.current} title={t('mediaCenter.player.next')}><Icon name="skip-forward" size={15} /></button>
         <button type="button" onClick={player.cycleRepeat} className={ps.repeat !== 'off' ? 'is-active' : ''} title={`Repeat: ${ps.repeat}`}><Icon name="repeat" size={14} /></button>
+        {/*
+          Like is the one thing the page's now-deleted inline transport could do that this
+          bar could not, so it moves here rather than disappearing. `likedTick` is read (not
+          just bumped) so the fill re-renders: the store is module state, so without a state
+          read this button would toggle the heart in `likedSongs` and paint the old fill.
+        */}
+        <button
+          type="button"
+          onClick={() => { if (ps.current) { toggleLiked(ps.current.id); state.bumpLikedTick(); } }}
+          disabled={!ps.current}
+          className={`mc-player-like${ps.current && liked ? ' is-active' : ''}`}
+          aria-pressed={!!ps.current && liked}
+          title={t('music.controls.addToLiked')}
+        >
+          <Icon name="heart" size={14} fill={liked} />
+        </button>
       </div>
       {/* Transport, which §2.3 names as what Liquid is FOR. The seek row holds a
           range input, so without the role it classifies as dense work sitting on
           the player bar's own backdrop-filter and reads as a category-3 failure. */}
       <ContextualSurface className="mc-player-progress">
         <span>{fmt(ps.time)}</span>
-        <input type="range" min={0} max={ps.duration || 1} step={0.1} value={Math.min(ps.time, ps.duration || 1)} onChange={(event) => player.seek(Number(event.target.value))} disabled={!ps.current} aria-label={t('a11y.slider.trackPosition')} />
+        {/* Named so probes and the parity ledger can address the surviving seek — the
+            page's `.music-seek` was the duplicate that went away with the inline row. */}
+        <input type="range" className="mc-player-seek" min={0} max={ps.duration || 1} step={0.1} value={Math.min(ps.time, ps.duration || 1)} onChange={(event) => player.seek(Number(event.target.value))} disabled={!ps.current} aria-label={t('a11y.slider.trackPosition')} />
         <span>{fmt(ps.duration)}</span>
       </ContextualSurface>
       <ContextualSurface className="mc-player-volume lq-hit-scope">

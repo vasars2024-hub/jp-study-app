@@ -91,6 +91,26 @@ const CONTROL = has('control');
  * every snapshot either way, so a run taken with it stays attributable rather than silent.
  */
 const ALLOW_SCROLL = has('allow-scroll');
+/**
+ * `--shell-chrome "<selector list>"` — DEFAULT EMPTY, and every baseline taken before this
+ * option existed is therefore bit-identical under it.
+ *
+ * Q4 asks whether THIS SURFACE's default view is cluttered. The bar already refuses to charge
+ * a surface for chrome it did not author: `chromeControls` excludes `.fwin-bar`, the floating
+ * window's own title bar. Music is the first surface scored whose root is a SHELL rather than
+ * a single app — `@.fwin:has(.mc-root)` is the entire Media Center — and its nav rail, top bar
+ * and persistent player bar are byte-identical on all six of its sections. Charging Music for
+ * them makes it the only one of the 18 scored surfaces whose root contains another surface's
+ * chrome, and makes the score incomparable with the 17 single-app windows.
+ *
+ * So the exclusion is widened by exactly one principle — same chrome, more of it — and it is
+ * made LOUD rather than silent: it applies only when a run names the selectors, `shellControls`
+ * and `shellChromeSelector` land in the snapshot so a reader can add them back and disagree,
+ * and `scannedControls` keeps its unchanged `<= 12` bar. What it must never become is a
+ * general escape hatch: it is not for a surface's own toolbar, and a run that used it says so
+ * in its baseline.
+ */
+const SHELL_CHROME = arg('shell-chrome', '');
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own.');
   console.error('         A window title ("Library") or a root selector ("@.reader").');
@@ -421,7 +441,15 @@ const SNAP = `(function(){
   var collapsed = [].slice.call(root.querySelectorAll('details:not([open]),[aria-expanded="false"]')).filter(painted);
   function repeatingRow(e){
     return e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],[class*="-spotlight"],li'); }
-  var chromeControls = controls.filter(function(e){ return !repeatingRow(e) && !e.closest('.fwin-bar'); });
+  // --shell-chrome: the same rule as the .fwin-bar exclusion below, extended to the selectors
+  // a run names. Empty by default, so an unparameterised run is identical to every baseline
+  // taken before this option existed. (No backticks in here: this block lives inside a
+  // template literal and one backtick ends it — that cost a run.)
+  var SHELL_SEL = ${A(SHELL_CHROME)};
+  function shellChrome(e){ return !!SHELL_SEL && !!e.closest(SHELL_SEL); }
+  var notPageControls = controls.filter(function(e){ return !repeatingRow(e) && !e.closest('.fwin-bar'); });
+  var shellControls = notPageControls.filter(shellChrome);
+  var chromeControls = notPageControls.filter(function(e){ return !shellChrome(e); });
   // The clutter term is controls the user must SCAN in the default state: chrome, minus the
   // contents of any <details> (tucked away by definition) and minus the summary headers
   // (counted once by collapsedDisclosures, not charged twice). The bar stays at 12.
@@ -661,6 +689,9 @@ const SNAP = `(function(){
     q3: { primaryAction: primaryAction ? name(primaryAction) : null, insideBodyViewport: primaryVisible,
           explicitlyMarked: !!explicitPrimary },
     q4: { collapsedDisclosures: collapsed.length, scannedControls: scanned.length,
+          shellChromeSelector: SHELL_SEL || null, shellControls: shellControls.length,
+          shellList: shellControls.slice(0,24).map(function(e){
+            return (e.getAttribute('aria-label') || e.textContent || e.title || e.tagName).trim().slice(0,24); }),
           chromeControlsRaw: chromeControls.length, summaryHeaders: summaryHeaders.length,
           behindDisclosure: behindDisclosure.length,
           disclosures: { total: allDetails.length, open: allDetails.filter(function(d){ return d.open; }).length },
