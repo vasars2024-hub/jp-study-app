@@ -82,3 +82,15 @@ the hit box measures **32.5 × 24.5** and category 1 is **9/10**, not the contro
 held at `3c460684`. Not repairable this turn — both owners, `renderer/styles.css` and
 `media/MediaWorkspaceHost.tsx`, are dirty with another track's work. **Category 1 re-closes
 when that lands; it stays counted, not dropped.**
+
+## 2026-08-30 — category 4 PASS 10/10; Music is 39/80
+
+The one allowed repair followed the measured widths. The missing-lyrics actions now wrap inside
+their pane, moving compact hidden overflow **1→0** (`137>108` to `108=108`). The open secondary
+group now shrinks to a reachable 40px floor and scrolls its own excess, moving overlaps **2/0/1
+→ 0/0/0** at default/compact/maximized without changing the failed `.mc-nav { flex:1 1 0 }` path.
+
+Controlled shared-harness result: clipped/overlaps/horizontal scrollers/hidden overflow are all
+**0/0/0/0** at **1080×700, 260×170, 1264×765**; dead region **4.7/0.5/8.0%**; chrome
+**62.1→55.9%** while canvas **94.8→95.3%**. Injected clip **0→1→0**, geometry restored.
+Guard `musicCompactLayout.test.ts`: **2/2**. Evidence: `baselines/cat4-l8-music.json`.

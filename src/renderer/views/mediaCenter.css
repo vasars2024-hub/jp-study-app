@@ -323,7 +323,11 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-height: 40px;
   margin-top: 10px;
+  overflow-y: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.13) transparent;
+  scrollbar-width: thin;
 }
 
 .mc-nav-group__heading {
@@ -3123,6 +3127,18 @@
     width: 100%;
     min-width: 0;
     padding-inline: 0;
+  }
+
+  .mc-lyrics-frame .music-hint-btns {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .mc-lyrics-frame .music-hint-btns > button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
   }
 }
 

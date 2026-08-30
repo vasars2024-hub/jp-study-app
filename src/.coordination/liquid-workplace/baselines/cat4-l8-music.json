@@ -9,7 +9,7 @@
       "kind": "default",
       "box": "1080x700",
       "clipped": 0,
-      "overlaps": 2,
+      "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
       "deadPctViewport": 4.7,
@@ -18,7 +18,7 @@
       "dominantCanvasPct": 94.8,
       "bars": {
         "clipped": true,
-        "overlaps": false,
+        "overlaps": true,
         "horizontal": true,
         "deadRegion": true
       },
@@ -30,7 +30,7 @@
       "clipped": 0,
       "overlaps": 0,
       "horizontalScrollers": 0,
-      "hiddenOverflowX": 1,
+      "hiddenOverflowX": 0,
       "deadPctViewport": 0.5,
       "deadRegionBasis": "visible surface",
       "chromePct": 81.3,
@@ -38,7 +38,7 @@
       "bars": {
         "clipped": true,
         "overlaps": true,
-        "horizontal": false,
+        "horizontal": true,
         "deadRegion": true
       },
       "restored": true
@@ -47,7 +47,7 @@
       "kind": "maximized",
       "box": "1264x765",
       "clipped": 0,
-      "overlaps": 1,
+      "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
       "deadPctViewport": 8,
@@ -56,7 +56,7 @@
       "dominantCanvasPct": 95.3,
       "bars": {
         "clipped": true,
-        "overlaps": false,
+        "overlaps": true,
         "horizontal": true,
         "deadRegion": true
       },
@@ -74,10 +74,7 @@
       "restoredFrom": null,
       "restoredTo": null,
       "clippedList": [],
-      "overlapList": [
-        "details.mc-nav-group x div.mc-sidebar-spacer (175x191)",
-        "details.mc-nav-group x div.mc-sidebar-library (172x27)"
-      ],
+      "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
       "deadRegionBox": "296x166 at grid 29,19",
@@ -97,14 +94,12 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 49;",
-      "restoredTo": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 49;",
+      "restoredFrom": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 53;",
+      "restoredTo": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 53;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
-      "hiddenOverflowXList": [
-        "div.music-hint 137>108"
-      ],
+      "hiddenOverflowXList": [],
       "deadRegionBox": "258x20 at grid 0,12",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
@@ -121,12 +116,10 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 49;",
-      "restoredTo": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 53;",
+      "restoredFrom": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 53;",
+      "restoredTo": "left: 94px; top: 54px; width: 1080px; height: 700px; z-index: 57;",
       "clippedList": [],
-      "overlapList": [
-        "details.mc-nav-group x div.mc-sidebar-spacer (175x223)"
-      ],
+      "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
       "deadRegionBox": "252x329 at grid 21,0",
@@ -143,18 +136,15 @@
   ],
   "bars": {
     "clipped": true,
-    "overlaps": false,
-    "horizontal": false,
+    "overlaps": true,
+    "horizontal": true,
     "deadRegion": true,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "overlaps",
-    "horizontal"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
