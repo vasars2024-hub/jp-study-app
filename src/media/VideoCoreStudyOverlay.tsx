@@ -50,7 +50,7 @@ import {
   whisperHfId,
   type WhisperDevice,
 } from '../renderer/whisperSettings';
-import { markTierDownloaded } from '../renderer/whisperModelCache';
+import { effectiveWhisperTier, markTierDownloaded } from '../renderer/whisperModelCache';
 import WhisperWorker from '../renderer/whisperWorker?worker';
 import {
   activeStudyCuesAtTime,
@@ -141,6 +141,7 @@ type WhisperWorkerMessage = {
   progress?: number;
   file?: string;
   device?: 'webgpu' | 'wasm';
+  model?: string;
   message?: string;
   cues?: Array<{ start: number; end: number; text: string }>;
 };
@@ -1366,7 +1367,7 @@ export default function VideoCoreStudyOverlay({
       }
       if (message.type === 'status' && message.status === 'transcribing') {
         const device = message.device === 'webgpu' ? 'webgpu' : 'wasm';
-        markTierDownloaded(whisperModel, device, whisperDevice);
+        markTierDownloaded(effectiveWhisperTier(whisperModel, message.model), device, whisperDevice);
         setWhisperState('transcribing');
         setWhisperMessage(
           translateUi('mediaWorkspace.study.whisperOnDevice', {

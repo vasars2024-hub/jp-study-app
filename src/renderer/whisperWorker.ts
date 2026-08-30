@@ -4,6 +4,11 @@
 // are produced — instead of one long silent wait. WebGPU (fast, quantised) is
 // used when available, falling back to WASM.
 import { pipeline, env } from '@huggingface/transformers';
+import {
+  WHISPER_CPU_PIPELINE_OPTIONS,
+  WHISPER_GPU_PIPELINE_OPTIONS,
+  whisperModelForCpu,
+} from './whisperRuntimeProfile';
 
 env.allowLocalModels = false;
 
@@ -25,6 +30,7 @@ const WINDOW_SEC = 25; // seconds of audio transcribed per step
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let transcriber: any = null;
 let loadedModel = '';
+let effectiveModel = '';
 let device = 'webgpu';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,18 +44,21 @@ async function load(model: string, prefer: 'auto' | 'cpu'): Promise<any> {
   const progress_callback = (p: any): void => post({ type: 'progress', ...p });
 
   // CPU/WASM path — used when the user forces it, or as a GPU fallback.
-  // IMPORTANT: must be fp32 here. The quantised variants (q8/q4) use the
-  // MatMulNBits op, which onnxruntime-web (WASM/CPU) can't load — it fails with
-  // "TransposeDQWeightsForMatMulNBits Missing required scale". fp32 uses only
-  // standard ops and works on CPU (it's a bigger download, but reliable).
+  // q4/int8/q8 use MatMulNBits, which this onnxruntime-web build cannot load.
+  // fp32 is safe after `whisperModelForCpu` replaces models whose fp32 encoder
+  // uses external ONNX data that the packaged browser runtime cannot mount.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const loadWasm = async (): Promise<any> => {
-    transcriber = await pipeline('automatic-speech-recognition', model, {
-      device: 'wasm',
-      dtype: 'fp32',
+    const cpuModel = whisperModelForCpu(model);
+    if (cpuModel !== model) {
+      post({ type: 'status', status: 'model-fallback', requestedModel: model, model: cpuModel, device: 'wasm' });
+    }
+    transcriber = await pipeline('automatic-speech-recognition', cpuModel, {
+      ...WHISPER_CPU_PIPELINE_OPTIONS,
       progress_callback,
     });
     device = 'wasm';
+    effectiveModel = cpuModel;
     return transcriber;
   };
 
@@ -71,12 +80,12 @@ async function load(model: string, prefer: 'auto' | 'cpu'): Promise<any> {
 
   try {
     transcriber = await pipeline('automatic-speech-recognition', model, {
-      device: 'webgpu',
       // Quantised decoder is dramatically faster than fp32 on the GPU.
-      dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4' },
+      ...WHISPER_GPU_PIPELINE_OPTIONS,
       progress_callback,
     });
     device = 'webgpu';
+    effectiveModel = model;
     return transcriber;
   } catch {
     return loadWasm();
@@ -98,7 +107,7 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
   if (mode === 'prefetch') {
     try {
       await load(model, prefer ?? 'auto');
-      post({ type: 'ready', device });
+      post({ type: 'ready', device, model: effectiveModel, requestedModel: model });
     } catch (err) {
       post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }
@@ -109,7 +118,7 @@ self.onmessage = async (e: MessageEvent): Promise<void> => {
   try {
     if (!audio) throw new Error('no audio provided');
     const t = await load(model, prefer ?? 'auto');
-    post({ type: 'status', status: 'transcribing', device });
+    post({ type: 'status', status: 'transcribing', device, model: effectiveModel, requestedModel: model });
 
     const windowLen = WINDOW_SEC * SAMPLE_RATE;
     const windows = Math.max(1, Math.ceil(audio.length / windowLen));

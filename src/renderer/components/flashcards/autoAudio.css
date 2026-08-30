@@ -43,6 +43,12 @@
   cursor: pointer;
 }
 
+/* Full-row actions still need the same pointer target as the option labels. */
+.auto-audio-options > button,
+.auto-reading-options > button {
+  min-height: var(--lq-hit-target, 32px);
+}
+
 .auto-audio-options input[type='checkbox'],
 .auto-reading-options input[type='checkbox'] {
   accent-color: var(--accent);

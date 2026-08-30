@@ -12,7 +12,7 @@
 // own copy, so a future i18n caller (or the media player, should it adopt this)
 // is not forced through Blanc's plain-English string policy.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { markTierDownloaded, type WhisperVariant } from './whisperModelCache';
+import { effectiveWhisperTier, markTierDownloaded, type WhisperVariant } from './whisperModelCache';
 import { whisperHfId, type WhisperDevice, type WhisperModelTier } from './whisperSettings';
 
 export type TranscribeState =
@@ -142,7 +142,7 @@ export function useWhisperTranscribe(): WhisperTranscription {
             // The pipeline loaded, so this tier's files are now fully cached for
             // whichever backend actually won (auto can fall back to wasm).
             const variant = asVariant(m.device);
-            markTierDownloaded(opts.tier, variant, opts.device);
+            markTierDownloaded(effectiveWhisperTier(opts.tier, m.model), variant, opts.device);
             setDevice(variant);
             setDownload(null);
             setState('transcribing');

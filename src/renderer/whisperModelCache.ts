@@ -29,6 +29,15 @@ export type DownloadedMap = Partial<Record<WhisperModelTier, WhisperVariant[]>>;
 
 const asVariant = (v: unknown): WhisperVariant => (v === 'webgpu' ? 'webgpu' : 'wasm');
 
+/** The tier whose artifacts the worker actually loaded after a CPU fallback. */
+export function effectiveWhisperTier(
+  requested: WhisperModelTier,
+  workerModel: unknown,
+): WhisperModelTier {
+  if (typeof workerModel !== 'string') return requested;
+  return WHISPER_MODEL_SPECS.find((spec) => spec.hfId === workerModel)?.id ?? requested;
+}
+
 export function loadDownloaded(): DownloadedMap {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(DOWNLOADED_KEY) ?? '{}');
@@ -173,7 +182,7 @@ export function prefetchWhisperModel(
         onProgress?.(Math.round(m.progress));
       } else if (m.type === 'ready') {
         settled = true;
-        markTierDownloaded(tier, asVariant(m.device), device);
+        markTierDownloaded(effectiveWhisperTier(tier, m.model), asVariant(m.device), device);
         worker.terminate();
         resolve();
       } else if (m.type === 'error') {

@@ -54,6 +54,13 @@ afterEach(() => {
 });
 
 describe('whisperModelCache', () => {
+  it('records the model the worker actually loaded after a CPU fallback', async () => {
+    const c = await import('../whisperModelCache');
+
+    expect(c.effectiveWhisperTier('kotoba-whisper', 'Xenova/whisper-base')).toBe('whisper-base');
+    expect(c.effectiveWhisperTier('kotoba-whisper', undefined)).toBe('kotoba-whisper');
+  });
+
   it('does not tick a GPU download as available for CPU', async () => {
     const c = await import('../whisperModelCache');
 

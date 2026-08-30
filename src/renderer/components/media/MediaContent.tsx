@@ -47,6 +47,7 @@ import {
   whisperHfId,
 } from '../../whisperSettings';
 import {
+  effectiveWhisperTier,
   isDownloadedIn,
   loadDownloaded,
   markTierDownloaded,
@@ -866,7 +867,11 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         } else if (m.type === 'status' && m.status === 'transcribing') {
           // The pipeline is loaded, so this tier's files are now fully cached —
           // for whichever backend actually won (auto can fall back to wasm).
-          markTierDownloaded(modelTier, m.device === 'webgpu' ? 'webgpu' : 'wasm', prefer);
+          markTierDownloaded(
+            effectiveWhisperTier(modelTier, m.model),
+            m.device === 'webgpu' ? 'webgpu' : 'wasm',
+            prefer,
+          );
           setGenState('transcribing');
           setGenMsg(
             t('media.gen.transcribingOn', {
