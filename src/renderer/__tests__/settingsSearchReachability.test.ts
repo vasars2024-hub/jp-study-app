@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { SETTINGS_NAV, SETTINGS_REGISTRY, searchSettings } from '../components/settings/settingsRegistry';
+import { SCRAPER_REGISTRY } from '../components/scraper/scraperRegistry';
 import { SettingsProvider } from '../components/settings/SettingsContext';
 import SettingsCard from '../components/settings/SettingsCard';
 import type { SettingsController } from '../components/settings/types';
@@ -44,6 +45,22 @@ function sourceFiles(dir: string, out: Record<string, string> = {}): Record<stri
 }
 
 const SRC = sourceFiles(SETTINGS_DIR);
+
+const SCRAPER_DIR = join(__dirname, '..', 'components', 'scraper');
+const scraperSrc = ((): Record<string, string> => {
+  const out: Record<string, string> = {};
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+        out[full] = readFileSync(full, 'utf8');
+      }
+    }
+  };
+  walk(SCRAPER_DIR);
+  return out;
+})();
 
 /** settingId -> the files that can answer to it. */
 const anchors = ((): Map<string, Set<string>> => {
@@ -139,6 +156,46 @@ describe('settings search reachability', () => {
     }
     expect(misrouted).toEqual([]);
     expect(unanchored).toEqual([]);
+  });
+
+  /**
+   * The gate names two things — "every setting AND SCRAPER ACTION" — and the
+   * Scraper app implements the same contract under its own names: ScraperSearch
+   * calls `ctl.navigate(hit.pageId, hit.id)` and ScraperApp stores it as
+   * `focusSettingId`, exactly as Settings does.
+   *
+   * Its registry is a PAGE index: 17 of its 18 entries carry a page's own nav
+   * labelKey, so navigating to the page is the whole answer and no card anchor
+   * is owed. Only an entry that names something INSIDE a page needs one. Scoring
+   * the page entries as unanchored is what made a first run read 1 of 18.
+   */
+  it('routes every scraper registry entry to a page, and anchors the ones inside a page', () => {
+    const navSrc = readFileSync(join(SCRAPER_DIR, 'scraperPages.ts'), 'utf8');
+    const navLabelKeys = new Set([...navSrc.matchAll(/labelKey: '([^']+)'/g)].map((m) => m[1]));
+    const navIds = new Set([...navSrc.matchAll(/id: '([a-z0-9-]+)'/g)].map((m) => m[1]));
+    expect(navLabelKeys.size).toBeGreaterThan(0);
+
+    const scraperAnchors = new Set<string>();
+    for (const text of Object.values(scraperSrc)) {
+      for (const m of text.matchAll(/<ScrCard\b[^>]*?\bid="([^"{]+)"/gs)) scraperAnchors.add(m[1]);
+      for (const m of text.matchAll(/focusSettingId === '([^']+)'/g)) scraperAnchors.add(m[1]);
+    }
+
+    const offPage: string[] = [];
+    const unanchored: string[] = [];
+    let insidePageEntries = 0;
+    for (const entry of SCRAPER_REGISTRY) {
+      if (!navIds.has(entry.pageId)) offPage.push(`${entry.id} -> unknown page '${entry.pageId}'`);
+      if (navLabelKeys.has(entry.titleKey)) continue; // page entry: the page is the answer
+      insidePageEntries += 1;
+      if (!scraperAnchors.has(entry.id)) unanchored.push(`${entry.id} -> '${entry.pageId}'`);
+    }
+    expect(offPage).toEqual([]);
+    expect(unanchored).toEqual([]);
+    // Vacuity guard: if every entry were skipped as a page entry the assertions
+    // above would pass having checked nothing.
+    expect(insidePageEntries).toBeGreaterThan(0);
+    expect(scraperAnchors.size).toBeGreaterThan(0);
   });
 
   /**

@@ -33,7 +33,35 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../../../..');
-const SET_DIR = path.join(ROOT, 'src/renderer/components/settings');
+
+/**
+ * The gate names two things — "every SETTING and SCRAPER ACTION" — and the two
+ * apps implement the same contract with different names, so the surface is a
+ * PARAMETER rather than a second probe. `--registry scraper` scores the Scraper
+ * app's own search; the default scores Settings.
+ */
+const REGISTRIES = {
+  settings: {
+    dir: 'src/renderer/components/settings',
+    registryFile: 'settingsRegistry.ts',
+    registryConst: 'SETTINGS_REGISTRY',
+    appFile: 'SettingsApp.tsx',
+    navFile: 'settingsRegistry.ts',
+    // `{page === 'id' && <Component />}`
+    routeRe: /page === '([a-z0-9-]+)' && <([A-Z][A-Za-z0-9]*)/g,
+    cardRe: /<SettingsCard\b[^>]*?\bid="([^"{]+)"/gs,
+  },
+  scraper: {
+    dir: 'src/renderer/components/scraper',
+    registryFile: 'scraperRegistry.ts',
+    registryConst: 'SCRAPER_REGISTRY',
+    appFile: 'ScraperApp.tsx',
+    navFile: 'scraperPages.ts',
+    // `case 'id': return <Component />;`
+    routeRe: /case '([a-z0-9-]+)':\s*\n?\s*return <([A-Z][A-Za-z0-9]*)/g,
+    cardRe: /<ScrCard\b[^>]*?\bid="([^"{]+)"/gs,
+  },
+};
 
 const args = process.argv.slice(2);
 const opt = (name, def) => {
@@ -51,6 +79,13 @@ function walk(dir, out = []) {
   return out;
 }
 
+const REG = REGISTRIES[opt('--registry', 'settings')];
+if (!REG) {
+  console.error(`unknown --registry; expected one of ${Object.keys(REGISTRIES).join(', ')}`);
+  process.exit(2);
+}
+const SET_DIR = path.join(ROOT, REG.dir);
+
 const files = walk(SET_DIR);
 const rel = (p) => path.relative(SET_DIR, p).split(path.sep).join('/');
 const src = new Map(files.map((f) => [rel(f), fs.readFileSync(f, 'utf8')]));
@@ -64,10 +99,10 @@ const add = (id, f) => {
 for (const [f, text] of src) {
   // Explicit anchor.
   for (const m of text.matchAll(/focusSettingId === '([^']+)'/g)) add(m[1], f);
-  // Implicit anchor: SettingsCard derives `is-highlight` from its own `id`, so a
-  // `<SettingsCard id="x">` is reachable by a registry entry whose id is `x`
+  // Implicit anchor: the app's card primitive derives `is-highlight` from its
+  // own `id`, so an id'd card is reachable by a registry entry of the same id
   // even with no `highlight` prop at the call site.
-  for (const m of text.matchAll(/<SettingsCard\b[^>]*?\bid="([^"{]+)"/gs)) add(m[1], f);
+  for (const m of text.matchAll(REG.cardRe)) add(m[1], f);
 }
 
 /* ---- 2. which files does a page render? ------------------------------
@@ -75,11 +110,12 @@ for (const [f, text] of src) {
  * further section components. Resolve the closure by following relative imports
  * from the page component, so a setting anchored in a nested section still
  * counts as reachable from its page. */
-const appSrc = src.get('SettingsApp.tsx') || '';
+const appSrc = src.get(REG.appFile) || '';
 const pageComponent = new Map(); // pageId -> component name
-// SettingsApp routes with `{page === 'id' && <Component />}` — anchor on the
+// Settings routes with `{page === 'id' && <Component />}` — anchored on the
 // `&& <` so the many `disabled={page === 'id'}` guards above cannot match.
-for (const m of appSrc.matchAll(/page === '([a-z0-9-]+)' && <([A-Z][A-Za-z0-9]*)/g)) {
+// Scraper routes with a `switch (shell.page)`.
+for (const m of appSrc.matchAll(REG.routeRe)) {
   pageComponent.set(m[1], m[2]);
 }
 // A route may name a local wrapper defined in SettingsApp itself (Appearance is
@@ -92,7 +128,10 @@ for (const [pageId, comp] of [...pageComponent]) {
 const fileForComponent = (name) => {
   const direct = [...src.keys()].find((f) => f.endsWith(`/${name}.tsx`) || f === `${name}.tsx`);
   if (direct) return direct;
-  return [...src.keys()].find((f) => new RegExp(`export default function ${name}\\b|const ${name}[:=]`).test(src.get(f)));
+  // Several Scraper pages are named exports sharing one module (DataPages.tsx),
+  // so a file-name match alone routes only a third of them.
+  const decl = new RegExp(`export (?:default )?function ${name}\\b|export const ${name}[:=]|\\bconst ${name}[:=]`);
+  return [...src.keys()].find((f) => decl.test(src.get(f)));
 };
 
 function closure(startFile, seen = new Set()) {
@@ -115,8 +154,8 @@ for (const [pageId, comp] of pageComponent) {
 }
 
 /* ---- 3. the registry, read from source ------------------------------- */
-const regSrc = src.get('settingsRegistry.ts') || '';
-const regBody = regSrc.slice(regSrc.indexOf('export const SETTINGS_REGISTRY'));
+const regSrc = src.get(REG.registryFile) || '';
+const regBody = regSrc.slice(regSrc.indexOf(`export const ${REG.registryConst}`));
 const entries = [];
 for (const m of regBody.matchAll(/\{\s*\n\s*id: '([^']+)',([\s\S]*?)pageId: '([^']+)'/g)) {
   entries.push({
@@ -132,13 +171,24 @@ for (const m of regBody.matchAll(/\{\s*\n\s*id: '([^']+)',([\s\S]*?)pageId: '([^
 const onlyPage = opt('--page', null);
 const plantMisroute = has('--control');
 
+/* A PAGE-LEVEL entry names a whole page rather than something inside one: its
+ * titleKey IS the page's own nav label (Settings spells this `page-` on the id;
+ * the Scraper app does not spell it at all). Navigating to the page is the whole
+ * answer for those, so scoring them "unanchored" is a false alarm — it is what
+ * made the Scraper read 1 of 18 on the first run. They are counted separately
+ * and named, never quietly folded into `landed`. */
+const navSrc = src.get(REG.navFile) || '';
+const navLabelKeys = new Set([...navSrc.matchAll(/labelKey: '([^']+)'/g)].map((m) => m[1]));
+const isPageEntry = (e) => e.id.startsWith('page-') || navLabelKeys.has(e.titleKey);
+
 const scope = entries.filter((e) => !onlyPage || e.pageId === onlyPage);
 const rows = [];
 for (const e of scope) {
   const owners = consumers.get(e.id);
   const reachable = pageFiles.get(e.pageId);
   let state;
-  if (!owners || owners.size === 0) state = 'unanchored';
+  if (isPageEntry(e)) state = pageFiles.has(e.pageId) ? 'landedByPage' : 'misrouted';
+  else if (!owners || owners.size === 0) state = 'unanchored';
   else if (reachable && [...owners].some((o) => reachable.has(o))) state = 'landed';
   else state = 'misrouted';
   rows.push({ id: e.id, pageId: e.pageId, state, owners: owners ? [...owners] : [] });
@@ -155,15 +205,32 @@ if (plantMisroute && rows.length) {
   });
 }
 
+/* Anchoring answers "does a result land?". Coverage answers the other half of
+ * the gate — "is it searchable AT ALL?". Every id'd card is a destination a user
+ * could reasonably search for; one that no registry entry names is unreachable
+ * by search no matter how well the landing works. */
+const cardIds = new Set();
+for (const text of src.values()) {
+  for (const m of text.matchAll(REG.cardRe)) cardIds.add(m[1]);
+}
+const indexedIds = new Set(entries.map((e) => e.id));
+const uncovered = [...cardIds].filter((id) => !indexedIds.has(id)).sort();
+
 const count = (s) => rows.filter((r) => r.state === s).length;
 const result = {
+  registry: REG.registryConst,
   scope: onlyPage || 'all-pages',
   control: plantMisroute,
   pagesRouted: pageFiles.size,
   entries: rows.length,
   landed: count('landed'),
+  landedByPage: count('landedByPage'),
   misrouted: count('misrouted'),
   unanchored: count('unanchored'),
+  cardDestinations: cardIds.size,
+  cardDestinationsIndexed: cardIds.size - uncovered.length,
+  cardDestinationsUnsearchable: uncovered.length,
+  unsearchableIds: uncovered,
   misroutedIds: rows.filter((r) => r.state === 'misrouted').map((r) => `${r.id} -> page '${r.pageId}' but anchored in ${r.owners.join(',')}`),
   unanchoredIds: rows.filter((r) => r.state === 'unanchored').map((r) => `${r.id} -> page '${r.pageId}'`),
 };
