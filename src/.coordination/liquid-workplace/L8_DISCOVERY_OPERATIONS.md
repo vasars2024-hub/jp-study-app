@@ -604,3 +604,13 @@ page keys and 17/17 history keys, with 0 missing / 0 extra**.
 
 `i18n-check` passes at **11,695** English keys and the focused suite passes **21/21**. Category 8
 remains open at 89.3%; the operational-prefix tail contains 64 English `TEXT` fallbacks.
+
+### 2026-08-30 — Scraper i18n, batch 11: Discovery and result honesty complete
+
+**572 of 596 keys migrated (96.0%)**, +40 this batch. All 14 `discover.*`, 13 `build.*`, and 13
+`results.*` entries now resolve from the shared catalogs: shortlist reversibility, pluralized
+episode/chapter counts, mock-versus-working honesty, result recovery, and missing/failure counts.
+Mechanical comparison reports **14/14 + 13/13 + 13/13, with 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,735** English keys and the focused suite passes **21/21**. Category 8
+remains open at 96.0%; 24 fallbacks remain in downloads/schedule/export/media-type/torrent chrome.
