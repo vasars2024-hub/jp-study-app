@@ -323,17 +323,25 @@ export function TorrentTable({
   onToggle?: (id: string) => void;
 }) {
   const selectable = Boolean(onToggle);
-  const template = `${selectable ? '34px ' : ''}1fr 120px 92px 80px 80px 96px 96px 84px 110px`;
+  // The track list lives in `scraper.css` keyed off these classes, never inline: an inline
+  // declaration — including an inline custom property — outranks a container query, so a
+  // template written here could never reflow. See `.scr-table--torrents`.
   return (
-    <div className="scr-table" role="table" aria-rowcount={torrents.length + 1}>
-      <div className="scr-thead" role="row" aria-rowindex={1} style={{ gridTemplateColumns: template }}>
+    <div
+      className={`scr-table scr-table--torrents${selectable ? ' is-selectable' : ''}`}
+      role="table"
+      aria-rowcount={torrents.length + 1}
+    >
+      <div className="scr-thead" role="row" aria-rowindex={1}>
         {selectable && <div role="columnheader" className="scr-th" />}
-        {[
-          sx('result.col.name'), sx('result.col.group'), sx('result.col.resolution'),
-          sx('result.col.seeders'), sx('result.col.leechers'), sx('result.col.size'),
-          sx('result.col.age'), sx('result.col.subs'), sx('result.col.tracker'),
-        ].map((label) => (
-          <div key={label} role="columnheader" className="scr-th">{label}</div>
+        {([
+          ['name', sx('result.col.name')], ['group', sx('result.col.group')],
+          ['resolution', sx('result.col.resolution')], ['seeders', sx('result.col.seeders')],
+          ['leechers', sx('result.col.leechers')], ['size', sx('result.col.size')],
+          ['age', sx('result.col.age')], ['subs', sx('result.col.subs')],
+          ['tracker', sx('result.col.tracker')],
+        ] as const).map(([col, label]) => (
+          <div key={col} role="columnheader" className="scr-th" data-col={col}>{label}</div>
         ))}
       </div>
       <div className="scr-tbody">
@@ -348,7 +356,6 @@ export function TorrentTable({
               role="row"
               aria-rowindex={index + 2}
               className={`scr-row${selected?.has(row.id) ? ' is-selected' : ''}`}
-              style={{ gridTemplateColumns: template }}
             >
               {selectable && (
                 <div role="gridcell" className="scr-td scr-td--center">
@@ -360,32 +367,40 @@ export function TorrentTable({
                   />
                 </div>
               )}
-              <div role="gridcell" className="scr-td">
+              <div role="gridcell" className="scr-td" data-col="name">
                 <span className="scr-t-titles">
                   <span className="scr-t-en">{row.name}</span>
                   <span className="scr-t-ja">
                     {row.isBatch ? sx('result.batch') : sx('result.single')} · {row.fileCount} files
                   </span>
+                  {/* The four columns the narrow tier drops, folded back into the row that
+                      lost them. Nothing about this table is reachable anywhere else — there
+                      is no per-row inspector here — so hiding a column without this line
+                      would delete the value outright. Painted only by the tier. */}
+                  <span className="scr-t-fold">
+                    {row.releaseGroup} · {row.ageDays}d ·{' '}
+                    {row.subtitleLanguages.join(', ').toUpperCase()} · {row.tracker}
+                  </span>
                 </span>
               </div>
-              <div role="gridcell" className="scr-td"><Pill>{row.releaseGroup}</Pill></div>
-              <div role="gridcell" className="scr-td"><Pill tone="outline">{row.resolution}</Pill></div>
+              <div role="gridcell" className="scr-td" data-col="group"><Pill>{row.releaseGroup}</Pill></div>
+              <div role="gridcell" className="scr-td" data-col="resolution"><Pill tone="outline">{row.resolution}</Pill></div>
               {/* Seeders drive whether a torrent is usable at all, so the number
                   is toned rather than left as neutral text. */}
-              <div role="gridcell" className="scr-td">
+              <div role="gridcell" className="scr-td" data-col="seeders">
                 <span className={`scr-seed${row.seeders < 3 ? ' is-low' : row.seeders > 200 ? ' is-high' : ''}`}>
                   {row.seeders.toLocaleString()}
                 </span>
               </div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-num">{row.leechers.toLocaleString()}</span></div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatBytes(row.sizeBytes)}</span></div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-num">{row.ageDays}d</span></div>
-              <div role="gridcell" className="scr-td">
+              <div role="gridcell" className="scr-td" data-col="leechers"><span className="scr-t-num">{row.leechers.toLocaleString()}</span></div>
+              <div role="gridcell" className="scr-td" data-col="size"><span className="scr-t-num">{formatBytes(row.sizeBytes)}</span></div>
+              <div role="gridcell" className="scr-td" data-col="age"><span className="scr-t-num">{row.ageDays}d</span></div>
+              <div role="gridcell" className="scr-td" data-col="subs">
                 <Pill tone={row.subtitleLanguages.includes('ja') ? 'good' : 'warn'}>
                   {row.subtitleLanguages.join(', ').toUpperCase()}
                 </Pill>
               </div>
-              <div role="gridcell" className="scr-td"><span className="scr-t-plain">{row.tracker}</span></div>
+              <div role="gridcell" className="scr-td" data-col="tracker"><span className="scr-t-plain">{row.tracker}</span></div>
             </div>
           )}
         />

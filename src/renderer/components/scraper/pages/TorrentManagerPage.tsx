@@ -578,15 +578,14 @@ export default function TorrentManagerPage() {
           </span>
         }
       >
-        <div className="scr-table" role="table" aria-rowcount={transfers.length + 1}>
+        <div className="scr-table scr-table--mirror" role="table" aria-rowcount={transfers.length + 1}>
           <div
             className="scr-thead"
             role="row"
             aria-rowindex={1}
-            style={{ gridTemplateColumns: MIRROR_TEMPLATE }}
           >
-            {MIRROR_COLUMNS.map((label) => (
-              <div key={label} role="columnheader" className="scr-th">
+            {MIRROR_COLUMNS.map(([col, label]) => (
+              <div key={col} role="columnheader" className="scr-th" data-col={col}>
                 {label}
               </div>
             ))}
@@ -599,43 +598,58 @@ export default function TorrentManagerPage() {
               gridRole="rowgroup"
               emptyState={<p className="scr-table-empty">{sx('torrent.noTransfers')}</p>}
               renderItem={(t, index) => (
-                <div role="row" aria-rowindex={index + 2} className="scr-row" style={{ gridTemplateColumns: MIRROR_TEMPLATE }}>
-                  <div role="gridcell" className="scr-td">
+                <div role="row" aria-rowindex={index + 2} className="scr-row">
+                  <div role="gridcell" className="scr-td" data-col="name">
                     <span className="scr-t-titles">
                       <span className="scr-t-en">{t.name}</span>
                       <span className="scr-t-ja">{t.savePath}</span>
+                      {/* Everything the two narrow tiers drop, folded back into the row that
+                          owns it. The per-row inspector carries only state, progress,
+                          availability, ratio and peers, so speeds, size, category, tags and
+                          completion would otherwise have no route at a narrow pane. */}
+                      <span className="scr-t-fold">
+                        {t.ratio.toFixed(2)} · {t.seedsConnected}/{t.seedsTotal} ·{' '}
+                        {t.peersConnected}/{t.peersTotal} · {t.availability.toFixed(2)} ·{' '}
+                        {t.category || '—'} · {t.tags.join(', ') || '—'} ·{' '}
+                        {t.completedOn ? t.completedOn.slice(0, 10) : '—'}
+                      </span>
+                      <span className="scr-t-fold scr-t-fold--b">
+                        {Math.round(t.progress * 100)}% · ↓ {speed(t.downloadSpeedBps)} · ↑{' '}
+                        {speed(t.uploadSpeedBps)} ·{' '}
+                        {t.etaSec === null ? '—' : formatEtaClock(t.etaSec)}
+                      </span>
                     </span>
                   </div>
-                  <div role="gridcell" className="scr-td">
+                  <div role="gridcell" className="scr-td" data-col="state">
                     <Pill tone={STATE_TONE[t.state]}>{t.state}</Pill>
                   </div>
-                  <div role="gridcell" className="scr-td">
+                  <div role="gridcell" className="scr-td" data-col="progress">
                     <div className="scr-progress-cell">
                       <PieceStrip pieces={t.pieceStates} />
                       <span className="scr-t-num">{Math.round(t.progress * 100)}%</span>
                     </div>
                   </div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{speed(t.downloadSpeedBps)}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{speed(t.uploadSpeedBps)}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{t.etaSec === null ? '—' : formatEtaClock(t.etaSec)}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{t.ratio.toFixed(2)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="down"><span className="scr-t-num">{speed(t.downloadSpeedBps)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="up"><span className="scr-t-num">{speed(t.uploadSpeedBps)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="eta"><span className="scr-t-num">{t.etaSec === null ? '—' : formatEtaClock(t.etaSec)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="ratio"><span className="scr-t-num">{t.ratio.toFixed(2)}</span></div>
                   {/* Peers and seeds as connected/total — qBittorrent's own list
                       shows only the connected half, which hides a swarm that is
                       large but unreachable. */}
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{t.seedsConnected} / {t.seedsTotal}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{t.peersConnected} / {t.peersTotal}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{t.availability.toFixed(2)}</span></div>
-                  <div role="gridcell" className="scr-td"><span className="scr-t-num">{formatBytes(t.sizeBytes)}</span></div>
-                  <div role="gridcell" className="scr-td">
+                  <div role="gridcell" className="scr-td" data-col="seeds"><span className="scr-t-num">{t.seedsConnected} / {t.seedsTotal}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="peers"><span className="scr-t-num">{t.peersConnected} / {t.peersTotal}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="avail"><span className="scr-t-num">{t.availability.toFixed(2)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="size"><span className="scr-t-num">{formatBytes(t.sizeBytes)}</span></div>
+                  <div role="gridcell" className="scr-td" data-col="category">
                     <Pill tone="outline">{t.category || '—'}</Pill>
                   </div>
-                  <div role="gridcell" className="scr-td">
+                  <div role="gridcell" className="scr-td" data-col="tags">
                     <span className="scr-t-plain">{t.tags.join(', ') || '—'}</span>
                   </div>
-                  <div role="gridcell" className="scr-td">
+                  <div role="gridcell" className="scr-td" data-col="completed">
                     <span className="scr-t-plain">{t.completedOn ? t.completedOn.slice(0, 10) : '—'}</span>
                   </div>
-                  <div role="gridcell" className="scr-td scr-td--center">
+                  <div role="gridcell" className="scr-td scr-td--center" data-col="actions">
                     <IconButton
                       label={`Actions for ${t.name}`}
                       size="sm"
@@ -704,23 +718,26 @@ export default function TorrentManagerPage() {
   );
 }
 
-const MIRROR_COLUMNS = [
-  'Name',
-  'State',
-  'Progress',
-  '↓ Speed',
-  '↑ Speed',
-  'ETA',
-  'Ratio',
-  'Seeds',
-  'Peers',
-  'Avail.',
-  'Size',
-  'Category',
-  'Tags',
-  'Completed',
-  '',
+// Each column carries the key its cells are tagged with, so the two responsive tiers in
+// `scraper.css` can drop a column and its header together. The track list itself is NOT
+// here any more: it lives on `.scr-table--mirror`, because an inline `grid-template-columns`
+// outranks a container query and made this table's 1582px min-content unreflowable.
+// (The labels stay the raw strings they already were; that pre-existing i18n gap is
+// unchanged by this slice and is recorded in the L8 ledger.)
+const MIRROR_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ['name', 'Name'],
+  ['state', 'State'],
+  ['progress', 'Progress'],
+  ['down', '↓ Speed'],
+  ['up', '↑ Speed'],
+  ['eta', 'ETA'],
+  ['ratio', 'Ratio'],
+  ['seeds', 'Seeds'],
+  ['peers', 'Peers'],
+  ['avail', 'Avail.'],
+  ['size', 'Size'],
+  ['category', 'Category'],
+  ['tags', 'Tags'],
+  ['completed', 'Completed'],
+  ['actions', ''],
 ];
-
-const MIRROR_TEMPLATE =
-  'minmax(220px, 2fr) 104px 150px 96px 96px 84px 68px 84px 84px 68px 92px 96px 120px 104px 44px';

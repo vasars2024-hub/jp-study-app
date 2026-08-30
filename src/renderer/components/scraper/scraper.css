@@ -157,6 +157,14 @@
   min-height: 0;
   overflow: auto;
   padding: var(--space-lg);
+  /* The pane, not the shell, is what a dense table actually gets: the rail's
+     52/205px and an open drawer's 360-500px come off the shell first, so the
+     same 1226px shell hands the table 674px or 1174px depending on state a
+     shell-level query cannot see. Tables below reflow against THIS. Safe to
+     contain: nothing under `.scr-main` is `position: fixed`, and both sticky
+     theads resolve against their scroll container, which is this element. */
+  container-type: inline-size;
+  container-name: scr-pane;
 }
 
 .scr-loading {
@@ -2397,6 +2405,14 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  /* The track list arrives as a CUSTOM PROPERTY, never as an inline
+     `grid-template-columns`. An inline declaration outranks every rule in this
+     file including a container query, so while the templates were written that
+     way no responsive tier could ever reach them — which is why a 15-column
+     table sat at a 1582px min-content inside a 606px card and pushed the whole
+     page into a horizontal scroll. Tables that have not been given the property
+     keep their own inline value and are unaffected. */
+  grid-template-columns: var(--scr-cols);
 }
 
 .scr-thead {
@@ -2411,6 +2427,104 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* --------------------------------------------- indexer results, responsive --- */
+
+/* Nine columns with a 792px fixed floor. At a 606px card — which is what a
+   1226px shell hands this table once the rail and an open drawer are paid —
+   the grid overflowed its own box, and because nothing between the row and
+   `.scr-main` scrolls, the whole PAGE scrolled sideways: measured
+   `main.scr-main 1611>664`, dragging the page head and every other card with
+   it. The tier below drops the four columns to a folded line in the row that
+   owns them, so the value stays on screen. */
+.scr-table--torrents {
+  --scr-cols: 1fr 120px 92px 80px 80px 96px 96px 84px 110px;
+}
+
+.scr-table--torrents.is-selectable {
+  --scr-cols: 34px 1fr 120px 92px 80px 80px 96px 96px 84px 110px;
+}
+
+.scr-t-fold {
+  display: none;
+  color: var(--muted);
+  font-size: var(--font-size-2xs);
+}
+
+@container scr-pane (max-width: 980px) {
+  .scr-table--torrents {
+    --scr-cols: 1fr 92px 80px 80px 96px;
+  }
+
+  .scr-table--torrents.is-selectable {
+    --scr-cols: 34px 1fr 92px 80px 80px 96px;
+  }
+
+  /* Release group, age, subtitle languages and tracker. Each one is re-rendered
+     by `.scr-t-fold` on the name cell in the same row, so this hides a COLUMN,
+     never a value — the table has no per-row inspector to fall back on. */
+  .scr-table--torrents [data-col='group'],
+  .scr-table--torrents [data-col='age'],
+  .scr-table--torrents [data-col='subs'],
+  .scr-table--torrents [data-col='tracker'] {
+    display: none;
+  }
+
+  .scr-table--torrents .scr-t-fold {
+    display: block;
+  }
+}
+
+/* ---------------------------------------- qBittorrent mirror, responsive --- */
+
+/* Fifteen columns, a 1582px min-content, and the same 606px card: this is the
+   table that put `main.scr-main` at 1611>664. Two tiers, because one drop is
+   not enough — even without the seven secondary columns it still wants ~930px. */
+.scr-table--mirror {
+  --scr-cols: minmax(220px, 2fr) 104px 150px 96px 96px 84px 68px 84px 84px 68px 92px 96px 120px 104px 44px;
+}
+
+@container scr-pane (max-width: 1650px) {
+  .scr-table--mirror {
+    --scr-cols: minmax(200px, 2fr) 104px 150px 96px 96px 84px 92px 44px;
+  }
+
+  .scr-table--mirror [data-col='ratio'],
+  .scr-table--mirror [data-col='seeds'],
+  .scr-table--mirror [data-col='peers'],
+  .scr-table--mirror [data-col='avail'],
+  .scr-table--mirror [data-col='category'],
+  .scr-table--mirror [data-col='tags'],
+  .scr-table--mirror [data-col='completed'] {
+    display: none;
+  }
+
+  /* `--b` carries `.scr-t-fold` too, so it must be excluded here or tier A would
+     paint the tier-B line as well and duplicate four values still in columns. */
+  .scr-table--mirror .scr-t-fold:not(.scr-t-fold--b) {
+    display: block;
+  }
+}
+
+/* Transfer identity, its state, its size and its actions. Progress, both speeds
+   and ETA move to the second folded line rather than disappearing — they are the
+   numbers a running transfer exists to show. */
+@container scr-pane (max-width: 1000px) {
+  .scr-table--mirror {
+    --scr-cols: minmax(160px, 2fr) 104px 92px 44px;
+  }
+
+  .scr-table--mirror [data-col='progress'],
+  .scr-table--mirror [data-col='down'],
+  .scr-table--mirror [data-col='up'],
+  .scr-table--mirror [data-col='eta'] {
+    display: none;
+  }
+
+  .scr-table--mirror .scr-t-fold--b {
+    display: block;
+  }
 }
 
 .scr-th--end { justify-self: end; }
