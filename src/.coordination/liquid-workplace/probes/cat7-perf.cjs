@@ -417,6 +417,67 @@ const SPECS = {
     },
     collection: { container: '.game-list', row: '.game-list-item' },
   },
+  scraper: {
+    title: 'Scraper',
+    root: '.scr-shell',
+    heavy: {
+      /*
+       * NAVIGATION IS THIS SURFACE'S LOAD, and that is a measured claim rather than a
+       * convenient one. Swept live before this spec was written, all 17 rail pages in
+       * one pass: the largest is Dashboard at 551 elements / 61 rows, and Results,
+       * Downloads, Site Rules, Plugins and all three testers render 0 rows on this
+       * profile — the last scrape was 19 days ago. So there is no collection here to
+       * scroll: `scrollAll('.scr-shell')` would have picked `div.scr-drawer-pane`
+       * (1,315 px of overflow, the largest in the root) and measured the SETTINGS
+       * DRAWER instead of the Scraper.
+       *
+       * What the surface does at scale is swap pages. Each click unmounts one lazy
+       * page chunk and mounts another into `.scr-main`, and `ScraperSettingsDrawer`
+       * documents that the page behind the drawer re-renders with it. 17 pages twice
+       * is 34 mounts, which is the heaviest real work this surface performs without
+       * touching the network or the user's data.
+       *
+       * `shell.page` is persisted, so the load restores the page it started on and the
+       * proof REFUSES unless the rail came back to it.
+       */
+      label: 'navigate all 17 rail pages, twice',
+      // 34 ticks at 110 ms is ~3.74 s plus a 200 ms settle for the restore check.
+      durationMs: 4500,
+      js: `(() => {
+        delete window.__lqScraperLoad;
+        const rail = document.querySelector('nav.scr-rail');
+        if (!rail) return 'REFUSE: no scraper rail';
+        const btns = Array.from(rail.querySelectorAll('button')).filter((b) => (b.textContent || '').trim());
+        if (btns.length < 10) return 'REFUSE: expected the full rail, found ' + btns.length + ' pages';
+        const activeIndex = btns.findIndex((b) => b.classList.contains('is-active'));
+        const startIndex = activeIndex < 0 ? 0 : activeIndex;
+        const rec = { pages: btns.length, start: (btns[startIndex].textContent || '').trim(), ticks: 0, restored: false };
+        window.__lqScraperLoad = rec;
+        const total = btns.length * 2;
+        const timer = setInterval(() => {
+          btns[rec.ticks % btns.length].click();
+          rec.ticks += 1;
+          if (rec.ticks >= total) {
+            clearInterval(timer);
+            btns[startIndex].click();
+            setTimeout(() => {
+              const back = rail.querySelector('button.is-active');
+              rec.restored = !!back && (back.textContent || '').trim() === rec.start;
+            }, 200);
+          }
+        }, 110);
+        return 'cycling ' + btns.length + ' pages twice from ' + rec.start;
+      })()`,
+      proof: `(() => {
+        const r = window.__lqScraperLoad;
+        if (!r) return 'REFUSE: the load never armed';
+        if (r.ticks < r.pages * 2) return 'REFUSE: only ' + r.ticks + ' of ' + (r.pages * 2) + ' navigations ran';
+        if (!r.restored) return 'REFUSE: the rail did not return to ' + r.start;
+        return r.pages + ' pages x2 = ' + r.ticks + ' navigations, restored to ' + r.start;
+      })()`,
+    },
+    collection: { container: '.scr-main', row: '.scr-row' },
+  },
   dictionary: {
     title: 'Dictionary',
     root: '.dict-view',
