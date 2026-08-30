@@ -526,3 +526,14 @@ Live acceptance was attempted with the existing parameterised category-8 harness
 Scraper was absent; reopening it through the debug bridge produced a visible 803.6×568.4 shell,
 but its parent `.fwin` remained at computed `opacity: 0`, so the harness correctly VOIDed on
 0 painted runs and wrote no evidence file. Per the one-repair rule, no further retry this turn.
+
+### 2026-08-30 — Scraper i18n, batch 4: Dashboard workflow complete
+
+**302 of 588 keys migrated (51.4%)**, +53 this batch. Every `dash.*` entry now resolves from
+the shared catalogs: hero and quick actions, series/stat summaries, backend honesty, active and
+cancelled jobs, source health, runtime, scheduling and the study handoff. Mechanical comparison:
+**53 TEXT / 53 shared / 0 missing / 0 extra**.
+
+`i18n-check` passes at **11,465** English keys and the focused suite passes **21/21**. No second
+live harness run was made after batch 3's one allowed repair still left the parent window at
+opacity 0; category 8 remains open at 51.4% coverage.
