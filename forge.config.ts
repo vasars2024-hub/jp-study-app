@@ -209,6 +209,14 @@ const config: ForgeConfig = {
           config: 'vite.main.config.ts',
           target: 'main',
         },
+        {
+          // Japanese neural speech keeps four ONNX graphs (~400 MB) outside
+          // Electron's event loop and address space. The host reuses this
+          // worker across a deck, then reaps it after the idle grace period.
+          entry: 'src/main/flashcardTtsWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
       ],
       renderer: [
         {

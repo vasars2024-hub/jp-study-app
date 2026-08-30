@@ -8,12 +8,26 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import type { FlashcardAudioFailure } from '../shared/flashcardAudioMessages';
 import {
+  SUPERTONIC_VOICES,
+  supertonicVoiceFromId,
+  supertonicVoiceId,
+  type SupertonicModelPaths,
+  type SupertonicVoice,
+} from '../shared/flashcardTtsProtocol';
+import { ASSET_CATALOG, assetDependencyClosure } from '../shared/assetRegistry';
+import {
   resolveVoice,
   voiceLanguageOf,
   type FlashcardVoice,
   type FlashcardVoiceInventory,
   type VoiceResolution,
 } from '../shared/flashcardVoices';
+import { assetPath, isInstalled, registerAssetUnloadHandler } from './downloads';
+import {
+  cancelSupertonicSynthesis,
+  shutdownSupertonicHost,
+  synthesizeWithSupertonic,
+} from './flashcardTtsHost';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
@@ -311,6 +325,7 @@ export function cancelFlashcardSynthesis(requestId: string): boolean {
   if (!requestId || !activeSynthesisRequests.has(requestId)) return false;
   cancelledSynthesisRequests.add(requestId);
   synthesisChildren.get(requestId)?.kill();
+  cancelSupertonicSynthesis(requestId);
   return true;
 }
 
@@ -429,6 +444,36 @@ export function parseLinuxVoices(stdout: string): FlashcardVoice[] {
 
 let voiceCache: FlashcardVoiceInventory | null = null;
 
+function supertonicPaths(voice: SupertonicVoice): SupertonicModelPaths | null {
+  const paths: SupertonicModelPaths = {
+    durationPredictor: assetPath('supertonic-3-duration') ?? '',
+    textEncoder: assetPath('supertonic-3-text') ?? '',
+    vectorEstimator: assetPath('supertonic-3') ?? '',
+    vocoder: assetPath('supertonic-3-vocoder') ?? '',
+    config: assetPath('supertonic-3-config') ?? '',
+    unicodeIndexer: assetPath('supertonic-3-indexer') ?? '',
+    voiceStyle: assetPath(`supertonic-3-voice-${voice.toLowerCase()}`) ?? '',
+  };
+  return Object.values(paths).every(Boolean) ? paths : null;
+}
+
+function neuralVoices(): FlashcardVoice[] {
+  if (!isInstalled('supertonic-3')) return [];
+  return SUPERTONIC_VOICES
+    .filter((voice) => Boolean(supertonicPaths(voice)))
+    .map((voice) => ({
+      id: supertonicVoiceId(voice),
+      name: `Supertonic 3 ${voice}`,
+      culture: 'ja-JP',
+      language: 'ja',
+      engine: 'neural' as const,
+    }));
+}
+
+function withNeuralVoices(inventory: FlashcardVoiceInventory): FlashcardVoiceInventory {
+  return { ...inventory, voices: [...neuralVoices(), ...inventory.voices] };
+}
+
 /**
  * Every offline voice this machine can speak with.
  *
@@ -438,7 +483,7 @@ let voiceCache: FlashcardVoiceInventory | null = null;
  * without restarting the app, which is the only reason the cache is escapable.
  */
 export async function listFlashcardVoices(refresh = false): Promise<FlashcardVoiceInventory> {
-  if (voiceCache && !refresh) return voiceCache;
+  if (voiceCache && !refresh) return withNeuralVoices(voiceCache);
   const platform = process.platform;
   try {
     let voices: FlashcardVoice[];
@@ -473,7 +518,7 @@ export async function listFlashcardVoices(refresh = false): Promise<FlashcardVoi
       error: error instanceof Error ? error.message : String(error),
     };
   }
-  return voiceCache;
+  return withNeuralVoices(voiceCache);
 }
 
 /**
@@ -639,24 +684,64 @@ export async function synthesizeFlashcardAudio(
     resolution = resolved.resolution;
   }
 
-  const extension = process.platform === 'darwin' ? 'aiff' : 'wav';
+  let neuralVoice = supertonicVoiceFromId(chosen?.id);
+  let extension = neuralVoice ? 'wav' : process.platform === 'darwin' ? 'aiff' : 'wav';
   const directory = path.join(audioRoot(), 'tts');
   fs.mkdirSync(directory, { recursive: true });
   // The voice is part of the cache key: two voices reading one sentence are two
   // different files, and sharing a path would hand back the wrong one forever.
-  const output = path.join(directory, `${fileHash(culture, chosen?.id ?? '', sentence)}.${extension}`);
+  let output = path.join(directory, `${fileHash(culture, chosen?.id ?? '', sentence)}.${extension}`);
   if (fs.existsSync(output) && fs.statSync(output).size > 0) {
     finishSynthesisRequest(requestId);
     return { ok: true, path: output, voice: chosen?.name, voiceResolution: resolution };
   }
   try {
-    const voiceId = chosen?.id ?? '';
+    let voiceId = chosen?.id ?? '';
     if (requestId && cancelledSynthesisRequests.has(requestId)) {
       throw new SynthesizerError('Offline audio generation was cancelled.', 'cancelled');
     }
-    if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output, voiceId, requestId);
-    else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output, voiceId, requestId);
-    else await synthesizeLinux(sentence, culture, output, voiceId, requestId);
+    if (neuralVoice) {
+      const paths = supertonicPaths(neuralVoice);
+      if (!paths) throw new Error('The Japanese neural voice bundle is incomplete.');
+      try {
+        await synthesizeWithSupertonic({
+          kind: 'synthesize',
+          id: requestId ?? crypto.randomUUID(),
+          text: sentence,
+          language: 'ja',
+          voice: neuralVoice,
+          outputPath: output,
+          paths,
+          steps: 5,
+          speed: 1.05,
+        });
+      } catch (neuralError) {
+        if ((neuralError instanceof Error && neuralError.name === 'AbortError')
+          || (requestId && cancelledSynthesisRequests.has(requestId))) {
+          throw new SynthesizerError('Offline audio generation was cancelled.', 'cancelled');
+        }
+        // A broken neural model must not turn a whole deck into a false success.
+        // Use an installed Japanese system voice and disclose the fallback via
+        // `voiceResolution: language`; otherwise preserve the neural diagnostic.
+        const systemVoices = inventory.voices.filter((voice) => voice.engine !== 'neural');
+        const fallback = resolveVoice(systemVoices, culture);
+        if (!fallback.voice) throw neuralError;
+        chosen = fallback.voice;
+        resolution = 'language';
+        neuralVoice = null;
+        voiceId = chosen.id;
+        extension = process.platform === 'darwin' ? 'aiff' : 'wav';
+        output = path.join(directory, `${fileHash(culture, voiceId, sentence)}.${extension}`);
+        if (fs.existsSync(output) && fs.statSync(output).size > 0) {
+          return { ok: true, path: output, voice: chosen.name, voiceResolution: resolution };
+        }
+      }
+    }
+    if (!neuralVoice) {
+      if (process.platform === 'win32') await synthesizeWindows(sentence, culture, output, voiceId, requestId);
+      else if (process.platform === 'darwin') await synthesizeMac(sentence, culture, output, voiceId, requestId);
+      else await synthesizeLinux(sentence, culture, output, voiceId, requestId);
+    }
     if (!fs.existsSync(output) || fs.statSync(output).size === 0) {
       throw new Error('The offline voice produced no audio.');
     }
@@ -691,6 +776,11 @@ function readManagedAudio(filePath: string): FlashcardAudioResult {
 }
 
 export function registerFlashcardAudioIpc(): void {
+  // Bundle removal walks owned dependencies before the visible root. ONNX may
+  // mmap any graph, so the first file removed must already stop the worker.
+  for (const asset of assetDependencyClosure(ASSET_CATALOG, 'supertonic-3')) {
+    registerAssetUnloadHandler(asset.id, shutdownSupertonicHost);
+  }
   ipcMain.handle('flashcards:synthesizeAudio', (_event, text?: string, language?: string, voice?: string, requestId?: string) => (
     synthesizeFlashcardAudio(
       typeof text === 'string' ? text : '',

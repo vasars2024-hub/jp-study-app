@@ -162,6 +162,7 @@ describe('main/preload build graph boundary', () => {
       'src/main/dictionary/importWorker.ts',
       'src/main/anki/apkgReadWorker.ts',
       'src/main/llamaHostWorker.ts',
+      'src/main/flashcardTtsWorker.ts',
     ].filter((e) => existsSync(resolve(REPO, e)));
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {

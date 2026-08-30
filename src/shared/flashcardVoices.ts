@@ -22,6 +22,8 @@ export interface FlashcardVoice {
   culture: string;
   /** The primary subtag of `culture`, lowercased: `ja`, `zh`, `ru`, `en`. */
   language: string;
+  /** Omitted on older persisted inventories; those entries are operating-system voices. */
+  engine?: 'system' | 'neural';
 }
 
 export interface FlashcardVoiceInventory {
