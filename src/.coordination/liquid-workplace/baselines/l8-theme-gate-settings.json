@@ -1,0 +1,24 @@
+{
+  "surface": "settings",
+  "currentTheme": "forest-night",
+  "movedTo": "frutiger-aero",
+  "query": "pillarbox",
+  "queryUnderCurrent": 0,
+  "queryUnderTheme": 1,
+  "queryBackUnderCurrent": 0,
+  "queryTitlesUnderTheme": [
+    "Pillarbox style"
+  ],
+  "gateMoves": true,
+  "gateReverses": true,
+  "control": "wallpaper",
+  "controlUnderCurrent": 10,
+  "controlUnderTheme": 10,
+  "controlHeld": true,
+  "restored": {
+    "theme": "forest-night",
+    "adv": false,
+    "query": ""
+  },
+  "restoredClean": true
+}

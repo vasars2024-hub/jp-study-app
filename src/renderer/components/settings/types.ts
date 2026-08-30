@@ -74,6 +74,19 @@ export interface SettingsRegistryEntry {
   pageId: SettingsPageId;
   group: string;
   advanced?: boolean;
+  /**
+   * Theme ids this entry's card actually renders under. Omit when the card
+   * renders everywhere, which is the overwhelming majority.
+   *
+   * `advanced` hides an entry whose card is behind Advanced Mode; this is the
+   * same idea on the theme axis. A card rendered under a guard such as
+   * `activeThemeId === AERO_THEME_ID` does not exist for a Study OS user, so a
+   * search hit for it navigates to a page that highlights nothing — the
+   * misroute the registry exists to prevent. (Spelled as prose rather than as
+   * the tag itself: `l8-searchability.cjs` scans this tree for card tags and
+   * would count the example as a real destination.)
+   */
+  themes?: string[];
 }
 
 export interface UserWallThumb {

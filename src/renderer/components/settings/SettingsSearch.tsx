@@ -5,6 +5,7 @@ import type { SettingsPageId, SettingsRegistryEntry } from './types';
 import Icon from '../Icons';
 import { useT } from '../../i18n';
 import { loadSettingsAdvanced } from '../../settingsAdvanced';
+import { loadThemeId, onThemeChanged } from '../../theme/engine';
 
 const SettingsSearch = forwardRef<
   HTMLInputElement,
@@ -21,10 +22,15 @@ const SettingsSearch = forwardRef<
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  // A theme-gated entry stops being a real destination the moment the shell
+  // changes underneath an open Settings window, so this follows the same
+  // `onThemeChanged` subscription the pages that render those cards use.
+  const [themeId, setThemeId] = useState(loadThemeId);
+  useEffect(() => onThemeChanged(setThemeId), []);
   const listId = useId();
   const results = useMemo(
-    () => searchSettings(query, t, { advanced: advancedMode }),
-    [query, lang, advancedMode, t],
+    () => searchSettings(query, t, { advanced: advancedMode, themeId }),
+    [query, lang, advancedMode, themeId, t],
   );
   const recent = useMemo(() => (query.trim() ? [] : getRecentQueries()), [query, open]);
 

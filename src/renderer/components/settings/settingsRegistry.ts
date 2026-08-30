@@ -7,6 +7,20 @@ import { en } from '../../../shared/i18n/catalogs';
 // since the search index still matches on English feature names regardless of
 // the active UI language (see the SETTINGS_REGISTRY comment).
 
+/**
+ * The two secret shells, as plain ids rather than an import of
+ * `theme/frutiger-aero` + `theme/wired-archive`. Those modules register their
+ * theme on import and drag in sound packs, wallpaper packs and an icon pack;
+ * this file is a data table that the search box, the agent navigation index and
+ * several node-side tests all read, so it stays free of side effects.
+ * `settingsSearchThemeGate.test.ts` asserts these two strings still equal
+ * `AERO_THEME_ID` / `WIRED_ARCHIVE_THEME_ID`, which is where the drift would
+ * otherwise hide.
+ */
+export const AERO_SHELL_THEME = 'frutiger-aero';
+export const WIRED_SHELL_THEME = 'wired-archive';
+export const SECRET_SHELL_THEMES = [AERO_SHELL_THEME, WIRED_SHELL_THEME];
+
 /** Sidebar pages in display order, grouped for the rail. */
 export const SETTINGS_NAV: SettingsNavPage[] = [
   { id: 'home', labelKey: 'settings.nav.home', icon: 'settings', group: '', descKey: 'settings.nav.home.desc' },
@@ -1156,6 +1170,11 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   // `advanced` marks a card that only renders once the user has reached a state
   // of their own (the Aero / WIRED secret shells): offering the row to everyone
   // else would scroll to nothing and give the secret away in the same click.
+  // `advanced` alone never actually did that, though — Advanced Mode is a
+  // preference, not a shell, so a Study OS user who turned it on still got the
+  // row and still scrolled to nothing. `themes` is the gate that means what this
+  // paragraph says; `settingsSearchThemeGate.test.ts` derives it from the card's
+  // own render guard so a moved card cannot quietly lose it.
   // ---------------------------------------------------------------------
   {
     id: 'app-border',
@@ -1165,6 +1184,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'appearance',
     group: 'Personalization',
     advanced: true,
+    themes: [AERO_SHELL_THEME],
   },
   {
     id: 'pillarbox',
@@ -1174,6 +1194,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'appearance',
     group: 'Personalization',
     advanced: true,
+    themes: [AERO_SHELL_THEME],
   },
   {
     id: 'environment-preset',
@@ -1210,6 +1231,11 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     pageId: 'companions',
     group: 'Personalization',
     advanced: true,
+    // CompanionsPage renders this card only under a secret shell. Without the
+    // gate a Study OS user searching "leave secret os" lands on Companions with
+    // nothing highlighted — and the way out of a shell they are not in is not a
+    // setting they need.
+    themes: SECRET_SHELL_THEMES,
   },
   {
     id: 'trinkets',
@@ -1574,18 +1600,28 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
 ];
 
+/**
+ * `themeId` is the theme the searching window is actually running, and it gates
+ * entries carrying `themes`. Omitting it drops every gated entry rather than
+ * admitting them all: a gated card renders under a minority of themes, so the
+ * unknown-theme guess that is right more often is "not rendered", and a missing
+ * result costs a user less than one that navigates to a page and highlights
+ * nothing.
+ */
 export function searchSettings(
   query: string,
   t: (key: string) => string,
-  opts?: { advanced?: boolean },
+  opts?: { advanced?: boolean; themeId?: string },
 ): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const advanced = opts?.advanced ?? false;
+  const themeId = opts?.themeId;
   const words = q.split(/\s+/).filter(Boolean);
   const scored: { e: SettingsRegistryEntry; score: number; title: string }[] = [];
   for (const e of SETTINGS_REGISTRY) {
     if (e.advanced && !advanced) continue;
+    if (e.themes && (!themeId || !e.themes.includes(themeId))) continue;
     const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
     if (page?.advanced && !advanced) continue;
     const title = e.titleKey ? t(e.titleKey) : '';

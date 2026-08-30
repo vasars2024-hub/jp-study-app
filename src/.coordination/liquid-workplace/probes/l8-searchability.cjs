@@ -189,6 +189,23 @@ for (const m of regBody.matchAll(
   });
 }
 
+/* `themes:` sits AFTER `pageId:` in an entry, so the capture above cannot see
+ * it. Read it in its own pass over whole entry bodies rather than widening that
+ * regex, which the last two runs of this probe had to repair. */
+const themeGated = new Map(); // entry id -> theme ids the entry declares
+for (const m of regBody.matchAll(/id: '([^']+)',([\s\S]*?)\n {2}\},/g)) {
+  const decl = m[2].match(/themes: (?:\[([^\]]*)\]|([A-Z_][A-Z0-9_]*))/);
+  if (!decl) continue;
+  // `themes: SECRET_SHELL_THEMES` names a const declared above the table.
+  const listed = decl[1] ?? (regSrc.match(new RegExp(`${decl[2]} = \\[([^\\]]*)\\]`)) || [])[1] ?? '';
+  themeGated.set(
+    m[1],
+    [...listed.matchAll(/'([^']+)'|([A-Z_][A-Z0-9_]*)/g)]
+      .map((x) => x[1] ?? (regSrc.match(new RegExp(`${x[2]} = '([^']+)'`)) || [])[1])
+      .filter(Boolean),
+  );
+}
+
 /* ---- 4. score --------------------------------------------------------- */
 const onlyPage = opt('--page', null);
 const plantMisroute = has('--control');
@@ -251,21 +268,97 @@ const cardPage = new Map();
  * `advanced: true` gates BuildStatusPanel. Reported by name so neither is
  * excused by silence. */
 const conditionalCards = new Set();
+/* Which guard a conditional card is written under, so the THEME axis can be
+ * separated from every other one. An indexed card behind a pure theme guard and
+ * no `themes:` in its entry is the defect that hid here longest: the entry is
+ * found, it routes to the right page, its anchor is in a file that page renders
+ * -- and the card is not on screen, because this user is not in that shell. File
+ * closure cannot see that, which is why it is measured here and not there. */
+const cardGuard = new Map(); // card id -> the guard line, verbatim
 for (const [f, text] of src) {
   for (const m of text.matchAll(REG.cardRe)) {
     cardIds.add(m[1]);
-    if (/(?:&&|\?)\s*\(\s*$/.test(text.slice(0, m.index))) conditionalCards.add(m[1]);
+    if (/(?:&&|\?)\s*\(\s*$/.test(text.slice(0, m.index))) {
+      conditionalCards.add(m[1]);
+      const lines = text.slice(0, m.index).split('\n');
+      cardGuard.set(m[1], { guard: (lines[lines.length - 2] || '').trim(), file: f });
+    }
     if (!cardPage.has(m[1])) {
       const owner = [...pageFiles].find(([, files]) => files.has(f));
       cardPage.set(m[1], owner ? owner[0] : null);
     }
   }
 }
+
+/* Theme ids a guard requires, or null when it is not a PURE theme guard. One
+ * alias level is resolved -- `const aeroActive = theme === AERO_THEME_ID` is how
+ * the two longest-lived instances were written, and a regex looking for
+ * `THEME_ID` beside the tag would have scored both clean. A guard mixing a theme
+ * test with anything else (`wired || isWiredDiscovered`) is NOT pure: that card
+ * renders for a discoverer under any theme, so gating its entry would hide a
+ * live destination -- the same error in the other direction. */
+function themesRequiredBy(guard, text) {
+  let expr = guard.replace(/^\{\s*/, '').replace(/&&\s*\($/, '').trim();
+  const bare = expr.match(/^([A-Za-z_$][\w$]*)$/);
+  if (bare) {
+    const decl = text.match(new RegExp(`const ${bare[1]}\\s*=\\s*([^;\\n]+)`));
+    if (!decl) return null;
+    expr = decl[1].trim();
+  }
+  expr = expr.replace(/^\((.*)\)$/s, '$1').trim();
+  if (expr.includes('&&') || expr.includes('?')) return null;
+  const out = [];
+  for (const term of expr.split('||')) {
+    const eq = term.replace(/^\(|\)$/g, '').trim().match(/^[\w$.]+\s*===\s*([A-Z_][A-Z0-9_]*)$/);
+    if (!eq) return null;
+    // The constant's value lives in whichever theme module declares it.
+    let value = null;
+    for (const t2 of src.values()) {
+      const hit = t2.match(new RegExp(`${eq[1]} = '([^']+)'`));
+      if (hit) { value = hit[1]; break; }
+    }
+    if (!value) {
+      for (const p of ['src/renderer/theme/frutiger-aero.ts', 'src/renderer/theme/wired-archive.ts']) {
+        const hit = fs.readFileSync(path.join(ROOT, p), 'utf8').match(new RegExp(`${eq[1]} = '([^']+)'`));
+        if (hit) { value = hit[1]; break; }
+      }
+    }
+    if (!value) return null;
+    out.push(value);
+  }
+  return out.length ? out : null;
+}
+
+const themeGuarded = new Map(); // card id -> theme ids its render guard requires
+const otherAxisGuards = [];
+for (const [id, { guard, file }] of cardGuard) {
+  const themes = themesRequiredBy(guard, src.get(file) || '');
+  if (themes) themeGuarded.set(id, themes);
+  else otherAxisGuards.push(`${id} <- ${guard}`);
+}
 const indexedIds = new Set(entries.map((e) => e.id));
 const uncovered = [...cardIds]
   .filter((id) => !indexedIds.has(id) && !conditionalCards.has(id))
   .sort();
 const conditionalOnly = [...conditionalCards].filter((id) => !indexedIds.has(id)).sort();
+
+/* An indexed card behind a pure theme guard whose entry carries no matching
+ * `themes:`. This is a MISROUTE that file-closure scoring cannot see, so it is
+ * reported next to `misrouted` and exits non-zero the same way. */
+const themeUngated = [];
+for (const [id, required] of themeGuarded) {
+  if (!indexedIds.has(id)) continue;
+  const declared = themeGated.get(id);
+  if (!declared) themeUngated.push(`${id} renders only under ${required.join('/')}, entry has no themes:`);
+  else if ([...declared].sort().join() !== [...required].sort().join()) {
+    themeUngated.push(`${id} declares ${declared.join('/')} but its guard requires ${required.join('/')}`);
+  }
+}
+/* The reverse: an entry gated on a theme whose card is not theme-guarded at all
+ * would hide a destination that every user can actually reach. */
+const themeOverGated = [...themeGated.keys()]
+  .filter((id) => cardIds.has(id) && !themeGuarded.has(id))
+  .map((id) => `${id} declares themes: but its card renders under every theme`);
 
 const count = (s) => rows.filter((r) => r.state === s).length;
 const result = {
@@ -283,6 +376,13 @@ const result = {
   cardDestinationsIndexed: [...cardIds].filter((id) => indexedIds.has(id)).length,
   cardDestinationsConditional: conditionalOnly.length,
   cardDestinationsUnsearchable: uncovered.length,
+  themeGuardedCards: themeGuarded.size,
+  themeGatedEntries: themeGated.size,
+  themeUngated: themeUngated.length,
+  themeOverGated: themeOverGated.length,
+  themeUngatedIds: themeUngated,
+  themeOverGatedIds: themeOverGated,
+  conditionalOtherAxis: otherAxisGuards,
   conditionalIds: conditionalOnly,
   unsearchableIds: uncovered.map((id) => `${id} -> page '${cardPage.get(id) ?? 'UNROUTED'}'`),
   misroutedIds: rows.filter((r) => r.state === 'misrouted').map((r) => `${r.id} -> page '${r.pageId}' but anchored in ${r.owners.join(',')}`),
@@ -292,4 +392,4 @@ const result = {
 console.log(JSON.stringify(result, null, 2));
 const out = opt('--out', null);
 if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(result, null, 2));
-process.exit(result.misrouted > 0 && !plantMisroute ? 1 : 0);
+process.exit((result.misrouted > 0 || result.themeUngated > 0 || result.themeOverGated > 0) && !plantMisroute ? 1 : 0);

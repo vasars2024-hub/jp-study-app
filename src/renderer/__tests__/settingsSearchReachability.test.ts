@@ -136,7 +136,11 @@ describe('settings search reachability', () => {
     for (const entry of SETTINGS_REGISTRY) {
       const label = t(entry.titleKey).trim();
       if (!label) continue;
-      const results = searchSettings(label, t, { advanced: true });
+      // A `themes`-gated entry is searchable only inside the shell whose cards
+      // it names, so it is searched there — asking for it under the default
+      // theme would prove the gate works, which is
+      // `settingsSearchThemeGate.test.ts`'s job, not coverage.
+      const results = searchSettings(label, t, { advanced: true, themeId: entry.themes?.[0] });
       if (!results.some((r) => r.id === entry.id)) invisible.push(`${entry.id} ("${label}")`);
     }
     expect(invisible).toEqual([]);
