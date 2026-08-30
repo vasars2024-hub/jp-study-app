@@ -24055,6 +24055,17 @@ html.lockscreen-widget-root #root {
   gap: 6px;
   align-items: center;
 }
+/* Three classes, so the app's own box wins on SPECIFICITY rather than on which sheet the
+   bundler happened to import last — the same reason `.scr-drawer .lq-anchor.scr-drawer-search`
+   is written that way. `.lq-anchor[data-bare]` zeroes padding and radius so a migrated region
+   gains no box inside chrome that already draws one; here the field group wants a small inset
+   and a radius of its own, because in Liquid presentation it is the one opaque thing in a
+   translucent rail and a hard rectangle would read as a seam. */
+.yt-side .lq-anchor.yt-add,
+.yt-side .lq-anchor.yt-folder-add {
+  padding: 3px;
+  border-radius: 9px;
+}
 .yt-add .gram-search,
 .yt-folder-add .gram-search {
   flex: 1;
@@ -24129,6 +24140,11 @@ html.lockscreen-widget-root #root {
   min-height: 0;
 }
 .yt-header {
+  /* `.lq-contextual` resets `min-height` to 0 so a primitive can be a scroll container, and
+     that reset is unconditional. In this column flex it let the header be crushed by the
+     video list below it — the same collapse `settingsLiquidRegions.test.tsx` pins for the
+     nav groups. Chrome does not shrink; the list is the flexible child. */
+  flex: 0 0 auto;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border, #333);
   display: flex;
@@ -24158,10 +24174,22 @@ html.lockscreen-widget-root #root {
   justify-content: flex-end;
 }
 .yt-prefs {
+  /* The playlist preference form used to live INSIDE `header.yt-header` and inherited its
+     padding and bottom rule. Category 3 is why it moved out: a `<header>` is contextual
+     chrome and Liquid's translucent role, and §2.3 keeps forms on an opaque anchor — so a
+     ten-control form sitting in there would have been dense work on glass the moment the
+     window went Liquid. It keeps the header's own box so nothing moves. */
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: center;
+}
+/* Three classes for the same reason as `.yt-add` above: `.lq-anchor[data-bare]` zeroes the
+   padding this band inherited from the header it used to live in. */
+.yt-main .lq-anchor.yt-prefs {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #333);
 }
 .yt-pref {
   /* Category 1's 32px pointer floor. `.lq-hit-scope` on `.yt-root` covers the buttons, but

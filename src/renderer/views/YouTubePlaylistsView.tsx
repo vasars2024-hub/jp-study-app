@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu } from '../components/ui';
+import { AnchorSurface, ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useT } from '../i18n';
 import { setStudyLang } from '../studyEnvironment';
 import { openExtensionSettings, openLibraryInbox } from '../extensionBridgeUi';
@@ -545,8 +546,17 @@ export default function YouTubePlaylistsView() {
           `input` are replaced elements the scope cannot reach; their floor is the `min-height`
           on `.yt-pref`, which is the label a pointer actually aims at. */}
       <div className="yt-root lq-hit-scope">
-        <aside className="yt-side">
-          <div className="yt-add">
+        {/* The playlist rail and the two headers are navigation and contextual tools, which
+            §2.3 says is what Liquid is FOR. `ContextualSurface` declares the role and paints
+            nothing until the window opts into Liquid, so the conventional window is unchanged
+            and reversal costs no component state. Dense work does NOT go here: the playlist
+            preference form moved out of the header onto its own anchor below. */}
+        <ContextualSurface as="aside" className="yt-side">
+          {/* The two field rows in the rail are forms, so they anchor rather than ride the
+              rail's material — §2.3 keeps editing on stable opaque surfaces, and an input
+              floating on glass is the exact case it names. `bare` because the rail already
+              draws the box; the fill and radius restore below. */}
+          <AnchorSurface bare className="yt-add">
             <input
               className="gram-search"
               value={addUrl}
@@ -563,7 +573,7 @@ export default function YouTubePlaylistsView() {
             >
               {t('yt.add.submit')}
             </button>
-          </div>
+          </AnchorSurface>
           <p className="yt-hint">{t('yt.add.extensionHint')}</p>
           <div className="yt-side-links" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <button type="button" className="btn small" onClick={() => openExtensionSettings()}>
@@ -577,7 +587,7 @@ export default function YouTubePlaylistsView() {
             </button>
           </div>
 
-          <div className="yt-folder-add">
+          <AnchorSurface bare className="yt-folder-add">
             <input
               className="gram-search"
               value={folderName}
@@ -588,7 +598,7 @@ export default function YouTubePlaylistsView() {
             <button type="button" className="btn small" onClick={() => void addFolder()}>
               <Icon name="folder" size={14} />
             </button>
-          </div>
+          </AnchorSurface>
 
           <div className="yt-tree">
             <button
@@ -628,7 +638,7 @@ export default function YouTubePlaylistsView() {
               {playlistsByFolder.root.map(renderPlaylistBtn)}
             </div>
           </div>
-        </aside>
+        </ContextualSurface>
 
         <section className="yt-main">
           <div className="yt-tabs">
@@ -704,7 +714,7 @@ export default function YouTubePlaylistsView() {
 
           {mainTab === 'news' ? (
             <>
-              <header className="yt-header">
+              <ContextualSurface as="header" className="yt-header">
                 <div className="yt-header-top">
                   <div className="yt-header-titles">
                     <div className="yt-header-title">{t('yt.tab.news')}</div>
@@ -735,7 +745,7 @@ export default function YouTubePlaylistsView() {
                     </button>
                   </div>
                 </div>
-              </header>
+              </ContextualSurface>
               <VirtualList
                 className="yt-list"
                 items={displayedNews}
@@ -751,7 +761,7 @@ export default function YouTubePlaylistsView() {
             <div className="yt-empty">{t('yt.empty')}</div>
           ) : showPlaylistPane ? (
             <>
-              <header className="yt-header">
+              <ContextualSurface as="header" className="yt-header">
                 <div className="yt-header-top">
                   <div className="yt-header-titles">
                     <div className="yt-header-title">
@@ -816,146 +826,146 @@ export default function YouTubePlaylistsView() {
                     </button>
                   </div>
                 </div>
+              </ContextualSurface>
 
-                {side?.kind === 'playlist' && playlist ? (
-                  <div className="yt-prefs">
-                    {playlist.channelId ? (
-                      <div className="yt-pref yt-channel-card">
-                        <span>Channel tracking</span>
-                        <div className="yt-channel-card-body">
-                          <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
-                          <div>{playlist.subscriptionStatus}</div>
-                          <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
-                        </div>
-                      </div>
-                    ) : null}
-                    <label className="yt-pref">
-                      <span>{t('yt.pref.lang')}</span>
-                      <select
-                        value={playlist.lang}
-                        onChange={(e) => void setLang(e.target.value as YtStudyLang)}
-                      >
-                        {LANG_OPTS.map((l) => (
-                          <option key={l} value={l}>
-                            {t(`yt.lang.${l}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className="yt-pref">
-                      <span>{t('yt.pref.subs')}</span>
-                      <div className="yt-chips">
-                        {SUB_OPTS.map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            className={`yt-chip${(playlist.preferSubs ?? []).includes(s) ? ' active' : ''}`}
-                            onClick={() => void toggleSub(s)}
-                          >
-                            {s.toUpperCase()}
-                          </button>
-                        ))}
+              {side?.kind === 'playlist' && playlist ? (
+                <AnchorSurface bare className="yt-prefs">
+                  {playlist.channelId ? (
+                    <div className="yt-pref yt-channel-card">
+                      <span>Channel tracking</span>
+                      <div className="yt-channel-card-body">
+                        <div>{channelById.get(playlist.channelId)?.title ?? playlist.channelTitle ?? playlist.channelId}</div>
+                        <div>{playlist.subscriptionStatus}</div>
+                        <div>{channelById.get(playlist.channelId)?.videoCount ?? 0} videos tracked</div>
                       </div>
                     </div>
-                    <label className="yt-pref yt-pref-check">
-                      <input
-                        type="checkbox"
-                        checked={playlist.autoUpdate}
-                        onChange={(e) => void setAutoUpdate(e.target.checked)}
-                      />
-                      {t('yt.pref.autoUpdate')}
-                    </label>
-                    <label className="yt-pref">
-                      <span>Channel id</span>
-                      <input
-                        value={playlist.channelId ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
-                        placeholder="UC..."
-                      />
-                    </label>
-                    <label className="yt-pref">
-                      <span>Channel title</span>
-                      <input
-                        value={playlist.channelTitle ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
-                        placeholder="Channel name"
-                      />
-                    </label>
-                    <label className="yt-pref">
-                      <span>Channel icon URL</span>
-                      <input
-                        value={playlist.channelIconUrl ?? ''}
-                        onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
-                        placeholder="https://..."
-                      />
-                    </label>
-                    <label className="yt-pref">
-                      <span>Subscription status</span>
-                      <select
-                        value={playlist.subscriptionStatus}
-                        onChange={(e) =>
-                          void setPlaylistField({
-                            subscriptionStatus: e.currentTarget.value as YtSubscriptionStatus,
-                          })
-                        }
-                      >
-                        {SUB_STATUS_OPTS.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="yt-pref">
-                      <span>Update frequency (hours)</span>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={playlist.updateFrequencyHours}
-                        onChange={(e) =>
-                          void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
-                        }
-                      />
-                    </label>
-                    <label className="yt-pref">
-                      <span>{t('yt.pref.folder')}</span>
-                      <select
-                        value={playlist.folderId ?? ''}
-                        onChange={(e) => void moveToFolder(e.target.value || null)}
-                      >
-                        <option value="">{t('yt.folder.unfiled')}</option>
-                        {folders.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="yt-pref">
-                      <span>{t('yt.pref.sort')}</span>
-                      <select
-                        value={sort}
-                        onChange={(e) => void setSortPref(e.target.value as YtPlaylistSort)}
-                      >
-                        {SORT_OPTS.map((s) => (
-                          <option key={s} value={s}>
-                            {t(`yt.sort.${s}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="yt-pref yt-pref-check">
-                      <input
-                        type="checkbox"
-                        checked={onlyUnlogged}
-                        onChange={(e) => setOnlyUnlogged(e.target.checked)}
-                      />
-                      {t('yt.pref.unloggedOnly')}
-                    </label>
+                  ) : null}
+                  <label className="yt-pref">
+                    <span>{t('yt.pref.lang')}</span>
+                    <select
+                      value={playlist.lang}
+                      onChange={(e) => void setLang(e.target.value as YtStudyLang)}
+                    >
+                      {LANG_OPTS.map((l) => (
+                        <option key={l} value={l}>
+                          {t(`yt.lang.${l}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="yt-pref">
+                    <span>{t('yt.pref.subs')}</span>
+                    <div className="yt-chips">
+                      {SUB_OPTS.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className={`yt-chip${(playlist.preferSubs ?? []).includes(s) ? ' active' : ''}`}
+                          onClick={() => void toggleSub(s)}
+                        >
+                          {s.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                ) : null}
-              </header>
+                  <label className="yt-pref yt-pref-check">
+                    <input
+                      type="checkbox"
+                      checked={playlist.autoUpdate}
+                      onChange={(e) => void setAutoUpdate(e.target.checked)}
+                    />
+                    {t('yt.pref.autoUpdate')}
+                  </label>
+                  <label className="yt-pref">
+                    <span>Channel id</span>
+                    <input
+                      value={playlist.channelId ?? ''}
+                      onChange={(e) => void setPlaylistField({ channelId: e.currentTarget.value })}
+                      placeholder="UC..."
+                    />
+                  </label>
+                  <label className="yt-pref">
+                    <span>Channel title</span>
+                    <input
+                      value={playlist.channelTitle ?? ''}
+                      onChange={(e) => void setPlaylistField({ channelTitle: e.currentTarget.value })}
+                      placeholder="Channel name"
+                    />
+                  </label>
+                  <label className="yt-pref">
+                    <span>Channel icon URL</span>
+                    <input
+                      value={playlist.channelIconUrl ?? ''}
+                      onChange={(e) => void setPlaylistField({ channelIconUrl: e.currentTarget.value })}
+                      placeholder="https://..."
+                    />
+                  </label>
+                  <label className="yt-pref">
+                    <span>Subscription status</span>
+                    <select
+                      value={playlist.subscriptionStatus}
+                      onChange={(e) =>
+                        void setPlaylistField({
+                          subscriptionStatus: e.currentTarget.value as YtSubscriptionStatus,
+                        })
+                      }
+                    >
+                      {SUB_STATUS_OPTS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="yt-pref">
+                    <span>Update frequency (hours)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={playlist.updateFrequencyHours}
+                      onChange={(e) =>
+                        void setPlaylistField({ updateFrequencyHours: Number(e.currentTarget.value) })
+                      }
+                    />
+                  </label>
+                  <label className="yt-pref">
+                    <span>{t('yt.pref.folder')}</span>
+                    <select
+                      value={playlist.folderId ?? ''}
+                      onChange={(e) => void moveToFolder(e.target.value || null)}
+                    >
+                      <option value="">{t('yt.folder.unfiled')}</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="yt-pref">
+                    <span>{t('yt.pref.sort')}</span>
+                    <select
+                      value={sort}
+                      onChange={(e) => void setSortPref(e.target.value as YtPlaylistSort)}
+                    >
+                      {SORT_OPTS.map((s) => (
+                        <option key={s} value={s}>
+                          {t(`yt.sort.${s}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="yt-pref yt-pref-check">
+                    <input
+                      type="checkbox"
+                      checked={onlyUnlogged}
+                      onChange={(e) => setOnlyUnlogged(e.target.checked)}
+                    />
+                    {t('yt.pref.unloggedOnly')}
+                  </label>
+                </AnchorSurface>
+              ) : null}
 
               <VirtualList
                 className="yt-list"

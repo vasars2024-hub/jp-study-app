@@ -55,3 +55,50 @@ describe('L8 YouTube — 32px pointer floor', () => {
     expect(ruleBody(css, '.yt-folder-head')).toContain('min-height: var(--lq-hit-target);');
   });
 });
+
+describe('L8 YouTube — category 3 roles', () => {
+  const view = () => read('views', 'YouTubePlaylistsView.tsx');
+
+  it('declares the rail and both headers contextual, from the shared primitive', () => {
+    const src = view();
+    expect(src).toContain('<ContextualSurface as="aside" className="yt-side">');
+    expect(src.match(/<ContextualSurface as="header" className="yt-header">/g)).toHaveLength(2);
+    // The raw landmarks must be gone, or one branch renders an untreated region and the
+    // category scores 1 of 2 while the source still reads as migrated.
+    expect(src).not.toContain('<aside className="yt-side">');
+    expect(src).not.toContain('<header className="yt-header">');
+  });
+
+  it('keeps every form off the contextual material', () => {
+    const src = view();
+    // The preference form is a sibling of the header, not a child: a `<header>` is the
+    // translucent role, and ten controls inside it measured as dense work on glass.
+    expect(src).not.toMatch(/className="yt-header"[\s\S]*?yt-prefs[\s\S]*?<\/ContextualSurface>/);
+    for (const field of ['yt-prefs', 'yt-add', 'yt-folder-add']) {
+      expect(src).toContain(`<AnchorSurface bare className="${field}">`);
+    }
+  });
+
+  it('compensates for the primitives unconditional min-height reset', () => {
+    // `.lq-contextual`/`.lq-anchor` set `min-height: 0` so a primitive can be a scroll
+    // container. In this column flex that lets the chrome be crushed by the video list.
+    const css = read('styles.css');
+    expect(ruleBody(css, '.yt-header')).toContain('flex: 0 0 auto;');
+    expect(ruleBody(css, '.yt-prefs')).toContain('flex: 0 0 auto;');
+  });
+
+  it('restores the app box at three classes, not by import order', () => {
+    const css = read('styles.css');
+    // `.lq-anchor[data-bare]` zeroes padding and radius, and it is (0,2,0). A two-class
+    // restore only TIES with it, so which one wins is decided by which sheet the bundler
+    // emitted last — the restore has to outweigh it, as `.scr-drawer-search` does.
+    for (const sel of [
+      '.yt-side .lq-anchor.yt-add',
+      '.yt-side .lq-anchor.yt-folder-add',
+      '.yt-main .lq-anchor.yt-prefs',
+    ]) {
+      expect(css, `missing three-class restore for ${sel}`).toContain(sel);
+    }
+    expect(ruleBody(css, '.yt-main .lq-anchor.yt-prefs')).toContain('padding: 10px 12px;');
+  });
+});

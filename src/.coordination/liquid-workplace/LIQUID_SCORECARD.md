@@ -1014,3 +1014,54 @@ Regression: `youtubeLiquidHitFloor.test.ts` **3/3** — it fails if `.yt-root` l
 if either `min-height` leaves its rule, or if `.lq-hit-scope`'s `:is()` ever grows `input`/
 `select` (which would make the `.yt-pref` rule dead while the test still passed).
 Evidence: `baselines/cat1-l8-youtube.json`. Zero new probes — one RUN of `cat1-accessibility.cjs`.
+
+## 2026-08-30 · primary — YouTube category 3 closes at a controlled 10/10
+
+Opened FAIL on two of three bars: `liquidTreatedEligible` **0 of 2** and
+`sharedPrimitiveEligible` **0 of 2**. The two eligible regions are `aside.yt-side` and
+`header.yt-header` — the only semantic landmarks this surface has, and exactly the
+navigation/contextual chrome §2.3 says Liquid is for. Both took `ContextualSurface`
+(`as="aside"` / `as="header"`), which declares the role, paints nothing outside
+`.fwin-liquid`, and therefore costs no reversibility.
+
+**Making the header contextual immediately broke the OTHER bar, which is the finding worth
+carrying.** `div.yt-prefs` — ten playlist settings, `forms >= 1`, dense work by every rule
+the rubric has — lived INSIDE that `<header>`. The moment the header became the translucent
+role, the form was on glass. So the form moved OUT of the header and onto its own
+`AnchorSurface bare` sibling. The same thing then surfaced one level down in the rail:
+`div.yt-add` and `div.yt-folder-add` each hold an input, and with `aside.yt-side` contextual
+they read `alpha 0.72 on aside.lq-contextual`. `denseWorkOnTranslucent` **0 → 2 → 0**; both
+field rows are anchors now.
+
+Generalisation, and it is the mirror of Carry 20: **declaring a landmark contextual promotes
+every form inside it onto glass.** Take the landmark and its dense children in ONE edit, or
+the category trades one failing bar for another and each pass looks like progress.
+
+Final: regions **83**, roles Work 4 / Liquid-eligible 2 / Anchor 73 / Anchor(holds work) 4 /
+Ambient 0. `denseWorkOnTranslucent` **0**, `liquidTreatedEligible` **2 of 2**,
+`sharedPrimitiveEligible` **2 of 2**. Window paint alpha 0.72, `blur(8px) saturate(1.25)`.
+Control: `[0,2,2,2,4] → oneRegionGlass [1,…] → allGlass [4,…] → restored [0,2,2,2,4]`,
+`movedOne` true, `allWorkFailed` true, returned — **CONTROL FAILED AS REQUIRED**.
+
+**Two traps this cost, both already recorded elsewhere and both live here.**
+1. `.lq-contextual`/`.lq-anchor` set `min-height: 0` unconditionally so a primitive can be a
+   scroll container. In `.yt-main`'s column flex that lets the header be crushed by the video
+   list. `flex: 0 0 auto` on `.yt-header` and `.yt-prefs` is the compensation.
+2. `.lq-anchor[data-bare]` zeroes padding and radius, and it is **(0,2,0)**. A two-class
+   restore only TIES and is then decided by bundler import order — measured live: `.yt-prefs`
+   came back `padding: 0px` with my two-class rule in place. The restores are three classes
+   (`.yt-side .lq-anchor.yt-add`, `.yt-main .lq-anchor.yt-prefs`), the same shape
+   `.scr-drawer .lq-anchor.scr-drawer-search` uses and for the same reason.
+
+**Deliberate visual change, recorded rather than smoothed:** the prefs band and the two rail
+field rows now carry `--lq-anchor-bg` (`#121c17` against the root's `#0c1410` in forest-night)
+in BOTH presentations, because `.lq-anchor` paints unconditionally. That is the anchor role's
+own token, remapped per theme, not a baked palette. It reads as a distinct configuration band,
+which is the honest thing for a ten-control form; reverting is dropping the primitive.
+
+**Category 1 RE-RUN at this tree per Carry 19, not carried across the restructure:** still
+**PASS 10/10** — `belowFloorByHit` 0, stolen 0, occluded 0, minRatio 6.52, unreachable 0.
+Regression: `youtubeLiquidHitFloor.test.ts` **7/7** (4 new cases pin the roles, the absence of
+the raw landmarks, the flex compensation, and the three-class restores).
+Evidence: `baselines/cat3-l8-youtube.json`. Zero new probes — two RUNs of
+`cat3-liquid-utilization.cjs`, one re-RUN of `cat1-accessibility.cjs`.
