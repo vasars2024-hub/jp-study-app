@@ -415,6 +415,8 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
    <!-- status: closed; evidence: 2026-08-31 86e9cb41 -- named after its video (a37d4c5e) AND found by search; NFKC+kataToHira fold, control fails 1 of 25 -->
 3. One-click mine from the list works end to end for one item of each mineable kind.
+   <!-- status: closed; evidence: 2026-08-31 d17d138b -- 85/86 cue transcripts, 210/177/204 cue subtitles, 6603/16787/9517 sentence books, all real; two MP4 controls refuse -->
+
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
    manual step.
 5. Context entry from an epub page opens the Files app scoped to epubs with that book focused,
@@ -796,3 +798,48 @@ Gates section on the first run — anchor on the Gates section, not on the numbe
   (`readingDiscoveryActions.ts` orphan, `TourOverlay.tsx` test-only) are both other tracks'
   modules. `shared/scraperHistoryStore.ts` is imported by two modules, so it is not an orphan.
 - `npx eslint` on all 11 touched paths — **0 errors, 0 warnings.**
+
+## 2026-08-31 (third) — Gate 3 closes: one-click mine, on the real corpus
+
+**Gate 3 CLOSED, `d17d138b`.** Three layers, one writer each: main reads bytes
+(`main/filesApp/mineSource.ts`), `shared/filesApp/mining.ts` turns passages into drafts,
+the renderer writes the deck. Main returns **passages, never cards** — the deck is renderer
+localStorage, so a main-side "mine" handler would have nowhere to write.
+
+Measured on the user's own files, not a fixture. Numbers, per kind:
+
+| kind | file | read | cards | prov | scene |
+| --- | --- | --- | --- | --- | --- |
+| transcript | `B73sEyA0wbs.json` | 85 | 85 | `transcript` | `03:46` |
+| transcript | `T-5_dUq-oyo.json` | 86 | 86 | `transcript` | `00:05` |
+| subtitle | Podcast #38 `.ja.vtt` | 210 | 200 (+10 over cap) | `human-subs` | `00:05` |
+| subtitle | Podcast #28 `.ja.vtt` | 177 | 176 (1 dup) | `human-subs` | `00:05` |
+| subtitle | Podcast #24 `.ja.vtt` | 204 | 200 (1 dup, 3 cap) | `human-subs` | `00:05` |
+| book | 悪の教典 下 | 6,603 | 200 (23 notJa, 8 dup) | `book-text` | ABSENT |
+| book | 魍魎の匣 | 16,787 | 200 (1 notJa, 20 dup) | `book-text` | ABSENT |
+| book | ゴールデンスランバー | 9,517 | 200 (5 notJa) | `book-text` | ABSENT |
+
+`drafts + notJa + dup + overCap == read` is asserted, so no passage disappears unaccounted.
+`scene=ABSENT` on books is the point, not a gap: an epub sentence has no timing and must not
+be given a fabricated zero. **Negative controls, real files that must refuse:** two MP4s
+(61.1 MB / 137.0 MB) as subtitle → `tooLarge`; the same MP4 as book → `notEpub`.
+
+**A defect this gate exposed in the ANALYZER, fixed here.** `splitSentences` split on
+`(?<=[。！？!?.])\s+` — whitespace REQUIRED after the terminator. Japanese writes none, so
+Japanese prose never split at all, and since `sampleSentence` is whatever chunk a token was
+found in (three call sites in `mining.ts`), **every card mined from a Japanese book carried a
+whole paragraph as its example sentence.** On the same three real books: **3,195 → 6,603 /
+6,665 → 16,787 / 3,068 → 9,517** (2.1× – 3.1×). ASCII `.!?` still require the space, which is
+what keeps `example.com` and `3.5` intact — that asymmetry is the fix, and it has its own
+negative-control test.
+
+TRAPS, both cost time this turn:
+1. **`extractEpubSections` puts the section HEADING in `section.text`.** The first sentence of
+   every chapter is `第一章 吾輩は…`, not `吾輩は…`. The title is *also* on `section.title`.
+   A test asserting the bare sentence fails and looks like a splitter bug.
+2. **A state updater is not a place for a deck write.** React double-invokes updaters in
+   StrictMode; undo must read `mineState` outside `setMineState`.
+3. Vitest's config **suppresses `console.log`** — `--silent=false` does not restore it. Write
+   measurements to a file.
+
+**Gate tags now: 5 closed (1, 2, 3, 13, 14) / 1 open (12, half) / 31 untagged.**
