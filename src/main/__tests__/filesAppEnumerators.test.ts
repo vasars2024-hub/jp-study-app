@@ -8,6 +8,7 @@ import {
   dictionaryEnumerator,
   readingLensEnumerator,
   scraperJobEnumerator,
+  transcriptionQueueEnumerator,
   type FilesEnumeratorContext,
 } from '../filesApp/enumerators';
 import { deleteModeFor, revealTargetFor } from '../../shared/filesApp/catalog';
@@ -610,5 +611,48 @@ describe('files app index — Reading Lens captures (outputs/highlights)', () =>
     expect(readingLensEnumerator.run(ctx())).toEqual([]);
     write('reading-lens-history.json', 'not json');
     expect(readingLensEnumerator.run(ctx())).toEqual([]);
+  });
+});
+
+describe('files app index — the transcription queue (workspaces/queue)', () => {
+  it('lists a queued job by media, keyed by the id the queue itself uses', () => {
+    write(
+      'transcription-jobs.json',
+      JSON.stringify([
+        { mediaId: 'm1', title: 'Episode 1', lang: 'ja', queuedAt: 700, attempts: 0 },
+        { mediaId: 'm2', title: '', lang: 'ja', queuedAt: 800, attempts: 1 },
+        { noMediaId: true },
+      ]),
+    );
+
+    const items = transcriptionQueueEnumerator.run(ctx());
+    expect(items.map((i) => i.id)).toEqual(['transcribe-job:m1', 'transcribe-job:m2']);
+    expect(items.every((i) => i.categoryId === 'workspaces/queue')).toBe(true);
+    expect(items[1].name).toBe('m2');
+    expect(items[0].createdAt).toBe(700);
+    // A queued job has produced no text yet, so it makes no transcript claim.
+    expect(items.every((i) => i.provenance === 'app-generated')).toBe(true);
+  });
+
+  it('reads an empty queue as zero rows from a reader that ran', () => {
+    // This is the profile's real state as of 2026-08-31, and it is why the
+    // reader exists: an absent reader and an empty store print the same 0.
+    write('transcription-jobs.json', '[]');
+    expect(transcriptionQueueEnumerator.run(ctx())).toEqual([]);
+
+    const report = buildFilesIndex(ctx()).enumerators.find(
+      (r) => r.source === 'transcribe-queue',
+    );
+    expect(report).toBeDefined();
+    expect(report?.itemCount).toBe(0);
+    expect(report?.error).toBeUndefined();
+  });
+
+  it('shares workspaces/queue with scrape jobs without either shadowing the other', () => {
+    write('transcription-jobs.json', JSON.stringify([{ mediaId: 'm1', title: 'Ep', queuedAt: 1 }]));
+    write('scraper/history.json', JSON.stringify({ jobs: [{ id: 'j1', titleEn: 'S', finishedAt: 2 }] }));
+
+    const queue = buildFilesIndex(ctx()).counts.find((c) => c.categoryId === 'workspaces/queue');
+    expect(queue?.total).toBe(2);
   });
 });

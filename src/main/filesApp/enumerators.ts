@@ -34,6 +34,8 @@ import {
 import { AUDIO_EXT, SUBTITLE_EXT, VIDEO_EXT, extOf } from '../../shared/mediaKind';
 import { ANKI_DRAFT_SESSION_STORE_FILE } from '../../shared/ankiDraftSession';
 import { ANKI_INTERVALS_SNAPSHOT_FILE } from '../../shared/anki';
+import { TRANSCRIPTION_QUEUE_FILE } from '../../shared/subtitleStorage';
+import type { TranscriptionJob } from '../../shared/transcriptionIpc';
 import {
   YOUTUBE_PLAYLIST_STORE_FILE,
   YOUTUBE_TRANSCRIPT_DIRECTORY,
@@ -939,6 +941,54 @@ export const scraperJobEnumerator: FilesEnumerator = {
 };
 
 /**
+ * Queued transcriptions — `workspaces/queue`, alongside scrape jobs.
+ *
+ * The store is `transcription-jobs.json`, a bare array that survives a restart
+ * so a queue resumes where it stopped. It is EMPTY on this profile as of
+ * 2026-08-31, measured — which is why this reader exists rather than being
+ * skipped: an absent reader over an empty store and a working reader over an
+ * empty store print the same 0, and the whole gate-1 finding was five zeros
+ * that had been explained instead of checked. When a job is queued it appears
+ * here without anyone having to remember this store was never wired.
+ *
+ * A job is keyed by `mediaId`, not by an id of its own — the queue holds at
+ * most one job per media — so that is what the row id and the pointer use.
+ */
+export const transcriptionQueueEnumerator: FilesEnumerator = {
+  source: 'transcribe-queue',
+  run(ctx) {
+    const rows = readJson<unknown>(path.join(ctx.userDataPath, TRANSCRIPTION_QUEUE_FILE), null);
+    if (!Array.isArray(rows)) return [];
+    const out: FilesItem[] = [];
+    for (const row of rows as Partial<TranscriptionJob>[]) {
+      const mediaId = typeof row?.mediaId === 'string' ? row.mediaId : null;
+      if (!mediaId) continue;
+      out.push({
+        id: `transcribe-job:${mediaId}`,
+        name: typeof row.title === 'string' && row.title ? row.title : mediaId,
+        kind: 'job',
+        categoryId: categoryForKind('job'),
+        // A queued job has produced no text yet. Whisper output is
+        // `whisper-transcript` once it exists, on the transcript's own row.
+        provenance: 'app-generated',
+        sizeBytes: null,
+        createdAt: typeof row.queuedAt === 'number' ? row.queuedAt : null,
+        modifiedAt: null,
+        lastUsedAt: null,
+        location: {
+          store: 'json',
+          file: TRANSCRIPTION_QUEUE_FILE,
+          pointer: `/${mediaId}`,
+        },
+        flags: {},
+        source: 'transcribe-queue',
+      });
+    }
+    return out;
+  },
+};
+
+/**
  * Reading Lens captures — `outputs/highlights`.
  *
  * A capture is text the user pointed the lens at and kept; that is the same
@@ -1007,6 +1057,7 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   profileEnumerator,
   workspaceEnumerator,
   scraperJobEnumerator,
+  transcriptionQueueEnumerator,
   readingLensEnumerator,
 ];
 
