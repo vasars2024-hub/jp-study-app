@@ -557,3 +557,12 @@ The renderer-store census also found **15** real highlights across 3 per-book ke
 exports its prefix, key builder, and legacy-compatible pure parser, and uses that parser for both
 single-book and all-book reads. **12/12 focused tests passed**, including malformed-row and
 unrelated-key negative controls. Gate 1 remains open pending the renderer/main snapshot merge.
+
+### 2026-08-30 — codexA, Gate 1 scraper-history contract
+
+The live main store has **10** authoritative scraper job summaries and **15** result files;
+the production snapshot has 0 `workspaces/queue` rows. Scraper History now exports its index and
+results locations plus one legacy-preserving parser used by both History and future Files reads.
+A valid JSON document with the wrong shape now returns 0 instead of throwing. **11/11 focused
+tests passed**. Gate 1 remains open until the 10 indexed jobs join the production snapshot; the
+5 unindexed result files stay named as orphans rather than being falsely promoted to jobs.

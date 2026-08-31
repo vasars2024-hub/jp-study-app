@@ -12,7 +12,15 @@ vi.mock('electron', () => ({
   ipcMain: { handle: () => undefined },
 }));
 
-const { clearScraperHistory, recordJob, storedResult, storedSummaries } =
+const {
+  clearScraperHistory,
+  recordJob,
+  scraperHistoryJobsFromStoredDocument,
+  SCRAPER_HISTORY_INDEX_FILE,
+  SCRAPER_HISTORY_RESULTS_DIRECTORY,
+  storedResult,
+  storedSummaries,
+} =
   await import('../scraper/history');
 const { setScraperStoreRoot } = await import('../scraper/store');
 
@@ -145,6 +153,24 @@ function resultWithProviderStream(id: string): ScrapeResult {
 }
 
 describe('job history', () => {
+  it('exposes one defensive persistence contract for Files catalogue consumers', () => {
+    expect(SCRAPER_HISTORY_INDEX_FILE).toBe('history.json');
+    expect(SCRAPER_HISTORY_RESULTS_DIRECTORY).toBe('results');
+    expect(scraperHistoryJobsFromStoredDocument({
+      jobs: [
+        { id: 'job-a', finishedAt: 123, titleEn: 'Kept' },
+        { id: 'job-old', titleEn: 'Legacy timestamp' },
+        null,
+        { titleEn: 'missing id' },
+      ],
+    })).toEqual([
+      { id: 'job-a', finishedAt: 123, titleEn: 'Kept' },
+      { id: 'job-old', finishedAt: 0, titleEn: 'Legacy timestamp' },
+    ]);
+    expect(scraperHistoryJobsFromStoredDocument({ jobs: {} })).toEqual([]);
+    expect(scraperHistoryJobsFromStoredDocument('not an index')).toEqual([]);
+  });
+
   it('round-trips a summary and its result', async () => {
     await recordJob(summary('job-a'), result('job-a'));
     const listed = await storedSummaries();
@@ -227,5 +253,11 @@ describe('job history', () => {
     // A later write repairs it.
     await recordJob(summary('job-b'), result('job-b'));
     expect((await storedSummaries()).map((j) => j.id)).toEqual(['job-b']);
+  });
+
+  it('survives valid JSON with the wrong index shape', async () => {
+    await fsp.mkdir(path.join(tempRoot, 'scraper'), { recursive: true });
+    await fsp.writeFile(path.join(tempRoot, 'scraper', 'history.json'), '{"jobs":{}}', 'utf-8');
+    await expect(storedSummaries()).resolves.toEqual([]);
   });
 });
