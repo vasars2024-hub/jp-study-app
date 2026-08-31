@@ -1769,5 +1769,8 @@ is not scored on. Restore: residue 0, theme and `data-display-transparency` byte
 3. **Q3 — primaryAction null**, the same question one step on: what IS a desktop shell's
    primary action. Answer it once, for Q1 and Q3 together.
 
-**RULE C: 6 of 16 cells — cat1, cat2, cat3, cat4, cat6 PASS, cat5 at 7/10. 10 to run.**
-`sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+**RULE C: still 5 of 16 cells PASSING — cat1, cat2, cat3, cat4, cat6, all Wired.** A cell
+closes at 10/10, so cat5 at 7/10 is SCORED but not closed; 11 to run counting it. Said this
+way deliberately: the previous line in this file read "6 of 16" for a moment and that would
+have credited a 7 as a pass. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+notifications, onboarding, help.
