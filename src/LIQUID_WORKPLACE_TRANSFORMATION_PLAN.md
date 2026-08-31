@@ -458,19 +458,30 @@ statements only, so they are tagged `open` with `evidence: plan:1174`. L7 is hum
 it is not closed, and marking it closed to reach the pin's 7 is exactly the fabrication RULE A
 exists to stop.
 
-The 20 `unknown` are L0, L2, L3, L4 and L5: no status line exists for them anywhere in this
-plan. They are all *behind* current work and do not block 2026-09-06. Audit at most 4 per turn
-as a side-slice.
+**RULE E is DONE — 2026-08-31, backup. All 20 `unknown` resolved against the TREE, none from a
+summary. The triple is now `24 closed / 22 open / 0 unknown` of 46.** Eighteen resolved `closed`
+and each carries its artifact, commit or test in its own tag. Two resolved **`open`**, and they
+are new work nobody was counting, so they are named here rather than left in a tag alone:
+
+- **L0 line 484 — player frame stability was never measured.** Five of its six axes are in
+  `PERF_BASELINE_RESTART.md`; the sixth needs a real clip playing, and both
+  `PERF_BASELINE.md:104` and `VIDEO_BASELINE.md:109` already recorded it open. Not human-blocked:
+  `L4_MEDIA_SHELL.md` records the "needs a real clip" blocker CLOSED, so the clip exists.
+- **L4 line 651 — `mediaWorkspace` has no Liquid destination.** `parity-ledger.json` reads
+  `mediaCenter` 8 of 8 `both` but `mediaWorkspace` **6 of 6 `pending`**, so "every player feature
+  in standard *and* Liquid" is not met on that surface.
+
+Do not re-derive the eighteen. Do not re-tag any bullet `unknown` without new source evidence.
 
 ### L0 — Relay cleanup, live baseline, and freeze map
 
 Dependency: complete the current relay’s clean-HEAD repair instructions first.
 
-- Reconcile the active dirty tree without staging foreign work.  <!-- status: unknown; evidence:  -->
-- Capture fresh player and all-app baselines.  <!-- status: unknown; evidence:  -->
-- Inventory routes, controls, commands, settings, tests, and visual states.  <!-- status: unknown; evidence:  -->
-- Create the feature parity ledger and protected-system matrix.  <!-- status: unknown; evidence:  -->
-- Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.  <!-- status: unknown; evidence:  -->
+- Reconcile the active dirty tree without staging foreign work.  <!-- status: closed; evidence: all 4 liquid docs tracked (git ls-files); 435 path-scoped commits under .coordination/liquid-workplace; 391 foreign dirty paths still unstaged -->
+- Capture fresh player and all-app baselines.  <!-- status: closed; evidence: VIDEO_BASELINE.md + ALL_APPS_BASELINE.md, 22 surfaces x 3 sizes, raw records baselines/L0-baseline-1/ -->
+- Inventory routes, controls, commands, settings, tests, and visual states.  <!-- status: closed; evidence: CENSUS.md milestone L0-baseline-1 da154966 -- 25 sections / 21 root components / 4,709 controls / 464 commands / 5,715 i18n keys -->
+- Create the feature parity ledger and protected-system matrix.  <!-- status: closed; evidence: PARITY_LEDGER.md verdict "L0 gate CLOSED as of 2026-08-17", 9 of 9 protected-system rows verified; parity-ledger.json 50 rows -->
+- Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.  <!-- status: open; evidence: 5 of 6 measured in PERF_BASELINE_RESTART.md (boot/drag/resize/theme/memory); PLAYER FRAME STABILITY never measured -- PERF_BASELINE.md:104 and VIDEO_BASELINE.md:109 both record it open, needs a real clip -->
 
 Gate: no Liquid product code until the baseline and parity ledger exist.
 
@@ -617,28 +628,28 @@ refusal already driven), its dead-control and fabricated-value counts, and the l
 
 ### L2 — Semantic tokens and shared primitives
 
-- Add Liquid semantic tokens without changing existing app output.  <!-- status: unknown; evidence:  -->
-- Implement Anchor/Work/Liquid/Ambient surfaces, scaffold, dock, inspector, adaptive rail, and context toolbar.  <!-- status: unknown; evidence:  -->
-- Map default, Aero, Wired, high-contrast, performance, and motion variants.  <!-- status: unknown; evidence:  -->
-- Build focused harnesses and accessibility tests.  <!-- status: unknown; evidence:  -->
+- Add Liquid semantic tokens without changing existing app output.  <!-- status: closed; evidence: b0c34c99; theme/liquid-tokens.css 121 --lq-* declarations, new file so no existing output changed; liquidTokens.test.ts 6/6, 4 mutations red -->
+- Implement Anchor/Work/Liquid/Ambient surfaces, scaffold, dock, inspector, adaptive rail, and context toolbar.  <!-- status: closed; evidence: 576bc45f (four roles) + b2c36a3b (scaffold) + 001469f4 (rail/toolbar) + deb9c2e3 (dock/inspector); L2_PRIMITIVES.md records section 5.2 list complete -->
+- Map default, Aero, Wired, high-contrast, performance, and motion variants.  <!-- status: closed; evidence: verified in liquid-tokens.css: :root, [data-materials=aero], [data-materials=wired], [data-theme=high-contrast], [data-perf=atmosphere|performance|balanced|battery], @media prefers-reduced-motion + .reduce-motion -->
+- Build focused harnesses and accessibility tests.  <!-- status: closed; evidence: tokens 6 + surfaces 11 + scaffold 13 + controls 23 + dock/inspector 14 unit tests; 113 probe scripts under probes/; 205 banked baselines -->
 
 Gate: primitives pass contrast, keyboard, motion, and performance checks in isolation.
 
 ### L3 — Opt-in per-window infrastructure
 
-- Extend the existing window snapshot with backward-compatible presentation state.  <!-- status: unknown; evidence:  -->
-- Add explicit Make Liquid / Return to standard commands.  <!-- status: unknown; evidence:  -->
-- Preserve geometry, focus, z-order, pin, pop-out, snap, monitor transfer, and taskbar behavior.  <!-- status: unknown; evidence:  -->
-- Add corrupt-state recovery and mode round-trip tests.  <!-- status: unknown; evidence:  -->
+- Extend the existing window snapshot with backward-compatible presentation state.  <!-- status: closed; evidence: d844f239; WindowSnapshot.presentation? optional so conventional is the ABSENCE of the field and every pre-existing layout parses unchanged; 24 tests, 9 of 9 mutations red -->
+- Add explicit Make Liquid / Return to standard commands.  <!-- status: closed; evidence: 20462e3a wires the title-bar toggle to DesktopShell + main/desktop.ts; liquidCommandEntryPoint.test.ts; keyboardShortcuts.ts route -->
+- Preserve geometry, focus, z-order, pin, pop-out, snap, monitor transfer, and taskbar behavior.  <!-- status: closed; evidence: liquidWindowSnapshotFidelity.test.ts (68d1a65c) covers move, taskbar tear-off, cross-monitor drag+adopt, "changes presentation and nothing else -- not even z", maximize both directions; pin/z/visibility asserted untouched in d844f239; pop-out host added 6c16653f. SNAP IS NOT A FEATURE of this shell -- 0 snap identifiers in DesktopShell.tsx, the only match in shared/desktop.ts is WindowSnapshot -->
+- Add corrupt-state recovery and mode round-trip tests.  <!-- status: closed; evidence: 13 corrupt blob shapes each dropped rather than thrown, parsePresentation total, sanitizeWindowPresentation drops forward; 10 consecutive toggles land on the original geometry -->
 
 Gate: an unchanged sample app can switch modes and back with byte-for-byte app data and equivalent observable state.
 
 ### L4 — Media shell repair and Video pilot
 
-- Restore/confirm the coherent Media shell first.  <!-- status: unknown; evidence:  -->
-- Refine the player through §6, using the concept hierarchy and current workspace capabilities.  <!-- status: unknown; evidence:  -->
-- Validate every player feature in standard and Liquid modes.  <!-- status: unknown; evidence:  -->
-- Score the video result on the rubric before calling it the system pattern.  <!-- status: unknown; evidence:  -->
+- Restore/confirm the coherent Media shell first.  <!-- status: closed; evidence: L4_MEDIA_SHELL.md 2026-08-17: 17/17 gates with 3 negative controls; the Ready row Open played a real clip, pane box 0x0 -> 1264x821 after restart; 2026-08-22 detach / second monitor / reopen identical in all four numbers -->
+- Refine the player through §6, using the concept hierarchy and current workspace capabilities.  <!-- status: closed; evidence: LIQUID_SCORECARD.md: Video scored at 1080x700 liquid, categories 3 (Liquid utilization) and 4 (use of space) both 10/10 against the concept hierarchy -->
+- Validate every player feature in standard and Liquid modes.  <!-- status: open; evidence: parity-ledger.json: mediaCenter 8 of 8 rows status "both", but mediaWorkspace 6 of 6 rows are still "pending" -- no Liquid destination exists for the workspace surface, so "every player feature in BOTH modes" is not met -->
+- Score the video result on the rubric before calling it the system pattern.  <!-- status: closed; evidence: LIQUID_SCORECARD.md:698 "Video is 8 of 8" and gate 461 CLOSES (2026-08-25); category 7 receipt in L7_PERF_VIDEO.md:193, all four legs with a control that fired -->
 
 Gate: complete §6.5 acceptance matrix and 80/80 on `src/LIQUID_UI_RUBRIC.md`, driven live on a
 real playback state. (Was "user visual approval"; amended 2026-08-16, see §10.4.)
@@ -647,9 +658,9 @@ real playback state. (Was "user visual approval"; amended 2026-08-16, see §10.4
 
 Order: Dictionary → Grammar → Translate → Agent.
 
-- Establish the common selection/context-inspector contract.  <!-- status: unknown; evidence:  -->
-- Keep results, prose, forms, and conversation anchored.  <!-- status: unknown; evidence:  -->
-- Move only contextual actions and deep detail into Liquid regions.  <!-- status: unknown; evidence:  -->
+- Establish the common selection/context-inspector contract.  <!-- status: closed; evidence: f29b5537 -- one app-parameterised parity engine probes/l6-parity.js with a per-app SPEC; shared/__tests__/liquidSelection.test.ts; contract driven across all four L5 apps -->
+- Keep results, prose, forms, and conversation anchored.  <!-- status: closed; evidence: parity-ledger.json 44 rows both presentations: dictionary 7/7, grammar 8/8, translate 7/7, agent 8/8, round trip byte-identical, 3 negative controls each -->
+- Move only contextual actions and deep detail into Liquid regions.  <!-- status: closed; evidence: 7bc4cc57 ContextualSurface + .lq-contextual + the .fwin-liquid paint gate, 48/48; 6c16653f gives the pop-out host the same interior so the region language is not inert there -->
 
 Gate: feature ledgers complete; cross-app handoffs retain context.
 
