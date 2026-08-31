@@ -207,3 +207,69 @@ describe('files app catalogue — search and provenance', () => {
     expect(isMachineDerived('book-text')).toBe(false);
   });
 });
+
+/**
+ * Gate 2 — "findable in the Files app WITHOUT navigating to that video".
+ *
+ * The title below is the real one on this profile, read out of
+ * `yt-playlists.json` by the census on 2026-08-31. It is used verbatim because
+ * a fixture title invented in ASCII cannot exercise the thing that actually
+ * breaks Japanese search.
+ */
+describe('files app catalogue — a transcript is findable by search (gate 2)', () => {
+  const TITLE =
+    '日本語の歴史が生んだ奇跡。「パリパリ」がオノマトペだと断定できるのはなぜ？【オノマトペ3】#286';
+
+  function transcript(name = TITLE): FilesItem {
+    return {
+      id: 'transcripts:B73sEyA0wbs',
+      name,
+      kind: 'transcript',
+      categoryId: 'sources/text',
+      provenance: 'whisper-transcript',
+      sizeBytes: 4096,
+      createdAt: 1000,
+      modifiedAt: null,
+      lastUsedAt: null,
+      location: { store: 'file', path: 'yt-transcripts/B73sEyA0wbs.json' },
+      flags: {},
+      source: 'transcripts',
+    };
+  }
+
+  it('finds it by a word from its title', () => {
+    expect(matchesQuery(transcript(), 'オノマトペ')).toBe(true);
+    expect(matchesQuery(transcript(), '日本語の歴史')).toBe(true);
+  });
+
+  it('finds it by kind and by provenance, which is how the tree is browsed', () => {
+    expect(matchesQuery(transcript(), 'transcript')).toBe(true);
+    expect(matchesQuery(transcript(), 'whisper')).toBe(true);
+  });
+
+  it('finds it when the query is typed in the other kana, or at the other width', () => {
+    // A user who knows the reading types hiragana; the title is katakana.
+    expect(matchesQuery(transcript(), 'おのまとぺ')).toBe(true);
+    // A Japanese IME emits full-width digits. NFKC folds them both ways.
+    expect(matchesQuery(transcript(), '２８６')).toBe(true);
+    expect(matchesQuery(transcript(), '286')).toBe(true);
+    // Half-width katakana still arrives from some subtitle sources.
+    expect(matchesQuery(transcript(), 'ｵﾉﾏﾄﾍﾟ')).toBe(true);
+  });
+
+  it('does NOT match a word the title does not contain', () => {
+    // Negative control. Without it, a fold broad enough to match everything
+    // would pass every assertion above while making search useless.
+    expect(matchesQuery(transcript(), '猫')).toBe(false);
+    expect(matchesQuery(transcript(), 'ドキュメンタリー')).toBe(false);
+    // A different kind and a different provenance must both miss.
+    expect(matchesQuery(transcript(), 'dictionary')).toBe(false);
+    expect(matchesQuery(transcript(), 'human-subs')).toBe(false);
+  });
+
+  it('still finds a transcript that kept its raw id because no playlist claims it', () => {
+    // The other transcript on this profile: its video left, its transcript
+    // stayed. It is still real and still mineable, so it must still be findable.
+    expect(matchesQuery(transcript('T-5_dUq-oyo'), 't-5_duq')).toBe(true);
+  });
+});

@@ -24,6 +24,9 @@
  *    refuse honestly instead of opening the wrong folder.
  */
 
+// `langs.ts` has no imports of its own, so this keeps the module pure.
+import { kataToHira } from '../langs';
+
 /* ------------------------------------------------------------------ *
  * Provenance — what decides whether a card from this item is trusted.
  * ------------------------------------------------------------------ */
@@ -474,12 +477,39 @@ function tieBreak(a: FilesItem, b: FilesItem): number {
  * Search — one query across everything.
  * ------------------------------------------------------------------ */
 
-/** Matches name, kind and provenance, case-insensitively. Empty query matches all. */
+/**
+ * The fold every Files search compares under.
+ *
+ * `toLowerCase` alone is a Latin rule, and most names in this index are
+ * Japanese, where it does nothing at all. Two real ways a search then misses an
+ * item that is right there — gate 2's "findable" is exactly this:
+ *
+ * - **Width.** A Japanese IME emits full-width Latin and digits (`＃２８６`),
+ *   and half-width katakana still arrives from some sources. NFKC folds both,
+ *   so typing `286` finds `＃２８６`.
+ * - **Kana.** A user who knows a title's reading types it in hiragana; the
+ *   title is written in katakana. `kataToHira` is how the rest of this app
+ *   already compares kana (`kanaEquals`, `langs.ts:132`) and it is reused here
+ *   rather than reinvented — two search folds that disagree is worse than one
+ *   that is merely strict.
+ *
+ * Applied to BOTH sides, so the query and the name are folded the same way.
+ */
+function searchFold(text: string): string {
+  return kataToHira(text.normalize('NFKC').toLowerCase());
+}
+
+/**
+ * Matches name, kind and provenance. Empty query matches all.
+ *
+ * `kind` and `provenance` are compared folded too, but they are ASCII
+ * identifiers, so the fold is a no-op on them and only the name benefits.
+ */
 export function matchesQuery(item: FilesItem, query: string): boolean {
-  const q = query.trim().toLowerCase();
+  const q = searchFold(query).trim();
   if (!q) return true;
   return (
-    item.name.toLowerCase().includes(q) ||
+    searchFold(item.name).includes(q) ||
     item.kind.includes(q) ||
     item.provenance.includes(q)
   );

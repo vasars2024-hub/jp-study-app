@@ -413,6 +413,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    both were right. See the 2026-08-31 (second) Progress entry for the table, the numbers
    and the four remaining zeros, each measured against its own store.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
+   <!-- status: open; evidence: 2026-08-31 a37d4c5e names the transcript after its video; the search half is explicitly NOT claimed -->
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
    manual step.
@@ -440,11 +441,14 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 12. **Reveal out.** An item opens its real location in Explorer, for at least one file-backed
    and one non-file-backed kind — the latter must refuse honestly rather than open the wrong
    folder.
+   <!-- status: open; evidence: 2026-08-30 refusal half proven (revealTargetFor null, Reveal absent for a SQLite row); the Explorer half needs a live click -->
 13. **The assistant can reach it.** A natural-language request resolves to a scoped Files view
    through `AGENT_NAVIGATION_INDEX`, not a bespoke path.
+   <!-- status: closed; evidence: 2026-08-30 'files' in DESKTOP_WIN_SECTIONS/AGENT_NAVIGABLE_SECTIONS/palette/POPOUT_SECTIONS/AGENT_NAVIGATION_INDEX; both directions tested -->
 14. **Sorting is real.** Sorting by date created and by size reorders correctly on a set with
    known values, in both directions, including items whose store supplies no such value — those
    must sort predictably rather than landing arbitrarily.
+   <!-- status: closed; evidence: 2026-08-30 sortItems by size+date, both directions, nulls last in both; negative control broke 4 tests across 2 suites -->
 15. **Music is untouched.** A track opens the existing music app, and that app's behaviour is
    unchanged before and after.
 16. **Collections are real folders.** Create a folder, add items of two different kinds to it,
