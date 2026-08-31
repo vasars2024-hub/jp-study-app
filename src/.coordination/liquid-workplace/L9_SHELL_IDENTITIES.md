@@ -1091,3 +1091,40 @@ left the per-LAYER one.
 
 **Video's cat5 stays 8/10 and is NOT closed**: Q5 pending correction 27's re-score, Q4 (`24`
 controls scanned against a bar of 12, `collapsedDisclosures 0`) untouched. **Cells still 10 of 16.**
+
+## 2026-08-31 — boss-audit repair, not scoring: liquid commits that shipped without their consumers
+
+`docs/audit/RELAY_BOSS_AUDIT.md`'s 2026-08-31 receipt (audit-20260831-043527-2edb16dc) found three
+defects, all of them liquid commits whose product wiring stayed uncommitted in the shared tree.
+Re-derived here before repair, then re-measured in a detached worktree at each new HEAD.
+
+**Measured, clean HEAD, `node tools/architecture-audit.cjs`: 15 new identities before, 9 after.**
+Focused suites at clean HEAD after: **6 files / 61 tests pass** (settingsSearchReachability,
+liquidTokens, videoStudyLayout, aeroSafeModeRecovery, aeroViewportWiring, studyBlockWindows).
+
+- `a6f61698` — finding 2. `27bcbf36` committed `aeroSafeMode.ts` but not the CSS or any importer, so
+  `liquidTokens.test.ts:179` threw **ENOENT** on `theme/aero-safe-mode.css` and the file could not
+  even load. Landed the sheet, `main.tsx` boot, the sound/ambient suppressors, the Motion settings
+  card, its registry entry, the storage-domain key, and 11 keys × 4 catalogs.
+- `c47feb3f` — `src/main/studyBlockWindows.ts` had no importer; no detached block could be opened.
+- `7795f921` — `AeroViewport`, `DetachedStudyBlock` and `TourOverlay` had no importer. HEAD still
+  carried its **own inline copy** of AeroViewport, which is why the extraction looked harmless.
+- `c7c0b711` — finding 3. Negative control at `7795f921`: `settingsSearchReachability.test.ts`
+  fails with **exactly** `profile-identity`, `profile-site-overrides`, `profile-history`,
+  `profile-portable` unanchored. After: 6/6. L8's "zero unanchored" claim was stale, now true again.
+- `7ce85e50` — `studyBlockWindows.test.ts` (22 cases) and `aeroViewportWiring.test.tsx` were
+  **untracked**: the shared tree was green on tests that did not exist at HEAD.
+
+**Trap for the next worker.** Seven of these files also carry another track's uncommitted hunks
+(the i18n conversion of `App.tsx`/`POPOUT_LABELS` and the four catalogs, the transcription domain in
+`settingsCatalog.ts`). Each was staged as HEAD-blob + this slice's hunks via `git hash-object
+--no-filters` + `update-index --cacheinfo`, never `git add` of the whole file. That work is still
+uncommitted and untouched; do not absorb it.
+
+**Deliberately NOT fixed, and why.** The 9 remaining orphans need consumers that live inside
+in-progress foreign rewrites: `StudyBottomBar`/`StudyDocks`/`StudyWorkspaceCustomizer` are imported
+only by `VideoCoreStudyOverlay.tsx` (**+936/-662 uncommitted**), and `seanimeMediaAuth` only by
+`StudyPlayerSlice.tsx` (**+237**, 11 hunks). Landing either means committing another track's
+half-finished slice. `episodeProcessingRules`, `blancMasterSources`, `captureKindKeys`,
+`companionAssignments`, `readingDiscoveryActions` likewise sit behind scraper/blanc/i18n dirt.
+**Clean HEAD's architecture gate stays red at 9 until those owners land their consumers.**
