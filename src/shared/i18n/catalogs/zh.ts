@@ -10652,6 +10652,22 @@ export const zh: Catalog = {
   'filesApp.review.undone': {
     other: '已撤销 {count} 项导入。',
   },
+  'filesApp.settings.title': '扫描到的文件如何导入',
+  'filesApp.settings.confidenceLabel': '无需确认即可导入的范围',
+  'filesApp.settings.confidence.always-review': '都不自动导入，先让我查看',
+  'filesApp.settings.confidence.high-confidence': '仅限能够准确识别的',
+  'filesApp.settings.confidence.everything': '全部导入，包括推测的',
+  'filesApp.settings.stabilityLabel': '文件大小停止变化后等待（毫秒）',
+  'filesApp.settings.stabilityHint':
+    '仍在写入的文件不会被导入，无论此项如何设置。',
+  'filesApp.settings.categoriesTitle': '按目标位置',
+  'filesApp.settings.policy.inherit': '沿用上面的设置',
+  'filesApp.settings.policy.auto': '无需确认直接导入',
+  'filesApp.settings.policy.review': '每次都询问我',
+  'filesApp.settings.error.stabilityRange': '请输入 0 到 600000 毫秒之间的等待时间。',
+  'filesApp.settings.error.unknownValue': '此设置无法接受该值。',
+  'filesApp.settings.error.saveFailed':
+    '无法保存此设置。它现在有效，但重启应用后会恢复默认值。',
   'filesApp.view.label': '视图',
   'filesApp.view.mode.details': '详细信息',
   'filesApp.view.mode.compact': '紧凑',

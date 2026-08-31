@@ -63,6 +63,32 @@ export const INGEST_CONFIDENCE_POLICIES: readonly IngestConfidencePolicy[] = [
  */
 export type IngestCategoryPolicy = 'auto' | 'review' | 'inherit';
 
+/**
+ * The destinations a per-category override can name, in the order the settings
+ * panel lists them.
+ *
+ * `unknown` is absent because there is nothing to route into — an override
+ * there would be a control that cannot act, and `setIngestCategoryPolicy`
+ * refuses it. `folder` is absent for the same reason from the other end: the
+ * scan classifies files, never directories, so no scanned row can carry it.
+ * The two the gates name lead, because they are the pair a user sets first.
+ */
+export const INGEST_OVERRIDABLE_TARGETS: readonly DropTargetId[] = [
+  'subtitle',
+  'media',
+  'library-book',
+  'library-manga',
+  'dictionary-yomitan',
+  'frequency-dict',
+  'deck-csv',
+  'anki-cards',
+  'anki-level',
+  'vn-script',
+  'wallpaper',
+  'shortcut',
+  'backup',
+];
+
 export interface IngestSettings {
   confidence: IngestConfidencePolicy;
   /** Per-destination overrides. Absent means `inherit`. */

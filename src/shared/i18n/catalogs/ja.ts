@@ -10751,6 +10751,22 @@ export const ja: Catalog = {
   'filesApp.review.undone': {
     other: '{count} 件の取り込みを元に戻しました。',
   },
+  'filesApp.settings.title': '取り込み方の設定',
+  'filesApp.settings.confidenceLabel': '確認せずに取り込む範囲',
+  'filesApp.settings.confidence.always-review': '何も自動では取り込まない（必ず確認）',
+  'filesApp.settings.confidence.high-confidence': '確実に判別できたものだけ',
+  'filesApp.settings.confidence.everything': '推測を含めてすべて',
+  'filesApp.settings.stabilityLabel': 'サイズが変化しなくなってから待つ時間（ミリ秒）',
+  'filesApp.settings.stabilityHint':
+    'まだ書き込み中のファイルは、この設定に関わらず取り込まれません。',
+  'filesApp.settings.categoriesTitle': '保存先ごとの設定',
+  'filesApp.settings.policy.inherit': '上の設定に従う',
+  'filesApp.settings.policy.auto': '確認せずに取り込む',
+  'filesApp.settings.policy.review': '必ず確認する',
+  'filesApp.settings.error.stabilityRange': '待ち時間は 0〜600000 ミリ秒で入力してください。',
+  'filesApp.settings.error.unknownValue': 'この設定では扱えない値です。',
+  'filesApp.settings.error.saveFailed':
+    'この設定を保存できませんでした。今は反映されますが、アプリを再起動すると既定値に戻ります。',
   'filesApp.view.label': '表示',
   'filesApp.view.mode.details': '詳細',
   'filesApp.view.mode.compact': 'コンパクト',

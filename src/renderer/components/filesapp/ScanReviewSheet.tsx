@@ -18,16 +18,33 @@
  * auto-import" is the router's permission, not a licence for a scan to write
  * to the library while the user is still reading the report — the scan itself
  * stays read-only (gate 24), and the one write is the confirm.
+ *
+ * **The settings are here rather than in Settings** (gates 31 and 36). They
+ * decide what this sheet's next scan does, and both gates are demonstrated by
+ * changing one and watching the piles move — a control two screens away from
+ * its own effect would be adjustable in name only. They persist per profile,
+ * so the panel is a view onto the document, never a copy of it.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import {
-  DEFAULT_INGEST_SETTINGS,
+  INGEST_CONFIDENCE_POLICIES,
+  INGEST_OVERRIDABLE_TARGETS,
   planIngest,
+  type IngestCategoryPolicy,
+  type IngestConfidencePolicy,
   type IngestItem,
   type IngestPlan,
   type IngestSettings,
 } from '../../../shared/filesApp/ingest';
+import {
+  commitIngestCategoryPolicy,
+  commitIngestConfidence,
+  commitIngestStabilityMs,
+  loadIngestSettings,
+  onIngestSettingsChanged,
+} from '../../filesIngestSettingsStore';
+import { MAX_STABILITY_MS } from '../../../shared/filesApp/stability';
 import type { FilesScanReport } from '../../../shared/filesApp/scan';
 import type { DropCandidate, DropTargetId } from '../../../shared/fileRouting';
 import { executeImport, undoImports, type ImportReceipt } from '../../fileImportExecute';
@@ -65,6 +82,10 @@ type SheetState =
 
 export interface ScanReviewSheetProps {
   onClose: () => void;
+  /**
+   * An override, for a caller that has its own settings. Absent — which is the
+   * production case — means the persisted document, read live.
+   */
   settings?: IngestSettings;
   /** Fired after anything actually lands, so a caller can re-read its own state. */
   onImported?: () => void;
@@ -91,8 +112,23 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
    * keystroke in the root field.
    */
   const [ledger, setLedger] = useState<ImportLedger>(loadImportLedger);
+  /*
+   * Gates 31 and 36. The document is the source of truth and this is a view of
+   * it: every control commits and then re-reads, so a refused write leaves the
+   * control showing what is actually stored rather than what was clicked.
+   */
+  const [stored, setStored] = useState<IngestSettings>(loadIngestSettings);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  /** What the number field currently holds, which may not yet be a legal value. */
+  const [stabilityDraft, setStabilityDraft] = useState<string>(() =>
+    String(loadIngestSettings().stabilityMs),
+  );
 
-  const effectiveSettings = settings ?? DEFAULT_INGEST_SETTINGS;
+  // A second Files window editing the same document must not leave this one
+  // scanning with a window it no longer has.
+  useEffect(() => onIngestSettingsChanged(() => setStored(loadIngestSettings())), []);
+
+  const effectiveSettings = settings ?? stored;
 
   const plan: IngestPlan | null = useMemo(() => {
     if (state.status !== 'report') return null;
@@ -112,7 +148,15 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
       /* a remembered path is a convenience, never a requirement */
     }
     try {
-      const report = await window.api.filesScan([target]);
+      /*
+       * Gate 31's product half: the window the user set travels with the call.
+       * Main re-normalises it — the renderer is not trusted to turn the
+       * completeness check off — but nothing in main knows this preference
+       * otherwise, so omitting it here would leave the control decorative.
+       */
+      const report = await window.api.filesScan([target], {
+        stabilityMs: effectiveSettings.stabilityMs,
+      });
       if (!report || !report.roots.length) {
         // An unreadable root produces a report with no roots. Saying "0 files"
         // for a folder that does not exist would be a false negative.
@@ -240,6 +284,115 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
     setState({ status: 'undone', count });
   }, [state, onImported]);
 
+  /**
+   * One place where a commit becomes visible state, so no control can report
+   * success on a write that was refused or that did not land.
+   */
+  const applyCommit = useCallback(
+    (commit: { doc: IngestSettings; errorKey?: string; storageErrorKey?: string }) => {
+      setStored(commit.doc);
+      setStabilityDraft(String(commit.doc.stabilityMs));
+      setSettingsError(commit.errorKey ?? commit.storageErrorKey ?? null);
+    },
+    [],
+  );
+
+  const onConfidenceChange = useCallback(
+    (policy: IngestConfidencePolicy) => applyCommit(commitIngestConfidence(policy)),
+    [applyCommit],
+  );
+
+  const onCategoryChange = useCallback(
+    (target: DropTargetId, policy: IngestCategoryPolicy) =>
+      applyCommit(commitIngestCategoryPolicy(target, policy)),
+    [applyCommit],
+  );
+
+  /**
+   * Committed on blur and on Enter rather than per keystroke: "3000" is typed
+   * through "3", "30" and "300", and committing those would store three
+   * windows nobody asked for and refuse the empty field mid-edit.
+   */
+  const onStabilityCommit = useCallback(() => {
+    const raw = stabilityDraft.trim();
+    if (raw === '') {
+      // An empty field is not a zero window. Put the stored value back rather
+      // than silently storing the most permissive setting there is.
+      setStabilityDraft(String(stored.stabilityMs));
+      setSettingsError(null);
+      return;
+    }
+    applyCommit(commitIngestStabilityMs(Number(raw)));
+  }, [applyCommit, stabilityDraft, stored.stabilityMs]);
+
+  const renderSettings = () => (
+    <details className="fa-review-settings">
+      <summary>{t('filesApp.settings.title')}</summary>
+      <div className="fa-review-settings-body">
+        <label className="fa-review-setting">
+          <span>{t('filesApp.settings.confidenceLabel')}</span>
+          <select
+            className="fa-review-confidence"
+            value={effectiveSettings.confidence}
+            onChange={(e) => onConfidenceChange(e.target.value as IngestConfidencePolicy)}
+          >
+            {INGEST_CONFIDENCE_POLICIES.map((policy) => (
+              <option key={policy} value={policy}>
+                {t(`filesApp.settings.confidence.${policy}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="fa-review-setting">
+          <span>{t('filesApp.settings.stabilityLabel')}</span>
+          <input
+            className="fa-review-stability"
+            type="number"
+            min={0}
+            max={MAX_STABILITY_MS}
+            step={500}
+            value={stabilityDraft}
+            onChange={(e) => setStabilityDraft(e.target.value)}
+            onBlur={onStabilityCommit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onStabilityCommit();
+            }}
+          />
+        </label>
+        <p className="fa-review-note">{t('filesApp.settings.stabilityHint')}</p>
+
+        <fieldset className="fa-review-categories">
+          <legend>{t('filesApp.settings.categoriesTitle')}</legend>
+          {INGEST_OVERRIDABLE_TARGETS.map((target) => (
+            <label className="fa-review-category" key={target}>
+              <span>{t(`fileDrop.target.${target}`)}</span>
+              <select
+                data-target={target}
+                value={effectiveSettings.byTarget[target] ?? 'inherit'}
+                onChange={(e) =>
+                  onCategoryChange(target, e.target.value as IngestCategoryPolicy)
+                }
+              >
+                {(['inherit', 'auto', 'review'] as const).map((policy) => (
+                  <option key={policy} value={policy}>
+                    {t(`filesApp.settings.policy.${policy}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </fieldset>
+
+        {settingsError ? (
+          <p className="fa-review-error" role="status">
+            {t(settingsError)}
+          </p>
+        ) : null}
+      </div>
+    </details>
+  );
+
   const renderReviewRow = (item: IngestItem) => {
     const pick = picks[item.entry.path] ?? item.entry.target;
     const choices: DropCandidate[] = item.choices ?? [];
@@ -318,6 +471,8 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
               : t('filesApp.review.scan')}
           </button>
         </div>
+
+        {renderSettings()}
 
         {state.status === 'error' ? (
           <p className="fa-review-error" role="status">

@@ -1059,6 +1059,63 @@
   font-family: inherit;
 }
 
+/* Gates 31 and 36. Collapsed by default: these are the sheet's settings, not
+   its subject, and a scan field pushed below thirteen selects would be the
+   control the user actually came for, buried under the ones they did not. */
+.fa-review-settings > summary {
+  cursor: pointer;
+  min-height: var(--lq-hit-target);
+  display: flex;
+  align-items: center;
+  color: var(--lq-work-text-muted);
+  font-size: 0.86em;
+}
+
+.fa-review-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2);
+  padding: var(--lq-space-2) 0 0;
+}
+
+.fa-review-setting,
+.fa-review-category {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-2);
+  min-height: var(--lq-hit-target);
+}
+
+.fa-review-setting > select,
+.fa-review-setting > input,
+.fa-review-category > select {
+  min-height: var(--lq-hit-target);
+  min-width: 12ch;
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+  background: var(--lq-work-bg-raised);
+  color: var(--lq-work-text);
+  font-family: inherit;
+}
+
+.fa-review-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 var(--lq-space-3);
+  margin: 0;
+  padding: var(--lq-space-2);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+}
+
+.fa-review-categories > legend {
+  padding: 0 var(--lq-space-1);
+  color: var(--lq-work-text-muted);
+  font-size: 0.86em;
+}
+
 /* An error and a warning must differ by more than colour: each carries weight
    and a rule, so the distinction survives a monochrome or high-contrast pass. */
 .fa-review-error {
