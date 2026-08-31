@@ -11,7 +11,11 @@ import {
   transcriptionQueueEnumerator,
   type FilesEnumeratorContext,
 } from '../filesApp/enumerators';
-import { deleteModeFor, revealTargetFor } from '../../shared/filesApp/catalog';
+import {
+  deleteModeFor,
+  revealTargetFor,
+  youtubeIdFromFileName,
+} from '../../shared/filesApp/catalog';
 
 let root = '';
 
@@ -654,5 +658,97 @@ describe('files app index — the transcription queue (workspaces/queue)', () =>
 
     const queue = buildFilesIndex(ctx()).counts.find((c) => c.categoryId === 'workspaces/queue');
     expect(queue?.total).toBe(2);
+  });
+});
+
+/**
+ * Gate 4 — categorisation is derived. Nothing is filed by hand, and the proof
+ * is a BEFORE and an AFTER around a single file appearing on disk: no code
+ * runs between them, nothing is refreshed by hand, and the index simply says
+ * something different because the disk does.
+ */
+describe('files app index — derived categorisation (gate 4)', () => {
+  /** A yt-dlp download and the playlist row that names it. */
+  function seedYoutubeVideo(): void {
+    write('downloads/Japanese Podcast #38 [x9QKu3OLjaU].mp4', 'video bytes');
+    write(
+      'yt-playlists.json',
+      JSON.stringify({ videos: [{ youtubeId: 'x9QKu3OLjaU', title: 'Japanese Podcast #38' }] }),
+    );
+  }
+
+  it('a newly transcribed video changes the index with no manual step', () => {
+    seedYoutubeVideo();
+
+    const before = buildFilesIndex(ctx());
+    const videoBefore = before.items.find((i) => i.kind === 'video');
+    expect(videoBefore?.flags.transcribed).toBeUndefined();
+    expect(before.items.some((i) => i.kind === 'transcript')).toBe(false);
+    const textBefore =
+      before.counts.find((c) => c.categoryId === 'sources/text')?.total ?? 0;
+
+    // The ONLY thing that happens between the two builds. This is exactly what
+    // `ytPlaylists.ts:770` writes when a transcription finishes.
+    write('yt-transcripts/x9QKu3OLjaU.json', JSON.stringify([{ start: 0, end: 1, text: 'こんにちは' }]));
+
+    const after = buildFilesIndex(ctx());
+    const transcript = after.items.find((i) => i.kind === 'transcript');
+    // Placed by what it IS, not by anyone filing it.
+    expect(transcript?.categoryId).toBe('sources/text');
+    expect(transcript?.provenance).toBe('whisper-transcript');
+    expect(transcript?.name).toBe('Japanese Podcast #38');
+    expect(after.counts.find((c) => c.categoryId === 'sources/text')?.total).toBe(textBefore + 1);
+    // ...and the video it belongs to knows, though a different enumerator made it.
+    expect(after.items.find((i) => i.kind === 'video')?.flags.transcribed).toBe(true);
+  });
+
+  it('does not mark a DIFFERENT video transcribed — the negative control', () => {
+    seedYoutubeVideo();
+    write('downloads/Another Video [ZZZZZZZZZZZ].mp4', 'video bytes');
+    write('yt-transcripts/x9QKu3OLjaU.json', JSON.stringify([{ text: 'こんにちは' }]));
+
+    const items = buildFilesIndex(ctx()).items.filter((i) => i.kind === 'video');
+    expect(items).toHaveLength(2);
+    const byName = new Map(items.map((i) => [i.name, i]));
+    expect(byName.get('Japanese Podcast #38 [x9QKu3OLjaU].mp4')?.flags.transcribed).toBe(true);
+    // A transcript existing for SOME video must not colour every video.
+    expect(byName.get('Another Video [ZZZZZZZZZZZ].mp4')?.flags.transcribed).toBeUndefined();
+  });
+
+  it('leaves the flag ABSENT on a video with no derivable id, rather than false', () => {
+    // "We could not tell" and "not transcribed" are different answers, and only
+    // one of them justifies offering a Transcribe button.
+    write('downloads/holiday-clip.mp4', 'video bytes');
+    write('yt-transcripts/x9QKu3OLjaU.json', JSON.stringify([{ text: 'こんにちは' }]));
+    const video = buildFilesIndex(ctx()).items.find((i) => i.name === 'holiday-clip.mp4');
+    expect(video?.flags).not.toHaveProperty('transcribed');
+  });
+
+  it('marks a media-library video too, not only a loose download', () => {
+    const filePath = write('outside/Podcast [x9QKu3OLjaU].mkv', 'video bytes');
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Podcast', path: filePath, kind: 'video' }] }));
+    write('yt-transcripts/x9QKu3OLjaU.json', JSON.stringify([{ text: 'こんにちは' }]));
+
+    // The row's NAME is the library title and carries no id; the derivation has
+    // to fall through to the path, or every imported video reads untranscribed.
+    const video = buildFilesIndex(ctx()).items.find((i) => i.id === 'media:v1');
+    expect(video?.name).toBe('Podcast');
+    expect(video?.flags.transcribed).toBe(true);
+  });
+});
+
+describe('youtubeIdFromFileName', () => {
+  it('takes the LAST bracketed id, so a bracketed title does not win', () => {
+    expect(youtubeIdFromFileName('[4K] Some Title [x9QKu3OLjaU].mp4')).toBe('x9QKu3OLjaU');
+    expect(youtubeIdFromFileName('Plain [x9QKu3OLjaU].ja.vtt')).toBe('x9QKu3OLjaU');
+  });
+
+  it('returns null rather than guessing at a bracket that is not an id', () => {
+    expect(youtubeIdFromFileName('[4K] Some Title.mp4')).toBeNull();
+    expect(youtubeIdFromFileName('[ENG SUB] Episode 1.mkv')).toBeNull();
+    expect(youtubeIdFromFileName('holiday-clip.mp4')).toBeNull();
+    // Eleven characters exactly — ten and twelve are not YouTube ids.
+    expect(youtubeIdFromFileName('x [abcdefghij].mp4')).toBeNull();
+    expect(youtubeIdFromFileName('x [abcdefghijkl].mp4')).toBeNull();
   });
 });

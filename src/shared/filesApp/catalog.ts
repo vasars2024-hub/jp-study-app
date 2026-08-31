@@ -352,6 +352,68 @@ export interface FilesItem {
 }
 
 /* ------------------------------------------------------------------ *
+ * Derivation — gate 4. Nothing here is filed by hand.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The YouTube id yt-dlp encoded into a downloaded filename.
+ *
+ * `Title [x9QKu3OLjaU].mp4` — the id is the LAST bracketed group, because a
+ * title may legitimately contain brackets of its own (`[4K]`, `[ENG SUB]`) and
+ * taking the first match would return one of those. The 11-character
+ * URL-safe-base64 shape is YouTube's, and requiring it is what keeps `[4K]`
+ * from being mistaken for an id when it is the only bracket present.
+ *
+ * Returns `null` rather than a guess: a wrong id would silently mark the wrong
+ * video transcribed, which is worse than leaving the flag off.
+ */
+export function youtubeIdFromFileName(name: string): string | null {
+  const matches = name.match(/\[([A-Za-z0-9_-]{11})\]/g);
+  if (!matches || matches.length === 0) return null;
+  return matches[matches.length - 1].slice(1, -1);
+}
+
+/**
+ * Cross-store derivation, run once over the assembled index.
+ *
+ * Gate 4's requirement is that a newly transcribed video appears in the right
+ * place **with no manual step**. Placement was already derived — `categoryId`
+ * comes from `kind`. The state was not: transcripts knew they were transcripts,
+ * and the videos they belong to knew nothing, because a `yt-transcripts/` row
+ * and a `downloads/` row are produced by two different enumerators that never
+ * see each other's output.
+ *
+ * So it happens HERE, after every enumerator has run, rather than inside one of
+ * them. An enumerator that reached across into another store's directory would
+ * be a second reader of that store, and the two would drift.
+ *
+ * The link is the YouTube id: a transcript file is named `<youtubeId>.json`
+ * and its row id is `transcript:<youtubeId>`, while a downloaded video carries
+ * the same id in its filename. A video with no derivable id is left alone —
+ * absent, not false, because "we could not tell" and "not transcribed" are
+ * different answers and only one of them justifies offering a Transcribe button.
+ */
+export function deriveCrossStoreFlags(items: readonly FilesItem[]): FilesItem[] {
+  const transcribedIds = new Set<string>();
+  for (const item of items) {
+    if (item.kind !== 'transcript') continue;
+    const id = item.id.startsWith('transcript:') ? item.id.slice('transcript:'.length) : null;
+    if (id) transcribedIds.add(id);
+  }
+  if (transcribedIds.size === 0) return [...items];
+
+  return items.map((item) => {
+    if (item.kind !== 'video' && item.kind !== 'audio') return item;
+    if (item.flags.transcribed) return item;
+    const path = item.location.store === 'file' ? item.location.path : '';
+    const youtubeId =
+      youtubeIdFromFileName(item.name) ?? youtubeIdFromFileName(path);
+    if (!youtubeId || !transcribedIds.has(youtubeId)) return item;
+    return { ...item, flags: { ...item.flags, transcribed: true } };
+  });
+}
+
+/* ------------------------------------------------------------------ *
  * Counting — gate 1.
  * ------------------------------------------------------------------ */
 

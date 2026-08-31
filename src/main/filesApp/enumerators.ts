@@ -25,6 +25,7 @@ import path from 'node:path';
 import {
   categoryForKind,
   countByCategory,
+  deriveCrossStoreFlags,
   type FilesEnumeratorReport,
   type FilesIndexSnapshot,
   type FilesItem,
@@ -1103,9 +1104,13 @@ export function buildFilesIndex(
     }
   }
 
+  // Gate 4: state that only exists ACROSS stores, derived once here rather
+  // than inside an enumerator that would have to read a store it does not own.
+  const derived = deriveCrossStoreFlags(items);
+
   return {
-    items,
-    counts: countByCategory(items),
+    items: derived,
+    counts: countByCategory(derived),
     enumerators: reports,
     builtAt: Date.now(),
   };
