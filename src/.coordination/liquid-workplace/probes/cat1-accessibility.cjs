@@ -276,9 +276,17 @@ const PROBE = `(function(){
       var px = parseFloat(cs.fontSize) || 16;
       var bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
       var large = px >= 24 || (bold && px >= 18.66);
+      // Pure decoration, and it is the PRODUCT that declares it: an aria-hidden subtree that
+      // holds nothing focusable is unreachable by assistive tech AND by keyboard, so no reader
+      // and no keyboard user can ever arrive at it. The guard is the second half - an
+      // aria-hidden wrapper around something FOCUSABLE is a different defect (hidden operable
+      // content) and stays scored, so the exemption can never launder a real control.
+      var hiddenHost = el.closest('[aria-hidden="true"]');
+      var FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
+      var decorative = !!hiddenHost && !hiddenHost.matches(FOCUSABLE) && !hiddenHost.querySelector(FOCUSABLE);
       textRows.push({ el: label(el), text: s.slice(0,24), px: Math.round(px*10)/10, large: large,
                       ratio: Math.round(ratio(composited, bg)*100)/100, bar: large ? 3 : 4.5,
-                      inactive: !!el.closest(':disabled') });
+                      inactive: !!el.closest(':disabled'), decorative: decorative });
     } finally { hideAgain(); }
   }
   var measurable = textRows.filter(function(x){ return typeof x.ratio === 'number'; });
@@ -294,8 +302,16 @@ const PROBE = `(function(){
   // is not part of an inactive component and the exemption does not reach it.
   // No backticks and no dollar-brace in this comment: it lives inside the PROBE template
   // literal, so either one is a parse error in THIS file, not in the browser. Both were made.
+  // CORRECTION 30 - the SECOND half of 1.4.3's Incidental exemption, which this harness applied
+  // only in its inactive-component form. "Pure decoration" is the other listed case, and the
+  // Wired shell is where it first bit: span.wired-wall-kana, the desktop wallpaper watermark at
+  // DesktopShell.tsx:2591, measured 1.46 and failed the whole surface. Raising a WATERMARK to
+  // 3:1 stops it being a watermark - that is damage to the art, exactly the conclusion this file
+  // already reaches for disabled controls and for rect-vs-pointer target sizes. Skipped rows are
+  // PRINTED with their ratios, never silent, so a reader can always audit what was exempted.
   var inactiveRows = measurable.filter(function(x){ return x.inactive; });
-  var active = measurable.filter(function(x){ return !x.inactive; });
+  var decorativeRows = measurable.filter(function(x){ return !x.inactive && x.decorative; });
+  var active = measurable.filter(function(x){ return !x.inactive && !x.decorative; });
   var failing = active.filter(function(x){ return x.ratio < x.bar; }).sort(function(a,b){ return a.ratio - b.ratio; });
   var minRow = active.slice().sort(function(a,b){ return a.ratio - b.ratio; })[0] || null;
 
@@ -419,6 +435,8 @@ const PROBE = `(function(){
       failingCount: failing.length,
       worst: failing.slice(0, 8),
       inactiveSkipped: inactiveRows.length,
+      decorativeSkipped: decorativeRows.length,
+      decorativeWorst: decorativeRows.filter(function(x){ return x.ratio < x.bar; }),
       inactiveWorst: inactiveRows.filter(function(x){ return x.ratio < x.bar; })
         .sort(function(a,b){ return a.ratio - b.ratio; }).slice(0, 6)
     },
@@ -503,7 +521,14 @@ const CONTROL_INJECT = `(function(){
   d.innerHTML = '<span style="color:#4a4a4a;font-size:13px">contrast control</span>'
     + '<button style="width:12px;height:12px;padding:0" aria-label="tiny a">a</button>'
     + '<button style="width:12px;height:12px;padding:0;margin-left:-4px" aria-label="tiny b">b</button>'
-    + '<button tabindex="-1" style="width:40px;height:40px" aria-label="unreachable">u</button>';
+    + '<button tabindex="-1" style="width:40px;height:40px" aria-label="unreachable">u</button>'
+    // Correction 30's own control, two halves that must land on OPPOSITE sides of the
+    // exemption. The first is pure decoration and must be exempted (decorativeSkipped moves).
+    // The second is an aria-hidden wrapper around a REAL focusable button, and must still be
+    // scored - if it ever stops failing, the exemption has widened into laundering operable
+    // content and the run is VOID rather than a pass.
+    + '<div aria-hidden="true" style="background:#3a3a3a"><span style="color:#414141;font-size:13px">decor control</span></div>'
+    + '<div aria-hidden="true" style="background:#3a3a3a"><button style="color:#414141;font-size:13px;width:40px;height:40px">hidden op</button></div>';
   root.appendChild(d);
   return JSON.stringify({ injected: true, id: '__cat1Control' });
 })()`;
@@ -813,6 +838,12 @@ async function bail(code, msg) {
       targetsByRect: dirty.targets.under32Count > base.targets.under32Count,
       wcag258: dirty.targets.wcag258FailCount > base.targets.wcag258FailCount,
       keyboard: dirty.keyboard.unreachableCount > base.keyboard.unreachableCount,
+      // Correction 30, both directions in one pass: the decorative span must be EXEMPTED and
+      // the aria-hidden-but-focusable button must still be CAUGHT. `contrast` above already
+      // requires the caught half to move; this requires the exempted half to move too, so an
+      // exemption that silently stopped working and an exemption that silently widened are
+      // both VOID rather than either one reading as a clean 10/10.
+      decorativeExemptionIsNarrow: dirty.text.decorativeSkipped > base.text.decorativeSkipped,
     };
     // The restore is asserted on the counts that are SCORED. The rect under-32 count is
     // reported but not asserted: a live surface's control set moves under the probe — a
@@ -820,6 +851,7 @@ async function bail(code, msg) {
     // then 39 with nothing injected. Voiding a correct 10/10 on that drift would be the
     // opposite failure to the one this control exists to catch, so the drift is printed.
     const backToBaseline = restored.text.failingCount === base.text.failingCount
+      && restored.text.decorativeSkipped === base.text.decorativeSkipped
       && restored.targets.wcag258FailCount === base.targets.wcag258FailCount
       && restored.keyboard.unreachableCount === base.keyboard.unreachableCount;
     const rectDrift = restored.targets.under32Count - base.targets.under32Count;
