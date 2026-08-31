@@ -1,5 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import DesktopShell from './components/DesktopShell';
+import { parseDetachTarget } from '../shared/studyDetach';
 import { useExtensionSnapshots } from './analysisActions';
 import BootScreen from './components/BootScreen';
 import ConsentScreen from './components/ConsentScreen';
@@ -13,6 +14,7 @@ import type { LibraryItem } from '../shared/types';
 import type { DesktopWinSection } from '../shared/desktop';
 import CompanionHostView from './environment/CompanionHostView';
 import PerfOverlay from './components/PerfOverlay';
+import TourOverlay from './components/onboarding/TourOverlay';
 import SecretAeroTrigger from './theme/SecretAeroTrigger';
 import SecretHistoryTrigger from './theme/SecretHistoryTrigger';
 import {
@@ -30,6 +32,14 @@ import Lockscreen from './components/Lockscreen';
 // index.html?blanc=1 — and importing it eagerly cost the Study OS window the
 // entire ~1.5 MB Blanc chunk on every cold start.
 const BlancShell = lazy(() => import('./components/blanc/BlancShell'));
+/**
+ * A detached Study Block window (`?studyBlock=…`).
+ *
+ * Lazy on purpose: it pulls the transcript, grammar and mining panels in with it, and
+ * every other window in the app — desktop, pop-outs, mini widget, lock widget — would
+ * otherwise pay for a bundle only this one renders.
+ */
+const DetachedStudyBlock = lazy(() => import('../media/DetachedStudyBlock'));
 const BlancLockscreen = lazy(() =>
   import('./components/blanc/BlancShell').then((m) => ({ default: m.BlancLockscreen })),
 );
@@ -70,48 +80,9 @@ import MainWindowChrome from './components/shell/MainWindowChrome';
 import { useWindowChromeMode } from './windowChrome';
 import { requestWiredArchiveEntryBoot } from './wiredArchiveLifecycle';
 import { isBlancWindow, loadBlancMode, onBlancModeChanged, type BlancModeSettings } from './blancMode';
+import AeroViewport from './components/AeroViewport';
 
-const AERO_VIEWPORT_WIDTH = 1280;
-const AERO_VIEWPORT_HEIGHT = 960;
 const STUDY_OS_REBOOT_EVENT = 'shell:studyOsReboot';
-
-function AeroViewport({ children }: { children: ReactNode }) {
-  const stageRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    const update = (): void => {
-      const next = Math.min(
-        stage.clientWidth / AERO_VIEWPORT_WIDTH,
-        stage.clientHeight / AERO_VIEWPORT_HEIGHT,
-      );
-      setScale(Number.isFinite(next) && next > 0 ? next : 1);
-    };
-
-    update();
-    const ro = 'ResizeObserver' in window ? new ResizeObserver(update) : null;
-    ro?.observe(stage);
-    window.addEventListener('resize', update);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-
-  const style = {
-    '--os-viewport-scale': String(scale),
-  } as CSSProperties;
-
-  return (
-    <div ref={stageRef} className="os-viewport-stage" style={style}>
-      <div className="os-viewport-ambience" aria-hidden="true" />
-      <div className="os-viewport-frame">{children}</div>
-    </div>
-  );
-}
 
 /** Main window while Mini Widget is active — spawn/focus the floating widget. */
 function MiniMainBridge() {
@@ -162,6 +133,11 @@ function isCompanionHostWindow(): boolean {
   return new URLSearchParams(window.location.search).get('companionHost') === '1';
 }
 
+/** A detached Study Block window — `?studyBlock=<id>&surface=<kind>`. */
+function isDetachedStudyBlockWindow(): boolean {
+  return parseDetachTarget(window.location.search) !== null;
+}
+
 /** Dedicated borderless Mini Widget OS window (`?miniWidget=1`). */
 function isMiniWidgetWindow(): boolean {
   return new URLSearchParams(window.location.search).get('miniWidget') === '1';
@@ -205,6 +181,7 @@ export default function App() {
   const [studyBootNonce, setStudyBootNonce] = useState(0);
   const popout = popoutSection();
   const [secondary] = useState(secondaryDesktop);
+  const [detachedBlock] = useState(isDetachedStudyBlockWindow);
   // L3.2 — the pop-out's own presentation state. Hoisted above every early
   // return because hooks cannot be conditional; a window that is not a pop-out
   // reads `undefined` and never renders the toggle.
@@ -222,6 +199,7 @@ export default function App() {
     !locked &&
     !popout &&
     !secondary &&
+    !detachedBlock &&
     !isMiniWidgetWindow() &&
     !isLockscreenWindow() &&
     !isBlancWindow() &&
@@ -637,6 +615,22 @@ export default function App() {
     return <CompanionHostView />;
   }
 
+  /*
+    One Study Block, in its own window, on whichever monitor the user put it.
+
+    Checked before every other branch and outside the `locked` gate for the same reason
+    the companion host is: this window is opened *by* an already-unlocked session, and
+    making it show a PIN pad would lock the user out of a panel of the app they are
+    currently using in the window next to it.
+  */
+  if (detachedBlock) {
+    return (
+      <Suspense fallback={null}>
+        <DetachedStudyBlock />
+      </Suspense>
+    );
+  }
+
   // Floating Mini Widget window — only the craft panel (transparent OS chrome).
   if (isMiniWidgetWindow()) {
     return (
@@ -811,6 +805,12 @@ export default function App() {
       <SeanimeDevPanel />
       {/* Phase-2 MEDIA workspace (adopted library/lists). Same self-hiding rule. */}
       <MediaWorkspaceHost />
+      {/*
+        First-boot guided tour (Phase 9.5 / audit T1). Self-hides once completed
+        or skipped. Mounted last so its spotlight layers over the shell, and
+        outside the `locked` gate so it never competes with the lock screen.
+      */}
+      <TourOverlay />
     </>
   );
 }
