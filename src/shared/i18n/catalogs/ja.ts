@@ -10673,6 +10673,28 @@ export const ja: Catalog = {
   'filesApp.favorite.error.notPinned': 'それはピン留めされていません。',
   'filesApp.favorite.error.saveFailed':
     'お気に入りを保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.smart.heading': '保存した検索',
+  'filesApp.smart.save': 'この検索を保存',
+  'filesApp.smart.saveName': 'この検索の名前',
+  'filesApp.smart.saved': '「{name}」を保存しました。',
+  'filesApp.smart.delete': '保存した検索を削除',
+  'filesApp.smart.deleted': '「{name}」を削除しました。',
+  'filesApp.smart.empty': '自分で保存した検索はまだありません。',
+  'filesApp.smart.preset.untranscribedVideo': '未文字起こしの動画',
+  'filesApp.smart.preset.transcribedVideo': '文字起こし済みの動画',
+  'filesApp.smart.preset.brokenLinks': 'リンク切れ',
+  'filesApp.smart.preset.unminedText': '未収集のテキスト',
+  'filesApp.smart.error.emptyName': '保存する検索には名前が必要です。',
+  'filesApp.smart.error.nameTooLong': 'その名前は保存する検索には長すぎます。',
+  'filesApp.smart.error.duplicateName': 'その名前の保存済み検索がすでにあります。',
+  'filesApp.smart.error.duplicateId': 'その保存済み検索はすでに存在します。',
+  'filesApp.smart.error.emptyCriteria':
+    '保存できるものがありません。この表示は絞り込まれていないため、検索はすべてに一致してしまいます。',
+  'filesApp.smart.error.noSuchFolder': 'その保存済み検索はもうありません。',
+  'filesApp.smart.error.presetLocked':
+    'この検索はアプリに組み込まれているため削除できません。自分で保存したものは削除できます。',
+  'filesApp.smart.error.saveFailed':
+    '保存した検索を保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

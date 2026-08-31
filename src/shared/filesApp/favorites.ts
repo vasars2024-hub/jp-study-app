@@ -135,7 +135,7 @@ export function unpinFavorite(
 }
 
 /** The toggle the UI actually binds to, so pin and unpin cannot diverge. */
-export function toggleFavorite(
+export function toggleFilesFavorite(
   doc: FilesFavoritesDoc,
   target: FilesFavoriteTarget,
   now: number,

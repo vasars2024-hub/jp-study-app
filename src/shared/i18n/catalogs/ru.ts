@@ -11553,6 +11553,28 @@ export const ru: Catalog = {
   'filesApp.favorite.error.notPinned': 'Это не закреплено.',
   'filesApp.favorite.error.saveFailed':
     'Не удалось сохранить избранное. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
+  'filesApp.smart.heading': 'Сохранённые запросы',
+  'filesApp.smart.save': 'Сохранить этот запрос',
+  'filesApp.smart.saveName': 'Название запроса',
+  'filesApp.smart.saved': 'Запрос «{name}» сохранён.',
+  'filesApp.smart.delete': 'Удалить сохранённый запрос',
+  'filesApp.smart.deleted': 'Запрос «{name}» удалён.',
+  'filesApp.smart.empty': 'Своих сохранённых запросов пока нет.',
+  'filesApp.smart.preset.untranscribedVideo': 'Видео без расшифровки',
+  'filesApp.smart.preset.transcribedVideo': 'Видео с расшифровкой',
+  'filesApp.smart.preset.brokenLinks': 'Битые ссылки',
+  'filesApp.smart.preset.unminedText': 'Текст, из которого ещё не добывали',
+  'filesApp.smart.error.emptyName': 'Сохранённому запросу нужно название.',
+  'filesApp.smart.error.nameTooLong': 'Это название слишком длинное для сохранённого запроса.',
+  'filesApp.smart.error.duplicateName': 'Сохранённый запрос с таким названием уже есть.',
+  'filesApp.smart.error.duplicateId': 'Такой сохранённый запрос уже существует.',
+  'filesApp.smart.error.emptyCriteria':
+    'Сохранять нечего — этот вид не отфильтрован, и запрос совпал бы со всем подряд.',
+  'filesApp.smart.error.noSuchFolder': 'Этого сохранённого запроса больше нет.',
+  'filesApp.smart.error.presetLocked':
+    'Этот запрос встроен в приложение, поэтому его нельзя удалить. Свои — можно.',
+  'filesApp.smart.error.saveFailed':
+    'Не удалось сохранить ваши запросы. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 

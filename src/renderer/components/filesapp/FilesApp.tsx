@@ -89,7 +89,7 @@ import {
   favoriteKey,
   isPinned,
   resolveFavorites,
-  toggleFavorite,
+  toggleFilesFavorite,
   type FilesFavoritesDoc,
   type FilesFavoriteTarget,
 } from '../../../shared/filesApp/favorites';
@@ -98,6 +98,25 @@ import {
   loadFavoritesDoc,
   onFavoritesChanged,
 } from '../../filesFavoritesStore';
+import {
+  allSmartFolders,
+  criteriaAreNarrowing,
+  deleteSmartFolder,
+  isPresetSmartFolder,
+  saveSmartFolder,
+  smartFolderById,
+  smartFolderCount,
+  smartFolderMembers,
+  type FilesSmartCriteria,
+  type FilesSmartFolder,
+  type FilesSmartFoldersDoc,
+} from '../../../shared/filesApp/smartFolders';
+import {
+  commitSmartFolders,
+  loadSmartFoldersDoc,
+  newSmartFolderId,
+  onSmartFoldersChanged,
+} from '../../filesSmartFoldersStore';
 import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
 import { openSectionSurface } from '../../sectionSurface';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
@@ -299,6 +318,12 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   /** Gate 18. Same store shape as the folders, same restart guarantee. */
   const [favoritesDoc, setFavoritesDoc] = useState<FilesFavoritesDoc>(loadFavoritesDoc);
 
+  /** Gate 19. The document holds QUESTIONS; membership is never stored. */
+  const [smartDoc, setSmartDoc] = useState<FilesSmartFoldersDoc>(loadSmartFoldersDoc);
+  const [smartScope, setSmartScope] = useState<string | null>(null);
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [searchNameDraft, setSearchNameDraft] = useState('');
+
   /**
    * The scope was read above; taking it is this effect's job, so the next plain
    * open of the Files app does not silently inherit the last caller's filter.
@@ -319,6 +344,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       // on top of whatever collection was open and the list would show the
       // intersection of two things nobody asked to intersect.
       setCollectionScope(null);
+      setSmartScope(null);
       setSelectedId(detail.focusItemId ?? null);
       setFocusCardId(detail.focusCardId ?? null);
       // A scope arriving on an open window must not land inside a stale search:
@@ -335,6 +361,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    */
   useEffect(() => onCollectionsChanged(() => setCollectionsDoc(loadCollectionsDoc())), []);
   useEffect(() => onFavoritesChanged(() => setFavoritesDoc(loadFavoritesDoc())), []);
+  useEffect(() => onSmartFoldersChanged(() => setSmartDoc(loadSmartFoldersDoc())), []);
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -368,7 +395,22 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     return resolveCollection(collection, new Set(allItems.map((i) => i.id)));
   }, [collectionScope, collectionsDoc, allItems]);
 
+  /** The saved search currently open, resolved from presets + the user's own. */
+  const scopedSmart: FilesSmartFolder | null = useMemo(
+    () => (smartScope ? (smartFolderById(smartDoc, smartScope) ?? null) : null),
+    [smartScope, smartDoc],
+  );
+
   const visible = useMemo(() => {
+    if (scopedSmart) {
+      // Recomputed from the live index every render: gate 19's "stays live" is
+      // structural because there is no stored membership to go out of date.
+      return sortItems(
+        smartFolderMembers(allItems, scopedSmart.criteria).filter((i) => matchesQuery(i, query)),
+        sortColumn,
+        sortDirection,
+      );
+    }
     if (scopedCollection) {
       // The user's own order is the folder's order, so the ids drive the walk
       // and the index is only consulted for the row. Filtering `allItems` by
@@ -385,7 +427,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         (scope === null || categoryContains(scope, item.categoryId)) && matchesQuery(item, query),
     );
     return sortItems(filtered, sortColumn, sortDirection);
-  }, [allItems, scope, scopedCollection, query, sortColumn, sortDirection]);
+  }, [allItems, scope, scopedCollection, scopedSmart, query, sortColumn, sortDirection]);
 
   const selected = useMemo(
     () => visible.find((i) => i.id === selectedId) ?? null,
@@ -714,6 +756,65 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
   }, [scopedCollection, selected, runCollectionOp]);
 
+  /* ------------------------ gate 19 actions ----------------------- */
+
+  /** What the user is looking at right now, as criteria a search could save. */
+  const currentCriteria: FilesSmartCriteria = useMemo(() => {
+    const criteria: FilesSmartCriteria = {};
+    if (scope) criteria.categoryId = scope;
+    if (query.trim()) criteria.query = query.trim();
+    return criteria;
+  }, [scope, query]);
+
+  const onSaveSearch = useCallback(() => {
+    const name = searchNameDraft;
+    const commit = commitSmartFolders((doc) =>
+      saveSmartFolder(doc, {
+        id: newSmartFolderId(),
+        name,
+        criteria: currentCriteria,
+        now: Date.now(),
+      }),
+    );
+    setSmartDoc(commit.doc);
+    const errorKey = commit.errorKey ?? commit.storageErrorKey;
+    if (errorKey) {
+      // The editor stays open on a refusal, same as the folder rename: closing
+      // it would throw away what was typed and leave a toast to explain it.
+      setFolderNotice({ key: errorKey, tone: 'error' });
+      return;
+    }
+    setFolderNotice({ key: 'filesApp.smart.saved', values: { name }, tone: 'ok' });
+    setSavingSearch(false);
+    setSearchNameDraft('');
+  }, [searchNameDraft, currentCriteria]);
+
+  const onDeleteSearch = useCallback(
+    (folder: FilesSmartFolder) => {
+      const commit = commitSmartFolders((doc) => deleteSmartFolder(doc, folder.id));
+      setSmartDoc(commit.doc);
+      const errorKey = commit.errorKey ?? commit.storageErrorKey;
+      setFolderNotice(
+        errorKey
+          ? { key: errorKey, tone: 'error' }
+          : { key: 'filesApp.smart.deleted', values: { name: folder.name ?? '' }, tone: 'ok' },
+      );
+      if (!errorKey && smartScope === folder.id) setSmartScope(null);
+    },
+    [smartScope],
+  );
+
+  const onOpenSmart = useCallback((id: string) => {
+    setSmartScope(id);
+    setScope(null);
+    setCollectionScope(null);
+    setFocusCardId(null);
+    setFolderNotice(null);
+    // A saved search already carries its own query; leaving the box filled
+    // would intersect it with a second filter the user did not save.
+    setQuery('');
+  }, []);
+
   /* ------------------------ gate 18 actions ----------------------- */
 
   /**
@@ -730,7 +831,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const onToggleFavorite = useCallback(
     (target: FilesFavoriteTarget, name: string) => {
       const wasPinned = isPinned(favoritesDoc, target);
-      const commit = commitFavorites((doc) => toggleFavorite(doc, target, Date.now()));
+      const commit = commitFavorites((doc) => toggleFilesFavorite(doc, target, Date.now()));
       setFavoritesDoc(commit.doc);
       const errorKey = commit.errorKey ?? commit.storageErrorKey;
       setFolderNotice(
@@ -787,12 +888,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     if (target.type === 'item') {
       setScope(null);
       setCollectionScope(null);
+      setSmartScope(null);
       selectItem(target.itemId);
       return;
     }
     if (target.type === 'category') {
       setScope(target.categoryId);
       setCollectionScope(null);
+      setSmartScope(null);
       setFocusCardId(null);
       return;
     }
@@ -853,6 +956,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         onClick={() => {
           setScope(null);
           setCollectionScope(null);
+          setSmartScope(null);
         }}
       >
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
@@ -887,6 +991,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           onClick={() => {
             setScope(node.id);
             setCollectionScope(null);
+            setSmartScope(null);
             // A tree click is not a search hit; it asked for the panel, not for
             // one card inside it. Carrying the highlight over would leave the
             // previous hit's row lit on a screen nobody searched for.
@@ -910,6 +1015,93 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           )}
         </button>
       ))}
+
+      {/* ---------------- gate 19: saved searches ---------------- */}
+      <div className="fa-smart">
+        <div className="fa-collections-head">
+          <h3 className="fa-collections-title">{t('filesApp.smart.heading')}</h3>
+          <button
+            type="button"
+            className="fa-smart-save"
+            onClick={() => {
+              // Refused HERE as well as in the model, so the name editor never
+              // opens on a view that cannot produce a search worth saving.
+              if (!criteriaAreNarrowing(currentCriteria)) {
+                setFolderNotice({ key: 'filesApp.smart.error.emptyCriteria', tone: 'error' });
+                return;
+              }
+              setFolderNotice(null);
+              setSavingSearch(true);
+            }}
+          >
+            {t('filesApp.smart.save')}
+          </button>
+        </div>
+        {savingSearch ? (
+          <div className="fa-collection-rename fa-smart-name">
+            <label>
+              <span className="fa-visually-hidden">{t('filesApp.smart.saveName')}</span>
+              <input
+                type="text"
+                value={searchNameDraft}
+                autoFocus
+                onChange={(e) => setSearchNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onSaveSearch();
+                  }
+                  if (e.key === 'Escape') setSavingSearch(false);
+                }}
+              />
+            </label>
+            <button type="button" className="fa-action fa-smart-name-save" onClick={onSaveSearch}>
+              {t('filesApp.collections.renameSave')}
+            </button>
+            <button type="button" className="fa-action" onClick={() => setSavingSearch(false)}>
+              {t('filesApp.collections.renameCancel')}
+            </button>
+          </div>
+        ) : null}
+        {allSmartFolders(smartDoc).map((folder) => (
+          <div key={folder.id} className="fa-smart-row" data-preset={isPresetSmartFolder(folder.id) ? 'true' : undefined}>
+            <button
+              type="button"
+              className="fa-tree-node fa-smart-node"
+              data-smart={folder.id}
+              data-selected={smartScope === folder.id ? 'true' : undefined}
+              aria-pressed={smartScope === folder.id}
+              onClick={() => onOpenSmart(folder.id)}
+            >
+              <span className="fa-tree-label">
+                {folder.nameKey ? t(folder.nameKey) : (folder.name ?? '')}
+              </span>
+              {/* Counted from the live index on every render. There is no cached
+                  membership anywhere, which is what gate 19 is really asking. */}
+              <span className="fa-tree-count">
+                {smartFolderCount(allItems, folder.criteria).toLocaleString(LANG_TAGS[lang])}
+              </span>
+            </button>
+            {/* A preset has no delete control at all — it is compiled in, and a
+                button that appears to remove it would be lying. The model
+                refuses too, so the two cannot drift. */}
+            {isPresetSmartFolder(folder.id) ? null : (
+              <button
+                type="button"
+                className="fa-smart-delete"
+                aria-label={t('filesApp.smart.delete')}
+                title={t('filesApp.smart.delete')}
+                onClick={() => onDeleteSearch(folder)}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {smartDoc.folders.length === 0 ? (
+          <p className="fa-collections-empty fa-smart-empty">{t('filesApp.smart.empty')}</p>
+        ) : null}
+      </div>
 
       {/* ---------------- gate 18: Favorites ---------------- */}
       <div className="fa-favorites">
@@ -1026,6 +1218,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 onClick={() => {
                   setCollectionScope(collection.id);
                   setScope(null);
+                  setSmartScope(null);
                   setFocusCardId(null);
                   setFolderNotice(null);
                 }}
@@ -1144,7 +1337,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * user's own folders — so a collection scope cannot end up as the only filter
    * with no way out stated in the same sentence.
    */
-  const scopeLabel = scopedCollection
+  const scopeLabel = scopedSmart
+    ? t('filesApp.collections.scoped', {
+        name: scopedSmart.nameKey ? t(scopedSmart.nameKey) : (scopedSmart.name ?? ''),
+      })
+    : scopedCollection
     ? t('filesApp.collections.scoped', { name: scopedCollection.collection.name })
     : scope
       ? t('filesApp.entry.scoped', {
@@ -1205,6 +1402,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           onClick={() => {
             setScope(null);
             setCollectionScope(null);
+            setSmartScope(null);
           }}
           title={scopeLabel}
         >

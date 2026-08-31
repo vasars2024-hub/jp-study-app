@@ -10579,6 +10579,27 @@ export const zh: Catalog = {
   'filesApp.favorite.error.notPinned': '那个并未被固定。',
   'filesApp.favorite.error.saveFailed':
     '无法保存你的收藏夹。此更改现在有效，但重启应用后会丢失。',
+  'filesApp.smart.heading': '已保存的搜索',
+  'filesApp.smart.save': '保存此搜索',
+  'filesApp.smart.saveName': '此搜索的名称',
+  'filesApp.smart.saved': '已保存“{name}”。',
+  'filesApp.smart.delete': '删除已保存的搜索',
+  'filesApp.smart.deleted': '已删除“{name}”。',
+  'filesApp.smart.empty': '还没有你自己保存的搜索。',
+  'filesApp.smart.preset.untranscribedVideo': '未转写的视频',
+  'filesApp.smart.preset.transcribedVideo': '已转写的视频',
+  'filesApp.smart.preset.brokenLinks': '断开的链接',
+  'filesApp.smart.preset.unminedText': '尚未挖掘的文本',
+  'filesApp.smart.error.emptyName': '已保存的搜索需要一个名称。',
+  'filesApp.smart.error.nameTooLong': '该名称对已保存的搜索来说太长了。',
+  'filesApp.smart.error.duplicateName': '你已经有同名的已保存搜索。',
+  'filesApp.smart.error.duplicateId': '该已保存搜索已经存在。',
+  'filesApp.smart.error.emptyCriteria':
+    '没有可保存的内容——当前视图没有筛选，这个搜索会匹配所有项目。',
+  'filesApp.smart.error.noSuchFolder': '该已保存搜索已不存在。',
+  'filesApp.smart.error.presetLocked': '此搜索内置于应用中，无法删除。你自己保存的可以删除。',
+  'filesApp.smart.error.saveFailed':
+    '无法保存你的已保存搜索。此更改现在有效，但重启应用后会丢失。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',

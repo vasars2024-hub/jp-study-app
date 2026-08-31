@@ -108,6 +108,47 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* --------------------- gate 19: saved searches --------------------- */
+
+.fa-smart {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: var(--lq-space-3);
+  padding-top: var(--lq-space-2);
+  border-top: 1px solid var(--lq-liquid-border);
+}
+
+.fa-smart-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-1);
+}
+
+.fa-smart-node {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fa-smart-save,
+.fa-smart-delete {
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: var(--lq-liquid-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-smart-save:hover,
+.fa-smart-delete:hover {
+  background: var(--lq-liquid-bg-raised);
+}
+
 /* ------------------------ gate 18: Favorites ------------------------ */
 
 .fa-favorites {

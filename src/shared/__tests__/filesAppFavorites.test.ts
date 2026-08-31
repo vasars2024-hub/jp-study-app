@@ -16,7 +16,7 @@ import {
   parseFavoritesDoc,
   pinFavorite,
   resolveFavorites,
-  toggleFavorite,
+  toggleFilesFavorite,
   unpinFavorite,
   type FilesFavoritesDoc,
   type FilesFavoriteTarget,
@@ -103,9 +103,9 @@ describe('pin and unpin', () => {
   });
 
   it('toggle is exactly pin-then-unpin, so the two cannot diverge', () => {
-    const on = toggleFavorite(EMPTY_FAVORITES_DOC, ITEM, 10);
+    const on = toggleFilesFavorite(EMPTY_FAVORITES_DOC, ITEM, 10);
     expect(isPinned(on.doc, ITEM)).toBe(true);
-    const off = toggleFavorite(on.doc, ITEM, 20);
+    const off = toggleFilesFavorite(on.doc, ITEM, 20);
     expect(isPinned(off.doc, ITEM)).toBe(false);
     expect(off.errorKey).toBeUndefined();
   });

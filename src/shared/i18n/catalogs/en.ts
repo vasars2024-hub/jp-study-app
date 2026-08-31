@@ -11136,6 +11136,28 @@ export const en: Catalog = {
   'filesApp.favorite.error.notPinned': 'That is not pinned.',
   'filesApp.favorite.error.saveFailed':
     'Your favorites could not be saved. This change works now but will be gone when the app restarts.',
+  'filesApp.smart.heading': 'Saved searches',
+  'filesApp.smart.save': 'Save this search',
+  'filesApp.smart.saveName': 'Name for this search',
+  'filesApp.smart.saved': 'Saved "{name}".',
+  'filesApp.smart.delete': 'Delete saved search',
+  'filesApp.smart.deleted': 'Deleted "{name}".',
+  'filesApp.smart.empty': 'No saved searches of your own yet.',
+  'filesApp.smart.preset.untranscribedVideo': 'Untranscribed videos',
+  'filesApp.smart.preset.transcribedVideo': 'Transcribed videos',
+  'filesApp.smart.preset.brokenLinks': 'Broken links',
+  'filesApp.smart.preset.unminedText': 'Text not yet mined',
+  'filesApp.smart.error.emptyName': 'A saved search needs a name.',
+  'filesApp.smart.error.nameTooLong': 'That name is too long for a saved search.',
+  'filesApp.smart.error.duplicateName': 'You already have a saved search with that name.',
+  'filesApp.smart.error.duplicateId': 'That saved search already exists.',
+  'filesApp.smart.error.emptyCriteria':
+    'There is nothing to save — this view is not filtered, so the search would match everything.',
+  'filesApp.smart.error.noSuchFolder': 'That saved search is no longer there.',
+  'filesApp.smart.error.presetLocked':
+    'This search is built into the app, so it cannot be deleted. Yours can be.',
+  'filesApp.smart.error.saveFailed':
+    'Your saved searches could not be saved. This change works now but will be gone when the app restarts.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':
