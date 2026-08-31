@@ -525,4 +525,75 @@ two pull against each other anywhere else, this rule wins and the plan is wrong.
 
 ## Progress
 
-_(none yet — opened 2026-08-16)_
+### 2026-08-30 — primary2, worktree `jp-wt-filesapp`, branch `wt/files-app`
+
+**The commits are on `wt/files-app`, NOT on `feat/nyaa-subtitles`.** Six, in order:
+`733fa357` catalogue model · `088a8f9a` enumerators + IPC · `00d6ca02` the surface ·
+`b5c20423` section wiring · `a5247e10` three wrong store shapes · `20742a49` guard fixes.
+They need a merge or cherry-pick to reach the branch.
+
+**Architecture, decided under standing auto-approval.** The folders are views, so the
+model is three layers: `shared/filesApp/catalog.ts` (pure — tree, kinds, provenance,
+locations, sort, counts), `main/filesApp/` (ten enumerators + `filesapp:index` /
+`filesapp:reveal`), `renderer/components/filesapp/` (the surface, on
+`LiquidAppScaffold`). The one decision worth not re-deriving: **enumerators take an
+injected context (`userDataPath`, an `openDictionary` thunk) instead of calling
+`app.getPath` inside each reader.** userData is 8.6 GB with no restore point and cannot
+be fixtured if the path is baked in — injection is what lets `buildFilesIndex` run in
+vitest against a temp tree, and in plain Node against the real profile, with no Electron.
+Both were needed this turn. The thunk is a function, not a value, because opening
+`dict.db` runs the migration ladder and an index build must not trigger that.
+
+**Gate 1 — CLOSED, live.** `buildFilesIndex` over the real `%APPDATA%/jp-study-app`:
+library 24, media 39, transcripts 2, yt-subs 0, exports 2, dictionaries 8, models 13,
+artwork 1640, profiles 28, workspaces 4. **1,760 items, 45.52 GB, 0 broken links**, all
+five groups non-empty — sources 65, outputs 2, reference 1661, system 28, workspaces 4.
+The 8 dictionaries independently match this plan's own 2026-08-16 count.
+
+**The finding that run produced, which fixtures could not.** Three of ten enumerators
+first read 0 against full stores, and none failed loudly — each returned `[]` and gave
+its category a permanent, plausible zero. `media.json` is `{ items, ... }`, not a bare
+array (39 videos read as 0). `profiles.json`'s `profiles` is a **record keyed by id**
+with a `label`, not a `name` (28 read as 0). The workspace store is
+`agent/workspace-v1.json` with a `conversations` record, not `agent-workspaces.json`
+(the whole group read 0). Root cause: every reader was written against a fixture the
+same hand invented. `collectionValues()` now accepts array-or-record in one place,
+because this app genuinely persists collections both ways. **Next worker: check the real
+store's shape before adding an enumerator — a wrong guess here is silent.**
+
+**Gate 13 — CLOSED.** `files` is registered in `DESKTOP_WIN_SECTIONS`,
+`AGENT_NAVIGABLE_SECTIONS`, the label-key record, `AppSection`, the command palette,
+main's `POPOUT_SECTIONS` + `ARGV_OPEN_SECTIONS`, and `AGENT_NAVIGATION_INDEX`. Its terms
+are **`['files']` alone** — `agentNavigationIndexMirror` refuses words the destination
+does not own, correctly: "library" and "transcripts" belong to the surfaces that hold
+them, and an entry matching those would outscore an established destination. Tested both
+directions: file requests resolve here, "library"/"music" still resolve to their own.
+
+**Gate 14 — CLOSED at component level.** Sorting by size/date reorders in both
+directions on the real component; a `null` sorts **last in both directions** (the arrow
+reverses the rows that have a value, it does not promote the ones that do not), ties fall
+back to name then id. Negative control: inverting that branch broke 4 tests across two
+suites. Not yet driven in live Electron.
+
+**Gate 12 — HALF closed.** The refusal half is proven: `revealTargetFor` returns `null`
+for every non-file store, the Reveal button is **absent** for a SQLite dictionary row
+rather than present-and-failing, and the inspector says why. The "opens its real location
+in Explorer" half needs a live click and is NOT claimed.
+
+**Gate 37 — run, and the tree is not green, which is not new.** Baseline at `aba52483`
+already fails **13 suites / 33 tests**. Measured properly, in a throwaway worktree at the
+base commit, by set-difference on test NAME rather than count. Five regressions were mine
+and all are fixed; the final failing-name set is **byte-identical to baseline (34 lines
+each side, `diff` clean)**. i18n-check exit 0 at 11,724 keys; architecture audit reports
+nothing for filesApp; ESLint clean on every touched path.
+
+Two traps banked for whoever is next. `theme/liquid-surfaces.css` puts `padding` on
+`.lq-liquid`/`.lq-work` at (0,1,0) from a sheet that loads *after* a component import, so
+a slot override must win by specificity (descendant-of-shell), not order. And
+`virtualListSemantics` reads the **opening tag** — a row role inside an extracted
+`useCallback` is invisible to it, so render rows inline like every other call site.
+
+**Exact next slice:** gate 8 — migrate memory/statistics out of Settings
+(`settingsRegistry.ts:183` and `:1101-1144` plus their search entries) into
+`system/memory` and `system/statistics`, capturing the old numbers **before** removal and
+comparing after. Those two leaves are the ones still reading 0 for a real reason.
