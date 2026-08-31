@@ -11,8 +11,11 @@ import type { PluginInfo } from '../data/scraperPort';
 import { parsePluginManifest } from '../data/pluginManifest';
 import {
   chooseScraperPreset,
+  exportScraperSettings,
   getActiveScraperSettings,
+  importScraperSettings,
   loadScraperSettingsDocument,
+  onScraperSettingsChanged,
   saveScraperSettingsDocument,
   updateActiveScraperSettings,
 } from '../../../scraperSettingsStore';
@@ -26,6 +29,12 @@ import {
 } from '../../../../shared/scraperSiteRules';
 import {
   createScraperProfile,
+  deleteScraperProfile,
+  removeScraperSiteOverride,
+  resetScraperProfile,
+  rollbackScraperProfile,
+  setScraperSiteOverride,
+  updateScraperProfileDetails,
   type ScraperPresetId,
   type ScraperSettingsDocument,
 } from '../../../../shared/scraperSettings';
@@ -79,8 +88,30 @@ export function ProfilesPage() {
   const [document, setDocument] = useState<ScraperSettingsDocument>(() =>
     loadScraperSettingsDocument(),
   );
+  const [message, setMessage] = useState<string | null>(null);
+  const [newProfileName, setNewProfileName] = useState('');
+  const [siteDraft, setSiteDraft] = useState('');
+  const [portableJson, setPortableJson] = useState('');
   const activeProfile = document.profiles.find((profile) => profile.id === document.activeProfileId);
   const revisionCount = document.profiles.reduce((count, profile) => count + profile.history.length, 0);
+
+  // The Advanced Settings drawer edits the same document. Without this the page
+  // showed whatever it read on mount and silently disagreed with the drawer —
+  // the reason this state has to be a subscription and not a one-shot load.
+  useEffect(() => onScraperSettingsChanged(setDocument), []);
+
+  // Every mutation goes through here so a thrown validation error becomes a
+  // visible message instead of an unhandled rejection in the console.
+  const commit = (next: ScraperSettingsDocument, fallbackKey: string) => {
+    try {
+      setDocument(saveScraperSettingsDocument(next));
+      setMessage(null);
+      return true;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t(fallbackKey));
+      return false;
+    }
+  };
 
   const activate = (id: string) => {
     const next = saveScraperSettingsDocument({ ...document, activeProfileId: id });
@@ -228,6 +259,275 @@ export function ProfilesPage() {
             </div>
           ))}
         </div>
+      </ScrCard>
+
+      {/* The four cards below were the scraper-engine half of the main Settings
+          app's Scraper page. They edit the profile *document* — identity, the
+          per-site override table, the revision log and the portable JSON — none
+          of which the Advanced Settings drawer can express, because the drawer's
+          fields are all dotted paths into one profile's `settings`. Moving them
+          here puts every profile-level control on the page named Profiles, and
+          leaves the Settings app owning only what is genuinely shared with the
+          rest of the product (providers, tracking, players, subtitles). */}
+      {activeProfile && (
+        <ScrCard
+          id="profile-identity"
+          title={t('scraperMgmt.identity.title')}
+          description={t('scraperMgmt.identity.description')}
+          statusId="set.profiles"
+        >
+          <div className="scr-special-field-grid">
+            <label className="scr-special-field">
+              <span>{t('scraperMgmt.identity.name')}</span>
+              {/* defaultValue + key, so a rejected rename can be rolled back to
+                  the stored name without fighting a controlled value. */}
+              <input
+                key={activeProfile.id}
+                className="scr-input"
+                defaultValue={activeProfile.name}
+                onBlur={(event) => {
+                  if (event.currentTarget.value === activeProfile.name) return;
+                  const ok = commit(
+                    updateScraperProfileDetails(document, activeProfile.id, {
+                      name: event.currentTarget.value,
+                    }),
+                    'scraperMgmt.identity.renameFailed',
+                  );
+                  if (!ok) event.currentTarget.value = activeProfile.name;
+                }}
+              />
+            </label>
+            <label className="scr-special-field">
+              <span>{t('scraperMgmt.identity.descriptionField')}</span>
+              <input
+                className="scr-input"
+                value={activeProfile.description}
+                onChange={(event) => commit(
+                  updateScraperProfileDetails(document, activeProfile.id, {
+                    description: event.target.value,
+                  }),
+                  'scraperMgmt.identity.renameFailed',
+                )}
+              />
+            </label>
+            <label className="scr-special-field">
+              <span>{t('scraperMgmt.identity.newProfile')}</span>
+              <input
+                className="scr-input"
+                value={newProfileName}
+                placeholder={t('scraperMgmt.identity.newProfilePlaceholder')}
+                onChange={(event) => setNewProfileName(event.target.value)}
+              />
+              <small>{t('scraperMgmt.identity.newProfileHint')}</small>
+            </label>
+          </div>
+          <div className="scr-page-actions">
+            <Button
+              size="sm"
+              leftIcon={<Icon name="plus" size={13} />}
+              disabled={!newProfileName.trim()}
+              onClick={() => {
+                if (commit(
+                  createScraperProfile(document, newProfileName),
+                  'scraperMgmt.identity.createFailed',
+                )) setNewProfileName('');
+              }}
+            >
+              {t('scraperMgmt.identity.create')}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                commit(
+                  resetScraperProfile(document, activeProfile.id),
+                  'scraperMgmt.identity.resetFailed',
+                );
+                setMessage(t('scraperMgmt.identity.resetDone', { name: activeProfile.name }));
+              }}
+            >
+              {t('scraperMgmt.identity.reset')}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              // The model refuses to delete the last profile; disabling the
+              // button says so before the click rather than after it.
+              disabled={document.profiles.length <= 1}
+              onClick={() => commit(
+                deleteScraperProfile(document, activeProfile.id),
+                'scraperMgmt.identity.deleteFailed',
+              )}
+            >
+              {t('scraperMgmt.identity.delete')}
+            </Button>
+          </div>
+          {message && <p className="scr-action-notice" role="status">{message}</p>}
+        </ScrCard>
+      )}
+
+      <ScrCard
+        id="profile-site-overrides"
+        title={t('scraperMgmt.overrides.title')}
+        description={t('scraperMgmt.overrides.description')}
+        statusId="set.profiles"
+      >
+        <div className="scr-special-field-grid">
+          <label className="scr-special-field">
+            <span>{t('scraperMgmt.overrides.host')}</span>
+            <input
+              className="scr-input"
+              value={siteDraft}
+              placeholder="example.org"
+              spellCheck={false}
+              onChange={(event) => setSiteDraft(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="scr-page-actions">
+          <Button
+            size="sm"
+            leftIcon={<Icon name="plus" size={13} />}
+            disabled={!siteDraft.trim()}
+            onClick={() => {
+              if (commit(
+                setScraperSiteOverride(document, siteDraft, {}, document.activeProfileId),
+                'scraperMgmt.overrides.addFailed',
+              )) setSiteDraft('');
+            }}
+          >
+            {t('scraperMgmt.overrides.add')}
+          </Button>
+        </div>
+        {Object.keys(document.siteOverrides).length === 0 ? (
+          <p className="scr-muted">{t('scraperMgmt.overrides.empty')}</p>
+        ) : (
+          <ul className="scr-list">
+            {Object.entries(document.siteOverrides).map(([site, override]) => (
+              <li className="scr-list-row" key={site}>
+                <span className="scr-list-main">
+                  <span className="scr-list-title">{site}</span>
+                  <span className="scr-list-sub">
+                    {override.profileId
+                      ? t('scraperMgmt.overrides.inherits', {
+                        name: document.profiles.find((profile) => profile.id === override.profileId)?.name
+                          ?? t('scraperMgmt.overrides.inheritsUnknown'),
+                      })
+                      : t('scraperMgmt.overrides.snapshot')}
+                  </span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => commit(
+                    removeScraperSiteOverride(document, site),
+                    'scraperMgmt.overrides.removeFailed',
+                  )}
+                >
+                  {t('scraperMgmt.overrides.remove')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ScrCard>
+
+      {activeProfile && (
+        <ScrCard
+          id="profile-history"
+          title={t('scraperMgmt.history.title')}
+          description={t('scraperMgmt.history.description')}
+          statusId="set.profiles"
+          trailing={<span className="scr-pill scr-pill--quiet">{activeProfile.history.length}</span>}
+        >
+          {activeProfile.history.length === 0 ? (
+            <p className="scr-muted">{t('scraperMgmt.history.empty')}</p>
+          ) : (
+            <ul className="scr-list">
+              {activeProfile.history.map((version) => (
+                <li className="scr-list-row" key={version.id}>
+                  <span className="scr-list-main">
+                    <span className="scr-list-title">{version.reason}</span>
+                    <span className="scr-list-sub">
+                      {new Date(version.createdAt).toLocaleString(LANG_TAGS[lang])}
+                      {' · '}
+                      {t(`scraperMgmt.preset.${version.preset}`)}
+                    </span>
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (commit(
+                        rollbackScraperProfile(document, activeProfile.id, version.id),
+                        'scraperMgmt.history.restoreFailed',
+                      )) {
+                        setMessage(t('scraperMgmt.history.restored', {
+                          when: new Date(version.createdAt).toLocaleString(LANG_TAGS[lang]),
+                        }));
+                      }
+                    }}
+                  >
+                    {t('scraperMgmt.history.restore')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ScrCard>
+      )}
+
+      <ScrCard
+        id="profile-portable"
+        title={t('scraperMgmt.portable.title')}
+        description={t('scraperMgmt.portable.description')}
+        statusId="set.profiles"
+      >
+        <label className="scr-special-field">
+          <span>{t('scraperMgmt.portable.json')}</span>
+          <textarea
+            className="scr-input"
+            value={portableJson}
+            spellCheck={false}
+            placeholder={t('scraperMgmt.portable.placeholder')}
+            style={{ minHeight: 140, fontFamily: 'var(--font-mono, monospace)' }}
+            onChange={(event) => setPortableJson(event.target.value)}
+          />
+        </label>
+        <div className="scr-page-actions">
+          <Button
+            size="sm"
+            leftIcon={<Icon name="external" size={13} />}
+            onClick={() => {
+              setPortableJson(exportScraperSettings(document));
+              setMessage(t('scraperMgmt.portable.exported'));
+            }}
+          >
+            {t('scraperMgmt.portable.export')}
+          </Button>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={!portableJson.trim()}
+            onClick={() => {
+              try {
+                const imported = importScraperSettings(portableJson);
+                setDocument(imported.document);
+                // An import that dropped fields is not a clean import, and
+                // saying so is the difference between "restored" and "restored,
+                // minus the parts this version could not read".
+                setMessage(imported.issues.length
+                  ? t('scraperMgmt.portable.importedWithIssues', { count: imported.issues.length })
+                  : t('scraperMgmt.portable.imported'));
+              } catch (error) {
+                setMessage(error instanceof Error
+                  ? error.message
+                  : t('scraperMgmt.portable.importFailed'));
+              }
+            }}
+          >
+            {t('scraperMgmt.portable.import')}
+          </Button>
+        </div>
+        {message && <p className="scr-action-notice" role="status">{message}</p>}
       </ScrCard>
     </div>
   );
