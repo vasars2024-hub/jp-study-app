@@ -178,7 +178,10 @@ export function isRoutableLocation(location: FilesLocation): location is {
  * `filesOpenDecision` so the ranked-list branch can be re-run after the user
  * picks, without re-classifying the path.
  */
-export function decisionForRoutedPlan(plan: FilesOpenRoutedPlan): FilesOpenDecision {
+export function decisionForRoutedPlan(
+  plan: FilesOpenRoutedPlan,
+  kind?: FilesItemKind,
+): FilesOpenDecision {
   const candidates = plan.candidates.filter((c) => c.target !== 'unknown');
   if (candidates.length === 0) {
     const first = plan.candidates[0];
@@ -189,11 +192,46 @@ export function decisionForRoutedPlan(plan: FilesOpenRoutedPlan): FilesOpenDecis
   // Reading `confidence === 'ambiguous'` instead would silently open the first
   // of the two `.apkg` homes, which are ranked `likely` then `ambiguous`.
   if (candidates.length > 1) return { mode: 'choose', candidates };
-  return openFor(candidates[0], plan.sniffed === true);
+  return openFor(candidates[0], plan.sniffed === true, kind);
+}
+
+/**
+ * Where the row's own kind knows more than the router does — gate 15.
+ *
+ * The router's buckets are IMPORT destinations, and `media` is deliberately one
+ * bucket for audio and video because both land in the same media library
+ * (`DropRouter` calls `addMediaPaths` for either). Ownership is not one bucket:
+ * a track's app is Music (`MediaCenterView initialTab="music"`), and gate 15 is
+ * explicit that "a track opens the existing music app". The index already knows
+ * which it is — `enumerators.ts` sets `kind: 'audio'` from the media row's own
+ * `kind`/extension — so the refinement is a fact the caller already holds, not
+ * a second guess at the file.
+ *
+ * Kept as an explicit pair list rather than "kind always wins": letting the kind
+ * override generally would defeat the sniffers, which exist precisely because
+ * the index's kind for a `.zip` (`package`) is the coarser answer.
+ */
+const KIND_REFINEMENTS: readonly {
+  target: DropTargetId;
+  kind: FilesItemKind;
+  section: DesktopWinSection;
+}[] = [{ target: 'media', kind: 'audio', section: 'music' }];
+
+export function refineSectionByKind(
+  target: DropTargetId,
+  kind: FilesItemKind,
+  section: DesktopWinSection,
+): DesktopWinSection {
+  const hit = KIND_REFINEMENTS.find((r) => r.target === target && r.kind === kind);
+  return hit ? hit.section : section;
 }
 
 /** The decision once a single candidate is settled — by ranking or by the user. */
-export function openFor(candidate: DropCandidate, sniffed: boolean): FilesOpenDecision {
+export function openFor(
+  candidate: DropCandidate,
+  sniffed: boolean,
+  kind?: FilesItemKind,
+): FilesOpenDecision {
   const section = sectionForDropTarget(candidate.target);
   if (!section) {
     return {
@@ -204,7 +242,7 @@ export function openFor(candidate: DropCandidate, sniffed: boolean): FilesOpenDe
   return {
     mode: 'open',
     target: candidate.target,
-    section,
+    section: kind ? refineSectionByKind(candidate.target, kind, section) : section,
     reasonKey: candidate.reasonKey,
     sniffed,
   };
@@ -225,7 +263,7 @@ export function filesOpenDecision(
 ): FilesOpenDecision {
   if (isRoutableLocation(item.location)) {
     if (!plan) return { mode: 'refuse', reasonKey: 'filesApp.open.refuse.unrouted' };
-    return decisionForRoutedPlan(plan);
+    return decisionForRoutedPlan(plan, item.kind);
   }
   const section = sectionForKind(item.kind);
   if (!section) return { mode: 'refuse', reasonKey: 'filesApp.open.refuse.noOwner' };

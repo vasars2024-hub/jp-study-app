@@ -467,6 +467,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    <!-- status: closed; evidence: 2026-08-30 sortItems by size+date, both directions, nulls last in both; negative control broke 4 tests across 2 suites -->
 15. **Music is untouched.** A track opens the existing music app, and that app's behaviour is
    unchanged before and after.
+   <!-- status: closed; evidence: 2026-08-31 -- found FAILING by gate 10's own table (audio shares the router's `media` bucket, which maps to `player`); fixed with one explicit {target:'media',kind:'audio'}->'music' pair, control proves it is not "kind wins"; the untouched half asserted as an absence -- FilesApp imports no music module and routes through openSectionSurface -->
 16. **Collections are real folders.** Create a folder, add items of two different kinds to it,
    nest it, reopen the app and it survives. Deleting the collection leaves every item in place —
    proven by re-finding one of them afterwards.
@@ -1305,7 +1306,7 @@ merge. This worker took 10 and 11 instead.
 
 ### 2026-08-31 (eleventh) — gate 12 CLOSES, and the second wrong folder it was hiding
 
-`<this commit>`. The refusal half was already proven from the renderer (button absent for a
+`fbc52a83`. The refusal half was already proven from the renderer (button absent for a
 SQLite row). Checking the HANDLER — which nobody had — found a second wrong folder the
 renderer cannot see: **a `brokenLink` row IS file-backed**, so `revealTargetFor` hands back a
 path, and `shell.showItemInFolder` on a path that no longer exists opens the nearest
@@ -1328,3 +1329,26 @@ the reveal path is now exercised: the renderer test proves the click calls
 `showItemInFolder(<exactly that path>)`. The only unobserved step is Electron's own shell
 API opening a window, which is not this app's code and which no headless agent can watch.
 Gate 12 is closed on that basis rather than on a click nobody can record.
+
+### 2026-08-31 (twelfth) — gate 15 CLOSES on a finding gate 10 produced
+
+`<hash>`. Gate 15 is "a track opens the existing music app, and that app's behaviour is
+unchanged before and after". Checking the first half against gate 10's own table found it
+FAILING: `classifyByExtension` puts `AUDIO_EXT` and `VIDEO_EXT` in one `media` bucket —
+correctly, because both IMPORT to the same media library through `addMediaPaths` — and
+`media` maps to `player`. So a track in the Files app would have opened the media Player.
+
+**Ownership is not one bucket, and the index already knows which row this is**
+(`enumerators.ts` sets `kind: 'audio'` from the media row's own `kind`/extension). The fix is
+one explicit PAIR, `{ target: 'media', kind: 'audio' } -> 'music'`, not "kind wins": a general
+override would defeat the sniffers, whose entire point is that the index's kind for a `.zip`
+(`package`) is the COARSER answer. A control asserts exactly that — the sniffed dictionary
+zip still lands on `dictionary` while `sectionForKind('package')` is null. The kind travels
+on the picked-from-the-list route too, or the refinement would vanish whenever the ranked
+list was involved.
+
+Second half, "unchanged before and after", is an ABSENCE, so it is asserted against the
+sources: the Files app names the SECTION and lets the shell mount `MediaCenterView
+initialTab="music"` through the shared `openSectionSurface`; it imports no music module
+(`musicPlayer`, `MediaCenterView`, `audioEngine`, `musicLibrary` all absent from
+`FilesApp.tsx`). 22 tests in `filesAppOpenPlan.test.ts`, up from 18.

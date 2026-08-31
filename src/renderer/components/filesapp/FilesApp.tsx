@@ -323,8 +323,10 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   }, [selected, openItem]);
 
   const onChooseCandidate = useCallback(
-    (candidate: DropCandidate) => runOpenDecision(openFor(candidate, false)),
-    [runOpenDecision],
+    // The kind travels with the pick too, or gate 15's refinement would apply
+    // on the direct route and be dropped the moment the list was involved.
+    (candidate: DropCandidate) => runOpenDecision(openFor(candidate, false, selected?.kind)),
+    [runOpenDecision, selected],
   );
 
   /**

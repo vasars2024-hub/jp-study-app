@@ -278,6 +278,72 @@ describe('gate 10 — sniffing settles the ambiguous extension', () => {
   });
 });
 
+describe('gate 15 — a track opens the existing Music app, and Music is untouched', () => {
+  it('an audio row opens Music, not the media Player the router would import to', () => {
+    // The finding gate 10's own table produced: `AUDIO_EXT` and `VIDEO_EXT`
+    // share the router's `media` bucket, because both IMPORT to the same media
+    // library. Ownership is not one bucket, and the index already knows which
+    // this row is.
+    const file = join(dir, 'track.mp3');
+    writeFileSync(file, 'x');
+    const plan = planForPath(file);
+    expect(plan.candidates.map((c) => c.target)).toEqual(['media']);
+
+    // Without the kind, the coarse answer — this is the pre-fix behaviour.
+    expect(decisionForRoutedPlan(plan)).toMatchObject({ section: 'player' });
+    // With it, the app that owns a track.
+    expect(filesOpenDecision(fileItem(file, 'audio'), plan)).toMatchObject({
+      target: 'media',
+      section: 'music',
+    });
+  });
+
+  it('CONTROL: the refinement is one PAIR, not "kind wins"', () => {
+    // A video row through the same target keeps the player...
+    const video = join(dir, 'ep.mp4');
+    writeFileSync(video, 'x');
+    expect(filesOpenDecision(fileItem(video, 'video'), planForPath(video))).toMatchObject({
+      section: 'player',
+    });
+    // ...and the sniffed `.zip` keeps the sniffer's answer even though its
+    // index kind is the coarser `package`. A general "kind wins" would send it
+    // to whatever `sectionForKind('package')` said, which is nothing at all.
+    const zip = join(dir, 'dict2.zip');
+    const z = new AdmZip();
+    z.addFile('index.json', Buffer.from(JSON.stringify({ format: 3 })));
+    z.writeZip(zip);
+    expect(sectionForKind('package')).toBe(null);
+    expect(filesOpenDecision(fileItem(zip, 'package'), planForPath(zip))).toMatchObject({
+      section: 'dictionary',
+      sniffed: true,
+    });
+  });
+
+  it('the picked-from-the-list route refines too', () => {
+    const picked: DropCandidate = {
+      target: 'media',
+      confidence: 'exact',
+      reasonKey: 'fileDrop.reason.media',
+    };
+    expect(openFor(picked, false, 'audio')).toMatchObject({ section: 'music' });
+    expect(openFor(picked, false, 'video')).toMatchObject({ section: 'player' });
+    expect(openFor(picked, false)).toMatchObject({ section: 'player' });
+  });
+
+  it('the Music app itself is untouched — the Files app imports nothing of it', () => {
+    // "That app's behaviour is unchanged before and after" is an ABSENCE, so it
+    // is asserted against the sources. The Files app names the SECTION and lets
+    // the shell mount it; it does not reach into the music player's own modules.
+    expect(APP_SECTION).toContain("case 'music':");
+    expect(APP_SECTION).toContain('<MediaCenterView initialTab="music" />');
+    for (const forbidden of ['musicPlayer', 'MediaCenterView', 'audioEngine', 'musicLibrary']) {
+      expect(FILES_APP, `FilesApp must not reach into ${forbidden}`).not.toContain(forbidden);
+    }
+    // ...and the route it does use is the shared one every widget uses.
+    expect(FILES_APP).toContain('openSectionSurface(decision.section)');
+  });
+});
+
 describe('gate 10 — every handled type, including the rows with no file', () => {
   it('opens one item of each file-backed kind in the app that owns it', () => {
     const cases: [string, string, string][] = [
