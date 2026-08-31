@@ -140,6 +140,7 @@ import {
   type FilesScopeRequest,
 } from './filesAppScope';
 import { useFilesIndex } from './useFilesIndex';
+import { ScanReviewSheet } from './ScanReviewSheet';
 import './filesApp.css';
 
 /**
@@ -383,6 +384,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    */
   const [viewStateDoc, setViewStateDoc] = useState<FilesViewStateDoc>(loadViewStateDoc);
   const [viewNotice, setViewNotice] = useState<string | null>(null);
+
+  /* Gate 27's surface. Mounted only while open so a closed sheet holds no
+     report in memory — a 5,000-row scan is not something to keep alive behind
+     a hidden dialog. */
+  const [scanOpen, setScanOpen] = useState(false);
 
   /**
    * Which folder's view is on screen. The precedence — smart, then collection,
@@ -1559,6 +1565,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
             {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
           </button>
+          {/* Gates 23 and 27: the scan's report, and the review queue that
+              stands between a guess and the library. */}
+          <button
+            type="button"
+            className="fa-scan-open"
+            onClick={() => setScanOpen(true)}
+          >
+            {t('filesApp.review.title')}
+          </button>
           {bulkSelectedIds.size > 0 ? (
             <>
               <button
@@ -2112,6 +2127,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
 
   return (
+    <>
     <LiquidAppScaffold
       className={`fa-shell${onPanel ? ' fa-shell-panel' : ''}`}
       rail={rail}
@@ -2126,6 +2142,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     >
       {canvas}
     </LiquidAppScaffold>
+    {scanOpen ? (
+      <ScanReviewSheet
+        onClose={() => setScanOpen(false)}
+        // Anything that lands has to reach this window's own list, not just the
+        // index bus — the sheet is a sibling, so it cannot assume a remount.
+        onImported={refresh}
+      />
+    ) : null}
+    </>
   );
 }
 

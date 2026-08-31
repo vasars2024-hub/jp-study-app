@@ -1374,6 +1374,7 @@ export const en: Catalog = {
     other: '{count} files filed',
   },
   'fileDrop.toast.noDestination': 'Nothing here can open {name} yet.',
+  'fileDrop.toast.emptyFolder': '{name} holds nothing this app can import.',
   // Gate 11: the two ways a drop used to end in nothing at all.
   'fileDrop.toast.noPath': {
     one: 'Windows did not say where that item is, so it could not be imported. Try dragging it from a folder rather than from inside an archive or an email.',
@@ -11179,6 +11180,43 @@ export const en: Catalog = {
   'filesApp.ingest.review.category': 'This category is set to be reviewed first.',
   'filesApp.ingest.refuse.noDestination':
     'Nothing in the app can open this, so there is nowhere to put it.',
+  'filesApp.review.title': 'Scan a folder',
+  'filesApp.review.subtitle':
+    'Nothing is imported until you press Import. The scan only reads.',
+  'filesApp.review.rootLabel': 'Folder to scan',
+  'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
+  'filesApp.review.scan': 'Scan',
+  'filesApp.review.scanning': 'Scanning…',
+  'filesApp.review.error.noRoot': 'Type the folder you want scanned first.',
+  'filesApp.review.error.unreadableRoot':
+    'That folder could not be read, so nothing was scanned.',
+  'filesApp.review.error.scanFailed': 'The scan could not finish.',
+  'filesApp.review.importing': 'Importing {done} of {total}…',
+  'filesApp.review.destinationCount': '{total} — {placed} placed, {ambiguous} to choose',
+  'filesApp.review.autoHeading': 'Recognised exactly ({count})',
+  'filesApp.review.reviewHeading': 'Waiting for you ({count})',
+  'filesApp.review.refusedHeading': 'Nowhere to put these ({count})',
+  'filesApp.review.skippedHeading': 'Not looked at ({count})',
+  'filesApp.review.warned': {
+    one: '{count} of these was a guess, not a certainty.',
+    other: '{count} of these were guesses, not certainties.',
+  },
+  'filesApp.review.destinationFor': 'Where {name} should go',
+  'filesApp.review.skip': 'Leave it alone',
+  'filesApp.review.confirm': {
+    one: 'Import {count} item',
+    other: 'Import {count} items',
+  },
+  'filesApp.review.importedSummary': '{succeeded} of {total} imported.',
+  'filesApp.review.outcomeOk': 'Imported.',
+  'filesApp.review.undo': {
+    one: 'Undo {count} import',
+    other: 'Undo {count} imports',
+  },
+  'filesApp.review.undone': {
+    one: 'Reversed {count} import.',
+    other: 'Reversed {count} imports.',
+  },
   'filesApp.view.label': 'View',
   'filesApp.view.mode.details': 'Details',
   'filesApp.view.mode.compact': 'Compact',

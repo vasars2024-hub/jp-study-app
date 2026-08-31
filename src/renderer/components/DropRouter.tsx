@@ -7,9 +7,11 @@
  * affordance (there was none), a triage sheet for genuinely ambiguous files,
  * and an undo.
  *
- * Dispatch lives here rather than in main because every importer this calls is
- * an `ipcMain.handle` with no exported function behind it; see the note at the
- * top of `main/fileRouter.ts`.
+ * Dispatch is renderer-side rather than in main because every importer it calls
+ * is an `ipcMain.handle` with no exported function behind it; see the note at
+ * the top of `main/fileRouter.ts`. The dispatch table itself now lives in
+ * `renderer/fileImportExecute.ts`, shared with the Files app's scan-and-review
+ * sheet — one importer, for the same reason there is one classifier.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DropPlan } from '../../main/fileRouter';
@@ -20,20 +22,17 @@ import { loadFileDropPrefs, onFileDropPrefsChanged, type FileDropPrefs } from '.
 import { announceFilesIndexChanged } from '../filesIndexBus';
 import { showOsToast } from './ToastHost';
 import Icon from './Icons';
-import { importApkgCards } from '../apkgImport';
-import { removeDeckCards } from '../flashcardDeck';
+import { executeImport, undoImports, type ImportReceipt } from '../fileImportExecute';
 
-/** Everything needed to reverse one routed file. */
-interface UndoEntry {
-  targetId: DropTargetId;
+/**
+ * One routed file, ready to reverse.
+ *
+ * The dispatch table itself moved to `renderer/fileImportExecute.ts` so the
+ * Files app's scan-and-review sheet imports through the same calls a drop does;
+ * all this adds is the resolved label the toast prints.
+ */
+interface UndoEntry extends ImportReceipt {
   label: string;
-  /** Library/media ids created by the import, for removal. */
-  libraryIds: string[];
-  mediaIds: string[];
-  /** Wallpaper: the path that was in place before. */
-  previousWallpaper?: string | null;
-  /** Flashcards created by an .apkg card import, for exact removal on undo. */
-  deckCardIds?: string[];
 }
 
 const TARGETS_IN_TRIAGE: DropTargetId[] = [
@@ -69,124 +68,26 @@ export default function DropRouter({
 
   const execute = useCallback(
     async (plan: DropPlan, target: DropTargetId): Promise<UndoEntry | null> => {
-      const label = t(`fileDrop.target.${target}`);
-      switch (target) {
-        case 'library-book':
-        case 'library-manga': {
-          const paths = plan.isDirectory
-            ? await window.api.fileDropFolderFiles(plan.path)
-            : [plan.path];
-          if (!paths.length) return null;
-          const items = await window.api.importPaths(paths);
-          onOpenSection?.(target === 'library-manga' ? 'library' : 'library');
-          return {
-            targetId: target,
-            label,
-            libraryIds: (items ?? []).map((i) => i.id),
-            mediaIds: [],
-          };
-        }
-        case 'media': {
-          const paths = plan.isDirectory
-            ? await window.api.fileDropFolderFiles(plan.path)
-            : [plan.path];
-          if (!paths.length) return null;
-          const items = await window.api.addMediaPaths(paths);
-          onOpenSection?.('player');
-          return {
-            targetId: target,
-            label,
-            libraryIds: [],
-            mediaIds: (items ?? []).map((i) => i.id),
-          };
-        }
-        case 'wallpaper': {
-          const previous = await window.api.getWallpaper().catch(() => null);
-          await window.api.setWallpaperFromPath(plan.path);
-          return { targetId: target, label, libraryIds: [], mediaIds: [], previousWallpaper: previous };
-        }
-        case 'anki-level': {
-          await window.api.importApkg(plan.path);
-          onOpenSection?.('anki');
-          return { targetId: target, label, libraryIds: [], mediaIds: [] };
-        }
-        case 'anki-cards': {
-          const res = await importApkgCards(plan.path);
-          if (!res.ok) throw new Error(res.error ?? 'apkg-card-import-failed');
-          onOpenSection?.('flashcards');
-          // Undo removes exactly the rows this import created, by id — the deck
-          // is shared with every other card source, so removing "the last N" or
-          // the whole deck group would take the user's own cards with it.
-          return {
-            targetId: target,
-            label,
-            libraryIds: [],
-            mediaIds: [],
-            deckCardIds: (res.added ?? []).map((c) => c.id),
-          };
-        }
-        case 'dictionary-yomitan': {
-          const res = await window.api.dictImportYomitan(plan.path);
-          if (!res?.ok) {
-            showOsToast(t('fileDrop.toast.failed', { name: plan.name }), 'err');
-            return null;
-          }
-          onOpenSection?.('dictionary');
-          return { targetId: target, label, libraryIds: [], mediaIds: [] };
-        }
-        case 'frequency-dict': {
-          const res = await window.api.miningImportFrequencyDict(plan.path);
-          if (!res?.ok) {
-            showOsToast(t('fileDrop.toast.failed', { name: plan.name }), 'err');
-            return null;
-          }
-          return { targetId: target, label, libraryIds: [], mediaIds: [] };
-        }
-        case 'subtitle': {
-          // The player owns subtitle attachment; hand it the path and let the
-          // open media session pick it up.
-          window.dispatchEvent(
-            new CustomEvent('media:attach-subtitle', { detail: { path: plan.path } }),
+      const receipt = await executeImport(plan, target, {
+        onOpenSection,
+        // The refusals this component always showed, now named by the importer
+        // rather than decided twice. `emptyFolder` is new and was previously a
+        // silent `null` — a folder drop that imported nothing and said nothing.
+        onRefused: (reasonKey, subject) => {
+          showOsToast(
+            t(reasonKey, { name: subject.name }),
+            reasonKey === 'fileDrop.toast.noDestination' ? 'warn' : 'err',
           );
-          onOpenSection?.('player');
-          return { targetId: target, label, libraryIds: [], mediaIds: [] };
-        }
-        case 'shortcut': {
-          window.dispatchEvent(
-            new CustomEvent('desktop:add-shortcut', {
-              detail: { target: plan.path, name: plan.name.replace(/\.[^.]+$/, '') },
-            }),
-          );
-          return { targetId: target, label, libraryIds: [], mediaIds: [] };
-        }
-        case 'deck-csv':
-        case 'vn-script':
-        case 'backup':
-        case 'folder':
-        case 'unknown':
-        default:
-          // Named, not silently swallowed. These have no path-in importer yet;
-          // saying so is the honest outcome and beats pretending it worked.
-          showOsToast(t('fileDrop.toast.noDestination', { name: plan.name }), 'warn');
-          return null;
-      }
+        },
+      });
+      if (!receipt) return null;
+      return { ...receipt, label: t(`fileDrop.target.${target}`) };
     },
     [onOpenSection, t],
   );
 
   const undo = useCallback(async (entries: UndoEntry[]) => {
-    for (const entry of entries) {
-      try {
-        for (const id of entry.libraryIds) await window.api.removeItem(id);
-        for (const id of entry.mediaIds) await window.api.removeMedia(id);
-        if (entry.targetId === 'wallpaper' && entry.previousWallpaper) {
-          await window.api.setWallpaperFromPath(entry.previousWallpaper);
-        }
-        if (entry.deckCardIds?.length) removeDeckCards(entry.deckCardIds);
-      } catch {
-        /* a partially-reversible plan still reverses what it can */
-      }
-    }
+    await undoImports(entries);
     // Gate 11 in reverse: the Files tree has to lose the row again, or an undo
     // leaves a window showing an item that no longer exists.
     announceFilesIndexChanged();

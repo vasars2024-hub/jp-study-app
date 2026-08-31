@@ -1262,6 +1262,7 @@ export const ja: Catalog = {
   'fileDrop.toast.routedOne': '{name} → {target}',
   'fileDrop.toast.routedMany': { other: '{count} 件を振り分けました' },
   'fileDrop.toast.noDestination': '{name} を開けるものがまだありません。',
+  'fileDrop.toast.emptyFolder': '{name} には取り込めるものがありません。',
   'fileDrop.toast.noPath': {
     other:
       'その {count} 件の場所を Windows が伝えなかったため、取り込めませんでした。書庫やメールの中からではなく、フォルダーからドラッグしてみてください。',
@@ -10715,6 +10716,39 @@ export const ja: Catalog = {
   'filesApp.ingest.review.category': 'この分類は先に確認する設定になっています。',
   'filesApp.ingest.refuse.noDestination':
     'このアプリで開けるものがないため、置き場所がありません。',
+  'filesApp.review.title': 'フォルダーをスキャン',
+  'filesApp.review.subtitle':
+    '「取り込む」を押すまで何も取り込まれません。スキャンは読み取りのみです。',
+  'filesApp.review.rootLabel': 'スキャンするフォルダー',
+  'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
+  'filesApp.review.scan': 'スキャン',
+  'filesApp.review.scanning': 'スキャン中…',
+  'filesApp.review.error.noRoot': 'まずスキャンするフォルダーを入力してください。',
+  'filesApp.review.error.unreadableRoot':
+    'そのフォルダーを読み取れなかったため、何もスキャンしていません。',
+  'filesApp.review.error.scanFailed': 'スキャンを完了できませんでした。',
+  'filesApp.review.importing': '{total} 件中 {done} 件を取り込み中…',
+  'filesApp.review.destinationCount': '{total} 件 — 確定 {placed} 件、要選択 {ambiguous} 件',
+  'filesApp.review.autoHeading': '確実に判別 ({count})',
+  'filesApp.review.reviewHeading': '確認待ち ({count})',
+  'filesApp.review.refusedHeading': '置き場所なし ({count})',
+  'filesApp.review.skippedHeading': '未確認 ({count})',
+  'filesApp.review.warned': {
+    other: 'このうち {count} 件は確実ではなく推測です。',
+  },
+  'filesApp.review.destinationFor': '{name} の置き場所',
+  'filesApp.review.skip': 'そのままにする',
+  'filesApp.review.confirm': {
+    other: '{count} 件を取り込む',
+  },
+  'filesApp.review.importedSummary': '{total} 件中 {succeeded} 件を取り込みました。',
+  'filesApp.review.outcomeOk': '取り込みました。',
+  'filesApp.review.undo': {
+    other: '{count} 件の取り込みを元に戻す',
+  },
+  'filesApp.review.undone': {
+    other: '{count} 件の取り込みを元に戻しました。',
+  },
   'filesApp.view.label': '表示',
   'filesApp.view.mode.details': '詳細',
   'filesApp.view.mode.compact': 'コンパクト',
