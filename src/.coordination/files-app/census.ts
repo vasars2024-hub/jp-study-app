@@ -61,6 +61,11 @@ console.log(`orphans: ${snapshot.items.filter((i) => i.flags.orphan).length}`);
 const byProvenance: Record<string, number> = {};
 for (const item of snapshot.items) byProvenance[item.provenance] = (byProvenance[item.provenance] ?? 0) + 1;
 console.log(`provenance: ${JSON.stringify(byProvenance)}`);
+const transcripts = snapshot.items.filter((i) => i.kind === 'transcript');
+console.log(`transcript rows: ${transcripts.length}`);
+for (const item of transcripts) {
+  console.log(`  ${item.flags.orphan ? 'orphan ' : '       '}${item.name}`);
+}
 const subs = snapshot.items.filter((i) => i.kind === 'subtitle');
 console.log(`subtitle rows: ${subs.length}`);
 for (const item of subs) {

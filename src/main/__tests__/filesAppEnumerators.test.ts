@@ -359,6 +359,31 @@ describe('files app index — what each row records', () => {
     expect(subs.find((s) => s.name === 'Episode 1 — ja')?.flags.orphan).toBeUndefined();
   });
 
+  it('names a transcript by its video title, not by the youtube id (gate 2)', () => {
+    write('yt-transcripts/B73sEyA0wbs.json', '[]');
+    write('yt-transcripts/gone-from-playlists.json', '[]');
+    write(
+      'yt-playlists.json',
+      JSON.stringify({
+        videos: [{ youtubeId: 'B73sEyA0wbs', title: '日本語の歴史' }],
+      }),
+    );
+
+    const rows = buildFilesIndex(ctx()).items.filter((i) => i.kind === 'transcript');
+    const named = rows.find((r) => r.id === 'transcript:B73sEyA0wbs');
+    // "findable" is the gate's word, and `B73sEyA0wbs` is not a thing anybody
+    // searches for.
+    expect(named?.name).toBe('日本語の歴史');
+    expect(named?.flags.orphan).toBeUndefined();
+
+    // A transcript whose video left every playlist keeps the raw id and says
+    // so, rather than being dropped or given an invented name.
+    const orphan = rows.find((r) => r.id === 'transcript:gone-from-playlists');
+    expect(orphan?.name).toBe('gone-from-playlists');
+    expect(orphan?.flags.orphan).toBe(true);
+    expect(orphan?.flags.transcribed).toBe(true);
+  });
+
   it('a transcript is its own row, so a transcribed video is findable without its video (gate 2)', () => {
     write('yt-transcripts/dQw4w9WgXcQ.json', '[]');
     const items = buildFilesIndex(ctx()).items;

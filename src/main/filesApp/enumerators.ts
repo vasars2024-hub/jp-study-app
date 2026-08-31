@@ -35,6 +35,10 @@ import { AUDIO_EXT, SUBTITLE_EXT, VIDEO_EXT, extOf } from '../../shared/mediaKin
 import { ANKI_DRAFT_SESSION_STORE_FILE } from '../../shared/ankiDraftSession';
 import { ANKI_INTERVALS_SNAPSHOT_FILE } from '../../shared/anki';
 import {
+  YOUTUBE_PLAYLIST_STORE_FILE,
+  YOUTUBE_TRANSCRIPT_DIRECTORY,
+} from '../../shared/youtubeStorage';
+import {
   MEDIA_DOWNLOAD_DIRECTORY,
   MEDIA_LIBRARY_STORE_FILE,
   mediaItemsFromStoredDocument,
@@ -277,19 +281,42 @@ export const mediaEnumerator: FilesEnumerator = {
 export const transcriptEnumerator: FilesEnumerator = {
   source: 'transcripts',
   run(ctx) {
-    const dir = path.join(ctx.userDataPath, 'yt-transcripts');
+    // Gate 2's actual requirement is *findable*, and `B73sEyA0wbs` is not a
+    // thing anybody searches for. The title lives in `yt-playlists.json`, keyed
+    // by the same youtubeId the transcript file is named after. A transcript
+    // whose video is no longer in any playlist keeps the raw id and says so
+    // with `brokenLink`-adjacent honesty rather than inventing a name — one of
+    // the two live transcripts is in exactly that state.
+    const playlists = readJson<{ videos?: unknown }>(
+      path.join(ctx.userDataPath, YOUTUBE_PLAYLIST_STORE_FILE),
+      {},
+    );
+    const titleById = new Map<string, string>();
+    for (const video of collectionValues<{ youtubeId?: unknown; title?: unknown }>(
+      playlists?.videos,
+    )) {
+      if (typeof video?.youtubeId === 'string' && typeof video.title === 'string' && video.title) {
+        titleById.set(video.youtubeId, video.title);
+      }
+    }
+
+    const dir = path.join(ctx.userDataPath, YOUTUBE_TRANSCRIPT_DIRECTORY);
     return listDir(dir)
       .filter((e) => !e.isDirectory() && extOf(e.name) === '.json')
       .map((e) => {
         const youtubeId = e.name.slice(0, -'.json'.length);
+        const title = titleById.get(youtubeId);
         return fileItem({
           id: `transcript:${youtubeId}`,
-          name: youtubeId,
+          name: title ?? youtubeId,
           kind: 'transcript',
           filePath: path.join(dir, e.name),
           provenance: 'whisper-transcript',
           source: 'transcripts',
-          flags: { transcribed: true },
+          // No title means the video left every playlist while its transcript
+          // stayed. The transcript is still real and still mineable; flagging
+          // it is what keeps gate 34's orphan story true in both directions.
+          flags: { transcribed: true, ...(title ? {} : { orphan: true }) },
         });
       });
   },
