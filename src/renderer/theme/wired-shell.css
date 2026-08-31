@@ -138,6 +138,19 @@
   background: rgba(3, 12, 18, 0.86);
 }
 
+/* The close affordance belongs to the button, so it takes the button's own ink.
+   `styles.css` gives `.os-task-win .os-task-close` a flat `var(--muted)` at 0,2,0,
+   which outranks the inherited colour the two rules above set — so on the ACTIVE
+   button the label is #e9feff while the one control that destroys the window stayed
+   #77a8b2, measured at 3.47:1 against a 4.5 bar (cat5 Q5, 2026-08-31). Inheriting
+   hands it the label's own already-passing ratio in both revealed states rather than
+   inventing a third cyan nobody scored. `:not(:hover)` keeps the shared destructive
+   hover (red plate, white glyph) exactly as it is — both rules are 0,3,0, so without
+   it source order would decide which one wins. */
+:root[data-materials='wired'] .os-task-win .os-task-close:not(:hover) {
+  color: inherit;
+}
+
 :root[data-materials='wired'] .os-clock {
   color: var(--wired-cyan);
   border: 1px solid rgba(109, 241, 255, 0.26);
