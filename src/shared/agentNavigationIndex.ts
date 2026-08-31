@@ -123,6 +123,14 @@ const SECTION_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   // page for that one section, so "settings" resolves to the Home page below.
   { section: 'youtube', titleKey: 'palette.section.youtube', terms: ['youtube'] },
   { section: 'scraper', titleKey: 'palette.section.scraper', terms: ['scraper'] },
+  // The Files app registers here rather than growing a bespoke resolver, so
+  // "show my transcripts" or "where is that epub" reaches it through the
+  // mechanism every other destination already uses (FILES_APP_PLAN gate 13).
+  {
+    section: 'files',
+    titleKey: 'palette.section.files',
+    terms: ['files', 'folders', 'file manager', 'explorer', 'my files', 'transcripts', 'library files'],
+  },
 ];
 
 /** Settings pages, named by their own sidebar label and description. */

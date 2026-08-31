@@ -71,6 +71,7 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
+  { id: 'files', labelKey: 'palette.section.files', glyph: 'resources' },
 ];
 
 function openSection(id: string): void {

@@ -29,6 +29,7 @@ const ImmersionView = lazy(() => import('../views/ImmersionView'));
 const CalendarView = lazy(() => import('../views/CalendarView'));
 const YouTubePlaylistsView = lazy(() => import('../views/YouTubePlaylistsView'));
 const SettingsApp = lazy(() => import('./settings/SettingsApp'));
+const FilesApp = lazy(() => import('./filesapp/FilesApp'));
 
 // The section → view mapping. Shared by the in-desktop FloatingWindow
 // (DesktopShell) and the pop-out window (App) so an app renders identically
@@ -131,6 +132,9 @@ export default function AppSection({
       break;
     case 'reading':
       view = <ReadingWorkspaceView initialSection="discover" onOpenBook={onOpenBook} />;
+      break;
+    case 'files':
+      view = <FilesApp />;
       break;
     default:
       // NOT `null`. A section the switch does not recognise used to render an

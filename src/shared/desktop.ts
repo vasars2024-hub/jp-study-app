@@ -46,6 +46,7 @@ export const DESKTOP_WIN_SECTIONS = [
   'reading',
   'youtube',
   'scraper',
+  'files',
 ] as const;
 
 export type DesktopWinSection = (typeof DESKTOP_WIN_SECTIONS)[number];

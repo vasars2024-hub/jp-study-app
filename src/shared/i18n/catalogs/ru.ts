@@ -2490,6 +2490,7 @@ export const ru: Catalog = {
   'palette.section.city': 'Сад лунного гриба',
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': 'Скрапер',
+  'palette.section.files': 'Файлы',
   'palette.section.agent': 'Агент',
   'agent.shell.aria': 'Рабочая область агента',
   'agent.rail.aria': 'Разговоры',

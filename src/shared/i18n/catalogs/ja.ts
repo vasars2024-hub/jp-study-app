@@ -2322,6 +2322,7 @@ export const ja: Catalog = {
   'palette.section.city': 'ムーンキャップ庭園',
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': 'スクレイパー',
+  'palette.section.files': 'ファイル',
   'palette.section.agent': 'エージェント',
   'agent.shell.aria': 'エージェントワークスペース',
   'agent.rail.aria': '会話',

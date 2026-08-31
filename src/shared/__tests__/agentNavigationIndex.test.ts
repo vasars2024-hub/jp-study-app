@@ -375,6 +375,23 @@ describe('agent navigation index — a question asked in another language', () =
     expect(resolveAgentNavigationQuery('音楽はどこ', tiny, short)).toBeNull();
   });
 
+  // FILES_APP_PLAN gate 13: the assistant reaches the Files app through this
+  // index, not a bespoke path. Registration is only half of it — the terms have
+  // to actually win against the surfaces that already own those words.
+  it('resolves a natural-language file request to the Files app', () => {
+    expect(destinationFor('files').section).toBe('files');
+    expect(destinationFor('open my files').section).toBe('files');
+    expect(destinationFor('file manager').section).toBe('files');
+    expect(destinationFor('where are my folders').section).toBe('files');
+  });
+
+  it('does not steal a query that belongs to an established surface', () => {
+    // "library" is the book library's own word, and the Files app listing books
+    // must not take it. Same for the music app.
+    expect(destinationFor('library').section).toBe('library');
+    expect(destinationFor('music').section).toBe('music');
+  });
+
   it('ignores an English catalog handed in among the translations', () => {
     // `ensureCatalog` falls back to English when a language fails to load, and
     // English text scored through this lane would move answers pinned above.

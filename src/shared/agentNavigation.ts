@@ -78,6 +78,7 @@ export const AGENT_NAVIGABLE_SECTIONS: readonly DesktopWinSection[] = [
   'settings',
   'youtube',
   'scraper',
+  'files',
 ];
 
 const NAVIGABLE = new Set<string>(AGENT_NAVIGABLE_SECTIONS);
@@ -189,6 +190,7 @@ export const AGENT_NAVIGATION_SECTION_LABEL_KEYS: Record<DesktopWinSection, stri
   settings: 'palette.section.settings',
   youtube: 'palette.section.youtube',
   scraper: 'palette.section.scraper',
+  files: 'palette.section.files',
   // Present so the record stays exhaustive over `DesktopWinSection`; neither is
   // navigable, so neither key is ever resolved.
   note: 'palette.section.notebook',

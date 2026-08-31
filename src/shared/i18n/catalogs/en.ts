@@ -2471,6 +2471,7 @@ export const en: Catalog = {
   'palette.section.city': 'Mooncap Garden',
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': 'Scraper',
+  'palette.section.files': 'Files',
   // Agent workspace (components/agent/AgentWorkspaceShell.tsx). The scope and
   // retention notices are load-bearing, not filler: this surface manages stored
   // conversations and cannot run a prompt yet, and it has to say so.

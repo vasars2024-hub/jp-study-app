@@ -2312,6 +2312,7 @@ export const zh: Catalog = {
   'palette.section.city': '月帽花园',
   'palette.section.youtube': 'YouTube',
   'palette.section.scraper': '抓取器',
+  'palette.section.files': '文件',
   'palette.section.agent': '智能体',
   'agent.shell.aria': '智能体工作区',
   'agent.rail.aria': '对话',
