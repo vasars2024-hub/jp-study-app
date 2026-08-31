@@ -252,6 +252,39 @@ const hostExpr = (surface) => `(function(){
   return e && e.closest ? e.closest('.fwin') : null;
 })()`;
 
+/**
+ * CORRECTION 22 (2026-08-31, primary). THE CONTENT VIEWPORT MUST BE THE ROOT'S OWN BODY.
+ * All three uses in this file were `win.querySelector('.fwin-body') || win` — a DESCENDANT
+ * search, which is right for a `.fwin` root and wrong for every `@selector` SHELL root. A
+ * shell CONTAINS floating windows, so it contains their bodies: on `@.os-desktop-wired`
+ * with three `.fwin` open, the first match is a nested WINDOW's body, not the desktop's.
+ * The same bug class as corrections 32/33/33b in `cat3-liquid-utilization.cjs` and
+ * `l1-surface-roles.js` (2026-08-31, backup) — containment mistaken for ownership.
+ *
+ * What it cost here, and it is worse than a refusal because all three sites fail SILENTLY:
+ *  - the READER (line ~274) takes `B` — the content viewport that correction 17 added
+ *    precisely so the category compares content against chrome — from a foreign window.
+ *    A minimised nested window is 0x0, so `bodyClippedShare` is measured against nothing
+ *    while the root's own 1264x821 canvas goes unmeasured.
+ *  - BOTH CONTROLS (lines ~811, ~859) mount their stranded-content and art-plate plants
+ *    into that foreign body. A plant inside a 0x0 minimised window strands nothing, the
+ *    reader's numbers do not move, and the run scores VOID — the exact shape correction
+ *    33b hit in cat3, where the product bars were passing the whole time.
+ *
+ * The rule is ownership, not containment: a `.fwin-body` belongs to this root only when
+ * the `.fwin` it belongs to IS this root. A chromeless root (a shell, a reader that
+ * replaced the shell) owns no `.fwin-body` and IS its own content viewport, which is what
+ * correction 17 always said in words.
+ */
+const OWN_BODY_FN = `function(root){
+  if (!root) return root;
+  var bodies = [].slice.call(root.querySelectorAll('.fwin-body'));
+  for (var i = 0; i < bodies.length; i += 1) {
+    if (bodies[i].closest('.fwin') === root) return bodies[i];
+  }
+  return root;
+}`;
+
 /* ------------------------------------------------------------------ in-page */
 
 /**
@@ -271,7 +304,7 @@ const READ = (surface) => `(function(){
   if (!win) return JSON.stringify({ refuse: 'surface not found: ' + ${JSON.stringify(surface)} });
   var R = win.getBoundingClientRect();
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0 (minimised or unmounted) - refusing to record zeros' });
-  var body = win.querySelector('.fwin-body') || win;
+  var body = (${OWN_BODY_FN})(win);
   var B = body.getBoundingClientRect();
 
   var scrollableAncestor = function(el, axis){
@@ -455,6 +488,79 @@ const READ = (surface) => `(function(){
     }
     return null;
   };
+  // CORRECTION 23. A DECORATIVE BACKDROP PAINTED BEHIND THE CHROME IS NOT AN OVERLAP WITH IT.
+  // purePaint (correction 20) proxies "decoration" as "no text anywhere", which is right for
+  // City's parallax and wrong for a wall that carries ORNAMENTAL text. Measured on the Wired
+  // shell: div.wired-wall-atmosphere is 1264x821 at 0,0 - the whole desktop - position absolute,
+  // pointer-events none, 0 controls, and it holds 19 characters of decorative kana. So it fails
+  // purePaint by those 19 characters, and every one of the surface's overlaps was this backdrop
+  // against the chrome sitting on top of it: wall x os-taskbar, wall x os-task-wins, wall x
+  // os-tray, plus wall-kana x the same at the compact size.
+  //
+  // A full-surface background layer intersects the box of EVERY element on the surface, so under
+  // the old rule any surface with one fails this bar no matter how good its layout. That is an
+  // instrument assumption, not a defect.
+  //
+  // The test is the app's OWN declaration rather than this file's judgement about what looks
+  // decorative: aria-hidden means the product has already said this text is ornament and not
+  // content, and pointer-events none means it cannot take a click. A backdrop that is inert,
+  // hidden from the accessibility tree AND painted behind the other box hides nothing from it -
+  // the other box is on top - and what it loses to the other box is ornament by declaration.
+  // Any one of the three missing and the pair is still counted.
+  var a11yHidden = function(e){
+    var n = e;
+    while (n && n !== win.parentElement) {
+      if (n.getAttribute && n.getAttribute('aria-hidden') === 'true') return true;
+      n = n.parentElement;
+    }
+    return false;
+  };
+  var decorativeBackdrop = function(e){
+    if (!outOfFlowHost(e)) return false;
+    if (getComputedStyle(e).pointerEvents !== 'none') return false;
+    if (e.matches(ACTIONABLE) || e.querySelector(ACTIONABLE)) return false;
+    return a11yHidden(e);
+  };
+  // Is "a" painted BEHIND "b"? Resolve both to the child of their nearest common ancestor that
+  // each descends from, then compare z-index with document order as the tiebreak - which is how
+  // the painting algorithm orders siblings. When both resolve to the SAME child neither is
+  // behind the other in any meaningful sense, so this declines rather than guesses.
+  var zOf = function(e){ var v = parseInt(getComputedStyle(e).zIndex, 10); return isNaN(v) ? 0 : v; };
+  var childUnder = function(anc, e){
+    var n = e;
+    while (n && n.parentElement !== anc) n = n.parentElement;
+    return n;
+  };
+  var paintsBehind = function(a2, b3){
+    var anc = a2.parentElement;
+    while (anc && !anc.contains(b3)) anc = anc.parentElement;
+    if (!anc) return false;
+    var ca = childUnder(anc, a2), cb = childUnder(anc, b3);
+    if (!ca || !cb || ca === cb) return false;
+    var za = zOf(ca), zb = zOf(cb);
+    if (za !== zb) return za < zb;
+    return !!(ca.compareDocumentPosition(cb) & Node.DOCUMENT_POSITION_FOLLOWING);
+  };
+
+  // CORRECTION 24. A DESKTOP'S FREE WORKSPACE IS NOT DEAD SPACE. The dead-region bar asks whether
+  // a surface wastes the room it was given, and 15 pct is the right bar for an APPLICATION
+  // interior, which is what every surface scored before this one was. A window-hosting shell is
+  // the opposite shape: its empty middle is not layout that failed to fill, it is the workspace
+  // the windows open into, and a desktop with no free space is the broken one. Measured on the
+  // Wired shell: 59.5 pct at 1264x821, 54.0 compact, 63.4 maximized, against chromePct 0 - and
+  // the three .fwin it hosts were all minimised to 0x0 at the time, so the room they would take
+  // was empty BY DEFINITION. No arrangement of a desktop passes a 15 pct bar.
+  //
+  // So the bar does not apply here. It is NOT silently passed: the percentages are recorded at
+  // every size exactly as measured, deadRegionApplies says false, and deadRegionBasis names
+  // the reason. This is correction 19's shape - a product whose shape means the leg does not
+  // exist - and it is deliberately narrow: it needs the surface to actually HOST windows, so an
+  // application interior with a big empty panel is still scored, and so is a .fwin, which is a
+  // window rather than a desktop no matter what it contains.
+  var hostedWindows = win.classList && win.classList.contains('fwin') ? [] : [].slice.call(win.querySelectorAll('.fwin')).filter(function(f){
+    return f.parentElement && !f.parentElement.closest('.fwin');
+  });
+
   var plateCache = new WeakMap();
   var artPlate = function(e){
     if (plateCache.has(e)) return plateCache.get(e);
@@ -560,6 +666,7 @@ const READ = (surface) => `(function(){
   };
   var overlaps = [];
   var artPlateOverlaps = [];
+  var backdropOverlaps = [];
   for (var i = 0; i < regions.length; i += 1) {
     for (var j = i + 1; j < regions.length; j += 1) {
       var a = regions[i], b2 = regions[j];
@@ -577,6 +684,16 @@ const READ = (surface) => `(function(){
       // decorative backdrop is excused for the same honest reason; two real panels are not.
       if (outOfFlowHost(a) && outOfFlowHost(b2) && (purePaint(a) || purePaint(b2))) {
         artPlateOverlaps.push(name(a) + ' x ' + name(b2) + ' (' + Math.round(ox) + 'x' + Math.round(oy) + ')');
+        continue;
+      }
+      // CORRECTION 23, applied. Reported by name in its own list, never silently dropped, and
+      // the direction that matters is recorded: which one was the backdrop, and behind what.
+      if (decorativeBackdrop(a) && paintsBehind(a, b2)) {
+        backdropOverlaps.push(name(a) + ' behind ' + name(b2) + ' (' + Math.round(ox) + 'x' + Math.round(oy) + ')');
+        continue;
+      }
+      if (decorativeBackdrop(b2) && paintsBehind(b2, a)) {
+        backdropOverlaps.push(name(b2) + ' behind ' + name(a) + ' (' + Math.round(ox) + 'x' + Math.round(oy) + ')');
         continue;
       }
       if (ox > 4 && oy > 4) overlaps.push(name(a) + ' x ' + name(b2) + ' (' + Math.round(ox) + 'x' + Math.round(oy) + ')');
@@ -723,6 +840,14 @@ const READ = (surface) => `(function(){
     artPlateClipsHasControlPlant: artPlateClips.some(function(n){ return String(n).indexOf('lqcat4-plate-control') !== -1; }),
     artPlateOverlapCount: artPlateOverlaps.length,
     artPlateOverlaps: artPlateOverlaps.slice(0, 6),
+    // CORRECTION 23, same discipline: excused pairs are named, with which side was the backdrop.
+    backdropOverlapCount: backdropOverlaps.length,
+    backdropOverlaps: backdropOverlaps.slice(0, 6),
+    // Only the BACKDROP side counts. The rows read "X behind Y", and the in-front control plant
+    // legitimately appears on the Y side - the wall really is behind it - so a bare substring
+    // match reported the exclusion as having excused the plant when it had not. Split on the
+    // separator and test the excused side alone.
+    backdropOverlapsHasControlPlant: backdropOverlaps.some(function(n){ return String(n).split(' behind ')[0].indexOf('lqcat4-front-control') !== -1; }),
     artPlateOverflowCount: artPlateOverflow.length,
     artPlateOverflow: artPlateOverflow.slice(0, 6),
     devOnlyExcludedCount: devOnlyExcluded.length,
@@ -734,9 +859,13 @@ const READ = (surface) => `(function(){
     deadRegionPctOfWindow: Number(((best * cellArea) / (R.width * R.height) * 100).toFixed(1)),
     deadRegionPctOfViewport: Number(((best * cellArea) / (window.innerWidth * window.innerHeight) * 100).toFixed(1)),
     deadRegionBox: bestBox ? Math.round(bestBox.w * cw) + 'x' + Math.round(bestBox.h * ch) + ' at grid ' + bestBox.x + ',' + bestBox.y : null,
-    deadRegionBasis: deadRegionPagers.length
-      ? 'union of rendered fragments across ' + deadRegionPagers.map(function(p){ return p.getAttribute('data-paged-pages'); }).join(',') + '-page proven pager buffer(s)'
-      : 'visible surface',
+    deadRegionApplies: hostedWindows.length === 0,
+    hostedWindowCount: hostedWindows.length,
+    deadRegionBasis: hostedWindows.length
+      ? 'NOT SCORED - window-hosting shell: the empty area is the workspace ' + hostedWindows.length + ' detached window(s) open into, not layout that failed to fill'
+      : (deadRegionPagers.length
+        ? 'union of rendered fragments across ' + deadRegionPagers.map(function(p){ return p.getAttribute('data-paged-pages'); }).join(',') + '-page proven pager buffer(s)'
+        : 'visible surface'),
     chromePct: Number((chrome / total * 100).toFixed(1)),
     chromeParts: outermost.map(name),
     dominantCanvasPct: Number((dominant / total * 100).toFixed(1))
@@ -808,7 +937,7 @@ const CONTROL_INJECT = (surface) => `(function(){
   if (!win) return JSON.stringify({ refuse: 'surface not found' });
   var R = win.getBoundingClientRect();
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0' });
-  var body = win.querySelector('.fwin-body') || win;
+  var body = (${OWN_BODY_FN})(win);
   // CORRECTION 11. THE CONTROL MUST BE PLACED IN THE CLIPPER'S OWN COORDINATE SPACE, not the
   // viewport's. Every .fwin carries contain: content, which includes contain: layout and
   // therefore makes the WINDOW the containing block for position:fixed descendants. A fixed box
@@ -856,7 +985,7 @@ const PLATE_CONTROL_INJECT = (surface) => `(function(){
   if (!win) return JSON.stringify({ refuse: 'surface not found' });
   var R = win.getBoundingClientRect();
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0' });
-  var body = win.querySelector('.fwin-body') || win;
+  var body = (${OWN_BODY_FN})(win);
   var cbPos = getComputedStyle(body).position;
   var restorePos = cbPos === 'static' ? body.style.position : null;
   if (cbPos === 'static') body.style.position = 'relative';
@@ -873,6 +1002,58 @@ const PLATE_CONTROL_INJECT = (surface) => `(function(){
     hasText: !!(p.textContent || '').trim(),
     hasControl: !!p.querySelector('button,a[href],input,select,textarea,[tabindex],[role="button"]')
   });
+})()`;
+
+/*
+ * CORRECTION 23's OWN CONTROL, and it runs in the one direction that exclusion could go wrong:
+ * widening into a blanket amnesty. This plant satisfies EVERY backdrop condition except the last
+ * one — out of flow, pointer-events none, aria-hidden, no control anywhere — but it carries
+ * z-index 999999, so it is painted IN FRONT of the chrome it covers. A box on top genuinely does
+ * hide what is under it, so it must NOT be excused: `overlaps` must RISE while it is mounted, and
+ * it must NOT appear in `backdropOverlaps`. It also carries TEXT, which keeps correction 20's
+ * older plate rule from excusing it first and letting this leg pass for the wrong reason.
+ *
+ * So the two legs pin the exclusion from both sides: the Wired wall (inert, hidden, behind) is
+ * excused, and this box (inert, hidden, IN FRONT) is not. An edit that drops the paintsBehind
+ * test fails here; an edit that narrows the rule to nothing fails on the surface itself.
+ */
+const FRONT_CONTROL_INJECT = (surface) => `(function(){
+  var win = ${rootExpr(surface)};
+  if (!win) return JSON.stringify({ refuse: 'surface not found' });
+  var R = win.getBoundingClientRect();
+  if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0' });
+  var body = (${OWN_BODY_FN})(win);
+  var cbPos = getComputedStyle(body).position;
+  var restorePos = cbPos === 'static' ? body.style.position : null;
+  if (cbPos === 'static') body.style.position = 'relative';
+  var p = document.createElement('div');
+  p.id = '__lqcat4_front';
+  p.className = 'lqcat4-front-control';
+  if (restorePos !== null) p.setAttribute('data-restore-pos', restorePos);
+  p.setAttribute('aria-hidden', 'true');
+  p.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;background:rgba(255,0,255,0.15);pointer-events:none;z-index:999999;';
+  p.textContent = 'lq control: inert aria-hidden plant, painted IN FRONT';
+  body.appendChild(p);
+  var cs = getComputedStyle(p);
+  return JSON.stringify({
+    injected: true,
+    ariaHidden: p.getAttribute('aria-hidden') === 'true',
+    pointerEvents: cs.pointerEvents,
+    zIndex: cs.zIndex,
+    hasText: !!(p.textContent || '').trim(),
+    hasControl: !!p.querySelector('button,a[href],input,select,textarea,[tabindex],[role="button"]')
+  });
+})()`;
+
+const FRONT_CONTROL_REMOVE = `(function(){
+  var p = document.getElementById('__lqcat4_front');
+  if (p && p.hasAttribute('data-restore-pos')) {
+    var host = p.parentElement;
+    var was = p.getAttribute('data-restore-pos');
+    if (host) { if (was) host.style.position = was; else host.style.removeProperty('position'); }
+  }
+  if (p) p.remove();
+  return JSON.stringify({ removed: true, stillPresent: !!document.getElementById('__lqcat4_front') });
 })()`;
 
 const PLATE_CONTROL_REMOVE = `(function(){
@@ -1067,7 +1248,9 @@ const BARS_OF = (m) => ({
   clipped: m.clipped === 0,
   overlaps: m.overlaps === 0,
   horizontal: m.horizontalScrollers === 0 && m.hiddenOverflowX === 0,
-  deadRegion: m.deadRegionPctOfViewport <= 15,
+  // CORRECTION 24: a window-hosting shell has no dead-region bar to fail. The measured
+  // percentage still travels in the artifact at every size; only the SCORING is withheld.
+  deadRegion: m.deadRegionApplies === false ? 'NOT-APPLICABLE' : m.deadRegionPctOfViewport <= 15,
 });
 
 (async () => {
@@ -1144,12 +1327,22 @@ const BARS_OF = (m) => ({
     clipped: sized.length === 0 ? 'UNMEASURED' : perSize.every((p) => p.bars.clipped),
     overlaps: sized.length === 0 ? 'UNMEASURED' : perSize.every((p) => p.bars.overlaps),
     horizontal: sized.length === 0 ? 'UNMEASURED' : perSize.every((p) => p.bars.horizontal),
-    deadRegion: sized.length === 0 ? 'UNMEASURED' : perSize.every((p) => p.bars.deadRegion),
+    deadRegion: sized.length === 0
+      ? 'UNMEASURED'
+      : (perSize.every((p) => p.bars.deadRegion === 'NOT-APPLICABLE')
+        ? 'NOT-APPLICABLE'
+        : perSize.every((p) => p.bars.deadRegion === true || p.bars.deadRegion === 'NOT-APPLICABLE')),
     contentGrowsNotChrome,
     allThreeSizes: sized.length === sizesExpected,
     restored: ranLegs.length > 0 && ranLegs.every((l) => l.restored === true),
   };
-  const unmeasured = Object.entries(bars).filter(([, v]) => typeof v === 'string').map(([k]) => k);
+  // CORRECTION 24. 'NOT-APPLICABLE' and 'UNMEASURED' must not collapse into each other. UNMEASURED
+  // means this run failed to get a number and the rubric's own rule is "measure it or score 0,
+  // never 10". NOT-APPLICABLE means the number exists, is recorded at every size, and the bar is
+  // not a question this shape of surface can answer. Folding the first into the second would let
+  // a broken run score; folding the second into the first makes a desktop unscoreable forever.
+  const notApplicable = Object.entries(bars).filter(([, v]) => v === 'NOT-APPLICABLE').map(([k]) => k);
+  const unmeasured = Object.entries(bars).filter(([, v]) => typeof v === 'string' && v !== 'NOT-APPLICABLE').map(([k]) => k);
   const failed = Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k);
   const pass = failed.length === 0 && unmeasured.length === 0;
 
@@ -1196,6 +1389,10 @@ const BARS_OF = (m) => ({
       artPlateClips: l.measurement && l.measurement.artPlateClips,
       artPlateOverlapCount: l.measurement && l.measurement.artPlateOverlapCount,
       artPlateOverlaps: l.measurement && l.measurement.artPlateOverlaps,
+      backdropOverlapCount: l.measurement && l.measurement.backdropOverlapCount,
+      backdropOverlaps: l.measurement && l.measurement.backdropOverlaps,
+      deadRegionApplies: l.measurement && l.measurement.deadRegionApplies,
+      hostedWindowCount: l.measurement && l.measurement.hostedWindowCount,
       artPlateOverflowCount: l.measurement && l.measurement.artPlateOverflowCount,
       artPlateOverflow: l.measurement && l.measurement.artPlateOverflow,
       devOnlyExcludedCount: l.measurement && l.measurement.devOnlyExcludedCount,
@@ -1209,6 +1406,8 @@ const BARS_OF = (m) => ({
         : 'FAIL'),
     failedBars: failed,
     unmeasuredBars: unmeasured,
+    notApplicableBars: notApplicable,
+    deadRegionPctBySize: perSize.map((p) => `${p.kind} ${p.deadPctViewport}%`),
     visibleAtEveryRead,
     notMeasuredHere: [
       'contrast and focus order (rubric category 1 harness)',
@@ -1249,6 +1448,19 @@ const BARS_OF = (m) => ({
       plateRestored = await read();
     }
 
+    // CORRECTION 23's control, its own cycle for the same reason as the one above.
+    const frontInj = JSON.parse(await ev(FRONT_CONTROL_INJECT(SURFACE)));
+    let frontDirty = null;
+    let frontRm = null;
+    let frontRestored = null;
+    if (!frontInj.refuse) {
+      await sleep(SETTLE);
+      frontDirty = await read();
+      frontRm = JSON.parse(await ev(FRONT_CONTROL_REMOVE));
+      await sleep(SETTLE);
+      frontRestored = await read();
+    }
+
     const submin = await atSize('submin');
     const moved = !dirty.refuse && dirty.clipped > base.clipped;
     const backToBaseline = !restored.refuse && restored.clipped === base.clipped;
@@ -1278,6 +1490,27 @@ const BARS_OF = (m) => ({
           restored: plateRestored.refuse ? plateRestored.refuse : plateRestored.artPlateClipCount,
         },
         removalProven: plateRm && plateRm.removed === true && plateRm.stillPresent === false,
+      },
+      backdropExclusion: frontInj.refuse ? { refuse: frontInj.refuse } : {
+        // The plant IS a backdrop by every test but the last: inert, hidden from the a11y tree,
+        // no control — and painted in front, which is the one thing that makes it a real collision.
+        plantIsInertAndHidden: frontInj.ariaHidden === true && frontInj.pointerEvents === 'none' && frontInj.hasControl === false,
+        plantCarriesText: frontInj.hasText === true,
+        plantPaintedInFront: frontInj.zIndex === '999999',
+        overlapsRose: !frontDirty.refuse && frontDirty.overlaps > base.overlaps,
+        notExcusedAsBackdrop: !frontDirty.refuse && frontDirty.backdropOverlapsHasControlPlant === false,
+        backToBaseline: !frontRestored.refuse && frontRestored.overlaps === base.overlaps,
+        overlaps: {
+          base: base.overlaps,
+          dirty: frontDirty.refuse ? frontDirty.refuse : frontDirty.overlaps,
+          restored: frontRestored.refuse ? frontRestored.refuse : frontRestored.overlaps,
+        },
+        backdropOverlapCount: {
+          base: base.backdropOverlapCount,
+          dirty: frontDirty.refuse ? frontDirty.refuse : frontDirty.backdropOverlapCount,
+          restored: frontRestored.refuse ? frontRestored.refuse : frontRestored.backdropOverlapCount,
+        },
+        removalProven: frontRm && frontRm.removed === true && frontRm.stillPresent === false,
       },
       provenPagerDeadRegion: pagerMutation.applicable ? {
         applicable: true,
