@@ -10417,5 +10417,28 @@ export const zh: Catalog = {
   'ankiWorkbench.parity.why.connect.note-type-css': '每种笔记类型的样式保持 Anki 中的设置。',
   'ankiWorkbench.parity.why.connect.deck-config':
     '牌组选项预设保持 Anki 中的设置。拆分创建的牌组会沿用父牌组的预设，除此之外不做任何修改。',
+  // 文件应用删除：明确区分不同的恢复方式（门槛 9/21）。
+  'filesApp.delete.action': '删除',
+  'filesApp.delete.confirmAction': '确认删除',
+  'filesApp.delete.cancel': '取消',
+  'filesApp.delete.undo': '撤销',
+  'filesApp.delete.confirmTrash':
+    '要将“{name}”移到回收站吗？之后可以从回收站恢复该文件。',
+  'filesApp.delete.confirmMediaTrash':
+    '要将不可替代的媒体“{name}”移到回收站吗？它会从应用中移除，但文件仍可从回收站恢复。',
+  'filesApp.delete.confirmSoft':
+    '要从文件应用中移除“{name}”的记录吗？不会有文件进入回收站，并可在短时间内撤销。',
+  'filesApp.delete.refuseComputed': '这是计算结果而不是已存储的资料，因此没有可删除的内容。',
+  'filesApp.delete.refuseNotTrashable':
+    '此项目不是桌面进程可以送入回收站的文件。请刷新文件应用后重试。',
+  'filesApp.delete.invalidRequest': '删除请求无效。没有移除任何内容。',
+  'filesApp.delete.notFound': '该项目已不在文件应用中。没有移除任何内容。',
+  'filesApp.delete.confirmationRequired': '此媒体需要单独明确确认，才能移到回收站。',
+  'filesApp.delete.confirmationMismatch': '确认期间选择已更改。没有移除任何内容。',
+  'filesApp.delete.failed': '无法删除该项目。没有移除其他内容。',
+  'filesApp.delete.trashed': '“{name}”已移到回收站。',
+  'filesApp.delete.softDeleted': '“{name}”已从文件应用中移除，可在短时间内撤销。',
+  'filesApp.delete.undoExpired': '撤销期限已过；该记录仍处于移除状态。',
+  'filesApp.delete.undoFailed': '无法恢复该记录；它仍处于移除状态。',
 };
 

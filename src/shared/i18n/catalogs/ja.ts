@@ -10507,5 +10507,31 @@ export const ja: Catalog = {
     '各ノートタイプのスタイルは Anki のままです。',
   'ankiWorkbench.parity.why.connect.deck-config':
     'デッキオプションのプリセットは Anki のままです。分割で作成されたデッキには親のプリセットが設定され、それ以外は変更されません。',
+  // Files アプリの削除：復元方法の違いを明確に表示する（ゲート 9/21）。
+  'filesApp.delete.action': '削除',
+  'filesApp.delete.confirmAction': '削除を確定',
+  'filesApp.delete.cancel': 'キャンセル',
+  'filesApp.delete.undo': '元に戻す',
+  'filesApp.delete.confirmTrash':
+    '「{name}」をごみ箱に移動しますか？ファイルはごみ箱から復元できます。',
+  'filesApp.delete.confirmMediaTrash':
+    '代替できないメディア「{name}」をごみ箱に移動しますか？アプリからは消えますが、ごみ箱からファイルを復元できます。',
+  'filesApp.delete.confirmSoft':
+    '「{name}」の記録を Files から削除しますか？ファイルはごみ箱へ移動せず、短時間だけ元に戻せます。',
+  'filesApp.delete.refuseComputed':
+    'これは保存されたデータではなく計算結果のため、削除できるものはありません。',
+  'filesApp.delete.refuseNotTrashable':
+    'この項目はデスクトップ処理からごみ箱へ送れるファイルではありません。Files を更新して再試行してください。',
+  'filesApp.delete.invalidRequest': '削除要求が無効です。何も削除されませんでした。',
+  'filesApp.delete.notFound': 'その項目は Files にありません。何も削除されませんでした。',
+  'filesApp.delete.confirmationRequired':
+    'このメディアをごみ箱へ移動するには、個別の明示的な確認が必要です。',
+  'filesApp.delete.confirmationMismatch':
+    '確認画面を開いている間に選択が変わりました。何も削除されませんでした。',
+  'filesApp.delete.failed': '項目を削除できませんでした。他の項目は削除されていません。',
+  'filesApp.delete.trashed': '「{name}」をごみ箱に移動しました。',
+  'filesApp.delete.softDeleted': '「{name}」を Files から削除しました。短時間だけ元に戻せます。',
+  'filesApp.delete.undoExpired': '元に戻せる時間が切れました。記録は削除されたままです。',
+  'filesApp.delete.undoFailed': '記録を復元できませんでした。削除されたままです。',
 };
 

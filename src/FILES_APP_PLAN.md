@@ -549,6 +549,13 @@ renderer declaration returns the same validated result union. The source guard p
 surfaces share the contract, **31 of 31** focused deletion tests pass, and the production preload
 bundle builds from **26 modules**. Gate 21 remains open pending the inspector and live restore.
 
+### 2026-08-31 — codexA, Gate 9/21 honest deletion copy
+
+All **18** deletion interaction/result keys now exist in EN/JA/ZH/RU. Recycle Bin, soft-delete
+with Undo, computed refusal, stale selection and failure are distinct messages; no raw key needs
+to become the Files inspector's error UI. `i18n-check` passes at **11,811** English keys and the
+catalog/deletion guard passes **16 of 16** tests. Gate 21 remains open pending live integration.
+
 ### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
 
 Gate 1 remains **OPEN**. Debug-bridge evaluation against the running main renderer measured

@@ -11375,5 +11375,31 @@ export const ru: Catalog = {
     'Оформление каждого типа заметки остаётся таким, как в Anki.',
   'ankiWorkbench.parity.why.connect.deck-config':
     'Наборы настроек колод остаются такими, как в Anki. Колода, созданная разделением, получает набор родительской колоды, и больше ничего не меняется.',
+  // Удаление в Files: способы восстановления явно различаются (гейты 9/21).
+  'filesApp.delete.action': 'Удалить',
+  'filesApp.delete.confirmAction': 'Подтвердить удаление',
+  'filesApp.delete.cancel': 'Отмена',
+  'filesApp.delete.undo': 'Отменить',
+  'filesApp.delete.confirmTrash':
+    'Переместить «{name}» в Корзину? Файл можно будет восстановить оттуда.',
+  'filesApp.delete.confirmMediaTrash':
+    'Переместить незаменимый медиафайл «{name}» в Корзину? Он исчезнет из приложения, но останется доступен для восстановления из Корзины.',
+  'filesApp.delete.confirmSoft':
+    'Удалить запись «{name}» из Files? Файл не попадёт в Корзину, а действие можно будет ненадолго отменить.',
+  'filesApp.delete.refuseComputed':
+    'Это вычисляемое значение, а не сохранённый материал, поэтому удалять нечего.',
+  'filesApp.delete.refuseNotTrashable':
+    'Этот элемент не является файлом, который процесс приложения может отправить в Корзину. Обновите Files и повторите попытку.',
+  'filesApp.delete.invalidRequest': 'Запрос на удаление недействителен. Ничего не удалено.',
+  'filesApp.delete.notFound': 'Этого элемента больше нет в Files. Ничего не удалено.',
+  'filesApp.delete.confirmationRequired':
+    'Для перемещения этого медиафайла в Корзину требуется отдельное явное подтверждение.',
+  'filesApp.delete.confirmationMismatch':
+    'Пока окно подтверждения было открыто, выбор изменился. Ничего не удалено.',
+  'filesApp.delete.failed': 'Не удалось удалить элемент. Другие элементы не удалены.',
+  'filesApp.delete.trashed': '«{name}» перемещён в Корзину.',
+  'filesApp.delete.softDeleted': '«{name}» удалён из Files. Действие можно ненадолго отменить.',
+  'filesApp.delete.undoExpired': 'Время для отмены истекло; запись остаётся удалённой.',
+  'filesApp.delete.undoFailed': 'Не удалось восстановить запись. Она остаётся удалённой.',
 };
 

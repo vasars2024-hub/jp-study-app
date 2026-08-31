@@ -10963,6 +10963,32 @@ export const en: Catalog = {
   'ankiWorkbench.parity.why.connect.deck-config':
     'Deck options presets stay as Anki has them. A deck created by a split is given its parent preset, and nothing else is changed.',
 
+  // Files app deletion: recovery semantics stay visibly distinct (gates 9/21).
+  'filesApp.delete.action': 'Delete',
+  'filesApp.delete.confirmAction': 'Confirm delete',
+  'filesApp.delete.cancel': 'Cancel',
+  'filesApp.delete.undo': 'Undo',
+  'filesApp.delete.confirmTrash':
+    'Send “{name}” to the Recycle Bin? You can restore the file from there.',
+  'filesApp.delete.confirmMediaTrash':
+    'Send irreplaceable media “{name}” to the Recycle Bin? This removes it from the app, but the file remains restorable from the Recycle Bin.',
+  'filesApp.delete.confirmSoft':
+    'Remove the record for “{name}” from Files? No file goes to the Recycle Bin, and Undo is available briefly.',
+  'filesApp.delete.refuseComputed':
+    'This is a calculated reading, not stored material, so there is nothing to delete.',
+  'filesApp.delete.refuseNotTrashable':
+    'This item is not a file the desktop process can send to the Recycle Bin. Refresh Files and try again.',
+  'filesApp.delete.invalidRequest': 'The delete request was not valid. Nothing was removed.',
+  'filesApp.delete.notFound': 'That item is no longer in Files. Nothing was removed.',
+  'filesApp.delete.confirmationRequired':
+    'This media needs its own explicit confirmation before it can be moved to the Recycle Bin.',
+  'filesApp.delete.confirmationMismatch':
+    'The selection changed while confirmation was open. Nothing was removed.',
+  'filesApp.delete.failed': 'The item could not be deleted. Nothing else was removed.',
+  'filesApp.delete.trashed': '“{name}” was moved to the Recycle Bin.',
+  'filesApp.delete.softDeleted': '“{name}” was removed from Files. Undo is available briefly.',
+  'filesApp.delete.undoExpired': 'The Undo window has expired; the record remains removed.',
+  'filesApp.delete.undoFailed': 'The record could not be restored. It remains removed.',
 };
 
 
