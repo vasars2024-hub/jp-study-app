@@ -1332,7 +1332,7 @@ Gate 12 is closed on that basis rather than on a click nobody can record.
 
 ### 2026-08-31 (twelfth) — gate 15 CLOSES on a finding gate 10 produced
 
-`<hash>`. Gate 15 is "a track opens the existing music app, and that app's behaviour is
+`3895f458`. Gate 15 is "a track opens the existing music app, and that app's behaviour is
 unchanged before and after". Checking the first half against gate 10's own table found it
 FAILING: `classifyByExtension` puts `AUDIO_EXT` and `VIDEO_EXT` in one `media` bucket —
 correctly, because both IMPORT to the same media library through `addMediaPaths` — and
