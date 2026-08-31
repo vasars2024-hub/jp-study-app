@@ -4,6 +4,7 @@ import {
   FILES_DELETE_CHANNEL,
   createFilesDeletionMainDependencies,
   deleteFilesItemInMain,
+  isAbsoluteFilePath,
   lookupFilesDeletionTarget,
   registerFilesDeletionIpc,
   type FilesDeletionMainDependencies,
@@ -87,6 +88,26 @@ describe('Files app main-process deletion boundary', () => {
     expect(deps.lookupItem).toHaveBeenCalledWith('transcript:one');
     expect(deps.trashItem).toHaveBeenCalledWith('C:\\owned\\episode-1.json');
     expect(deps.onTrashed).toHaveBeenCalledWith(target());
+  });
+
+  it('accepts absolute Windows, UNC and POSIX paths but refuses relative catalogue paths', async () => {
+    expect(isAbsoluteFilePath('C:\\owned\\episode-1.json')).toBe(true);
+    expect(isAbsoluteFilePath('\\\\server\\share\\episode-1.json')).toBe(true);
+    expect(isAbsoluteFilePath('/owned/episode-1.json')).toBe(true);
+    expect(isAbsoluteFilePath('episode-1.json')).toBe(false);
+    expect(isAbsoluteFilePath('C:episode-1.json')).toBe(false);
+    expect(isAbsoluteFilePath('   ')).toBe(false);
+
+    for (const filePath of ['episode-1.json', 'C:episode-1.json']) {
+      const deps = dependencies(target({ location: { store: 'file', path: filePath } }));
+      await expect(deleteFilesItemInMain({ itemId: 'transcript:one' }, deps)).resolves.toEqual({
+        ok: false,
+        itemId: 'transcript:one',
+        reasonKey: 'filesApp.delete.failed',
+      });
+      expect(deps.trashItem).not.toHaveBeenCalled();
+      expect(deps.onTrashed).not.toHaveBeenCalled();
+    }
   });
 
   it('ignores injected renderer path and kind fields', async () => {

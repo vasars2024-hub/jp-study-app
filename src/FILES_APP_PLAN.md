@@ -534,6 +534,14 @@ two pull against each other anywhere else, this rule wins and the plan is wrong.
 
 ## Progress
 
+### 2026-08-31 — codexA, Gate 9/21 absolute-target boundary
+
+The privileged deletion boundary now refuses relative and drive-relative paths from a malformed
+authoritative snapshot before `shell.trashItem` can run. Absolute Windows drive, UNC and POSIX
+controls pass; **2 of 2** relative-path controls return the named failure with **0** trash calls
+and **0** cache invalidations. Focused result: **11 of 11 tests pass**. Gates 9/21 remain open
+until the merged Files inspector drives the bridge and one Recycle Bin fixture is restored.
+
 ### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
 
 Gate 1 remains **OPEN**. Debug-bridge evaluation against the running main renderer measured

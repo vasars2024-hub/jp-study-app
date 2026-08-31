@@ -6,6 +6,7 @@ import {
   type FilesDeletionResult,
   type FilesDeletionTarget,
 } from '../../shared/filesApp/deletion';
+import path from 'node:path';
 
 export { FILES_DELETE_CHANNEL };
 
@@ -133,6 +134,11 @@ export async function deleteFilesItemInMain(
     };
   }
 
+  const filePath = target.location.store === 'file' ? target.location.path : '';
+  if (!isAbsoluteFilePath(filePath)) {
+    return { ok: false, itemId: request.itemId, reasonKey: 'filesApp.delete.failed' };
+  }
+
   const result = await executeFilesDeletion(
     target,
     { confirmedItemId: request.confirmedItemId },
@@ -158,6 +164,18 @@ export async function deleteFilesItemInMain(
     }
   }
   return result;
+}
+
+/**
+ * A catalogue row is authoritative about which item was selected, but a
+ * malformed row must not turn the app's working directory into a deletion
+ * root. Accept both platform path syntaxes so imported Windows rows remain
+ * testable on non-Windows CI while still refusing relative and drive-relative
+ * values such as `episode.srt` and `C:episode.srt`.
+ */
+export function isAbsoluteFilePath(value: string): boolean {
+  const candidate = value.trim();
+  return Boolean(candidate) && (path.win32.isAbsolute(candidate) || path.posix.isAbsolute(candidate));
 }
 
 export interface FilesIpcHandleRegistrar {
