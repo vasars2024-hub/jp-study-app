@@ -22,3 +22,12 @@ export const YOUTUBE_SUBTITLE_DIRECTORIES = [
 export const YOUTUBE_SUBTITLE_DIRECTORY_LAYOUTS = YOUTUBE_SUBTITLE_DIRECTORIES.map(
   (directory) => ({ directory, recursive: true as const }),
 );
+
+export type YoutubeSubtitleProvenance = 'human-subs' | 'auto-captions';
+
+/** yt-dlp marks automatic tracks as `<video>.a.<lang>.<ext>`. */
+export function youtubeSubtitleProvenance(fileName: string): YoutubeSubtitleProvenance {
+  return /\.a\.[a-z-]+\.[a-z0-9]+$/i.test(fileName)
+    ? 'auto-captions'
+    : 'human-subs';
+}

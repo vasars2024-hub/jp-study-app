@@ -6,6 +6,7 @@ import {
   YOUTUBE_SUBTITLE_DIRECTORIES,
   YOUTUBE_SUBTITLE_DIRECTORY_LAYOUTS,
   YOUTUBE_TRANSCRIPT_DIRECTORY,
+  youtubeSubtitleProvenance,
 } from '../youtubeStorage';
 
 describe('YouTube persisted storage contract', () => {
@@ -26,5 +27,12 @@ describe('YouTube persisted storage contract', () => {
       { directory: 'yt-subs', recursive: true },
       { directory: 'subs-cache', recursive: true },
     ]);
+  });
+
+  it('derives YouTube caption provenance from yt-dlp track names', () => {
+    expect(youtubeSubtitleProvenance('video.a.ja.vtt')).toBe('auto-captions');
+    expect(youtubeSubtitleProvenance('video.a.zh-Hans.srt')).toBe('auto-captions');
+    expect(youtubeSubtitleProvenance('video.ja.vtt')).toBe('human-subs');
+    expect(youtubeSubtitleProvenance('episode.ass')).toBe('human-subs');
   });
 });
