@@ -108,7 +108,14 @@ async function dirtyField(pres) {
   return call(`(function(){
     var w = window.__LQP.__win(${A(APP)}, ${A(pres)});
     if (!w) return { refused: 'surface gone before dirtying' };
-    var el = [].slice.call(w.querySelectorAll('input,textarea')).filter(function(x){
+    // The shell CONTAINS the windows it hosts, so an unscoped query dirties a hosted app's
+    // search box and then compares it across a trip that legitimately re-renders it. The
+    // shell's own fields are the ones outside every .fwin -- and NO BACKTICK may appear in
+    // this comment, because it sits inside a template literal (harness trap 2).
+    var all = [].slice.call(w.querySelectorAll('input,textarea')).filter(function(x){
+      return !w.classList.contains('os-desktop') || !x.closest('.fwin');
+    });
+    var el = all.filter(function(x){
       var b = x.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !x.disabled && !x.readOnly
         && (x.tagName === 'TEXTAREA' || !x.type || /^(text|search)$/i.test(x.type));
@@ -290,7 +297,15 @@ async function flip(pres, want) {
   }
 
   const titleRe = await ev(`(function(){ return String(window.__LQP.__titleRe(${A(APP)})).slice(1, -2); })()`);
-  const raised = await raise(titleRe);
+  // THE SHELL IS NOT RAISED, and this is a refusal to guess rather than a shortcut. The
+  // desktop has no taskbar button of its own, so `raise` would find none, then discover
+  // `__win('shell')` is not a `.fwin` — and its `if (!w) { b.click(); return 'opened'; }`
+  // branch would click SOME other window's button. The taskbar button is a toggle
+  // (correction, 2026-08-31), so that click minimises a window and every measurement below
+  // runs against a shell hosting one fewer visible window than it really has.
+  const isShell = found.host === 'shell';
+  const raised = isShell ? 'n/a — the shell is the host, not a window' : await raise(titleRe);
+  if (isShell) await post('/focus', {});
 
   const start = await call(`window.__LQP.snapshot(${A(APP)})`);
   if (start.refused) {

@@ -1,0 +1,203 @@
+{
+  "label": "cat6-l9b4-wired",
+  "app": "shell",
+  "win": "(focused)",
+  "raised": "n/a — the shell is the host, not a window",
+  "matchedBy": "shell-selector",
+  "host": "shell",
+  "presentationAsFound": "liquid",
+  "box": "1264x821",
+  "driven": [
+    {
+      "step": "openStart",
+      "result": "{\"clicked\":\"start\"}"
+    },
+    {
+      "step": "readStartOpen",
+      "result": "{\"opened\":1}"
+    },
+    {
+      "step": "closeStart",
+      "result": "{\"clicked\":\"backdrop\"}"
+    },
+    {
+      "step": "readStartClosed",
+      "result": "{\"after\":0}"
+    },
+    {
+      "step": "openTray",
+      "result": "{\"clicked\":\"Quick settings\"}"
+    },
+    {
+      "step": "readTrayOpen",
+      "result": "{\"opened\":1,\"via\":\"Quick settings\"}"
+    },
+    {
+      "step": "closeTray",
+      "result": "{\"clicked\":\"tray toggle\"}"
+    },
+    {
+      "step": "readTrayClosed",
+      "result": "{\"after\":0}"
+    },
+    {
+      "step": "taskbarRaise",
+      "result": "{\"clicked\":\"SIG-VID / Signal Archive\"}"
+    },
+    {
+      "step": "readRaise",
+      "result": "{\"raised\":\"SIG-VID / Signal Archive\",\"rank\":1,\"of\":3}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "liquid": "9/9",
+    "standard": "9/9",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "liquid -> standard -> liquid",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1264x821"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "taskbarIdentity",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "taskbarIdentity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "trayControls",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "title stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "trayControls"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"aria-label\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "virtualDesktops",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "active removed from 1 of 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "virtualDesktops"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "clock",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "clock"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "shellIdentity",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "2 identity element(s) detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "shellIdentity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"detached\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "startEntryPoint",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "startClosed forced to 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "startEntryPoint"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "trayFlyout",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "flyoutClosed forced to 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "trayFlyout"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "taskbarRaises",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "raisedTo forced to 99",
+        "reachable": "8/9",
+        "fellRows": [
+          "taskbarRaises"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "9/9",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

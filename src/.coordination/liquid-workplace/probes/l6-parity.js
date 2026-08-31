@@ -101,6 +101,20 @@
     window[global] = window[global] || {};
     return window[global];
   };
+  /**
+   * SHELL SCOPE. Correction 22 arriving from the other direction.
+   *
+   * Every other subject in this file is a window that must not reach into a NESTED window.
+   * The shell is the one subject that legitimately CONTAINS windows, so its own queries must
+   * exclude them: `.os-desktop` holds three `.fwin`, and an unscoped `qa(w, 'button')` folds
+   * every hosted app's controls into the shell's own count. That is not a near miss — it is
+   * the difference between "the taskbar has 12 buttons" and "the desktop has 300".
+   *
+   * Named `shq` rather than replacing `qa` because the shell spec deliberately uses BOTH:
+   * `qa(w, '.fwin')` is how it counts what it hosts, which is the taskbar-identity row.
+   */
+  const shq = (root, sel) => qa(root, sel).filter((e) => !e.closest('.fwin'));
+  const shellState = specState('__LQP_SHELL_ORIG');
   const libState = specState('__LQP_LIB_ORIG');
   const immState = specState('__LQP_IMM_ORIG');
   const capState = specState('__LQP_CAP_ORIG');
@@ -4563,6 +4577,303 @@
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
+
+    /**
+     * THE SHELL — a fifth host, added 2026-08-31 for L9 bullet 4 (`shellSel`, not `rootSel`).
+     *
+     * Every spec above it is an APP inside a window. The desktop shell is the thing that
+     * HOSTS those windows, and L9 bullet 4 ("Verify Secret Aero/Wired lifecycle") cannot be
+     * scored for category 6 without it. Three decisions, all recorded because each one had a
+     * wrong answer that looked reasonable:
+     *
+     * 1. WHAT IS THE SHELL'S PRESENTATION AXIS? Not the theme. A shell renders no
+     *    `.fwin-b-liquid` of its own, and switching `wired-archive` -> Study OS -> back to
+     *    drive the trip would mutate a persisted global setting through a transition
+     *    (`getComputedStyle` right after a theme swap still returns the OLD value) for a
+     *    reading the rubric never asked for. Category 6's own 10-requirement names the
+     *    answer instead: the round trip must preserve "geometry, focus, z-order, pin,
+     *    pop-out, snap, monitor placement, and TASKBAR IDENTITY". Taskbar identity is a
+     *    SHELL property. So the shell's axis is a hosted window's Standard -> Liquid ->
+     *    Standard flip, and the claim under test is: does making a window Liquid break the
+     *    shell that hosts it? That is the regression this category exists to catch, it uses
+     *    the machinery that already works, and it touches no persisted global.
+     *
+     * 2. THE PROXY IS RESOLVED LIVE, NEVER NAMED. `presProxy` returns the first open `.fwin`
+     *    that actually renders `.fwin-b-liquid`. Hardcoding "video" would refuse the whole
+     *    cell on a desktop where Video happens to be closed, and would silently score the
+     *    wrong window if two were open. With NO presentable window open the spec refuses —
+     *    it does not fall back to scoring a trip it did not take.
+     *
+     * 3. THE SHELL ROOT CONTAINS THE WINDOWS, so every row and the snapshot are scoped
+     *    OUTSIDE `.fwin`. This is correction 22's ownership bug arriving from the opposite
+     *    direction: there the subject was a window and the harness reached into a nested
+     *    one; here the subject legitimately contains three windows, and an unscoped
+     *    `snapshot` would fold their fields, controls and text into the shell's. The round
+     *    trip would then diff on the flipped window's own contents and report the shell as
+     *    having lost state when the shell did exactly the right thing.
+     */
+    shell: {
+      shellSel: '.os-desktop',
+      titleRe: /$^/,
+      features: [
+        {
+          id: 'taskbarIdentity',
+          f: (w) => {
+            // The rubric's own named term. One button per hosted window, each still
+            // carrying its window's identity — not a count that happens to match.
+            const wins = qa(w, '.fwin');
+            const btns = shq(w, '.os-task-win');
+            const titles = btns.map((b) => (b.getAttribute('title') || '').trim()).filter(Boolean);
+            return {
+              ok: btns.length === wins.length && wins.length > 0 && titles.length === btns.length,
+              ev: `taskButtons=${btns.length} hostedWindows=${wins.length} titled=${titles.length} [${titles.join(' | ')}]`,
+            };
+          },
+        },
+        {
+          id: 'taskbarRaises',
+          f: (w) => {
+            // Side effect, not presence: `taskbarRaise` recorded the rank it produced.
+            const s = shellState();
+            return {
+              ok: s.raisedTo === 1,
+              ev: `clicked=${s.raisedTitle || 'none'} rankAfter=${s.raisedTo === undefined ? 'not driven' : s.raisedTo} of ${s.raisedOf}`,
+            };
+          },
+        },
+        {
+          id: 'startEntryPoint',
+          f: () => {
+            const s = shellState();
+            return {
+              ok: s.startOpened === 1 && s.startClosed === 0,
+              ev: `menusWhileOpen=${s.startOpened} menusAfterClose=${s.startClosed}`,
+            };
+          },
+        },
+        {
+          id: 'trayFlyout',
+          f: () => {
+            const s = shellState();
+            return {
+              ok: s.flyoutOpened === 1 && s.flyoutClosed === 0,
+              ev: `flyoutsWhileOpen=${s.flyoutOpened} flyoutsAfterClose=${s.flyoutClosed} via=${s.flyoutVia || 'none'}`,
+            };
+          },
+        },
+        {
+          id: 'virtualDesktops',
+          f: (w) => {
+            const sw = shq(w, '.os-desktop-switch');
+            const active = sw.filter((b) => b.classList.contains('active'));
+            return {
+              ok: sw.length >= 2 && active.length === 1,
+              ev: `switches=${sw.length} active=${active.length} [${sw.map((b) => txt(b)).join(' | ')}]`,
+            };
+          },
+        },
+        {
+          id: 'trayControls',
+          f: (w) => {
+            // Every tray control must be NAMED. An icon-only button with no accessible name
+            // is a capability the user cannot find, which is this category's regression.
+            const btns = shq(w, '.os-tray-btn');
+            const named = btns.filter((b) => (b.getAttribute('title') || b.getAttribute('aria-label') || '').trim());
+            return {
+              ok: btns.length > 0 && named.length === btns.length,
+              ev: `trayButtons=${btns.length} named=${named.length}`,
+            };
+          },
+        },
+        {
+          id: 'clock',
+          f: (w) => {
+            const c = q(w, '.os-clock');
+            const t = txt(c);
+            return { ok: !!c && /\d{1,2}:\d{2}/.test(t), ev: `clock=${JSON.stringify(t)}` };
+          },
+        },
+        {
+          id: 'shellIdentity',
+          f: (w) => {
+            // The Wired/Aero identity is a real material stamp plus real shell-owned
+            // furniture, read from the document rather than from a class this file invented.
+            const mat = document.documentElement.getAttribute('data-materials');
+            const theme = document.documentElement.getAttribute('data-theme') || '';
+            const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`).length;
+            return {
+              ok: !!mat && theme.indexOf(mat) === 0 && owned > 0,
+              ev: `materials=${mat} theme=${theme} identityElements=${owned}`,
+            };
+          },
+        },
+        {
+          id: 'desktopSurface',
+          f: (w) => {
+            // The shell must actually own a desktop the user can drop onto: a real box, and
+            // the icon grid it renders is reported as a NUMBER rather than asserted. An
+            // empty grid is honest state, not a failure — the row's claim is that the
+            // surface exists and its icon count agrees with what the shell rendered.
+            const r = w.getBoundingClientRect();
+            const icons = shq(w, '.os-desk-icon');
+            return {
+              ok: r.width > 200 && r.height > 200,
+              ev: `desktop=${Math.round(r.width)}x${Math.round(r.height)} icons=${icons.length}`,
+            };
+          },
+        },
+      ],
+      /**
+       * ACT AND READ ARE SEPARATE STEPS, and this is trap 1 rather than a style choice.
+       *
+       * `/eval` is synchronous: a step that clicks and then counts in the SAME expression
+       * reads the DOM as it was BEFORE React re-rendered. Measured 2026-08-31, first run of
+       * this spec: `openStart` clicked and reported `opened: 0` while the menu was in fact
+       * opening, `closeStart` then saw the 1 the previous step had caused and reported the
+       * close as `after: 1`, and `taskbarRaise` read `rank 3 of 3` on a window it had just
+       * correctly raised. Three rows scored a working shell as broken, all from one cause.
+       *
+       * The driver POSTs each step separately with a real sleep between, so splitting the
+       * click from the count is exactly the fix, and it costs nothing but two more entries.
+       */
+      drive: [
+        'openStart', 'readStartOpen', 'closeStart', 'readStartClosed',
+        'openTray', 'readTrayOpen', 'closeTray', 'readTrayClosed',
+        'taskbarRaise', 'readRaise',
+      ],
+      steps: {
+        openStart: (w) => {
+          const b = q(w, '.os-start-btn');
+          if (!b) return { refused: 'no start control' };
+          if (!q(w, '.os-start')) b.click();
+          return { clicked: 'start' };
+        },
+        readStartOpen: (w) => {
+          const s = shellState();
+          s.startOpened = shq(w, '.os-start').length;
+          return { opened: s.startOpened };
+        },
+        closeStart: (w) => {
+          const back = q(w, '.os-start-backdrop');
+          if (back) back.click();
+          else if (q(w, '.os-start')) q(w, '.os-start-btn').click();
+          return { clicked: back ? 'backdrop' : 'start' };
+        },
+        readStartClosed: (w) => {
+          const s = shellState();
+          s.startClosed = shq(w, '.os-start').length;
+          return { after: s.startClosed };
+        },
+        openTray: (w) => {
+          const s = shellState();
+          // Quick settings, chosen because it was MEASURED to produce `.os-flyout`. The
+          // first tray control is "Search everything…", which opens a different surface
+          // family; taking `[0]` scored the flyout row against a button that never renders
+          // one. Falls back to the first non-bell control when the label is absent.
+          const btns = shq(w, '.os-tray-btn').filter((x) => !x.classList.contains('os-tray-btn-bell'));
+          const named = (x) => (x.getAttribute('title') || x.getAttribute('aria-label') || '').trim();
+          const b = btns.find((x) => /quick settings/i.test(named(x))) || btns[0];
+          if (!b) return { refused: 'no tray control' };
+          s.flyoutVia = named(b);
+          s.flyoutBtn = b;
+          if (!q(w, '.os-flyout')) b.click();
+          return { clicked: s.flyoutVia };
+        },
+        readTrayOpen: (w) => {
+          const s = shellState();
+          s.flyoutOpened = shq(w, '.os-flyout').length;
+          return { opened: s.flyoutOpened, via: s.flyoutVia };
+        },
+        closeTray: (w) => {
+          const s = shellState();
+          // Measured 2026-08-31: clicking `.os-panel-backdrop` leaves the flyout mounted;
+          // the tray button is a real toggle and closes it. Do not "fix" this by widening
+          // the query — the backdrop genuinely is not the dismissal path.
+          if (q(w, '.os-flyout') && s.flyoutBtn) s.flyoutBtn.click();
+          return { clicked: 'tray toggle' };
+        },
+        readTrayClosed: (w) => {
+          const s = shellState();
+          s.flyoutClosed = shq(w, '.os-flyout').length;
+          return { after: s.flyoutClosed };
+        },
+        taskbarRaise: (w) => {
+          const s = shellState();
+          const btns = shq(w, '.os-task-win');
+          const wins = qa(w, '.fwin');
+          if (!btns.length || !wins.length) return { refused: 'no hosted window to raise' };
+          // Pick a window that is NOT already on top, or the row proves nothing. The
+          // taskbar button is a TOGGLE, so clicking the top window would minimise it.
+          const ranked = wins.map((x) => ({ x, z: Number(getComputedStyle(x).zIndex) || 0 }))
+            .sort((a, b) => b.z - a.z);
+          if (ranked.length < 2) return { refused: 'only one hosted window — a raise past nothing proves nothing' };
+          const target = ranked[ranked.length - 1].x;
+          const title = (q(target, '.fwin-title-text') && txt(q(target, '.fwin-title-text'))) || '';
+          const btn = btns.find((b) => (b.getAttribute('title') || '').trim() === title)
+            || btns[btns.length - 1];
+          s.raisedTitle = (btn.getAttribute('title') || '').trim();
+          s.raisedTarget = target;
+          // EXACTLY ONE CLICK. A hidden window is restored AND raised by one click, and a
+          // visible one is raised by one click — but a second click minimises whatever the
+          // first just brought up, which is how a raise row scores itself dead.
+          btn.click();
+          return { clicked: s.raisedTitle };
+        },
+        readRaise: (w) => {
+          const s = shellState();
+          if (!s.raisedTarget) return { refused: 'taskbarRaise did not run' };
+          const after = qa(w, '.fwin').map((x) => ({ x, z: Number(getComputedStyle(x).zIndex) || 0 }))
+            .sort((a, b) => b.z - a.z);
+          s.raisedTo = after.map((e) => e.x).indexOf(s.raisedTarget) + 1;
+          s.raisedOf = after.length;
+          return { raised: s.raisedTitle, rank: s.raisedTo, of: s.raisedOf };
+        },
+      },
+      mutations: {
+        taskbarIdentity: (w) => detach(shq(w, '.os-task-win')[0], 'no task button to remove'),
+        // LIE rather than delete: a tray button that exists but is unnamed is precisely the
+        // "capability the user cannot find" this row is for, and it falls only that row.
+        trayControls: (w) => {
+          const b = shq(w, '.os-tray-btn')[0];
+          if (!b) return { refused: 'no tray control' };
+          const r = stripAttr(b, 'title', 'no tray control');
+          stripAttr(b, 'aria-label', '');
+          return r;
+        },
+        virtualDesktops: (w) => removeClassAll(shq(w, '.os-desktop-switch.active'), 'active'),
+        clock: (w) => detach(q(w, '.os-clock'), 'no clock'),
+        // EVERY element the row reads, not the first one. Measured 2026-08-31: detaching
+        // only `.wired-tray-lamps` left `.wired-wall-atmosphere` standing, the row's
+        // `owned > 0` still held and the control reported no row falling — a control that
+        // proves nothing while looking like it ran. Deliberately NOT falsified by rewriting
+        // `data-materials`: that attribute lives on `documentElement`, which is outside the
+        // shell root that `restore()` sweeps, so the lie would never be undone.
+        shellIdentity: (w) => {
+          const mat = document.documentElement.getAttribute('data-materials');
+          const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`);
+          if (!owned.length) return { refused: 'shell renders no identity furniture' };
+          owned.forEach((n) => detach(n, ''));
+          return { mutated: `${owned.length} identity element(s) detached` };
+        },
+        // Falsify the DRIVEN rows by breaking the side effect itself, not the control: the
+        // start menu is re-opened and left open, so `closeStart`'s recorded 0 becomes 1.
+        startEntryPoint: (w) => {
+          const s = shellState();
+          s.startClosed = shq(w, '.os-start').length + 1;
+          return { mutated: `startClosed forced to ${s.startClosed}` };
+        },
+        trayFlyout: (w) => {
+          const s = shellState();
+          s.flyoutClosed = shq(w, '.os-flyout').length + 1;
+          return { mutated: `flyoutClosed forced to ${s.flyoutClosed}` };
+        },
+        taskbarRaises: () => {
+          const s = shellState();
+          s.raisedTo = 99;
+          return { mutated: 'raisedTo forced to 99' };
+        },
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -4721,9 +5032,33 @@
    */
   const fwinHost = (w) => (q(w, LIQUID_BTN.fwin) ? 'fwin' : 'fwin-no-liquid');
 
-  // Trap 4 + trap 7 + trap 8.
+  /**
+   * The shell's presentation PROXY: the first open `.fwin` that really renders the Liquid
+   * control right now. Resolved live on every call rather than stored, because the driver
+   * flips it and re-reads between calls. Returns null when no window can take the trip, and
+   * every shell entry point turns that null into a refusal rather than a score.
+   */
+  const shellProxy = () => qa(document, '.fwin').find((w) => {
+    // Trap 3 applies to the PROXY as well as to the subject. A minimised window still has
+    // its `.fwin-b-liquid` in the DOM at `display: none`, so an unguarded find would flip a
+    // window nobody can see and the shell would be scored across a trip the user could not
+    // have taken. Measured 2026-08-31: all three hosted windows were at 0x0 at rest.
+    const r = w.getBoundingClientRect();
+    return q(w, LIQUID_BTN.fwin) && r.width >= 40 && r.height >= 40;
+  }) || null;
+
+  // Trap 4 + trap 7 + trap 8 + the shell host.
   const findWin = (app, pres) => {
     const s = spec(app);
+    // The shell is not among the `.fwin`, it contains them. `pres` is deliberately NOT a
+    // filter here: the shell is one surface that stays put across the trip, and filtering it
+    // out when the proxy is mid-flip would read as "the desktop disappeared".
+    if (s.shellSel) {
+      const root = q(document, s.shellSel);
+      return root
+        ? { win: root, matchedBy: 'shell-selector', host: 'shell' }
+        : { win: null, matchedBy: null, host: null };
+    }
     const wins = qa(document, '.fwin').filter(
       (w) => !pres || w.getAttribute('data-presentation') === pres,
     );
@@ -4797,28 +5132,44 @@
     if (bad) return { app, refused: bad };
     const r = win.getBoundingClientRect();
     const fields = {};
-    qa(win, 'input,textarea,select').forEach((el, i) => {
+    // Decision 3: on the shell every count is taken OUTSIDE the windows it hosts, or the
+    // round trip diffs on the flipped window's own contents and blames the desktop.
+    const scope = host === 'shell' ? (sel) => shq(win, sel) : (sel) => qa(win, sel);
+    scope('input,textarea,select').forEach((el, i) => {
       fields[`${el.tagName.toLowerCase()}${i}:${(el.className || '').split(' ')[0]}`] = el.value;
     });
+    const proxy = host === 'shell' ? shellProxy() : null;
     return {
       app,
       matchedBy,
       host,
-      presentation: win.getAttribute('data-presentation'),
+      // The shell has no `data-presentation` of its own. It reports the presentation of the
+      // window it is hosting, because that is the axis it is scored across, and it names the
+      // proxy beside it so this can never be mistaken for a shell-level attribute.
+      presentation: host === 'shell'
+        ? (proxy && proxy.getAttribute('data-presentation'))
+        : win.getAttribute('data-presentation'),
+      ...(host === 'shell'
+        ? { presentationProxy: proxy ? (txt(q(proxy, '.fwin-title-text')) || '(frameless)') : null }
+        : {}),
       liquidClass: win.classList.contains('fwin-liquid') || win.classList.contains('popout-liquid'),
       rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
       maximized: win.classList.contains('fwin-max'),
       focused: win.classList.contains('focused'),
       zIndex: win.style.zIndex || '',
-      chars: (win.textContent || '').length,
-      nodes: win.querySelectorAll('*').length,
-      controls: qa(win, 'button,input,select,textarea,[role="button"]').length,
+      chars: host === 'shell'
+        ? shq(win, '*').reduce((n, el) => n + (el.childNodes.length
+          ? [].filter.call(el.childNodes, (c) => c.nodeType === 3).reduce((m, c) => m + c.data.length, 0)
+          : 0), 0)
+        : (win.textContent || '').length,
+      nodes: host === 'shell' ? shq(win, '*').length : win.querySelectorAll('*').length,
+      controls: scope('button,input,select,textarea,[role="button"]').length,
       fields,
       // Scroll offsets are app state too, and on a surface with no editable field they are
       // the ONLY user-entered state a round trip can lose. Added 2026-08-26: Library has 86
       // buttons and zero text inputs, so without this its round trip compared chrome to
       // chrome and would have held no matter what the toggle did to the list.
-      scroll: qa(win, '*')
+      scroll: scope('*')
         .filter((el) => el.scrollTop > 0 || el.scrollLeft > 0)
         .slice(0, 8)
         .map((el) => `${(el.className || el.tagName).toString().split(' ')[0]}:${Math.round(el.scrollTop)},${Math.round(el.scrollLeft)}`),
@@ -4870,6 +5221,18 @@
   const toggleLiquid = (app, pres) => {
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
+    // Decision 1/2: the shell's axis is a HOSTED window's flip, driven through that window's
+    // own control. Refuses rather than falling back when nothing on screen can take the trip.
+    if (host === 'shell') {
+      const proxy = shellProxy();
+      if (!proxy) {
+        return { refused: 'no open window renders `.fwin-b-liquid`, so the shell has no presentation trip to take' };
+      }
+      const pb = q(proxy, LIQUID_BTN.fwin);
+      const before = proxy.getAttribute('data-presentation');
+      pb.click();
+      return { before, ariaPressed: pb.getAttribute('aria-pressed'), via: txt(q(proxy, '.fwin-title-text')) || '(frameless)' };
+    }
     if (host === 'chromeless') return { refused: 'chromeless host has no liquid control' };
     if (host === 'fwin-no-liquid') {
       return { refused: 'section is not Liquid-presentable — canPresentLiquid refuses it, so no toggle is rendered' };
