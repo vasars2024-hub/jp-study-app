@@ -7878,6 +7878,7 @@ export const zh: Catalog = {
   'mediaCenter.video.openStudy': '打开学习模式',
   'mediaCenter.video.learningControls': '学习控制',
   'mediaCenter.video.subtitleTranscription': '字幕与转写',
+  'mediaCenter.video.advancedTools': '转写、监视文件夹与下载',
   'mediaCenter.video.youtube': '从 YouTube 打开',
   'mediaCenter.video.libraryQueue': '媒体库队列',
   'mediaCenter.video.videoCount': '{count} 个视频',

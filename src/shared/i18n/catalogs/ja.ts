@@ -7913,6 +7913,7 @@ export const ja: Catalog = {
   'mediaCenter.video.openStudy': '学習モードを開く',
   'mediaCenter.video.learningControls': '学習コントロール',
   'mediaCenter.video.subtitleTranscription': '字幕と文字起こし',
+  'mediaCenter.video.advancedTools': '文字起こし・監視フォルダー・ダウンロード',
   'mediaCenter.video.youtube': 'YouTubeから開く',
   'mediaCenter.video.libraryQueue': 'ライブラリキュー',
   'mediaCenter.video.videoCount': 'ビデオ {count} 本',

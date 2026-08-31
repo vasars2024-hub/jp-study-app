@@ -8300,6 +8300,7 @@ export const en: Catalog = {
   'mediaCenter.video.openStudy': 'Open Study Mode',
   'mediaCenter.video.learningControls': 'Learning controls',
   'mediaCenter.video.subtitleTranscription': 'Subtitle & transcription',
+  'mediaCenter.video.advancedTools': 'Transcription, watch folder and downloads',
   'mediaCenter.video.youtube': 'Open from YouTube',
   'mediaCenter.video.libraryQueue': 'Library queue',
   'mediaCenter.video.videoCount': '{count} videos',

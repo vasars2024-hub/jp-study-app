@@ -1520,6 +1520,45 @@
 }
 
 /*
+ * The inspector's setup tools are a disclosure. Same rule as `.mc-music-import`, with one
+ * addition it needs and Music did not: this one wraps TWO blocks, so the open state has to
+ * re-establish the rail's own 9px column gap that a `<details>` swallows as a single flex
+ * child. The summary is a control, so it takes the surface's 32px pointer floor.
+ */
+.mc-inspector-advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--mc-line);
+  border-radius: var(--mc-radius);
+  color: var(--mc-dim);
+  font-size: var(--mc-fs-small, 12px);
+  cursor: pointer;
+  list-style: none;
+}
+
+.mc-inspector-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mc-inspector-advanced > summary:hover,
+.mc-inspector-advanced[open] > summary {
+  color: var(--mc-text);
+}
+
+.mc-inspector-advanced[open] > summary {
+  margin-bottom: 9px;
+}
+
+.mc-inspector-advanced[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/*
  * The video inspector's blocks are ANCHORS, not glass.
  *
  * They hold the forms — six toggles in `.mc-toggle-list`, the transcription controls,

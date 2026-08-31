@@ -8646,6 +8646,7 @@ export const ru: Catalog = {
   'mediaCenter.video.openStudy': 'Открыть режим учёбы',
   'mediaCenter.video.learningControls': 'Инструменты учёбы',
   'mediaCenter.video.subtitleTranscription': 'Субтитры и расшифровка',
+  'mediaCenter.video.advancedTools': 'Расшифровка, отслеживаемая папка и загрузки',
   'mediaCenter.video.youtube': 'Открыть с YouTube',
   'mediaCenter.video.libraryQueue': 'Очередь медиатеки',
   'mediaCenter.video.videoCount': 'Видео: {count}',

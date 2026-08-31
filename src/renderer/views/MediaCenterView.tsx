@@ -993,15 +993,30 @@ function VideoPanel({
             </div>
           </section>
 
-          <section className="mc-inspector-block">
-            <span className="mc-eyebrow">{t('mediaCenter.video.subtitleTranscription')}</span>
-            <MediaTranscriptionControls state={state} />
-            <MediaWatchFolder state={state} />
-          </section>
-          <section className="mc-inspector-block mc-video-source">
-            <span className="mc-eyebrow">{t('mediaCenter.video.youtube')}</span>
-            <MediaYoutubeBar state={state} />
-          </section>
+          {/*
+            §10.4's Q4 — "advanced tools discoverable without cluttering" — measured this rail
+            at `collapsedDisclosures 0, scannedControls 34` against a bar of `>=1 collapsed AND
+            <=12`. Fetching a Whisper model, choosing its language, arming an auto-add watch
+            folder and pasting a download link are each an occasional setup task; none of them
+            is part of watching or studying the video this pane is about, and all fourteen of
+            their controls were painted at once above the fold. One disclosure, same shape and
+            same uncontrolled semantics as `.mc-music-import` (`da07ac39`), for the same reason
+            given there: nothing is persisted, so opening it is not a settings write, and every
+            field stays mounted either way — a disclosure hides, it does not unmount, so the
+            watch folder keeps watching and a running transcription keeps reporting.
+          */}
+          <details className="mc-inspector-advanced">
+            <summary><Icon name="wrench" size={12} /> {t('mediaCenter.video.advancedTools')}</summary>
+            <section className="mc-inspector-block">
+              <span className="mc-eyebrow">{t('mediaCenter.video.subtitleTranscription')}</span>
+              <MediaTranscriptionControls state={state} />
+              <MediaWatchFolder state={state} />
+            </section>
+            <section className="mc-inspector-block mc-video-source">
+              <span className="mc-eyebrow">{t('mediaCenter.video.youtube')}</span>
+              <MediaYoutubeBar state={state} />
+            </section>
+          </details>
         </ContextualSurface>
       </div>
 

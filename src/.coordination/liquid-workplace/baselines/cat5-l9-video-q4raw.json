@@ -1,8 +1,8 @@
 {
   "surface": "Video",
-  "label": "l9-video",
+  "label": "l9-video-q4raw",
   "control": false,
-  "at": "2026-08-31T09:58:27.252Z",
+  "at": "2026-08-31T09:58:02.809Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -10,20 +10,8 @@
   "bodyScrollTop": 0,
   "presentationAsFound": "standard",
   "cat6": {
-    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video.json",
-    "verdict": "PASS 10/10",
-    "parity": {
-      "standard": "10/10",
-      "liquid": "10/10",
-      "na": 0,
-      "equal": true,
-      "rowsAgree": true,
-      "failing": [],
-      "onlyInOne": []
-    },
-    "roundTrip": {
-      "diffs": []
-    }
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "missing": true
   },
   "axes": {
     "theme": [
@@ -100,39 +88,33 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 1,
-        "scannedControls": 7,
-        "shellChromeSelector": ".mc-sidebar,.mc-topbar,.mc-playerbar",
-        "shellControls": 15,
-        "shellList": [
-          "HomeYour media at a glan",
-          "LibraryAll local media",
-          "VideoImmersion player",
-          "MusicListening room",
-          "Study ModeMine and revie",
-          "Study tools",
-          "ReadinessUnified library",
-          "ReviewWatch to review",
-          "DiscoverMAL + AniList",
-          "Media workspaceLibrary",
-          "Media SettingsPlayback a",
-          "Back",
-          "Forward",
-          "Search your media librar",
-          "Open media"
-        ],
-        "chromeControlsRaw": 8,
-        "summaryHeaders": 1,
-        "behindDisclosure": 0,
+        "scannedControls": 17,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "chromeControlsRaw": 23,
+        "summaryHeaders": 2,
+        "behindDisclosure": 4,
         "disclosures": {
           "total": 2,
           "open": 1
         },
         "ariaDisclosures": [],
         "scannedList": [
+          "HomeYour media at a glance",
+          "LibraryAll local media",
+          "VideoImmersion player",
+          "MusicListening room",
+          "Study ModeMine and review",
+          "Media SettingsPlayback and s",
+          "Back",
+          "Forward",
+          "Search your media library…",
+          "Open media",
           "Open video",
           "Media workspace",
           "Subtitles",
@@ -223,46 +205,36 @@
       "id": 7,
       "q": "standard mode remains fully normal",
       "bar": "category 6's parity: the same features reachable in standard as in Liquid",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "basis": null,
-        "parity": {
-          "standard": "10/10",
-          "liquid": "10/10",
-          "na": 0,
-          "equal": true,
-          "rowsAgree": true,
-          "failing": [],
-          "onlyInOne": []
-        }
+        "parity": null
       }
     },
     {
       "id": 8,
       "q": "Liquid can be turned off without losing state",
       "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "basis": null,
         "liquidAbsence": null,
         "lifecycleTrip": null,
-        "roundTrip": {
-          "diffs": []
-        }
+        "roundTrip": null
       }
     },
     {
       "id": 9,
       "q": "all pre-migration features reachable and functional",
       "bar": "category 6's row agreement: no row reachable in only one presentation",
-      "verdict": "YES",
+      "verdict": "MEASURE",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
         "basis": null,
-        "rowsAgree": true,
-        "onlyInOne": []
+        "rowsAgree": null,
+        "onlyInOne": null
       }
     },
     {
@@ -299,7 +271,7 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "YES",
+    "q4": "NO",
     "q6": "YES",
     "q10": "YES"
   },
@@ -319,35 +291,29 @@
     },
     "q4": {
       "collapsedDisclosures": 1,
-      "scannedControls": 7,
-      "shellChromeSelector": ".mc-sidebar,.mc-topbar,.mc-playerbar",
-      "shellControls": 15,
-      "shellList": [
-        "HomeYour media at a glan",
-        "LibraryAll local media",
-        "VideoImmersion player",
-        "MusicListening room",
-        "Study ModeMine and revie",
-        "Study tools",
-        "ReadinessUnified library",
-        "ReviewWatch to review",
-        "DiscoverMAL + AniList",
-        "Media workspaceLibrary",
-        "Media SettingsPlayback a",
-        "Back",
-        "Forward",
-        "Search your media librar",
-        "Open media"
-      ],
-      "chromeControlsRaw": 8,
-      "summaryHeaders": 1,
-      "behindDisclosure": 0,
+      "scannedControls": 17,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "chromeControlsRaw": 23,
+      "summaryHeaders": 2,
+      "behindDisclosure": 4,
       "disclosures": {
         "total": 2,
         "open": 1
       },
       "ariaDisclosures": [],
       "scannedList": [
+        "HomeYour media at a glance",
+        "LibraryAll local media",
+        "VideoImmersion player",
+        "MusicListening room",
+        "Study ModeMine and review",
+        "Media SettingsPlayback and s",
+        "Back",
+        "Forward",
+        "Search your media library…",
+        "Open media",
         "Open video",
         "Media workspace",
         "Subtitles",
@@ -400,8 +366,14 @@
     }
   },
   "controlsPaintedA": 35,
-  "findings": [],
-  "voided": [],
-  "score": 10,
-  "verdict": "PASS 10/10"
+  "findings": [
+    "Q4 advanced tools discoverable without cluttering"
+  ],
+  "voided": [
+    "Q7 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "Q8 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "Q9 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json"
+  ],
+  "score": "VOID",
+  "verdict": "VOID"
 }
