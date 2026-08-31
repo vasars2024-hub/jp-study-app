@@ -22,7 +22,7 @@ export interface FilesSoftDeletePersistence {
 
 export type FilesSoftDeleteUndoResult =
   | { ok: true; itemId: string }
-  | { ok: false; reason: 'unknown-token' | 'expired' };
+  | { ok: false; reason: 'unknown-token' | 'expired' | 'storage-failed' };
 
 function isFiniteTimestamp(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -103,10 +103,17 @@ export class FilesSoftDeleteStore {
     if (!match) return { ok: false, reason: 'unknown-token' };
     if (now > match.undoExpiresAt) return { ok: false, reason: 'expired' };
 
-    this.save({
-      version: 1,
-      tombstones: state.tombstones.filter((row) => row.itemId !== match.itemId),
-    });
+    try {
+      this.save({
+        version: 1,
+        tombstones: state.tombstones.filter((row) => row.itemId !== match.itemId),
+      });
+    } catch {
+      // localStorage writes are allowed to fail (quota, privacy policy, an
+      // unavailable renderer store). The row must remain hidden rather than
+      // claiming Undo worked only for it to reappear deleted after restart.
+      return { ok: false, reason: 'storage-failed' };
+    }
     return { ok: true, itemId: match.itemId };
   }
 
