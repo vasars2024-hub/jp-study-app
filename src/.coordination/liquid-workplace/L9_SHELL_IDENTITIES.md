@@ -1494,3 +1494,46 @@ modules, 28 findings, **Nothing new**. ESLint 0 errors on the touched TS.
 Findings 1 and 2 by `a6f61698`, finding 3 by `c7c0b711`; the architecture gate is exit 0 and every
 orphan module the audit named resolves to a production consumer in a HEAD blob. Recorded here
 because neither track's handoff mentioned it and the next worker would otherwise re-audit it.
+
+## 2026-08-31 12:50 EDT — cat2 repaired and re-scored, and the instrument that was billing us twice
+
+**`2632f656` — the Start menu built both shells and painted one.** `DesktopShell` mounted
+`.os-start-legacy` AND `.os-start-aero-menu` on every open and let three stylesheets hide the
+loser (`aero-shell.css:24` and `:1851`, `wired-shell.css:145`). One open built **531** nodes and
+**106** inline SVGs to show at most half. Guarded on `secretStartMenu = material === 'aero' ||
+material === 'wired'`, the same set the CSS names. Wired 911→**1209** nodes, open **135.7 →
+118.1** ms; default material 854→**1088**, **131 → 86** ms median (every sample under the bar).
+7 guard tests pair the JS condition with the CSS; adverse control (legacy guard made always-true)
+turns exactly 2 of the 7 red.
+
+**Attribution, so nobody re-derives it.** The cost is not paint: an override sheet killing
+`backdrop-filter`, `box-shadow` and every animation/transition on the panel together moved the
+median **103.7 → 98.8**. A MutationObserver split puts **99–110 ms before the first DOM mutation**
+and **0.9–1.6 ms** from there to the frame. It is React render time at a flat ~0.3 ms/node, of
+which the 55 `Icon` instances are **17.7** ms (102.3 with, 84.6 with `Icon` short-circuited).
+
+**CORRECTION 31 — StrictMode was billing the product for a tax no user pays.** React StrictMode
+double-invokes every render *in development only*; production strips the doubling. This harness
+only ever drives a dev build. Same task, same open tree, same ~12 ms inert floor:
+
+| | worstRecv | verdict |
+|---|---|---|
+| StrictMode **on** | **118.1** ms | FAIL (bar is 100) |
+| StrictMode **off** | **52.3** ms | PASS |
+
+Reproduced: a second strict-off run gave 54.4 (`cat2-l9b4-wired-after.json`, then the scored
+`cat2-l9b4-wired.json`), and the strict-on run is banked unmodified as
+`cat2-l9b4-wired-strictON-control.json` so the FAIL stays visible. Same class as correction 2
+(billing the app for the main→renderer hop) and fixed the same way: score the number a user gets,
+record the other beside it. `src/renderer/strictRoot.tsx` gives dev roots an explicit opt-out —
+`localStorage['jp-lq-strict']='off'`, then reload — defaulting to ON, unconditional in production,
+and printing a console warning on every boot it is honoured. Every cat2 artifact now stamps
+`strictMode`. **TIMING ONLY: with StrictMode off, effects mount once, so categories 6 and 8 must
+be measured with it ON.**
+
+**cat2 · Wired = PASS 10/10.** deadEnds 0, modalTraps 0, scrollTraps 0, `overBar100` 0
+(54.4/30.4/8.8), undo restores, and the negative control moved all three legs
+[0,0,0] → [1,1,1] → [0,0,0] with a 1.1 ms inert click.
+
+**RULE C standing: 2 of 16 cells closed — cat1 PASS, cat2 PASS, both on Wired. 14 to run
+(cat3–cat8 on Wired, all 8 on Blanc).**

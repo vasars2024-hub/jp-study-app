@@ -18,6 +18,7 @@ import React, { useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import BlancShell, { BlancLockscreen } from './components/blanc/BlancShell';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { withStrictMode } from './strictRoot';
 import ToastHost from './components/ToastHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
@@ -153,11 +154,11 @@ if (container) {
   // flashes English. English is already loaded — a microtask for most sessions.
   void initI18n().then(() => {
     createRoot(container).render(
-      <React.StrictMode>
+      withStrictMode(
         <AppErrorBoundary>
           <BlancRoot />
-        </AppErrorBoundary>
-      </React.StrictMode>,
+        </AppErrorBoundary>,
+      ),
     );
     applyZoom(loadZoom());
   });

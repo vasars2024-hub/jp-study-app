@@ -5,6 +5,7 @@ import App from './App';
 import SystemDictOverlay from './components/SystemDictOverlay';
 import ReadingLensOverlay from './components/lens/ReadingLensOverlay';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { withStrictMode } from './strictRoot';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
 import { bootDisplayPrefs, loadDisplayPrefs } from './displayPrefs';
@@ -307,32 +308,32 @@ if (container) {
       // Profile state powers the popup's Anki mining target; nothing else boots.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <SystemDictOverlay />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
     } else if (isReadingLens) {
       // Mining target comes from the active profile; the shell/environment stay dormant.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <ReadingLensOverlay />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
     } else {
       await import('./levelLists')
         .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
         .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <App />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
       // Re-apply after mount so compensated size is correct once #root is live.
       applyZoom(loadZoom());

@@ -1036,11 +1036,25 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   const failed = Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k);
   const pass = failed.length === 0 && unmeasured.length === 0;
 
+  // Correction 31: React StrictMode double-invokes every render IN DEVELOPMENT ONLY, and this
+  // harness only ever drives a dev build. That tax is a developer's, never a user's. Measured
+  // 2026-08-31 on the Wired Start menu - same task, same open tree, same ~12 ms inert floor:
+  // worstRecv 118.1 ms with StrictMode on and 52.3 ms with it off, against a 100 ms bar. Same
+  // class of error as correction 2 (billing the app for the main->renderer hop), and fixed the
+  // same way: the scored run is taken with the dev doubling off, the on-number is recorded
+  // beside it, and every artifact says which it was. `src/renderer/strictRoot.tsx` reads the
+  // flag and production ignores it. The opt-out is for TIMING ONLY - with StrictMode off,
+  // effects mount once, so categories 6 and 8 must be measured with it ON.
+  const strictOff = (await ev("String(localStorage.getItem('jp-lq-strict'))")) === 'off';
+
   const out = {
     label: LABEL,
     surface: SURFACE,
     win: WIN || '(focused)',
     task: TASK || '(none)',
+    strictMode: strictOff
+      ? 'off - dev double-render removed; latency scores the cost a shipped user pays'
+      : 'on - latency carries the dev double-render tax; see correction 31',
     presentation: m.presentation === null ? 'main-window section (no per-window presentation)' : m.presentation,
     raised: m.raised,
     base: m.base,

@@ -1,9 +1,8 @@
 {
-  "label": "l9b4-wired",
+  "label": "l9b4-wired-strictON-control",
   "surface": "@.os-desktop-wired",
   "win": "main",
   "task": "click:.os-start-btn >> wait:500 >> click:.os-start-btn >> wait:400 >> click:.os-desktop-switch:not(.active) >> wait:800",
-  "strictMode": "off - dev double-render removed; latency scores the cost a shipped user pays",
   "presentation": "main-window section (no per-window presentation)",
   "raised": "root surface - no taskbar button",
   "base": {
@@ -19,21 +18,21 @@
   },
   "latencyMs": {
     "clickRecv": [
-      54.4,
-      30.4,
-      8.8
+      118.1,
+      49.9,
+      8.7
     ],
     "inputRecv": [],
-    "worstRecv": 54.4,
-    "overBar100": 0,
+    "worstRecv": 118.1,
+    "overBar100": 1,
     "n": 3,
     "clickStampUnscored": [
-      82.4,
-      32.9,
-      15.9
+      147.5,
+      51.9,
+      16.7
     ],
     "inputStampUnscored": [],
-    "worstStampUnscored": 82.4
+    "worstStampUnscored": 147.5
   },
   "steps": [
     {
@@ -181,8 +180,8 @@
       "click:.os-desktop-switch:not(.active)"
     ],
     "restored": true,
-    "baseHash": "1f7qudb",
-    "afterHash": "1f7qudb",
+    "baseHash": "1m9f3g1",
+    "afterHash": "1m9f3g1",
     "liveRegionsBefore": [
       "div.mc-video-empty|Video plays in the media workspace",
       "div.mc-video-empty|Open the workspace to watch with subtitles, transcript and mining. It reports th",
@@ -194,8 +193,8 @@
       "div.mc-video-empty|Open in the media workspace"
     ],
     "textHashRoundTrip": {
-      "base": "oidlk6",
-      "after": "oidlk6"
+      "base": "1rtehrc",
+      "after": "1rtehrc"
     }
   },
   "stepsDriven": 3,
@@ -213,42 +212,16 @@
     "deadEnds": true,
     "modalTraps": true,
     "scrollTraps": true,
-    "latency": true,
+    "latency": false,
     "costParity": "N/A-single-path"
   },
-  "verdict": "PASS 10/10",
-  "failedBars": [],
+  "verdict": "FAIL",
+  "failedBars": [
+    "latency"
+  ],
   "unmeasuredBars": [],
   "notMeasuredHere": [
     "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
     "mute-pair explanation quality (rubric category 8 harness)"
-  ],
-  "control": {
-    "moved": {
-      "deadEnd": true,
-      "modalTrap": true,
-      "scrollTrap": true
-    },
-    "backToBaseline": true,
-    "counts": {
-      "base": [
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        1,
-        1
-      ],
-      "restored": [
-        0,
-        0,
-        0
-      ]
-    },
-    "inertClickRecvMs": [
-      1.1
-    ]
-  }
+  ]
 }
