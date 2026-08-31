@@ -10695,6 +10695,18 @@ export const ja: Catalog = {
     'この検索はアプリに組み込まれているため削除できません。自分で保存したものは削除できます。',
   'filesApp.smart.error.saveFailed':
     '保存した検索を保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.bulk.selection': '一括選択',
+  'filesApp.bulk.selectItem': '{name} を一括操作に選択',
+  'filesApp.bulk.mine': '選択項目を採取（{count}）',
+  'filesApp.bulk.mining': '選択項目を採取中（{count}）…',
+  'filesApp.bulk.clear': '選択を解除',
+  'filesApp.bulk.progress': '{total} 件中 {completed} 件を処理しました。',
+  'filesApp.bulk.summary':
+    '{total} 件中 {succeeded} 件から {cards} 枚のカードを追加し、{failed} 件は失敗しました。',
+  'filesApp.bulk.itemAdded': '{count} 枚のカードを追加しました。',
+  'filesApp.bulk.undo': '追加したカードをすべて元に戻す',
+  'filesApp.bulk.undone': 'この一括操作で追加した {count} 枚のカードを削除しました。',
+  'filesApp.mine.refuse.writeFailed': 'カードをデッキに書き込めませんでした。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

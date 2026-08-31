@@ -841,6 +841,90 @@ describe('Files app — one-click mine (gate 3)', () => {
   });
 });
 
+describe('Files app — bulk mine isolates every item (gate 20)', () => {
+  const bulkItems: FilesItem[] = [
+    item({
+      id: 'transcript:first',
+      name: 'First transcript',
+      kind: 'transcript',
+      categoryId: 'sources/text',
+      provenance: 'whisper-transcript',
+      location: { store: 'file', path: 'C:\\t\\first.json' },
+    }),
+    item({
+      id: 'transcript:broken',
+      name: 'Broken transcript',
+      kind: 'transcript',
+      categoryId: 'sources/text',
+      provenance: 'whisper-transcript',
+      location: { store: 'file', path: 'C:\\t\\broken.json' },
+    }),
+    item({
+      id: 'subtitle:last',
+      name: 'Last subtitle',
+      kind: 'subtitle',
+      categoryId: 'sources/text',
+      provenance: 'human-subs',
+      location: { store: 'file', path: 'C:\\subs\\last.srt' },
+    }),
+  ];
+
+  async function selectForBulk(name: string): Promise<void> {
+    await click(
+      host?.querySelector<HTMLInputElement>(
+        `input[aria-label="Select ${name} for bulk actions"]`,
+      ),
+    );
+  }
+
+  it('names three outcomes and continues after the middle item throws', async () => {
+    filesIndex.mockImplementation(async () => snapshot(bulkItems));
+    filesMineSource.mockImplementation(async (location) => {
+      const path = (location as { path?: string }).path ?? '';
+      if (path.endsWith('broken.json')) throw new Error('fixture read failed');
+      return {
+        ok: true,
+        readCount: 1,
+        passages: [
+          { index: 1, text: path.endsWith('first.json') ? '最初の文' : '最後の文' },
+        ],
+      };
+    });
+
+    await mount(<FilesApp />);
+    await settle();
+    await selectForBulk('First transcript');
+    await selectForBulk('Broken transcript');
+    await selectForBulk('Last subtitle');
+
+    const action = host?.querySelector<HTMLButtonElement>('.fa-bulk-mine');
+    expect(action?.textContent).toContain('3');
+    await click(action);
+
+    // All three were attempted. The throw in call 2 did not abort call 3.
+    expect(filesMineSource).toHaveBeenCalledTimes(3);
+    expect(
+      filesMineSource.mock.calls.map(([location]) => (location as { path: string }).path),
+    ).toEqual(['C:\\t\\first.json', 'C:\\t\\broken.json', 'C:\\subs\\last.srt']);
+    expect(deck.map((card) => card.word).sort()).toEqual(['最初の文', '最後の文'].sort());
+
+    const receipt = host?.querySelector('.fa-bulk-result');
+    expect(receipt?.textContent).toContain('2 of 3 items added 2 cards; 1 failed.');
+    expect(receipt?.textContent).toContain('First transcript — 1 cards added.');
+    expect(receipt?.textContent).toContain('Broken transcript — The file could not be read.');
+    expect(receipt?.textContent).toContain('fixture read failed');
+    expect(receipt?.textContent).toContain('Last subtitle — 1 cards added.');
+    expect(receipt?.querySelectorAll('li[data-outcome="done"]')).toHaveLength(2);
+    expect(receipt?.querySelectorAll('li[data-outcome="refused"]')).toHaveLength(1);
+
+    await click(receipt?.querySelector('.fa-bulk-undo'));
+    expect(deck).toHaveLength(0);
+    expect(host?.querySelector('.fa-bulk-result')?.textContent).toContain(
+      'Removed all 2 cards added by this bulk action.',
+    );
+  });
+});
+
 /* ---------------------- gate 5: context entry ---------------------- */
 
 /** Books and manga are different leaves; the fixture needs one of each. */

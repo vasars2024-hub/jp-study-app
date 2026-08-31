@@ -397,6 +397,8 @@
 
 .fa-sort-dir,
 .fa-refresh,
+.fa-bulk-mine,
+.fa-bulk-clear,
 .fa-action {
   flex: none;
   min-height: var(--lq-hit-target);
@@ -434,13 +436,41 @@
 
 .fa-row {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
   align-items: center;
   gap: var(--lq-space-3);
   padding: 0 var(--lq-space-3);
   height: 32px;
   border-bottom: 1px solid var(--lq-work-border);
   cursor: default;
+}
+
+.fa-cell-select {
+  display: grid;
+  place-items: center;
+}
+
+.fa-bulk-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.fa-bulk-result {
+  margin-top: var(--lq-space-3);
+  padding: var(--lq-space-3);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  background: var(--lq-anchor-bg);
+}
+
+.fa-bulk-result ul {
+  margin: var(--lq-space-2) 0;
+  padding-inline-start: var(--lq-space-5);
+}
+
+.fa-bulk-result li[data-outcome='refused'] {
+  color: var(--danger-text);
 }
 
 .fa-row:hover {

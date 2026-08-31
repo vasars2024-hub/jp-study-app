@@ -11158,6 +11158,18 @@ export const en: Catalog = {
     'This search is built into the app, so it cannot be deleted. Yours can be.',
   'filesApp.smart.error.saveFailed':
     'Your saved searches could not be saved. This change works now but will be gone when the app restarts.',
+  'filesApp.bulk.selection': 'Bulk selection',
+  'filesApp.bulk.selectItem': 'Select {name} for bulk actions',
+  'filesApp.bulk.mine': 'Mine selected ({count})',
+  'filesApp.bulk.mining': 'Mining selected ({count})…',
+  'filesApp.bulk.clear': 'Clear selection',
+  'filesApp.bulk.progress': 'Processed {completed} of {total} items.',
+  'filesApp.bulk.summary':
+    '{succeeded} of {total} items added {cards} cards; {failed} failed.',
+  'filesApp.bulk.itemAdded': '{count} cards added.',
+  'filesApp.bulk.undo': 'Undo all added cards',
+  'filesApp.bulk.undone': 'Removed all {count} cards added by this bulk action.',
+  'filesApp.mine.refuse.writeFailed': 'The cards could not be written to the deck.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':

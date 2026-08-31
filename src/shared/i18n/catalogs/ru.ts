@@ -11575,6 +11575,18 @@ export const ru: Catalog = {
     'Этот запрос встроен в приложение, поэтому его нельзя удалить. Свои — можно.',
   'filesApp.smart.error.saveFailed':
     'Не удалось сохранить ваши запросы. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
+  'filesApp.bulk.selection': 'Множественный выбор',
+  'filesApp.bulk.selectItem': 'Выбрать {name} для массовых действий',
+  'filesApp.bulk.mine': 'Добыть выбранное ({count})',
+  'filesApp.bulk.mining': 'Добываем выбранное ({count})…',
+  'filesApp.bulk.clear': 'Очистить выбор',
+  'filesApp.bulk.progress': 'Обработано {completed} из {total}.',
+  'filesApp.bulk.summary':
+    '{succeeded} из {total} элементов добавили {cards} карточек; ошибок: {failed}.',
+  'filesApp.bulk.itemAdded': 'Добавлено карточек: {count}.',
+  'filesApp.bulk.undo': 'Отменить все добавленные карточки',
+  'filesApp.bulk.undone': 'Удалены все {count} карточек, добавленные этим массовым действием.',
+  'filesApp.mine.refuse.writeFailed': 'Не удалось записать карточки в колоду.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 

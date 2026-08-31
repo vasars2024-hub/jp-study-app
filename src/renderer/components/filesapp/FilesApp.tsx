@@ -235,6 +235,20 @@ type MineState =
     }
   | { status: 'undone'; count: number };
 
+type SettledMineState = Extract<MineState, { status: 'done' | 'refused' }>;
+
+interface BulkMineResult {
+  itemId: string;
+  name: string;
+  result: SettledMineState;
+}
+
+type BulkMineState =
+  | { status: 'idle' }
+  | { status: 'running'; completed: number; total: number }
+  | { status: 'done'; results: BulkMineResult[] }
+  | { status: 'undone'; count: number; results: BulkMineResult[] };
+
 export interface FilesAppProps {
   /**
    * Context entry: the category the caller came from. A filter, never a mode —
@@ -292,6 +306,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * the new rows so undo removes those and nothing that happened to match.
    */
   const [mineState, setMineState] = useState<MineState>({ status: 'idle' });
+  /** Gate 20. Checkboxes own multi-selection; the focused row remains independent. */
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkMineState, setBulkMineState] = useState<BulkMineState>({ status: 'idle' });
 
   /* ------------------------- gate 16 state ------------------------ */
 
@@ -511,52 +528,109 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * turns passages into drafts, and the renderer — the only owner of the deck —
    * writes them. No card is invented here that the source did not carry.
    */
-  const onMine = useCallback(async () => {
-    if (!selected) return;
-    const mineable = mineabilityOf(selected);
+  const mineOne = useCallback(async (item: FilesItem): Promise<SettledMineState> => {
+    const mineable = mineabilityOf(item);
     if (!mineable.mineable) {
-      setMineState({ status: 'refused', reasonKey: mineable.reasonKey });
-      return;
+      return { status: 'refused', reasonKey: mineable.reasonKey };
     }
-    setMineState({ status: 'reading' });
-    const kind = selected.kind as 'transcript' | 'subtitle' | 'book';
-    const read = await window.api?.filesMineSource?.(selected.location, kind);
+    const kind = item.kind as 'transcript' | 'subtitle' | 'book';
+    let read;
+    try {
+      read = await window.api?.filesMineSource?.(item.location, kind);
+    } catch (error) {
+      return {
+        status: 'refused',
+        reasonKey: 'filesApp.mine.refuse.unreadable',
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
     if (!read) {
-      setMineState({ status: 'refused', reasonKey: 'filesApp.mine.refuse.unreadable' });
-      return;
+      return { status: 'refused', reasonKey: 'filesApp.mine.refuse.unreadable' };
     }
     if (!read.ok) {
-      setMineState({ status: 'refused', reasonKey: read.reasonKey, detail: read.detail });
-      return;
+      return { status: 'refused', reasonKey: read.reasonKey, detail: read.detail };
     }
-    const plan = buildFilesMineDrafts(selected, read.passages, {
+    const plan = buildFilesMineDrafts(item, read.passages, {
       existingWords: existingDeckKeys(loadDeck().map((card) => card.sentence || card.word)),
     });
     if (plan.drafts.length === 0) {
       // Two different empty results, told apart rather than merged: nothing was
       // Japanese, or everything was already mined. They need opposite actions.
-      setMineState({
+      return {
         status: 'refused',
         reasonKey:
           plan.skippedDuplicate > 0
             ? 'filesApp.mine.refuse.allDuplicates'
             : 'filesApp.mine.refuse.noJapanese',
         values: { read: plan.passagesRead },
-      });
-      return;
+      };
     }
-    const created = addDeckCardsTracked(plan.drafts);
-    setMineState({
+    let created;
+    try {
+      created = addDeckCardsTracked(plan.drafts);
+    } catch (error) {
+      return {
+        status: 'refused',
+        reasonKey: 'filesApp.mine.refuse.writeFailed',
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+    return {
       status: 'done',
       added: created.length,
       passagesRead: plan.passagesRead,
       skippedNotJapanese: plan.skippedNotJapanese,
       skippedDuplicate: plan.skippedDuplicate,
       skippedOverCap: plan.skippedOverCap,
-      machineDerived: isMachineDerived(selected.provenance),
+      machineDerived: isMachineDerived(item.provenance),
       addedIds: created.map((card) => card.id),
+    };
+  }, []);
+
+  const onMine = useCallback(async () => {
+    if (!selected) return;
+    setMineState({ status: 'reading' });
+    setMineState(await mineOne(selected));
+  }, [selected, mineOne]);
+
+  const toggleBulkSelection = useCallback((item: FilesItem) => {
+    setBulkSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
     });
-  }, [selected]);
+    setSelectedId(item.id);
+    setBulkMineState({ status: 'idle' });
+  }, []);
+
+  const onBulkMine = useCallback(async () => {
+    const items = allItems.filter((item) => bulkSelectedIds.has(item.id));
+    if (items.length === 0) return;
+    const results: BulkMineResult[] = [];
+    setBulkMineState({ status: 'running', completed: 0, total: items.length });
+    // Sequential on purpose: each item re-reads the deck after the previous
+    // write, so two files containing the same cue cannot race in a duplicate.
+    for (const item of items) {
+      const result = await mineOne(item);
+      results.push({ itemId: item.id, name: item.name, result });
+      setBulkMineState({ status: 'running', completed: results.length, total: items.length });
+    }
+    setBulkMineState({ status: 'done', results });
+    // The receipt retains the exact batch and its undo ids. Clearing the check
+    // marks the action complete and prevents a second click from overwriting
+    // the only recovery path for cards the first click added.
+    setBulkSelectedIds(new Set());
+  }, [allItems, bulkSelectedIds, mineOne]);
+
+  const onUndoBulkMine = useCallback(() => {
+    if (bulkMineState.status !== 'done') return;
+    const ids = bulkMineState.results.flatMap((entry) =>
+      entry.result.status === 'done' ? entry.result.addedIds : [],
+    );
+    removeDeckCards(ids);
+    setBulkMineState({ status: 'undone', count: ids.length, results: bulkMineState.results });
+  }, [bulkMineState]);
 
   // Read outside the updater deliberately: React double-invokes state updaters
   // in StrictMode, and a deck write is not something to run twice.
@@ -1389,6 +1463,33 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
             {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
           </button>
+          {bulkSelectedIds.size > 0 ? (
+            <>
+              <button
+                type="button"
+                className="fa-bulk-mine"
+                onClick={() => void onBulkMine()}
+                disabled={bulkMineState.status === 'running'}
+              >
+                {t(
+                  bulkMineState.status === 'running'
+                    ? 'filesApp.bulk.mining'
+                    : 'filesApp.bulk.mine',
+                  { count: bulkSelectedIds.size },
+                )}
+              </button>
+              <button
+                type="button"
+                className="fa-bulk-clear"
+                onClick={() => {
+                  setBulkSelectedIds(new Set());
+                  setBulkMineState({ status: 'idle' });
+                }}
+              >
+                {t('filesApp.bulk.clear')}
+              </button>
+            </>
+          ) : null}
         </>
       ) : null}
       {/* Gate 5: a narrowed list has to say it is narrowed. Without this the
@@ -1416,6 +1517,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   const header = (
     <div className="fa-row fa-head" role="row" aria-rowindex={1}>
+      <span role="columnheader" aria-sort="none" className="fa-cell fa-cell-select">
+        <span className="fa-visually-hidden">{t('filesApp.bulk.selection')}</span>
+      </span>
       {(['name', 'kind', 'provenance', 'size', 'modified'] as const).map((column) => (
         <button
           key={column}
@@ -1547,6 +1651,17 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               }
             }}
           >
+            <span role="gridcell" className="fa-cell fa-cell-select">
+              <input
+                type="checkbox"
+                className="fa-bulk-check"
+                checked={bulkSelectedIds.has(item.id)}
+                disabled={bulkMineState.status === 'running'}
+                aria-label={t('filesApp.bulk.selectItem', { name: item.name })}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleBulkSelection(item)}
+              />
+            </span>
             <span role="gridcell" className="fa-cell fa-cell-name">
               {item.name}
               {item.flags.brokenLink ? (
@@ -1703,6 +1818,58 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
   })();
 
+  const bulkMineResult = (() => {
+    if (bulkMineState.status === 'idle') return null;
+    if (bulkMineState.status === 'running') {
+      return (
+        <p className="fa-details-note fa-bulk-progress" role="status">
+          {t('filesApp.bulk.progress', {
+            completed: bulkMineState.completed,
+            total: bulkMineState.total,
+          })}
+        </p>
+      );
+    }
+    const results = bulkMineState.results;
+    const succeeded = results.filter((entry) => entry.result.status === 'done');
+    const cards = succeeded.reduce(
+      (sum, entry) => sum + (entry.result.status === 'done' ? entry.result.added : 0),
+      0,
+    );
+    return (
+      <div className="fa-bulk-result" role="status">
+        <p>
+          {bulkMineState.status === 'undone'
+            ? t('filesApp.bulk.undone', { count: bulkMineState.count })
+            : t('filesApp.bulk.summary', {
+                succeeded: succeeded.length,
+                total: results.length,
+                cards,
+                failed: results.length - succeeded.length,
+              })}
+        </p>
+        <ul>
+          {results.map((entry) => (
+            <li key={entry.itemId} data-outcome={entry.result.status}>
+              <strong>{entry.name}</strong>{' — '}
+              {entry.result.status === 'done'
+                ? t('filesApp.bulk.itemAdded', { count: entry.result.added })
+                : t(entry.result.reasonKey, entry.result.values)}
+              {entry.result.detail ? (
+                <span className="fa-state-detail"> {entry.result.detail}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {bulkMineState.status === 'done' && cards > 0 ? (
+          <button type="button" className="fa-action fa-bulk-undo" onClick={onUndoBulkMine}>
+            {t('filesApp.bulk.undo')}
+          </button>
+        ) : null}
+      </div>
+    );
+  })();
+
   const inspector = selected && mineability ? (
     <div className="fa-details">
       <h2 className="fa-details-title">{selected.name}</h2>
@@ -1759,6 +1926,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
       )}
       {mineResult}
+      {bulkMineResult}
       {/* Gate 18's first half. A toggle, because pin and unpin are one gesture
           and two buttons would let the app show both at once. */}
       <button

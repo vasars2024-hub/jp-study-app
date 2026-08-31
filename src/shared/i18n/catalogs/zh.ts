@@ -10600,6 +10600,18 @@ export const zh: Catalog = {
   'filesApp.smart.error.presetLocked': '此搜索内置于应用中，无法删除。你自己保存的可以删除。',
   'filesApp.smart.error.saveFailed':
     '无法保存你的已保存搜索。此更改现在有效，但重启应用后会丢失。',
+  'filesApp.bulk.selection': '批量选择',
+  'filesApp.bulk.selectItem': '选择 {name} 进行批量操作',
+  'filesApp.bulk.mine': '采集所选项目（{count}）',
+  'filesApp.bulk.mining': '正在采集所选项目（{count}）…',
+  'filesApp.bulk.clear': '清除选择',
+  'filesApp.bulk.progress': '已处理 {total} 项中的 {completed} 项。',
+  'filesApp.bulk.summary':
+    '{total} 项中有 {succeeded} 项添加了 {cards} 张卡片；{failed} 项失败。',
+  'filesApp.bulk.itemAdded': '已添加 {count} 张卡片。',
+  'filesApp.bulk.undo': '撤销所有新增卡片',
+  'filesApp.bulk.undone': '已移除此批量操作添加的全部 {count} 张卡片。',
+  'filesApp.mine.refuse.writeFailed': '无法将卡片写入卡组。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',
