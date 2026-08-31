@@ -408,11 +408,15 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 
 1. The index enumerates real items across all five groups, reporting a count per category that
    matches what is on disk / in the tables. A category reading 0 while items exist is a FINDING.
-   <!-- status: open; evidence: 2026-08-30 census omitted 19 live subtitles/<mediaId> files -->
+   <!-- status: open; evidence: 2026-08-30 live census found 3,238 deck cards and 23 Notebook rows absent from the main-process-only snapshot -->
    **2026-08-30 retraction:** the 1,760-item census proved five non-empty groups, but its Text
    readers omit the populated `subtitles/<mediaId>/` store, scan nested `yt-subs` as flat, and
    omit the distinct `subs-cache` flow. Gate 1 remains open until those readers and the live
    count are corrected; empty YouTube cache roots today are not a valid negative control.
+   **2026-08-30 second retraction:** after the subtitle repair, the production index still
+   reads only main-process stores. The live renderer owns **3,238** local deck cards in 2
+   folders and **23** Notebook rows; none is present in its snapshot. Gate 1 closes only after
+   those renderer-owned rows are merged into the derived index without moving their stores.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
@@ -530,4 +534,18 @@ two pull against each other anywhere else, this rule wins and the plan is wrong.
 
 ## Progress
 
-_(none yet — opened 2026-08-16)_
+### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
+
+Gate 1 remains **OPEN**. Debug-bridge evaluation against the running main renderer measured
+`jp-flashcard-deck`: **3,238 cards / 2 folders / 1,334,057 bytes**, split dictionary 3, epub
+3,218, media 17; `jp-grammarx-notebook-timeline-v1`: **23 rows / 3,973 bytes**, split audio 3,
+translations 20. The worktree index has no localStorage contribution, so its 1,783-row receipt
+omits at least 3,261 real rows. Empty output leaves were a finding, not an honest zero.
+
+Decision: renderer-owned stores stay renderer-owned. Files reads them through their existing
+pure parser/key/event contract and merges rows with the main snapshot in memory; shipping 1.3 MB
+through an IPC round trip or adding a main-process LevelDB reader would create a second owner.
+This checkpoint exports `FLASHCARD_DECK_STORAGE_KEY`, `FLASHCARD_DECK_EVENT`, the persisted
+shape, and the exact over-encoding-aware parser used by the deck itself. Focused regression:
+**28/28 passed** across the live-store draft and write suites. Next: after `wt/files-app` merges,
+add the renderer contribution for deck cards and Notebook rows, then repeat the live receipt.

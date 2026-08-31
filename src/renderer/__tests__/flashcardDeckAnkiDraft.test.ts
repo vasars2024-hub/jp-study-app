@@ -10,7 +10,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addDeckCards,
   createDeckFolder,
+  FLASHCARD_DECK_EVENT,
+  FLASHCARD_DECK_STORAGE_KEY,
   loadDeckAsAnkiDraft,
+  parseFlashcardDeckStore,
   setDeckCardFolder,
 } from '../flashcardDeck';
 import { LOCAL_DECK_NOTE_TYPE_NAME } from '../../shared/ankiLocalDeck';
@@ -20,6 +23,31 @@ beforeEach(() => {
 });
 
 describe('loadDeckAsAnkiDraft', () => {
+  it('exposes one read-only persistence contract for Files catalogue consumers', () => {
+    expect(FLASHCARD_DECK_STORAGE_KEY).toBe('jp-flashcard-deck');
+    expect(FLASHCARD_DECK_EVENT).toBe('flashcard-deck-changed');
+
+    const raw = JSON.stringify(JSON.stringify({
+      folders: ['Books', 42],
+      cards: [
+        { id: 'fc-1', word: '本', source: 'epub', addedAt: 1 },
+        null,
+        { word: 'missing id' },
+      ],
+    }));
+    expect(parseFlashcardDeckStore(raw)).toEqual({
+      store: {
+        folders: ['Books'],
+        cards: [{ id: 'fc-1', word: '本', source: 'epub', addedAt: 1 }],
+      },
+      layers: 2,
+    });
+    expect(parseFlashcardDeckStore('not-json')).toEqual({
+      store: { folders: [], cards: [] },
+      layers: 0,
+    });
+  });
+
   it('reads an empty store without inventing anything', () => {
     const { draft, summary } = loadDeckAsAnkiDraft();
     expect(draft.notes).toEqual([]);
@@ -77,7 +105,7 @@ describe('loadDeckAsAnkiDraft', () => {
   it('reads a deck through the store over-encoding repair rather than as empty', () => {
     // The v1.0 audit 5.1 shape: one extra JSON layer over the whole store.
     const store = { folders: [], cards: [{ id: 'fc-1', word: '雨', reading: 'あめ', meaning: 'rain', source: 'epub', addedAt: 1 }] };
-    localStorage.setItem('jp-flashcard-deck', JSON.stringify(JSON.stringify(store)));
+    localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify(JSON.stringify(store)));
 
     const { draft, summary } = loadDeckAsAnkiDraft();
     expect(summary.cardsRead).toBe(1);
