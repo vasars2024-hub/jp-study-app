@@ -27,6 +27,11 @@ export interface FilesDeletionTarget {
   kind: string;
   location: FilesDeletionLocation;
   sizeBytes: number | null;
+  /**
+   * The catalogue points at a user-owned file in place. Removing this item must
+   * hide the index row only; it must never trash the original file (gate 30).
+   */
+  referenced?: boolean;
 }
 
 export interface FilesDeletionPlan {
@@ -45,6 +50,18 @@ export function deletionModeForLocation(location: FilesDeletionLocation): FilesD
   return 'soft';
 }
 
+/**
+ * Resolve the actual operation, including reference-in-place ownership.
+ *
+ * A referenced file is still file-backed for Open and Reveal, but it is
+ * index-backed for Delete. Keeping that distinction on the target prevents a
+ * generic `location.store === 'file'` branch from deleting user-owned bytes.
+ */
+export function deletionModeForTarget(target: FilesDeletionTarget): FilesDeletionMode {
+  if (target.location.store === 'file' && target.referenced === true) return 'soft';
+  return deletionModeForLocation(target.location);
+}
+
 const IRREPLACEABLE_MEDIA_KINDS: ReadonlySet<string> = new Set(['video', 'audio']);
 
 /** The caller cannot downgrade media risk with a request field. */
@@ -58,7 +75,7 @@ export function deletionRiskForKind(kind: string): FilesDeletionRisk {
  * Recycle Bin wording and imply a recovery path that does not exist.
  */
 export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPlan {
-  const mode = deletionModeForLocation(target.location);
+  const mode = deletionModeForTarget(target);
   const risk = deletionRiskForKind(target.kind);
   const messageKey =
     mode === 'trash'
@@ -75,7 +92,9 @@ export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPla
     risk,
     messageKey,
     messageValues: { name: target.name, sizeBytes: target.sizeBytes },
-    requiresExplicitConfirmation: risk === 'irreplaceable-media' && mode !== 'none',
+    // The separate media guard protects bytes. Removing a reference is an
+    // undoable index action and leaves those bytes untouched.
+    requiresExplicitConfirmation: risk === 'irreplaceable-media' && mode === 'trash',
   };
 }
 
@@ -143,7 +162,7 @@ export async function executeFilesDeletion(
   try {
     if (plan.mode === 'trash') {
       const path = target.location.store === 'file' ? target.location.path : null;
-      if (!path) {
+      if (!path?.trim()) {
         return { ok: false, itemId: target.id, reasonKey: 'filesApp.delete.failed' };
       }
       await dependencies.trashFile(path);

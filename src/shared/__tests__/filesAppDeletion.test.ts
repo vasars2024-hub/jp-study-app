@@ -78,6 +78,31 @@ describe('Files app deletion policy', () => {
     expect(deps.trashFile).not.toHaveBeenCalled();
   });
 
+  it('removes a referenced file from the index without touching the user-owned original', async () => {
+    const deps = dependencies();
+    const referencedVideo = target({
+      id: 'media:referenced-episode',
+      name: 'Referenced episode.mkv',
+      kind: 'video',
+      location: { store: 'file', path: 'D:\\Anime\\Referenced episode.mkv' },
+      referenced: true,
+    });
+
+    expect(planFilesDeletion(referencedVideo)).toMatchObject({
+      mode: 'soft',
+      risk: 'irreplaceable-media',
+      messageKey: 'filesApp.delete.confirmSoft',
+      requiresExplicitConfirmation: false,
+    });
+    await expect(executeFilesDeletion(referencedVideo, {}, deps)).resolves.toMatchObject({
+      ok: true,
+      itemId: 'media:referenced-episode',
+      mode: 'soft',
+    });
+    expect(deps.softDelete).toHaveBeenCalledWith(referencedVideo);
+    expect(deps.trashFile).not.toHaveBeenCalled();
+  });
+
   it('refuses computed state without invoking either destructive dependency', async () => {
     const deps = dependencies();
     const result = await executeFilesDeletion(
@@ -142,5 +167,14 @@ describe('Files app deletion policy', () => {
       reasonKey: 'filesApp.delete.failed',
       detail: 'Recycle Bin unavailable',
     });
+  });
+
+  it('refuses a blank file path before invoking the trash dependency', async () => {
+    const deps = dependencies();
+
+    await expect(
+      executeFilesDeletion(target({ location: { store: 'file', path: '   ' } }), {}, deps),
+    ).resolves.toMatchObject({ ok: false, reasonKey: 'filesApp.delete.failed' });
+    expect(deps.trashFile).not.toHaveBeenCalled();
   });
 });
