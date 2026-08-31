@@ -214,6 +214,8 @@ describe('presentability and reversibility are the same predicate', () => {
 
   it('keeps Note conventional by default but permits its explicit reversible Liquid palette', () => {
     expect(canPresentLiquid('note')).toBe(true);
+    expect(canPresentLiquid('note', 'popout')).toBe(false);
+    expect(canPresentLiquid('note', 'reader')).toBe(false);
     expect(presentationToSnapshot({ section: 'note', presentation: LIQUID })).toEqual({ presentation: LIQUID });
   });
 

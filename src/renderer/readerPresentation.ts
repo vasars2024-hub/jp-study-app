@@ -77,7 +77,7 @@ function readMap(): PresentationMap {
  * was toggled back.
  */
 export function readReaderPresentation(kind: LibraryKind): LiquidPresentationState | undefined {
-  if (!canPresentLiquid(kind)) return undefined;
+  if (!canPresentLiquid(kind, 'reader')) return undefined;
   return readMap()[kind];
 }
 
@@ -118,7 +118,7 @@ export function toggleReaderPresentation(
   kind: LibraryKind,
   current: LiquidPresentationState | undefined,
 ): LiquidPresentationState | undefined {
-  if (!canPresentLiquid(kind)) return undefined;
+  if (!canPresentLiquid(kind, 'reader')) return undefined;
   const entering = current?.mode !== 'liquid';
   const rect = liveWindowRect();
   if (entering && !rect) return current;
@@ -155,7 +155,7 @@ export interface ReaderPresentation {
  */
 export function useReaderPresentation(kind: LibraryKind): ReaderPresentation {
   const [presentation, setPresentation] = useState(() => readReaderPresentation(kind));
-  const presentable = canPresentLiquid(kind);
+  const presentable = canPresentLiquid(kind, 'reader');
   const liquid = presentable && presentation?.mode === 'liquid';
   const toggle = useCallback(() => {
     setPresentation((current) => toggleReaderPresentation(kind, current));

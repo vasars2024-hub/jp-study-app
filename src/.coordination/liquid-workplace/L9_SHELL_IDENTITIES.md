@@ -88,3 +88,10 @@ Focused verification passed 2/2 and touched-path ESLint had 0 errors; i18n remai
 11,783 keys. Live Electron rendered one focusable BUTTON labelled `Open Music`; focusing and
 activating it opened a real Music floating window while Visualizer remained mounted. Visualizer's
 style/settings edge controls and full rubric receipt remain open.
+
+## 2026-08-30 — Note host-boundary correction
+
+The broad suite caught Note's desktop eligibility leaking into the manually addressable pop-out
+helper. Presentability is now host-aware: Note is eligible only on the desktop that owns its state;
+pop-out and reader helpers reject it, while all other prior policies are unchanged. The exact
+presentation boundary suite passes 93/93 after correction.

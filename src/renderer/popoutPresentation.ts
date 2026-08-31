@@ -77,7 +77,7 @@ function readMap(): PresentationMap {
 export function readPopoutPresentation(
   section: DesktopWinSection,
 ): LiquidPresentationState | undefined {
-  if (!canPresentLiquid(section)) return undefined;
+  if (!canPresentLiquid(section, 'popout')) return undefined;
   return readMap()[section];
 }
 
@@ -118,7 +118,7 @@ export function togglePopoutPresentation(
   section: DesktopWinSection,
   current: LiquidPresentationState | undefined,
 ): LiquidPresentationState | undefined {
-  if (!canPresentLiquid(section)) return undefined;
+  if (!canPresentLiquid(section, 'popout')) return undefined;
   const entering = current?.mode !== 'liquid';
   const rect = liveWindowRect();
   if (entering && !rect) return current;

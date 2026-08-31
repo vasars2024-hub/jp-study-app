@@ -27,7 +27,7 @@ import MiniShell from './components/MiniShell';
 import Lockscreen from './components/Lockscreen';
 // Lazy since Blanc got its own entry point (BLANC_REFINEMENT_PLAN.md Pillar 1).
 // The Blanc window now loads blanc.html, so this branch is only a fallback for
-// index.html?blanc=1 — and importing it eagerly cost the Study OS window the
+// index.html?blanc=1 - and importing it eagerly cost the Study OS window the
 // entire ~1.5 MB Blanc chunk on every cold start.
 const BlancShell = lazy(() => import('./components/blanc/BlancShell'));
 const BlancLockscreen = lazy(() =>
@@ -113,18 +113,18 @@ function AeroViewport({ children }: { children: ReactNode }) {
   );
 }
 
-/** Main window while Mini Widget is active — spawn/focus the floating widget. */
+/** Main window while Mini Widget is active - spawn/focus the floating widget. */
 function MiniMainBridge() {
   useEffect(() => {
     if (!loadMiniMode().enabled) return;
     void window.api.miniOpen();
   }, []);
-  // Fallback canvas if the floating widget fails to open — avoids a blank main window.
+  // Fallback canvas if the floating widget fails to open - avoids a blank main window.
   return <MiniShell />;
 }
 
 // Sections that may be shown alone in a pop-out window. Mirrors POPOUT_SECTIONS
-// in the main process (src/main.ts). `player`→Media and `city`→Mooncap match the
+// in the main process (src/main.ts). `player`Media and `city`Mooncap match the
 // desktop's app labels.
 const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   agent: 'Agent',
@@ -137,8 +137,8 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   translate: 'Translate',
   player: 'Media Center',
   scraper: 'Scraper',
-  video: 'Media Center · Video',
-  music: 'Media Center · Music',
+  video: 'Media Center � Video',
+  music: 'Media Center � Music',
   musicwidget: '',
   anki: 'Anki',
   flashcards: 'Flashcards',
@@ -190,7 +190,7 @@ function secondaryDesktop(): { desktopIndex: number; displayKey: string } | null
 
 // Study OS: the desktop shell is the whole app. Opening a book/manga takes over
 // the window with the reader; closing it returns to the desktop. A pop-out
-// window (?popout=…) instead shows just one app, full-window.
+// window (?popout=.) instead shows just one app, full-window.
 export default function App() {
   const [reading, setReading] = useState<LibraryItem | null>(null);
   const [focusMode, setFocusModeState] = useState(loadFocusMode);
@@ -205,13 +205,13 @@ export default function App() {
   const [studyBootNonce, setStudyBootNonce] = useState(0);
   const popout = popoutSection();
   const [secondary] = useState(secondaryDesktop);
-  // L3.2 — the pop-out's own presentation state. Hoisted above every early
+  // L3.2 - the pop-out's own presentation state. Hoisted above every early
   // return because hooks cannot be conditional; a window that is not a pop-out
   // reads `undefined` and never renders the toggle.
   const [popoutPresentation, setPopoutPresentation] = useState(() =>
     popout ? readPopoutPresentation(popout) : undefined,
   );
-  const popoutPresentable = popout != null && canPresentLiquid(popout);
+  const popoutPresentable = popout != null && canPresentLiquid(popout, 'popout');
   const popoutLiquid = popoutPresentable && popoutPresentation?.mode === 'liquid';
   const togglePopoutLiquid = useCallback(() => {
     if (!popout) return;
@@ -231,7 +231,7 @@ export default function App() {
     markLockscreenUnlocked();
     const pendingAeroBoot = consumePendingAeroBoot();
     const pendingWiredBoot = consumePendingWiredBoot();
-    // Lockscreen replaces the boot splash on cold launch — don't replay it on unlock.
+    // Lockscreen replaces the boot splash on cold launch - don't replay it on unlock.
     if (!pendingAeroBoot && !pendingWiredBoot) {
       try {
         sessionStorage.setItem('jp-booted', '1');
@@ -293,14 +293,14 @@ export default function App() {
     return () => window.removeEventListener(AERO_ENTRY_LOCKED_EVENT, onEntryLocked);
   }, []);
 
-  // Chrome extension selection mining → local flashcard collection (Phase 9).
+  // Chrome extension selection mining  local flashcard collection (Phase 9).
   useEffect(() => {
     return window.api.onExtensionMined((payload) => {
       const text = (payload.text || '').trim();
       const term =
         (payload.term || '').trim() ||
         text
-          .split(/[\s。．！？!?]+/)
+          .split(/[\s?.!?!?]+/)
           .find((s) => s.trim().length > 0)
           ?.trim()
           .slice(0, 40) ||
@@ -309,7 +309,7 @@ export default function App() {
       const mode =
         payload.mode === 'word' || payload.mode === 'sentence'
           ? payload.mode
-          : text.length > 40 || /[。．！？!?]/.test(text)
+          : text.length > 40 || /[?.!?!?]/.test(text)
             ? 'sentence'
             : 'word';
       const folder =
@@ -342,7 +342,7 @@ export default function App() {
     });
   }, []);
 
-  // Extension audio → Whisper (installed model in renderer worker).
+  // Extension audio  Whisper (installed model in renderer worker).
   useEffect(() => {
     return window.api.onExtensionTranscribeRequest(({ id, pcmBase64 }) => {
       void (async () => {
@@ -362,7 +362,7 @@ export default function App() {
     });
   }, []);
 
-  // Transcription queue → Whisper. The main process owns the queue but cannot
+  // Transcription queue  Whisper. The main process owns the queue but cannot
   // run the model, so it asks the renderer one chunk at a time.
   useEffect(() => {
     return window.api.onTranscriptionChunkRequest?.(({ id, pcmBase64, lang }) => {
@@ -404,8 +404,8 @@ export default function App() {
         folder: 'Media',
         audioPath: card.audioPath,
         sceneReference: card.timing === 'chunk-estimated'
-          ? `≈ ${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`
-          : `${card.startSec.toFixed(2)}–${card.endSec.toFixed(2)} s`,
+          ? `� ${card.startSec.toFixed(2)}-${card.endSec.toFixed(2)} s`
+          : `${card.startSec.toFixed(2)}-${card.endSec.toFixed(2)} s`,
         timingFidelity: card.timing,
         // Machine-read speech, not an authored subtitle line. A card that can be
         // wrong about what was said has to say where the text came from.
@@ -423,7 +423,7 @@ export default function App() {
     });
   }, []);
 
-  // Extension → app clipboard history
+  // Extension  app clipboard history
   useEffect(() => {
     return window.api.onExtensionClipboardAppend((payload) => {
       const text = (payload.text || '').trim();
@@ -563,7 +563,7 @@ export default function App() {
           if (!estimate) {
             window.api.replyLevelEstimate(id, {
               ok: true,
-              badge: '—',
+              badge: '-',
               noLists: true,
               lang,
               scheme: lang === 'zh' ? 'hsk' : 'jlpt',
@@ -573,7 +573,7 @@ export default function App() {
           const badge = compactLevelBadge(estimate.label);
           window.api.replyLevelEstimate(id, {
             ok: true,
-            badge: badge || '—',
+            badge: badge || '-',
             lang,
             scheme: estimate.scheme,
             label: estimate.label,
@@ -582,7 +582,7 @@ export default function App() {
         } catch (err) {
           window.api.replyLevelEstimate(id, {
             ok: false,
-            badge: '—',
+            badge: '-',
             error: err instanceof Error ? err.message : String(err),
           });
         }
@@ -619,7 +619,7 @@ export default function App() {
     }
   }, []);
 
-  // Global toggle — desktop and focus shell both honor this command
+  // Global toggle - desktop and focus shell both honor this command
   useEffect(() => {
     return registerCommandHandler('study.focusMode', () => {
       toggleFocusMode();
@@ -632,12 +632,12 @@ export default function App() {
   const closeReader = useCallback(() => setReading(null), []);
   useReaderResumeHandoff(Boolean(reading), closeReader);
 
-  // Transparent OS overlay for desktop pets (L4) — skip chrome / boot entirely.
+  // Transparent OS overlay for desktop pets (L4) - skip chrome / boot entirely.
   if (isCompanionHostWindow()) {
     return <CompanionHostView />;
   }
 
-  // Floating Mini Widget window — only the craft panel (transparent OS chrome).
+  // Floating Mini Widget window - only the craft panel (transparent OS chrome).
   if (isMiniWidgetWindow()) {
     return (
       <>
@@ -647,7 +647,7 @@ export default function App() {
     );
   }
 
-  // Floating lock widget — frameless transparent PIN panel only.
+  // Floating lock widget - frameless transparent PIN panel only.
   if (isLockscreenWindow()) {
     return (
       <>
@@ -682,7 +682,7 @@ export default function App() {
     );
   }
 
-  // PIN gate — full-screen lock UI over a pre-mounted desktop so the unlock
+  // PIN gate - full-screen lock UI over a pre-mounted desktop so the unlock
   // fade never reveals an empty black canvas behind it.
   if (locked && !popout && !secondary) {
     return (
@@ -699,7 +699,7 @@ export default function App() {
   }
 
   // Focus mode: no desktop / living layer / clipboard chrome.
-  // A per-monitor desktop never enters focus/mini/lock — those are modes of the
+  // A per-monitor desktop never enters focus/mini/lock - those are modes of the
   // main window, and mirroring them onto every monitor would blank them all.
   if (focusMode && !popout && !secondary) {
     return (
@@ -754,12 +754,12 @@ export default function App() {
 
   if (popout) {
     // The OS window itself is borderless (frame: false), so we supply our own
-    // thin drag strip + window buttons — the immersive frameless look.
+    // thin drag strip + window buttons - the immersive frameless look.
     const flush = popout === 'music' || popout === 'city' || popout === 'musicwidget' || popout === 'settings' || popout === 'games';
     const mooncapWidget = popout === 'city';
     return (
       <div
-        // L5/L3.2 — this host is the second Liquid destination. Until now every
+        // L5/L3.2 - this host is the second Liquid destination. Until now every
         // interior rule was scoped to `.fwin.fwin-liquid`, so the four apps that
         // adopted Liquid regions had them permanently inert once popped out.
         // `popout-liquid` is the pop-out's own opt-in class; the frame stays
@@ -783,7 +783,7 @@ export default function App() {
         <GlobalDictionaryOverlay />
         <ToastHost />
         {/* Slice 14: `player` routes to the workspace too, and a pop-out is its own
-            renderer — without a host here its open button dispatched into nothing. */}
+            renderer - without a host here its open button dispatched into nothing. */}
         {sectionOpensMediaWorkspace(popout) && <MediaWorkspaceHost />}
       </div>
     );
@@ -820,7 +820,7 @@ export default function App() {
  *
  * Two things differ from the main window. The desktop index is pinned rather
  * than read from `activeDesktopIndex`, and `main/desktopWindows.ts` can retarget
- * it in place when the user reassigns the display in Settings — cheaper and less
+ * it in place when the user reassigns the display in Settings - cheaper and less
  * jarring than tearing the window down and rebuilding it.
  *
  * B8: the fixed 1280x960 Aero canvas letterboxes badly on a portrait or
@@ -846,11 +846,11 @@ function SecondaryDesktopWindow({
 
   /**
    * The query string names the desktop this window was *created* for, and a
-   * retarget deliberately does not rebuild the window — so after any reload the
+   * retarget deliberately does not rebuild the window - so after any reload the
    * URL names a desktop this display no longer shows.
    *
    * Measured on a simulated second display: assigned desktop index 2, reloaded,
-   * and the shell came back showing index 1 — the value baked into its URL —
+   * and the shell came back showing index 1 - the value baked into its URL -
    * while the store, main's registry and Settings -> Monitors all still said 2.
    *
    * Main owns the assignment, so ask it instead of trusting the URL. The URL
@@ -928,19 +928,19 @@ function PopoutChrome({
             aria-pressed={liquid}
             onClick={onToggleLiquid}
           >
-            {liquid ? '◆' : '◇'}
+            {liquid ? '?' : '?'}
           </button>
         )}
         <button className="popout-btn" title="Minimize" onClick={() => void window.api.popoutControl('minimize')}>
-          ─
+          �
         </button>
         {canMaximize && (
           <button className="popout-btn" title="Maximize" onClick={() => void window.api.popoutControl('maximize')}>
-            ▢
+            ?
           </button>
         )}
         <button className="popout-btn popout-close" title="Close" onClick={() => void window.api.popoutControl('close')}>
-          ×
+          x
         </button>
       </div>
     </div>
