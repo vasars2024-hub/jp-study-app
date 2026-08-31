@@ -16,21 +16,47 @@ import type { ScrapeJobSummary, ScrapeResult } from '../../shared/scraperResults
 import { scraperLog } from './logBus';
 import { readScraperJson, scraperStorePath, writeScraperJson } from './store';
 
-const INDEX_FILE = 'history.json';
-const RESULTS_DIR = 'results';
+/** Persisted locations shared with read-only catalogues such as Files. */
+export const SCRAPER_HISTORY_INDEX_FILE = 'history.json';
+export const SCRAPER_HISTORY_RESULTS_DIRECTORY = 'results';
 /** Runs kept on disk. Older ones are dropped with their result files. */
 const MAX_HISTORY = 50;
 
-interface StoredSummary extends ScrapeJobSummary {
+export interface StoredScrapeJobSummary extends ScrapeJobSummary {
   /** Absolute time, so age is computed on read instead of going stale. */
   finishedAt: number;
 }
 
-interface HistoryFile {
-  jobs: StoredSummary[];
+export interface ScraperHistoryFile {
+  jobs: StoredScrapeJobSummary[];
 }
 
-const EMPTY: HistoryFile = { jobs: [] };
+const EMPTY: ScraperHistoryFile = { jobs: [] };
+
+/**
+ * Read the durable index without assuming a fixture-authored shape.
+ *
+ * Files consumes the same stored rows as History. A corrupt top-level object,
+ * a non-array `jobs`, or a malformed row becomes an honest omission instead of
+ * taking down either surface. Only identity is required for legacy rows; an old
+ * row without `finishedAt` remains visible with epoch 0 rather than disappearing.
+ */
+export function scraperHistoryJobsFromStoredDocument(value: unknown): StoredScrapeJobSummary[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const jobs = (value as { jobs?: unknown }).jobs;
+  if (!Array.isArray(jobs)) return [];
+  return jobs.flatMap((candidate) => {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return [];
+    const row = candidate as Partial<StoredScrapeJobSummary>;
+    if (typeof row.id !== 'string' || !row.id) return [];
+    return [{
+      ...row,
+      finishedAt: typeof row.finishedAt === 'number' && Number.isFinite(row.finishedAt)
+        ? row.finishedAt
+        : 0,
+    } as StoredScrapeJobSummary];
+  });
+}
 
 /**
  * Provider URLs are commonly signed and provider headers may contain cookies
@@ -61,22 +87,22 @@ function resultFile(jobId: string): string {
   // Job ids are minted by the engine, but a path is a path: anything that could
   // climb out of the results directory is refused rather than sanitised.
   if (!/^[A-Za-z0-9_-]+$/.test(jobId)) throw new Error(`Unusable job id: ${jobId}`);
-  return path.join(RESULTS_DIR, `${jobId}.json`);
+  return path.join(SCRAPER_HISTORY_RESULTS_DIRECTORY, `${jobId}.json`);
 }
 
 export async function recordJob(summary: ScrapeJobSummary, result: ScrapeResult): Promise<void> {
   try {
     await writeScraperJson(resultFile(summary.id), resultForScraperHistory(result));
-    const file = await readScraperJson<HistoryFile>(INDEX_FILE, EMPTY);
+    const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
     // `ageMinutes` is relative and would be a lie the moment it is written;
     // `finishedAt` replaces it and the age is recomputed on read.
-    const stored: StoredSummary = { ...summary, finishedAt: Date.now() };
-    const jobs: StoredSummary[] = [
+    const stored: StoredScrapeJobSummary = { ...summary, finishedAt: Date.now() };
+    const jobs: StoredScrapeJobSummary[] = [
       stored,
-      ...file.jobs.filter((job) => job.id !== summary.id),
+      ...scraperHistoryJobsFromStoredDocument(file).filter((job) => job.id !== summary.id),
     ];
     const kept = jobs.slice(0, MAX_HISTORY);
-    await writeScraperJson(INDEX_FILE, { jobs: kept });
+    await writeScraperJson(SCRAPER_HISTORY_INDEX_FILE, { jobs: kept });
 
     for (const dropped of jobs.slice(MAX_HISTORY)) {
       await fsp.rm(scraperStorePath(resultFile(dropped.id)), { force: true }).catch(() => undefined);
@@ -94,9 +120,9 @@ export async function recordJob(summary: ScrapeJobSummary, result: ScrapeResult)
 
 /** Stored summaries, newest first, with age recomputed against now. */
 export async function storedSummaries(): Promise<ScrapeJobSummary[]> {
-  const file = await readScraperJson<HistoryFile>(INDEX_FILE, EMPTY);
+  const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
   const now = Date.now();
-  return file.jobs.map((stored) => ({
+  return scraperHistoryJobsFromStoredDocument(file).map((stored) => ({
     ...stored,
     ageMinutes: Math.max(0, Math.round((now - stored.finishedAt) / 60_000)),
   }));
@@ -118,8 +144,8 @@ export async function previousEpisodeIds(
   excludeJobId: string,
 ): Promise<Set<string> | null> {
   if (!seriesId) return null;
-  const file = await readScraperJson<HistoryFile>(INDEX_FILE, EMPTY);
-  const previous = file.jobs
+  const file = await readScraperJson<unknown>(SCRAPER_HISTORY_INDEX_FILE, EMPTY);
+  const previous = scraperHistoryJobsFromStoredDocument(file)
     .filter((job) => job.seriesId === seriesId && job.id !== excludeJobId)
     .sort((a, b) => b.finishedAt - a.finishedAt)[0];
   if (!previous) return null;
@@ -138,6 +164,6 @@ export async function storedResult(jobId: string): Promise<ScrapeResult | null> 
 
 /** Test seam — removes the index and every stored result. */
 export async function clearScraperHistory(): Promise<void> {
-  await fsp.rm(scraperStorePath(INDEX_FILE), { force: true }).catch(() => undefined);
-  await fsp.rm(scraperStorePath(RESULTS_DIR), { recursive: true, force: true }).catch(() => undefined);
+  await fsp.rm(scraperStorePath(SCRAPER_HISTORY_INDEX_FILE), { force: true }).catch(() => undefined);
+  await fsp.rm(scraperStorePath(SCRAPER_HISTORY_RESULTS_DIRECTORY), { recursive: true, force: true }).catch(() => undefined);
 }

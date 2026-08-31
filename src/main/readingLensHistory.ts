@@ -32,7 +32,8 @@ import {
 } from '../shared/readingLensHistory';
 import { normalizeReadingLensCapture } from '../shared/readingLens';
 
-const HISTORY_FILE = 'reading-lens-history.json';
+/** Persisted location shared with read-only catalogues such as Files. */
+export const READING_LENS_HISTORY_FILE = 'reading-lens-history.json';
 
 /**
  * Loaded once and kept in memory. The file is at most a few hundred short
@@ -51,7 +52,7 @@ let entries: ReadingLensHistoryEntry[] | null = null;
 let retentionDays: ReadingLensRetentionDays = READING_LENS_RETENTION_DEFAULT;
 
 function historyPath(): string {
-  return path.join(app.getPath('userData'), HISTORY_FILE);
+  return path.join(app.getPath('userData'), READING_LENS_HISTORY_FILE);
 }
 
 function load(): ReadingLensHistoryEntry[] {

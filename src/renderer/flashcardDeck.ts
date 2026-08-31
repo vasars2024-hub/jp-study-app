@@ -90,7 +90,14 @@ export interface DeckFlashcard {
 
 export type DeckFolderFilter = 'all' | 'unfiled' | string;
 
-interface FlashcardDeckStore {
+/**
+ * Persisted renderer-owned deck shape.
+ *
+ * Exported for read-only catalogue consumers such as the Files app. The deck
+ * remains owned by this module; exposing its shape does not give another
+ * surface a second writer.
+ */
+export interface FlashcardDeckStore {
   folders: string[];
   cards: DeckFlashcard[];
 }
@@ -106,8 +113,44 @@ import { isOverEncoded, quarantineIfUnrepaired, unwrapOverEncoded } from '../sha
 import { emitCompanionEvent } from './environment/companionEvents';
 import { logBlanc } from './blancConsole';
 
-const KEY = 'jp-flashcard-deck';
-const EVENT = 'flashcard-deck-changed';
+/** Stable localStorage key shared with read-only Files catalogue consumers. */
+export const FLASHCARD_DECK_STORAGE_KEY = 'jp-flashcard-deck';
+/** Emitted after this module has persisted a deck change. */
+export const FLASHCARD_DECK_EVENT = 'flashcard-deck-changed';
+
+export interface ParsedFlashcardDeckStore {
+  store: FlashcardDeckStore;
+  /** Successful JSON layers; greater than one means the legacy over-encoding defect. */
+  layers: number;
+}
+
+/**
+ * Parse the established store without reading or mutating browser storage.
+ *
+ * Files needs the same acceptance rule as the deck itself: one parser prevents
+ * an over-encoded live deck from becoming 0 rows in one surface and 3,238 in
+ * another. Invalid rows are skipped exactly as the existing reader skipped
+ * them, and an unreadable value is an honest empty result.
+ */
+export function parseFlashcardDeckStore(raw: string | null): ParsedFlashcardDeckStore {
+  try {
+    const { value, layers } = unwrapOverEncoded<Partial<FlashcardDeckStore>>(raw);
+    const parsed = (value ?? {}) as Partial<FlashcardDeckStore>;
+    return {
+      store: {
+        folders: Array.isArray(parsed.folders)
+          ? parsed.folders.filter((folder): folder is string => typeof folder === 'string')
+          : [],
+        cards: Array.isArray(parsed.cards)
+          ? parsed.cards.filter((card): card is DeckFlashcard => !!card && typeof card.id === 'string')
+          : [],
+      },
+      layers,
+    };
+  } catch {
+    return { store: { folders: [], cards: [] }, layers: 0 };
+  }
+}
 
 function newId(): string {
   return `fc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -115,25 +158,20 @@ function newId(): string {
 
 function readStore(): FlashcardDeckStore {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(FLASHCARD_DECK_STORAGE_KEY);
     if (!raw) return { folders: [], cards: [] };
     // v1.0 audit 5.1 — this key accumulated one JSON layer per boot from an old
     // migration-runner bug. A single parse then yields a *string*, both checks
     // below fail, and a real deck reads as empty (measured: 3,221 cards gone,
     // 37.25 MB of text, 5.2 s of blocked main thread per read).
-    const { value, layers } = unwrapOverEncoded<Partial<FlashcardDeckStore>>(raw);
-    const parsed = (value ?? {}) as Partial<FlashcardDeckStore>;
-    const store: FlashcardDeckStore = {
-      folders: Array.isArray(parsed.folders) ? parsed.folders.filter((f) => typeof f === 'string') : [],
-      cards: Array.isArray(parsed.cards) ? parsed.cards.filter((c) => c && typeof c.id === 'string') : [],
-    };
+    const { store, layers } = parseFlashcardDeckStore(raw);
     // Self-heal once, so the cost is paid a single time rather than per read.
     // Only when peeling actually recovered a deck — never write back an empty
     // store over a value we simply failed to understand.
     if (isOverEncoded(layers)) {
       if (store.cards.length > 0 || store.folders.length > 0) {
         try {
-          localStorage.setItem(KEY, JSON.stringify(store));
+          localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify(store));
           mirrorToIdb(IDB_KEYS.flashcardDeck, store);
         } catch {
           /* quota — the value stays as it was and the next read peels again */
@@ -141,7 +179,7 @@ function readStore(): FlashcardDeckStore {
       } else {
         // Damaged and unrecoverable. The first deck write would overwrite it,
         // so keep a copy — this is the loss that happened to the CSV draft.
-        quarantineIfUnrepaired(localStorage, KEY, layers);
+        quarantineIfUnrepaired(localStorage, FLASHCARD_DECK_STORAGE_KEY, layers);
       }
     }
     return store;
@@ -152,14 +190,14 @@ function readStore(): FlashcardDeckStore {
 
 function writeStore(store: FlashcardDeckStore): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(store));
+    localStorage.setItem(FLASHCARD_DECK_STORAGE_KEY, JSON.stringify(store));
   } catch {
     /* localStorage full — the IndexedDB mirror below still persists it */
   }
   // Write-through to IndexedDB: durable home for deck data. localStorage is
   // just the synchronous cache (see storage/storage.ts).
   mirrorToIdb(IDB_KEYS.flashcardDeck, store);
-  window.dispatchEvent(new CustomEvent(EVENT));
+  window.dispatchEvent(new CustomEvent(FLASHCARD_DECK_EVENT));
 }
 
 export function loadDeck(): DeckFlashcard[] {
@@ -586,10 +624,10 @@ export function groupDeckByBook(cards: DeckFlashcard[]): BookGroup[] {
 
 export function onDeckChanged(cb: () => void): () => void {
   const handler = (): void => cb();
-  window.addEventListener(EVENT, handler);
+  window.addEventListener(FLASHCARD_DECK_EVENT, handler);
   window.addEventListener('storage', handler);
   return () => {
-    window.removeEventListener(EVENT, handler);
+    window.removeEventListener(FLASHCARD_DECK_EVENT, handler);
     window.removeEventListener('storage', handler);
   };
 }

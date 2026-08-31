@@ -540,6 +540,11 @@ describe('capture history IPC', () => {
     };
   }
 
+  it('shares the established history location with Files catalogue consumers', async () => {
+    const { READING_LENS_HISTORY_FILE } = await import('../readingLensHistory');
+    expect(READING_LENS_HISTORY_FILE).toBe(HISTORY);
+  });
+
   beforeEach(() => {
     fs.rmSync(historyPath(), { force: true });
   });
@@ -874,6 +879,7 @@ describe('default OCR engine', () => {
     m.registerReadingLensIpc();
     return m;
   }
+
   const init = (): { defaultEngine: string } => h.ipc.handlers.get('lens:getInit')!() as never;
   const setEngine = async (engine: unknown): Promise<{ defaultEngine: string }> =>
     (await h.ipc.handlers.get('lens:setDefaultEngine')!({}, engine)) as never;
