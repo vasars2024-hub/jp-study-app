@@ -722,6 +722,14 @@ export default function DesktopShell({
   const [notes, setNotes] = useState<Record<string, NoteData>>({});
   const [widgets, setWidgets] = useState<WidgetSnapshot[]>([]);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  /**
+   * Tray overflow ("show hidden icons"), the shell's own progressive-disclosure
+   * idiom. The secondary tray commands live behind it rather than in the bar; it
+   * obscures nothing — the panel is one click or one Enter away and every item
+   * keeps its label there, which the 32px icon buttons in the bar never had.
+   */
+  const [trayOverflowOpen, setTrayOverflowOpen] = useState(false);
+  const trayOverflowBtnRef = useRef<HTMLButtonElement | null>(null);
   const [wall, setWall] = useState<WallChoice & { path?: string }>({ kind: 'preset', id: 'crimsonveil' });
   const [wallImage, setWallImage] = useState<string | null>(null);
   const [wallVideo, setWallVideo] = useState<string | null>(null);
@@ -3193,19 +3201,22 @@ export default function DesktopShell({
               <path d="M21 21l-4.3-4.3" />
             </svg>
           </button>
-          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} aria-haspopup="dialog" aria-expanded={galleryOpen} onClick={() => setGalleryOpen((o) => !o)}>
-            <Icon name="app" size={18} />
-          </button>
+          {/* Widgets, Clipboard history and Settings live behind this, exactly as
+              Windows tucks its secondary tray icons behind a chevron. */}
           <button
-            className="os-tray-btn"
-            title={t('desktop.clipboardHistory')}
+            type="button"
+            ref={trayOverflowBtnRef}
+            className={`os-tray-btn os-tray-overflow-btn ${trayOverflowOpen ? 'active' : ''}`}
+            title={t('desktop.tray.hiddenIcons')}
+            aria-label={t('desktop.tray.hiddenIcons')}
             aria-haspopup="dialog"
-            onClick={() => window.dispatchEvent(new CustomEvent('clipboard:open'))}
+            aria-expanded={trayOverflowOpen}
+            aria-controls={TRAY_OVERFLOW_ID}
+            onClick={() => setTrayOverflowOpen((o) => !o)}
           >
-            <Icon name="clipboard" size={18} />
-          </button>
-          <button className="os-tray-btn" title={t('palette.section.settings')} onClick={() => open('settings')}>
-            <Icon name="settings" size={18} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 14l6-6 6 6" />
+            </svg>
           </button>
           <button
             type="button"
@@ -3232,6 +3243,17 @@ export default function DesktopShell({
           />
         </div>
       </div>
+      {trayOverflowOpen && (
+        <TrayOverflow
+          onClose={() => {
+            setTrayOverflowOpen(false);
+            trayOverflowBtnRef.current?.focus();
+          }}
+          galleryOpen={galleryOpen}
+          onWidgets={() => setGalleryOpen((o) => !o)}
+          onSettings={() => open('settings')}
+        />
+      )}
       <DesktopLayerHost />
       <QuickSettings />
       <NotificationCenter />
@@ -3320,6 +3342,101 @@ function WiredTrayLamps() {
       <i className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`} />
       <i className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`} />
     </span>
+  );
+}
+
+/**
+ * The id the tray chevron names through `aria-controls`. It has to be a module
+ * constant so the toggle and the panel cannot drift apart — a disclosure whose
+ * `aria-controls` points at nothing is worse than no disclosure at all.
+ */
+const TRAY_OVERFLOW_ID = 'os-tray-overflow';
+
+/**
+ * Tray overflow panel — the "show hidden icons" flyout.
+ *
+ * The three secondary tray commands render here with their labels showing, so
+ * the disclosure is not a pure cost: in the bar they were 32px unlabelled icon
+ * buttons whose only naming was a `title` tooltip. Nothing becomes unreachable
+ * — Settings still opens from Start, the palette and Quick Settings' "All
+ * settings", and Widgets still has its desktop context menu.
+ */
+function TrayOverflow({
+  onClose,
+  galleryOpen,
+  onWidgets,
+  onSettings,
+}: {
+  onClose: () => void;
+  galleryOpen: boolean;
+  onWidgets: () => void;
+  onSettings: () => void;
+}) {
+  const { t } = useT();
+  const panelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    // Focus the panel itself rather than the first item: the items are commands,
+    // and landing on one makes Enter fire something the user only meant to reveal.
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+
+  /*
+   * `popup` mirrors the bar's own contract from a2e9c1ce: the two that open a
+   * flyout say so, and Settings — which opens a window — stays a plain command.
+   * Only Widgets carries `aria-expanded`; Clipboard dispatches a CustomEvent and
+   * its panel owns the state, so a stale `false` over an open panel is worse.
+   */
+  const items: { id: string; label: string; icon: ReactNode; popup?: boolean; expanded?: boolean; run: () => void }[] = [
+    { id: 'widgets', label: t('desktop.widgets'), icon: <Icon name="app" size={18} />, popup: true, expanded: galleryOpen, run: onWidgets },
+    {
+      id: 'clipboard',
+      label: t('desktop.clipboardHistory'),
+      icon: <Icon name="clipboard" size={18} />,
+      popup: true,
+      run: () => window.dispatchEvent(new CustomEvent('clipboard:open')),
+    },
+    { id: 'settings', label: t('palette.section.settings'), icon: <Icon name="settings" size={18} />, run: onSettings },
+  ];
+
+  return (
+    <>
+      <div className="os-panel-backdrop" onMouseDown={onClose} />
+      <aside
+        ref={panelRef}
+        tabIndex={-1}
+        id={TRAY_OVERFLOW_ID}
+        className="os-flyout os-flyout--tray anim-slide-up"
+        role="dialog"
+        aria-label={t('desktop.tray.hiddenIcons')}
+      >
+        <div className="os-flyout-body os-tray-overflow-body">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="os-tray-overflow-item ui-focusable"
+              aria-haspopup={item.popup ? 'dialog' : undefined}
+              aria-expanded={item.expanded}
+              onClick={() => {
+                item.run();
+                onClose();
+              }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </>
   );
 }
 

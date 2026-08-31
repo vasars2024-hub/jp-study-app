@@ -65,20 +65,23 @@ describe('the shell taskbar declares its popups', () => {
     expect(tag).toContain('aria-expanded={startOpen}');
   });
 
-  it('the Widgets tray button is a dialog button with a live expanded state', () => {
-    const tag = buttonTag(read(SHELL), "t('desktop.widgets')");
-    expect(tag).toContain('aria-haspopup="dialog"');
-    expect(tag).toContain('aria-expanded={galleryOpen}');
-  });
-
   it.each([
     ['search', "t('palette.searchPlaceholder')"],
-    ['clipboard history', "t('desktop.clipboardHistory')"],
     ['quick settings', "t('quickSettings.title')"],
   ])('the %s tray button declares its popup and claims no expanded state it cannot read', (_name, marker) => {
     const tag = buttonTag(read(SHELL), marker);
     expect(tag).toContain('aria-haspopup="dialog"');
     expect(tag).not.toContain('aria-expanded');
+  });
+
+  it('the tray overflow chevron is a dialog button that names the panel it reveals', () => {
+    // Widgets, Clipboard history and Settings moved behind this chevron (L9 bullet 4,
+    // cat5 Q4). Their own popup semantics are pinned in `shellTrayOverflow.test.ts`,
+    // against the item descriptors that now carry them.
+    const tag = buttonTag(read(SHELL), 'os-tray-overflow-btn');
+    expect(tag).toContain('aria-haspopup="dialog"');
+    expect(tag).toContain('aria-expanded={trayOverflowOpen}');
+    expect(tag).toContain('aria-controls={TRAY_OVERFLOW_ID}');
   });
 
   it('the notification bell declares its popup and claims no expanded state it cannot read', () => {
@@ -95,14 +98,6 @@ describe('the shell taskbar declares its popups', () => {
     }
   });
 
-  it('the Settings tray button opens a window, so it stays a plain command', () => {
-    // The one tray button that is NOT a popup. Pinned so a future sweep that adds
-    // `aria-haspopup` to everything in the tray has to argue with a test rather than a
-    // comment: it opens the settings WINDOW through `open('settings')`.
-    const tag = buttonTag(read(SHELL), "t('palette.section.settings')");
-    expect(tag).toContain('os-tray-btn');
-    expect(tag).not.toContain('aria-haspopup');
-  });
 });
 
 describe('controls — so the scan cannot pass vacuously', () => {

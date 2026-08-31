@@ -3832,6 +3832,7 @@ export const en: Catalog = {
   'desktop.task.minimize': 'Minimize',
   'desktop.task.restore': 'Restore',
   'desktop.clipboardHistory': 'Clipboard history (Ctrl+Shift+V)',
+  'desktop.tray.hiddenIcons': 'Show hidden icons',
   'desktop.desktopN': 'Desktop {n}',
   'desktop.dragToDesktop': 'Drag to desktop · click to open',
   'desktop.dragToMove': 'Drag to move on desktop · click to open',

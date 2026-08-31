@@ -3632,6 +3632,7 @@ export const ja: Catalog = {
   'desktop.task.minimize': '最小化',
   'desktop.task.restore': '元に戻す',
   'desktop.clipboardHistory': 'クリップボード履歴（Ctrl+Shift+V）',
+  'desktop.tray.hiddenIcons': '隠れているアイコンを表示',
   'desktop.desktopN': 'デスクトップ {n}',
   'desktop.dragToDesktop': 'デスクトップへドラッグ・クリックで開く',
   'desktop.dragToMove': 'ドラッグしてデスクトップ上で移動・クリックで開く',

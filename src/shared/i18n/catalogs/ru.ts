@@ -3913,6 +3913,7 @@ export const ru: Catalog = {
   'desktop.task.minimize': 'Свернуть',
   'desktop.task.restore': 'Восстановить',
   'desktop.clipboardHistory': 'История буфера обмена (Ctrl+Shift+V)',
+  'desktop.tray.hiddenIcons': 'Показать скрытые значки',
   'desktop.desktopN': 'Стол {n}',
   'desktop.dragToDesktop': 'Перетащите на рабочий стол · нажмите, чтобы открыть',
   'desktop.dragToMove':

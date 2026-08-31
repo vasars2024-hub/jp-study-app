@@ -64,6 +64,48 @@
   gap: var(--space-sm);
 }
 
+/* Tray overflow ("show hidden icons") — a small command list, not a settings
+   panel, so it drops the 360px body width and the header the other flyouts use.
+   Anchored by the shared .os-flyout rule, i.e. above the tray in every shell. */
+.os-flyout--tray {
+  width: auto;
+  min-width: 200px;
+}
+.os-tray-overflow-body {
+  padding: var(--space-2xs);
+  gap: 2px;
+}
+.os-tray-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.os-tray-overflow-item:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+/* The chevron points at the panel: up when the icons are hidden, down while
+   they are showing, which is the affordance Windows users already read. */
+.os-tray-overflow-btn[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.os-tray-overflow-btn svg {
+  transition: transform var(--dur-fast, 140ms) var(--ease-standard, ease);
+}
+html.reduce-motion .os-tray-overflow-btn svg {
+  transition: none !important;
+}
+
 /* Notification Center */
 .os-notif-empty {
   text-align: center;
