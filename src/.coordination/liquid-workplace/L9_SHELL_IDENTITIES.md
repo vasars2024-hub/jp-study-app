@@ -1309,3 +1309,42 @@ What the sample does and does not cover, so nobody over-reads it: the two host w
 the title-bar button and the taskbar context item, and the palette IS the command entry point,
 so all three of the bullet's entry points are represented — but only the command one was scored
 as a surface in its own right.
+
+## 2026-08-31 — primary — L9 bullet 1 CLOSED; gates; and bullet 4's ground truth, measured not assumed
+
+**Bullet 1 tag flipped to `closed`** in the plan with its evidence. Re-derived the whole-plan
+count with the plan's OWN prescribed method, `grep -c '^- .*status: closed;'` and siblings:
+**25 closed / 21 open / 0 unknown, summing to 46.**
+
+**COUNT CORRECTION, and the plan already warned about it.** The previous handoff's
+"25 closed / 22 open of 47" is the unanchored-grep overcount described at
+`LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md:443` — that line IS the counting instruction and
+contains the literal `status: closed;`, so a pattern without the `^- ` anchor counts the
+paragraph as a bullet. The true figure before this turn was **24 / 22**. The three counts must
+sum to 46, and 47 is the tell.
+
+Per phase (closed/open): L0 4/1 · L1 0/4 · L2 4/0 · L3 4/0 · L4 3/1 · L5 3/0 · L6 2/0 ·
+L7 0/2 · L8 2/0 · **L9 3/1** · L10 0/4 · L11 0/4 · L12 0/4.
+
+**Four gates, after the last slice.** `npx vitest run` **exit 0 — 946 files passed / 1 skipped,
+12,232 tests passed / 6 skipped / 0 FAILED**. `node tools/i18n-check.cjs` exit 0 at **11,793**
+English keys complete in ja/zh/ru. `node tools/architecture-audit.cjs` exit 0, 2,396 modules,
+28 findings, **Nothing new**. ESLint on the touched paths: 0 errors.
+
+**BULLET 4's ground truth, read off the live root rather than assumed** — so the next turn does
+not spend its first half hour here. `documentElement.dataset` currently carries
+`theme=forest-night`, `aeroSafeMode=off`, `appBorder=aero-glass`, and a full `wired*` block
+(`wiredCrt=standard`, `wiredStatic=full`, `wiredAmbient=on`, `wiredFinding=off`,
+`wiredMotion=full`, `wiredIdle=on`) — i.e. **the Wired settings exist while no Wired root is
+mounted** (`[class*="wired-"]` is absent; `[class*="aero-"]` is present). The lifecycle state
+lives in localStorage: `jp-aero-discovered`, `jp-wired-archive-boot-seen-v1`,
+`jp-aero-restore-theme-v1`, `jp-blanc-mode-v1`, `jp-aero-environment-v1`.
+
+Those five keys are the bullet's real subject and they are PERSISTED, so a lifecycle probe must
+capture-patch-restore them and assert byte-identical (`-ceq`), never toggle and hope. Correction
+29 already covers the naming half: both `cat7-perf.cjs` and `cat8-honest-states.cjs` accept
+`@<selector>`, so a Secret shell with no `.fwin-title-text` needs no new probe.
+
+**App state left exactly as found**: palette closed, Media Center on Video, City at
+`128px/84px/680x679`, Settings on Appearance (the `ui-language` card is on screen — the `--langs`
+leg refuses without it), theme forest-night, lang en.
