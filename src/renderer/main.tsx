@@ -42,6 +42,7 @@ import './motion/motion-system.css';
 import './components/ui/ui.css';
 // Accessibility foundation (Phase 1 · M8) — imported late to reinforce.
 import './theme/a11y.css';
+import './theme/aero-safe-mode.css';
 // Performance tiers (Phase 1 · M9).
 import './theme/perf.css';
 // Liquid Workplace semantic tokens (L2). Declares --lq-* custom properties on
@@ -94,6 +95,7 @@ import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
 import { applyBlancModeClass, isBlancWindow } from './blancMode';
 import { initAgentOperationalState } from './agentOperationalClient';
 import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
+import { bootAeroSafeMode } from './aeroSafeMode';
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -193,6 +195,7 @@ installZoomResizeHook();
 registerFrutigerAero();
 registerWiredArchive();
 bootTheme();
+bootAeroSafeMode();
 // The Blanc window (index.html?blanc=1) shares this entry with Study OS, but
 // has its own visual language and must never adopt the secret material packs
 // (aero/wired). Strip `data-materials` after bootTheme and keep it stripped, so

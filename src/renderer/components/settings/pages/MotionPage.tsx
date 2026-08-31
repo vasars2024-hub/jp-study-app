@@ -25,6 +25,8 @@ import {
 import { fireRewardAt } from '../../../motion/rewardBurst';
 import LiquidMeter from '../../../motion/LiquidMeter';
 import ScoreTicker from '../../../motion/ScoreTicker';
+import { loadAeroSafeMode, onAeroSafeModeChanged, setAeroSafeMode } from '../../../aeroSafeMode';
+import { inspectAeroRecoveryHealth, onAeroRecoveryHealthChanged } from '../../../aeroRecoveryHealth';
 
 export default function MotionPage() {
   const { t } = useT();
@@ -33,8 +35,12 @@ export default function MotionPage() {
   // Preview state so the sliders are verifiable by eye, not just by trust.
   const [previewFill, setPreviewFill] = useState(0.35);
   const [previewScore, setPreviewScore] = useState(0);
+  const [safeMode, setSafeMode] = useState(() => loadAeroSafeMode().enabled);
+  const [recoveryHealth, setRecoveryHealth] = useState(inspectAeroRecoveryHealth);
 
   useEffect(() => onMotionPrefsChanged(setM), []);
+  useEffect(() => onAeroSafeModeChanged((state) => setSafeMode(state.enabled)), []);
+  useEffect(() => onAeroRecoveryHealthChanged(setRecoveryHealth), []);
 
   const patch = (p: Partial<MotionPrefs>) => setM(saveMotionPrefs(p));
 
@@ -45,6 +51,49 @@ export default function MotionPage() {
 
   return (
     <>
+      <SettingsCard
+        id="aero-safe-mode"
+        title={t('search.aeroSafeMode')}
+        description={t('search.aeroSafeMode.desc')}
+        highlight={focusSettingId === 'aero-safe-mode'}
+      >
+        <div className="os-viz-row">
+          <span className={`badge ${safeMode ? 'ok' : ''}`} role="status">
+            {t(safeMode ? 'settings.motion.safeMode.on' : 'settings.motion.safeMode.off')}
+          </span>
+          <button
+            type="button"
+            className={safeMode ? 'btn' : 'btn primary'}
+            onClick={() => {
+              setSafeMode(setAeroSafeMode(!safeMode).enabled);
+              setRecoveryHealth(inspectAeroRecoveryHealth());
+            }}
+          >
+            {t(safeMode ? 'settings.motion.safeMode.disable' : 'settings.motion.safeMode.enable')}
+          </button>
+        </div>
+        <p className="muted os-set-hint">{t('settings.motion.safeMode.hint')}</p>
+        <div className="os-viz-row" role="status" style={{ marginTop: 10 }}>
+          <span className={recoveryHealth.issues.length ? 'aero-recovery-warning' : 'muted'}>
+            {t(
+              !recoveryHealth.storageAvailable
+                ? 'settings.motion.safeMode.healthUnavailable'
+                : recoveryHealth.issues.length
+                  ? 'settings.motion.safeMode.healthWarning'
+                  : 'settings.motion.safeMode.healthHealthy',
+              { count: recoveryHealth.issues.length },
+            )}
+          </span>
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => setRecoveryHealth(inspectAeroRecoveryHealth())}
+          >
+            {t('settings.motion.safeMode.rescan')}
+          </button>
+        </div>
+      </SettingsCard>
+
       <SettingsCard
         id="motion-mode"
         title={t('search.motionMode')}

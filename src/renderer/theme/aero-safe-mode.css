@@ -1,0 +1,31 @@
+/* Phase 5 · M16 — reversible Secret OS sensory fallback.
+   This layer changes presentation only; it never rewrites user preferences. */
+:root[data-materials='aero'][data-aero-safe-mode='on'] *,
+:root[data-materials='aero'][data-aero-safe-mode='on'] *::before,
+:root[data-materials='aero'][data-aero-safe-mode='on'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-particle-canvas,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-weather,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-day-lighting,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-companion-layer,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-companion-host-root,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-wall-video {
+  display: none !important;
+}
+
+:root[data-materials='aero'][data-aero-safe-mode='on'] .glass,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .os-flyout,
+:root[data-materials='aero'][data-aero-safe-mode='on'] .fwin {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.aero-recovery-warning {
+  color: var(--warn, #d97706);
+  font-weight: 600;
+}

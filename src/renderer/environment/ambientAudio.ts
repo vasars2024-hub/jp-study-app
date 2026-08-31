@@ -16,6 +16,7 @@ import type { EnvironmentSettings } from './types';
 import type { WallpaperCategory } from './wallpaperFramework';
 import { isMiniMode, onMiniModeChanged } from '../miniMode';
 import { onThemeChanged } from '../theme/engine';
+import { isAeroSafeModeApplied, onAeroSafeModeChanged } from '../aeroSafeMode';
 
 const CATEGORY_BED: Record<WallpaperCategory, string> = {
   nature: 'forest',
@@ -40,7 +41,7 @@ function isAeroActive(): boolean {
 
 /** Secret OS mini widget — silence living-layer ambience beds. */
 function atmosphereSuppressed(): boolean {
-  return isAeroActive() && isMiniMode();
+  return isAeroSafeModeApplied() || (isAeroActive() && isMiniMode());
 }
 
 function desiredBed(env: EnvironmentSettings): string | null {
@@ -103,5 +104,6 @@ export function installAmbientAudio(): void {
   onEnvironmentChanged((env) => void sync(env));
   onMiniModeChanged(resync);
   onThemeChanged(resync);
+  onAeroSafeModeChanged(resync);
   window.addEventListener('jp-perf-changed', resync);
 }
