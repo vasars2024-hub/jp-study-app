@@ -1348,3 +1348,49 @@ capture-patch-restore them and assert byte-identical (`-ceq`), never toggle and 
 **App state left exactly as found**: palette closed, Media Center on Video, City at
 `128px/84px/680x679`, Settings on Appearance (the `ui-language` card is on screen — the `--langs`
 leg refuses without it), theme forest-night, lang en.
+
+## 2026-08-31 — primary — bullet 4: a real identity leak, found before a single cell was scored
+
+**Defect, measured live, not read off source.** `terminalModeSettings.ts:137-146` stamps six
+`data-wired-*` attributes on `<html>` on every boot under every theme, and `main.tsx` imports
+every wired sheet unconditionally. **61 selectors** keyed on those attributes were therefore
+live in forest-night, Aero and Blanc, and their subjects are shell-wide: `.fwin*`,
+`.os-task-win`, `.os-taskbar`, `.ui-toast*`, `.flash-card*`, `.stats-*`, `.dict-results
+article`, `.immersion-stage`, `.widget-frame`, `.os-clock`, `.media-player`, `.wgt-*`.
+
+Instrument: forest-night, `data-materials` **absent**, no Wired root mounted, a real `.fwin`
+with the product's own `fwin-anim-opening` class (`DesktopShell.tsx:3518`).
+`data-wired-motion='off'` → `fwinIn`/0.14s became **`none`/0s**. `'reduced'` → 0.12s.
+**Negative control** `'zzzcontrol'` → unchanged `fwinIn`/0.14s, so the instrument was reading
+the rule, not the weather.
+
+**Fix `59d3eb89`**: every gate scoped to `:root[data-materials='wired']` — the identity
+attribute `engine.ts:121` already stamps at its single choke point. After: off + no materials →
+`fwinIn`/0.14s (leak gone); off + `materials='wired'` → `none`/0s (**the feature still works** —
+this is the control that separates a fix from a deletion); reduced + materials →
+`wm-frame-power`/0.12s; materials removed again → `fwinIn`/0.14s. Root and app restored.
+
+**`c473e217`**: Aero was already clean — every `[data-aero-*]` and `[data-app-border]` rule
+carries `[data-materials='aero']`, which is exactly what made the wired set legible as an
+oversight. Nothing protected that, so the guard is now data-driven over 3 identity prefixes ×
+3 checks (corpus floor, scope present, scope on `:root`).
+
+**`f62c614e` — the Blanc cold-open boundary, and it is NOT the attribute that saves it.**
+Blanc keeps `data-theme`. Measured in Study OS with `data-materials` already absent — Blanc's
+exact attribute state — `data-theme='wired-archive'` alone moved `--bg` #0c1410 → **#02070d**,
+`--text` → #d8fbff, `--panel` → #06121a; `frutiger-aero` moved `--bg` → **#9ed8f2**. What
+actually saves Blanc is that `blancMain.tsx` imports six sheets and **none** of them is
+`styles.css` or a material pack, so the palette block does not exist in that document. One
+import re-opens it silently; now guarded. `main.tsx`'s comment claiming its own Blanc block was
+"the fallback entry that is actually loaded today" is **stale** — `main.ts:545` loads
+`blanc.html?blanc=1`, and `blanc.html:14` + `blanc-harness.html:175` both point at
+blancMain.tsx. Corrected in place, block kept as the only defence if a route returns.
+
+**Three adverse controls, each restored byte-identical**: reverting `wired-motion.css:536`
+failed exactly that assertion; `aero-safe-mode.css:3` failed the new Aero leg; adding
+`import './theme/wired-shell.css'` to `blancMain.tsx` failed the Blanc leg (`637f8b1e`).
+Guard: `renderer/__tests__/secretIdentityScope.test.ts`, **12 tests**.
+
+**BULLET 4 STAYS OPEN.** Its RULE C receipt — 2 surfaces × 8 categories — is not started. What
+this turn bought is that the leak the categories would have hunted is already gone, and the
+`unknown` half of the bullet's ground truth is now measured rather than assumed.
