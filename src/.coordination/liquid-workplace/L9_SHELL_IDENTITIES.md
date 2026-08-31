@@ -1449,3 +1449,36 @@ documented intent (`resolveDisplayKey`: "the user unplugged a monitor, they did 
 configuration"). **3 tests** added; the adverse control reverts the one clause and exactly the two
 new presence tests go red (2 failed / 31 passed) while both pre-existing guard tests stay green —
 so the fix cannot silently become a deletion of the guard.
+
+**Fix landed and verified LIVE, `f5b664ff`.** Main does not hot-reload, so the app was restarted
+(forge stalls at "Checking your system" without a TTY — launch it through `Start-Process cmd /c`,
+not `nohup`, or you wait five minutes for nothing). After the restart the shell hydrated on
+REMOTE FEED, `LOCAL NODE` went **ACTIVE on the first click**, and desktop 0's three windows came
+back at exactly their found geometry — 1080x700 @60,24 · 960x680 @94,54 · frameless 680x679
+@128,84. That is the same click that returned `desktop-on-another-display` forever beforehand.
+
+**cat2 · Wired — FAIL on latency alone, and two instrument findings first.**
+Bars: deadEnds **0** PASS · modalTraps **0** PASS · scrollTraps **0** PASS · costParity
+`N/A-single-path` · **latency FAIL**. Control moved all three legs (base [0,0,0] → dirty [1,1,1] →
+restored [0,0,0]) and the undo restored the surface, so the instrument is proven this session.
+
+1. **The idle-churn VOID did not reproduce.** First run: "the surface changes with no input",
+   `rawChannels:["text"]`. Second and third: `rawChurns:false` in both phases, and 12 samples over
+   5 s using cat2's own `painted()` filter found zero text drift. One idle reading is noise.
+2. **`key:Escape` read as a dead end and is not one.** `inputCost.keystrokes` was **0** and
+   `latencyMs.inputRecv` **[]** — the keystroke never reached the renderer at all — and on the
+   control's own restored pass the dead-end count fell to 0. Bridge key delivery to this window is
+   flaky; a `key:` step in a task can therefore manufacture a dead end. The task was rebuilt from
+   clicks only (Start is a toggle, so it closes itself) and dead ends went to 0.
+
+**The real defect, reproduced twice: opening the Wired Start menu is not acknowledged inside the
+rubric's 100 ms.** `clickRecv` **166.8** ms on the first run and **135.7** on the second, against
+an inert-element floor of **14.6** ms measured in the same pass — so ~121 ms of genuine renderer
+work, not bridge overhead. The other two clicks in the same task are fine: closing the menu 43.6,
+the desktop switch 15.5. Diagnosis for the next turn, measured rather than guessed: the panel is
+rendered inline in `DesktopShell.tsx:2714` behind `{startOpen && …}`, so the open is one
+synchronous commit that adds **531** nodes (911 → 1442), of which the panel is **232** nodes
+carrying **51** controls and **51 inline SVGs**. NOT repaired this turn — a perf refactor of a
+shared shell component is not a slice to start in a turn's last minutes.
+
+**RULE C standing: cat1 PASS 10/10, cat2 FAIL (banked, unrepaired). 14 of 16 cells not yet run.**

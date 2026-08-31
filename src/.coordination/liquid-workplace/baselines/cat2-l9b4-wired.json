@@ -1,0 +1,247 @@
+{
+  "label": "l9b4-wired",
+  "surface": "@.os-desktop-wired",
+  "win": "main",
+  "task": "click:.os-start-btn >> wait:500 >> click:.os-start-btn >> wait:400 >> click:.os-desktop-switch:not(.active) >> wait:800",
+  "presentation": "main-window section (no per-window presentation)",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 13,
+    "controlCount": 12,
+    "box": "1264x821",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 3,
+    "keystrokes": 0,
+    "total": 3
+  },
+  "latencyMs": {
+    "clickRecv": [
+      135.7,
+      43.6,
+      15.5
+    ],
+    "inputRecv": [],
+    "worstRecv": 135.7,
+    "overBar100": 1,
+    "n": 3,
+    "clickStampUnscored": [
+      138.4,
+      45.4,
+      17.7
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 138.4
+  },
+  "steps": [
+    {
+      "step": "click:.os-start-btn",
+      "target": {
+        "sel": ".os-start-btn",
+        "label": "NODE",
+        "disabled": false,
+        "at": "53,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.os-start-btn",
+      "target": {
+        "sel": ".os-start-btn",
+        "label": "NODE",
+        "disabled": false,
+        "at": "53,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.os-desktop-switch:not(.active)",
+      "target": {
+        "sel": ".os-desktop-switch:not(.active)",
+        "label": "REMOTE FEED",
+        "disabled": false,
+        "at": "246,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:800",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.os-desktop-switch:not(.active)",
+    "steps": [
+      "click:.os-desktop-switch:not(.active)"
+    ],
+    "restored": true,
+    "baseHash": "3cjue5",
+    "afterHash": "3cjue5",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "3cjue5",
+      "after": "3cjue5"
+    }
+  },
+  "stepsDriven": 3,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "N/A-single-path",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": false,
+    "costParity": "N/A-single-path"
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "latency"
+  ],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      14.6
+    ]
+  }
+}
