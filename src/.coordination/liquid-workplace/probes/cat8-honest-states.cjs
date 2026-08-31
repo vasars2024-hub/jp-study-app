@@ -227,12 +227,32 @@ const PROBE = `(function(){
   }
 
   var rawKeys = [], placeholders = [], statusCandidates = [];
-  var textRuns = 0, textAcc = [];
+  var textRuns = 0, textAcc = [], devOnlyRuns = 0, wordRuns = 0;
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (var t = tw.nextNode(); t; t = tw.nextNode()) {
     var s = t.nodeValue && t.nodeValue.trim();
     if (!s || !t.parentElement || !painted(t.parentElement)) continue;
+    /*
+     * CORRECTION 28, City 2026-08-31. A data-dev-only subtree renders behind
+     * import.meta.env.DEV and is absent from every packaged build, so scoring a surface on
+     * it scores text no user can see. Category 4's correction 21 already excludes exactly
+     * this element on exactly this surface; this is the same rule reaching the other
+     * harness, not a new exemption. It matters here rather than anywhere else because
+     * City's ENTIRE painted text is three window glyphs plus the seven runs of
+     * .reading-garden-sky-console -- with the console counted, cat8 read languagesDiffer
+     * false and scored the surface FAIL on an untranslated DEBUG panel. The count is
+     * reported, never silently dropped, so a reader can add it back.
+     * (No backtick anywhere in here: correction 8 -- one ends the template literal.)
+     */
+    if (t.parentElement.closest('[data-dev-only]')) { devOnlyRuns++; continue; }
     textRuns++;
+    // A run that is WORDS. languagesDiffer can only be answered by text a catalog could
+    // hold; City's surviving population after the exclusion above is the three window
+    // control glyphs, which are identical in every language BY DESIGN. Scoring that as
+    // languagesDiffer false files a localisation defect against a surface that has no
+    // localisable text at all -- a fabricated finding of exactly the shape correction 21
+    // was written for, pointing the other way.
+    if (/\\p{L}/u.test(s)) wordRuns++;
     textAcc.push(s);
     var toks = s.split(/\\s+/);
     for (var i = 0; i < toks.length; i++) {
@@ -325,6 +345,8 @@ const PROBE = `(function(){
     theme: document.documentElement.getAttribute('data-theme'),
     rect: Math.round(WR.width) + 'x' + Math.round(WR.height),
     textRuns: textRuns,
+    devOnlyRuns: devOnlyRuns,
+    wordRuns: wordRuns,
     textHash: hash,
     // Correction 19: the WHOLE candidate list, not the first ten. The node side decides
     // which of these are real catalog keys, and it cannot subtract from a truncated list.
@@ -656,6 +678,10 @@ const langRuns = (isBase) => `(function(){
     if (!s || !t.parentElement) continue;
     if (typeof t.parentElement.checkVisibility === 'function'
       && !t.parentElement.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })) continue;
+    // Correction 28, the language leg's half: the same [data-dev-only] exclusion as the
+    // snapshot above. Both walkers or neither — a base array built from a different
+    // population than the per-language ones compares positions that are not the same run.
+    if (t.parentElement.closest('[data-dev-only]')) continue;
     acc.push(s);
   }
   if (${isBase ? 'true' : 'false'}) { window.__cat8LangBase = acc; return JSON.stringify({ diffRuns: 0, examples: [] }); }
@@ -804,9 +830,19 @@ async function langLeg() {
     // The share floor is 1%: low enough that a Japanese-content-heavy surface (Dictionary, the
     // reader) is not failed for having little chrome, high enough that no single chrome label
     // can carry it. It is a floor, not proof of coverage — 0.08% is what it exists to reject.
-    languagesDiffer: LANGS
-      ? base.languages.distinctHashes > 1 && base.languages.diffShare > 0.01
-      : 'UNMEASURED',
+    // Correction 28: A SURFACE WITH NO WORDS CANNOT ANSWER THIS, AND `false` IS A
+    // FABRICATED DEFECT. City (`@.fwin-frameless`, the Mooncap Garden) is a canvas: after
+    // the `[data-dev-only]` exclusion above, its entire painted text is the three
+    // window-control glyphs `⧉ ─ ×`, which are identical in all four languages by design.
+    // Scored as-is it read `distinctHashes 1, diffShare 0` -> `languagesDiffer false` ->
+    // **FAIL**, i.e. a localisation defect filed against a surface that has no localisable
+    // text. `wordRuns` is the run count containing at least one Unicode letter; at 0 the
+    // bar is UNMEASURED, which the verdict already knows how to report and which is neither
+    // a 10 nor a fail. It is deliberately 0 and not a threshold: one real word is enough to
+    // ask the question, and correction 21's 1% share floor is what stops one label carrying it.
+    languagesDiffer: !LANGS ? 'UNMEASURED'
+      : base.wordRuns === 0 ? 'UNMEASURED'
+      : base.languages.distinctHashes > 1 && base.languages.diffShare > 0.01,
   };
   const unmeasured = Object.entries(bars).filter(([, v]) => v === 'UNMEASURED').map(([k]) => k);
   const pass = Object.values(bars).every((v) => v === true);

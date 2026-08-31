@@ -1,0 +1,128 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "680x679",
+  "textRuns": 3,
+  "devOnlyRuns": 7,
+  "wordRuns": 0,
+  "textHash": 1298072352,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9759,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9759 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 3,
+        "textHash": 1298072352,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 3,
+        "textHash": 1298072352,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 3,
+        "textHash": 1298072352,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 3,
+        "textHash": 1298072352,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 1,
+    "diffRunsMax": 0,
+    "baseRuns": 3,
+    "diffShare": 0
+  },
+  "statesObservable": [],
+  "statesNotObservable": [
+    "empty",
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "0 of 0 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": "UNMEASURED",
+    "languagesDiffer": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - statesNamed,languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "statesNamed",
+    "languagesDiffer"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

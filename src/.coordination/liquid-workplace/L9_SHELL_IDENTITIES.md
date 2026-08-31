@@ -1128,3 +1128,50 @@ only by `VideoCoreStudyOverlay.tsx` (**+936/-662 uncommitted**), and `seanimeMed
 half-finished slice. `episodeProcessingRules`, `blancMasterSources`, `captureKindKeys`,
 `companionAssignments`, `readingDiscoveryActions` likewise sit behind scraper/blanc/i18n dirt.
 **Clean HEAD's architecture gate stays red at 9 until those owners land their consumers.**
+
+## 2026-08-31 — backup — cat5 closes on Video (correction 27 + two real fixes); cat8 Video 10/10, City UNMEASURABLE
+
+**Correction 27 APPLIED (`8383aa1a`).** `cs.backgroundImage` is one string holding every layer;
+the stop regex harvested colours across all of them and `min(alphas)` was the most transparent
+stop of the most transparent LAYER, so the walk never sealed at an opaque lower layer. Layers
+now split on TOP-LEVEL commas (depth-counted), score separately in paint order, and the walk
+stops when ANY layer is opaque everywhere — a layer that dropped a fully transparent stop may
+not seal. **Video/classic-light: banked `22 failing / 1.01` → `7 failing / 1.09`. Fifteen were
+fabricated, as diagnosed. The seven were REAL** and are fixed: `.mc-tile-copy strong` and
+`.mc-study-row-copy strong` hardcoded `#dfe0e6`, so the Video empty state's recent-media titles
+painted rgb(223,224,230) on the now-white plate. `--mc-tile-ink`, dark literal unchanged,
+re-sourced in the light and high-contrast blocks. Live: dark `rgb(223,224,230)`, classic-light
+`rgb(30,30,30)`, high-contrast `rgb(255,255,0)`.
+
+**TRAP, and it cost a run.** The first re-run scored 9/10 on the **Music** section: the Media
+Center's internal route had drifted while the window title stayed "Video". `--surface Video`
+resolves the WINDOW, not the section. Check `.mc-nav .is-active` before every Media Center run;
+that run was discarded, not banked.
+
+**Q4 closed with a product change, not a flag (`06708e7c`).** Transcription + watch folder +
+YouTube move into one `<details class="mc-inspector-advanced">`, same uncontrolled semantics as
+`.mc-music-import`. Unflagged, live: **collapsed 0 → 1, scanned 34 → 17** (`cat5-l9-video-q4raw
+.json`). Ten of the 17 are `.mc-sidebar`/`.mc-topbar`; scored with the identical
+`.mc-sidebar,.mc-topbar,.mc-playerbar` exclusion Music's Q4 closed under, page-scanned **7**,
+shell 15. **cat5-l9-video PASS 10/10**; control `FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10`.
+
+**cat8 · Video PASS 10/10** — 0 raw keys / 0 placeholders / 0 mute pairs, statesNamed 1 of 1
+observable, langs 4 distinct hashes and diffShare 0.65 over 80 runs, restored. Control
+`[0,0,0] → [1,1,1] → [0,0,0]`.
+
+**cat8 · City is UNMEASURABLE, and scoring it FAIL would have been a fabricated defect.**
+City's ENTIRE painted text is 3 window glyphs plus 7 runs of `.reading-garden-sky-console`,
+which is `import.meta.env.DEV`-gated and carries `data-dev-only="true"`
+(`ReadingGardenSkyEvents.tsx:293,309`). Counted, cat8 read `distinctHashes 1, diffShare 0` →
+`languagesDiffer false` → **FAIL: a localisation defect filed against a debug panel no user
+sees.** **CORRECTION 28**: both walkers exclude `[data-dev-only]` (cat4's correction 21, reaching
+the other harness), the count is reported as `devOnlyRuns`, and `languagesDiffer` is UNMEASURED
+when `wordRuns === 0` — a surface with no words cannot answer it. City now reads `textRuns 3,
+devOnlyRuns 7, wordRuns 0`, **0 failed bars, UNMEASURED on statesNamed + languagesDiffer**.
+Video re-run under the corrected harness: `devOnlyRuns 0`, unchanged, still 10/10. Both controls
+fire and restore.
+
+**Cells: 10 → 12 of 16** (cat5 both, cat8 Video). **cat8 cannot close on this PAIR.** Per RULE C
+a failed category expands across remaining surfaces; an UNMEASURABLE cell is not a failure to
+repair but a surface that cannot answer, so cat8 needs a THIRD surface substituted for City —
+that alone, not the other seven. Next: cat7 on Video and City, then that substitution.
