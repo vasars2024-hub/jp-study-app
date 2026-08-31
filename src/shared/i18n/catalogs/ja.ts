@@ -2692,6 +2692,7 @@ export const ja: Catalog = {
   'commands.window.snapLeft': 'ウィンドウを左に配置',
   'commands.window.snapRight': 'ウィンドウを右に配置',
   'commands.window.center': 'ウィンドウを中央に配置',
+  'commands.window.togglePresentation': 'リキッドにする / 通常に戻す',
   'commands.window.tileAll': 'すべてのウィンドウを並べて表示',
   'commands.window.cascade': 'ウィンドウを重ねて表示',
   'commands.window.showDesktop': 'デスクトップを表示（すべて最小化）',
@@ -3636,6 +3637,7 @@ export const ja: Catalog = {
   'desktop.resize': 'サイズ変更',
   'desktop.makeLiquid': 'リキッド表示にする',
   'desktop.returnToStandard': '通常のウィンドウに戻す',
+  'desktop.presentation.unavailable': 'このウィンドウにはリキッド表示がありません。切り替える通常のクロームがないためです。',
   'desktop.sectionUnavailable.title': 'このアプリは利用できません',
   'desktop.sectionUnavailable.body':
     'このウィンドウは保存されたレイアウトから復元されましたが、参照先の「{section}」はこのバージョンのアプリには存在しません。ウィンドウを閉じるとデスクトップから削除されます。',

@@ -2682,6 +2682,7 @@ export const zh: Catalog = {
   'commands.window.snapLeft': '窗口贴靠左侧',
   'commands.window.snapRight': '窗口贴靠右侧',
   'commands.window.center': '窗口居中',
+  'commands.window.togglePresentation': '切换液态显示 / 恢复常规',
   'commands.window.tileAll': '平铺所有窗口',
   'commands.window.cascade': '层叠窗口',
   'commands.window.showDesktop': '显示桌面（全部最小化）',
@@ -3621,6 +3622,7 @@ export const zh: Catalog = {
   'desktop.resize': '调整大小',
   'desktop.makeLiquid': '切换为液态窗口',
   'desktop.returnToStandard': '返回标准窗口',
+  'desktop.presentation.unavailable': '此窗口没有液态显示模式——它没有可切换的常规窗口框架。',
   'desktop.sectionUnavailable.title': '此应用已不可用',
   'desktop.sectionUnavailable.body':
     '此窗口是从已保存的布局中恢复的，它指向的“{section}”在当前版本中不是一个应用。关闭该窗口即可将其从桌面移除。',

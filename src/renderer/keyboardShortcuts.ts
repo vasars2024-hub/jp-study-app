@@ -152,6 +152,20 @@ export const COMMAND_CATALOG: AppCommand[] = [
     note: 'Fills the right half of the desktop. Press again to take the right quarter.',
   },
   {
+    // Liquid Workplace L9 bullet 1: "finish taskbar/context/command entry
+    // points without forcing Liquid". The title-bar button and the taskbar
+    // context menu both offered this; the COMMAND entry point did not exist at
+    // all, so the palette — the one entry point a keyboard user reaches without
+    // pointing at a specific window — could not present anything as Liquid.
+    // No default chord: Liquid stays explicit and opt-in, never something a
+    // stray key produces.
+    id: 'window.togglePresentation',
+    label: 'Make Liquid / Return to standard',
+    category: 'Window',
+    defaultKeys: '',
+    note: 'Switches the focused window between conventional and Liquid presentation. Geometry, focus and state are preserved both ways.',
+  },
+  {
     id: 'window.center',
     label: 'Center window',
     category: 'Window',
@@ -1453,6 +1467,7 @@ function builtinHandler(id: string): Handler | null {
     case 'window.snapLeft':
     case 'window.snapRight':
     case 'window.center':
+    case 'window.togglePresentation':
     case 'window.tileAll':
     case 'window.cascade':
     case 'window.showDesktop':

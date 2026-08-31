@@ -2887,6 +2887,7 @@ export const ru: Catalog = {
   'commands.window.snapLeft': 'Прикрепить окно слева',
   'commands.window.snapRight': 'Прикрепить окно справа',
   'commands.window.center': 'Разместить окно по центру',
+  'commands.window.togglePresentation': 'Сделать Liquid / Вернуть обычный вид',
   'commands.window.tileAll': 'Разложить все окна плиткой',
   'commands.window.cascade': 'Расположить окна каскадом',
   'commands.window.showDesktop': 'Показать рабочий стол (свернуть всё)',
@@ -3919,6 +3920,7 @@ export const ru: Catalog = {
   'desktop.resize': 'Изменить размер',
   'desktop.makeLiquid': 'Жидкое окно',
   'desktop.returnToStandard': 'Вернуть обычное окно',
+  'desktop.presentation.unavailable': 'У этого окна нет режима Liquid — у него нет обычной рамки, которую можно было бы заменить.',
   'desktop.sectionUnavailable.title': 'Это приложение больше недоступно',
   'desktop.sectionUnavailable.body':
     'Окно восстановлено из сохранённого макета, который ссылается на «{section}» — в этой версии такого приложения нет. Закройте окно, чтобы убрать его с рабочего стола.',

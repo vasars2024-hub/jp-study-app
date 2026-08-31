@@ -1648,6 +1648,9 @@ export default function DesktopShell({
   // below must go through a ref to stay fresh.
   const closeRef = useRef(close);
   closeRef.current = close;
+  // `toggleLiquid` is declared below this bind-once effect, so the command entry
+  // point reaches it the same way `close` does rather than by hoisting it.
+  const toggleLiquidRef = useRef<(id: string) => void>(() => undefined);
   const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(() => Promise.resolve());
 
   useEffect(() => {
@@ -1826,6 +1829,21 @@ export default function DesktopShell({
           patch(topWin.id, { pin: !topWin.pin });
           return;
         }
+        case 'togglePresentation': {
+          if (!topWin) return;
+          // The garden and the visualizer are frameless trinkets with no
+          // conventional chrome to swap, so `canPresentLiquid` refuses them —
+          // and the command SAYS so instead of doing nothing. A palette entry
+          // that silently no-ops is the dead control this phase exists to
+          // remove; the two pointer entry points simply hide the affordance,
+          // which a command list cannot do per-window.
+          if (!canPresentLiquid(topWin.section)) {
+            showOsToast(t('desktop.presentation.unavailable'), 'muted');
+            return;
+          }
+          toggleLiquidRef.current(topWin.id);
+          return;
+        }
         case 'closeAll':
           all.forEach((w) => closeRef.current(w.id));
           return;
@@ -1915,6 +1933,7 @@ export default function DesktopShell({
   const toggleLiquid = (id: string) => {
     setWins((ws) => ws.map((w) => (w.id === id ? toggleWinPresentation(w) : w)));
   };
+  toggleLiquidRef.current = toggleLiquid;
 
   const taskClick = (w: Win) => {
     const isTop = w.z === Math.max(...wins.map((x) => x.z));

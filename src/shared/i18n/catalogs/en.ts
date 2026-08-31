@@ -2852,6 +2852,7 @@ export const en: Catalog = {
   'commands.window.snapLeft': 'Snap window left',
   'commands.window.snapRight': 'Snap window right',
   'commands.window.center': 'Center window',
+  'commands.window.togglePresentation': 'Make Liquid / Return to standard',
   'commands.window.tileAll': 'Tile all windows',
   'commands.window.cascade': 'Cascade windows',
   'commands.window.showDesktop': 'Show desktop (minimize all)',
@@ -3836,6 +3837,7 @@ export const en: Catalog = {
   'desktop.resize': 'Resize',
   'desktop.makeLiquid': 'Make Liquid',
   'desktop.returnToStandard': 'Return to standard window',
+  'desktop.presentation.unavailable': 'This window has no Liquid presentation — it has no conventional chrome to swap.',
   'desktop.sectionUnavailable.title': 'This app is no longer available',
   'desktop.sectionUnavailable.body':
     'This window was restored from a saved layout that points at “{section}”, which is not an app in this version. Close the window to remove it from your desktop.',
