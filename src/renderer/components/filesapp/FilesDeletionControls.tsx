@@ -7,6 +7,7 @@ import {
   type FilesDeletionNotice,
   type FilesDeletionSession,
 } from './filesDeletionSession';
+import './FilesDeletionControls.css';
 
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 
