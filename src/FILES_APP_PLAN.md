@@ -413,7 +413,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    both were right. See the 2026-08-31 (second) Progress entry for the table, the numbers
    and the four remaining zeros, each measured against its own store.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
-   <!-- status: open; evidence: 2026-08-31 a37d4c5e names the transcript after its video; the search half is explicitly NOT claimed -->
+   <!-- status: closed; evidence: 2026-08-31 86e9cb41 -- named after its video (a37d4c5e) AND found by search; NFKC+kataToHira fold, control fails 1 of 25 -->
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
    manual step.
@@ -765,3 +765,34 @@ justified zero is only as good as the store it was checked against.
 5. **`rendererCensus.ts` needs the raw store STRING**, not a parsed object — it feeds
    `parseFlashcardDeckStore`, which unwraps the legacy over-encoding. Parsing first would
    silently skip that repair and drop cards.
+
+### 2026-08-31 — primary2, `wt/files-app` — gate 2 CLOSED, and the turn's gate 37
+
+`86e9cb41` — gate 2's *search* half, which `a37d4c5e` correctly declined to claim.
+
+**Gate 2 — CLOSED.** `matchesQuery` folded with `toLowerCase()` alone, a Latin rule that
+does nothing to a Japanese title. The real transcript on this profile
+(`…【オノマトペ3】#286`) was not found by a user typing `２８６` from a Japanese IME, nor
+by anyone typing the reading in hiragana. Both fixed with NFKC + `kataToHira` on both
+sides, reusing `kanaEquals`'s fold (`langs.ts:132`) rather than inventing a second one.
+Negative control **on the fix**: restoring `toLowerCase()` fails exactly the width/kana
+test, 1 of 25. Negative control **on the search**: a word the title lacks, a wrong kind
+and a wrong provenance all miss.
+
+**Gate status tags added**, so the count stops being re-derived from prose every turn.
+Format matches the liquid plan's: `<!-- status: closed|open; evidence: … -->` under the
+gate's own text. Count with `grep -o "status: [a-z]*" src/FILES_APP_PLAN.md | sort | uniq -c`.
+**Now 4 closed (1, 2, 13, 14) / 1 open (12, half) / 32 untagged.** A stray-marker trap:
+`^\d+\. ` also matches the Decisions and Traps lists, and inserted 5 markers outside the
+Gates section on the first run — anchor on the Gates section, not on the numbering.
+
+**Gate 37 — the four full gates, run once after the last slice.**
+- `npx vitest run`: **13 suites / 33 tests failed, 11,931 passed, 6 skipped.** Identical in
+  shape to the recorded `aba52483` baseline, and proven by NAME, not count: every one of the
+  33 is a liquid/L6/L8/NovelReader/Settings/Statistics/Media-Center or tooling test.
+  **Zero contain `filesApp`** — checked mechanically, not by eye.
+- `node tools/i18n-check.cjs` — exit 0, **11,724** keys complete. This turn added no UI string.
+- `node tools/architecture-audit.cjs` — exit 0. Its two unclassified findings
+  (`readingDiscoveryActions.ts` orphan, `TourOverlay.tsx` test-only) are both other tracks'
+  modules. `shared/scraperHistoryStore.ts` is imported by two modules, so it is not an orphan.
+- `npx eslint` on all 11 touched paths — **0 errors, 0 warnings.**

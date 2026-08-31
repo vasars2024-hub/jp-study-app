@@ -10,7 +10,7 @@ import {
   withRendererItems,
 } from '../components/filesapp/rendererEnumerators';
 import { NOTEBOOK_TIMELINE_STORAGE_KEY, type NotebookTimelineEntry } from '../notebookTimeline';
-import { FLASHCARD_DECK_STORAGE_KEY, type DeckFlashcard } from '../flashcardDeck';
+import { type DeckFlashcard } from '../flashcardDeck';
 import { ANNOTATIONS_STORAGE_PREFIX, type Annotation } from '../annotations';
 import { countByCategory, type FilesIndexSnapshot } from '../../shared/filesApp/catalog';
 
