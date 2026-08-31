@@ -330,7 +330,16 @@ describe('grid track floors fit the narrowest window the product allows', () => 
     // page N. The occupancy reader projects every proven page fragment into one page viewport.
     expect(category4).toContain('var offset = ((r.left - p.left) % step + step) % step;');
     expect(category4).toContain("mark(rects[k], pagerFor(t.parentElement))");
-    expect(category4).toContain('deadRegionBasis: deadRegionPagers.length');
+    // The pager branch must still be the thing that names the basis. This was a `toContain` on
+    // the exact adjacency `deadRegionBasis: deadRegionPagers.length` until 2026-08-31, when
+    // cat4's correction 24 put a window-hosting-shell branch in front of it and this test went
+    // red on a change that did not touch the pager path at all. Pinning source text one token
+    // wide makes every neighbouring edit look like a regression; pin the RELATIONSHIP instead —
+    // that the pager count selects the union-of-fragments basis — which is what the projection
+    // actually promises and is strictly more than the old line asserted.
+    expect(category4).toMatch(
+      /deadRegionBasis:[\s\S]{0,400}deadRegionPagers\.length[\s\S]{0,80}union of rendered fragments/,
+    );
     // The exemption is not a declaration-only free pass: its own control falsifies the proof,
     // requires the dead-region number to move, and restores the published page count.
     expect(category4).toContain("pager.setAttribute('data-paged-pages', '1')");
