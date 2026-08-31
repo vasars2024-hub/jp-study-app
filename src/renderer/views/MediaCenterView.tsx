@@ -643,6 +643,24 @@ function HomePanel({
   );
 }
 
+/**
+ * A handler whose identity never changes but which always runs the latest render's closure.
+ *
+ * `query` lives in `useMedia`, so every keystroke in the top bar re-renders this whole view.
+ * The library grid's cards are memoized (`LibraryEntryCard`), but that memo is only as stable
+ * as the callbacks reaching it: `onPlay` -> `activate` -> the card's `onActivate`. An inline
+ * arrow at the call site made a new identity per keystroke and invalidated the memo — and the
+ * shell's `menuItems` useMemo with it. `useCallback` cannot fix this one, because the closure
+ * genuinely reads values that change; the ref does.
+ */
+function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const ref = useRef(fn);
+  useEffect(() => {
+    ref.current = fn;
+  });
+  return useCallback((...args: A) => ref.current(...args), []);
+}
+
 function LibraryPanel({
   state,
   music,
@@ -659,6 +677,19 @@ function LibraryPanel({
   const { t } = useT();
   // Where a chosen track has to be delivered. See `subtitleChoiceDestination`.
   const destination = subtitleChoiceDestination(workspace);
+  // Stable so the grid's card memo survives a keystroke — see `useStableCallback`.
+  const play = useStableCallback((id: string) => {
+    // Loading the item is only half of it: the player lives on another tab,
+    // so without the navigation a card click looks like it did nothing.
+    const item = state.items.find((entry) => entry.id === id);
+    if (item?.kind === 'audio' || item?.kind === 'audiobook') {
+      void music.play(item);
+      onNavigate('music');
+    } else {
+      void state.playItem(id);
+      onNavigate('video');
+    }
+  });
   return (
     <div className="mc-page mc-library-page">
       <MediaLibraryShell
@@ -677,18 +708,7 @@ function LibraryPanel({
          */
         query={state.debouncedQuery}
         currentId={state.current?.id ?? null}
-        onPlay={(id) => {
-          // Loading the item is only half of it: the player lives on another tab,
-          // so without the navigation a card click looks like it did nothing.
-          const item = state.items.find((entry) => entry.id === id);
-          if (item?.kind === 'audio' || item?.kind === 'audiobook') {
-            void music.play(item);
-            onNavigate('music');
-          } else {
-            void state.playItem(id);
-            onNavigate('video');
-          }
-        }}
+        onPlay={play}
         onImportFiles={state.openFile}
         onImportFolder={() => void state.openFolder()}
         onRemove={async (id) => {

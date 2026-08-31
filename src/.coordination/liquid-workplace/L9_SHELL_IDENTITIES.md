@@ -555,3 +555,50 @@ Re-score in the fix's own commit, as the rubric requires.
 
 **Bullet 1 stays at 3 of 16 cells** — category 2 does not close: City PASSES, Video FAILS.
 
+
+---
+
+## 2026-08-31 — Media Center per-keystroke render cost FIXED; category 2 · Video re-scores PASS 10/10
+
+**Recovered work, not new work.** The previous turn died mid-slice with the props-stabilisation
+edit sitting uncommitted in `MediaCenterView.tsx` and `MediaLibraryBrowser.tsx`. The whole diff
+of both files was that one slice, so it was verified and landed unchanged rather than re-derived.
+
+Product, exactly the two boundaries the previous entry named as defeated by prop identity:
+
+1. `LibraryEntryCard` — a `memo()` wrapper around `MediaPosterCard` in `MediaLibraryBrowser.tsx`.
+   The memo could not have worked at the old call site: `renderItem` built the subtitle string,
+   the `status` object literal and both callbacks inline, so every prop was a fresh identity per
+   render. All four derivations moved INSIDE the boundary, leaving stable inputs only — the entry
+   object (already a `useMemo` product from `entries`, which is keyed on `debouncedQuery`), two
+   ids, and the shell's two existing `useCallback` handlers.
+2. `useStableCallback` in `MediaCenterView.tsx`, applied to `LibraryPanel`'s `onPlay`. A ref
+   holds the latest closure, the returned identity never changes. `useCallback` was not an option
+   — the closure genuinely reads `state.items` / `state.current`. Without this the whole chain
+   invalidates: inline `onPlay` → `activate` (`MediaLibraryShell.tsx:227`, dep `[onPlay]`) →
+   the card's `onActivate`, and the `menuItems` useMemo at `:352` with it.
+
+**Re-scored in this commit, four consecutive runs, same harness and same task as the FAIL:**
+
+| run | worstRecv | inputRecv | overBar100 | liquid leg |
+| --- | --- | --- | --- | --- |
+| 1 | **82.2** | 82.2 / 60.3 / 37.9 / 18.1 | 0 | 76.4 |
+| 2 | **83.7** | 83.7 / 61.3 / 40.0 / 19.4 | 0 | 73.7 |
+| 3 | **79.6** | 79.6 / 56.9 / 37.8 / 20.6 | 0 | 72.5 |
+| 4 | **82.9** | 82.9 / 61.6 / 41.7 / 22.5 | 0 | 72.5 |
+
+Against the banked FAIL series 117.2 / 119.3 / 110.3 / 110.6 — **~30 ms off the worst keystroke**,
+17 ms of headroom under the 100 ms bar, and the two populations do not overlap. The other four
+bars are unchanged and still measured, not inherited: `deadEnds 0 · modalTraps 0 · scrollTraps 0
+· costParity 5 = 5` with the Liquid leg driven AND reversed (`restoredTo pressed:false`).
+Negative controls fired in the scoring run: `[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`,
+harness floor `inertClickRecvMs 0.2`. Undo `restored true`.
+
+`baselines/cat2-l9-video.json` now holds run 4. **Category 2 CLOSES for bullet 1 — both RULE C
+surfaces PASS 10/10.** Cells closed, counted by `ls baselines/ | grep l9` and reading each
+file's own `verdict`: **4 of 16** (`cat1-l9-video`, `cat1-l9-city`, `cat2-l9-city`,
+`cat2-l9-video`), all four `PASS 10/10`. Categories 3–8 are unmeasured on both surfaces.
+
+TRAP: the app must be RELOADED before measuring this, not trusted to HMR. The edit landed at
+00:59 and the window had been up since 22:12; a `/reload` is what put the measured code and the
+on-disk code in the same place.

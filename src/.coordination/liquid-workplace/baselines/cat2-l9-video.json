@@ -18,27 +18,27 @@
   },
   "latencyMs": {
     "clickRecv": [
-      44.6
+      44.7
     ],
     "inputRecv": [
-      110.6,
-      80.2,
-      54.4,
-      28.3
+      82.9,
+      61.6,
+      41.7,
+      22.5
     ],
-    "worstRecv": 110.6,
-    "overBar100": 1,
+    "worstRecv": 82.9,
+    "overBar100": 0,
     "n": 5,
     "clickStampUnscored": [
-      55.3
+      56.3
     ],
     "inputStampUnscored": [
-      110.9,
-      80.3,
-      54.6,
-      28.5
+      83.1,
+      61.8,
+      41.9,
+      22.7
     ],
-    "worstStampUnscored": 110.9
+    "worstStampUnscored": 83.1
   },
   "steps": [
     {
@@ -47,7 +47,7 @@
         "sel": ".mc-nav > button:nth-of-type(2)",
         "label": "LibraryAll local media",
         "disabled": false,
-        "at": "216,262"
+        "at": "182,232"
       },
       "counted": true,
       "moved": {
@@ -183,14 +183,14 @@
       "box": "1080x700",
       "total": 5,
       "deadEnds": 0,
-      "worstRecv": 110.6
+      "worstRecv": 82.9
     },
     "second": {
       "presentation": "liquid",
       "box": "1080x700",
       "total": 5,
       "deadEnds": 0,
-      "worstRecv": 106.6
+      "worstRecv": 72.5
     },
     "restored": true,
     "restoredTo": {
@@ -205,13 +205,11 @@
     "deadEnds": true,
     "modalTraps": true,
     "scrollTraps": true,
-    "latency": false,
+    "latency": true,
     "costParity": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "latency"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "notMeasuredHere": [
     "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
