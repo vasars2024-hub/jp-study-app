@@ -1821,3 +1821,29 @@ Q3, Q4, Q5 and Q10 as required; residue 0 and the shell/theme/transparency state
 **RULE C: 6 of 16 passing cells** — cat1 through cat6, all Wired. Next is cat7 then cat8 on
 Wired, followed by all eight on Blanc. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
 notifications, onboarding, help.
+
+## 2026-08-31 — codexA — cat7 Wired passes 10/10 under the real Start load
+
+The shared category-7 runner gained the `shell` spec; no single-use probe was added. Structural
+root `.os-desktop-wired` drives the OS-window branch. The heavy leg mounts/unmounts Start 24
+times — the largest reversible synchronous shell mount — and proves count, node delta and exact
+expanded-state restoration. Run used `--jank`, so the frame recorder was falsified in-session.
+
+**cat7 · Wired = PASS 10/10.** Scene: **2** floating windows / **634** window elements / **836**
+shell elements at 1264×821; main PID 804 uptime 3,881 s. Session ceiling p50/p95 16.7/16.8 ms,
+0 frames over 100. Drag p50/p95 16.7/16.9, resize 16.7/16.9, theme 16.7/16.8; all scenes stable,
+all closed loops true, all main maxima **≤58.3 ms** against the 500 ms bar.
+
+Heavy Start cycle: **24** ticks (12 open / 12 closed), **298** nodes mounted, state restored;
+main p50/p95/max **2.6/5.2/13.2 ms**. Sensitivity control injected twelve 120 ms renderer
+blocks and recorded **12** frames over 100 ms (clean drag 0). No findings, no voids.
+
+Category 8 did not close: opening Notifications marks unread history read. The original
+notification bytes and unread IDs 66–72 were restored; renderer reload verified badge 7.
+The byte-captured all-read fixture then raced Settings hydration twice and refused before any
+language change. Final state verified: Wired, Home, en/en, badge 7, center closed.
+
+**RULE C: 7 of 16 passing cells** — cat1 through cat7, all Wired. Exact next: rerun cat8 with
+hydration polling before opening Appearance, the captured-store fixture, and byte verification;
+then all eight categories on Blanc. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+notifications, onboarding, help.

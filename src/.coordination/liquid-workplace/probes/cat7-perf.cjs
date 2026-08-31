@@ -726,6 +726,62 @@ const SPECS = {
     },
     collection: { container: '.dict-view', row: '.dict-entry' },
   },
+  shell: {
+    // The shell is the root OS window rather than a floating app, so the interaction
+    // probe drives its Root branch. The structural root also prevents a foreign theme
+    // from being mistaken for the Wired identity this L9 cell is certifying.
+    title: 'Wired shell',
+    root: '.os-desktop-wired',
+    heavy: {
+      // Start is the shell's largest reversible synchronous mount: on this scene it
+      // adds roughly 300 nodes and 50 controls. Cycling it exercises the taskbar,
+      // launcher and hosted-window scene without changing a preference or user data.
+      label: 'mount and unmount the Start router 24 times',
+      durationMs: 4000,
+      js: `(() => {
+        delete window.__lqShellLoad;
+        const root = document.querySelector('.os-desktop-wired');
+        const start = root && root.querySelector('.os-start-btn');
+        if (!start) return 'REFUSE: no Wired Start router';
+        const openAtStart = start.getAttribute('aria-expanded') === 'true';
+        const rec = {
+          openAtStart, ticks: 0, opened: 0, closed: 0,
+          minNodes: root.querySelectorAll('*').length,
+          maxNodes: root.querySelectorAll('*').length,
+          restored: false,
+        };
+        window.__lqShellLoad = rec;
+        const timer = setInterval(() => {
+          start.click();
+          rec.ticks += 1;
+          if (start.getAttribute('aria-expanded') === 'true') rec.opened += 1;
+          else rec.closed += 1;
+          const nodes = root.querySelectorAll('*').length;
+          rec.minNodes = Math.min(rec.minNodes, nodes);
+          rec.maxNodes = Math.max(rec.maxNodes, nodes);
+          if (rec.ticks >= 24) {
+            clearInterval(timer);
+            setTimeout(() => {
+              if ((start.getAttribute('aria-expanded') === 'true') !== openAtStart) start.click();
+              setTimeout(() => {
+                rec.restored = (start.getAttribute('aria-expanded') === 'true') === openAtStart;
+              }, 160);
+            }, 160);
+          }
+        }, 120);
+        return 'cycling Start over ' + rec.minNodes + ' initial nodes';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqShellLoad;
+        if (!r) return 'REFUSE: shell load never armed';
+        if (r.ticks < 24 || r.opened < 10 || r.closed < 10) return 'REFUSE: incomplete shell cycle ' + JSON.stringify(r);
+        if (r.maxNodes - r.minNodes < 200) return 'REFUSE: Start mounted only ' + (r.maxNodes - r.minNodes) + ' nodes';
+        if (!r.restored) return 'REFUSE: Start did not restore expanded=' + r.openAtStart;
+        return 'cycled Start ' + r.ticks + ' times (' + r.opened + ' open / ' + r.closed + ' closed), mounted '
+          + (r.maxNodes - r.minNodes) + ' nodes and restored expanded=' + r.openAtStart;
+      })()`,
+    },
+  },
 };
 
 // L0-baseline-1, recorded 2026-08-16 in PERF_BASELINE_RESTART.md. PROVENANCE, NOT THE BAR —

@@ -1,0 +1,546 @@
+{
+  "surface": "shell",
+  "title": "Wired shell",
+  "root": ".os-desktop-wired",
+  "at": "2026-08-31T18:50:16.243Z",
+  "strictMode": "on - figures carry the dev double-render tax; see correction 31",
+  "scene": {
+    "fwins": 2,
+    "fwinElements": 634,
+    "root": ".os-desktop-wired",
+    "rootElements": 836,
+    "documentElements": 909,
+    "titles": [
+      "SIG-VID / Signal Archive",
+      "SYS / Service Panel"
+    ],
+    "theme": "wired-archive",
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 422
+  },
+  "surfaceWindow": {
+    "mechanism": "root OS window",
+    "matched": 0,
+    "elements": 836,
+    "deskWindows": 2,
+    "titles": [
+      "SIG-VID / Signal Archive",
+      "SYS / Service Panel"
+    ]
+  },
+  "process": {
+    "pid": 804,
+    "uptimeSecAtStart": 3881,
+    "mainRssMbBefore": 116.5,
+    "mainRssMbAfter": 128.5,
+    "mainHeapUsedMbAfter": 296.7
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "frames": 116,
+    "runs": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 50.1,
+        "over100": 0,
+        "frames": 116
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17.9,
+        "over100": 0,
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.9,
+        "over100": 0,
+        "frames": 112
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 50.1,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 419
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 421
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1307
+      },
+      "jank_blocks": null,
+      "frames": 116,
+      "frame_min_ms": 16.3,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 50.1,
+      "frames_over_16": 70,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1810,
+      "main_p50_ms": 4.2,
+      "main_p95_ms": 6.1,
+      "main_max_ms": 10.2
+    },
+    "ceilingRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 50.1,
+        "over100": 0,
+        "frames": 116
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 17.9,
+        "over100": 0,
+        "frames": 112
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 17.9,
+        "over100": 0,
+        "frames": 112
+      }
+    ],
+    "themeControlRuns": [
+      {
+        "p50": 16.7,
+        "p95": 100.3,
+        "max": 768.9,
+        "over100": 3,
+        "mainMax": 53.2
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 117,
+        "over100": 1,
+        "mainMax": 21.7
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": null,
+      "root": ".os-desktop-wired",
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 422
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 421
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 48,
+        "root": ".os-desktop-wired",
+        "mechanism": "pointer events on surface root",
+        "before": {
+          "left": 0,
+          "top": 0,
+          "width": 1264,
+          "height": 821
+        },
+        "after": {
+          "left": 0,
+          "top": 0,
+          "width": 1264,
+          "height": 821
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 111,
+      "frame_min_ms": 16.5,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 33.4,
+      "frames_over_16": 67,
+      "frames_over_33": 1,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1817,
+      "main_p50_ms": 3.7,
+      "main_p95_ms": 9.7,
+      "main_max_ms": 24.9,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.4,
+          "over100": 0,
+          "mainMax": 24.9,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 83.5,
+          "over100": 0,
+          "mainMax": 58.3,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": null,
+      "root": ".os-desktop-wired",
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 248
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 248
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "root": ".os-desktop-wired",
+        "mechanism": "debug bridge /bounds on root OS window",
+        "steps": 21,
+        "amplitudePx": 140,
+        "before": {
+          "width": 1264,
+          "height": 821
+        },
+        "after": {
+          "width": 1264,
+          "height": 821
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 111,
+      "frame_min_ms": 15.4,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 18.1,
+      "frames_over_16": 69,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 57,
+      "main_span_ms": 1809,
+      "main_p50_ms": 2.4,
+      "main_p95_ms": 3.5,
+      "main_max_ms": 16.6,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 18.1,
+          "over100": 0,
+          "mainMax": 16.6,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 16.8,
+          "over100": 0,
+          "mainMax": 14.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": null,
+      "root": ".os-desktop-wired",
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 248
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 249
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 111.6,
+        "restorePaintedMs": 96.8,
+        "restoredTo": "wired-archive"
+      },
+      "jank_blocks": null,
+      "frames": 101,
+      "frame_min_ms": 16.6,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 83.5,
+      "frames_over_16": 61,
+      "frames_over_33": 3,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1804,
+      "main_p50_ms": 2.5,
+      "main_p95_ms": 4.7,
+      "main_max_ms": 13.4,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 83.5,
+          "over100": 0,
+          "mainMax": 13.4,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 50.3,
+          "over100": 0,
+          "mainMax": 25.2,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "shell: mount and unmount the Start router 24 times (DURING -DuringJs)",
+      "samples": 130,
+      "span_ms": 4013,
+      "min_ms": 1.9,
+      "p50_ms": 2.6,
+      "p95_ms": 5.2,
+      "max_ms": 13.2
+    },
+    "heavyProof": "cycled Start 24 times (12 open / 12 closed), mounted 298 nodes and restored expanded=false",
+    "idle": {
+      "label": "shell: idle",
+      "samples": 129,
+      "span_ms": 4024,
+      "min_ms": 1.5,
+      "p50_ms": 2.3,
+      "p95_ms": 4.9,
+      "max_ms": 37.1
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": null,
+      "root": ".os-desktop-wired",
+      "scene_before": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 249
+      },
+      "scene_after": {
+        "fwins": 2,
+        "fwinElements": 634,
+        "root": ".os-desktop-wired",
+        "rootElements": 836,
+        "documentElements": 909,
+        "titles": [
+          "SIG-VID / Signal Archive",
+          "SYS / Service Panel"
+        ],
+        "theme": "wired-archive",
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 247
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 48,
+        "root": ".os-desktop-wired",
+        "mechanism": "pointer events on surface root",
+        "before": {
+          "left": 0,
+          "top": 0,
+          "width": 1264,
+          "height": 821
+        },
+        "after": {
+          "left": 0,
+          "top": 0,
+          "width": 1264,
+          "height": 821
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 12,
+      "frames": 68,
+      "frame_min_ms": 15.6,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 117,
+      "frame_max_ms": 118.1,
+      "frames_over_16": 47,
+      "frames_over_33": 13,
+      "frames_over_100": 12,
+      "main_samples": 59,
+      "main_span_ms": 1819,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 4.2,
+      "main_max_ms": 11.4
+    }
+  },
+  "findings": [],
+  "voided": [],
+  "environment": [],
+  "score": 10,
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}
