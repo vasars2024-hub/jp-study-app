@@ -158,3 +158,81 @@ opaque/none, restored byte-identical. Commit `b77a3b08`.
 Open, deliberately: this ladder has no committed source guard of its own. L9 bullet
 2 still owes Music widget, City, onboarding and help; bullet 1 still owes its
 controlled entry-point receipt.
+
+## 2026-08-30 — The Music widget, and the route its recovery button needed
+
+Eleven raw English literals in a four-language app, while the Music app itself
+already resolved `music.controls.*` for the identical controls — the widget was a
+second hand-written copy, not an un-localizable surface. Nine reuse the shipped
+keys; four are new. `.music-play` and `.mwidget-play` had NO accessible name in
+either host — icon-only, no title, no label, so both announced as "button". The
+three real toggles took `aria-pressed` and keep a CONSTANT name; repeat is a
+three-way cycle and correctly took neither.
+
+"Nothing playing — pick a song in Music" named an action and offered none. The
+Visualizer's equivalent got a real button last slice — dispatching a bare
+`os:open`, which is the DESKTOP bus. Both widgets also render in `?popout=`
+windows that mount no DesktopShell, so that fix was dead where the widget lives.
+`renderer/sectionSurface.ts` dispatches `cancelable`; the two shells that own the
+event mark it handled where they actually act, and `dispatchEvent`'s return value
+picks the pop-out fallback. No side registry to drift from its listeners.
+
+Live in `?popout=musicwidget`, `desktopShell:false`. CONTROL: the pre-fix bare
+`os:open` left the window list at `2:/?popout=musicwidget , 1:/`; the real button,
+focused first, produced `3:/?popout=music`. NOT measured live and named rather
+than claimed: `.music-play`'s rendered name — Media Center only mounts the
+transport once a track is current, and making one current writes a resume position
+into the user's library. Guarded at source in both hosts. Commit `17473824`.
+
+## 2026-08-30 — Help stops claiming a tour that is not in the branch
+
+Settings > Help > "Replay tour" printed "The tour will start again now." while
+`.tour-root` stayed at **0** and the store went `replays` 8 → 9. `TourOverlay`
+reads `shouldRunTour()` once, at mount.
+
+Then the tree said something worse. `git cat-file -e
+HEAD:src/renderer/components/onboarding/TourOverlay.tsx` **FAILS**. The overlay,
+`onboarding.css`, `shared/onboarding/tourScript.ts` and the `App.tsx` mount are
+untracked, stranded since 2026-08-05, on no branch — only on archive snapshot
+`c41e78b8`. `b63846ea` committed `HelpPage.tsx` and `onboardingStore.ts` WITHOUT
+them, so the shipped branch has a Replay button nothing can answer.
+
+So the fix is a receipt, not a flag: an overlay that actually put itself on screen
+answers with `announceTourStarted`, and the page reports what happened. The
+success line is earned; otherwise it says armed. True at HEAD, true in a
+popped-out Settings, and it needs no second change when the overlay lands.
+
+Live, one gesture: from `?popout=settings` (no overlay — HEAD's situation in a
+real window) status = "The tour is armed…", `.tour-root` 0 there, while the
+desktop window started it for real from the cross-window `storage` path,
+`.tour-root` 1, step `welcome`. Store restored byte-identical to `replays` 8.
+Commit `78893ce3`.
+
+NOT committed, deliberately: the stranded overlay files, the `App.tsx` mount hunk
+and the `tour.back` key. Their improvements sit in the working tree for whoever
+lands them — `Back` (Esc is an exit, not an undo, so one mis-click was
+unrecoverable), a polite live region on the step text, `flex-wrap` on the
+three-button row, and the `announceTourStarted` call. **Trap for the next worker:
+the onboarding directory is untracked. Do not "clean" it.**
+
+## 2026-08-30 — City's dossier answers the contract it advertises
+
+The mushroom is an `aria-expanded` disclosure over a `role="dialog"` and kept
+neither half: Escape did not close it, and closing dropped focus on `body`.
+Handled on the garden's own `onKeyDown` — React bubbles it from both the trigger
+and the panel, the only two places focus can be — never on `window`, which would
+race the shell's Escape in every host this mounts in.
+
+Live: open from the focused trigger, `aria-expanded` false → true; Escape from
+the trigger and again from inside the panel both closed it and returned
+`document.activeElement` to `BUTTON.reading-garden-mushroom-hitbox`. CONTROL: the
+City window survived both, 7 `.fwin` before and after, so the garden is not eating
+the shell's key; a fifth test pins that a CLOSED dossier still lets Escape through.
+Mutation control: deleting the prop fails exactly the two Escape cases.
+Commit `5d13f920`.
+
+L9 bullet 2's seven named surfaces are now all migrated — Note, Visualizer, Music
+widget, City, notifications, onboarding, help. Still open: bullet 1's controlled
+entry-point receipt, bullet 3 (Aero/Wired/Blanc-native adapters), bullet 4
+(Secret Aero/Wired lifecycle and Blanc cold-open boundaries), and the §8
+theme/mode gate.
