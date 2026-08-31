@@ -492,3 +492,66 @@ hitbox is a TOGGLE and the run's starting state decides which way it goes. Asser
 state in the same call that launches the run; this one started from a verified `open: false`.
 
 **Bullet 1 is at 5 of 16 cells.**
+
+## 2026-08-31 — backup — category 2 · Video: FAIL on latency alone, and a COUNT CORRECTION
+
+**Count correction first, because the three entries above inflate it.** A cell is one
+surface × one category, so 2 surfaces × 8 = 16. Cells CLOSED = pairs holding a banked
+`PASS 10/10`. Counted by the only method that cannot drift —
+`ls baselines/ | grep l9` — that is **3**: `cat1-l9-video`, `cat1-l9-city`, `cat2-l9-city`.
+The "2 → 4 → 5" running total above counted measured cells and passing cells in the same
+column. **Bullet 1 is at 3 of 16, not 5.** The number moved against us; it is published.
+
+Category 2 · Video (`--surface "Video" --win main --both-presentations --control`,
+1080x700, the same window category 1 scored). Task: `click:.mc-nav > button:nth-of-type(2)
+>> wait:1400 >> type:.mc-global-search input=jojo >> wait:1200`; undo returned the surface
+(`restored true`, hash `2q3mbt` both sides).
+
+Four bars PASS: `deadEnds 0 · modalTraps 0 · scrollTraps 0 · costParity 5 = 5`. The Liquid
+leg ran and reversed — standard 5 / liquid 5, `restoredTo pressed:false`, box unchanged.
+Control fired all three: `[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`.
+
+**`latency` FAILS: worstRecv 110.6 ms against the rubric's 100 ms bar, `overBar100 1`.**
+The whole `inputRecv` series is `[110.6, 80.2, 54.4, 28.3]` — four characters that resolve
+at ONE frame, so the first is billed the whole burst.
+
+**Reproduced four times: 117.2 / 119.3 / 110.3 / 110.6.** Two negative controls say the
+instrument is not the cause. (a) `inertClickRecvMs 0.2` — the harness's own floor on an
+element that repaints nothing is a fifth of a millisecond, so 110.6 is app work.
+(b) Every other `type:`-driven surface banked with THIS harness clears the bar with room:
+captures 26.2, resources 32.4, settings 35.6, novels 55.9, vn 66.1, `overBar100 0` on all
+five. Same instrument, same burst shape, 2–4x the cost here.
+
+A third control ran because City was still mounted from the interrupted turn and its
+reading-garden animates: closing it moved worst from 119.3 to 110.3. **~9 ms, not the
+cause** — City is exonerated and the defect is the Media Center's own.
+
+**Root cause, measured not guessed.** Synthetic bursts spaced 350 ms apart bill each
+keystroke separately: **~30 ms per keystroke with the list populated, ~17–19 ms with zero
+cards rendered** (`emptyList [19.4,19.2,17.2,17.5]` vs `fullList [32.4,26.8,18,16.2]`).
+So ~13 ms is the cards and ~18 ms is Media Center chrome that re-renders regardless.
+MutationObserver counts only 26/8/7/5 mutations per keystroke and PerformanceObserver
+records **zero** long tasks — few DOM writes, so this is React reconciling a large tree,
+not layout or paint. `displayedItems` is already a `useMemo` on `debouncedQuery`
+(`MediaContent.tsx:586`) and `useDebouncedValue(query, 80)` at `:575` already protects the
+FILTER; what is unprotected is the JSX. `query` state lives in `useMedia`, called at
+`MediaCenterView.tsx:1537`, so every keystroke reconciles the entire Media Center.
+
+TRAP, and it cost two VOIDs: `.mc-nav`'s first child is a `SPAN.mc-nav-label`, so
+`button:nth-child(2)` is **Home**, not Library. Use `nth-of-type`. The VOID reads
+`undo did not restore the surface`, which points at the undo and not at the task.
+Second trap: the harness's baseline is whatever the surface is at launch, so a probe that
+left the nav on Library makes the correct undo look broken. Assert the resting tab first.
+
+**NOT FIXED THIS TURN, and named so the next turn opens on it rather than re-deriving.**
+The fix is memoization, and the two obvious boundaries are both defeated by prop identity
+as the code stands: `MediaTile` (`MediaCenterView.tsx:387`) gets an inline
+`onPlay={() => playItem(item)}` at all three call sites (`:547`, `:571`, `:952`), and
+`MediaPosterCard` is built inside `renderItem` at `MediaLibraryBrowser.tsx:299` with an
+inline `status` object literal and two inline callbacks. So `React.memo` alone changes
+nothing; the props have to be stabilised first. Budget: per-keystroke must reach ~25 ms for
+a 4-character burst to clear 100 ms, and killing the ~13 ms card cost alone lands ~78 ms.
+Re-score in the fix's own commit, as the rubric requires.
+
+**Bullet 1 stays at 3 of 16 cells** — category 2 does not close: City PASSES, Video FAILS.
+
