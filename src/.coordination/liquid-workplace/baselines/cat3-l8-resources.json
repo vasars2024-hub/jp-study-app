@@ -1,0 +1,93 @@
+{
+  "label": "l8-resources",
+  "surface": "@.fwin:has(.res-view)",
+  "win": "main",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "820x580",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 244,
+  "controlsSkipped": 74,
+  "byRole": {
+    "Work": 10,
+    "Liquid-eligible": 1,
+    "Anchor": 210,
+    "Anchor(holds work)": 11,
+    "Ambient": 12
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 1,
+  "sharedPrimitiveEligible": 1,
+  "eligibleTotal": 1,
+  "theme": "forest-night",
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.res-controls-right",
+      "path": [
+        0,
+        0,
+        1,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        1,
+        1,
+        1,
+        10
+      ],
+      "oneRegionGlass": [
+        1,
+        1,
+        1,
+        1,
+        10
+      ],
+      "allGlass": [
+        10,
+        1,
+        1,
+        1,
+        10
+      ],
+      "restored": [
+        0,
+        1,
+        1,
+        1,
+        10
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgb(18, 28, 23)",
+      "immediate": "none|rgb(18, 28, 23)",
+      "settled": "none|rgb(18, 28, 23)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

@@ -1183,6 +1183,17 @@ Order: Resources → Scraper → Settings → YouTube → Music.
 
 Gate: every setting and scraper action remains searchable and keyboard reachable.
 
+**L8 status 2026-08-30 — CLOSED, 2 of 2 bullets and 40 of 40 rubric cells.** Resources,
+Scraper, Settings, YouTube, and Music each hold a controlled 80/80. The five receipts that a
+filename-only sweep missed are resolved: Settings and YouTube category 7 were already
+committed as `cat7-settings-perf.json` and `cat7-youtube-perf.json`; Resources categories 1,
+3, and 4 were re-run live on the populated 51-card surface and committed under the expected
+`catN-l8-resources.json` names. The Gate's searchable and keyboard-reachable halves remain
+clean for both Settings and Scraper: 130/129+1 and 28/27+1 destinations, zero unsearchable,
+misrouted, unanchored, ungated, or over-gated actions, with both category-1 runs at 10/10.
+Full receipt map and negative-control numbers are in
+`src/.coordination/liquid-workplace/L8_DISCOVERY_OPERATIONS.md`. L9 opens.
+
 ### L9 — Shell, widgets, and alternate identities
 
 - Finish taskbar/context/command entry points without forcing Liquid.

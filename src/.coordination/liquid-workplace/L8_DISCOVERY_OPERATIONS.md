@@ -812,3 +812,31 @@ speech with an installed offline voice", environment-dependent. The five `readin
 already named. Nothing failing imports `settingsRegistry`. `i18n-check` **11,776** exit 0;
 `architecture-audit` nothing new exit 0; touched-path ESLint 0 errors. Carry 26 (CRLF worktree /
 LF HEAD on `settingsRegistry.ts`) held both times — HEAD+region blobs, diffed before staging.
+
+## 2026-08-30 — L8 closes: 40/40 cells, 2/2 bullets, Gate clean
+
+The previous handoff found five absent `cat[1-8]-l8-*` filenames and correctly refused to
+close on the scorecard sentence. Two were aliases, not gaps: Settings category 7 is
+`cat7-settings-perf.json` and YouTube category 7 is `cat7-youtube-perf.json`; both carry
+`score: 10`, populated surface scenes, real heavy operations, and firing jank controls.
+
+Resources categories 1, 3, and 4 had exact controlled numbers in this ledger but no raw
+receipt. They were re-run sequentially on the real populated Resources window: 51 cards,
+empty search, All selected, 820x580 Standard as found.
+
+| category | result | controlled numbers |
+| --- | --- | --- |
+| 1 accessibility | **10/10** | 246 text runs, min 5.30, 78 hit-tested controls, 0 below the effective 32px floor, 0 unreachable; all five control bars moved and restored |
+| 3 Liquid utilization | **10/10** | 244 regions, dense Work on translucency 0, eligible/treated/shared 1/1/1; controls 0→1 and all 10 Work regions failing, then 0 |
+| 4 use of space | **10/10** | clipped/overlap/hscroll/hidden-X 0/0/0/0 at 820x580, 260x170, 1264x765; injected clip 0→1→0; geometry restored |
+
+Receipts: `cat1-l8-resources.json`, `cat3-l8-resources.json`,
+`cat4-l8-resources.json`. The full five-surface matrix is **40 of 40 cells at 10/10**;
+category-7 receipts use `score: 10`, every other receipt has `verdict: PASS 10/10`.
+
+L8's Gate remains measured clean from `747dd78d`/`8da9b91e`: Settings 130 destinations,
+129 indexed plus one duplicate rendering; Scraper 28, 27 indexed plus one selection-gated
+instance view; both have zero unsearchable, misrouted, unanchored, ungated, or over-gated
+actions on theme and discovery axes, and category 1 is 10/10 on both. Therefore both L8
+bullets close and L9 opens. Zero probe files were added; all three missing cells were RUNs
+of existing surface-parameterized harnesses.
