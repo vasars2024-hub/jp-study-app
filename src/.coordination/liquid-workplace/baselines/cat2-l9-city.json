@@ -1,0 +1,173 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "task": "click:.reading-garden-mushroom-hitbox >> wait:700",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 10,
+    "controlCount": 8,
+    "box": "680x739",
+    "results": 0
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      19.9
+    ],
+    "inputRecv": [],
+    "worstRecv": 19.9,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      32
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 32
+  },
+  "steps": [
+    {
+      "step": "click:.reading-garden-mushroom-hitbox",
+      "target": {
+        "sel": ".reading-garden-mushroom-hitbox",
+        "label": "",
+        "disabled": false,
+        "at": "355,531"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": true,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:700",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": null,
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [
+    {
+      "sel": "main.reading-garden",
+      "unreachablePx": 129,
+      "why": "out-of-flow plates, no control past the fold"
+    }
+  ],
+  "openDialogs": [
+    {
+      "sel": "aside.reading-garden-info",
+      "txt": "×Organism dossierInkspore Pearl01of 50AgeA single unread nig"
+    }
+  ],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [
+    "aside.reading-garden-info"
+  ],
+  "costParity": {
+    "liquidToggle": "absent - no button.fwin-b-liquid in this window",
+    "read": {
+      "presentation": "standard",
+      "pressed": null,
+      "box": "680x739"
+    }
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": "N/A-single-path"
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.9
+    ]
+  }
+}

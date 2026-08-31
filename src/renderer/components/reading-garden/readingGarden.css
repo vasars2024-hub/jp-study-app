@@ -1032,7 +1032,14 @@
   font-weight: 400;
   font-style: italic;
   letter-spacing: 0.045em;
+  /* `line-height: 0.95` is deliberate display leading, but the italic Palatino glyph box is
+     taller than the line box: measured live at 36px, `clientHeight` 34 against `scrollHeight`
+     41, so `overflow: hidden` (which is here only to serve the ellipsis) was cutting 7px off
+     the bottom of the title. Padding rather than a bigger `line-height`: the painted baseline
+     does not move, which is what a display title's leading is chosen for. 0.2em covers the
+     7px at every size in the clamp because the overflow scales with the font. */
   line-height: 0.95;
+  padding-bottom: 0.2em;
   text-shadow:
     0 0 18px rgba(112, 232, 226, 0.35),
     0 0 42px rgba(118, 100, 137, 0.28),

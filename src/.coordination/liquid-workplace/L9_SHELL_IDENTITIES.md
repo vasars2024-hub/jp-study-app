@@ -444,3 +444,51 @@ hand-rolled contrast walk.
 
 **Bullet 1 is at 4 of 16 cells** — category 1 now PASSES on both RULE C surfaces.
 Next: categories 2–8 on Video and City.
+
+## 2026-08-31 — primary — category 2 · City: PASS 10/10, after one product fix and three harness corrections
+
+Task driven: `click:.reading-garden-mushroom-hitbox >> wait:700` (open the organism
+dossier — City's dominant task; the window has no other multi-step flow).
+`deadEnds 0 · modalTraps 0 · scrollTraps 0 · worstRecv 19.9 ms, overBar100 0 · cost 1 click`.
+Control fired all three bars: `[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`.
+
+**Product fix, and it is visible: the organism title was clipping its own descenders.**
+`.reading-garden-game-title` is 36px italic Palatino at `line-height: 0.95`, and the
+`overflow: hidden` that serves its ellipsis was cutting the glyph box — measured
+`clientHeight 34` against `scrollHeight 41`, so **7px of "Mooncap" was cut off the bottom**.
+`padding-bottom: 0.2em` rather than a bigger `line-height`: the painted baseline does not
+move, which is the whole point of choosing tight display leading. 7 → **0**.
+
+It is also why the first control run VOIDed. The clipped title is state-dependent — it only
+exists while the dossier is open — so `scrollTraps` read 2 in the base and 2 in the dirty leg
+(root + title, then root + plant, title gone), the plant's `+1` was invisible, and
+`backToBaseline` was false. A transient defect hides the control that would have caught it.
+
+**Three harness corrections, all in `cat2-clunkiness.cjs`, none of them a way to skip a bar.**
+
+1. *Fifth scroll-trap exclusion — a clipped ART PLATE is not unreachable content.*
+   `main.reading-garden` reports 129px of overflow and every element crossing its clip line
+   is an out-of-flow parallax plate (`world-back`, the background master IMG, the sky-events
+   and life canvases, the foreground mask), deliberately taller than the window because the
+   camera pans them. The test is two-part so the real case survives: every overflowing
+   descendant must be out of flow, AND no control may have its top edge past the fold. The
+   two halves are asked separately because `world-front` crosses the clip line *and* holds
+   the mushroom hitbox, which sits in the middle of the visible scene — the naive
+   "does it contain a control" form fails on exactly that. The control's own plant is an
+   in-flow `div` and still counts. **Excluded rows are REPORTED in `decorativeClips`**, and
+   this run's reads `main.reading-garden 129px — out-of-flow plates, no control past the fold`.
+2. *The control plant needs `pointer-events: auto`.* City's root is now `pointer-events: none`
+   (see the category-1 entry), so an appended plant inherits `none` and becomes unreachable —
+   and an unreachable button "changes nothing when clicked", so the dead-end bar would move
+   for the wrong reason and the control would read as fired. One declaration.
+3. *`costParity` on a window that refuses Liquid.* The term has no second operand: City's
+   `.fwin-frameless` has no `button.fwin-b-liquid` at all. Read factually through the existing
+   `PRESENT_READ` (`pressed: null` — ABSENT, not disabled) and recorded as the same
+   `N/A-single-path` the root-surface case already used, with the read stored beside it.
+
+TRAP: `--undo "click:.reading-garden-info-close"` VOIDs here and the message is misleading —
+`no match in surface` means the panel was already closed at undo time, because the mushroom
+hitbox is a TOGGLE and the run's starting state decides which way it goes. Assert the starting
+state in the same call that launches the run; this one started from a verified `open: false`.
+
+**Bullet 1 is at 5 of 16 cells.**
