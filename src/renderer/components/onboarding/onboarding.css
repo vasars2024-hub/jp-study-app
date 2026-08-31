@@ -1,0 +1,108 @@
+/* First-boot guided tour. Audit T1 / Phase 9.5. */
+
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 99000; /* above shell chrome, below the crash boundary (999999) */
+  /* The tour must never block the app — only the bubble takes pointer events. */
+  pointer-events: none;
+}
+
+.tour-dim {
+  position: fixed;
+  background: rgb(6 8 14 / 58%);
+  transition: all 180ms ease;
+  pointer-events: none;
+}
+
+.tour-root--static .tour-dim,
+.tour-root--static .tour-ring {
+  transition: none;
+}
+
+.tour-dim--full {
+  inset: 0;
+}
+
+/* Outline only — the hole itself stays clickable so `anchor-click` steps work. */
+.tour-ring {
+  position: fixed;
+  border: 2px solid var(--accent, #d84a68);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 35%), 0 6px 24px rgb(0 0 0 / 45%);
+  transition: all 180ms ease;
+  pointer-events: none;
+}
+
+.tour-bubble {
+  position: fixed;
+  width: 340px;
+  max-width: calc(100vw - 28px);
+  padding: 16px 18px;
+  background: var(--surface, #1b1b21);
+  color: var(--text, #e8e8ef);
+  border: 1px solid var(--control-border, #3a3a44);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 55%);
+  pointer-events: auto;
+}
+
+.tour-bubble--centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tour-bubble__step {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+
+.tour-bubble__title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.tour-bubble__body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  opacity: 0.86;
+}
+
+.tour-bubble__hotkey {
+  margin: 12px 0 0;
+}
+
+.tour-bubble__hotkey kbd {
+  display: inline-block;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12px;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid var(--control-border, #3a3a44);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+}
+
+.tour-bubble__actions {
+  display: flex;
+  /* Three actions since Back landed, and the bubble is a fixed 340px. RU's
+     "Пропустить тур" is the widest label in the four shipped languages; wrapping
+     is how the third button stays reachable instead of overflowing the card. */
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-dim,
+  .tour-ring {
+    transition: none;
+  }
+}
