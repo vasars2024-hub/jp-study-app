@@ -1,0 +1,215 @@
+{
+  "label": "l9-city",
+  "app": "city",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "matchedBy": "root-selector",
+  "host": "fwin-no-liquid",
+  "presentationAsFound": "standard",
+  "box": "680x709",
+  "driven": [
+    {
+      "step": "dossier",
+      "result": "{\"opened\":true}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "liquidAbsence": {
+    "windowsOpen": 2,
+    "targetHasLiquidControl": false,
+    "targetPresentation": "standard",
+    "targetChromeButtons": 3,
+    "othersWithLiquidControl": [
+      "Video"
+    ]
+  },
+  "minimized": {
+    "present": true,
+    "display": "none"
+  },
+  "lifecycleTrip": {
+    "trip": "minimize -> restore (taskbar)",
+    "zBefore": {
+      "rank": 1,
+      "of": 2,
+      "z": "196"
+    },
+    "zAfter": {
+      "rank": 1,
+      "of": 2,
+      "z": "198"
+    },
+    "rankHeld": true
+  },
+  "parity": {
+    "standard": "9/9",
+    "liquid": "n/a — section is not Liquid-presentable",
+    "na": 0,
+    "equal": null,
+    "rowsAgree": null,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "minimize -> restore",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [
+      {
+        "key": "zIndex",
+        "before": "196",
+        "after": "198"
+      }
+    ],
+    "otherPresentationBox": null
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "dossierDisclosure",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "aria-controls stripped",
+        "reachable": "8/9",
+        "fellRows": [
+          "dossierDisclosure"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-controls\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "stageReadout",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "stageReadout"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "dossierFacts",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "dossierFacts"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "musicControls",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "aria-pressed set to \"true\"",
+        "reachable": "8/9",
+        "fellRows": [
+          "musicControls"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "musicVolumeReadout",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "musicVolumeReadout"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "scenePainted",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "reading-garden-cloud-sprite removed from 6 of 6",
+        "reachable": "8/9",
+        "fellRows": [
+          "scenePainted"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"removed-class\",\"removed-class\",\"removed-class\",\"removed-class\",\"removed-class\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "heroPlacement",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "hitbox pushed 4000px below the fold",
+        "reachable": "8/9",
+        "fellRows": [
+          "heroPlacement"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"style\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "devOnlyIsolated",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "reading-garden-sky-console removed from 1 of 1",
+        "reachable": "8/9",
+        "fellRows": [
+          "devOnlyIsolated"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "applied": "element detached",
+        "reachable": "8/9",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"city:dossier\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "liquidAbsenceProved": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

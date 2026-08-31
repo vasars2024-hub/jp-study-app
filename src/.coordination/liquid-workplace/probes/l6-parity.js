@@ -3365,6 +3365,247 @@
       },
     },
 
+    /*
+     * L9's second RULE C surface — City / Mooncap Garden, the sparsest window in the shell
+     * and the one section `canPresentLiquid` refuses. It has no `.fwin-title-text`, so it
+     * is always matched by `rootSel`; `titleRe` is here only because the runner raises by
+     * TASKBAR title, which is "Mooncap Garden".
+     *
+     * A canvas scene has almost no controls, so presence-counting would score it 10/10 on
+     * an empty stage. Every row here is instead an AGREEMENT between two numbers the scene
+     * computes independently — the stage badge against the root's `stage-band-N` class, the
+     * banked-pages sentence against the progress bar's inline width, the music toggle
+     * against the volume slider's `disabled` — plus `heroPlacement`, which is `df9441cf`'s
+     * fix stated as a contract so the mushroom cannot slide back under the fold.
+     */
+    city: {
+      titleRe: /Mooncap|ムーンキャップ|月帽|Мунка/i,
+      rootSel: '.reading-garden',
+      features: [
+        {
+          // Driven: `step('dossier')` clicks the hitbox. The disclosure must report itself
+          // open, point at the panel it opened, and offer an enabled way back out — the
+          // "every enable flow needs a disable path" invariant, in this surface's terms.
+          id: 'dossierDisclosure',
+          f: (w) => {
+            const hit = q(w, '.reading-garden-mushroom-hitbox');
+            const panel = q(w, '.reading-garden-info');
+            const close = q(w, '.reading-garden-info-close');
+            const controls = hit ? hit.getAttribute('aria-controls') : null;
+            return {
+              ok: !!hit && hit.getAttribute('aria-expanded') === 'true' && !!panel
+                && panel.getAttribute('role') === 'dialog' && !!(panel.getAttribute('aria-label') || '').trim()
+                && !!controls && panel.id === controls && !!close && !close.disabled,
+              ev: `expanded=${hit ? hit.getAttribute('aria-expanded') : 'absent'} panel=${!!panel} controls="${controls}" panelId="${panel ? panel.id : ''}" closeEnabled=${!!close && !close.disabled}`,
+            };
+          },
+        },
+        {
+          // The stage badge and the root's scene band are computed from one `stage` in two
+          // places: `stage-band-${floor((stage-1)/10)+1}`. A badge that says 11 on a
+          // band-1 scene is the surface telling the user one thing and painting another.
+          id: 'stageReadout',
+          f: (w) => {
+            const badge = Number(txt(q(w, '.reading-garden-info-stage strong')));
+            const root = q(w, '.reading-garden');
+            const band = Number((String(root && root.className).match(/stage-band-(\d+)/) || [])[1]);
+            const want = Number.isFinite(badge) && badge > 0 ? Math.floor((badge - 1) / 10) + 1 : NaN;
+            return {
+              ok: Number.isFinite(badge) && badge > 0 && band === want,
+              ev: `stageBadge=${badge} sceneBand=${band} expectedBand=${want}`,
+            };
+          },
+        },
+        {
+          // Three dossier facts, every `dt` and `dd` non-empty, AND the banked-pages
+          // sentence agreeing with the progress bar's inline width to within a point. The
+          // sentence is text and the bar is a percentage — the same fraction rendered
+          // twice, which is the only way to catch a bar that has stopped tracking.
+          id: 'dossierFacts',
+          f: (w) => {
+            const rows = qa(w, '.reading-garden-info-dossier > div');
+            const filled = rows.filter((r) => txt(q(r, 'dt')) && txt(q(r, 'dd'))).length;
+            const banked = txt(q(w, '.reading-garden-info-copy strong'));
+            const nums = (banked.match(/\d+/g) || []).map(Number);
+            const bar = q(w, '.reading-garden-info-track i');
+            const pct = bar ? Number(String(bar.style.width).replace('%', '')) : NaN;
+            // A mature organism renders no banked sentence; then the bar has no text to
+            // agree with and the row scores the facts alone rather than inventing a match.
+            const agrees = nums.length >= 2
+              ? Number.isFinite(pct) && Math.abs(pct - (nums[0] / nums[1]) * 100) <= 1
+              : !!txt(q(w, '.reading-garden-info-observation p'));
+            return {
+              ok: rows.length >= 3 && filled === rows.length && agrees,
+              ev: `factRows=${rows.length} filled=${filled} banked="${banked}" barWidth=${pct}%`,
+            };
+          },
+        },
+        {
+          // Exactly one of On/Off pressed, and the volume slider's `disabled` agreeing with
+          // which one — `disabled={!music.enabled}` in the source, so a slider live under a
+          // pressed Off is a control that outlives the state that gates it.
+          id: 'musicControls',
+          f: (w) => {
+            const btns = qa(w, '.reading-garden-info-music-toggle button');
+            const on = btns.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const enabled = on.length === 1 && btns.indexOf(on[0]) === 0;
+            const vol = q(w, '.reading-garden-info-music-volume input');
+            return {
+              ok: btns.length === 2 && on.length === 1 && !!vol && vol.disabled === !enabled,
+              ev: `buttons=${btns.length} pressed=${on.length} enabledSide=${enabled} sliderDisabled=${vol ? vol.disabled : 'absent'}`,
+            };
+          },
+        },
+        {
+          // The readout beside the slider is the slider's own value, rendered separately.
+          id: 'musicVolumeReadout',
+          f: (w) => {
+            const vol = q(w, '.reading-garden-info-music-volume input');
+            const out = txt(q(w, '.reading-garden-info-music-volume strong'));
+            return {
+              ok: !!vol && vol.type === 'range' && Number(vol.max) > 0 && out === String(Number(vol.value)),
+              ev: `value=${vol ? vol.value : 'absent'} readout="${out}" range=${vol ? `${vol.min}..${vol.max}` : 'absent'}`,
+            };
+          },
+        },
+        {
+          // A canvas scene that did not paint is a canvas with a 0x0 BACKING STORE, which
+          // no CSS box will reveal — `width`/`height` attributes, not the rect.
+          id: 'scenePainted',
+          f: (w) => {
+            const canvases = qa(w, '.reading-garden canvas')
+              .filter((c) => !c.closest('[data-dev-only="true"]'));
+            const painted = canvases.filter((c) => c.width > 0 && c.height > 0).length;
+            const layers = qa(w, '.reading-garden-world, .reading-garden-cloud-sprite').length;
+            return {
+              ok: canvases.length > 0 && painted === canvases.length && layers >= 6,
+              ev: `canvases=${canvases.length} painted=${painted} parallaxLayers=${layers}`,
+            };
+          },
+        },
+        {
+          /*
+           * `df9441cf` as a contract. `.reading-garden` had `min-height: 420px`, which is an
+           * OVERRIDE and not a floor, so at 260x170 the scene stayed 420 tall inside a 170px
+           * window and the mushroom — the surface's ONLY control, with no scrollbar to reach
+           * it — sat at y=254, under the fold. The row is the hitbox's box lying inside the
+           * window's own box on both axes.
+           */
+          id: 'heroPlacement',
+          f: (w) => {
+            const hit = q(w, '.reading-garden-mushroom-hitbox');
+            if (!hit) return { ok: false, ev: 'no mushroom hitbox' };
+            const a = hit.getBoundingClientRect();
+            const b = w.getBoundingClientRect();
+            const inside = a.top >= b.top - 1 && a.left >= b.left - 1
+              && a.bottom <= b.bottom + 1 && a.right <= b.right + 1;
+            return {
+              ok: inside && a.width >= 32 && a.height >= 32,
+              ev: `hitbox=${Math.round(a.x - b.x)},${Math.round(a.y - b.y)} ${Math.round(a.width)}x${Math.round(a.height)} window=${Math.round(b.width)}x${Math.round(b.height)} inside=${inside}`,
+            };
+          },
+        },
+        {
+          /*
+           * The dev-only console is not part of this surface. Correction 21 established the
+           * contract as an ATTRIBUTE the product sets next to its own `import.meta.env.DEV`
+           * guard, so the row asserts what the attribute is allowed to be on: nothing the
+           * user can reach. Every marked subtree is named in the evidence, so putting the
+           * attribute on a shipping element to dodge a score shows up here by name.
+           */
+          id: 'devOnlyIsolated',
+          f: (w) => {
+            const marked = qa(w, '[data-dev-only="true"]');
+            const named = marked.map((n) => `${n.tagName.toLowerCase()}.${String(n.className).split(' ')[0]}`);
+            const controls = qa(w, 'button, input, select, textarea')
+              .filter((c) => !c.closest('[data-dev-only="true"]') && !c.closest('.fwin-frameless-controls'));
+            return {
+              ok: marked.every((n) => /console|debug|dev/i.test(String(n.className))) && controls.length > 0,
+              ev: `devOnly=${marked.length} [${named.join(', ')}] userControls=${controls.length}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        dossier: (w) => {
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return { refused: 'no mushroom hitbox' };
+          // NOT the per-spec `specState` global the other apps use, and the difference is
+          // measured rather than stylistic: `restore()` nulls those, the control loop calls
+          // `restore()` after every mutation, and the next `drive()` would then re-capture
+          // the ORIGINAL as "open" — leaving the user's dossier open at the end of the run
+          // and calling it restored. This one records the true original once and is never
+          // cleared, so every restore puts the surface back to what was found.
+          if (window.__LQP_CITY_WAS_OPEN === undefined) {
+            window.__LQP_CITY_WAS_OPEN = hit.getAttribute('aria-expanded') === 'true';
+          }
+          if (hit.getAttribute('aria-expanded') === 'true') return { already: true };
+          hit.click();
+          return { opened: true };
+        },
+      },
+      drive: ['dossier'],
+      undo: {
+        city: (w) => {
+          const was = window.__LQP_CITY_WAS_OPEN;
+          if (was === undefined) return null;
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return null;
+          const open = hit.getAttribute('aria-expanded') === 'true';
+          if (open === was) return null;
+          const close = q(w, '.reading-garden-info-close');
+          (close || hit).click();
+          return 'city:dossier';
+        },
+      },
+      mutations: {
+        dossierDisclosure: (w) => stripAttr(
+          q(w, '.reading-garden-mushroom-hitbox'), 'aria-controls', 'no mushroom hitbox',
+        ),
+        stageReadout: (w) => detach(q(w, '.reading-garden-info-stage strong'), 'dossier not open — no stage badge'),
+        dossierFacts: (w) => detach(q(w, '.reading-garden-info-dossier > div dd'), 'no dossier facts'),
+        musicControls: (w) => setAttr(
+          qa(w, '.reading-garden-info-music-toggle button')
+            .filter((b) => b.getAttribute('aria-pressed') === 'false')[0],
+          'aria-pressed', 'true', 'no unpressed music button to falsify',
+        ),
+        musicVolumeReadout: (w) => detach(
+          q(w, '.reading-garden-info-music-volume strong'), 'no volume readout',
+        ),
+        /*
+         * The layer half, not the canvas half, and the choice is deliberate. Zeroing a
+         * canvas backing store is the more literal "did not paint" falsification, but the
+         * restore sweep only puts an ATTRIBUTE back — the pixels are gone, and a layer that
+         * is not on a redraw loop would stay blank in the user's live garden after the run.
+         * A class the sweep genuinely re-adds falsifies the same row with nothing at risk.
+         * Stated so the limitation is on the record: the control proves the parallax half of
+         * `scenePainted`, and the canvas half is asserted but not falsified.
+         */
+        scenePainted: (w) => removeClassAll(qa(w, '.reading-garden-cloud-sprite'), 'reading-garden-cloud-sprite'),
+        heroPlacement: (w) => {
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return { refused: 'no mushroom hitbox' };
+          hit.setAttribute('data-lqp-was-style', hit.getAttribute('style') || '');
+          hit.style.transform = 'translateY(4000px)';
+          return { mutated: 'hitbox pushed 4000px below the fold' };
+        },
+        // Marking a SHIPPING element `data-dev-only` would be the honest falsification, but
+        // the restore sweep can only put an attribute BACK, never remove one it invented —
+        // it would leave `data-dev-only=""` on a product node. Falsified from the other
+        // side instead: strip the marked panel's own identifying class, so the row can no
+        // longer confirm that what is marked is a console.
+        devOnlyIsolated: (w) => removeClassAll(
+          qa(w, '[data-dev-only="true"]'), 'reading-garden-sky-console',
+        ),
+        windowLifecycle: (w) => {
+          const bar = q(w, '.fwin-frameless-controls');
+          if (!bar) return { refused: 'no frameless control cluster' };
+          return detach(qa(bar, '.fwin-b')[0], 'no frameless chrome button');
+        },
+      },
+    },
+
     // Scraper's parity contract is the shell that reaches every provider, the settings
     // editor that configures them, and explicit reverse controls. Network work is never
     // triggered by this harness: it only changes and restores local navigation state.
@@ -4348,6 +4589,20 @@
       : qa(w, popout ? '.popout-btn' : '.fwin-b');
     const btn = q(w, LIQUID_BTN[reader ? 'reader' : popout ? 'popout' : 'fwin']);
     const pressed = btn ? btn.getAttribute('aria-pressed') : null;
+    // Correction 24. A `.fwin` whose section `canPresentLiquid` refuses renders no toggle
+    // at all, and for THAT host the honest contract is the exact inverse: the affordance
+    // must be ABSENT rather than present-with-a-real-boolean, and the window must actually
+    // be sitting in `standard` — a non-presentable window painting Liquid with nothing to
+    // leave it is the 2026-08-17 visualizer defect, which this row must still catch.
+    // Its chrome is 3 (Pop out, Minimize, Close): it has no maximize, and `DesktopShell`
+    // forces `max: false` for section `city` in two places, so 4 is unreachable by design.
+    if (!reader && !popout && !btn && w.classList.contains('fwin')) {
+      const pres = w.getAttribute('data-presentation');
+      return {
+        ok: chrome.length >= 3 && pres === 'standard' && !w.classList.contains('fwin-liquid'),
+        ev: `chromeButtons=${chrome.length}/3 liquidToggle=absent presentation=${pres} liquidClass=${w.classList.contains('fwin-liquid')}`,
+      };
+    }
     const need = reader ? 1 : popout ? 3 : 4;
     return {
       ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
@@ -4446,6 +4701,26 @@
     return s;
   };
 
+  /**
+   * Trap 8's FOURTH host, added 2026-08-31 for L9's City surface (correction 24).
+   *
+   * `canPresentLiquid` (`liquidWindowPresentation.ts:72`) refuses sections `city` and
+   * `visualizer` outright — "the frameless garden and visualizer trinkets have no
+   * conventional chrome to swap". So a `.fwin` can be a real, complete window and still
+   * have NO Liquid destination, and the harness must not treat that as chromeless (it has
+   * chrome: Pop out, Minimize, Close) nor as a broken `fwin` (it renders 3 buttons, not 4,
+   * and no toggle, so `lifecycle` would score a correct window false and `toggleLiquid`
+   * would throw the whole run).
+   *
+   * The classification is derived from the RENDERED ABSENCE of the control, never from a
+   * class name the harness recognises — and the absence alone is deliberately not enough
+   * to earn a score. The 2026-08-17 boss-audit finding was exactly a window that rendered
+   * Liquid with no button to leave it, so `cat6-feature-parity.cjs` requires a
+   * discriminating control before it will accept the absence: another `.fwin` open at the
+   * same moment that DOES render `.fwin-b-liquid`, under the identical query.
+   */
+  const fwinHost = (w) => (q(w, LIQUID_BTN.fwin) ? 'fwin' : 'fwin-no-liquid');
+
   // Trap 4 + trap 7 + trap 8.
   const findWin = (app, pres) => {
     const s = spec(app);
@@ -4471,9 +4746,9 @@
     const byTitle = wins.find(
       (w) => s.titleRe.test(txt(q(w, '.fwin-title-text'))) && owns(w),
     );
-    if (byTitle) return { win: byTitle, matchedBy: 'title', host: 'fwin' };
+    if (byTitle) return { win: byTitle, matchedBy: 'title', host: fwinHost(byTitle) };
     const byRoot = wins.find((w) => s.rootSel && q(w, s.rootSel) && owns(w));
-    if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: 'fwin' };
+    if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: fwinHost(byRoot) };
     // Trap 8, REVISED 2026-08-25 (`6c16653f`). A pop-out is no longer chromeless:
     // `.popout-root` now carries `data-presentation` and its bar carries
     // `.popout-btn-liquid`, so it is a real Liquid host and returning the
@@ -4596,6 +4871,9 @@
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
     if (host === 'chromeless') return { refused: 'chromeless host has no liquid control' };
+    if (host === 'fwin-no-liquid') {
+      return { refused: 'section is not Liquid-presentable — canPresentLiquid refuses it, so no toggle is rendered' };
+    }
     // The pop-out's control is the same affordance in its own bar (`6c16653f`),
     // and so is the reader's (`ReaderLiquidToggle`, shared by both readers).
     const btn = q(win, LIQUID_BTN[host] || '.fwin-b-liquid');

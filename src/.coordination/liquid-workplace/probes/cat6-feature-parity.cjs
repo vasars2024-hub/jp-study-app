@@ -138,16 +138,24 @@ async function undirtyField(pres, was) {
   })()`);
 }
 
-/** Raise by taskbar button, never by pointerdown on the frame (that fires edge-snap). */
+/**
+ * Raise by taskbar button, never by pointerdown on the frame (that fires edge-snap).
+ *
+ * The window is resolved through the SPEC (`__win`), not by re-querying the title.
+ * Corrected 2026-08-31: the title query returned nothing for a frameless window — City
+ * renders no `.fwin-title-text` at all — so the open, on-top window read as "not open" and
+ * this clicked the taskbar button to "open" it. The taskbar button is a TOGGLE, so that
+ * click MINIMISED the surface and every subsequent measurement would have run against a
+ * `display: none` window.
+ */
 async function raise(titleRe) {
   const r = await ev(`(function(){
     var re = new RegExp(${A(titleRe)}, 'i');
     var b = [].slice.call(document.querySelectorAll('.os-task-win')).filter(function(x){
       return re.test(x.getAttribute('title') || ''); })[0];
     if (!b) return 'no-taskbar-button';
-    var w = [].slice.call(document.querySelectorAll('.fwin')).filter(function(x){
-      var t = x.querySelector('.fwin-title-text, .fwin-title');
-      return t && re.test(t.textContent || ''); })[0];
+    var w = window.__LQP.__win(${A(APP)});
+    if (w && !w.classList.contains('fwin')) w = w.closest('.fwin');
     if (!w) { b.click(); return 'opened'; }
     var hidden = getComputedStyle(w).display === 'none';
     var zs = [].slice.call(document.querySelectorAll('.fwin')).map(function(x){
@@ -159,6 +167,86 @@ async function raise(titleRe) {
   await post('/focus', {});
   await sleep(300);
   return r;
+}
+
+/**
+ * ---------------------------------------------------------------- the no-Liquid host
+ *
+ * Correction 24, 2026-08-31. `canPresentLiquid` refuses sections `city` and `visualizer`
+ * outright, so those windows render no Make Liquid control and there is no
+ * Standard -> Liquid -> Standard trip to take. Left alone this file threw on the first
+ * `flip()` and category 6 was simply unreachable on L9's second RULE C surface.
+ *
+ * Scoring such a surface 10/10 because nothing could be measured is the empty-harness
+ * false pass the rubric caps at 0, so the parity bar is REPLACED rather than waived, by
+ * two things that are both real:
+ *
+ *   1. `liquidAbsenceProved` — a DISCRIMINATING control, not an assertion. The identical
+ *      `.fwin-b-liquid` query is run over every open window at the same moment: at least
+ *      one other window must render the control and this one must not. With no such
+ *      neighbour the run REFUSES, because then the absence is equally explained by an app
+ *      that renders the affordance nowhere — which is a defect, and is exactly the shape
+ *      of the 2026-08-17 visualizer finding.
+ *   2. `roundTripHeld` — measured over the reversible transition this window ACTUALLY has,
+ *      minimize -> restore, driven from its taskbar button. The rubric names geometry,
+ *      focus, z-order and taskbar identity as part of the trip, and all of them survive
+ *      that transition or they do not.
+ *
+ * Z-ORDER IS COMPARED AS RANK, not as the raw inline value. Restoring a minimised window
+ * legitimately raises it (195 -> 196 measured), and calling that a lost round trip would be
+ * scoring the shell's correct behaviour as a defect. What must hold is the window's PLACE
+ * among the others; the raw values are reported beside it so a reader can disagree.
+ */
+async function liquidAbsence() {
+  return call(`(function(){
+    var wins = [].slice.call(document.querySelectorAll('.fwin'));
+    var target = window.__LQP.__win(${A(APP)});
+    if (target && !target.classList.contains('fwin')) target = target.closest('.fwin');
+    var name = function(w){
+      var t = w.querySelector('.fwin-title-text');
+      return t && t.textContent.trim() ? t.textContent.trim() : '(frameless)';
+    };
+    var others = wins.filter(function(w){ return w !== target && w.querySelector('.fwin-b-liquid'); });
+    return {
+      windowsOpen: wins.length,
+      targetHasLiquidControl: !!(target && target.querySelector('.fwin-b-liquid')),
+      targetPresentation: target ? target.getAttribute('data-presentation') : null,
+      targetChromeButtons: target ? target.querySelectorAll('.fwin-b').length : 0,
+      othersWithLiquidControl: others.map(name)
+    };
+  })()`);
+}
+
+async function zRank() {
+  return call(`(function(){
+    var target = window.__LQP.__win(${A(APP)});
+    if (target && !target.classList.contains('fwin')) target = target.closest('.fwin');
+    var wins = [].slice.call(document.querySelectorAll('.fwin')).map(function(w){
+      return { w: w, z: Number(getComputedStyle(w).zIndex) || 0 };
+    }).sort(function(a, b){ return b.z - a.z; });
+    var i = wins.map(function(e){ return e.w; }).indexOf(target);
+    return { rank: i + 1, of: wins.length, z: target ? String(target.style.zIndex || '') : null };
+  })()`);
+}
+
+async function taskbarToggle(titleRe) {
+  return ev(`(function(){
+    var re = new RegExp(${A(titleRe)}, 'i');
+    var b = [].slice.call(document.querySelectorAll('.os-task-win')).filter(function(x){
+      return re.test(x.getAttribute('title') || ''); })[0];
+    if (!b) return 'no-taskbar-button';
+    b.click();
+    return 'clicked';
+  })()`);
+}
+
+async function windowHidden() {
+  return call(`(function(){
+    var w = window.__LQP.__win(${A(APP)});
+    if (w && !w.classList.contains('fwin')) w = w.closest('.fwin');
+    if (!w) return { present: false };
+    return { present: true, display: getComputedStyle(w).display };
+  })()`);
 }
 
 /** Flip presentation and READ IT BACK. A toggle that did not land must not be scored. */
@@ -266,25 +354,71 @@ async function flip(pres, want) {
     const asFound = await call(`window.__LQP.check(${A(APP)})`);
     if (asFound.refused) throw new Error(asFound.refused);
 
-    const toOther = await flip(undefined, other);
-    if (toOther.refused) throw new Error(toOther.refused);
-    flipped = true;
-    const inOther = await call(`window.__LQP.check(${A(APP)})`);
-    if (inOther.refused) throw new Error(inOther.refused);
-    const snapB = toOther.snapshot;
+    // Correction 24's branch. Everything below reads `inOther`, `snapB` and `snapC`, so the
+    // no-Liquid host fills them from the trip it can actually take rather than from a flip
+    // that would throw: `inOther` is the SAME check (there is one presentation, so parity is
+    // trivially equal and the bar that carries the weight is `liquidAbsenceProved`), and the
+    // round trip is minimize -> restore.
+    const noLiquid = start.host === 'fwin-no-liquid';
+    let inOther = asFound;
+    let snapB = null;
+    let snapC = null;
+    let rankA = null;
+    let rankC = null;
+    if (noLiquid) {
+      out.liquidAbsence = await liquidAbsence();
+      if (out.liquidAbsence.othersWithLiquidControl.length === 0) {
+        throw new Error('cannot discriminate: no OTHER window renders `.fwin-b-liquid` right now, so an'
+          + ' absent toggle on this one is equally explained by an app that renders it nowhere.'
+          + ' Open a presentable window (Video, Dictionary) alongside and re-run.');
+      }
+      rankA = await zRank();
+      await taskbarToggle(titleRe);
+      await sleep(700);
+      out.minimized = await windowHidden();
+      if (out.minimized.display !== 'none') {
+        throw new Error(`minimize did not land; window reads display: ${out.minimized.display}`);
+      }
+      await taskbarToggle(titleRe);
+      await sleep(900);
+      await post('/focus', {});
+      await sleep(300);
+      snapC = await call(`window.__LQP.snapshot(${A(APP)})`);
+      if (snapC.refused) throw new Error(`restore did not land: ${snapC.refused}`);
+      rankC = await zRank();
+      out.lifecycleTrip = {
+        trip: 'minimize -> restore (taskbar)',
+        zBefore: rankA,
+        zAfter: rankC,
+        rankHeld: rankA.rank === rankC.rank && rankA.of === rankC.of,
+      };
+    } else {
+      const toOther = await flip(undefined, other);
+      if (toOther.refused) throw new Error(toOther.refused);
+      flipped = true;
+      inOther = await call(`window.__LQP.check(${A(APP)})`);
+      if (inOther.refused) throw new Error(inOther.refused);
+      snapB = toOther.snapshot;
 
-    const back = await flip(undefined, startPres);
-    if (back.refused) throw new Error(back.refused);
-    flipped = false;
-    const snapC = back.snapshot;
+      const back = await flip(undefined, startPres);
+      if (back.refused) throw new Error(back.refused);
+      flipped = false;
+      snapC = back.snapshot;
+    }
 
     // Geometry, focus and z-order are part of what the round trip must preserve, but the
     // FIELDS are the app data the rubric names. Both are compared; they are reported apart
     // so a chrome-only difference is never mistaken for lost user state.
     const fieldsHeld = A(snapA.fields) === A(snapC.fields);
     const stripVolatile = (s) => {
-      const { chars: _chars, nodes: _nodes, controls: _controls, ...rest } = s;
-      return rest;
+      const {
+        chars: _chars, nodes: _nodes, controls: _controls, zIndex, ...rest
+      } = s;
+      // The raw `zIndex` is dropped ONLY on the minimize/restore trip, where raising the
+      // restored window is the shell behaving correctly; `lifecycleTrip.rankHeld` carries
+      // the z-order term instead and both raw values are printed there. On the presentation
+      // flip it stays compared, because nothing should raise anything.
+      return noLiquid ? rest : { ...rest, zIndex };
     };
     const shellHeld = A(stripVolatile(snapA)) === A(stripVolatile(snapC));
     const diffs = Object.keys(snapA)
@@ -300,18 +434,18 @@ async function flip(pres, want) {
 
     out.parity = {
       [startPres]: `${asFound.reachable}/${asFound.total}`,
-      [other]: `${inOther.reachable}/${inOther.total}`,
+      [other]: noLiquid ? 'n/a — section is not Liquid-presentable' : `${inOther.reachable}/${inOther.total}`,
       na: asFound.na,
-      equal: reachableEqual,
-      rowsAgree,
+      equal: noLiquid ? null : reachableEqual,
+      rowsAgree: noLiquid ? null : rowsAgree,
       failing: asFound.rows.filter((r) => r.reachable === false)
         .map((r) => `${r.id} (${r.evidence})`),
-      onlyInOne: asFound.rows
+      onlyInOne: noLiquid ? [] : asFound.rows
         .filter((r, i) => r.reachable !== inOther.rows[i].reachable)
         .map((r, i) => `${r.id}: ${startPres}=${r.reachable} ${other}=${inOther.rows[i].reachable}`),
     };
     out.roundTrip = {
-      trip: `${startPres} -> ${other} -> ${startPres}`,
+      trip: noLiquid ? 'minimize -> restore' : `${startPres} -> ${other} -> ${startPres}`,
       dirtiedField: dirty.field === undefined ? null : dirty.field,
       dirtyNote: dirty.note || null,
       fieldsHeld,
@@ -390,7 +524,16 @@ async function flip(pres, want) {
       };
     }
 
-    const bars = {
+    const bars = noLiquid ? {
+      allRowsReachable: asFound.total > 0 && asFound.reachable === asFound.total,
+      // The parity bar's replacement, and it is a control rather than an assertion: the
+      // same query, at the same moment, over every open window.
+      liquidAbsenceProved: out.liquidAbsence.targetHasLiquidControl === false
+        && out.liquidAbsence.othersWithLiquidControl.length >= 1
+        && out.liquidAbsence.targetPresentation === 'standard'
+        && out.liquidAbsence.targetChromeButtons >= 3,
+      roundTripHeld: fieldsHeld && shellHeld && out.lifecycleTrip.rankHeld,
+    } : {
       allRowsReachable: asFound.total > 0 && asFound.reachable === asFound.total,
       parityEqual: reachableEqual && rowsAgree,
       roundTripHeld: fieldsHeld && shellHeld,

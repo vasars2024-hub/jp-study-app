@@ -934,3 +934,67 @@ Restored to exactly what was found: presentation `standard`, toggles
 byte-identical, page still `mc-video-page`, 1080x700.
 
 **Cells: 9 of 16.** `sampled-out:` unchanged.
+
+## 2026-08-31 — primary — category 6 on City: PASS 10/10, and correction 24 — the no-Liquid host
+
+City could not be scored for category 6 at all. `canPresentLiquid` (`liquidWindowPresentation.ts:72`)
+refuses sections `city` and `visualizer` outright — "the frameless garden and visualizer trinkets
+have no conventional chrome to swap" — so the window renders **no Make Liquid control**, and
+`cat6-feature-parity.cjs` threw on its first `flip()`. The category was simply out of reach on
+L9's second RULE C surface.
+
+**Correction 24 — a `.fwin` with no Liquid destination is a FOURTH host, `fwin-no-liquid`.**
+Classified from the RENDERED ABSENCE of `.fwin-b-liquid`, never from a class name the harness
+recognises. It is not `chromeless` (it has Pop out / Minimize / Close) and it is not a broken
+`fwin` (3 buttons and no toggle would have scored a correct window false). `lifecycle()` gets the
+inverse contract for it: the toggle must be **absent**, `data-presentation` must read `standard`,
+and `fwin-liquid` must not be on the class list — a non-presentable window painting Liquid with
+nothing to leave it is the 2026-08-17 visualizer finding, which this row still has to catch.
+
+**Scoring 10/10 because nothing could be measured is the empty-harness false pass, so the parity
+bar is REPLACED, not waived.** Two real things take its place:
+
+| bar | what earned it |
+| --- | --- |
+| `liquidAbsenceProved` | the identical `.fwin-b-liquid` query over every open window at one moment: **City 0, Video 1**, City `data-presentation="standard"`, 3 chrome buttons. **With no such neighbour the run REFUSES** — an absent toggle is otherwise equally explained by an app that renders the affordance nowhere, which is a defect. |
+| `roundTripHeld` | the reversible transition City actually has — **minimize → restore** from its taskbar button. `display: none` asserted mid-trip, so a trip that did not happen cannot pass. |
+
+**Z-order is compared as RANK, not as the raw inline value.** Restoring a minimised window
+legitimately raises it — measured `zIndex 196 → 198` — and scoring the shell's correct behaviour
+as a lost round trip would be a fabricated defect. `rank 1 of 2` before and after; both raw values
+are printed beside it.
+
+**`city` spec — 9 rows, every one an agreement between two numbers the scene computes
+independently**, because a canvas surface has almost no controls and presence-counting would score
+an empty stage 10/10: `stageReadout` (badge `01` vs the root's `stage-band-1`, `floor((n-1)/10)+1`),
+`dossierFacts` (the sentence `10 / 50 pages banked` vs the progress bar's inline `width: 20%`),
+`musicControls` (one of two `aria-pressed` vs the volume slider's `disabled`), `musicVolumeReadout`,
+`dossierDisclosure` (`aria-controls` → the panel's own `id`, with an enabled way back out),
+`scenePainted`, `devOnlyIsolated`, `windowLifecycle`, and **`heroPlacement` — `df9441cf` stated as a
+contract**, so the mushroom can never slide back under the fold unnoticed.
+
+**Result: PASS 10/10.** 9/9 rows reachable, absence proved, round trip `fieldsHeld true`
+`shellHeld true` `rankHeld true`, geometry `94,54 680x709` identical. Negative control: **all 9
+mutations fell exactly their own row, all 9 returned to 9/9** — `CONTROL FAILED AS REQUIRED`. No
+product change was needed on this surface either.
+
+**Correction 25 — `raise()` resolved the window by title and City has none.** It queried
+`.fwin-title-text`, got nothing for a frameless window, concluded the open on-top window was not
+open, and clicked the taskbar button to "open" it. **The taskbar button is a TOGGLE**, so that
+click MINIMISED the surface and every measurement after it would have run on a `display: none`
+window. Now resolved through the spec's own `__win`.
+
+Two limitations, on the record rather than buried. `scenePainted`'s control falsifies the parallax
+half only: zeroing a canvas backing store is the more literal falsification, but the restore sweep
+puts an ATTRIBUTE back and not the pixels, so a layer not on a redraw loop would stay blank in the
+user's live garden. `devOnlyIsolated` is falsified from the other side — stripping the marked
+panel's identifying class — because the sweep can put an attribute back but never remove one the
+harness invented, and marking a shipping node would leave `data-dev-only=""` on it.
+
+Restored: dossier closed as found, 6 cloud sprites, sky console present, 3 chrome buttons,
+`94,54 680x709`, 0 leftover `data-lqp-*` markers. The hitbox keeps an inert `style=""` the restore
+sweep writes where no style attribute existed; it applies nothing and React drops it on re-render.
+**Video re-runs `PASS 10/10` with host `fwin` and `raised`, so correction 24/25 are inert on a
+presentable surface** — nothing that passed before passes for a new reason.
+
+**Category 6 CLOSED for L9 bullet 1. Cells: 10 of 16.** `sampled-out:` unchanged.
