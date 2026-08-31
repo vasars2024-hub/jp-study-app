@@ -11476,6 +11476,16 @@ export const ru: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'Это не файл, поэтому открывать нечего.',
   'filesApp.reveal.noLocation': 'У этого элемента не записано расположение.',
+  'filesApp.collection.error.emptyName': 'Папке нужно имя.',
+  'filesApp.collection.error.nameTooLong': 'Это имя слишком длинное для папки.',
+  'filesApp.collection.error.duplicateName': 'Здесь уже есть папка с таким именем.',
+  'filesApp.collection.error.duplicateId': 'Такая папка уже существует.',
+  'filesApp.collection.error.noSuchCollection': 'Этой папки больше нет.',
+  'filesApp.collection.error.noSuchParent': 'Папки, в которую вы её переносите, больше нет.',
+  'filesApp.collection.error.noSuchItem': 'Здесь нечего добавить.',
+  'filesApp.collection.error.notInCollection': 'Этого элемента нет в этой папке.',
+  'filesApp.collection.error.selfNest': 'Папку нельзя переместить внутрь самой себя.',
+  'filesApp.collection.error.cycle': 'Папку нельзя переместить в одну из её собственных папок.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 

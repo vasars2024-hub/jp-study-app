@@ -10603,6 +10603,16 @@ export const ja: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'この項目はファイルではないため、開けるフォルダーはありません。',
   'filesApp.reveal.noLocation': 'この項目には場所が記録されていません。',
+  'filesApp.collection.error.emptyName': 'フォルダーには名前が必要です。',
+  'filesApp.collection.error.nameTooLong': 'フォルダー名が長すぎます。',
+  'filesApp.collection.error.duplicateName': 'ここには同じ名前のフォルダーがすでにあります。',
+  'filesApp.collection.error.duplicateId': 'そのフォルダーはすでに存在します。',
+  'filesApp.collection.error.noSuchCollection': 'そのフォルダーはもうありません。',
+  'filesApp.collection.error.noSuchParent': '移動先のフォルダーはもうありません。',
+  'filesApp.collection.error.noSuchItem': '追加できるものがありません。',
+  'filesApp.collection.error.notInCollection': 'この項目はこのフォルダーに入っていません。',
+  'filesApp.collection.error.selfNest': 'フォルダーを自分自身の中へは移動できません。',
+  'filesApp.collection.error.cycle': 'フォルダーを、その中のフォルダーへは移動できません。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

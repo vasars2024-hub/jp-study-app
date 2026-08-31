@@ -11061,6 +11061,19 @@ export const en: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'This item is not a file, so there is no folder to open.',
   'filesApp.reveal.noLocation': 'This item records no location.',
+  // Gate 16 — collections, the user's own folders. Every refusal is a named
+  // key: a folder operation that silently no-ops is the shape the plan forbids.
+  'filesApp.collection.error.emptyName': 'A folder needs a name.',
+  'filesApp.collection.error.nameTooLong': 'That name is too long for a folder.',
+  'filesApp.collection.error.duplicateName':
+    'There is already a folder with that name in this place.',
+  'filesApp.collection.error.duplicateId': 'That folder already exists.',
+  'filesApp.collection.error.noSuchCollection': 'That folder is no longer there.',
+  'filesApp.collection.error.noSuchParent': 'The folder you moved this into is no longer there.',
+  'filesApp.collection.error.noSuchItem': 'There is nothing here to add.',
+  'filesApp.collection.error.notInCollection': 'That item is not in this folder.',
+  'filesApp.collection.error.selfNest': 'A folder cannot be moved inside itself.',
+  'filesApp.collection.error.cycle': 'A folder cannot be moved inside one of its own folders.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':

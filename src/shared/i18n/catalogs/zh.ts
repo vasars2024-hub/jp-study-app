@@ -10513,6 +10513,16 @@ export const zh: Catalog = {
 
   'filesApp.reveal.notFileBacked': '该项目不是文件，因此没有可打开的文件夹。',
   'filesApp.reveal.noLocation': '该项目没有记录位置。',
+  'filesApp.collection.error.emptyName': '文件夹需要一个名称。',
+  'filesApp.collection.error.nameTooLong': '这个文件夹名称太长了。',
+  'filesApp.collection.error.duplicateName': '这里已经有同名的文件夹了。',
+  'filesApp.collection.error.duplicateId': '该文件夹已存在。',
+  'filesApp.collection.error.noSuchCollection': '该文件夹已不存在。',
+  'filesApp.collection.error.noSuchParent': '你移入的那个文件夹已不存在。',
+  'filesApp.collection.error.noSuchItem': '这里没有可添加的内容。',
+  'filesApp.collection.error.notInCollection': '该项目不在这个文件夹里。',
+  'filesApp.collection.error.selfNest': '文件夹不能移动到它自己里面。',
+  'filesApp.collection.error.cycle': '文件夹不能移动到它自己的子文件夹里。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',
