@@ -2,7 +2,7 @@
   "surface": "@.os-desktop-wired",
   "label": "l9b4-wired",
   "control": true,
-  "at": "2026-08-31T17:32:31.684Z",
+  "at": "2026-08-31T18:28:37.694Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "shell",
@@ -118,10 +118,8 @@
       "numbers": {
         "titleText": "",
         "titleFrom": null,
-        "backAffordances": 1,
-        "backList": [
-          "Close SYS"
-        ]
+        "backAffordances": 0,
+        "backList": []
       }
     },
     {
@@ -142,11 +140,11 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 2,
-        "scannedControls": 35,
+        "scannedControls": 32,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 36,
+        "chromeControlsRaw": 33,
         "summaryHeaders": 1,
         "behindDisclosure": 0,
         "disclosures": {
@@ -160,12 +158,9 @@
           "REMOTE FEED",
           "SIG-VID×",
           "SYS×",
-          "Close SYS",
           "CAP-50×",
           "Search everything…",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
+          "Show hidden icons",
           "Quick settings",
           "Notifications, 7",
           "card 0",
@@ -174,7 +169,10 @@
           "card 3",
           "card 4",
           "clutter 0",
-          "clutter 1"
+          "clutter 1",
+          "clutter 2",
+          "clutter 3",
+          "clutter 4"
         ]
       }
     },
@@ -189,7 +187,7 @@
           {
             "cell": "data-display-transparency=full",
             "theme": "wired-archive",
-            "measured": 37,
+            "measured": 36,
             "unmeasurable": 4,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -204,7 +202,7 @@
           {
             "cell": "data-display-transparency=off",
             "theme": "wired-archive",
-            "measured": 37,
+            "measured": 36,
             "unmeasurable": 4,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -352,12 +350,12 @@
     "q2": "NO",
     "q3": "NO",
     "q4": "NO",
-    "q6": "NO-SUBJECT",
+    "q6": "YES",
     "q10": "NO"
   },
   "altThemeNumbers": {
     "theme": "wired-archive",
-    "controlsPainted": 36,
+    "controlsPainted": 33,
     "q1": {
       "entryPoints": 3,
       "primaryInputs": 3,
@@ -371,11 +369,11 @@
     },
     "q4": {
       "collapsedDisclosures": 2,
-      "scannedControls": 35,
+      "scannedControls": 32,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 36,
+      "chromeControlsRaw": 33,
       "summaryHeaders": 1,
       "behindDisclosure": 0,
       "disclosures": {
@@ -389,12 +387,9 @@
         "REMOTE FEED",
         "SIG-VID×",
         "SYS×",
-        "Close SYS",
         "CAP-50×",
         "Search everything…",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
+        "Show hidden icons",
         "Quick settings",
         "Notifications, 7",
         "card 0",
@@ -403,18 +398,23 @@
         "card 3",
         "card 4",
         "clutter 0",
-        "clutter 1"
+        "clutter 1",
+        "clutter 2",
+        "clutter 3",
+        "clutter 4"
       ]
     },
     "q6": {
-      "liquidRegions": 0,
-      "byBackdropFilter": 0,
+      "liquidRegions": 1,
+      "byBackdropFilter": 1,
       "byContextualPaint": 0,
-      "carryingATransition": 0,
+      "carryingATransition": 1,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 0,
+      "liquidMaterialTotal": 1,
       "decoratedLeaves": [],
-      "regionList": [],
+      "regionList": [
+        "div.os-taskbar"
+      ],
       "withoutTransition": []
     },
     "q10": {
@@ -446,7 +446,7 @@
       "dashboardHosts": 1
     }
   },
-  "controlsPaintedA": 36,
+  "controlsPaintedA": 33,
   "controlResult": {
     "Q2": true,
     "Q3": true,
@@ -455,7 +455,7 @@
     "Q10": true
   },
   "controlQ4": {
-    "scannedControls": 35,
+    "scannedControls": 32,
     "bar": 12,
     "behindDisclosure": 0,
     "ariaDisclosures": []

@@ -1774,3 +1774,27 @@ closes at 10/10, so cat5 at 7/10 is SCORED but not closed; 11 to run counting it
 way deliberately: the previous line in this file read "6 of 16" for a moment and that would
 have credited a 7 as a pass. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
 notifications, onboarding, help.
+
+## 2026-08-31 — codexA — interrupted tray-overflow slice recovered; Q4 closes
+
+**Recovery was product work, not a re-derivation.** HEAD `5b0cb42d` had no staged paths; the
+13:46–13:49 edits were `DesktopShell`, shell CSS, popup semantics, four catalog lines and the
+new overflow test. They match the preceding receipt's exact Q4 slice and are checkpointed as
+`234f0b44`; no foreign dirty hunk entered the commit.
+
+The shared `.os-tray` now shows Search, hidden-icons, Quick Settings and Notifications. Widgets,
+Clipboard history and Settings move behind the labeled hidden-icons dialog; every command remains
+present with its original popup/window semantics. Live Wired shell: top-level tray buttons **7→4**,
+dialog labels **3/3**, role `dialog`, initial focus on the panel, Escape closed it and returned
+focus to the chevron. Focused source regressions: **26/26**; ESLint **0 errors**.
+
+**cat5 · Wired remains 7/10, but Q4 NO→YES.** Default scanned controls **13→10** against the
+bar of 12, collapsed disclosures stayed 2. Both transparency cells measured **13** readable
+runs, **0** failures; minimum contrast 7.46/7.48. Category-6 evidence stayed 9/9 in each mode
+with 0 round-trip diffs. Control: Q2/Q3/Q4/Q5/Q10 all failed as required, residue 0, theme,
+presentation and `data-display-transparency=full` restored byte-identically.
+
+Open product question is unchanged and deliberately not papered over: Q1/Q2/Q3 need one shell
+navigation decision (dominant task, current location/recovery, primary action). **RULE C remains
+5 of 16 passing cells.** `sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications,
+onboarding, help.

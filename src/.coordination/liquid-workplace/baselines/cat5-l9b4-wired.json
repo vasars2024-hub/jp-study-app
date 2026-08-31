@@ -2,7 +2,7 @@
   "surface": "@.os-desktop-wired",
   "label": "l9b4-wired",
   "control": false,
-  "at": "2026-08-31T17:32:39.810Z",
+  "at": "2026-08-31T18:28:26.297Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "shell",
@@ -79,15 +79,13 @@
     {
       "id": 2,
       "q": "current location and way back obvious",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "a non-empty location label AND at least one way back",
       "numbers": {
         "titleText": "LOCAL NODE",
         "titleFrom": "button.os-desktop-switch",
-        "backAffordances": 1,
-        "backList": [
-          "Close SYS"
-        ]
+        "backAffordances": 0,
+        "backList": []
       }
     },
     {
@@ -104,15 +102,15 @@
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 2,
-        "scannedControls": 13,
+        "scannedControls": 10,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 13,
+        "chromeControlsRaw": 10,
         "summaryHeaders": 0,
         "behindDisclosure": 0,
         "disclosures": {
@@ -126,12 +124,9 @@
           "REMOTE FEED",
           "SIG-VID×",
           "SYS×",
-          "Close SYS",
           "CAP-50×",
           "Search everything…",
-          "BUTTON",
-          "BUTTON",
-          "BUTTON",
+          "Show hidden icons",
           "Quick settings",
           "Notifications, 7"
         ]
@@ -148,7 +143,7 @@
           {
             "cell": "data-display-transparency=full",
             "theme": "wired-archive",
-            "measured": 14,
+            "measured": 13,
             "unmeasurable": 4,
             "minRatio": 7.46,
             "failingCount": 0,
@@ -163,15 +158,15 @@
           {
             "cell": "data-display-transparency=off",
             "theme": "wired-archive",
-            "measured": 14,
+            "measured": 13,
             "unmeasurable": 4,
-            "minRatio": 7.46,
+            "minRatio": 7.48,
             "failingCount": 0,
             "worst": {
               "el": "span.os-clock-date",
-              "ratio": 7.46,
+              "ratio": 7.48,
               "bar": 4.5,
-              "bg": "div.os-clock@90% over gradient layer 1 of 3 on div.os-taskbar over gradient layer 2 of 3 on div.os-taskbar over div.os-taskbar@100%",
+              "bg": "div.os-clock@90% over gradient layer 1 of 3 on div.os-taskbar over gradient layer 2 of 3 on div.os-taskbar over div.os-taskbar@72% over gradient layer 1 of 2 on div.os-desktop over gradient layer 2 of 2 on div.os-desktop",
               "text": "Aug 31"
             }
           }
@@ -179,7 +174,7 @@
         "failing": [],
         "themeAxisMoved": true,
         "axisWitness": {
-          "minRatioMoved": false,
+          "minRatioMoved": true,
           "paintDigestMoved": true
         }
       }
@@ -286,15 +281,15 @@
   ],
   "altThemeVerdicts": {
     "q1": "NO",
-    "q2": "YES",
+    "q2": "NO",
     "q3": "NO",
-    "q4": "NO",
-    "q6": "NO-SUBJECT",
+    "q4": "YES",
+    "q6": "YES",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "wired-archive",
-    "controlsPainted": 13,
+    "controlsPainted": 10,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -304,11 +299,11 @@
     },
     "q4": {
       "collapsedDisclosures": 2,
-      "scannedControls": 13,
+      "scannedControls": 10,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 13,
+      "chromeControlsRaw": 10,
       "summaryHeaders": 0,
       "behindDisclosure": 0,
       "disclosures": {
@@ -322,25 +317,24 @@
         "REMOTE FEED",
         "SIG-VID×",
         "SYS×",
-        "Close SYS",
         "CAP-50×",
         "Search everything…",
-        "BUTTON",
-        "BUTTON",
-        "BUTTON",
+        "Show hidden icons",
         "Quick settings",
         "Notifications, 7"
       ]
     },
     "q6": {
-      "liquidRegions": 0,
-      "byBackdropFilter": 0,
+      "liquidRegions": 1,
+      "byBackdropFilter": 1,
       "byContextualPaint": 0,
-      "carryingATransition": 0,
+      "carryingATransition": 1,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 0,
+      "liquidMaterialTotal": 1,
       "decoratedLeaves": [],
-      "regionList": [],
+      "regionList": [
+        "div.os-taskbar"
+      ],
       "withoutTransition": []
     },
     "q10": {
@@ -365,11 +359,11 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 13,
+  "controlsPaintedA": 10,
   "findings": [
     "Q1 dominant task immediately obvious",
-    "Q3 primary actions visible without hunting",
-    "Q4 advanced tools discoverable without cluttering"
+    "Q2 current location and way back obvious",
+    "Q3 primary actions visible without hunting"
   ],
   "voided": [],
   "score": 7,
