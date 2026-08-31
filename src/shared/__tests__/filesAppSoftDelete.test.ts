@@ -98,6 +98,21 @@ describe('FilesSoftDeleteStore', () => {
     expect(persistence.events).toHaveLength(1);
   });
 
+  it('refuses undo honestly when the persisted tombstones cannot be read', () => {
+    const persistence = memoryPersistence();
+    const store = new FilesSoftDeleteStore(persistence, () => 'undo:unreadable', 5_000);
+    const receipt = store.delete('note:unreadable', 100);
+    persistence.read = () => {
+      throw new Error('storage unavailable');
+    };
+
+    expect(store.undo(receipt.undoToken, 200)).toEqual({
+      ok: false,
+      reason: 'storage-failed',
+    });
+    expect(persistence.events).toHaveLength(1);
+  });
+
   it('does not extend the undo window when the same row is deleted twice', () => {
     const persistence = memoryPersistence();
     let calls = 0;

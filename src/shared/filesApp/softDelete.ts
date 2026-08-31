@@ -98,7 +98,12 @@ export class FilesSoftDeleteStore {
   }
 
   undo(undoToken: string, now = Date.now()): FilesSoftDeleteUndoResult {
-    const state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
+    let state: FilesSoftDeleteStateV1;
+    try {
+      state = parseState(this.persistence.read(FILES_SOFT_DELETE_STORAGE_KEY));
+    } catch {
+      return { ok: false, reason: 'storage-failed' };
+    }
     const match = state.tombstones.find((row) => row.undoToken === undoToken);
     if (!match) return { ok: false, reason: 'unknown-token' };
     if (now > match.undoExpiresAt) return { ok: false, reason: 'expired' };
