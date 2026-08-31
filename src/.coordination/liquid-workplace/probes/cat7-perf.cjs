@@ -1028,9 +1028,21 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // the pin forbids.
   if (spec.partial) voided.push(`PARTIAL SURFACE: ${spec.partial}`);
   const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
+  // Correction 31 (shared with the cat2 harness, where it was measured). React StrictMode
+  // double-invokes every render IN DEVELOPMENT ONLY and this harness only ever drives a dev
+  // build, so every frame/latency figure here carries a tax production strips. Wired Start
+  // menu, same task and same open tree: worstRecv 118.1 ms with StrictMode on, 52.3 ms off,
+  // against a 100 ms bar. Stamped rather than corrected here, because this category's own
+  // numbers are frame-time under load and nobody has yet re-derived the tax for THAT leg -
+  // do not assume the 2.3x from cat2 transfers. `src/renderer/strictRoot.tsx` reads the flag.
+  const strictOff = (await ev("String(localStorage.getItem('jp-lq-strict'))")) === 'off';
+
   const out = {
     surface: SURFACE, title: spec.title, root: spec.root,
     at: new Date().toISOString(),
+    strictMode: strictOff
+      ? 'off - dev double-render removed; see correction 31'
+      : 'on - figures carry the dev double-render tax; see correction 31',
     scene: legs.drag ? legs.drag.scene_before : null,
     surfaceWindow: {
       mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
