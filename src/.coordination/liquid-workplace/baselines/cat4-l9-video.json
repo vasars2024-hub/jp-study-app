@@ -94,7 +94,9 @@
       "artPlateOverlapCount": 0,
       "artPlateOverlaps": [],
       "artPlateOverflowCount": 0,
-      "artPlateOverflow": []
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
     },
     {
       "kind": "compact",
@@ -102,8 +104,8 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 188;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 188;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -121,7 +123,9 @@
       "artPlateOverlapCount": 0,
       "artPlateOverlaps": [],
       "artPlateOverflowCount": 0,
-      "artPlateOverflow": []
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
     },
     {
       "kind": "maximized",
@@ -129,8 +133,8 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 188;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 188;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 192;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -148,7 +152,9 @@
       "artPlateOverlapCount": 0,
       "artPlateOverlaps": [],
       "artPlateOverflowCount": 0,
-      "artPlateOverflow": []
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
     }
   ],
   "bars": {

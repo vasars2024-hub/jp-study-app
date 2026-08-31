@@ -828,3 +828,60 @@ in it and the control read false while working correctly.*
    category would hide real inspectors. Disclosed instead, and the number stands as measured.
 
 **Cells: still 7 of 16** — cat4 closes on Video only. `sampled-out:` unchanged.
+
+## 2026-08-31 — category 4 · City: FAIL 5 bars → **PASS 10/10**. cat4 CLOSES on both surfaces.
+
+**Cells: 8 of 16.** Both L9 RULE C surfaces now bank `PASS 10/10` for category 4. Two product
+fixes and one more harness correction, on top of 19 and 20 in the entry above.
+
+**The compact failure was one CSS declaration, not camera maths — and the previous entry's
+"parallax camera maths" reading was wrong.** Measured at 260x170 before touching anything:
+
+| element | box | verdict |
+| --- | --- | --- |
+| `main.reading-garden` | 258 **x 420** in a 170px window | 251px below the frame |
+| `.reading-garden-mushroom` | y = **254** | under the fold |
+| `button.reading-garden-mushroom-hitbox` | y = **259** | the scene's ONLY control, unreachable |
+| `.reading-garden-sky-console` | y = **230** | under the fold |
+
+`.reading-garden` carried `height: 100%` and `min-height: 420px`. **`min-height` beats both
+`height` and `max-height`** — the used height is `max(min-height, min(max-height, height))` — so
+that was not a floor, it was an override, and it won every time the window was shorter than 420.
+`gardenWorldRect` projects off this element's own box, so the world was being cover-fitted into a
+420px area of which 170 was visible, and everything positioned inside it went with it.
+`min-height: min(420px, 100%)` keeps the floor where there is room and yields where there is not.
+After: `main` 258x168, mushroom (75, 76) 78x56, hitbox (83, 79) 61x50 — **inside the window**.
+Proven inert at the default size, which is what makes cat1/cat3's banked City scores still valid
+without re-running them: at 680x709 `main` is 678x707 with used `height: 707px`, exactly as before,
+because 420 < 707 either way. The percentage resolves in both real hosts — `.fwin-body` and
+`.popout-root` (`position: absolute; inset: 0; height: 100%`) both have definite heights, which is
+the same reason `height: 100%` above them already worked.
+
+**Correction 21 — a dev-only overlay is not part of the surface.** With the above fixed, City's
+ENTIRE remaining failure was `.reading-garden-sky-console`: 2 clipped and 8 overlaps at 260x170,
+3 overlaps at default, from a panel `ReadingGardenSkyEvents.tsx` returns `null` for in any
+packaged build. These harnesses walk the running DEV app, so it is on screen here and on no
+user's machine. The product now marks that root **`data-dev-only="true"`, next to its own
+`import.meta.env.DEV` guard**, and the reader drops such subtrees in `painted()`.
+
+An ATTRIBUTE the product sets, never a class list the harness knows — a surface-specific
+exception is what RULE 1 forbids, and a harness deciding for itself what "looks like" a debug
+panel would hide real inspectors. Every exclusion is named: City reports
+`devOnlyExcluded: ["div.reading-garden-sky-console (+8 descendants)"]`, count 1. Putting the
+attribute on a shipping element to dodge a score would appear there by name.
+
+| bar | City before | City after |
+| --- | --- | --- |
+| clipped (default / compact) | 24 / 55 | **0 / 0** |
+| overlaps | 397 / 266 | **0 / 0** |
+| horizontal | `main.reading-garden 947>678` | **0 / 0** |
+| allThreeSizes, restored | false, false | **true** (2 of 2 reachable, proven) |
+| contentGrowsNotChrome | UNMEASURED | **true** (compact → default, pair named) |
+
+**The instrument is inert where it should be.** Video re-runs `PASS 10/10` with
+`excused 0/0/0` and `devOnly 0` at all three sizes: none of corrections 19, 20 or 21 fires on a
+dense app surface, so nothing that passed before is passing for a new reason. Both controls hold
+on both surfaces — `injectedClip` 0 → 1 → 0, and the plate plant excused, named, and removed.
+
+**Category 4 CLOSED for L9 bullet 1.** Remaining for the bullet: categories 5–8 × 2 surfaces.
+`sampled-out:` unchanged.

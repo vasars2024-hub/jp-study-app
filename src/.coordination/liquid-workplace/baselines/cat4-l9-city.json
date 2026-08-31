@@ -9,7 +9,7 @@
       "kind": "default",
       "box": "680x709",
       "clipped": 0,
-      "overlaps": 3,
+      "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
       "deadPctViewport": 0,
@@ -18,7 +18,7 @@
       "dominantCanvasPct": 99.4,
       "bars": {
         "clipped": true,
-        "overlaps": false,
+        "overlaps": true,
         "horizontal": true,
         "deadRegion": true
       },
@@ -27,18 +27,18 @@
     {
       "kind": "compact",
       "box": "260x170",
-      "clipped": 13,
+      "clipped": 0,
       "overlaps": 0,
       "horizontalScrollers": 0,
-      "hiddenOverflowX": 1,
+      "hiddenOverflowX": 0,
       "deadPctViewport": 0,
       "deadRegionBasis": "visible surface",
       "chromePct": 0,
       "dominantCanvasPct": 98.1,
       "bars": {
-        "clipped": false,
+        "clipped": true,
         "overlaps": true,
-        "horizontal": false,
+        "horizontal": true,
         "deadRegion": true
       },
       "restored": true
@@ -74,17 +74,13 @@
       "restoredFrom": null,
       "restoredTo": null,
       "clippedList": [],
-      "overlapList": [
-        "div.reading-garden-world x div.reading-garden-sky-console (168x179)",
-        "div.reading-garden-world x div.reading-garden-sky-console-body (168x151)",
-        "div.reading-garden-world x div.reading-garden-sky-console-actions (146x95)"
-      ],
+      "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
       "deadRegionBox": null,
       "deadRegionBasis": "visible surface",
       "chromeParts": [],
-      "artPlateClipCount": 24,
+      "artPlateClipCount": 20,
       "artPlateClips": [
         "div.reading-garden-world",
         "img.reading-garden-background-master",
@@ -95,7 +91,7 @@
         "div.reading-garden-cloud-sprite",
         "canvas."
       ],
-      "artPlateOverlapCount": 336,
+      "artPlateOverlapCount": 436,
       "artPlateOverlaps": [
         "div.reading-garden-sky x div.reading-garden-world (678x707)",
         "div.reading-garden-sky x img.reading-garden-background-master (678x707)",
@@ -106,7 +102,11 @@
       ],
       "artPlateOverflowCount": 1,
       "artPlateOverflow": [
-        "main.reading-garden 1227>678 (hidden)"
+        "main.reading-garden 831>678 (hidden)"
+      ],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
       ]
     },
     {
@@ -117,34 +117,25 @@
       "clampedByOsMinimum": null,
       "restoredFrom": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 185;",
       "restoredTo": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 185;",
-      "clippedList": [
-        "main.reading-garden",
-        "div.reading-garden-world",
-        "div.reading-garden-mushroom",
-        "button.reading-garden-mushroom-hitbox",
-        "div.reading-garden-sky-console",
-        "button.reading-garden-sky-console-toggle"
-      ],
+      "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
-      "hiddenOverflowXList": [
-        "main.reading-garden 459>258"
-      ],
+      "hiddenOverflowXList": [],
       "deadRegionBox": null,
       "deadRegionBasis": "visible surface",
       "chromeParts": [],
-      "artPlateClipCount": 45,
+      "artPlateClipCount": 22,
       "artPlateClips": [
-        "div.reading-garden-sky",
         "div.reading-garden-world",
         "img.reading-garden-background-master",
         "div.reading-garden-world",
         "canvas.reading-garden-sky-events",
-        "div.reading-garden-stars",
-        "i.",
-        "i."
+        "div.reading-garden-moonbeam",
+        "div.reading-garden-environment-light",
+        "div.reading-garden-cloud-sprite",
+        "canvas."
       ],
-      "artPlateOverlapCount": 225,
+      "artPlateOverlapCount": 546,
       "artPlateOverlaps": [
         "div.reading-garden-sky x div.reading-garden-world (258x168)",
         "div.reading-garden-sky x img.reading-garden-background-master (258x168)",
@@ -153,8 +144,14 @@
         "div.reading-garden-sky x div.reading-garden-stars (258x168)",
         "div.reading-garden-sky x img.reading-garden-planet (24x24)"
       ],
-      "artPlateOverflowCount": 0,
-      "artPlateOverflow": []
+      "artPlateOverflowCount": 1,
+      "artPlateOverflow": [
+        "main.reading-garden 316>258 (hidden)"
+      ],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
     },
     {
       "kind": "maximized",
@@ -166,20 +163,16 @@
     }
   ],
   "bars": {
-    "clipped": false,
-    "overlaps": false,
-    "horizontal": false,
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
     "deadRegion": true,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "clipped",
-    "overlaps",
-    "horizontal"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
@@ -209,9 +202,9 @@
         "restored": 0
       },
       "artPlateClipCount": {
-        "base": 24,
-        "dirty": 25,
-        "restored": 24
+        "base": 20,
+        "dirty": 21,
+        "restored": 22
       },
       "removalProven": true
     },
@@ -222,10 +215,10 @@
     "subMinimumShrink": {
       "requested": "200x140",
       "box": "200x140",
-      "clipped": 13,
+      "clipped": 0,
       "overlaps": 0,
       "horizontalScrollers": 0,
-      "hiddenOverflowX": 1,
+      "hiddenOverflowX": 0,
       "restored": true
     }
   }

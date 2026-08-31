@@ -7,7 +7,23 @@
   container: reading-garden / size;
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  /*
+   * `min-height` BEATS `height` and `max-height` in CSS — the used height is
+   * max(min-height, min(max-height, height)) — so a flat 420px floor is not a
+   * floor, it is an override, and it silently won every time the window was
+   * shorter than 420. Measured at 260x170: this element stayed 420 tall inside a
+   * 170px window and 251px of it hung below the frame. Everything the garden
+   * positions is positioned inside it, so the mushroom (y=254), its hitbox
+   * (y=259) and the sky console (y=230) all sat under the fold — the scene's ONLY
+   * interactive control, unreachable, with no scrollbar because this box is
+   * `overflow: hidden`. `gardenWorldRect` projects off this element's box too, so
+   * the world was being cover-fitted into a 420px area of which 170 was visible.
+   *
+   * `min(420px, 100%)` keeps the floor wherever there is room for it — the
+   * percentage resolves because the parent's height is definite, which is the same
+   * reason `height: 100%` above works — and yields to the window when there is not.
+   */
+  min-height: min(420px, 100%);
   overflow: hidden;
   isolation: isolate;
   /* `z-index` + `pointer-events` together, and neither works without the other.

@@ -145,6 +145,14 @@
  *     no text anywhere in the subtree. An in-flow panel, a clipped menu with buttons, a clipped
  *     paragraph — each still counts. Overlaps need BOTH sides to be plates. Excluded rows are
  *     reported in `artPlateClips` / `artPlateOverlaps`, never dropped.
+ * 21. A DEV-ONLY OVERLAY IS NOT PART OF THE SURFACE. These harnesses walk the running DEV app,
+ *     so anything behind an `import.meta.env.DEV` guard is on screen here and on no user's
+ *     machine. City's sky console was every remaining category-4 failure it had after 19 and 20.
+ *     The product marks such a root `data-dev-only` next to its own guard — an attribute, never
+ *     a class list this file knows about, because a surface-specific exception is what RULE 1
+ *     forbids and a harness deciding for itself what "looks like" a debug panel would hide real
+ *     inspectors. Everything removed is named in `devOnlyExcluded`, so misusing the attribute on
+ *     a shipping element shows up by name in the run.
  *
  * NEGATIVE CONTROL (`--control`), two legs, because the rubric names one and history says it is
  * not enough on its own:
@@ -330,13 +338,30 @@ const READ = (surface) => `(function(){
     }
     return false;
   };
+  // CORRECTION 21. A DEV-ONLY OVERLAY IS NOT PART OF THE SURFACE. These harnesses walk the
+  // RUNNING DEV APP, so anything behind an import.meta.env.DEV guard is on screen here and on no
+  // user's machine. City's sky console accounted for every remaining category-4 failure it had
+  // after corrections 19 and 20 - 2 clipped and 8 overlaps at 260x170, from a debug panel that
+  // ReadingGardenSkyEvents returns null for in any packaged build.
+  // It is an ATTRIBUTE the product sets next to its own guard, never a class list this file
+  // knows about: a surface-specific exception is what RULE 1 forbids, and a harness that decided
+  // for itself which panels look like debug tools would hide real inspectors. Everything it
+  // removes is counted and named in devOnlyExcluded, so an audit can see what was taken out and
+  // check the guard for itself. Adding the attribute to a shipping element to dodge a score
+  // would show up there by name.
+  var devOnlyExcluded = [];
+  var isDevOnly = function(e){ return !!e.closest('[data-dev-only]'); };
   var painted = function(e){
+    if (isDevOnly(e)) return false;
     return typeof e.checkVisibility === 'function'
       ? e.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, contentVisibilityAuto: true })
       : true;
   };
   var name = function(e){ return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0]; };
 
+  [].slice.call(win.querySelectorAll('[data-dev-only]')).forEach(function(e){
+    devOnlyExcluded.push(name(e) + ' (+' + e.querySelectorAll('*').length + ' descendants)');
+  });
   var all = [].slice.call(win.querySelectorAll('*')).filter(painted);
   var deadRegionPagers = all.filter(provenPager);
 
@@ -700,6 +725,8 @@ const READ = (surface) => `(function(){
     artPlateOverlaps: artPlateOverlaps.slice(0, 6),
     artPlateOverflowCount: artPlateOverflow.length,
     artPlateOverflow: artPlateOverflow.slice(0, 6),
+    devOnlyExcludedCount: devOnlyExcluded.length,
+    devOnlyExcluded: devOnlyExcluded.slice(0, 6),
     horizontalScrollers: scrollers.length,
     horizontalScrollerList: scrollers.slice(0, 4).map(function(e){ return name(e) + ' ' + e.scrollWidth + '>' + e.clientWidth; }),
     hiddenOverflowX: hiddenX.length,
@@ -1171,6 +1198,8 @@ const BARS_OF = (m) => ({
       artPlateOverlaps: l.measurement && l.measurement.artPlateOverlaps,
       artPlateOverflowCount: l.measurement && l.measurement.artPlateOverflowCount,
       artPlateOverflow: l.measurement && l.measurement.artPlateOverflow,
+      devOnlyExcludedCount: l.measurement && l.measurement.devOnlyExcludedCount,
+      devOnlyExcluded: l.measurement && l.measurement.devOnlyExcluded,
     })),
     bars,
     verdict: pass
