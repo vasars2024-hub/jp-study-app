@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   executeFilesDeletion,
+  isFilesDeletionResultForItem,
   planFilesDeletion,
   type FilesDeletionDependencies,
   type FilesDeletionTarget,
@@ -176,5 +177,30 @@ describe('Files app deletion policy', () => {
       executeFilesDeletion(target({ location: { store: 'file', path: '   ' } }), {}, deps),
     ).resolves.toMatchObject({ ok: false, reasonKey: 'filesApp.delete.failed' });
     expect(deps.trashFile).not.toHaveBeenCalled();
+  });
+
+  it('validates complete bridge receipts and rejects malformed success states', () => {
+    expect(
+      isFilesDeletionResultForItem(
+        { ok: true, itemId: 'note:1', mode: 'soft', undoToken: 'undo:1', undoExpiresAt: 10 },
+        'note:1',
+      ),
+    ).toBe(true);
+    expect(
+      isFilesDeletionResultForItem(
+        { ok: false, itemId: 'note:1', reasonKey: 'filesApp.delete.failed' },
+        'note:1',
+      ),
+    ).toBe(true);
+
+    for (const malformed of [
+      { ok: true, itemId: 'note:other', mode: 'trash' },
+      { ok: true, itemId: 'note:1', mode: 'soft', undoExpiresAt: 10 },
+      { ok: true, itemId: 'note:1', mode: 'soft', undoToken: 'undo:1', undoExpiresAt: NaN },
+      { ok: false, itemId: 'note:1', reasonKey: 'filesApp.delete.unknown' },
+      { ok: false, itemId: 'note:1', reasonKey: 'filesApp.delete.failed', detail: 42 },
+    ]) {
+      expect(isFilesDeletionResultForItem(malformed, 'note:1')).toBe(false);
+    }
   });
 });

@@ -122,6 +122,55 @@ export type FilesDeletionResult =
       detail?: string;
     };
 
+const FILES_DELETION_FAILURE_REASONS: ReadonlySet<
+  Extract<FilesDeletionResult, { ok: false }>['reasonKey']
+> = new Set([
+  'filesApp.delete.refuseComputed',
+  'filesApp.delete.refuseNotTrashable',
+  'filesApp.delete.invalidRequest',
+  'filesApp.delete.notFound',
+  'filesApp.delete.confirmationRequired',
+  'filesApp.delete.confirmationMismatch',
+  'filesApp.delete.failed',
+]);
+
+/**
+ * Validate the untrusted value returned across the preload boundary.
+ *
+ * TypeScript disappears at runtime and a stale preload can outlive a renderer
+ * reload. A malformed success must not remove a row from the Files view or
+ * offer an Undo token that cannot work, so the renderer accepts only the
+ * complete versioned union it knows how to represent.
+ */
+export function isFilesDeletionResultForItem(
+  value: unknown,
+  expectedItemId: string,
+): value is FilesDeletionResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  if (result.itemId !== expectedItemId || typeof result.ok !== 'boolean') return false;
+
+  if (result.ok) {
+    if (result.mode === 'trash') return true;
+    return (
+      result.mode === 'soft' &&
+      typeof result.undoToken === 'string' &&
+      result.undoToken.length > 0 &&
+      typeof result.undoExpiresAt === 'number' &&
+      Number.isFinite(result.undoExpiresAt) &&
+      result.undoExpiresAt >= 0
+    );
+  }
+
+  return (
+    typeof result.reasonKey === 'string' &&
+    FILES_DELETION_FAILURE_REASONS.has(
+      result.reasonKey as Extract<FilesDeletionResult, { ok: false }>['reasonKey'],
+    ) &&
+    (result.detail === undefined || typeof result.detail === 'string')
+  );
+}
+
 export interface FilesDeletionDependencies {
   /** Main supplies Electron `shell.trashItem`; never `unlink` or `rm`. */
   trashFile(path: string): Promise<void>;

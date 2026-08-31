@@ -134,6 +134,21 @@ describe('FilesDeletionSession', () => {
     });
   });
 
+  it('rejects a malformed bridge success instead of hiding the selected row', async () => {
+    const { session, trash } = setup();
+    trash.mockResolvedValueOnce({
+      ok: true,
+      itemId: 'transcript:one',
+      mode: 'soft',
+    } as FilesDeletionResult);
+
+    await expect(session.delete(item())).resolves.toMatchObject({
+      ok: false,
+      itemId: 'transcript:one',
+      reasonKey: 'filesApp.delete.failed',
+    });
+  });
+
   it('turns a rejected trash bridge into the named failure state', async () => {
     const { session, trash } = setup();
     trash.mockRejectedValueOnce(new Error('Files delete bridge unavailable'));

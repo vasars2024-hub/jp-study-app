@@ -1,6 +1,7 @@
 import {
   authorizeFilesDeletion,
   executeFilesDeletion,
+  isFilesDeletionResultForItem,
   planFilesDeletion,
   type FilesDeletionAuthorization,
   type FilesDeletionLocation,
@@ -111,7 +112,7 @@ export class FilesDeletionSession {
       }
       // A stale or compromised bridge reply must not be attached to the row
       // currently selected in the renderer.
-      if (result.itemId !== target.id) {
+      if (!isFilesDeletionResultForItem(result, target.id)) {
         return {
           ok: false,
           itemId: target.id,
