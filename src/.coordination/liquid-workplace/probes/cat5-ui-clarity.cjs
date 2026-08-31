@@ -84,6 +84,34 @@ const has = (name) => process.argv.indexOf(`--${name}`) >= 0;
 const SURFACE = arg('surface', '');
 const WIN = arg('win', '');
 const ALT_THEME = arg('alt', 'classic-light');
+/**
+ * `--alt-attr name=value` — the SECOND CELL driven by a root attribute instead of a theme
+ * swap. DEFAULT EMPTY, so every one of the banked baselines re-derives bit-identical.
+ *
+ * Q5 asks whether contrast is STABLE, and the second cell is only evidence if it is a
+ * rendering the product actually ships. For an app window a foreign palette is exactly
+ * that. For a SHELL it is not: `.os-desktop-wired` exists only while a wired theme is
+ * applied, and `wired-archive` is the only theme in its family — measured 2026-08-31,
+ * `theme/wired-archive.ts` is the single `materialSet: 'wired'` id. The classic-light leg
+ * therefore reported 79 failures for a combination the product never renders, and all 79
+ * were hosted-window content besides.
+ *
+ * What a shell DOES have is its own degradation ladder, and it is a shipped three-way user
+ * control: `data-display-transparency` (full / reduced / off), whose `off` tier reuses the
+ * high-contrast block's opaque values (`liquid-tokens.css:280`). That is the moment the
+ * taskbar's translucent fill becomes solid and every text run over it changes background —
+ * a sharper stability question than a palette swap, asked inside the shell's own identity.
+ *
+ * The `q5Moved` VOID guard is unchanged and still decides whether the axis reached the
+ * paint, so naming an attribute that changes nothing VOIDs rather than passes.
+ */
+const ALT_ATTR = arg('alt-attr', '');
+const ALT_ATTR_NAME = ALT_ATTR ? ALT_ATTR.split('=')[0] : '';
+const ALT_ATTR_VALUE = ALT_ATTR ? ALT_ATTR.slice(ALT_ATTR.indexOf('=') + 1) : '';
+if (ALT_ATTR && (!ALT_ATTR_NAME || ALT_ATTR.indexOf('=') < 0)) {
+  console.error('REFUSE - --alt-attr must be name=value, e.g. --alt-attr data-display-transparency=off');
+  process.exit(2);
+}
 const CONTROL = has('control');
 /**
  * `--allow-scroll` — measure a surface whose body is NOT at its resting scroll position.
@@ -363,6 +391,30 @@ const SNAP = `(function(){
   var body = (${OWN_BODY_FN})(root);
   var B = body.getBoundingClientRect();
   /**
+   * CORRECTION 27 — SHELL SCOPE. Same family as the OWN_BODY_FN repair above it, one level
+   * out: that one stopped the harness reading a hosted window's BODY as the shell's; this
+   * one stops it reading the hosted windows' CONTENTS as the shell's.
+   *
+   * Measured live on the Wired shell 2026-08-31: 112 painted controls inside
+   * \`.os-desktop-wired\`, of which 13 belong to the shell and 99 are the hosted Media
+   * Center's nav rail, menubar and search. Those windows are separately-scored surfaces, so
+   * the unscoped read charged them TWICE and made the shell's number a function of which
+   * windows happened to be open. Q5 was worse: its classic-light cell reported 79 failing
+   * text runs, every one of them hosted-window content.
+   *
+   * A SHELL IS DETECTED STRUCTURALLY, never named: a root that is not itself a \`.fwin\` and
+   * CONTAINS one. A .fwin root can never satisfy it, a chromeless reader root contains no
+   * .fwin, so \`rq\` is the identity function on every one of the 18 surfaces already banked
+   * and their baselines re-derive bit-identical. Same principle as category 6's shell
+   * decision 3 (\`shq\`), reached from the same evidence.
+   */
+  var isShell = !isFwin && !!root.querySelector('.fwin');
+  function rq(sel){
+    var list = [].slice.call(root.querySelectorAll(sel));
+    return isShell ? list.filter(function(e){ return !e.closest('.fwin'); }) : list;
+  }
+  function rq1(sel){ return rq(sel)[0] || null; }
+  /**
    * TRAP 6 — "AT REST" IS NOT WHATEVER THE LAST PROBE LEFT BEHIND, and this one had already
    * published a false FINDING before it was caught. Q3's bar is literally "the primary action
    * is inside the body viewport AT REST", and Q4's is "the default state" — both are undefined
@@ -381,7 +433,7 @@ const SNAP = `(function(){
   var bodyScrollTop = Math.round(body.scrollTop || 0);
   if (bodyScrollTop > 0 && !${ALLOW_SCROLL})
     return JSON.stringify({ refuse: 'body is scrolled ' + bodyScrollTop + 'px off its resting position - "at rest" (Q3) and "the default state" (Q4) are undefined here. Scroll it to the top, or pass --allow-scroll to score it where it stands.' });
-  var controls = [].slice.call(root.querySelectorAll(CTRL)).filter(painted);
+  var controls = rq(CTRL).filter(painted);
   function inBody(e){
     var b = e.getBoundingClientRect();
     return b.top >= B.top - 1 && b.bottom <= B.bottom + 1 && b.width > 0;
@@ -452,10 +504,26 @@ const SNAP = `(function(){
    * owns. Scoring a root surface against .fwin chrome would mark every reader in the app
    * "location not obvious", which is a property of the probe, not the product.
    */
+  /*
+   * A SHELL HAS NO HEADING, and looking for one is the same host-taxonomy miss the
+   * chromeless branch above was written to fix. A desktop shell does not sit somewhere in
+   * an app; it IS the place, and "where am I" is which of its own places is current. The
+   * product states that the standard way -- the selected desktop switch carries
+   * aria-pressed="true" -- so the term reads the app's own declaration rather than
+   * inventing a shell-specific selector. Any surface that marks current-ness with
+   * aria-current / aria-pressed / aria-selected answers it the same way.
+   *
+   * DISCLOSED: this reads an attribute that landed in a2e9c1ce, ten minutes before this
+   * line. Before it, the Wired shell stated its desktop only in paint, and the honest
+   * verdict on that markup is the NO this used to give.
+   */
   var titleEl = isFwin
     ? root.querySelector('.fwin-title-text, .fwin-title')
-    : ([].slice.call(root.querySelectorAll('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]')).filter(function(e){
-        return painted(e) && (e.textContent || '').trim().length > 0; })[0] || null);
+    : isShell
+      ? (rq('[aria-current]:not([aria-current="false"]),[aria-pressed="true"],[aria-selected="true"]').filter(function(e){
+          return painted(e) && (e.textContent || '').trim().length > 0; })[0] || null)
+      : (rq('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]').filter(function(e){
+          return painted(e) && (e.textContent || '').trim().length > 0; })[0] || null);
   var titleText = titleEl ? (titleEl.textContent || '').trim() : '';
   var backAffordances = controls.filter(function(e){
     var l = (e.getAttribute('aria-label') || e.title || e.textContent || '').trim();
@@ -528,7 +596,7 @@ const SNAP = `(function(){
     .filter(function(e, i, a){ return e && a.indexOf(e) === i; });
 
   // ---- Q4: advanced tools tucked away, default view not cluttered. ------------------------
-  var collapsed = [].slice.call(root.querySelectorAll('details:not([open]),[aria-expanded="false"]')).filter(painted);
+  var collapsed = rq('details:not([open]),[aria-expanded="false"]').filter(painted);
   function repeatingRow(e){
     return e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],[class*="-spotlight"],li'); }
   // --shell-chrome: the same rule as the .fwin-bar exclusion below, extended to the selectors
@@ -563,14 +631,14 @@ const SNAP = `(function(){
    * verdict. The bar stays at 12.
    */
   var ariaRegions = [];
-  [].slice.call(root.querySelectorAll('[aria-expanded][aria-controls]')).filter(painted).forEach(function(tog){
+  rq('[aria-expanded][aria-controls]').filter(painted).forEach(function(tog){
     // .split(' ') and not /\\s+/: this block is inside a template literal, where a
     // lone backslash-s collapses to a bare "s" and the id splits on its own letters.
     // aria-controls is space-separated by spec, so the plain split is also correct.
     (tog.getAttribute('aria-controls') || '').split(' ').forEach(function(id){
       if (!id) return;
       var region = null;
-      try { region = root.querySelector('#' + CSS.escape(id)); } catch (e) { region = null; }
+      try { region = rq1('#' + CSS.escape(id)); } catch (e) { region = null; }
       if (!region || region === root || region.contains(root) || region.contains(tog)) return;
       if (ariaRegions.indexOf(region) < 0) ariaRegions.push(region);
     });
@@ -590,7 +658,7 @@ const SNAP = `(function(){
   var summaryHeaders = chromeControls.filter(function(e){ return e.tagName === 'SUMMARY'; });
   var behindDisclosure = chromeControls.filter(inDisclosure);
   var scanned = chromeControls.filter(function(e){ return !inDisclosure(e) && e.tagName !== 'SUMMARY'; });
-  var allDetails = [].slice.call(root.querySelectorAll('details'));
+  var allDetails = rq('details');
 
   // ---- Q5's population: every painted text run, and its worst ratio. ----------------------
   /**
@@ -600,11 +668,33 @@ const SNAP = `(function(){
    */
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   var seen = [], worst = null, minRatio = 99, failing = [], unmeasurable = 0;
+  /**
+   * A WITNESS THAT THE AXIS REACHED THE PAINT, independent of minRatio.
+   *
+   * The runner VOIDs a run whose two cells report the same minimum, on the argument that the
+   * swap never reached the paint. That argument is right and the witness was too narrow: it
+   * is the WORST single ratio of the whole population, so an axis that repaints every run
+   * and happens to leave the worst one alone reads exactly like a swap that did nothing —
+   * and an axis that changes translucency without changing any composited colour (a
+   * degradation tier zeroing --lq-liquid-blur) genuinely does repaint and genuinely does
+   * not move a ratio. This accumulates every measured foreground and its composited
+   * background into one djb2 digest, so the guard can ask what it actually means: did
+   * ANYTHING about the paint change. Strictly more sensitive than the old term, so it can
+   * only retire false VOIDs, never manufacture a pass — and both witnesses are reported.
+   */
+  var paintKey = 5381;
+  function digest(str){
+    for (var di = 0; di < str.length; di++) paintKey = ((paintKey * 33) ^ str.charCodeAt(di)) >>> 0;
+  }
   for (var t = walker.nextNode(); t; t = walker.nextNode()) {
     var s = (t.nodeValue || '').trim();
     if (!s) continue;
     var el = t.parentElement;
     if (!el || !painted(el) || seen.indexOf(el) >= 0) continue;
+    // The walker takes a ROOT, not a selector, so shell scope is applied here instead of
+    // through rq(). Without it the shell's classic-light cell reported 79 failing runs,
+    // every one of them a hosted window's own text.
+    if (isShell && el.closest('.fwin')) continue;
     seen.push(el);
     var cs = getComputedStyle(el);
     var fg = parseRgb(cs.color);
@@ -613,6 +703,7 @@ const SNAP = `(function(){
     if (bgs.unmeasurable) { unmeasurable++; continue; }
     // The worst stop, so a gradient is scored where it is hardest to read rather than on average.
     var r = Math.min.apply(null, bgs.colors.map(function(c){ return ratio(fg, c); }));
+    digest(name(el) + '|' + fg.join(',') + '|' + bgs.colors.map(function(c){ return c.join(','); }).join(';'));
     var big = parseFloat(cs.fontSize) >= 24
       || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
     var bar = big ? 3.0 : 4.5;
@@ -621,7 +712,7 @@ const SNAP = `(function(){
   }
 
   // ---- Q6: does Liquid motion explain a real relationship. --------------------------------
-  var blurRegions = [].slice.call(root.querySelectorAll('*')).filter(function(e){
+  var blurRegions = rq('*').filter(function(e){
     if (!painted(e)) return false;
     var cs = getComputedStyle(e);
     return (cs.backdropFilter && cs.backdropFilter !== 'none')
@@ -629,7 +720,7 @@ const SNAP = `(function(){
   });
   // Liquid is not spelled backdrop-filter on every surface: .fwin is a backdrop root, so its
   // interior treatment is translucency + border + radius + shadow on .lq-contextual.
-  var contextualPainted = [].slice.call(root.querySelectorAll('.lq-contextual')).filter(function(e){
+  var contextualPainted = rq('.lq-contextual').filter(function(e){
     if (!painted(e)) return false;
     var cs = getComputedStyle(e);
     return alphaOf(cs.backgroundColor) > 0.02 || parseFloat(cs.borderTopWidth) > 0
@@ -686,7 +777,7 @@ const SNAP = `(function(){
     'content','main','section','header','footer','sidebar','list','page','view','app','flex',
     'inner','outer','body','block','btn','icon','group','stack','pane','bar','menu','modal',
     'overlay','wrap','text','title','label','field','form','cell','area','frame','shell'];
-  var structural = [].slice.call(root.querySelectorAll('*')).filter(function(e){
+  var structural = rq('*').filter(function(e){
     if (!painted(e) || isControl(e)) return false;
     var b = e.getBoundingClientRect();
     return (b.width * b.height) / Math.max(1, R.width * R.height) >= 0.01;
@@ -702,7 +793,7 @@ const SNAP = `(function(){
   });
   var bespokePrefixes = Object.keys(prefixTally).filter(function(p){ return prefixTally[p] >= 3; });
   var contentBest = null, contentBestArea = 0;
-  [].slice.call(root.querySelectorAll('*')).filter(painted).forEach(function(e){
+  rq('*').filter(painted).forEach(function(e){
     var b = e.getBoundingClientRect();
     var a = b.width * b.height;
     if (a <= contentBestArea) return;
@@ -717,14 +808,27 @@ const SNAP = `(function(){
   var contentFrac = Math.round(contentBestArea / Math.max(1, R.width * R.height) * 100) / 100;
   var fillsViewport = (R.width / Math.max(1, window.innerWidth)) >= 0.95
     && (R.height / Math.max(1, window.innerHeight)) >= 0.95;
-  var chromelessHost = !isFwin && fillsViewport;
-  var surfaceChrome = !!root.querySelector('[class*="-toolbar"],[class*="-topbar"],[class*="-header"],[class*="-bar"]');
+  /*
+   * A SHELL IS NOT CHROMELESS -- it is the chrome. The chromeless branch was written for a
+   * full-screen reader that REPLACES the desktop shell, so all three OS markers are absent
+   * by construction there. A desktop shell has every one of them by definition, and scoring
+   * it against the replacement set gave identityCount 1 of 4 on a surface that owns the
+   * taskbar, the desktop layer and the floating-window chrome the chromed set names. Same
+   * repair as the 2026-08-26 one directly above, third host kind. THE BAR IS NOT LOWERED:
+   * the shell is scored against the byte-identical chromed set the 18 .fwin surfaces use.
+   */
+  var chromelessHost = !isFwin && !isShell && fillsViewport;
+  var surfaceChrome = !!rq1('[class*="-toolbar"],[class*="-topbar"],[class*="-header"],[class*="-bar"]');
   var themeToken = !!document.documentElement.getAttribute('data-theme');
   var identityMarkers = chromelessHost
     ? { surfaceChrome: surfaceChrome,
         themeToken: themeToken,
         bespokeRegionPrefix: bespokePrefixes.length > 0,
         contentDominantRegion: contentFrac >= 0.25 }
+    // DELIBERATELY NOT rq(). For a .fwin root this asks "does this window have a title
+    // bar"; for a SHELL root the same query asks "does this shell host titled windows",
+    // which is a true and identity-bearing fact about a desktop shell rather than a
+    // neighbour's chrome borrowed. Every other marker here is already document-level.
     : { floatingWindowChrome: !!root.querySelector('.fwin-bar'),
         surfaceChrome: surfaceChrome,
         taskbar: !!document.querySelector('.os-task-win'),
@@ -734,7 +838,7 @@ const SNAP = `(function(){
   var cardUniformity = 0, cardHost = null, cardHostDetail = null, cardControlSignatures = 0;
   var cardHosts = [];
   var bodyArea = Math.max(1, B.width * B.height);
-  var hosts = [].slice.call(root.querySelectorAll('*'));
+  var hosts = rq('*');
   for (var hi = 0; hi < hosts.length; hi++) {
     var host = hosts[hi];
     var hb = host.getBoundingClientRect();
@@ -742,6 +846,10 @@ const SNAP = `(function(){
     var hostBg = effectiveBg(host);
     var kids = [].slice.call(host.children).filter(function(c){
       if (!painted(c)) return false;
+      // A shell's hosted windows are bordered, painted boxes well over 120x60, so an
+      // unscoped read counts four open windows as a uniform card grid and answers
+      // "is this a generic card dashboard" with the user's window arrangement.
+      if (isShell && c.matches && (c.matches('.fwin') || c.closest('.fwin'))) return false;
       var b = c.getBoundingClientRect();
       if (b.width < 120 || b.height < 60) return false;
       var cs2 = getComputedStyle(c);
@@ -807,7 +915,13 @@ const SNAP = `(function(){
 
   return JSON.stringify({
     surface: ${A(SURFACE)},
-    hostClass: isFwin ? 'fwin' : 'root-selector',
+    hostClass: isFwin ? 'fwin' : isShell ? 'shell' : 'root-selector',
+    // Reported as a NUMBER, not as a flag alone: a reader can see how much of the surface
+    // the scope removed and add it back to disagree.
+    shellScope: isShell
+      ? { hostedWindows: root.querySelectorAll('.fwin').length,
+          controlsInHostedWindows: root.querySelectorAll(CTRL).length - rq(CTRL).length }
+      : null,
     theme: document.documentElement.getAttribute('data-theme'),
     lang: document.documentElement.lang,
     presentation: root.getAttribute('data-presentation') || null,
@@ -832,7 +946,7 @@ const SNAP = `(function(){
             return { region: name(r), controlsTaken: chromeControls.filter(function(e){ return r.contains(e); }).length }; }),
           scannedList: scanned.slice(0,20).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0,28); }) },
-    q5: { measured: seen.length, unmeasurable: unmeasurable,
+    q5: { measured: seen.length, unmeasurable: unmeasurable, paintKey: paintKey,
           minRatio: minRatio === 99 ? null : Math.round(minRatio*100)/100,
           failingCount: failing.length, worst: worst, failing: failing.slice(0,8) },
     q6: { liquidRegions: liquidRegions.length, byBackdropFilter: blurRegions.length,
@@ -860,6 +974,14 @@ const PLANT_JS = `(function(){
   if (!root) return JSON.stringify({ refuse: 'surface not found for control injection' });
   var body = (${OWN_BODY_FN})(root);
   var isFwin = root.classList && root.classList.contains('fwin');
+  // The plant hunts the same population the snapshot scores, shell scope included; see the
+  // rq() note in SNAP. Without this the shell's Q2 plant blanked headings inside hosted
+  // windows and the term it was aiming at never moved.
+  var isShell = !isFwin && !!root.querySelector('.fwin');
+  function prq(sel){
+    var list = [].slice.call(root.querySelectorAll(sel));
+    return isShell ? list.filter(function(e){ return !e.closest('.fwin'); }) : list;
+  }
 
   /*
    * Q2 — blank the location label. EVERY CANDIDATE, not the first one, and this is the same
@@ -883,10 +1005,20 @@ const PLANT_JS = `(function(){
       ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
       : true;
   }
+  /*
+   * THREE BRANCHES, matching SNAP's three, because a control that attacks a DIFFERENT term
+   * from the one under test proves nothing and still prints as if it ran. The shell branch
+   * was added 2026-08-31 after exactly that: SNAP had learned to read a shell's location
+   * from its own aria-current / aria-pressed / aria-selected declaration and this plant was
+   * still blanking headings, so the run reported "CONTROL DID NOT FAIL on Q2" on a term
+   * that is perfectly falsifiable.
+   */
   var titleEls = isFwin
     ? [].slice.call(root.querySelectorAll('.fwin-title-text, .fwin-title'))
-    : [].slice.call(root.querySelectorAll('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]'))
-        .filter(function(e){ return plantPainted(e) && (e.textContent || '').trim().length > 0; });
+    : (isShell
+        ? prq('[aria-current]:not([aria-current="false"]),[aria-pressed="true"],[aria-selected="true"]')
+        : prq('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]')
+      ).filter(function(e){ return plantPainted(e) && (e.textContent || '').trim().length > 0; });
   /*
    * innerHTML, NOT textContent, and this one was damaging the live app. \`.fwin-title\` is
    * \`<span class="fwin-title"><Icon/><span class="fwin-title-text">…</span></span>\` — nested,
@@ -1113,10 +1245,37 @@ function scoreSnapshot(s) {
     ? { file: path.relative(process.cwd(), c6path), verdict: c6.verdict, parity: c6.parity, roundTrip: c6.roundTrip && { diffs: c6.roundTrip.diffs, order: c6.roundTrip.order } }
     : { file: path.relative(process.cwd(), c6path), missing: true };
 
-  // --- the theme sweep: Q5's stability axis, and a fresh snapshot per cell ------------------
+  // --- the sweep: Q5's stability axis, and a fresh snapshot per cell ------------------------
   const BASE_THEME = found.theme;
   const SECOND_THEME = ALT_THEME;
-  out.axes = { theme: [BASE_THEME, SECOND_THEME] };
+  /**
+   * The value the root already carried, so the restore puts back ABSENCE as absence rather
+   * than as an empty string — `[attr='']` and no attribute at all select differently.
+   * `ABSENT` is a sentinel STRING because the bridge cannot carry a JS null (`ev` treats a
+   * null result as "the expression threw"), and it is namespaced so it cannot collide with
+   * a real value of the attribute being driven.
+   */
+  const ABSENT = 'cat5:absent';
+  const attrBefore = ALT_ATTR
+    ? await ev(`(function(){ var v = document.documentElement.getAttribute(${A(ALT_ATTR_NAME)}); return v === null ? ${A(ABSENT)} : v; })()`)
+    : null;
+  const setAttr = (v) => ev(`(function(){ var h = document.documentElement;
+    if (${A(v)} === ${A(ABSENT)}) h.removeAttribute(${A(ALT_ATTR_NAME)});
+    else h.setAttribute(${A(ALT_ATTR_NAME)}, ${A(v)});
+    return 'ok' })()`);
+  const attrLabel = attrBefore === ABSENT ? '(absent)' : attrBefore;
+  /** Both cells as {label, apply}. Theme mode is byte-identical to what it replaced. */
+  const cellPlan = ALT_ATTR
+    ? [{ label: `${ALT_ATTR_NAME}=${attrLabel}`, apply: () => setAttr(attrBefore) },
+       { label: `${ALT_ATTR_NAME}=${ALT_ATTR_VALUE}`, apply: () => setAttr(ALT_ATTR_VALUE) }]
+    : [BASE_THEME, SECOND_THEME].map((theme) => ({
+        label: `theme=${theme}`,
+        apply: () => ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(theme)}); return 'ok'; })()`),
+      }));
+  out.axes = ALT_ATTR
+    ? { attr: cellPlan.map((c) => c.label), theme: [BASE_THEME, BASE_THEME],
+        why: 'the shell root exists only under its own theme family, so the second cell is its shipped degradation tier rather than a foreign palette' }
+    : { theme: [BASE_THEME, SECOND_THEME] };
   const storeKeys = ['jp-os-theme', 'jp-os-theme-engine-v'];
   const readStore = () => evj(`(function(){ var o = {}; ${A(storeKeys)}.forEach(function(k){ o[k] = localStorage.getItem(k); }); return JSON.stringify(o); })()`);
   out.storeBefore = await readStore();
@@ -1143,10 +1302,24 @@ function scoreSnapshot(s) {
    */
   const LIQUID_BTN = { fwin: '.fwin-b-liquid', popout: '.popout-btn-liquid', reader: '.reader-btn-liquid' };
   const presRead = () => ev(`(function(){ var r = ${ROOT_EXPR}; return r ? String(r.getAttribute('data-presentation')) : 'no-root'; })()`);
-  const presToggle = () => ev(`(function(){
+  /**
+   * SHELL SCOPE APPLIES TO THE TOGGLE TOO, and here it was not merely a wrong number — it
+   * MUTATED THE APP. `r.querySelector('.fwin-b-liquid, …')` on a shell root returns the
+   * first HOSTED window's control, so the Wired run at 17:09 on 2026-08-31 flipped
+   * 'SIG-VID / Signal Archive' to Liquid, then read `data-presentation` off the shell
+   * (which has none), refused with "surface reads null", and — because the restore branch
+   * is guarded on `!refused` — left that window flipped. A refusing leg stranding app state
+   * is a trap this directory has already paid for once.
+   */
+  const OWN_LIQUID_BTN = `(function(){
     var r = ${ROOT_EXPR};
-    if (!r) return 'no-root';
-    var b = r.querySelector(${A(Object.values(LIQUID_BTN).join(','))});
+    if (!r) return null;
+    var isShell = !r.classList.contains('fwin') && !!r.querySelector('.fwin');
+    return [].slice.call(r.querySelectorAll(${A(Object.values(LIQUID_BTN).join(','))}))
+      .filter(function(b){ return !isShell || !b.closest('.fwin'); })[0] || null;
+  })()`;
+  const presToggle = () => ev(`(function(){
+    var b = ${OWN_LIQUID_BTN};
     if (!b) return 'no-control';
     b.click();
     return 'clicked';
@@ -1154,9 +1327,32 @@ function scoreSnapshot(s) {
 
   step('Q6: opt in to Liquid');
   const presBefore = await presRead();
+  const isShellRoot = found.hostClass === 'shell';
   let q6cell = null;
   const q6leg = { presentationAsFound: presBefore };
-  if (presBefore === 'liquid') {
+  /**
+   * THE SHELL HAS ONE PRESENTATION, so there is nothing to opt into — and that is the
+   * honest reading, not a waiver. Every other host answers Q6 in Liquid because in Standard
+   * there is by design no Liquid material to explain anything. A shell renders its chrome
+   * with whatever material its identity gives it, unconditionally: `.os-taskbar` carries
+   * `data-lq-role="liquid"` whether or not any hosted window is Liquid, and dropping that
+   * role is a code change, not a user-reachable mode.
+   *
+   * Category 6 answered the same question differently ON PURPOSE and the two do not
+   * conflict. Its 10-requirement names "taskbar identity", a SHELL property that only a
+   * hosted window's flip can threaten, so its axis is that flip. Q6's bar is "every
+   * Liquid-treated region carries a state-change transition and none loops forever", which
+   * is a property of the shell's OWN material and is the same in either case. Driving a
+   * neighbour's toggle to read it would mutate a window this run does not score for a
+   * number that cannot move.
+   *
+   * NOT A FREE YES: `scoreSnapshot` still returns NO-SUBJECT on zero regions and NO on any
+   * region missing a transition or looping forever, and `liquidRegions` is published so a
+   * thin population is visible rather than hidden behind a verdict.
+   */
+  if (isShellRoot) {
+    q6leg.basis = 'shell: one presentation — its chrome material is unconditional, so Q6 is measured where the shell is found; no hosted window was touched';
+  } else if (presBefore === 'liquid') {
     q6leg.note = 'surface was already in Liquid presentation; measured where it was found';
   } else {
     const clicked = await presToggle();
@@ -1174,7 +1370,11 @@ function scoreSnapshot(s) {
     const c = await evj(SNAP);
     if (!c.refuse) { q6cell = c; q6leg.measuredIn = c.presentation; }
   }
-  if (presBefore !== 'liquid' && !q6leg.refused) {
+  // EVERY CLICK IS UNDONE, INCLUDING A REFUSING ONE. This used to be guarded on
+  // `!q6leg.refused`, so the one path that reached the toggle and then refused — a flip
+  // that did not land where it was aimed — left the app holding the probe's change, and
+  // the next run recorded that damage as the user's setting.
+  if (q6leg.toggle === 'clicked') {
     await presToggle();
     await sleep(900);
     q6leg.restoredTo = await presRead();
@@ -1183,20 +1383,24 @@ function scoreSnapshot(s) {
   out.q6leg = q6leg;
 
   const cells = [];
-  for (const theme of [BASE_THEME, SECOND_THEME]) {
-    step(`cell theme=${theme}`);
-    await ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(theme)}); return 'ok'; })()`);
+  for (const plan of cellPlan) {
+    step(`cell ${plan.label}`);
+    await plan.apply();
     // Trap 2: a theme swap is a 240 ms colour transition and getComputedStyle during one
-    // returns the OLD colour, which reads exactly like a fix that did not land.
+    // returns the OLD colour, which reads exactly like a fix that did not land. The
+    // attribute axis is the same shape — `data-display-transparency` retunes `--lq-*`
+    // tokens that painted elements transition on.
     await sleep(700);
     const c = await evj(SNAP);
-    if (c.refuse) throw new Error(`REFUSE - cell ${theme}: ${c.refuse}`);
+    if (c.refuse) throw new Error(`REFUSE - cell ${plan.label}: ${c.refuse}`);
+    c.cell = plan.label;
     cells.push(c);
   }
 
   // --- restore, and VERIFY it, before any verdict is computed -------------------------------
   step('restore');
   await ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(BASE_THEME)}); return 'ok'; })()`);
+  if (ALT_ATTR) await setAttr(attrBefore);
   if (CONTROL) out.unplanted = await evj(unplantJs(planted && planted.savedTitle));
   await sleep(400);
   out.storeAfter = await readStore();
@@ -1205,6 +1409,14 @@ function scoreSnapshot(s) {
   out.restored = { theme: back.theme, presentation: back.presentation, box: back.box,
     plantResidue: out.unplanted ? out.unplanted.residue : 0 };
   if (back.theme !== BASE_THEME) out.restoreWarning = `theme left as ${back.theme}, wanted ${BASE_THEME}`;
+  if (ALT_ATTR) {
+    // The driven attribute is restored and READ BACK, absence included — the same standard
+    // the theme leg is held to. A run that leaves the shell in a degradation tier has
+    // changed a shipped user setting.
+    const attrAfter = await ev(`(function(){ var v = document.documentElement.getAttribute(${A(ALT_ATTR_NAME)}); return v === null ? ${A(ABSENT)} : v; })()`);
+    out.restored.attr = { name: ALT_ATTR_NAME, before: attrBefore, after: attrAfter, identical: attrAfter === attrBefore };
+    if (attrAfter !== attrBefore) out.restoreWarning = `${ALT_ATTR_NAME} left as ${attrAfter}, found ${attrBefore}`;
+  }
 
   // --- assemble the ten -------------------------------------------------------------------
   const A_CELL = cells[0];
@@ -1216,13 +1428,16 @@ function scoreSnapshot(s) {
   // minimum the swap never reached the paint and the axis measured nothing — the same guard
   // `l1-q5-drive.cjs` calls its `frozen` control.
   const q5Failing = A_CELL.q5.failingCount + B_CELL.q5.failingCount;
-  const q5Moved = A_CELL.q5.minRatio !== B_CELL.q5.minRatio;
+  const q5MovedRatio = A_CELL.q5.minRatio !== B_CELL.q5.minRatio;
+  const q5MovedPaint = A_CELL.q5.paintKey !== B_CELL.q5.paintKey;
+  const q5Moved = q5MovedRatio || q5MovedPaint;
   const q5 = {
     verdict: q5Failing === 0 ? 'YES' : 'NO',
-    cells: cells.map((c) => ({ theme: c.theme, measured: c.q5.measured, unmeasurable: c.q5.unmeasurable,
+    cells: cells.map((c) => ({ cell: c.cell, theme: c.theme, measured: c.q5.measured, unmeasurable: c.q5.unmeasurable,
       minRatio: c.q5.minRatio, failingCount: c.q5.failingCount, worst: c.q5.worst })),
     failing: [...A_CELL.q5.failing, ...B_CELL.q5.failing].slice(0, 12),
     themeAxisMoved: q5Moved,
+    axisWitness: { minRatioMoved: q5MovedRatio, paintDigestMoved: q5MovedPaint },
   };
 
   const fromC6 = (term, ok) => (c6 ? (ok ? 'YES' : 'NO') : 'MEASURE');
@@ -1294,7 +1509,7 @@ function scoreSnapshot(s) {
   const unscored = questions.filter((x) => x.verdict === 'MEASURE' || x.verdict === 'NO-SUBJECT');
   for (const u of unscored) voided.push(`Q${u.id} is ${u.verdict} — ${u.verdict === 'MEASURE' ? `no category-6 baseline at ${path.relative(process.cwd(), c6path)}` : 'the surface has no subject for this question'}`);
   if (!q5Moved && !CONTROL) {
-    voided.push(`Q5's theme axis did not move (both themes report minRatio ${A_CELL.q5.minRatio}); the swap never reached the paint, so contrast stability measured nothing`);
+    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}); the swap never reached the paint, so contrast stability measured nothing`);
   }
   if (out.storeIdentical === false) voided.push('persisted theme state was NOT restored byte-identical');
   if (out.restoreWarning) voided.push(out.restoreWarning);
@@ -1304,7 +1519,7 @@ function scoreSnapshot(s) {
   // is scored from its own Liquid leg, so comparing the two cells' q6 compares two readings of
   // a question neither of them answers.
   const drift = Object.keys(live).filter((k) => k !== 'q6' && live[k] !== liveAlt[k]);
-  if (drift.length) voided.push(`verdicts drift with the theme (${drift.join(', ')}); a §10.4 answer that depends on the palette is not an answer`);
+  if (drift.length) voided.push(`verdicts drift across ${A_CELL.cell} -> ${B_CELL.cell} (${drift.join(', ')}); a §10.4 answer that depends on the ${ALT_ATTR ? 'degradation tier' : 'palette'} is not an answer`);
 
   if (CONTROL) {
     // The control must move all five. A control that does not fail voids the score rather
