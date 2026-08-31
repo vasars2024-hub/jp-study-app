@@ -1,0 +1,79 @@
+{
+  "label": "l9b4-wired",
+  "surface": "@.os-desktop-wired",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": false,
+  "box": "1264x821",
+  "presentation": "(root)",
+  "windowOwnPaint": {
+    "alpha": 0,
+    "backdrop": null,
+    "image": "radial-gradient(circle at 72% 24%, rgba(",
+    "opacity": 1
+  },
+  "regions": 5,
+  "controlsSkipped": 12,
+  "byRole": {
+    "Work": 0,
+    "Liquid-eligible": 1,
+    "Anchor": 4,
+    "Anchor(holds work)": 0,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 1,
+  "sharedPrimitiveEligible": 1,
+  "eligibleTotal": 1,
+  "theme": "wired-archive",
+  "materials": "wired",
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "kind": "plant",
+    "why": "the surface has no runtime Work region; controls A and B have nothing to perturb",
+    "plantSidePx": 145,
+    "counts": {
+      "base": [
+        0,
+        1,
+        1,
+        1,
+        0
+      ],
+      "planted": [
+        1,
+        1,
+        1,
+        2,
+        1
+      ],
+      "restored": [
+        0,
+        1,
+        1,
+        1,
+        0
+      ]
+    },
+    "movedEligible": true,
+    "sharedHeld": true,
+    "movedDense": true,
+    "returned": true,
+    "cleaned": true,
+    "barsWhilePlanted": {
+      "denseWorkAnchored": false,
+      "sharedPrimitives": false
+    },
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven by plant"
+  }
+}

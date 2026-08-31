@@ -169,7 +169,17 @@
     if (!win) return { surface, refuse: `surface not found: ${surface}` };
     const wr = win.getBoundingClientRect();
     if (!wr.width || !wr.height) return { surface, refuse: 'surface is 0x0 — measurement invalid' };
-    const body = win.querySelector('.fwin-body') || win;
+    // CORRECTION 33 (2026-08-31, backup): `win.querySelector('.fwin-body')` is a DESCENDANT
+    // search. For a `.fwin` root that is its own body, which is the intent. For an `@selector`
+    // SHELL root it is a nested WINDOW's body — the desktop contains the floating windows.
+    // Measured on `@.os-desktop-wired`: the walk started from a 0x0 minimised window body and
+    // returned `regions: 0` on a 1264x821 desktop that plainly has `.wired-wall-atmosphere`
+    // (100%) and `.os-taskbar` (6.8%). Zero regions then made every bar vacuous and the
+    // negative control unfalsifiable, so the run scored VOID for an instrument fault.
+    // Ownership, not containment: a body counts only when the window that owns it is the root.
+    const ownBody = [...win.querySelectorAll('.fwin-body')]
+      .find((b) => b.closest('.fwin') === win);
+    const body = ownBody || win;
     const winArea = wr.width * wr.height;
     const regions = [];
     let controlsSkipped = 0;

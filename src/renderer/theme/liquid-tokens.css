@@ -304,3 +304,26 @@
   --lq-liquid-saturate: 1;
   --lq-ambient-blur: 0px;
 }
+
+/* ---------- The taskbar is transport chrome ----------------------------
+   §2.3 names navigation and transport as what Liquid is FOR, and the shell's
+   taskbar is the largest instance of both in the product. It was opaque under
+   every material: measured 2026-08-31 on the Wired shell, `rgb(2,11,18)` at
+   alpha 1 with `backdrop-filter: none`.
+
+   `styles.css:14654` deliberately made it solid, and that note — "translucent
+   mix showed the dark wallpaper through" — is correct and is the reason this
+   rule is BLUR-backed rather than a plain alpha mix. `--lq-liquid-blur` is the
+   whole difference between the two, and every degradation tier above already
+   zeroes it (high contrast :179, battery, Aero safe mode), at which point
+   `--lq-liquid-bg` is itself opaque and the taskbar returns to solid chrome on
+   its own. So the fallback is the old behaviour, not a broken middle.
+
+   Attribute specificity (0,2,1) beats the base `.os-taskbar` rule (0,1,0), so
+   this holds wherever the sheets load, and dropping the attribute in
+   `DesktopShell` reverts the material with it. */
+.os-taskbar[data-lq-role='liquid'] {
+  background: var(--lq-liquid-bg);
+  border-top: 1px solid var(--lq-liquid-border);
+  backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate, 1));
+}

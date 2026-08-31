@@ -3018,10 +3018,20 @@ export default function DesktopShell({
       {/* Per-display taskbar mode. 'none' hides it entirely; 'windows-only'
           drops the Start button and desktop switcher and keeps the window
           list, which is what a secondary monitor usually wants. */}
+      {/* The taskbar switches windows and desktops, so `navigation` is the
+          accurate landmark, and `data-lq-role="liquid"` is the same shared
+          contract `LiquidAppScaffold` marks its rail and dock with. Both were
+          missing: measured 2026-08-31 on the Wired shell, this 1264x56 bar with
+          12 focusables classified as a plain Anchor, so the shell's primary
+          transport chrome was invisible to landmark navigation and scored
+          outside category 3's denominator entirely. One element, every shell. */}
       <div
         className={`os-taskbar os-taskbar-${taskbarMode}`}
         ref={taskbarRef}
         hidden={taskbarMode === 'none'}
+        role="navigation"
+        aria-label={t('settings.monitors.taskbar')}
+        data-lq-role="liquid"
       >
         {taskbarMode === 'full' && (
           <>

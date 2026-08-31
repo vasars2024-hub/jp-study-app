@@ -135,16 +135,64 @@ async function raise() {
  * contract every Liquid host writes (`.fwin`, `.popout-root`, the reader root), and
  * `.fwin-b-liquid` is the only control that changes it. A root that carries neither is
  * simply not presentable and is scored as it stands.
+ *
+ * CORRECTION 32 (2026-08-31, backup): `toggle` used to be a bare
+ * `root.querySelector('.fwin-b-liquid')`, a DESCENDANT search. That is right for a `.fwin`
+ * root, whose own toggle sits in its own title bar, and wrong for every `@selector` SHELL
+ * root, which CONTAINS floating windows and therefore contains their toggles. Measured on
+ * `@.os-desktop-wired`: the shell root has `data-presentation` null and is not a `.fwin`,
+ * but two toggles matched inside it — owned by 'SIG-VID / Signal Archive' and
+ * 'SYS / Service Panel'. The harness read that as "presentable, currently standard" and
+ * REFUSED, so category 3 could not be scored on any shell surface at all. Worse, the
+ * `--presentation liquid` escape hatch would have "fixed" it by clicking a nested WINDOW's
+ * toggle and scoring the shell in a presentation nobody set.
+ *
+ * The rule is ownership, not containment: a toggle belongs to this root only when the
+ * nearest presentable host above it IS this root. `PRESENTABLE_HOST` is the selector set
+ * every Liquid host writes, so this stays surface-agnostic.
  */
+const PRESENTABLE_HOST = '.fwin, .popout-root, [data-presentation]';
+
+/**
+ * The root's OWN body, by the same ownership rule and for the same reason as
+ * CORRECTION 33 in `l1-surface-roles.js`: on a shell root, `.fwin-body` matches a nested
+ * WINDOW's body. Both of this harness's uses were hitting it — the control-A path resolver
+ * and the plant host. Measured on `@.os-desktop-wired`: the plant mounted its 145px nodes
+ * inside a 0x0 minimised window body, so `planted` came back identical to `base`
+ * ([0,1,1,1,0] three times) and the run scored `VOID - the planted control did not falsify`
+ * while the product bars were in fact all passing.
+ */
+const OWN_BODY_EXPR = `(function(root){
+  var bodies = [].slice.call(root.querySelectorAll('.fwin-body'));
+  for (var i = 0; i < bodies.length; i += 1) {
+    if (bodies[i].closest('.fwin') === root) return bodies[i];
+  }
+  return root;
+})`;
+
+const OWN_TOGGLE_EXPR = `(function(root){
+  var candidates = [].slice.call(root.querySelectorAll('.fwin-b-liquid'));
+  for (var i = 0; i < candidates.length; i += 1) {
+    var host = candidates[i].closest(${JSON.stringify(PRESENTABLE_HOST)});
+    if (host === root) return candidates[i];
+  }
+  return null;
+})`;
+
 async function readPresentation() {
   return JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     if (!root) return JSON.stringify({ refuse: 'surface not found while reading presentation' });
+    var own = (${OWN_TOGGLE_EXPR})(root);
+    var nested = root.querySelectorAll('.fwin-b-liquid').length;
     return JSON.stringify({
       attr: root.getAttribute('data-presentation'),
       liquid: root.classList.contains('fwin-liquid') || root.classList.contains('popout-liquid')
         || root.getAttribute('data-presentation') === 'liquid',
-      toggle: !!root.querySelector('.fwin-b-liquid')
+      toggle: !!own,
+      // Kept in the receipt so a shell root reads as "not presentable, N nested toggles
+      // ignored" rather than looking like the toggle search simply found nothing.
+      nestedToggles: own ? nested - 1 : nested
     });
   })()`));
 }
@@ -153,8 +201,10 @@ async function clickPresentationToggle() {
   const clicked = JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     if (!root) return JSON.stringify({ refuse: 'surface disappeared before the presentation toggle' });
-    var btn = root.querySelector('.fwin-b-liquid');
-    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle' });
+    // Same ownership rule as readPresentation (correction 32): clicking a nested window's
+    // toggle would change a window this run does not own and leave it changed.
+    var btn = (${OWN_TOGGLE_EXPR})(root);
+    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle of its own' });
     btn.click();
     return JSON.stringify({ ok: true });
   })()`));
@@ -189,7 +239,7 @@ async function read() {
 }
 
 const RESOLVE_PATH = `(function(root, parts){
-  var node = root.querySelector('.fwin-body') || root;
+  var node = (${OWN_BODY_EXPR})(root);
   for (var i = 0; node && i < parts.length; i += 1) node = node.children[parts[i]];
   return node;
 })`;
@@ -288,7 +338,7 @@ async function plantControls() {
     if (root.querySelector('[data-lq-cat3-plant]')) {
       return JSON.stringify({ refuse: 'a prior category-3 plant is still mounted' });
     }
-    var host = root.querySelector('.fwin-body') || root;
+    var host = (${OWN_BODY_EXPR})(root);
     var r = root.getBoundingClientRect();
     // The instrument ignores anything under 1% of the window area and under 8px a side.
     var side = Math.max(96, Math.ceil(Math.sqrt(r.width * r.height * 0.02)));
