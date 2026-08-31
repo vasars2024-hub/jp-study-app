@@ -112,6 +112,9 @@ export type FilesDeletionResult =
       itemId: string;
       reasonKey:
         | 'filesApp.delete.refuseComputed'
+        | 'filesApp.delete.refuseNotTrashable'
+        | 'filesApp.delete.invalidRequest'
+        | 'filesApp.delete.notFound'
         | 'filesApp.delete.confirmationRequired'
         | 'filesApp.delete.confirmationMismatch'
         | 'filesApp.delete.failed';

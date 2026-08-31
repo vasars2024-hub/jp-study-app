@@ -109,7 +109,6 @@ export class FilesDeletionSession {
           ok: false,
           itemId: target.id,
           reasonKey: 'filesApp.delete.failed',
-          detail: 'Deletion reply did not match the requested item.',
         };
       }
       return result;
