@@ -1,0 +1,357 @@
+/*
+ * The Files app — presentation.
+ *
+ * Every colour, radius and spacing here is an `--lq-*` token. Not one literal
+ * hex value: the plan's rule is that Liquid is a composition language, not one
+ * palette, and hardcoding a shell's colours into an app is exactly how a
+ * component stops surviving a theme it was not written against.
+ *
+ * The three surface roles are used as the design contract intends and not
+ * interchangeably: the item list is WORK (a table is read and scanned, so it
+ * sits on a stable opaque anchor-weight surface rather than glass), while the
+ * rail, toolbar, inspector and dock are chrome and take the liquid treatment
+ * from the scaffold itself. Universal glass is a failure, not a maximum.
+ */
+
+.fa-shell {
+  height: 100%;
+  min-height: 0;
+  color: var(--lq-work-text);
+}
+
+/* -----------------------------------------------------------------------------
+   WHY THESE FIVE SLOTS ARE ZEROED BY A DESCENDANT SELECTOR AND NOT NAMED DIRECTLY.
+
+   `theme/liquid-surfaces.css` declares `padding: var(--lq-space-4)` on
+   `.lq-liquid` and `padding: var(--lq-gutter)` on `.lq-work` — at (0,1,0), from a
+   stylesheet loaded by `main.tsx` and therefore AFTER this component-level
+   import. A bare `.lq-scaffold-rail { padding: 0 }` here is the same specificity
+   and loses on order, exactly the cascade `readingCanvas.css` documents losing to.
+
+   Each row in this app is a 32px line in a dense table; a 16px inset on every
+   edge of every slot is a different layout from the one the sizes below assume.
+   So the padding is claimed by the inner containers, and a
+   descendant-of-shell selector at (0,2,0) settles it by SPECIFICITY rather than
+   by load order — which is the only form that survives a change in import order.
+   -------------------------------------------------------------------------- */
+.fa-shell > .lq-scaffold-rail,
+.fa-shell > .lq-scaffold-toolbar,
+.fa-shell > .lq-scaffold-inspector,
+.fa-shell > .lq-scaffold-dock,
+.fa-shell > .lq-scaffold-canvas {
+  padding: 0;
+}
+
+/* ----------------------------- rail ----------------------------- */
+
+.fa-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--lq-space-2);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.fa-tree-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-2);
+  width: 100%;
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: var(--lq-liquid-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lq-motion-move) var(--lq-ease-move);
+}
+
+/* A leaf is indented under its group; a group stays flush and reads as a header. */
+.fa-tree-node[data-leaf='true'] {
+  padding-left: var(--lq-space-4);
+}
+
+.fa-tree-node:not([data-leaf='true']) {
+  font-weight: 600;
+  color: var(--lq-liquid-text);
+}
+
+.fa-tree-root {
+  font-weight: 600;
+  margin-bottom: var(--lq-space-2);
+}
+
+.fa-tree-node:hover {
+  background: var(--lq-liquid-bg-raised);
+}
+
+.fa-tree-node[data-selected='true'] {
+  background: var(--lq-liquid-highlight);
+  border-color: var(--lq-liquid-border);
+}
+
+.fa-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Kept legible rather than decorative: this number is the gate-1 reading. */
+.fa-tree-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--lq-liquid-text-muted);
+}
+
+/* --------------------------- toolbar ---------------------------- */
+
+.fa-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  padding: 0 var(--lq-space-3);
+  height: 100%;
+  min-width: 0;
+}
+
+.fa-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.fa-search input,
+.fa-sort select {
+  min-height: var(--lq-hit-target);
+  width: 100%;
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg-raised);
+  color: var(--lq-liquid-text);
+  font: inherit;
+}
+
+.fa-sort {
+  flex: none;
+}
+
+.fa-sort-dir,
+.fa-refresh,
+.fa-action {
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg-raised);
+  color: var(--lq-liquid-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-refresh[disabled] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+/* ---------------------------- list ------------------------------ */
+
+.fa-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--lq-work-bg);
+  color: var(--lq-work-text);
+}
+
+.fa-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fa-row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  align-items: center;
+  gap: var(--lq-space-3);
+  padding: 0 var(--lq-space-3);
+  height: 32px;
+  border-bottom: 1px solid var(--lq-work-border);
+  cursor: default;
+}
+
+.fa-row:hover {
+  background: var(--lq-work-bg-raised);
+}
+
+.fa-row[data-selected='true'] {
+  background: var(--lq-liquid-highlight);
+}
+
+.fa-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--lq-work-bg-raised);
+  font-weight: 600;
+}
+
+.fa-head .fa-cell {
+  border: none;
+  background: none;
+  color: var(--lq-work-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  min-height: var(--lq-hit-target);
+  padding: 0;
+}
+
+.fa-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fa-cell-size {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-cell-modified {
+  color: var(--lq-work-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Machine-produced text is marked, and the plan is one-directional about it:
+ * this may become MORE prominent, never hidden. Weight plus a rule, not colour
+ * alone — colour alone is invisible to a reader who cannot distinguish it.
+ */
+.fa-cell-provenance[data-machine='true'],
+.fa-details-list dd[data-machine='true'] {
+  font-style: italic;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.fa-badge {
+  margin-left: var(--lq-space-2);
+  padding: 0 var(--lq-space-1);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+  font-size: 0.85em;
+}
+
+.fa-row[data-broken='true'] .fa-cell-name {
+  color: var(--lq-work-text-muted);
+}
+
+/* -------------------------- inspector --------------------------- */
+
+.fa-details {
+  padding: var(--lq-space-3);
+  overflow-y: auto;
+  min-height: 0;
+  color: var(--lq-liquid-text);
+}
+
+.fa-details-title {
+  margin: 0 0 var(--lq-space-3);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.fa-details-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--lq-space-1) var(--lq-space-3);
+  margin: 0 0 var(--lq-space-3);
+}
+
+.fa-details-list dt {
+  color: var(--lq-liquid-text-muted);
+}
+
+.fa-details-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fa-details-location {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.fa-details-note {
+  margin: var(--lq-space-2) 0 0;
+  color: var(--lq-liquid-text-muted);
+}
+
+/* ---------------------------- dock ------------------------------ */
+
+.fa-status {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-4);
+  height: 100%;
+  padding: 0 var(--lq-space-3);
+  color: var(--lq-liquid-text-muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* --------------------------- states ----------------------------- */
+
+.fa-state {
+  padding: var(--lq-space-4);
+  color: var(--lq-work-text-muted);
+}
+
+.fa-state-error {
+  color: var(--lq-work-text);
+}
+
+.fa-state-detail {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+/* A store that could not be read. Reported, never rounded to an honest zero. */
+.fa-state-warning {
+  margin: 0;
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border-bottom: 1px solid var(--lq-work-border);
+  background: var(--lq-work-bg-raised);
+  color: var(--lq-work-text);
+}
+
+.fa-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-tree-node {
+    transition: none;
+  }
+}
