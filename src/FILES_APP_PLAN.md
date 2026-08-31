@@ -509,13 +509,27 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    epub, a dictionary zip, a video — and it reports a count per destination. Report the number
    found, the number placed and the number left ambiguous; "scanned successfully" with no
    numbers is not a pass.
+   <!-- status: closed; evidence: 2026-08-31 8fca0963 -- shared/filesApp/scan.ts + main/filesApp/scan.ts + filesapp:scan IPC + preload filesScan; real mixed folder through the PRODUCTION planForPath: 9 files -> found 8 / placed 7 / ambiguous 0 / unplaced 1 / skipped 1; per destination subtitle 3, media 2, library-book 1, dictionary-yomitan 1 (sniffed, a real Yomitan zip with format:3), unknown 1; scanReportBalances asserted; adverse control removing the incomplete skip turns 4 of 12 red -->
+   <!-- decision: placement reuses the drop router's own preferredTarget/needsTriage verbatim.
+        A second opinion here would let a file scan into a destination the drop router would
+        refuse, and the plan's "one classifier" would quietly become two. `unplaced` is kept
+        separate from `ambiguous` because they ask the user for different things. -->
 24. **Scan is read-only.** After a scan and an import, every original file is byte-identical and
    still in its original path — verified, not assumed.
+   <!-- status: open; evidence: 2026-08-31 8fca0963 -- the SCAN half is measured: size, mtime and full bytes of every fixture file captured before and compared after three scans including the zip-reading sniffer; identical, and nothing created or removed. Read-only is also structural (readdirSync/statSync/lstatSync only, no injectable fs, symlinks not descended). The IMPORT half needs the confirm-and-import path, which does not exist yet. -->
+   **1 of 2 clauses landed, gate still OPEN.** The import half opens when the review/confirm
+   surface lands (gate 27's slice).
 25. **Watch picks up a live download.** A file appearing in a watched folder is recognised
    without a manual refresh, and the elapsed time is reported.
 26. **A partial download is never ingested.** A `.crdownload`/`.part`/`.!qB` file, and a file
    still growing, are both ignored until complete — proven by watching one arrive mid-write,
    not by asserting the extension list exists.
+   <!-- status: closed; evidence: 2026-08-31 f12f54de -- shared/filesApp/stability.ts; watched mid-write against real bytes on real disk with the scan running BETWEEN chunks: firstSighting -> stillGrowing -> refused at +2s -> tooSoon -> found 1 at sizeBytes 7168 (every byte written); 8 incomplete extensions each skipped by name with one finished file as the control; adverse control making a size change not restart the clock turns 3 of 14 red -->
+   <!-- decision: stability is a COMPARISON, never a single reading — the observation carries
+        the moment the size last changed, and any change (shrinking included, because clients
+        that preallocate then trim would otherwise read as finished) restarts it. Also stated
+        as a test: a scan with no ledger does not pretend to judge completeness. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (eighteenth) Progress entry.
 27. **Ambiguity goes to review, not into the library.** A file the router settles only by
    guessing lands in the review queue; a high-confidence match may auto-import. Both paths
    demonstrated with a real file each.
@@ -530,6 +544,8 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 31. **The stability window is honoured and adjustable.** Setting it higher delays ingest of a
    file still growing by that amount; setting it lower does not bypass the completeness check
    entirely. Proven against a file arriving mid-write at two different settings.
+   <!-- status: open; evidence: 2026-08-31 f12f54de -- the MODEL half is measured at two settings: at 30,000 ms the file is refused at +29,999 and accepted at +30,000; at 0 ms it is still refused until a second reading holds, because the empty and first-sighting refusals run BEFORE the window is consulted (control flow, not a clamp anyone can lower). What is missing is "adjustable" as a product surface — the folder setting that carries `stabilityMs`. -->
+   **The honoured half is measured; the adjustable half needs the folder setting.**
 32. **Cleanup dry-runs before it acts.** Every cleanup class reports its count and reclaimable
    size first, and the report matches exactly what is removed when confirmed — item for item,
    not just in total.
@@ -1528,3 +1544,55 @@ at least one theme.
 Focused gates: **26/26** across the two new suites, ESLint **exit 0 / 0 warnings** on all
 10 touched TS/TSX paths, i18n **exit 0 at 11,885 keys**, architecture the same **15**
 pre-existing branch-divergence findings and no gate-22 identity among them.
+
+### 2026-08-31 (eighteenth) — gates 23 and 26 CLOSE; 24 and 31 land one half each
+
+`8fca0963` (scan) and `f12f54de` (completeness). The two are one feature: ingest is the drop
+router's classifier plus volume, plus the two things a single drop never has to decide —
+what to skip, and when to stop.
+
+**Gate 23, measured on real files through the production `planForPath`.** Nine files in a
+mixed folder: **found 8 / placed 7 / ambiguous 0 / unplaced 1 / skipped 1**. Per destination:
+`subtitle` 3, `media` 2, `library-book` 1, `dictionary-yomitan` 1, `unknown` 1. The
+dictionary row is a REAL Yomitan zip carrying `index.json` with `format: 3`, so the archive
+sniffer actually runs and reports `sniffed: true` — a hand-named empty file would have
+exercised the extension table and left the gate's hardest row untested. `scanReportBalances`
+is asserted, not assumed: placed + ambiguous + unplaced === found, so a file the report lost
+cannot pass as a clean run. Adverse control: removing the incomplete-file skip turns **4 of
+12** red.
+
+`unplaced` is deliberately not folded into `ambiguous`. Two valid homes needs a choice; no
+home at all cannot be reviewed into anywhere, and a report saying "12 to review" when 11 are
+unreviewable is the kind of number this plan exists to prevent.
+
+**Gate 26, watched mid-write, because the gate's own sentence forbids the cheap version.**
+Real bytes to real disk with the scan running BETWEEN chunks and only the clock injected:
+chunk 1 -> `firstSighting`; chunk 2 at +1 s -> `stillGrowing`; chunk 3 at +2 s -> still
+refused (**a naive "seen twice" rule would have imported a half-written video here**); the
+write stops -> `tooSoon`; +3 s unchanged -> **found 1 at sizeBytes 7168**, every byte that was
+written. Eight incomplete extensions each skipped by name, with one finished `.srt` in the
+same folder as the control so a report of zero could not pass as "it skips everything".
+Adverse control: making a size change NOT restart the clock turns **3 of 14** red.
+
+**Gate 24's scan half is closed inside gate 23's own run** — size, mtime and full bytes of
+every fixture file captured before and compared after three scans including the zip-reading
+path, all identical, nothing created or removed. Read-only is also structural: the module
+uses `readdirSync`/`statSync`/`lstatSync` only, takes no injectable `fs`, and does not descend
+symlinks (a junction at `C:\` would otherwise turn a Downloads scan into a whole-drive walk).
+The import half stays open until there is an import.
+
+**Gate 31's honoured half is closed too**, at two settings: refused at +29,999 ms and accepted
+at +30,000 ms with a 30 s window; and at a 0 ms window still refused until a second reading
+holds, because the empty and first-sighting refusals run BEFORE the window is consulted. That
+is control flow, not a clamp someone can lower next year. What 31 still needs is the folder
+setting that makes it adjustable.
+
+Traps for the next worker: (1) the file ceiling **stops the walk** and records itself once —
+an earlier draft pushed one skip row per remaining file, which on a media drive costs more
+memory than the scan it refused to do. (2) A one-shot scan has **no** previous reading, so it
+cannot judge completeness and deliberately does not pretend to; the caller must carry a
+`StabilityLedger` across passes. That limitation is pinned as its own test so it cannot be
+mistaken for the feature working.
+
+Focused gates: **26/26** across the two new main suites, ESLint **exit 0** on every touched
+TS path, i18n **exit 0 at 11,894 keys**.
