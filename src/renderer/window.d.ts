@@ -633,6 +633,9 @@ declare global {
       fileDropClassify(paths: string[]): Promise<DropPlan[]>;
       fileDropFolderImages(dirPath: string): Promise<string[]>;
       fileDropFolderFiles(dirPath: string): Promise<string[]>;
+      filesDelete(
+        request: import('../shared/filesApp/deletion').FilesDeleteRequest,
+      ): Promise<import('../shared/filesApp/deletion').FilesDeletionResult>;
 
       popOut(section: string): Promise<void>;
       popoutListOpen(): Promise<string[]>;

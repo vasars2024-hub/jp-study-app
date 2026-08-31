@@ -8,6 +8,7 @@ import {
   type SeanimeStatus,
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
+import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -997,6 +998,15 @@ const api = {
     ipcRenderer.invoke('filedrop:listFolderImages', dirPath),
   fileDropFolderFiles: (dirPath: string): Promise<string[]> =>
     ipcRenderer.invoke('filedrop:listFolderFiles', dirPath),
+
+  /**
+   * Delete one Files-index item through its authoritative id. Paths, kinds and
+   * risk classifications never cross this bridge; main resolves them again.
+   */
+  filesDelete: (
+    request: import('./shared/filesApp/deletion').FilesDeleteRequest,
+  ): Promise<import('./shared/filesApp/deletion').FilesDeletionResult> =>
+    ipcRenderer.invoke(FILES_DELETE_CHANNEL, request),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

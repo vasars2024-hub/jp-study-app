@@ -542,6 +542,13 @@ controls pass; **2 of 2** relative-path controls return the named failure with *
 and **0** cache invalidations. Focused result: **11 of 11 tests pass**. Gates 9/21 remain open
 until the merged Files inspector drives the bridge and one Recycle Bin fixture is restored.
 
+### 2026-08-31 — codexA, Gate 9/21 typed renderer bridge
+
+Preload now invokes the shared `filesapp:delete` channel with only the versioned request; the
+renderer declaration returns the same validated result union. The source guard proves both
+surfaces share the contract, **31 of 31** focused deletion tests pass, and the production preload
+bundle builds from **26 modules**. Gate 21 remains open pending the inspector and live restore.
+
 ### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
 
 Gate 1 remains **OPEN**. Debug-bridge evaluation against the running main renderer measured
