@@ -13,6 +13,7 @@ import {
   MEDIA_LIBRARY_STORE_FILE,
   mediaItemsFromStoredDocument,
 } from '../shared/mediaLibraryEntries';
+import { YOUTUBE_MEDIA_SUBTITLE_DIRECTORY } from '../shared/youtubeStorage';
 import { classifyMediaKind } from '../shared/mediaKind';
 import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
@@ -1358,7 +1359,7 @@ export function registerMediaIpc(): void {
       const bin = await findYtDlp();
       if (!bin) return { ok: false, error: 'yt-dlp was not found on your PATH.' };
 
-      const outDir = path.join(userDataSubdir('subs-cache'), item.youtubeId || item.id);
+      const outDir = path.join(userDataSubdir(YOUTUBE_MEDIA_SUBTITLE_DIRECTORY), item.youtubeId || item.id);
       fs.mkdirSync(outDir, { recursive: true });
       const ytArgs = await withYtDlpJsRuntime([
         url,
