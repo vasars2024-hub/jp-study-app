@@ -1704,3 +1704,70 @@ Settings window — real, but a different surface's cell.
 
 **RULE C: 5 of 16 cells — cat1, cat2, cat3, cat4, cat6, all Wired. 11 to run.** `sampled-out:`
 Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+
+## 2026-08-31 — primary — cat5 scores a shell: VOID → 7/10, plus two product fixes
+
+Three named terms from the previous receipt, all closed. Harness: `0e855e0d`.
+
+1. **Shell scope (`rq`).** Detected structurally — not a `.fwin` and contains one — so it is
+   the IDENTITY on every banked surface. Proved live rather than argued: 51/51, 53/53, 8/8 on
+   the three open windows, 127 → 15 on the desktop. Applied to the snapshot, the Q2 plant, the
+   card-host scan (four open windows would read as a uniform card grid) and the Q6 toggle.
+2. **The Q6 toggle was MUTATING A NEIGHBOUR** — the real defect under "surface reads null".
+   `r.querySelector('.fwin-b-liquid')` on a shell root returns the first HOSTED window's
+   control, so the 17:09 run flipped SIG-VID, read `data-presentation` off the shell (which has
+   none), refused, and — restore guarded on `!refused` — left it flipped. Every click is undone
+   now, refusing ones included. The shell's own axis: **one presentation**, chrome material
+   unconditional, so Q6 is measured where the shell is found with the basis in the output.
+   Cat6's hosted-window flip answers a different requirement (taskbar identity); no conflict.
+3. **`--alt-attr name=value`.** `wired-archive` is the ONLY `materialSet: 'wired'` theme, so
+   the classic-light cell measured a combination the product never renders. The shell's shipped
+   stability axis is its own ladder: `data-display-transparency` full → off. Default empty →
+   every banked baseline re-derives unchanged. Restored and read back, absence included.
+
+Two host-taxonomy repairs of the 2026-08-26 family: a shell **is not chromeless** (it owns the
+taskbar, desktop layer and floating-window chrome the chromed set names, and scored 1 of 4
+against the replacement set), and a shell **has no heading**, so Q2 reads which of its own
+places is current from the app's own `aria-current`/`-pressed`/`-selected`. The bar is NOT
+lowered: the shell uses the byte-identical chromed set the 18 `.fwin` surfaces use.
+
+**Q5's VOID guard gained a second witness** — a djb2 digest over every measured fg/bg pair.
+`minRatio` alone is the population's worst single ratio, so a tier that repaints everything and
+leaves the worst one alone read as a swap that did nothing. Strictly more sensitive; both
+reported (`axisWitness`).
+
+**Two product fixes, both found by the scoped read.**
+- `a2e9c1ce` — the shell's launcher and flyouts never said they were popups. All nine taskbar
+  controls read `aria-haspopup=null`/`aria-expanded=null`; six open a menu or flyout and the two
+  desktop switches carried "which desktop am I on" only in a CSS class. `aria-haspopup` on all
+  six, `aria-expanded` only on Start and Widgets (the other four dispatch a CustomEvent and
+  their panels own the state; a stale `false` over an open panel is worse than nothing).
+  Collapsed disclosures **0 → 2**.
+- `34291a6c` — `div.os-taskbar` is the shell's ONLY Liquid-treated region and its
+  `transition-duration` read **0s**, so every degradation tier (high contrast, battery, Aero
+  safe mode) snapped it from glass to solid in one frame. Transition on exactly the three
+  properties that rule sets. Live 0s → 0.14s; control: `html.reduce-motion` collapses it to
+  1e-06s and removing it restores 0.14s byte-identical.
+
+**cat5 · Wired = 7/10, no VOIDs.** Q2/Q5/Q6/Q7/Q8/Q9/Q10 YES. Q5: 14 runs measured, **0
+failing in both tiers**, minRatio 7.46 (the 79-failure phantom was hosted-window content).
+Q6 is thin and says so: `liquidRegions: 1`. Control: **FAILED AS REQUIRED on Q2, Q3, Q4, Q5,
+Q10** — Q2 only after the plant was taught the shell branch, or it attacked a term the question
+is not scored on. Restore: residue 0, theme and `data-display-transparency` byte-identical.
+
+**Three open, all product, none instrument:**
+1. **Q4 — 13 scanned against a bar of 12.** Start + 2 desktop switches + 3 window buttons + 1
+   close + 6 tray buttons. The product answer is a tray overflow (the Windows "show hidden
+   icons" affordance): it obscures nothing, adds a disclosure and is the shell's own idiom.
+   Blast radius is all four shells' taskbar, so it is a slice, not a tail-of-turn edit.
+2. **Q1 — entryPoints 0** against a bar of 1..3. Two causes and only the first is instrument:
+   `topThird` encodes "reading order starts at the top" and a shell's chrome band is at the
+   BOTTOM by OS convention. Fixing the zone alone does NOT fix it — `os-start-btn` is neither
+   `declaredPrimary` nor "the only filled button among its siblings" (its siblings in
+   `.os-taskbar` are DIVs, so `sibs.length > 0` is false). Declaring it primary with an
+   attribute that changes nothing a user sees would be marking for the test; **not done**.
+3. **Q3 — primaryAction null**, the same question one step on: what IS a desktop shell's
+   primary action. Answer it once, for Q1 and Q3 together.
+
+**RULE C: 6 of 16 cells — cat1, cat2, cat3, cat4, cat6 PASS, cat5 at 7/10. 10 to run.**
+`sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
