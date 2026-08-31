@@ -19,9 +19,8 @@
  *   home. This IS the failure condition in general, and the plan permits it only
  *   for capabilities on `FILES_PERMITTED_MIGRATIONS`.
  *
- * As of gate 7b there is exactly ONE `migrated` row, `notebook`. Gate 8 has not
- * landed, so memory and statistics are still in Settings and their permission is
- * still unused.
+ * As of gate 8 there are TWO `migrated` rows: `notebook`, and the system panel
+ * `panel:system/memory` that plan decision 1 moved out of Settings.
  *
  * **The rule that decides `preserved` vs `migrated`, made explicit at gate 7b:**
  * a route counts as preserved only if it exists in the DEFAULT shell. Blanc is
@@ -37,8 +36,19 @@ export type FilesParityStatus = 'preserved' | 'new' | 'migrated';
 
 export interface FilesParityRow {
   /**
-   * What is being checked. Either an enumerator `source` id — the capability
-   * "see this store's rows" — or an `action:` id for an interactive control.
+   * What is being checked. Three shapes, and the prefix is what tells them
+   * apart:
+   *
+   * - a bare enumerator `source` id — the capability "see this store's rows".
+   *   These are pinned 1:1 against the two enumerator registries, so a bare id
+   *   that is not a real `source:` literal fails the test.
+   * - `action:<id>` — an interactive control in the Files list.
+   * - `panel:<categoryId>` — a whole system panel the Files app hosts at one of
+   *   its leaves (gate 8's memory and statistics).
+   *
+   * The prefixed forms are deliberately NOT enumerator sources, which is why
+   * `isEnumeratorCapability` excludes anything carrying a colon: adding them
+   * bare would break the 1:1 equality and its own negative control.
    */
   capability: string;
   status: FilesParityStatus;
@@ -66,7 +76,18 @@ export interface FilesParityRow {
  * The only capabilities allowed to leave their old home for the Files app.
  * Adding to this list is a product decision, not a repair.
  *
- * - `memory`, `statistics` — plan decision 1, gate 8: they leave Settings.
+ * - `panel:system/memory` — plan decision 1, gate 8: the Settings "Memory" page
+ *   is deleted and the Files app is its only home. Recorded with the `panel:`
+ *   prefix rather than a bare `memory` because the bare form is reserved for
+ *   enumerator sources; see `FilesParityRow.capability`.
+ *
+ *   Decision 1 names "memory and statistics", but only memory is here, and the
+ *   difference is measured rather than assumed: statistics never had a Settings
+ *   page. Its home is the top-level `stats` section, which gate 8 did not touch
+ *   (`AppSection.tsx` still routes `case 'stats'` to `StatisticsView`), so
+ *   `panel:system/statistics` is `preserved` and needs no permission. Listing it
+ *   here anyway would license a future removal of the Statistics section that
+ *   nobody decided.
  * - `notebook` — gate 7b. Distinct from the pair above in kind, not in degree:
  *   memory and statistics are moved out of a Settings page that still exists,
  *   whereas the Notebook's HOST is deleted. `FILES_APP_PLAN.md` opens with "a
@@ -77,10 +98,20 @@ export interface FilesParityRow {
  *   has to show each absorbed feature landing somewhere real.
  */
 export const FILES_PERMITTED_MIGRATIONS: readonly string[] = [
-  'memory',
-  'statistics',
+  'panel:system/memory',
   'notebook',
 ];
+
+/**
+ * True for the rows that must line up 1:1 with an enumerator `source` id.
+ *
+ * Exported so the test and the table cannot drift apart on what counts: the
+ * equality it guards is the only thing stopping a store from being enumerated
+ * in the Files app with no route recorded for it anywhere.
+ */
+export function isEnumeratorCapability(capability: string): boolean {
+  return !capability.includes(':');
+}
 
 /**
  * Every i18n key that labels an interactive control in `FilesApp.tsx`.
@@ -397,6 +428,39 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
     module: '',
     symbol: '',
     note: 'Rebuilds the Files index cache. No other surface has an index to rebuild.',
+  },
+
+  /* ------------------------ the system panels ------------------------- */
+  {
+    capability: 'panel:system/memory',
+    status: 'migrated',
+    section: null,
+    module: '',
+    symbol: '',
+    note:
+      'Plan decision 1, gate 8: the Settings "Memory" page is deleted '
+      + '(MemoryPage.tsx removed, `memory` out of SETTINGS_NAV and the page switch) and '
+      + 'FilesMemoryPanel at the `system/memory` leaf is its only home. This is the ONE '
+      + 'exception the user made to the not-a-gatekeeper rule, and it is recorded as a '
+      + 'migration rather than waived. What did NOT go with it: the nine registry entries '
+      + 'are kept and carry `movedTo: \'files\'`, so every Settings search term that used '
+      + 'to reach these cards — "factory reset" included — still matches and is redirected '
+      + 'by SettingsApp.navigate to the Files app at the same card id. Losing a search term '
+      + 'would be a capability lost, not moved.',
+  },
+  {
+    capability: 'panel:system/statistics',
+    status: 'preserved',
+    section: 'stats',
+    module: 'src/renderer/views/StatisticsView.tsx',
+    symbol: 'StatisticsView',
+    note:
+      'Decision 1 names statistics alongside memory, but statistics never had a Settings '
+      + 'page to lose: its home is the top-level `stats` section, which gate 8 left alone — '
+      + "AppSection.tsx still routes `case 'stats'` to StatisticsView, and that view is what "
+      + 'this row re-derives. The Files panel is an additional route over the same '
+      + 'StatsContent readers (useStats / StatsCards / StatsChart / StatsBooks / StatsShows / '
+      + 'WordKnowledge), so nothing migrated and no permission is owed.',
   },
 ];
 

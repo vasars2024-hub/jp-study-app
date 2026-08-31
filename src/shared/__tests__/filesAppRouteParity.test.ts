@@ -28,8 +28,10 @@ import {
   FILES_ROUTE_PARITY,
   filesParityRow,
   filesParityViolations,
+  isEnumeratorCapability,
   type FilesParityRow,
 } from '../filesApp/routeParity';
+import { FILES_SYSTEM_PANEL_CARDS, filesPanelForCard } from '../filesApp/systemPanels';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
@@ -83,13 +85,22 @@ describe('files app route parity (gate 6)', () => {
     // stores the Notebook aggregated. Asserted as a number so a regex that
     // silently stops matching cannot pass by comparing two empty lists.
     expect(sources).toHaveLength(25);
-    const declared = FILES_ROUTE_PARITY.map((r) => r.capability).filter(
-      (c) => !c.startsWith('action:'),
-    );
+    const declared = FILES_ROUTE_PARITY.map((r) => r.capability).filter(isEnumeratorCapability);
     expect(new Set(declared).size).toBe(declared.length);
     expect([...new Set(sources)].sort()).toEqual([...declared].sort());
     // Control: dropping any one row must break the equality above.
     expect([...new Set(sources)].sort()).not.toEqual([...declared].slice(1).sort());
+    // Control on the filter itself. `isEnumeratorCapability` is what keeps the
+    // `action:`/`panel:` rows out of the equality, so if it ever started
+    // returning true for everything the equality would fail — but if it started
+    // returning FALSE for everything, `declared` would be empty and `sources`
+    // would have to be empty too for the test to pass. Pin both directions.
+    expect(declared.length).toBe(25);
+    expect(FILES_ROUTE_PARITY.filter((r) => !isEnumeratorCapability(r.capability)).length)
+      .toBeGreaterThan(0);
+    expect(isEnumeratorCapability('panel:system/memory')).toBe(false);
+    expect(isEnumeratorCapability('action:reveal')).toBe(false);
+    expect(isEnumeratorCapability('transcripts')).toBe(true);
   });
 
   it('re-derives every preserved route from the file it names', () => {
@@ -100,17 +111,62 @@ describe('files app route parity (gate 6)', () => {
 
   it('has no capability that became Files-app-only without permission', () => {
     expect(filesParityViolations()).toEqual([]);
-    // Gate 7b migrated exactly one capability, and gate 8 has not landed, so
-    // memory/statistics are still in Settings. Asserted as the exact list rather
-    // than a count: a second silent migration cannot hide behind a `>= 1`.
+    // Gate 7b migrated `notebook`; gate 8 migrated the memory PANEL and nothing
+    // else. Asserted as the exact list rather than a count: a third silent
+    // migration cannot hide behind a `>= 2`.
     const migrated = FILES_ROUTE_PARITY.filter((r) => r.status === 'migrated');
-    expect(migrated.map((r) => r.capability).sort()).toEqual(['notebook']);
-    expect(FILES_PERMITTED_MIGRATIONS).toEqual(['memory', 'statistics', 'notebook']);
+    expect(migrated.map((r) => r.capability).sort()).toEqual([
+      'notebook',
+      'panel:system/memory',
+    ]);
+    expect(FILES_PERMITTED_MIGRATIONS).toEqual(['panel:system/memory', 'notebook']);
     // The permission is not a waiver: a migrated row still has to explain where
     // the capability went, and gate 7b's own note names three destinations.
     const notebook = filesParityRow('notebook')!;
     expect(notebook.note).toMatch(/ReadingCapturesView/);
     expect(notebook.note.length).toBeGreaterThan(200);
+  });
+
+  it('gate 8: memory migrated, statistics did not, and the difference is derived', () => {
+    // The claim the two rows make, checked against the files rather than against
+    // each other. Memory's page is gone; statistics' section is not.
+    expect(existsSync(join(ROOT, 'src/renderer/components/settings/pages/MemoryPage.tsx')))
+      .toBe(false);
+    const registry = read('src/renderer/components/settings/settingsRegistry.ts');
+    // The page is out of the sidebar and out of the page switch...
+    expect(registry).not.toMatch(/\{ id: 'memory',/);
+    expect(read('src/renderer/components/settings/SettingsApp.tsx'))
+      .not.toMatch(/case 'memory':/);
+    // ...but `pageId: 'memory'` DELIBERATELY survives on the entries, and this
+    // assertion is the right way round. The id is the historical coordinate the
+    // agent index and stale deep links still speak; `SettingsApp.navigate`
+    // redirects it. Deleting the entries would cost a user who types "factory
+    // reset" the ability to find it at all — capability lost, not moved.
+    // Both counted on the trailing comma, which is what makes them entry FIELDS
+    // — the bare `movedTo: 'files'` also appears inside the explanatory comment
+    // above SETTINGS_NAV, and counting that made this read 10.
+    expect([...registry.matchAll(/pageId: 'memory',/g)]).toHaveLength(9);
+    expect([...registry.matchAll(/movedTo: 'files',/g)]).toHaveLength(9);
+    expect(registry).toMatch(/factory reset/i);
+    expect(registry).toMatch(/SETTINGS_PAGES_MOVED_TO_FILES = \['memory'\] as const/);
+
+    // Statistics: the section route is intact, so `preserved` is not a courtesy.
+    expect(APP_SECTION).toMatch(/case 'stats':/);
+    expect((DESKTOP_WIN_SECTIONS as readonly string[]).includes('stats')).toBe(true);
+    const stats = filesParityRow('panel:system/statistics')!;
+    expect(stats.status).toBe('preserved');
+    expect(checkRow(stats)).toEqual([]);
+    // Control: the same checker on the same row with the section removed must
+    // fail, so the pass above is the route and not an empty check.
+    expect(checkRow({ ...stats, section: null })).not.toEqual([]);
+
+    // Every card the panels claim to own is routed by the table, nothing else is.
+    const memoryCards = FILES_SYSTEM_PANEL_CARDS.filter(
+      (c) => c.categoryId === 'system/memory',
+    );
+    expect(memoryCards).toHaveLength(9);
+    expect(filesPanelForCard('factory-reset')).toBe('system/memory');
+    expect(filesPanelForCard('appearance')).toBe(null);
   });
 
   it('the Notebook section is really gone from every registry it was in', () => {
@@ -200,7 +256,13 @@ describe('files app route parity (gate 6)', () => {
         note: 'a capability that left its old home without permission',
       };
       expect(filesParityViolations([rogue])).toEqual([rogue]);
-      expect(filesParityViolations([{ ...rogue, capability: 'memory' }])).toEqual([]);
+      expect(filesParityViolations([{ ...rogue, capability: 'panel:system/memory' }]))
+        .toEqual([]);
+      // And the near-miss: the whitelist is matched whole, so the BARE `memory`
+      // that gate 8 rejected in favour of the prefixed id is still a violation.
+      // Without this the spelling decision could silently regress.
+      expect(filesParityViolations([{ ...rogue, capability: 'memory' }]))
+        .toEqual([{ ...rogue, capability: 'memory' }]);
     });
   });
 });
