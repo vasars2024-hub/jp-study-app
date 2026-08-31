@@ -1,0 +1,449 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "main",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "680x709",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 31,
+    "unmeasurable": 0,
+    "minRatio": 3.54,
+    "minOwner": "small \"Last:\" 9px",
+    "failingCount": 7,
+    "worst": [
+      {
+        "el": "small",
+        "text": "Last:",
+        "px": 9,
+        "large": false,
+        "ratio": 3.54,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "dt",
+        "text": "Age",
+        "px": 8,
+        "large": false,
+        "ratio": 3.9,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "dt",
+        "text": "Lifetime pages read",
+        "px": 8,
+        "large": false,
+        "ratio": 3.9,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "dt",
+        "text": "Condition",
+        "px": 8,
+        "large": false,
+        "ratio": 3.9,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "span",
+        "text": "Garden music",
+        "px": 8,
+        "large": false,
+        "ratio": 3.9,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "span",
+        "text": "Observation",
+        "px": 8,
+        "large": false,
+        "ratio": 3.91,
+        "bar": 4.5,
+        "inactive": false
+      },
+      {
+        "el": "small",
+        "text": "endless dream",
+        "px": 10,
+        "large": false,
+        "ratio": 4.49,
+        "bar": 4.5,
+        "inactive": false
+      }
+    ],
+    "inactiveSkipped": 0,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 12,
+    "smallest": "input 16px",
+    "smallestPx": 16,
+    "under32Count": 11,
+    "under32": [
+      {
+        "el": "input",
+        "min": 16,
+        "nearest": 58.1
+      },
+      {
+        "el": "button.reading-garden-sky-console-toggle",
+        "min": 22,
+        "nearest": 79.6
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.reading-garden-info-close",
+        "min": 28,
+        "nearest": 319.3
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button.is-active",
+        "min": 29,
+        "nearest": 66.2
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 12,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 1,
+    "sel": [
+      "reading-garden-mushroom-hitbox"
+    ],
+    "settle": {
+      "nodes": 169,
+      "controls": 12,
+      "text": 393,
+      "expanded": 1,
+      "samples": 8,
+      "stable": 7,
+      "elapsedMs": 2101
+    }
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 97,
+    "beforeLongest": {
+      "el": "div.reading-garden-cloud-sprite",
+      "dur": 193
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 97,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".fwin-frameless",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "680x709",
+    "deferredVisibilityOwners": 0,
+    "controls": 12,
+    "measured": 12,
+    "belowFloorByRect": 11,
+    "belowFloorByHit": 11,
+    "belowFloor": [
+      {
+        "sel": "button",
+        "n": 4,
+        "rect": "146x29",
+        "hit": "52.5x29.5",
+        "hitMin": 29.5,
+        "blockers": [
+          "div.reading-garden-sky-console-body",
+          "div.reading-garden-sky-console-actions"
+        ]
+      },
+      {
+        "sel": "button.fwin-b",
+        "n": 2,
+        "rect": "30x24",
+        "hit": "30.5x24.5",
+        "hitMin": 24.5,
+        "blockers": [
+          "div.fwin-frameless-controls",
+          "div.fwin-frameless-controls"
+        ]
+      },
+      {
+        "sel": "button.fwin-b.fwin-close",
+        "n": 1,
+        "rect": "30x24",
+        "hit": "30.5x24.5",
+        "hitMin": 24.5,
+        "blockers": [
+          "div.fwin-frameless-controls",
+          "div.fwin-frameless-controls"
+        ]
+      },
+      {
+        "sel": "button.reading-garden-sky-console-toggle",
+        "n": 1,
+        "rect": "62x22",
+        "hit": "52.5x22.5",
+        "hitMin": 22.5,
+        "blockers": [
+          "div.reading-garden-stars",
+          "div.reading-garden-sky-console"
+        ]
+      },
+      {
+        "sel": "button.reading-garden-info-close",
+        "n": 1,
+        "rect": "28x28",
+        "hit": "28.5x16",
+        "hitMin": 16,
+        "blockers": [
+          "aside.reading-garden-info",
+          "aside.reading-garden-info"
+        ]
+      },
+      {
+        "sel": "button.is-active",
+        "n": 1,
+        "rect": "103x29",
+        "hit": "52.5x29.5",
+        "hitMin": 29.5,
+        "blockers": [
+          "div.reading-garden-info-music",
+          "div.reading-garden-info-music"
+        ]
+      },
+      {
+        "sel": "input via label.reading-garden-info-music-volume",
+        "n": 1,
+        "rect": "210x20",
+        "hit": "52.5x20.5",
+        "hitMin": 20.5,
+        "blockers": [
+          "div.reading-garden-info-music",
+          "aside.reading-garden-info"
+        ]
+      }
+    ],
+    "smallestHit": {
+      "el": "button.reading-garden-info-close",
+      "rect": "28x28",
+      "rectMin": 28,
+      "hit": "28.5x16",
+      "hitMin": 16,
+      "shrunk": true,
+      "shrunkBy": 10.5,
+      "blockers": [
+        "aside.reading-garden-info",
+        "aside.reading-garden-info",
+        "div.fwin-drag-strip",
+        "div.reading-garden-info-heading"
+      ]
+    },
+    "stolenCount": 1,
+    "stolen": [
+      {
+        "sel": "button.reading-garden-info-close",
+        "n": 1,
+        "rect": "28x28",
+        "hit": "28.5x16",
+        "shrunkBy": 10.5,
+        "blockers": [
+          "aside.reading-garden-info",
+          "aside.reading-garden-info"
+        ]
+      }
+    ],
+    "worstShrunkBy": 10.5,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 0,
+    "disabled": [],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 11,
+      "stolenCount": 1,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": false,
+    "targets32": false,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "contrast",
+    "targets32"
+  ],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        7,
+        11,
+        0,
+        0,
+        11
+      ],
+      "dirty": [
+        8,
+        13,
+        2,
+        1,
+        13
+      ],
+      "restored": [
+        7,
+        11,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "clicked": 1,
+    "sel": [
+      "reading-garden-mushroom-hitbox"
+    ],
+    "settle": {
+      "nodes": 130,
+      "controls": 8,
+      "text": 69,
+      "expanded": 0,
+      "samples": 8,
+      "stable": 7,
+      "elapsedMs": 2104
+    }
+  }
+}

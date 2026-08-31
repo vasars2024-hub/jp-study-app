@@ -329,3 +329,58 @@ TRAP 2: **Aero scales the desk** — `DIV.os-viewport-frame` carries
 `matrix(0.855…)`. `getBoundingClientRect` therefore reports a fabricated geometry
 change across a materials switch. `offsetWidth/Height/Left` and the inline style
 are the app's real numbers and were identical (711x651 @ left 40) in all legs.
+
+## 2026-08-31 — backup — bullet 1's rubric receipt opens: category 1 on both sampled surfaces
+
+RULE C pair, and why these two: **Video** is the densest presentable surface (816
+controls, 100 commands in `CENSUS.md`) and **City / Mooncap Garden** is the most
+different — the sparsest window AND the section `canPresentLiquid` refuses, which
+is the only place bullet 1's "without forcing Liquid" half is observable.
+`sampled-out:` settings, scraper, anki, flashcards, immersion, agent, library,
+grammar, novels, dictionary, youtube, calendar, games, resources, translate,
+statistics, notebook, musicwidget, visualizer, note.
+
+**The "without forcing" half is OBSERVED, live, and it holds.** One `/eval` over
+both windows at once: Video is `.fwin` with a `.fwin-bar` and buttons
+`[Pop out, Make Liquid, Minimize, Maximize, Close]`; City is `.fwin-frameless`
+with **no `.fwin-bar` at all** and `[Pop out, Minimize, Close]` — the affordance is
+absent, not disabled, on the section the predicate refuses. Both read
+`data-presentation="standard"`.
+
+**Category 1 · Video · PASS 10/10 — after two product fixes (`e863fbdb`).** It
+FAILED first, on two bars, and both defects were in the media library rather than
+in the entry points. `minRatio` **1.79 → 4.24** on `div.medialib-card__fallback`,
+`belowFloorByHit` **2 → 0** on `button.medialib-chip`. Control fired all five bars:
+`[0,6,0,0,0] → [1,8,2,1,2] → [0,6,0,0]`, `rectDrift` 0.
+
+**Category 1 · City · FAIL, and it is a big one — 0/10, not repaired here.**
+Control fired all five bars, `[7,11,0,0,11] → [8,13,2,1,13] → [7,11,0,0]`, so the
+numbers are measurements:
+- **7 contrast failures**, all 8–10 px body text: `small "Last:"` 3.54, four at
+  3.90–3.91 (`dt "Age"`, `dt "Lifetime pages read"`, `dt "Condition"`,
+  `span "Garden music"`), `span "Observation"` 3.91, `small "endless dream"` 4.49
+  — that last one misses the 4.5 bar by 0.01.
+- **11 of 12 controls below the 32 px pointer floor**, worst first:
+  `.reading-garden-info-close` 28.5x**16** (and it is the one `stolenCount: 1`,
+  shrunk 10.5 px by `aside.reading-garden-info`),
+  `.reading-garden-sky-console-toggle` 22.5, the volume input 20.5, the four sky
+  console buttons and `button.is-active` at 29.5, and 3 `.fwin-b` at 24.5.
+
+**The frameless `.fwin-b` is a SEPARATE defect from the framed one.** On Video the
+chrome buttons own a 32x32.5 pointer region through the inset `::after` and pass at
+exactly 32.0. Inside `.fwin-frameless-controls` the same class measures **30.5x24.5**
+— the expander does not survive that host. Bullet 1's own chrome entry point is
+therefore at zero margin where it exists, and the expander is missing where the
+container differs.
+
+TRAPS. (1) `--surface` by TITLE cannot address a frameless window: it has no
+`.fwin-title`, and the harness correctly REFUSED rather than scoring another window.
+Use `@.fwin-frameless`. (2) The first City run came back `VOID — 12 of 12 controls
+occluded`, because Video sat on top and the harness cannot raise a window with no
+title bar to click. Minimize the other window first; the VOID is the instrument
+working, not a probe bug. (3) Video's category-1 contrast passed on the very first
+run and failed on the second: `medialib` cards paint asynchronously, so a run that
+starts too early scores a surface whose worst element has not rendered.
+
+**Bullet 1 stays OPEN at 2 of 16 cells.** Next: repair City's 18 category-1 defects
+above, re-score, then categories 2–8 on both surfaces.
