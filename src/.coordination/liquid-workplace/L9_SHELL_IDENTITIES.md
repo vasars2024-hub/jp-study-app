@@ -1847,3 +1847,26 @@ language change. Final state verified: Wired, Home, en/en, badge 7, center close
 hydration polling before opening Appearance, the captured-store fixture, and byte verification;
 then all eight categories on Blanc. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
 notifications, onboarding, help.
+
+## 2026-08-31 — codexA — cat8 Wired passes 10/10; hosted-app leakage removed
+
+The shared category-8 runner had the same containment defect already repaired in categories
+3–6: `.os-desktop-wired` contains every `.fwin`, so the first read charged two Media empty states
+and Settings controls to the shell. Correction 29 scopes the shell to authored descendants;
+the banked run excludes **371 hosted text runs / 3 windows** and reports the count.
+
+Control proves both directions: a key, placeholder, mute control and error host planted inside a
+hosted window changed **0** shell metrics (`hostedIsolation: true`); the same three honesty defects
+planted on shell chrome moved **0/0/0 → 1/1/1 → 0/0/0**. No single-use probe was added.
+
+One real product finding was fixed. Wired's visible red error lamp encoded an unread-error state
+only by color and its entire group was `aria-hidden`. It now exposes localized polite status text
+for both active and quiet states; source regressions are **26/26**, i18n is **11,815 keys**.
+
+**cat8 · Wired = PASS 10/10.** At 1264×821: 14 authored text runs, 0 raw keys, 0 placeholders,
+0 mute pairs, and the one observable error state named. Four languages produced 4 hashes,
+maximum **3/14 = 21.43%** changed runs, 0 raw keys; en/en restored exactly. Notification storage
+was never opened or mutated, so badge 7 and unread IDs 66–72 remained intact.
+
+**RULE C: 8 of 16 passing cells** — all eight Wired cells. Next is all eight categories on Blanc.
+`sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.

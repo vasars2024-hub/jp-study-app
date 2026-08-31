@@ -6546,6 +6546,8 @@ export const zh: Catalog = {
   // Notifications (bell + center)
   'notifications.title': '通知',
   'notifications.title.dnd': '通知（勿扰模式）',
+  'notifications.wired.unreadError': '有未读错误通知。',
+  'notifications.wired.noUnreadError': '没有未读错误通知。',
   'notifications.dismiss': '关闭',
   'notifications.quiet': '免打扰',
   'notifications.markAllRead': '全部标为已读',

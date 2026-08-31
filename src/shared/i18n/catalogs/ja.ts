@@ -6579,6 +6579,8 @@ export const ja: Catalog = {
   // Notifications (bell + center)
   'notifications.title': '通知',
   'notifications.title.dnd': '通知（取り込み中）',
+  'notifications.wired.unreadError': '未読のエラー通知があります。',
+  'notifications.wired.noUnreadError': '未読のエラー通知はありません。',
   'notifications.dismiss': '閉じる',
   'notifications.quiet': '取り込み中',
   'notifications.markAllRead': 'すべて既読にする',

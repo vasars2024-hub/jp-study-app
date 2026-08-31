@@ -6921,6 +6921,8 @@ export const en: Catalog = {
   // Notifications (bell + center)
   'notifications.title': 'Notifications',
   'notifications.title.dnd': 'Notifications (Do not disturb)',
+  'notifications.wired.unreadError': 'Unread error notifications are waiting.',
+  'notifications.wired.noUnreadError': 'No unread error notifications.',
   'notifications.dismiss': 'Dismiss',
   'notifications.quiet': 'Quiet',
   'notifications.markAllRead': 'Mark all read',

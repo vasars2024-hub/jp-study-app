@@ -177,6 +177,20 @@ const PROBE = `(function(){
       ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
       : true;
   }
+  /*
+   * CORRECTION 29, Wired shell 2026-08-31. The desktop CONTAINS every floating
+   * application window. Scanning root.querySelectorAll therefore charged the shell for
+   * Media Center empty states and Settings disabled controls, while the language leg
+   * compared whichever hosted app happened to be open. Categories 3 through 6 already
+   * carry this boundary. The category-8 population is likewise what the shell authors:
+   * descendants of a hosted .fwin are excluded, and the exclusion count is published.
+   * (No backtick or dollar-brace syntax in this in-page comment; correction 8.)
+   */
+  var isShell = root.classList.contains('os-desktop');
+  function rq(sel){
+    var list = [].slice.call(root.querySelectorAll(sel));
+    return isShell ? list.filter(function(e){ return !e.closest('.fwin'); }) : list;
+  }
   function name(e){
     return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0];
   }
@@ -227,11 +241,12 @@ const PROBE = `(function(){
   }
 
   var rawKeys = [], placeholders = [], statusCandidates = [];
-  var textRuns = 0, textAcc = [], devOnlyRuns = 0, wordRuns = 0;
+  var textRuns = 0, textAcc = [], devOnlyRuns = 0, hostedTextRunsExcluded = 0, wordRuns = 0;
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (var t = tw.nextNode(); t; t = tw.nextNode()) {
     var s = t.nodeValue && t.nodeValue.trim();
     if (!s || !t.parentElement || !painted(t.parentElement)) continue;
+    if (isShell && t.parentElement.closest('.fwin')) { hostedTextRunsExcluded++; continue; }
     /*
      * CORRECTION 28, City 2026-08-31. A data-dev-only subtree renders behind
      * import.meta.env.DEV and is absent from every packaged build, so scoring a surface on
@@ -293,7 +308,7 @@ const PROBE = `(function(){
   }
 
   var mutePairs = [];
-  var disabled = [].slice.call(root.querySelectorAll('[disabled],[aria-disabled="true"]'));
+  var disabled = rq('[disabled],[aria-disabled="true"]');
   for (var d = 0; d < disabled.length; d++) {
     var el = disabled[d];
     if (!painted(el)) continue;
@@ -320,7 +335,7 @@ const PROBE = `(function(){
   // this surface cannot currently be in is reported as unobservable rather than scored either way.
   function textOf(sel){
     var out = [];
-    var found = [].slice.call(root.querySelectorAll(sel));
+    var found = rq(sel);
     for (var j = 0; j < found.length; j++) {
       if (!painted(found[j])) continue;
       var v = (found[j].textContent || '').trim();
@@ -346,6 +361,8 @@ const PROBE = `(function(){
     rect: Math.round(WR.width) + 'x' + Math.round(WR.height),
     textRuns: textRuns,
     devOnlyRuns: devOnlyRuns,
+    hostedTextRunsExcluded: hostedTextRunsExcluded,
+    hostedWindowsExcluded: isShell ? root.querySelectorAll('.fwin').length : 0,
     wordRuns: wordRuns,
     textHash: hash,
     // Correction 19: the WHOLE candidate list, not the first ten. The node side decides
@@ -391,6 +408,25 @@ const CONTROL_INJECT = `(function(){
 
 const CONTROL_REMOVE = `(function(){
   var n = document.getElementById('__lq_cat8_control');
+  if (n && n.parentElement) n.parentElement.removeChild(n);
+  return JSON.stringify({ removed: !!n });
+})()`;
+
+const CONTROL_INJECT_HOSTED = `(function(){
+  var root = ${ROOT_EXPR};
+  if (!root || !root.classList.contains('os-desktop')) return JSON.stringify({ skipped: true });
+  var win = root.querySelector('.fwin');
+  if (!win) return JSON.stringify({ refuse: 'shell has no hosted window for the isolation control' });
+  var host = document.createElement('div');
+  host.id = '__lq_cat8_hosted_control';
+  host.className = 'cat8-error';
+  host.innerHTML = '<span>dict.results.err.addFailed</span><p>Lorem ipsum dolor sit amet.</p><button disabled>Go</button>';
+  win.appendChild(host);
+  return JSON.stringify({ injected: true });
+})()`;
+
+const CONTROL_REMOVE_HOSTED = `(function(){
+  var n = document.getElementById('__lq_cat8_hosted_control');
   if (n && n.parentElement) n.parentElement.removeChild(n);
   return JSON.stringify({ removed: !!n });
 })()`;
@@ -678,6 +714,7 @@ const langRuns = (isBase) => `(function(){
     if (!s || !t.parentElement) continue;
     if (typeof t.parentElement.checkVisibility === 'function'
       && !t.parentElement.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })) continue;
+    if (r.classList.contains('os-desktop') && t.parentElement.closest('.fwin')) continue;
     // Correction 28, the language leg's half: the same [data-dev-only] exclusion as the
     // snapshot above. Both walkers or neither — a base array built from a different
     // population than the per-language ones compares positions that are not the same run.
@@ -871,6 +908,18 @@ async function langLeg() {
   };
 
   if (CONTROL) {
+    let hostedIsolation = null;
+    if (base.hostedWindowsExcluded > 0) {
+      const hostedInj = JSON.parse(await ev(CONTROL_INJECT_HOSTED));
+      if (hostedInj.refuse) { console.error(`REFUSE - hosted isolation control: ${hostedInj.refuse}`); process.exit(2); }
+      const hostedDirty = await run();
+      await ev(CONTROL_REMOVE_HOSTED);
+      hostedIsolation = hostedDirty.textHash === base.textHash
+        && hostedDirty.rawKeyCount === base.rawKeyCount
+        && hostedDirty.placeholderCount === base.placeholderCount
+        && hostedDirty.mutePairCount === base.mutePairCount
+        && JSON.stringify(hostedDirty.states) === JSON.stringify(base.states);
+    }
     const inj = JSON.parse(await ev(CONTROL_INJECT));
     if (inj.refuse) { console.error(`REFUSE - control: ${inj.refuse}`); process.exit(2); }
     const dirty = await run();
@@ -887,13 +936,14 @@ async function langLeg() {
     out.control = {
       moved,
       backToBaseline,
+      hostedIsolation,
       counts: {
         base: [base.rawKeyCount, base.placeholderCount, base.mutePairCount],
         dirty: [dirty.rawKeyCount, dirty.placeholderCount, dirty.mutePairCount],
         restored: [restored.rawKeyCount, restored.placeholderCount, restored.mutePairCount],
       },
     };
-    if (!Object.values(moved).every(Boolean) || !backToBaseline) {
+    if (!Object.values(moved).every(Boolean) || !backToBaseline || hostedIsolation === false) {
       out.verdict = 'VOID - negative control did not falsify';
     }
   }

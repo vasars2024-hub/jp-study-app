@@ -7223,6 +7223,8 @@ export const ru: Catalog = {
   // Notifications (bell + center)
   'notifications.title': 'Уведомления',
   'notifications.title.dnd': 'Уведомления (не беспокоить)',
+  'notifications.wired.unreadError': 'Есть непрочитанные уведомления об ошибках.',
+  'notifications.wired.noUnreadError': 'Непрочитанных уведомлений об ошибках нет.',
   'notifications.dismiss': 'Скрыть',
   'notifications.quiet': 'Тихий режим',
   'notifications.markAllRead': 'Отметить всё как прочитанное',

@@ -90,6 +90,14 @@ describe('the shell taskbar declares its popups', () => {
     expect(tag).not.toContain('aria-expanded');
   });
 
+  it('names the Wired error lamp in both the active and quiet states', () => {
+    const source = read(SHELL);
+    expect(source).toContain('role="status"');
+    expect(source).toContain('aria-live="polite"');
+    expect(source).toContain("'notifications.wired.unreadError'");
+    expect(source).toContain("'notifications.wired.noUnreadError'");
+  });
+
   it('the desktop switches carry their selected-ness programmatically, not only as a class', () => {
     const source = read(SHELL);
     for (const n of [0, 1]) {

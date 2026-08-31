@@ -3389,15 +3389,27 @@ export default function DesktopShell({
  * dispatches (blinks while unread), red = an unread error is present.
  */
 function WiredTrayLamps() {
+  const { t } = useT();
   const [, setTick] = useState(0);
   useEffect(() => onNotificationsChanged(() => setTick((n) => n + 1)), []);
   const unread = getNotifications().filter((n) => !n.read);
   const hasError = unread.some((n) => n.kind === 'error');
   return (
-    <span className="wired-tray-lamps" aria-hidden="true">
-      <i className="wired-lamp wired-lamp-link on" />
-      <i className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`} />
-      <i className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`} />
+    <span className="wired-tray-lamps">
+      <i className="wired-lamp wired-lamp-link on" aria-hidden="true" />
+      <i
+        className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`}
+        aria-hidden="true"
+      />
+      <i
+        className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span className="sr-only">
+          {t(hasError ? 'notifications.wired.unreadError' : 'notifications.wired.noUnreadError')}
+        </span>
+      </i>
     </span>
   );
 }
