@@ -19,6 +19,25 @@ import { hasJapaneseSubtitles, subtitleLanguages } from './subtitleRecord';
 import { sortMediaItems, seriesLabel } from './mediaSorting';
 import type { MediaItem } from './types';
 
+/** Main-owned media library document, relative to Electron userData. */
+export const MEDIA_LIBRARY_STORE_FILE = 'media.json';
+
+/**
+ * Read the item collection from the persisted media document.
+ *
+ * The live store is `{ items, watchFolder, relationships }`. A Files indexer
+ * once treated it as a bare array and reported 0 items for a populated library,
+ * while its matching hand-written fixture passed. Keeping the shape beside the
+ * shared media model gives the writer and every read-only consumer one contract.
+ * A bare array remains accepted for defensive compatibility with early builds.
+ */
+export function mediaItemsFromStoredDocument(value: unknown): MediaItem[] {
+  if (Array.isArray(value)) return value as MediaItem[];
+  if (!value || typeof value !== 'object') return [];
+  const items = (value as { items?: unknown }).items;
+  return Array.isArray(items) ? items as MediaItem[] : [];
+}
+
 export type LibraryGrouping = 'series' | 'album' | 'none';
 
 export interface LibraryEntry {

@@ -9,6 +9,10 @@ import type { MediaAcquiredImport, MediaItem, MediaOpen, SubtitlePick, YouTubeDo
 import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, MediaDuplicateChoice } from '../shared/mediaHub';
 import { previewMediaOrganization } from '../shared/mediaHub';
 import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
+import {
+  MEDIA_LIBRARY_STORE_FILE,
+  mediaItemsFromStoredDocument,
+} from '../shared/mediaLibraryEntries';
 import { classifyMediaKind } from '../shared/mediaKind';
 import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
@@ -73,12 +77,12 @@ interface MediaDb {
   relationships?: MediaRelationship[];
 }
 function dbPath(): string {
-  return path.join(app.getPath('userData'), 'media.json');
+  return path.join(app.getPath('userData'), MEDIA_LIBRARY_STORE_FILE);
 }
 function readDb(): MediaDb {
   try {
     const db = JSON.parse(fs.readFileSync(dbPath(), 'utf-8')) as MediaDb;
-    return { items: Array.isArray(db.items) ? db.items : [], watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
+    return { items: mediaItemsFromStoredDocument(db), watchFolder: db.watchFolder, relationships: Array.isArray(db.relationships) ? db.relationships : [] };
   } catch {
     return { items: [], relationships: [] };
   }
