@@ -106,6 +106,14 @@ html.reduce-motion .os-tray-overflow-btn svg {
   transition: none !important;
 }
 
+/* A visible, keyboard-reachable route home from an open window stack. This is
+   the taskbar's standard Show desktop idiom, and aria-pressed exposes the
+   reversible state without making a second competing control system. */
+.os-show-desktop-btn[aria-pressed='true'] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
 /* Notification Center */
 .os-notif-empty {
   text-align: center;

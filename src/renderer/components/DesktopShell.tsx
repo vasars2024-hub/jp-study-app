@@ -35,6 +35,7 @@ import {
 } from '../liquidWindowPresentation';
 import type { LiquidPresentationState } from '../../shared/liquidWindowState';
 import { loadDisplayPrefs } from '../displayPrefs';
+import { captureVisibleWindowMinStates, setCapturedWindowsMinimized } from '../showDesktopState';
 import DropRouter from './DropRouter';
 import {
   beginDeskDrag,
@@ -730,6 +731,9 @@ export default function DesktopShell({
    */
   const [trayOverflowOpen, setTrayOverflowOpen] = useState(false);
   const trayOverflowBtnRef = useRef<HTMLButtonElement | null>(null);
+  /** The exact visible-window set hidden by the taskbar's Show desktop action. */
+  const showDesktopRestoreState = useRef<ReadonlyMap<string, boolean | undefined> | null>(null);
+  const [showDesktopActive, setShowDesktopActive] = useState(false);
   const [wall, setWall] = useState<WallChoice & { path?: string }>({ kind: 'preset', id: 'crimsonveil' });
   const [wallImage, setWallImage] = useState<string | null>(null);
   const [wallVideo, setWallVideo] = useState<string | null>(null);
@@ -782,6 +786,20 @@ export default function DesktopShell({
   useEffect(() => {
     winsRef.current = wins;
   }, [wins]);
+  useEffect(() => {
+    if (!showDesktopActive) return;
+    const restoreState = showDesktopRestoreState.current;
+    // Opening or restoring any window ends the transient Show desktop state.
+    // A switch to a desktop that does not own the captured ids does too.
+    if (
+      !restoreState
+      || !wins.some((window) => restoreState.has(window.id))
+      || wins.some((window) => !window.min)
+    ) {
+      showDesktopRestoreState.current = null;
+      setShowDesktopActive(false);
+    }
+  }, [showDesktopActive, wins]);
   useEffect(() => {
     notesRef.current = notes;
   }, [notes]);
@@ -1666,6 +1684,25 @@ export default function DesktopShell({
   // point reaches it the same way `close` does rather than by hoisting it.
   const toggleLiquidRef = useRef<(id: string) => void>(() => undefined);
   const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(() => Promise.resolve());
+  const showDesktopRef = useRef<() => void>(() => undefined);
+  const restoreShownDesktopRef = useRef<() => void>(() => undefined);
+
+  const showDesktop = (): void => {
+    const restoreState = captureVisibleWindowMinStates(winsRef.current);
+    if (restoreState.size === 0) return;
+    showDesktopRestoreState.current = restoreState;
+    setShowDesktopActive(true);
+    setWins((windows) => setCapturedWindowsMinimized(windows, restoreState, true));
+  };
+  const restoreShownDesktop = (): void => {
+    const restoreState = showDesktopRestoreState.current;
+    if (!restoreState) return;
+    showDesktopRestoreState.current = null;
+    setShowDesktopActive(false);
+    setWins((windows) => setCapturedWindowsMinimized(windows, restoreState, false));
+  };
+  showDesktopRef.current = showDesktop;
+  restoreShownDesktopRef.current = restoreShownDesktop;
 
   useEffect(() => {
     const onWidgets = () => setGalleryOpen((o) => !o);
@@ -1833,9 +1870,11 @@ export default function DesktopShell({
           return;
         }
         case 'showDesktop':
-          setWins((ws) => ws.map((w) => ({ ...w, min: true })));
+          showDesktopRef.current();
           return;
         case 'restoreAll':
+          showDesktopRestoreState.current = null;
+          setShowDesktopActive(false);
           setWins((ws) => ws.map((w) => ({ ...w, min: false })));
           return;
         case 'pinTop': {
@@ -3053,6 +3092,7 @@ export default function DesktopShell({
                 panels themselves. */}
             <button
               className={`os-start-btn ${startOpen ? 'active' : ''}`}
+              data-primary
               title={wired ? 'NODE ROUTER' : t('desktop.start')}
               aria-haspopup="menu"
               aria-expanded={startOpen}
@@ -3241,6 +3281,23 @@ export default function DesktopShell({
             hour12={!deskPrefs.clock24h}
             showDate={!!deskPrefs.clockShowDate}
           />
+          <button
+            type="button"
+            className={`os-tray-btn os-show-desktop-btn ${showDesktopActive ? 'active' : ''}`}
+            title={t(showDesktopActive ? 'commands.window.restoreAll' : 'commands.window.showDesktop')}
+            aria-label={t(showDesktopActive ? 'commands.window.restoreAll' : 'commands.window.showDesktop')}
+            aria-pressed={showDesktopActive}
+            disabled={!showDesktopActive && !wins.some((window) => !window.min)}
+            onClick={() => {
+              if (showDesktopActive) restoreShownDesktopRef.current();
+              else showDesktopRef.current();
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="12" rx="1.5" />
+              <path d="M8 20h8M12 17v3" />
+            </svg>
+          </button>
         </div>
       </div>
       {trayOverflowOpen && (
