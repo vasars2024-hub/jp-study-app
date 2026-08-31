@@ -1,0 +1,27 @@
+/*
+ * Blanc shell composition over the shared Liquid primitive.
+ *
+ * The taskbar and top bar are navigation/context chrome, so they use the shared
+ * `.lq-liquid` role. Blanc deliberately maps that role to a glassless raised panel;
+ * these rules retain its edge-to-edge OS-shell geometry after the primitive supplies
+ * material, motion and focus behavior.
+ */
+.blanc-root > .blanc-taskbar.lq-liquid {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--blanc-s3) var(--blanc-s2);
+}
+
+.blanc-root .blanc-top.lq-liquid {
+  border: 0;
+  border-bottom: 1px solid var(--blanc-border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--blanc-s2) var(--blanc-s4);
+}
+
+/* Dense transport controls and form controls stay on stable opaque islands. */
+.blanc-root .blanc-top.lq-liquid > :is(.focus-music-bar, .blanc-top-tools) {
+  background: var(--lq-anchor-bg);
+}

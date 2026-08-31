@@ -335,7 +335,11 @@ export default function BlancShell({
 
   return (
     <div className={`blanc-root${settings.darkMode ? ' is-dark' : ''}${workspaceFull ? ' is-workspace-full' : ''}${taskbarHidden ? ' is-taskbar-hidden' : ''}`}>
-      <aside className="blanc-taskbar" aria-label="Blanc Mode sections">
+      <aside
+        className="blanc-taskbar lq-liquid"
+        data-lq-role="liquid"
+        aria-label="Blanc Mode sections"
+      >
         <div className="blanc-brand">
           <span className="blanc-brand-mark" aria-hidden />
           <span>Blanc</span>
@@ -373,7 +377,7 @@ export default function BlancShell({
       </aside>
 
       <main className="blanc-main">
-        <header className="blanc-top">
+        <header className="blanc-top lq-liquid" data-lq-role="liquid">
           <div className="blanc-title">
             {book && (
               <button type="button" className="blanc-small-btn" onClick={() => setBook(null)}>

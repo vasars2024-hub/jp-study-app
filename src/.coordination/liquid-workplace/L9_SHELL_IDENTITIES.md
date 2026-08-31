@@ -1904,3 +1904,19 @@ modal traps 0, scroll traps 0, and Stats restored the exact surface hash. Contro
 defects **0/0/0 → 1/1/1 → 0/0/0**; inert acknowledgment 3.0 ms.
 
 **RULE C: 10 of 16 passing cells** — all eight Wired plus cat1–cat2 Blanc. Next: cat3 Blanc.
+
+## 2026-08-31 — codexB — cat3 Blanc passes with selective shared materials
+
+The first run found **3/3 untreated contextual regions**: taskbar, nested nav and top bar. Applying
+the shared primitive exposed the selective-material guard: Focus Music and the form cluster became
+**2 dense regions on contextual material**, so that attempt VOIDed rather than flattering the shell.
+
+Final composition keeps taskbar/top bar on Blanc's glassless `lq-liquid` mapping and their dense
+children on opaque anchor islands. The token adapter remains vocabulary-only; a separate shell
+layer preserves square edge-to-edge OS geometry. Focused guards: **12/12**.
+
+**cat3 · Blanc = PASS 10/10.** Dense work on contextual material **0/5**; treated contextual
+regions **3/3**; shared primitives **3/3**. Control moved one violation **0→1→0**, then the
+all-glass arm moved **all 5** Work regions and restored them.
+
+**RULE C: 11 of 16 passing cells** — all eight Wired plus cat1–cat3 Blanc. Next: cat4 Blanc.

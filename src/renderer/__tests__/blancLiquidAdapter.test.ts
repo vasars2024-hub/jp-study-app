@@ -28,6 +28,7 @@ const RENDERER_DIR = resolve(__dirname, '..');
 const read = (...p: string[]) => readFileSync(resolve(RENDERER_DIR, ...p), 'utf8');
 
 const ADAPTER = read('theme', 'blanc-liquid.css');
+const SHELL_ADAPTER = read('theme', 'blanc-shell-liquid.css');
 const BASE = read('theme', 'liquid-tokens.css');
 const BLANC_MAIN = read('blancMain.tsx');
 
@@ -74,15 +75,26 @@ describe('Blanc-native Liquid adapter', () => {
 
   it('is booted by the Blanc entry, after the sheet whose vars it reads', () => {
     const tokensAt = BLANC_MAIN.indexOf("import './theme/liquid-tokens.css'");
+    const surfacesAt = BLANC_MAIN.indexOf("import './theme/liquid-surfaces.css'");
     const blancAt = BLANC_MAIN.indexOf("import './theme/blanc.css'");
     const adapterAt = BLANC_MAIN.indexOf("import './theme/blanc-liquid.css'");
     expect(tokensAt, 'blancMain must import the base Liquid vocabulary').toBeGreaterThan(-1);
+    expect(surfacesAt, 'Blanc shell roles must use the shared Liquid primitive').toBeGreaterThan(tokensAt);
     expect(adapterAt, 'blancMain must import the Blanc adapter').toBeGreaterThan(-1);
     // The adapter's values are `var(--blanc-*)`, which `blanc.css` declares. A
     // later import order would still *resolve* (custom properties are late-bound)
     // but any same-specificity `--lq-*` in blanc.css would then win, silently.
     expect(adapterAt).toBeGreaterThan(blancAt);
     expect(adapterAt).toBeGreaterThan(tokensAt);
+  });
+
+  it('keeps shell geometry separate from the token-only adapter', () => {
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-root > \.blanc-taskbar\.lq-liquid/);
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-root \.blanc-top\.lq-liquid/);
+    expect(SHELL_ADAPTER).toMatch(/border-radius:\s*0/);
+    expect(SHELL_ADAPTER).toMatch(/:is\(\.focus-music-bar, \.blanc-top-tools\)[^{]*\{[^}]*background:\s*var\(--lq-anchor-bg\)/s);
+    expect(ADAPTER_BODY).not.toContain('.blanc-taskbar');
+    expect(ADAPTER_BODY).not.toContain('.blanc-top');
   });
 
   it('declares nothing but --lq-* custom properties', () => {
