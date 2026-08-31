@@ -669,6 +669,12 @@ export default function DesktopShell({
   const { t } = useT();
   const material = useAppMaterialSet();
   const wired = material === 'wired';
+  // Which Start panel to build. Aero and Wired share the two-column secret-OS
+  // menu; every other material gets the legacy grid. Both used to be mounted on
+  // every open and CSS hid the loser (`aero-shell.css:24`, `:1851`,
+  // `wired-shell.css:145`), so a single open paid for 528 nodes and 106 inline
+  // SVGs to show at most half of them.
+  const secretStartMenu = material === 'aero' || material === 'wired';
   const deskRef = useRef<HTMLDivElement>(null);
   const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
@@ -2725,283 +2731,287 @@ export default function DesktopShell({
             }}
             onDrop={(e) => dropStartAppOnDesktop(e)}
           />
-          <div
-            className="os-start os-start-legacy"
-            onDragOver={(e) => {
-              // Keep drops on the panel itself from landing on the desktop.
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = 'none';
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <div className="os-start-title">GrammarX</div>
-            <div className="os-start-hint">
-              {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
-            </div>
-            <button
-              type="button"
-              className="os-start-search"
-              onClick={() => {
-                setStartOpen(false);
-                window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+          {!secretStartMenu && (
+            <div
+              className="os-start os-start-legacy"
+              onDragOver={(e) => {
+                // Keep drops on the panel itself from landing on the desktop.
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'none';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-              <span className="os-start-search-ph">{t('desktop.startSearch')}</span>
-              <kbd className="os-start-search-kbd">Ctrl P</kbd>
-            </button>
-            <div className="os-start-groups">
-              {startGroups.map((g) => (
-                <section key={g.id} className="os-start-group" aria-label={t(g.labelKey)}>
-                  <h3 className="os-start-group-label">{t(g.labelKey)}</h3>
-                  <div className="os-start-grid">
-                    {g.apps.map((a) => {
-                      const pinned = isAppPinned(a.id);
-                      return (
-                        <div
-                          key={a.id}
-                          className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            className="os-start-app"
-                            draggable
-                            title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
-                            onDragStart={(e) => beginStartAppDrag(a, e)}
-                            onDragEnd={endStartAppDrag}
-                            onClick={() => open(a.id)}
-                          >
-                            <span className={`os-start-app-ic app-${a.id}`}>
-                              <Icon name={a.glyph} size={24} />
-                            </span>
-                            {t(a.labelKey)}
-                          </button>
-                          <button
-                            type="button"
-                            className={`os-start-tile-pin${pinned ? ' on' : ''}`}
-                            title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
-                            draggable={false}
-                            onClick={() => togglePinApp(a)}
-                          >
-                            <Icon name="pin" size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-              <section className="os-start-group" aria-label={t('desktop.startCategory.shortcuts')}>
-                <h3 className="os-start-group-label">{t('desktop.startCategory.shortcuts')}</h3>
-                <div className="os-start-grid">
-                  <button
-                    type="button"
-                    className="os-start-app special"
-                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
-                  >
-                    <span className="os-start-app-ic tone-widgets">
-                      <Icon name="widgets" size={24} />
-                    </span>
-                    {t('desktop.widgets')}
-                  </button>
-                  <button type="button" className="os-start-app special" onClick={openNote}>
-                    <span className="os-start-app-ic tone-note">
-                      <Icon name="note" size={24} />
-                    </span>
-                    {t('desktop.stickyNote')}
-                  </button>
-                  <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
-                    <span className="os-start-app-ic tone-add">
-                      <Icon name="plus" size={24} />
-                    </span>
-                    {t('desktop.addApp')}
-                  </button>
-                </div>
-              </section>
-            </div>
-            <div className="os-start-footer">
-              <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
-                <Icon name="settings" size={16} />
-                <span>{t('palette.section.settings')}</span>
-              </button>
-              <button
-                type="button"
-                className="os-start-foot-btn"
-                onClick={() => {
-                  setStartOpen(false);
-                  window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <line x1="4" y1="9" x2="20" y2="9" />
-                  <line x1="4" y1="15" x2="20" y2="15" />
-                  <circle cx="9" cy="9" r="2.2" />
-                  <circle cx="15" cy="15" r="2.2" />
-                </svg>
-                <span>{t('desktop.quick')}</span>
-              </button>
-              <span className="os-start-foot-spacer" />
-              <button
-                type="button"
-                className="os-start-foot-btn power"
-                title={t('desktop.restartShell')}
-                aria-label={t('desktop.restartShell')}
-                onClick={async () => {
-                  const ok = await confirmDialog({
-                    title: 'Restart shell',
-                    message: 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
-                    confirmLabel: 'Restart',
-                  });
-                  if (ok) window.location.reload();
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 3v9" />
-                  <path d="M6.5 7a8 8 0 1 0 11 0" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div
-            className="os-start os-start-aero-menu"
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = 'none';
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <div className="os-start-aero-head">
-              <span className="os-start-aero-avatar" aria-hidden="true">
-                <Icon name="logo" size={24} />
-              </span>
-              <div className="os-start-aero-id">
-                <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
-                <div className="os-start-aero-sub">
-                  {wired
-                    ? startAppDragging
-                      ? 'PATCH MODULE INTO LOCAL DESKTOP'
-                      : 'LAYER-09 / ROUTER INDEX'
-                    : startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
-                </div>
+              <div className="os-start-title">GrammarX</div>
+              <div className="os-start-hint">
+                {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
               </div>
               <button
                 type="button"
-                className="os-start-aero-search"
-                title="Search"
-                aria-label="Search"
+                className="os-start-search"
                 onClick={() => {
                   setStartOpen(false);
                   window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                 }}
               >
-                <Icon name="search" size={17} />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <span className="os-start-search-ph">{t('desktop.startSearch')}</span>
+                <kbd className="os-start-search-kbd">Ctrl P</kbd>
               </button>
+              <div className="os-start-groups">
+                {startGroups.map((g) => (
+                  <section key={g.id} className="os-start-group" aria-label={t(g.labelKey)}>
+                    <h3 className="os-start-group-label">{t(g.labelKey)}</h3>
+                    <div className="os-start-grid">
+                      {g.apps.map((a) => {
+                        const pinned = isAppPinned(a.id);
+                        return (
+                          <div
+                            key={a.id}
+                            className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className="os-start-app"
+                              draggable
+                              title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
+                              onDragStart={(e) => beginStartAppDrag(a, e)}
+                              onDragEnd={endStartAppDrag}
+                              onClick={() => open(a.id)}
+                            >
+                              <span className={`os-start-app-ic app-${a.id}`}>
+                                <Icon name={a.glyph} size={24} />
+                              </span>
+                              {t(a.labelKey)}
+                            </button>
+                            <button
+                              type="button"
+                              className={`os-start-tile-pin${pinned ? ' on' : ''}`}
+                              title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+                              draggable={false}
+                              onClick={() => togglePinApp(a)}
+                            >
+                              <Icon name="pin" size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+                <section className="os-start-group" aria-label={t('desktop.startCategory.shortcuts')}>
+                  <h3 className="os-start-group-label">{t('desktop.startCategory.shortcuts')}</h3>
+                  <div className="os-start-grid">
+                    <button
+                      type="button"
+                      className="os-start-app special"
+                      onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                    >
+                      <span className="os-start-app-ic tone-widgets">
+                        <Icon name="widgets" size={24} />
+                      </span>
+                      {t('desktop.widgets')}
+                    </button>
+                    <button type="button" className="os-start-app special" onClick={openNote}>
+                      <span className="os-start-app-ic tone-note">
+                        <Icon name="note" size={24} />
+                      </span>
+                      {t('desktop.stickyNote')}
+                    </button>
+                    <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
+                      <span className="os-start-app-ic tone-add">
+                        <Icon name="plus" size={24} />
+                      </span>
+                      {t('desktop.addApp')}
+                    </button>
+                  </div>
+                </section>
+              </div>
+              <div className="os-start-footer">
+                <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
+                  <Icon name="settings" size={16} />
+                  <span>{t('palette.section.settings')}</span>
+                </button>
+                <button
+                  type="button"
+                  className="os-start-foot-btn"
+                  onClick={() => {
+                    setStartOpen(false);
+                    window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <line x1="4" y1="9" x2="20" y2="9" />
+                    <line x1="4" y1="15" x2="20" y2="15" />
+                    <circle cx="9" cy="9" r="2.2" />
+                    <circle cx="15" cy="15" r="2.2" />
+                  </svg>
+                  <span>{t('desktop.quick')}</span>
+                </button>
+                <span className="os-start-foot-spacer" />
+                <button
+                  type="button"
+                  className="os-start-foot-btn power"
+                  title={t('desktop.restartShell')}
+                  aria-label={t('desktop.restartShell')}
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Restart shell',
+                      message: 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
+                      confirmLabel: 'Restart',
+                    });
+                    if (ok) window.location.reload();
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 3v9" />
+                    <path d="M6.5 7a8 8 0 1 0 11 0" />
+                  </svg>
+                </button>
+              </div>
             </div>
-
-            <div className="os-start-aero-columns">
-              <section className="os-start-aero-main" aria-label="Study programs">
-                <div className="os-start-aero-label">{wired ? 'NODE INDEX' : 'Study programs'}</div>
-                <div className="os-start-aero-programs">
-                  {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
+          )}
+          {secretStartMenu && (
+            <div
+              className="os-start os-start-aero-menu"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'none';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <div className="os-start-aero-head">
+                <span className="os-start-aero-avatar" aria-hidden="true">
+                  <Icon name="logo" size={24} />
+                </span>
+                <div className="os-start-aero-id">
+                  <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
+                  <div className="os-start-aero-sub">
+                    {wired
+                      ? startAppDragging
+                        ? 'PATCH MODULE INTO LOCAL DESKTOP'
+                        : 'LAYER-09 / ROUTER INDEX'
+                      : startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
+                  </div>
                 </div>
                 <button
                   type="button"
-                  className="os-start-aero-all"
+                  className="os-start-aero-search"
+                  title="Search"
+                  aria-label="Search"
                   onClick={() => {
                     setStartOpen(false);
                     window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                   }}
                 >
-                  <span>{wired ? 'LOCATE MODULE' : 'All programs'}</span>
-                  <Icon name="chevron" size={14} />
-                </button>
-              </section>
-
-              <aside className="os-start-aero-side" aria-label="Places and tools">
-                <div className="os-start-aero-label">{wired ? 'CHANNELS' : 'Places'}</div>
-                <div className="os-start-aero-places">
-                  {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
-                </div>
-                <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : 'Tools'}</div>
-                <div className="os-start-aero-tools">
-                  <button
-                    type="button"
-                    className="os-start-aero-tool"
-                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
-                  >
-                    <Icon name="widgets" size={17} />
-                    <span>{wired ? 'Module rack' : 'Widgets'}</span>
-                  </button>
-                  <button type="button" className="os-start-aero-tool" onClick={openNote}>
-                    <Icon name="note" size={17} />
-                    <span>{wired ? 'Field note' : 'Sticky note'}</span>
-                  </button>
-                  <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
-                    <Icon name="plus" size={17} />
-                    <span>{wired ? 'Mount module...' : 'Add app...'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="os-start-aero-tool"
-                    onClick={() => {
-                      setStartOpen(false);
-                      window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
-                    }}
-                  >
-                    <Icon name="wrench" size={17} />
-                    <span>{wired ? 'Relay panel' : 'Quick settings'}</span>
-                  </button>
-                </div>
-              </aside>
-            </div>
-
-            <div className="os-start-aero-footer">
-              <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
-                <Icon name="settings" size={16} />
-                <span>{wired ? 'SYS / Service Panel' : 'Control panel'}</span>
-              </button>
-              <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
-                <button
-                  type="button"
-                  className="os-start-aero-power"
-                  title="Sleep Secret OS"
-                  aria-label="Sleep Secret OS"
-                  onClick={sleepSecretOs}
-                >
-                  <Icon name="pause" size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="os-start-aero-power"
-                  title="Restart Secret OS"
-                  aria-label="Restart Secret OS"
-                  onClick={() => void restartSecretOs()}
-                >
-                  <Icon name="refresh" size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="os-start-aero-power shutdown"
-                  title="Shut down Secret OS"
-                  aria-label="Shut down Secret OS"
-                  onClick={() => void shutdownSecretOs()}
-                >
-                  <Icon name="power" size={15} />
+                  <Icon name="search" size={17} />
                 </button>
               </div>
+
+              <div className="os-start-aero-columns">
+                <section className="os-start-aero-main" aria-label="Study programs">
+                  <div className="os-start-aero-label">{wired ? 'NODE INDEX' : 'Study programs'}</div>
+                  <div className="os-start-aero-programs">
+                    {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
+                  </div>
+                  <button
+                    type="button"
+                    className="os-start-aero-all"
+                    onClick={() => {
+                      setStartOpen(false);
+                      window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+                    }}
+                  >
+                    <span>{wired ? 'LOCATE MODULE' : 'All programs'}</span>
+                    <Icon name="chevron" size={14} />
+                  </button>
+                </section>
+
+                <aside className="os-start-aero-side" aria-label="Places and tools">
+                  <div className="os-start-aero-label">{wired ? 'CHANNELS' : 'Places'}</div>
+                  <div className="os-start-aero-places">
+                    {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
+                  </div>
+                  <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : 'Tools'}</div>
+                  <div className="os-start-aero-tools">
+                    <button
+                      type="button"
+                      className="os-start-aero-tool"
+                      onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                    >
+                      <Icon name="widgets" size={17} />
+                      <span>{wired ? 'Module rack' : 'Widgets'}</span>
+                    </button>
+                    <button type="button" className="os-start-aero-tool" onClick={openNote}>
+                      <Icon name="note" size={17} />
+                      <span>{wired ? 'Field note' : 'Sticky note'}</span>
+                    </button>
+                    <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
+                      <Icon name="plus" size={17} />
+                      <span>{wired ? 'Mount module...' : 'Add app...'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="os-start-aero-tool"
+                      onClick={() => {
+                        setStartOpen(false);
+                        window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                      }}
+                    >
+                      <Icon name="wrench" size={17} />
+                      <span>{wired ? 'Relay panel' : 'Quick settings'}</span>
+                    </button>
+                  </div>
+                </aside>
+              </div>
+
+              <div className="os-start-aero-footer">
+                <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
+                  <Icon name="settings" size={16} />
+                  <span>{wired ? 'SYS / Service Panel' : 'Control panel'}</span>
+                </button>
+                <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
+                  <button
+                    type="button"
+                    className="os-start-aero-power"
+                    title="Sleep Secret OS"
+                    aria-label="Sleep Secret OS"
+                    onClick={sleepSecretOs}
+                  >
+                    <Icon name="pause" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="os-start-aero-power"
+                    title="Restart Secret OS"
+                    aria-label="Restart Secret OS"
+                    onClick={() => void restartSecretOs()}
+                  >
+                    <Icon name="refresh" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="os-start-aero-power shutdown"
+                    title="Shut down Secret OS"
+                    aria-label="Shut down Secret OS"
+                    onClick={() => void shutdownSecretOs()}
+                  >
+                    <Icon name="power" size={15} />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
