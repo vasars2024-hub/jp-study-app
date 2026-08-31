@@ -566,3 +566,11 @@ results locations plus one legacy-preserving parser used by both History and fut
 A valid JSON document with the wrong shape now returns 0 instead of throwing. **11/11 focused
 tests passed**. Gate 1 remains open until the 10 indexed jobs join the production snapshot; the
 5 unindexed result files stay named as orphans rather than being falsely promoted to jobs.
+
+### 2026-08-30 — codexA, Gate 1 Reading Lens history contract
+
+The live `reading-lens-history.json` contains **42** validated capture rows (35 screen, 7
+clipboard, 2 pinned) and is absent from the production Files snapshot. Its main-process owner
+already exposes the validated synchronous list; this checkpoint exports the established file
+location so Files can retain the honest JSON pointer instead of guessing a second filename.
+The existing Reading Lens IPC/history suite is the regression gate. Gate 1 remains open.
