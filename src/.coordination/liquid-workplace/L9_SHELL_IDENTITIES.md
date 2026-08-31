@@ -1175,3 +1175,46 @@ fire and restore.
 a failed category expands across remaining surfaces; an UNMEASURABLE cell is not a failure to
 repair but a surface that cannot answer, so cat8 needs a THIRD surface substituted for City —
 that alone, not the other seven. Next: cat7 on Video and City, then that substitution.
+
+## 2026-08-31 — primary — category 7 · Video: PASS 10/10, and correction 29 (the titleless window)
+
+**CORRECTION 29, applied before a number was taken.** City is `.fwin-frameless`: no
+`.fwin-title-text`, no `.fwin-bar`. `-Title ''` matches EVERY window and the largest-area
+tie-break then drives whichever is biggest — `probe-picks-first-visible-fwin` one level up,
+and it would have scored the Settings window as City. `-Title` and
+`cat7-collection-weight --title` now also accept **`@<css-selector>`** (the window that matches
+or contains it), the same form cat4/cat8 already use as `--surface @.fwin-frameless`, and the
+drag grip is `.fwin-bar, .fwin-drag-strip` so a frameless window has a real handle. A selector
+matching nothing still REFUSES. Proven live: `@.fwin-frameless` scoped the collection walk to
+the garden and returned its 120 nodes; the un-`@` form returns "no window titled".
+
+**Two specs added, not two probes** (RULE 1). Video's heavy leg is NOT "open a video": the
+section is a launcher — the stage renders workspace/connecting/needs-server copy
+(`MediaCenterView.tsx:890-921`) and `playItem` calls main's `media:open` then dispatches
+`os:open` to navigate away (`MediaContent.tsx:995-1001`), so it writes resume state AND leaves
+the surface. The repeatable read-only load is the inspector disclosure `06708e7c` created,
+cycled across the Up Next shelf's overflow, with both restored.
+
+**cat7 · Video PASS 10/10.** Session ceiling p50 **16.6** / p95 17.1, `noiseFloorOver100 0`,
+max 18.3 — the machine did not stall in this run, so over-100 counts are scored against 0.
+Scene 3 windows / 1,115 elements, stable on all three gestures; the Video window is 316.
+Process settled: `uptimeSec 33,483` (9.3 h).
+
+| leg | p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| drag | 16.7 | 33.6 | 66.8 | 0 | 10.0 |
+| resize | 16.7 | 17.1 | 66.9 | 0 | 13.1 |
+| theme | 16.7 | 17.3 | 50.3 | 0 | 12.2 |
+| theme CONTROL (root hidden) | 16.7 | 17.1 | 83.6 | 0 | 11.5 |
+
+Heavy leg main max **23.0 ms** against the 500 ms bar, p50 1.9 / p95 3.6, `span_ms 3027` of a
+declared 3000 — it covered its own load. Idle after: max 9.7. Proof, non-empty and
+non-refusing: `cycled 40 disclosures (20 open / 20 closed) over 7 tiles and 637 px, restored`.
+Memory: main RSS 54.0 → 73.2 MB, heap 312.3 MB. Collection: Up Next `rows 7 / domRows 7 /
+nodes 79 / overdraw 1.0`, **FITS** — it is not a virtualiser candidate.
+
+**CONTROL FIRED.** `--jank` produced **5 frames over 100 ms and a 133.3 ms max** against the
+clean run's 0 and 66.8. The recorder is seeing real frames, so the zeros above are measured.
+
+Cells **13 of 16** (cat1-cat6 both, cat8 Video, cat7 Video). Next: cat7 · City, then cat8's
+third-surface substitution.

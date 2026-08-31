@@ -1,0 +1,21 @@
+{
+  "label": "l9-video-upnext",
+  "title": "Video",
+  "container": ".mc-up-next",
+  "row": ".mc-media-tile",
+  "rows": 7,
+  "rowsSource": "domRows",
+  "domRows": 7,
+  "nodes": 79,
+  "scrollHeight": 788,
+  "clientHeight": 788,
+  "overdraw": 1,
+  "scroller": "mc-shelf mc-up-next",
+  "distinctRowHeights": 1,
+  "heights": {
+    "241.58": 7
+  },
+  "spacerHeight": null,
+  "verdict": "FITS",
+  "at": "2026-08-31T11:29:50.505Z"
+}
