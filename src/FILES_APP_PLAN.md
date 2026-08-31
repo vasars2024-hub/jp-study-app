@@ -408,11 +408,11 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 
 1. The index enumerates real items across all five groups, reporting a count per category that
    matches what is on disk / in the tables. A category reading 0 while items exist is a FINDING.
-   <!-- status: open; evidence: 2026-08-30 census omitted 19 live subtitles/<mediaId> files -->
-   **2026-08-30 retraction:** the 1,760-item census proved five non-empty groups, but its Text
-   readers omit the populated `subtitles/<mediaId>/` store, scan nested `yt-subs` as flat, and
-   omit the distinct `subs-cache` flow. Gate 1 remains open until those readers and the live
-   count are corrected; empty YouTube cache roots today are not a valid negative control.
+   <!-- status: closed; evidence: 2026-08-31 live census 1,926 items / 50.17 GB / 14 enumerators, every zero justified -->
+   **2026-08-30 retraction, resolved 2026-08-31.** The 1,760-item census proved five non-empty
+   groups but not every populated category; five read 0 against real data. Closed at **1,926
+   items / 50.17 GB / 14 enumerators**, with every remaining zero justified against its own
+   store. See the 2026-08-31 Progress entry for the table and the five traps.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
@@ -602,3 +602,57 @@ a slot override must win by specificity (descendant-of-shell), not order. And
 (`settingsRegistry.ts:183` and `:1101-1144` plus their search entries) into
 `system/memory` and `system/statistics`, capturing the old numbers **before** removal and
 comparing after. Those two leaves are the ones still reading 0 for a real reason.
+
+### 2026-08-31 — primary2, `wt/files-app` — gate 1 CLOSED (second attempt)
+
+Commits: `4e7f86a2` every subtitle store · `cf58d27f` downloads + drafts · `1d102ae6` the
+renderer enumerator layer · `5657bc4f` the 27 decks. Harness:
+`src/.coordination/files-app/census.ts` runs the **production** `buildFilesIndex` against
+the real profile outside Electron — not a replica, so a drifting reader breaks the census.
+
+**Gate 1 — CLOSED. 1,926 items, 50.17 GB, 14 enumerators, 0 broken links, 166 ms.**
+The 2026-08-30 retraction was right and understated: the census had validated the five
+non-empty groups, not every populated category. Five categories read 0 against real data.
+
+| category | was | is | what was actually there |
+| --- | --- | --- | --- |
+| `sources/text` | 2 | 73 | 19 `media.json` subtitle records (7 of them sidecars *outside* `subtitles/`) + 4 unclaimed fusion tracks + 48 downloaded `.vtt` |
+| `sources/video` | 37 | 81 | `downloads/` held 96 files / 5.14 GB, of which **4** were in `media.json` |
+| `outputs/drafts` | 0 | 24 | `anki-draft-sessions.json` |
+| `outputs/decks` | 0 | 27 | `anki-intervals.json` — 87,260 entries, 155,384 notes, 28 deck queries |
+| `outputs/notes` + `/highlights` | 0 | renderer | the Notebook is in renderer `localStorage`; main cannot decode it |
+
+**Every remaining 0 is now a measured statement, not an unexamined one.**
+`sources/visual-novels` — `immersion/visual-novels.json` is `{entries: [], captures: []}`.
+`workspaces/queue` — `transcription-jobs.json` is `[]`. `outputs/mined` — no per-card
+store exists outside the Anki mirror; the mined cards ARE those 27 decks' notes.
+`system/memory` + `system/statistics` — **gate 8's deliverable**, decision 1's sanctioned
+migration; they are the only two zeros with work still owed to them.
+
+**Decisions, under standing auto-approval:**
+1. **Decks, not notes.** 87,260 note rows would grow the index ~46x and serialize all of
+   it over IPC on every open — the plan's performance constraint forbids it. A deck is
+   also the honest unit; the notes are Anki's, not this app's.
+2. **A second enumerator layer in the renderer**, joined onto main's snapshot in
+   `useFilesIndex` rather than a second index. It recomputes `counts` from the joined
+   list, so a group can still never disagree with its leaves.
+3. **Two new flags rather than a drop.** `orphan` marks a file this app wrote that no
+   record claims — 4 fusion intermediates, and 92 downloaded-but-never-imported files.
+   The tree must be reconcilable against the disk; hiding the difference is what made
+   the first census wrong. Provenance of an orphan is `unknown`, never guessed: a
+   fabricated trust mark would travel onto a mined card.
+
+**TRAPS — each one cost real time and each one produces a confident wrong number.**
+1. **`dictionaryDir()` is `userData/dictionary` — SINGULAR.** The plural opened nothing
+   and printed `dictionaries 0`, indistinguishable from an empty store.
+2. **Provenance is in the record, never the folder.** Provider downloads and Whisper
+   output share one `subtitles/<mediaId>/` directory. Only `source`/`machineGenerated`
+   knows which is which — `subtitleRecordProvenance()`.
+3. **localStorage cannot be byte-scraped for a count.** Chromium Snappy-compresses the
+   blocks, so a scan can find the key, find the array start, and still never terminate
+   the JSON. It did. A count scraped that way is a guess; take it from the running app.
+4. **leveldb elides shared key prefixes.** Searching for `jp-grammarx-notebook-timeline-v1`
+   returns nothing while `grammarx-notebook-timeline-v1` is right there — `jp-` was
+   shared with the preceding key. A whole-key search reads exactly like "no notes".
+5. **The census reports only what MAIN sees.** `outputs/notes` will read 0 in that output
+   forever. That is correct and is not a regression.
