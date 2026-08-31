@@ -111,6 +111,10 @@
       "status": "pending",
       "note": "The L2 boundary LiquidSurface.tsx used to share and no longer does: 7bc4cc57 gave that file a real app-side caller (LexiconWorkbenchResults.tsx renders ContextualSurface), so its entry is deleted rather than re-annotated. The scaffold spine is still a destination nothing has migrated INTO — it composes a whole app's rail/toolbar/canvas/inspector/dock, which no existing surface can adopt piecemeal the way a single region adopted the contextual role. Closes when a surface is built or rebuilt on the spine."
     },
+    "test-only-module:src/renderer/components/filesapp/filesDeletionSession.ts": {
+      "status": "pending",
+      "note": "Files gates 9/21/30 deletion session: policy, exact soft-delete overlay and tests are built on feat/nyaa-subtitles while the FilesApp consumer is still isolated on wt/files-app. It deliberately sends only an item id across IPC and stays pending until mergeback connects the inspector action and main re-resolves that id from its authoritative index. Remove this entry at that connection; accepting it would hide an unfinished delete path."
+    },
     "test-only-module:src/renderer/components/liquid/LiquidDock.tsx": {
       "status": "pending",
       "note": "Same L2 boundary as LiquidAppScaffold.tsx. The dock is the compact-width home for the rail's routes, which the scaffold drops below its `medium` breakpoint; it and AdaptiveRail/ContextToolbar (reachable through it) complete §5.2's primitive list. No app has migrated, so nothing imports it yet. Closes when L4 migrates the Video player."

@@ -134,6 +134,26 @@ export interface FilesDeletionAuthorization {
 }
 
 /**
+ * Check the confirmation against the immutable plan before either process
+ * performs a destructive operation. Main repeats this check after resolving
+ * the item id from its own index; the renderer uses it to avoid presenting a
+ * doomed request as progress.
+ */
+export function authorizeFilesDeletion(
+  plan: FilesDeletionPlan,
+  authorization: FilesDeletionAuthorization,
+): Extract<FilesDeletionResult, { ok: false }> | null {
+  if (!plan.requiresExplicitConfirmation) return null;
+  if (!authorization.confirmedItemId) {
+    return { ok: false, itemId: plan.itemId, reasonKey: 'filesApp.delete.confirmationRequired' };
+  }
+  if (authorization.confirmedItemId !== plan.itemId) {
+    return { ok: false, itemId: plan.itemId, reasonKey: 'filesApp.delete.confirmationMismatch' };
+  }
+  return null;
+}
+
+/**
  * Execute one deletion plan against one exact target.
  *
  * Re-planning here is intentional. Callers may show a plan in the UI, but the
@@ -150,14 +170,8 @@ export async function executeFilesDeletion(
     return { ok: false, itemId: target.id, reasonKey: 'filesApp.delete.refuseComputed' };
   }
 
-  if (plan.requiresExplicitConfirmation) {
-    if (!authorization.confirmedItemId) {
-      return { ok: false, itemId: target.id, reasonKey: 'filesApp.delete.confirmationRequired' };
-    }
-    if (authorization.confirmedItemId !== target.id) {
-      return { ok: false, itemId: target.id, reasonKey: 'filesApp.delete.confirmationMismatch' };
-    }
-  }
+  const refusal = authorizeFilesDeletion(plan, authorization);
+  if (refusal) return refusal;
 
   try {
     if (plan.mode === 'trash') {
