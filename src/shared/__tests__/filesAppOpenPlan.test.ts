@@ -42,6 +42,15 @@ const { planForPath } = await import('../../main/fileRouter');
 const ROOT = join(__dirname, '..', '..', '..');
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const DROP_ROUTER = read('src/renderer/components/DropRouter.tsx');
+/*
+ * The drop router's dispatch TABLE moved here when the Files app's scan-review
+ * sheet needed to import through the same calls (gate 27) — one importer, for
+ * the same reason there is one classifier. `DropRouter.tsx` still owns the drop
+ * gesture and the triage sheet; the `onOpenSection` calls and the importers
+ * this file re-derives from now live in `fileImportExecute.ts`, so that is what
+ * is read. Reading the wrong file here would make these assertions vacuous.
+ */
+const IMPORT_EXECUTE = read('src/renderer/fileImportExecute.ts');
 const APP_SECTION = read('src/renderer/components/AppSection.tsx');
 const OPEN_PLAN = read('src/shared/filesApp/openPlan.ts');
 const FILES_APP = read('src/renderer/components/filesapp/FilesApp.tsx');
@@ -91,8 +100,8 @@ describe('gate 10 — the owning section is derived, not restated', () => {
   });
 
   it('agrees with DropRouter about where each target lands', () => {
-    // Re-derived from the drop router's own `onOpenSection?.('x')` calls. These
-    // six are the ones that file names a section for; the rest have no import
+    // Re-derived from the shared importer's own `onOpenSection?.('x')` calls.
+    // These are the targets it names a section for; the rest have no import
     // branch there, so there is nothing to disagree with.
     const fromRouter: Partial<Record<DropTargetId, string>> = {
       media: 'player',
@@ -102,19 +111,25 @@ describe('gate 10 — the owning section is derived, not restated', () => {
       'dictionary-yomitan': 'dictionary',
     };
     for (const [target, section] of Object.entries(fromRouter)) {
-      expect(DROP_ROUTER, `DropRouter no longer opens '${section}'`).toContain(
+      expect(IMPORT_EXECUTE, `the importer no longer opens '${section}'`).toContain(
         `onOpenSection?.('${section}')`,
       );
       expect(sectionForDropTarget(target as DropTargetId)).toBe(section);
     }
-    // The two library targets share a branch the router writes as a ternary
-    // whose arms are both `'library'`, so there is no literal call to match.
-    expect(DROP_ROUTER).toContain("onOpenSection?.(target === 'library-manga' ? 'library'");
+    // The two library targets share one branch — the extraction collapsed the
+    // router's `target === 'library-manga' ? 'library' : 'library'` ternary,
+    // whose arms were identical, into the single call below.
+    expect(IMPORT_EXECUTE).toContain("case 'library-book':");
+    expect(IMPORT_EXECUTE).toContain("case 'library-manga':");
+    expect(IMPORT_EXECUTE).toContain("onOpenSection?.('library')");
     expect(sectionForDropTarget('library-book')).toBe('library');
     expect(sectionForDropTarget('library-manga')).toBe('library');
     // Control: a section this table does NOT claim must not be findable this
     // way, or the assertions above would pass on any string in the file.
-    expect(DROP_ROUTER).not.toContain("onOpenSection?.('novels')");
+    expect(IMPORT_EXECUTE).not.toContain("onOpenSection?.('novels')");
+    // And the drop gesture still routes through that one importer, so the two
+    // surfaces cannot drift apart into two dispatch tables.
+    expect(DROP_ROUTER).toContain("from '../fileImportExecute'");
   });
 
   it('refuses the three targets that own no application, each by name', () => {
@@ -147,7 +162,7 @@ describe('gate 10 — the owning section is derived, not restated', () => {
       'miningImportFrequencyDict',
       'setWallpaperFromPath',
     ]) {
-      expect(DROP_ROUTER, `${importer} is no longer a DropRouter importer`).toContain(importer);
+      expect(IMPORT_EXECUTE, `${importer} is no longer an importer`).toContain(importer);
       expect(FILES_APP, `FilesApp must not call ${importer}`).not.toContain(importer);
     }
   });
