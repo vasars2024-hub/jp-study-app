@@ -146,3 +146,99 @@ describe('liquid semantic tokens — the role invariants', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Plan §8's last two rows — "High contrast: no blur/transparency dependency" and
+ * "Performance/safe mode: replace blur/refraction with stable tint".
+ *
+ * This does not restate the token sheet. It DERIVES the list of degradation
+ * triggers from the shared stylesheets that already implement them, then asks
+ * whether the Liquid role answers each one. That direction matters: every trigger
+ * in this app is a hand-written selector list, all four were written before
+ * Liquid existed, and the failure mode is silent — a new list never mentions
+ * `.lq-liquid`, so the material simply keeps its blur and nothing goes red.
+ *
+ * Measured 2026-08-30, before the fix: four triggers, two answered.
+ * `data-display-transparency='off'` — a shipped, localized Settings > Display
+ * control — and Aero safe mode both left `.lq-liquid` and `.lq-ambient` fully
+ * blurred and translucent. The transparency one was worse than doing nothing:
+ * its list contains `.fwin`, and a Liquid window IS a `.fwin`, so `off` stripped
+ * that window's blur with `!important` while its background stayed
+ * `var(--glass-tint)` — see-through and unblurred, less legible than either end.
+ */
+describe('liquid semantic tokens — every shell degradation trigger reaches the liquid role', () => {
+  /** `[attr='value']` qualifiers on a root-level selector part, in source order. */
+  function rootQualifiers(part: string): string[] | null {
+    const m = /^(?::root|html)((?:\[[^\]]+\])+)/.exec(part.trim());
+    if (!m) return null;
+    return (m[1].match(/\[[^\]]+\]/g) ?? []).map((q) => q.replace(/"/g, "'"));
+  }
+
+  /** Triggers: a shared sheet turning `backdrop-filter` off under a root qualifier. */
+  const triggers: { file: string; quals: string[]; selector: string }[] = [];
+  for (const rel of ['../styles.css', 'a11y.css', 'perf.css', 'aero-safe-mode.css']) {
+    const text = readFileSync(resolve(THEME_DIR, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const block of parseBlocks(text)) {
+      if (!/backdrop-filter\s*:\s*none/.test(block.declarations)) continue;
+      for (const part of block.selector.split(',')) {
+        const quals = rootQualifiers(part);
+        if (quals?.length) triggers.push({ file: rel, quals, selector: part.trim() });
+      }
+    }
+  }
+
+  /** Blocks in THIS sheet that actually flatten the liquid role. */
+  const flatteners = blocks
+    .filter((b) => /--lq-liquid-blur\s*:\s*0px/.test(b.declarations))
+    .flatMap((b) => b.selector.split(',').map((s) => rootQualifiers(s) ?? []))
+    .filter((q) => q.length > 0);
+
+  it('found the triggers and the flatteners it is comparing', () => {
+    // Guards the assertion below from passing vacuously on a bad read or a
+    // regex that stopped matching either side.
+    expect(new Set(triggers.map((t) => t.quals.join(''))).size).toBeGreaterThanOrEqual(4);
+    expect(flatteners.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('flattens the liquid role wherever the shell flattens its own glass', () => {
+    // "At least as broad": a flattener whose qualifiers are a SUBSET of the
+    // trigger's fires in every state the trigger does, and in more. That is why
+    // `[data-display-transparency='off'][data-chrome='frosted']` is answered by
+    // the plain `[data-display-transparency='off']` block and needs no rule of
+    // its own, while Aero safe mode genuinely needs both of its qualifiers.
+    const unanswered = triggers
+      .filter((t) => !flatteners.some((f) => f.every((q) => t.quals.includes(q))))
+      .map((t) => `${t.file} → ${t.selector}`);
+    expect(
+      [...new Set(unanswered)],
+      'plan §8 — a shell state that drops its own backdrop blur while `.lq-liquid` and ' +
+        '`.lq-ambient` keep theirs is the "blur/transparency dependency" that row forbids. ' +
+        `Add a :root[...] token block to liquid-tokens.css for:\n${unanswered.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('rejects a trigger nothing answers', () => {
+    // The control. Without it the rule above passes on an empty trigger list and
+    // on a `.every()` over an empty flattener, which is how a subset check lies.
+    const invented = [{ file: 'x', quals: ["[data-nobody='answers-this']"], selector: 'x' }];
+    const unanswered = invented.filter(
+      (t) => !flatteners.some((f) => f.every((q) => t.quals.includes(q))),
+    );
+    expect(unanswered).toHaveLength(1);
+  });
+
+  it('keeps the flattened role opaque, not merely unblurred', () => {
+    // The defect this whole block exists for was HALF applied: blur off, tint
+    // still see-through. A flattener that zeroes the blur must also say what the
+    // background becomes, or it reproduces exactly that state.
+    const bare = blocks
+      .filter((b) => /--lq-liquid-blur\s*:\s*0px/.test(b.declarations))
+      .filter((b) => !/--lq-liquid-bg\s*:/.test(b.declarations))
+      .map((b) => b.selector);
+    expect(
+      bare,
+      'a zero blur over an unchanged translucent tint is less legible than either endpoint:\n' +
+        bare.join('\n'),
+    ).toEqual([]);
+  });
+});

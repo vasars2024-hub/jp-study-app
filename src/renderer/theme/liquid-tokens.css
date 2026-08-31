@@ -240,3 +240,67 @@
   --lq-motion-move: 0.001ms;
   --lq-motion-scale: 0;
 }
+
+/* ---------- Settings > Display > Transparency — the in-app control -------
+   §8's "High contrast / no blur/transparency dependency" row has an in-product
+   trigger this sheet did not read. `displayPrefs.ts:207` writes
+   `data-display-transparency` from a shipped three-way control (full / reduced /
+   off), and `styles.css:1280` honours it with a hand-written selector list:
+   `.os-start`, `.os-taskbar`, `.fwin`. That list predates Liquid, so it lands
+   on exactly the wrong half of the material:
+
+     - `.fwin.fwin-liquid` IS a `.fwin`, so `off` stripped its blur with
+       `!important` while `--lq-liquid-bg` stayed `var(--glass-tint)` — a window
+       you can still see the desktop through, now unblurred, which is strictly
+       less legible than either endpoint.
+     - `.lq-liquid` and `.lq-ambient` — the shared primitives every migrated app
+       interior, dock and inspector is built from — are not in that list at all,
+       so `off` changed nothing about them.
+
+   Tokens rather than three more selectors, for the reason `liquid-surfaces.css`
+   states above its own `.lq-liquid` rule: every property that makes the role
+   translucent already reads one, and `presentation`'s history in this repo is
+   two hand-written lists that drifted apart (boss audit 2026-08-17, finding 2).
+
+   `reduced` mirrors the shared rule's own 6px rather than inventing a second
+   ladder. `off` reuses the high-contrast block's opaque values verbatim, so the
+   two ways a user can ask for the same thing cannot disagree.
+
+   Placed last on purpose: these are (0,2,0), the same as the theme palettes and
+   the perf tiers above, so source order is what makes an explicit accessibility
+   request win over the theme's preferred material. Only the transparency-owned
+   tokens are set — border and muted text are left to whatever theme or perf tier
+   decided them, so `data-theme='high-contrast'` is composed with, not undone. */
+:root[data-display-transparency='reduced'] {
+  --lq-liquid-bg: color-mix(in srgb, var(--panel) 88%, transparent);
+  --lq-liquid-bg-raised: color-mix(in srgb, var(--panel-2) 94%, transparent);
+  --lq-liquid-blur: 6px;
+  --lq-ambient-blur: var(--blur-sm);
+}
+:root[data-display-transparency='off'] {
+  --lq-liquid-bg: var(--panel);
+  --lq-liquid-bg-raised: var(--panel-2);
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-ambient-bg: var(--bg);
+  --lq-ambient-blur: 0px;
+}
+
+/* ---------- Aero safe mode — the fourth trigger, same omission -----------
+   §8 lists Aero safe mode among the protected systems and its own row asks for
+   "replace blur/refraction with stable tint; no feature or layout loss".
+   `aero-safe-mode.css:21` is another list written before Liquid existed —
+   `.glass`, `.os-flyout`, `.fwin` — so a user who reached for the sensory
+   fallback still got a blurred `.lq-liquid` dock and inspector.
+
+   Tinted rather than flattened to `var(--panel)`, unlike high contrast above:
+   safe mode is a cost fallback, not a legibility request, and Aero's identity is
+   the tint. This is `data-perf='battery'`'s exact treatment for the same reason,
+   so the two cost fallbacks cannot drift. Refraction is what goes. */
+:root[data-materials='aero'][data-aero-safe-mode='on'] {
+  --lq-liquid-bg: color-mix(in srgb, var(--panel) 92%, transparent);
+  --lq-liquid-bg-raised: var(--panel-2);
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-ambient-blur: 0px;
+}
