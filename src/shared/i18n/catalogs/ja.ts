@@ -10695,6 +10695,10 @@ export const ja: Catalog = {
     'この検索はアプリに組み込まれているため削除できません。自分で保存したものは削除できます。',
   'filesApp.smart.error.saveFailed':
     '保存した検索を保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.stability.firstSighting': '初めて検出しました。まもなく再確認します。',
+  'filesApp.stability.stillGrowing': 'まだ書き込み中です。サイズが変化しています。',
+  'filesApp.stability.tooSoon': '完了したか確認するため、少し待っています。',
+  'filesApp.stability.empty': 'まだ空です。取り込むものがありません。',
   'filesApp.scan.skip.incomplete': 'ダウンロード中のため、完了するまでスキップしました。',
   'filesApp.scan.skip.unreadable': '読み取れませんでした。',
   'filesApp.scan.skip.limit': 'スキャンがファイル数の上限に達し、ここで停止しました。',

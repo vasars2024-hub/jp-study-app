@@ -37,6 +37,11 @@ import {
   type FilesScanReport,
   type FilesScanSkip,
 } from '../../shared/filesApp/scan';
+import {
+  DEFAULT_STABILITY_MS,
+  StabilityLedger,
+  type StabilityVerdict,
+} from '../../shared/filesApp/stability';
 
 /**
  * How many files one scan will classify.
@@ -63,6 +68,14 @@ export interface FilesScanOptions {
   /** Walk sub-directories. A false here scans one folder's own files only. */
   recursive?: boolean;
   now?: () => number;
+  /**
+   * Gate 26's second half. Supply a ledger carried across passes and a file
+   * whose size is still moving is skipped, not classified — a one-shot scan has
+   * no previous reading to compare against, so it cannot make this judgement and
+   * deliberately does not pretend to.
+   */
+  stability?: StabilityLedger;
+  stabilityMs?: number;
 }
 
 /**
@@ -79,6 +92,8 @@ export function scanRoots(
   const limit = options.fileLimit ?? SCAN_FILE_LIMIT;
   const recursive = options.recursive ?? true;
   const now = options.now ?? Date.now;
+  const stability = options.stability;
+  const stabilityMs = options.stabilityMs ?? DEFAULT_STABILITY_MS;
   const startedAt = now();
 
   const entries: FilesScanEntry[] = [];
@@ -146,6 +161,27 @@ export function scanRoots(
         truncated = true;
         skips.push({ path: full, reasonKey: SCAN_SKIP_LIMIT });
         break walk;
+      }
+
+      // Gate 26's other half, and the one a name cannot answer: a torrent
+      // client writing `ep01.mkv` in place produces an ordinary name for a file
+      // that is only partly there. This runs BEFORE the classifier, so a
+      // half-written archive is never opened and sniffed.
+      if (stability) {
+        let size: number;
+        try {
+          size = fs.statSync(full).size;
+        } catch {
+          skips.push({ path: full, reasonKey: SCAN_SKIP_UNREADABLE });
+          continue;
+        }
+        const at = now();
+        stability.observe(full, size, at);
+        const verdict: StabilityVerdict = stability.verdict(full, at, stabilityMs);
+        if (!verdict.stable) {
+          skips.push({ path: full, reasonKey: verdict.reasonKey ?? SCAN_SKIP_INCOMPLETE });
+          continue;
+        }
       }
 
       let plan: DropPlan;

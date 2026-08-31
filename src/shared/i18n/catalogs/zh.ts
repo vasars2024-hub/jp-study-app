@@ -10600,6 +10600,10 @@ export const zh: Catalog = {
   'filesApp.smart.error.presetLocked': '此搜索内置于应用中，无法删除。你自己保存的可以删除。',
   'filesApp.smart.error.saveFailed':
     '无法保存你的已保存搜索。此更改现在有效，但重启应用后会丢失。',
+  'filesApp.stability.firstSighting': '首次发现——稍后会再次检查。',
+  'filesApp.stability.stillGrowing': '仍在写入——文件大小还在变化。',
+  'filesApp.stability.tooSoon': '正在稍作等待，以确认它已经完成。',
+  'filesApp.stability.empty': '目前为空——暂时没有可导入的内容。',
   'filesApp.scan.skip.incomplete': '正在下载——在完成之前已跳过。',
   'filesApp.scan.skip.unreadable': '无法读取。',
   'filesApp.scan.skip.limit': '扫描已达到文件数量上限，在此停止。',

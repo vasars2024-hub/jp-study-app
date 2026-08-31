@@ -11158,6 +11158,10 @@ export const en: Catalog = {
     'This search is built into the app, so it cannot be deleted. Yours can be.',
   'filesApp.smart.error.saveFailed':
     'Your saved searches could not be saved. This change works now but will be gone when the app restarts.',
+  'filesApp.stability.firstSighting': 'Seen for the first time — checked again shortly.',
+  'filesApp.stability.stillGrowing': 'Still being written — its size is changing.',
+  'filesApp.stability.tooSoon': 'Waiting a moment to be sure it has finished.',
+  'filesApp.stability.empty': 'Empty so far — nothing to bring in yet.',
   'filesApp.scan.skip.incomplete': 'Still downloading — skipped until it is finished.',
   'filesApp.scan.skip.unreadable': 'Could not be read.',
   'filesApp.scan.skip.limit': 'The scan reached its file limit and stopped here.',
