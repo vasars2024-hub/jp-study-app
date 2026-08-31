@@ -10615,6 +10615,47 @@ export const ja: Catalog = {
   'filesApp.collection.error.cycle': 'フォルダーを、その中のフォルダーへは移動できません。',
   'filesApp.collection.error.saveFailed':
     'フォルダーを保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.collections.heading': 'マイフォルダー',
+  'filesApp.collections.new': '新しいフォルダー',
+  'filesApp.collections.newNameDefault': '新しいフォルダー',
+  'filesApp.collections.empty': '自分のフォルダーはまだありません。',
+  'filesApp.collections.missing': {
+    other: 'このフォルダーの {count} 件は、ライブラリにもうありません。',
+  },
+  'filesApp.collections.nameLabel': 'フォルダー名',
+  'filesApp.collections.rename': '名前を変更',
+  'filesApp.collections.renameSave': '保存',
+  'filesApp.collections.renameCancel': 'キャンセル',
+  'filesApp.collections.renamed': '「{name}」に変更しました。',
+  'filesApp.collections.created': '「{name}」を作成しました。',
+  'filesApp.collections.delete': 'フォルダーを削除',
+  'filesApp.collections.deleteConfirm': {
+    other:
+      '「{name}」を削除しますか。中の {count} 件はそのまま残り、フォルダーだけがなくなります。',
+  },
+  'filesApp.collections.deleteConfirmYes': 'フォルダーを削除',
+  'filesApp.collections.deleteConfirmNo': '残す',
+  'filesApp.collections.deleted':
+    '「{name}」を削除しました。中にあったものはすべてライブラリに残っています。',
+  'filesApp.collections.moveTo': 'フォルダーの移動先',
+  'filesApp.collections.topLevel': '最上位',
+  'filesApp.collections.moved': '「{name}」を移動しました。',
+  'filesApp.collections.addTo': 'マイフォルダーに追加',
+  'filesApp.collections.add': '追加',
+  'filesApp.collections.added': '「{name}」を「{folder}」に追加しました。',
+  'filesApp.collections.removeFrom': 'このフォルダーから外す',
+  'filesApp.collections.removed':
+    '「{name}」を「{folder}」から外しました。項目そのものはそのままです。',
+  'filesApp.collections.noneYet': '先にフォルダーを作成してください。',
+  'filesApp.collections.scoped': '「{name}」を表示中',
+  'filesApp.derived.cannotRename':
+    '「{category}」は各項目の内容によって決まるため、変更できる名前を持ちません。自分で名前を付けたい場合はマイフォルダーを作成してください。',
+  'filesApp.derived.cannotDelete':
+    '「{category}」はライブラリの表示であって、入れ物ではありません。削除すると存在する項目が見えなくなるため、行えません。',
+  'filesApp.derived.cannotMove':
+    '「{category}」は各項目の内容から導かれるため、移動先がありません。',
+  'filesApp.derived.cannotAdd':
+    '「{category}」に項目が現れるのは、入れたからではなく内容によるものです。代わりにマイフォルダーへ追加してください。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

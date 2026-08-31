@@ -11076,6 +11076,48 @@ export const en: Catalog = {
   'filesApp.collection.error.cycle': 'A folder cannot be moved inside one of its own folders.',
   'filesApp.collection.error.saveFailed':
     'Your folders could not be saved. This change works now but will be gone when the app restarts.',
+  'filesApp.collections.heading': 'My folders',
+  'filesApp.collections.new': 'New folder',
+  'filesApp.collections.newNameDefault': 'New folder',
+  'filesApp.collections.empty': 'No folders of your own yet.',
+  'filesApp.collections.missing': {
+    one: '{count} item in this folder is no longer in the library.',
+    other: '{count} items in this folder are no longer in the library.',
+  },
+  'filesApp.collections.nameLabel': 'Folder name',
+  'filesApp.collections.rename': 'Rename',
+  'filesApp.collections.renameSave': 'Save',
+  'filesApp.collections.renameCancel': 'Cancel',
+  'filesApp.collections.renamed': 'Renamed to "{name}".',
+  'filesApp.collections.created': 'Created "{name}".',
+  'filesApp.collections.delete': 'Delete folder',
+  'filesApp.collections.deleteConfirm': {
+    one: 'Delete "{name}"? The {count} item in it stays exactly where it is — only the folder goes.',
+    other:
+      'Delete "{name}"? The {count} items in it stay exactly where they are — only the folder goes.',
+  },
+  'filesApp.collections.deleteConfirmYes': 'Delete the folder',
+  'filesApp.collections.deleteConfirmNo': 'Keep it',
+  'filesApp.collections.deleted': 'Deleted "{name}". Everything it held is still in the library.',
+  'filesApp.collections.moveTo': 'Move folder into',
+  'filesApp.collections.topLevel': 'Top level',
+  'filesApp.collections.moved': 'Moved "{name}".',
+  'filesApp.collections.addTo': 'Add to one of my folders',
+  'filesApp.collections.add': 'Add',
+  'filesApp.collections.added': 'Added "{name}" to "{folder}".',
+  'filesApp.collections.removeFrom': 'Remove from this folder',
+  'filesApp.collections.removed':
+    'Removed "{name}" from "{folder}". The item itself is untouched.',
+  'filesApp.collections.noneYet': 'Make a folder first.',
+  'filesApp.collections.scoped': 'Showing "{name}"',
+  'filesApp.derived.cannotRename':
+    '"{category}" is filled by what each item is, not by what it was called — so it has no name of its own to change. Make one of your own folders to name it yourself.',
+  'filesApp.derived.cannotDelete':
+    '"{category}" is a view of your library, not a container. Deleting it would hide items that still exist, so it is not offered.',
+  'filesApp.derived.cannotMove':
+    '"{category}" is derived from what each item is, so there is nowhere to move it to.',
+  'filesApp.derived.cannotAdd':
+    'Items appear in "{category}" because of what they are, not because they were put there. Add it to one of your own folders instead.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':

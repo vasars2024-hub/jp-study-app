@@ -108,6 +108,161 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* --------- gate 16: the folders the user writes, not derives --------- */
+
+/* A visible seam, because these two halves of the tree behave differently:
+   above it nothing can be renamed or dropped into, below it everything can. */
+.fa-collections {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: var(--lq-space-3);
+  padding-top: var(--lq-space-2);
+  border-top: 1px solid var(--lq-liquid-border);
+}
+
+.fa-collections-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-2);
+  padding: 0 var(--lq-space-2);
+  min-height: var(--lq-hit-target);
+}
+
+.fa-collections-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--lq-liquid-text);
+}
+
+.fa-collections-new,
+.fa-folder-actions .fa-action {
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: var(--lq-liquid-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-collections-new:hover,
+.fa-folder-actions .fa-action:hover {
+  background: var(--lq-liquid-bg-raised);
+}
+
+.fa-collections-empty {
+  margin: 0;
+  padding: var(--lq-space-1) var(--lq-space-2);
+  color: var(--lq-liquid-text-muted);
+}
+
+/* Nesting reads as indentation. `--fa-depth` is set per row from the walk, so
+   the depth the model computed and the depth on screen cannot disagree. */
+.fa-collection-node,
+.fa-collection-rename {
+  padding-left: calc(var(--lq-space-2) + var(--fa-depth, 0) * var(--lq-space-3));
+}
+
+/* The drop target has to be visibly a target BEFORE the mouse is released —
+   a highlight that only appears after the drop explains nothing. */
+.fa-collection-node[data-dragover='true'] {
+  background: var(--lq-liquid-highlight);
+  border-color: var(--lq-liquid-border);
+  border-style: dashed;
+}
+
+.fa-collection-rename {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-1);
+  min-height: var(--lq-hit-target);
+}
+
+.fa-collection-rename input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-anchor-bg);
+  color: var(--lq-anchor-text);
+  font: inherit;
+}
+
+.fa-folder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-1);
+  margin-top: var(--lq-space-2);
+}
+
+.fa-folder-move select {
+  min-height: var(--lq-hit-target);
+  max-width: 100%;
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-anchor-bg);
+  color: var(--lq-anchor-text);
+  font: inherit;
+}
+
+/* The confirm is an ANCHOR, not glass: the plan's selectivity rule keeps
+   decisions on stable opaque surfaces, and this one names a count the user is
+   being asked to accept. */
+.fa-folder-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  margin-top: var(--lq-space-2);
+  padding: var(--lq-space-2);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  background: var(--lq-anchor-bg-raised);
+  color: var(--lq-anchor-text);
+}
+
+.fa-folder-confirm p {
+  margin: 0;
+}
+
+.fa-folder-notice {
+  margin: var(--lq-space-2) 0 0;
+  padding: 0 var(--lq-space-2);
+  color: var(--lq-liquid-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A refusal is at FULL text weight, not the muted receipt colour — this repo
+   has no `--lq-*` danger token, and inventing a literal here would break the
+   rule that every colour in this file is a token. Contrast, not hue, is what
+   category 1 measures. */
+.fa-folder-notice[data-tone='error'] {
+  color: var(--lq-liquid-text);
+  font-weight: 600;
+}
+
+.fa-details-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  margin-top: var(--lq-space-2);
+}
+
+.fa-details-add select {
+  min-height: var(--lq-hit-target);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-anchor-bg);
+  color: var(--lq-anchor-text);
+  font: inherit;
+}
+
 /* --------------------------- toolbar ---------------------------- */
 
 .fa-toolbar {

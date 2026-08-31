@@ -23,7 +23,16 @@
  * 3. **Scope is a filter, not a mode.** Selecting a category narrows the list;
  *    the root node clears it. Same window either way (gate 5's shape).
  */
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+} from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
@@ -57,6 +66,25 @@ import {
   openFor,
   type FilesOpenDecision,
 } from '../../../shared/filesApp/openPlan';
+import {
+  addToCollection,
+  ancestorsOf,
+  childrenOf,
+  createCollection,
+  deleteCollection,
+  nestCollection,
+  removeFromCollection,
+  renameCollection,
+  resolveCollection,
+  type FilesCollection,
+  type FilesCollectionsDoc,
+} from '../../../shared/filesApp/collections';
+import {
+  commitCollections,
+  loadCollectionsDoc,
+  newCollectionId,
+  onCollectionsChanged,
+} from '../../filesCollectionsStore';
 import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
 import { openSectionSurface } from '../../sectionSurface';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
@@ -90,7 +118,39 @@ const FilesStatisticsPanel = lazy(() =>
 
 const ROW_HEIGHT = 32;
 
+/**
+ * Gate 16's drag payload.
+ *
+ * A private MIME type, not `text/plain`, for a measured reason: `DropRouter`
+ * (`DropRouter.tsx:231`) admits a drag only when `dataTransfer.types` includes
+ * `'Files'`, so an internal row drag never reaches the file importer — but a
+ * `text/plain` payload would still be droppable on every text field in the app.
+ * A named type means only the folders answer it.
+ */
+const FILES_DRAG_ITEM_TYPE = 'application/x-jp-files-item';
+
 type Translate = (k: string, v?: Record<string, string | number>) => string;
+
+/**
+ * Which folder the rail's own controls act on.
+ *
+ * Gate 17 is the reason this is one union rather than two independent pieces of
+ * state: the rename/delete controls have to be REACHABLE on a derived folder in
+ * order to refuse on it. A control that is hidden cannot say why it is not
+ * there, and the gate's words are "refused with a named message; it does not
+ * silently no-op".
+ */
+type FolderSelection =
+  | { kind: 'root' }
+  | { kind: 'derived'; id: FilesCategoryId }
+  | { kind: 'collection'; id: string };
+
+/** A refusal or a receipt from a folder action, always a key and never a literal. */
+interface FolderNotice {
+  key: string;
+  values?: Record<string, string | number>;
+  tone: 'ok' | 'error';
+}
 
 /**
  * Bytes, rendered with the unit the number actually deserves.
@@ -201,6 +261,28 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    */
   const [mineState, setMineState] = useState<MineState>({ status: 'idle' });
 
+  /* ------------------------- gate 16 state ------------------------ */
+
+  /**
+   * The user's own folders. Read from the store on mount rather than held only
+   * in React state — the document is the thing that survives a restart, and a
+   * component that kept its own copy would drift from a second window's writes.
+   */
+  const [collectionsDoc, setCollectionsDoc] = useState<FilesCollectionsDoc>(loadCollectionsDoc);
+  /** Which of the user's folders is scoped. Mutually exclusive with `scope`. */
+  const [collectionScope, setCollectionScope] = useState<string | null>(null);
+  const [folderNotice, setFolderNotice] = useState<FolderNotice | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  /**
+   * The delete confirm, inline rather than a native dialog. A native dialog
+   * cannot be seen by the debug bridge and cannot be dismissed by it either, so
+   * a confirm that lives in the DOM is the only shape this gate can be proven
+   * in — and it is also the only shape that can state the count.
+   */
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   /**
    * The scope was read above; taking it is this effect's job, so the next plain
    * open of the Files app does not silently inherit the last caller's filter.
@@ -216,6 +298,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       if (!detail) return;
       clearPendingFilesScope();
       setScope(detail.categoryId);
+      // A derived scope and one of the user's own folders are mutually
+      // exclusive filters. Without this the caller's category would be applied
+      // on top of whatever collection was open and the list would show the
+      // intersection of two things nobody asked to intersect.
+      setCollectionScope(null);
       setSelectedId(detail.focusItemId ?? null);
       setFocusCardId(detail.focusCardId ?? null);
       // A scope arriving on an open window must not land inside a stale search:
@@ -225,6 +312,12 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     window.addEventListener(FILES_SCOPE_EVENT, onScope);
     return () => window.removeEventListener(FILES_SCOPE_EVENT, onScope);
   }, []);
+
+  /**
+   * A second Files window (the app can pop one out) writes to the same store,
+   * so this one re-reads rather than trusting the copy it made on mount.
+   */
+  useEffect(() => onCollectionsChanged(() => setCollectionsDoc(loadCollectionsDoc())), []);
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -244,13 +337,38 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     [counts],
   );
 
+  /**
+   * The scoped collection, resolved against the index this very render.
+   *
+   * `resolveCollection` splits the ids into present and missing rather than
+   * filtering the missing away, because a folder that quietly shrank is the
+   * shape the plan calls a finding — the count is reported below the list.
+   */
+  const scopedCollection = useMemo(() => {
+    if (!collectionScope) return null;
+    const collection = collectionsDoc.collections.find((c) => c.id === collectionScope);
+    if (!collection) return null;
+    return resolveCollection(collection, new Set(allItems.map((i) => i.id)));
+  }, [collectionScope, collectionsDoc, allItems]);
+
   const visible = useMemo(() => {
+    if (scopedCollection) {
+      // The user's own order is the folder's order, so the ids drive the walk
+      // and the index is only consulted for the row. Filtering `allItems` by
+      // membership instead would silently re-sort the folder into index order.
+      const byId = new Map(allItems.map((i) => [i.id, i]));
+      const inFolder = scopedCollection.presentItemIds
+        .map((id) => byId.get(id))
+        .filter((i): i is FilesItem => Boolean(i))
+        .filter((i) => matchesQuery(i, query));
+      return sortItems(inFolder, sortColumn, sortDirection);
+    }
     const filtered = allItems.filter(
       (item) =>
         (scope === null || categoryContains(scope, item.categoryId)) && matchesQuery(item, query),
     );
     return sortItems(filtered, sortColumn, sortDirection);
-  }, [allItems, scope, query, sortColumn, sortDirection]);
+  }, [allItems, scope, scopedCollection, query, sortColumn, sortDirection]);
 
   const selected = useMemo(
     () => visible.find((i) => i.id === selectedId) ?? null,
@@ -397,16 +515,241 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     setOpenState({ status: 'idle' });
   }, []);
 
+  /* ---------------------- gate 16/17 actions ---------------------- */
+
+  /**
+   * Which folder the rail's controls act on. Derived and collection scopes are
+   * mutually exclusive by construction, so this cannot report both.
+   */
+  const folderSelection: FolderSelection = collectionScope
+    ? { kind: 'collection', id: collectionScope }
+    : scope
+      ? { kind: 'derived', id: scope }
+      : { kind: 'root' };
+
+  /**
+   * The name a gate-17 refusal has to say out loud. A refusal that will not
+   * name the folder it refused on is barely better than a no-op.
+   */
+  const derivedLabel = useCallback(
+    (selection: FolderSelection): string =>
+      selection.kind === 'derived'
+        ? t(categoryNode(selection.id)?.labelKey ?? 'filesApp.tree.everything')
+        : t('filesApp.tree.everything'),
+    // `lang` and not `t`: `t`'s identity is stable by design, so a dependency on
+    // it goes stale after a language switch instead of erroring.
+    [t, lang],
+  );
+
+  /** One place every write lands, so a refusal and a failed save look different. */
+  const runCollectionOp = useCallback(
+    (
+      op: Parameters<typeof commitCollections>[0],
+      success: FolderNotice,
+    ): FilesCollection | undefined => {
+      const commit = commitCollections(op);
+      setCollectionsDoc(commit.doc);
+      if (commit.errorKey) {
+        setFolderNotice({ key: commit.errorKey, tone: 'error' });
+        return undefined;
+      }
+      if (commit.storageErrorKey) {
+        // The change IS live — the document above already has it — but it will
+        // not survive a restart, and gate 16 is a restart gate. Saying so beats
+        // a receipt that turns out to have been a lie tomorrow.
+        setFolderNotice({ key: commit.storageErrorKey, tone: 'error' });
+        return undefined;
+      }
+      setFolderNotice(success);
+      return undefined;
+    },
+    [],
+  );
+
+  const onNewFolder = useCallback(() => {
+    const name = t('filesApp.collections.newNameDefault');
+    const id = newCollectionId();
+    // Numbered on collision rather than refused: "New folder" is a default
+    // nobody typed, so refusing it would punish the user for the app's choice.
+    const siblings = childrenOf(collectionsDoc, null).map((c) => c.name.toLocaleLowerCase());
+    let candidate = name;
+    for (let n = 2; siblings.includes(candidate.toLocaleLowerCase()); n += 1) {
+      candidate = `${name} ${n}`;
+    }
+    runCollectionOp(
+      (doc) => createCollection(doc, { name: candidate, id, now: Date.now() }),
+      { key: 'filesApp.collections.created', values: { name: candidate }, tone: 'ok' },
+    );
+    // Straight into rename: a folder called "New folder" is what the user has
+    // to fix next, every time.
+    setRenamingId(id);
+    setRenameDraft(candidate);
+  }, [collectionsDoc, runCollectionOp, t, lang]);
+
+  const onStartRename = useCallback(() => {
+    if (folderSelection.kind !== 'collection') {
+      // Gate 17: named, not silent. The control stays present precisely so it
+      // has somewhere to say this.
+      setFolderNotice({
+        key: 'filesApp.derived.cannotRename',
+        values: { category: derivedLabel(folderSelection) },
+        tone: 'error',
+      });
+      return;
+    }
+    const target = collectionsDoc.collections.find((c) => c.id === folderSelection.id);
+    if (!target) return;
+    setFolderNotice(null);
+    setRenamingId(target.id);
+    setRenameDraft(target.name);
+  }, [folderSelection, collectionsDoc, derivedLabel]);
+
+  const onCommitRename = useCallback(() => {
+    if (!renamingId) return;
+    const name = renameDraft;
+    const commit = commitCollections((doc) => renameCollection(doc, renamingId, name, Date.now()));
+    setCollectionsDoc(commit.doc);
+    if (commit.errorKey) {
+      // The editor stays OPEN on a refusal — closing it would throw away what
+      // the user typed and leave them to work out what was wrong from a toast.
+      setFolderNotice({ key: commit.errorKey, tone: 'error' });
+      return;
+    }
+    setFolderNotice(
+      commit.storageErrorKey
+        ? { key: commit.storageErrorKey, tone: 'error' }
+        : { key: 'filesApp.collections.renamed', values: { name }, tone: 'ok' },
+    );
+    setRenamingId(null);
+  }, [renamingId, renameDraft]);
+
+  const onRequestDelete = useCallback(() => {
+    if (folderSelection.kind !== 'collection') {
+      setFolderNotice({
+        key: 'filesApp.derived.cannotDelete',
+        values: { category: derivedLabel(folderSelection) },
+        tone: 'error',
+      });
+      return;
+    }
+    setFolderNotice(null);
+    setPendingDeleteId(folderSelection.id);
+  }, [folderSelection, derivedLabel]);
+
+  const onConfirmDelete = useCallback(() => {
+    if (!pendingDeleteId) return;
+    const target = collectionsDoc.collections.find((c) => c.id === pendingDeleteId);
+    const name = target?.name ?? '';
+    runCollectionOp((doc) => deleteCollection(doc, pendingDeleteId, Date.now()), {
+      key: 'filesApp.collections.deleted',
+      values: { name },
+      tone: 'ok',
+    });
+    setPendingDeleteId(null);
+    // The list must leave a folder that no longer exists, or it shows an empty
+    // canvas under a heading naming something deleted.
+    if (collectionScope === pendingDeleteId) setCollectionScope(null);
+  }, [pendingDeleteId, collectionsDoc, collectionScope, runCollectionOp]);
+
+  const onMoveFolder = useCallback(
+    (parentId: string | null) => {
+      if (folderSelection.kind !== 'collection') {
+        setFolderNotice({
+          key: 'filesApp.derived.cannotMove',
+          values: { category: derivedLabel(folderSelection) },
+          tone: 'error',
+        });
+        return;
+      }
+      const target = collectionsDoc.collections.find((c) => c.id === folderSelection.id);
+      runCollectionOp((doc) => nestCollection(doc, folderSelection.id, parentId, Date.now()), {
+        key: 'filesApp.collections.moved',
+        values: { name: target?.name ?? '' },
+        tone: 'ok',
+      });
+    },
+    [folderSelection, collectionsDoc, derivedLabel, runCollectionOp],
+  );
+
+  /** Drag-in and the keyboard "Add" button share this — one write path, one receipt. */
+  const addItemToFolder = useCallback(
+    (collectionId: string, item: FilesItem) => {
+      const target = collectionsDoc.collections.find((c) => c.id === collectionId);
+      runCollectionOp((doc) => addToCollection(doc, collectionId, item.id, Date.now()), {
+        key: 'filesApp.collections.added',
+        values: { name: item.name, folder: target?.name ?? '' },
+        tone: 'ok',
+      });
+    },
+    [collectionsDoc, runCollectionOp],
+  );
+
+  const onRemoveFromFolder = useCallback(() => {
+    if (!scopedCollection || !selected) return;
+    runCollectionOp(
+      (doc) =>
+        removeFromCollection(doc, scopedCollection.collection.id, selected.id, Date.now()),
+      {
+        key: 'filesApp.collections.removed',
+        values: { name: selected.name, folder: scopedCollection.collection.name },
+        tone: 'ok',
+      },
+    );
+  }, [scopedCollection, selected, runCollectionOp]);
+
   /* ---------------------------- rail ---------------------------- */
+
+  /**
+   * The user's folders as a depth-ordered list.
+   *
+   * Anything the walk from the root does not reach is appended at depth 0
+   * rather than dropped. A hand-edited store can hold a cycle that
+   * `nestCollection`'s guard never saw, and a folder the user made must not
+   * become invisible because of it — an invisible folder cannot be deleted,
+   * which is the one state with no way out.
+   */
+  const collectionRows = useMemo(() => {
+    const rows: { collection: FilesCollection; depth: number }[] = [];
+    const placed = new Set<string>();
+    const walk = (parentId: string | null, depth: number) => {
+      if (depth > 16) return;
+      for (const c of childrenOf(collectionsDoc, parentId)) {
+        if (placed.has(c.id)) continue;
+        placed.add(c.id);
+        rows.push({ collection: c, depth });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    for (const c of collectionsDoc.collections) {
+      if (!placed.has(c.id)) rows.push({ collection: c, depth: 0 });
+    }
+    return rows;
+  }, [collectionsDoc]);
+
+  const knownItemIds = useMemo(() => new Set(allItems.map((i) => i.id)), [allItems]);
+
+  /** The item a rail drop is carrying, read back from the index by its id. */
+  const itemFromDrag = useCallback(
+    (event: DragEvent): FilesItem | null => {
+      const id = event.dataTransfer?.getData(FILES_DRAG_ITEM_TYPE);
+      if (!id) return null;
+      return allItems.find((i) => i.id === id) ?? null;
+    },
+    [allItems],
+  );
 
   const rail = (
     <div className="fa-tree">
       <button
         type="button"
         className="fa-tree-node fa-tree-root"
-        data-selected={scope === null ? 'true' : undefined}
-        aria-pressed={scope === null}
-        onClick={() => setScope(null)}
+        data-selected={folderSelection.kind === 'root' ? 'true' : undefined}
+        aria-pressed={folderSelection.kind === 'root'}
+        onClick={() => {
+          setScope(null);
+          setCollectionScope(null);
+        }}
       >
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
         <span className="fa-tree-count">{allItems.length.toLocaleString(LANG_TAGS[lang])}</span>
@@ -418,10 +761,28 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           className="fa-tree-node"
           data-leaf={node.isLeaf ? 'true' : undefined}
           data-panel={isFilesPanelCategory(node.id) ? 'true' : undefined}
-          data-selected={scope === node.id ? 'true' : undefined}
-          aria-pressed={scope === node.id}
+          data-derived="true"
+          data-selected={
+            folderSelection.kind === 'derived' && folderSelection.id === node.id ? 'true' : undefined
+          }
+          aria-pressed={folderSelection.kind === 'derived' && folderSelection.id === node.id}
+          /* Gate 17, the "not offered" half. There is deliberately NO
+             `preventDefault` here, so the drop never fires and the browser shows
+             the no-drop cursor — a derived folder's membership is a consequence
+             of what an item IS, and a hand-placed row would be a lie about that.
+             Saying so is better than a cursor the user has to interpret. */
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(FILES_DRAG_ITEM_TYPE)) return;
+            e.dataTransfer.dropEffect = 'none';
+            setFolderNotice({
+              key: 'filesApp.derived.cannotAdd',
+              values: { category: t(node.labelKey) },
+              tone: 'error',
+            });
+          }}
           onClick={() => {
             setScope(node.id);
+            setCollectionScope(null);
             // A tree click is not a search hit; it asked for the panel, not for
             // one card inside it. Carrying the highlight over would leave the
             // previous hit's row lit on a screen nobody searched for.
@@ -445,12 +806,182 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           )}
         </button>
       ))}
+
+      {/* ---- gate 16: the only folders in this tree the user writes ---- */}
+      <div className="fa-collections">
+        <div className="fa-collections-head">
+          <h3 className="fa-collections-title">{t('filesApp.collections.heading')}</h3>
+          <button type="button" className="fa-collections-new" onClick={onNewFolder}>
+            {t('filesApp.collections.new')}
+          </button>
+        </div>
+        {collectionRows.length === 0 ? (
+          <p className="fa-collections-empty">{t('filesApp.collections.empty')}</p>
+        ) : (
+          collectionRows.map(({ collection, depth }) =>
+            renamingId === collection.id ? (
+              <div key={collection.id} className="fa-collection-rename" style={{ '--fa-depth': depth } as CSSProperties}>
+                <label>
+                  <span className="fa-visually-hidden">{t('filesApp.collections.nameLabel')}</span>
+                  <input
+                    type="text"
+                    value={renameDraft}
+                    autoFocus
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        onCommitRename();
+                      }
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                  />
+                </label>
+                <button type="button" className="fa-action" onClick={onCommitRename}>
+                  {t('filesApp.collections.renameSave')}
+                </button>
+                <button type="button" className="fa-action" onClick={() => setRenamingId(null)}>
+                  {t('filesApp.collections.renameCancel')}
+                </button>
+              </div>
+            ) : (
+              <button
+                key={collection.id}
+                type="button"
+                className="fa-tree-node fa-collection-node"
+                style={{ '--fa-depth': depth } as CSSProperties}
+                data-collection={collection.id}
+                data-dragover={dragOverId === collection.id ? 'true' : undefined}
+                data-selected={collectionScope === collection.id ? 'true' : undefined}
+                aria-pressed={collectionScope === collection.id}
+                onClick={() => {
+                  setCollectionScope(collection.id);
+                  setScope(null);
+                  setFocusCardId(null);
+                  setFolderNotice(null);
+                }}
+                /* The drop half of gate 16. `preventDefault` is what makes this
+                   a drop target at all — its absence on the derived nodes above
+                   is the whole difference between offered and not offered. */
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(FILES_DRAG_ITEM_TYPE)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  setDragOverId(collection.id);
+                }}
+                onDragLeave={() => setDragOverId((id) => (id === collection.id ? null : id))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverId(null);
+                  const item = itemFromDrag(e);
+                  if (item) addItemToFolder(collection.id, item);
+                }}
+              >
+                <span className="fa-tree-label">{collection.name}</span>
+                <span className="fa-tree-count">
+                  {resolveCollection(collection, knownItemIds).presentItemIds.length.toLocaleString(
+                    LANG_TAGS[lang],
+                  )}
+                </span>
+              </button>
+            ),
+          )
+        )}
+
+        {/* Gate 17's reachable surface. These act on whatever folder is
+            selected, derived or not — a control that vanishes on a derived
+            folder cannot say why it refused, and the gate asks for a named
+            message rather than an absence. */}
+        <div className="fa-folder-actions" role="group" aria-label={t('filesApp.collections.heading')}>
+          <button type="button" className="fa-action fa-folder-rename" onClick={onStartRename}>
+            {t('filesApp.collections.rename')}
+          </button>
+          <button type="button" className="fa-action fa-folder-delete" onClick={onRequestDelete}>
+            {t('filesApp.collections.delete')}
+          </button>
+          <label className="fa-folder-move">
+            <span className="fa-visually-hidden">{t('filesApp.collections.moveTo')}</span>
+            <select
+              value={
+                folderSelection.kind === 'collection'
+                  ? (collectionsDoc.collections.find((c) => c.id === folderSelection.id)?.parentId ??
+                    '')
+                  : ''
+              }
+              onChange={(e) => onMoveFolder(e.target.value || null)}
+            >
+              <option value="">{t('filesApp.collections.topLevel')}</option>
+              {collectionRows
+                .filter(({ collection }) => {
+                  if (folderSelection.kind !== 'collection') return true;
+                  // Neither itself nor anything beneath it: the model refuses
+                  // both, and offering an option that can only be refused is a
+                  // control that lies about what it does.
+                  if (collection.id === folderSelection.id) return false;
+                  return !ancestorsOf(collectionsDoc, collection.id).some(
+                    (a) => a.id === folderSelection.id,
+                  );
+                })
+                .map(({ collection }) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+
+        {pendingDeleteId ? (
+          <div className="fa-folder-confirm" role="alertdialog" aria-label={t('filesApp.collections.delete')}>
+            {/* The count is in the sentence because gate 16's claim IS the
+                count: these items stay where they are. A confirm that will not
+                say how many is asking for consent to something unstated. */}
+            <p>
+              {t('filesApp.collections.deleteConfirm', {
+                name: collectionsDoc.collections.find((c) => c.id === pendingDeleteId)?.name ?? '',
+                count:
+                  collectionsDoc.collections.find((c) => c.id === pendingDeleteId)?.itemIds.length ??
+                  0,
+              })}
+            </p>
+            <button type="button" className="fa-action fa-folder-confirm-yes" onClick={onConfirmDelete}>
+              {t('filesApp.collections.deleteConfirmYes')}
+            </button>
+            <button type="button" className="fa-action" onClick={() => setPendingDeleteId(null)}>
+              {t('filesApp.collections.deleteConfirmNo')}
+            </button>
+          </div>
+        ) : null}
+
+        {folderNotice ? (
+          <p
+            className="fa-folder-notice"
+            data-tone={folderNotice.tone}
+            role="status"
+          >
+            {t(folderNotice.key, folderNotice.values)}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 
   /* -------------------------- toolbar --------------------------- */
 
   const showListTools = scope === null || !isFilesPanelCategory(scope);
+
+  /**
+   * One label for both kinds of narrowing — a derived category and one of the
+   * user's own folders — so a collection scope cannot end up as the only filter
+   * with no way out stated in the same sentence.
+   */
+  const scopeLabel = scopedCollection
+    ? t('filesApp.collections.scoped', { name: scopedCollection.collection.name })
+    : scope
+      ? t('filesApp.entry.scoped', {
+          category: t(categoryNode(scope)?.labelKey ?? 'filesApp.tree.everything'),
+        })
+      : null;
 
   const toolbar = (
     <div className="fa-toolbar">
@@ -498,18 +1029,17 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           same window shows a fraction of the tree and reads as a broken index
           rather than as a filter someone asked for — and the way out is stated
           in the same sentence rather than left to be discovered in the rail. */}
-      {scope ? (
+      {scopeLabel ? (
         <button
           type="button"
           className="fa-scope-clear"
-          onClick={() => setScope(null)}
-          title={t('filesApp.entry.scoped', {
-            category: t(categoryNode(scope)?.labelKey ?? 'filesApp.tree.everything'),
-          })}
+          onClick={() => {
+            setScope(null);
+            setCollectionScope(null);
+          }}
+          title={scopeLabel}
         >
-          {t('filesApp.entry.scoped', {
-            category: t(categoryNode(scope)?.labelKey ?? 'filesApp.tree.everything'),
-          })}
+          {scopeLabel}
         </button>
       ) : null}
     </div>
@@ -593,6 +1123,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             {t('filesApp.state.partial', { sources: failed.map((f) => f.source).join(', ') })}
           </p>
         ) : null}
+        {/* A folder that quietly shrank is the shape the plan calls a finding.
+            The ids are kept, not dropped, so the shortfall between what the
+            user filed and what the list shows is stated rather than absorbed. */}
+        {scopedCollection && scopedCollection.missingItemIds.length > 0 ? (
+          <p className="fa-state-warning fa-collection-missing" role="status">
+            {t('filesApp.collections.missing', {
+              count: scopedCollection.missingItemIds.length,
+            })}
+          </p>
+        ) : null}
         <VirtualList
           items={visible}
           itemHeight={ROW_HEIGHT}
@@ -617,6 +1157,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             data-broken={item.flags.brokenLink ? 'true' : undefined}
             aria-selected={item.id === selectedId}
             tabIndex={0}
+            /* Gate 16's pointer path into a folder. The keyboard path is the
+               inspector's Add control — drag alone would put a whole feature
+               behind a gesture a keyboard user cannot make. */
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(FILES_DRAG_ITEM_TYPE, item.id);
+              e.dataTransfer.effectAllowed = 'copy';
+            }}
             onClick={() => selectItem(item.id)}
             /* Gate 10, the filing-system gesture: single click selects, double
                click opens. Both routes end in the same `openItem`, so there is
@@ -844,6 +1392,39 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
       )}
       {mineResult}
+      {/* Gate 16's keyboard path into a folder, and gate 17's "not offered" in
+          its plainest form: the options are the user's OWN folders and nothing
+          else, so a derived folder is never on the menu to begin with. */}
+      {collectionRows.length === 0 ? (
+        <p className="fa-details-note">{t('filesApp.collections.noneYet')}</p>
+      ) : (
+        <label className="fa-details-add">
+          <span>{t('filesApp.collections.addTo')}</span>
+          <select
+            className="fa-add-to-collection"
+            value=""
+            onChange={(e) => {
+              const id = e.target.value;
+              if (id) addItemToFolder(id, selected);
+            }}
+          >
+            <option value="">{t('filesApp.collections.add')}</option>
+            {collectionRows.map(({ collection }) => (
+              <option key={collection.id} value={collection.id}>
+                {collection.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {/* Only inside a folder: "remove from this folder" has no referent when
+          the list is a derived category, and a control whose target is a guess
+          is worse than one that is not there. */}
+      {scopedCollection && scopedCollection.presentItemIds.includes(selected.id) ? (
+        <button type="button" className="fa-action fa-remove-from-collection" onClick={onRemoveFromFolder}>
+          {t('filesApp.collections.removeFrom')}
+        </button>
+      ) : null}
       <p className="fa-details-note">
         {t(`filesApp.delete.mode.${deleteModeFor(selected.location)}`)}
       </p>

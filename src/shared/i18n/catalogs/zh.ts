@@ -10525,6 +10525,43 @@ export const zh: Catalog = {
   'filesApp.collection.error.cycle': '文件夹不能移动到它自己的子文件夹里。',
   'filesApp.collection.error.saveFailed':
     '无法保存你的文件夹。此更改现在有效，但重启应用后会丢失。',
+  'filesApp.collections.heading': '我的文件夹',
+  'filesApp.collections.new': '新建文件夹',
+  'filesApp.collections.newNameDefault': '新建文件夹',
+  'filesApp.collections.empty': '还没有你自己的文件夹。',
+  'filesApp.collections.missing': {
+    other: '此文件夹中的 {count} 个项目已不在库里。',
+  },
+  'filesApp.collections.nameLabel': '文件夹名称',
+  'filesApp.collections.rename': '重命名',
+  'filesApp.collections.renameSave': '保存',
+  'filesApp.collections.renameCancel': '取消',
+  'filesApp.collections.renamed': '已重命名为“{name}”。',
+  'filesApp.collections.created': '已创建“{name}”。',
+  'filesApp.collections.delete': '删除文件夹',
+  'filesApp.collections.deleteConfirm': {
+    other: '删除“{name}”吗？其中的 {count} 个项目会原样保留，只有文件夹会消失。',
+  },
+  'filesApp.collections.deleteConfirmYes': '删除文件夹',
+  'filesApp.collections.deleteConfirmNo': '保留',
+  'filesApp.collections.deleted': '已删除“{name}”。它装的一切都还在库里。',
+  'filesApp.collections.moveTo': '将文件夹移入',
+  'filesApp.collections.topLevel': '顶层',
+  'filesApp.collections.moved': '已移动“{name}”。',
+  'filesApp.collections.addTo': '添加到我的文件夹',
+  'filesApp.collections.add': '添加',
+  'filesApp.collections.added': '已把“{name}”添加到“{folder}”。',
+  'filesApp.collections.removeFrom': '从此文件夹移出',
+  'filesApp.collections.removed': '已把“{name}”从“{folder}”移出。项目本身没有改动。',
+  'filesApp.collections.noneYet': '请先创建一个文件夹。',
+  'filesApp.collections.scoped': '正在显示“{name}”',
+  'filesApp.derived.cannotRename':
+    '“{category}”由每个项目本身的性质决定，因此没有可更改的名称。想自己命名请创建你自己的文件夹。',
+  'filesApp.derived.cannotDelete':
+    '“{category}”是库的一个视图，不是容器。删除它会隐藏仍然存在的项目，因此不提供该操作。',
+  'filesApp.derived.cannotMove': '“{category}”由每个项目本身的性质推导而来，没有可移动的去处。',
+  'filesApp.derived.cannotAdd':
+    '项目出现在“{category}”是因为它们本身的性质，而不是被放进去的。请改为添加到你自己的文件夹。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',

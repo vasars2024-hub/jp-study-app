@@ -11488,6 +11488,51 @@ export const ru: Catalog = {
   'filesApp.collection.error.cycle': 'Папку нельзя переместить в одну из её собственных папок.',
   'filesApp.collection.error.saveFailed':
     'Не удалось сохранить ваши папки. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
+  'filesApp.collections.heading': 'Мои папки',
+  'filesApp.collections.new': 'Новая папка',
+  'filesApp.collections.newNameDefault': 'Новая папка',
+  'filesApp.collections.empty': 'Своих папок пока нет.',
+  'filesApp.collections.missing': {
+    one: '{count} элемента из этой папки больше нет в библиотеке.',
+    few: '{count} элементов из этой папки больше нет в библиотеке.',
+    many: '{count} элементов из этой папки больше нет в библиотеке.',
+    other: '{count} элемента из этой папки больше нет в библиотеке.',
+  },
+  'filesApp.collections.nameLabel': 'Имя папки',
+  'filesApp.collections.rename': 'Переименовать',
+  'filesApp.collections.renameSave': 'Сохранить',
+  'filesApp.collections.renameCancel': 'Отмена',
+  'filesApp.collections.renamed': 'Переименовано в «{name}».',
+  'filesApp.collections.created': 'Создана папка «{name}».',
+  'filesApp.collections.delete': 'Удалить папку',
+  'filesApp.collections.deleteConfirm': {
+    one: 'Удалить «{name}»? {count} элемент в ней останется на месте — исчезнет только папка.',
+    few: 'Удалить «{name}»? {count} элемента в ней останутся на месте — исчезнет только папка.',
+    many: 'Удалить «{name}»? {count} элементов в ней останутся на месте — исчезнет только папка.',
+    other: 'Удалить «{name}»? {count} элемента в ней останутся на месте — исчезнет только папка.',
+  },
+  'filesApp.collections.deleteConfirmYes': 'Удалить папку',
+  'filesApp.collections.deleteConfirmNo': 'Оставить',
+  'filesApp.collections.deleted':
+    'Папка «{name}» удалена. Всё, что в ней было, осталось в библиотеке.',
+  'filesApp.collections.moveTo': 'Переместить папку в',
+  'filesApp.collections.topLevel': 'Верхний уровень',
+  'filesApp.collections.moved': 'Папка «{name}» перемещена.',
+  'filesApp.collections.addTo': 'Добавить в мою папку',
+  'filesApp.collections.add': 'Добавить',
+  'filesApp.collections.added': '«{name}» добавлено в «{folder}».',
+  'filesApp.collections.removeFrom': 'Убрать из этой папки',
+  'filesApp.collections.removed': '«{name}» убрано из «{folder}». Сам элемент не тронут.',
+  'filesApp.collections.noneYet': 'Сначала создайте папку.',
+  'filesApp.collections.scoped': 'Показано: «{name}»',
+  'filesApp.derived.cannotRename':
+    '«{category}» наполняется тем, чем является каждый элемент, а не тем, как его назвали, — своего имени у неё нет. Чтобы назвать папку самому, создайте свою.',
+  'filesApp.derived.cannotDelete':
+    '«{category}» — это представление библиотеки, а не контейнер. Удаление скрыло бы существующие элементы, поэтому оно не предлагается.',
+  'filesApp.derived.cannotMove':
+    '«{category}» выводится из свойств самих элементов, поэтому перемещать её некуда.',
+  'filesApp.derived.cannotAdd':
+    'Элементы попадают в «{category}» из-за того, чем они являются, а не потому что их туда положили. Добавьте элемент в свою папку.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 
