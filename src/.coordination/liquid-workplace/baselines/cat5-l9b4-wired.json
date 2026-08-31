@@ -2,7 +2,7 @@
   "surface": "@.os-desktop-wired",
   "label": "l9b4-wired",
   "control": false,
-  "at": "2026-08-31T18:28:26.297Z",
+  "at": "2026-08-31T18:44:28.850Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "shell",
@@ -66,37 +66,41 @@
     {
       "id": 1,
       "q": "dominant task immediately obvious",
-      "verdict": "NO",
-      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "verdict": "YES",
+      "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
       "numbers": {
-        "entryPoints": 0,
+        "entryPoints": 1,
         "primaryInputs": 0,
-        "accentButtons": 0,
-        "accentList": [],
+        "accentButtons": 1,
+        "accentList": [
+          "button.os-start-btn::NODE"
+        ],
         "inputList": []
       }
     },
     {
       "id": 2,
       "q": "current location and way back obvious",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "a non-empty location label AND at least one way back",
       "numbers": {
         "titleText": "LOCAL NODE",
         "titleFrom": "button.os-desktop-switch",
-        "backAffordances": 0,
-        "backList": []
+        "backAffordances": 1,
+        "backList": [
+          "Show desktop (minimi"
+        ]
       }
     },
     {
       "id": 3,
       "q": "primary actions visible without hunting",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": null,
-        "insideBodyViewport": false,
-        "explicitlyMarked": false
+        "primaryAction": "button.os-start-btn",
+        "insideBodyViewport": true,
+        "explicitlyMarked": true
       }
     },
     {
@@ -106,11 +110,11 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 2,
-        "scannedControls": 10,
+        "scannedControls": 11,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 10,
+        "chromeControlsRaw": 11,
         "summaryHeaders": 0,
         "behindDisclosure": 0,
         "disclosures": {
@@ -128,7 +132,8 @@
           "Search everything…",
           "Show hidden icons",
           "Quick settings",
-          "Notifications, 7"
+          "Notifications, 7",
+          "Show desktop (minimize all)"
         ]
       }
     },
@@ -280,30 +285,32 @@
     }
   ],
   "altThemeVerdicts": {
-    "q1": "NO",
-    "q2": "NO",
-    "q3": "NO",
+    "q1": "YES",
+    "q2": "YES",
+    "q3": "YES",
     "q4": "YES",
     "q6": "YES",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "wired-archive",
-    "controlsPainted": 10,
+    "controlsPainted": 11,
     "q1": {
-      "entryPoints": 0,
+      "entryPoints": 1,
       "primaryInputs": 0,
-      "accentButtons": 0,
-      "accentList": [],
+      "accentButtons": 1,
+      "accentList": [
+        "button.os-start-btn::NODE"
+      ],
       "inputList": []
     },
     "q4": {
       "collapsedDisclosures": 2,
-      "scannedControls": 10,
+      "scannedControls": 11,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 10,
+      "chromeControlsRaw": 11,
       "summaryHeaders": 0,
       "behindDisclosure": 0,
       "disclosures": {
@@ -321,7 +328,8 @@
         "Search everything…",
         "Show hidden icons",
         "Quick settings",
-        "Notifications, 7"
+        "Notifications, 7",
+        "Show desktop (minimize all)"
       ]
     },
     "q6": {
@@ -359,13 +367,9 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 10,
-  "findings": [
-    "Q1 dominant task immediately obvious",
-    "Q2 current location and way back obvious",
-    "Q3 primary actions visible without hunting"
-  ],
+  "controlsPaintedA": 11,
+  "findings": [],
   "voided": [],
-  "score": 7,
-  "verdict": "7/10 — 3 question(s) answer NO"
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

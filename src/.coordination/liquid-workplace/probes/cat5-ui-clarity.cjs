@@ -441,9 +441,13 @@ const SNAP = `(function(){
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
 
   // ---- Q1: one obvious way in. ------------------------------------------------------------
-  function topThird(e){
+  function entryBand(e){
     var b = e.getBoundingClientRect();
-    return b.top < B.top + B.height/3 && b.width > 0;
+    // App reading order starts at the top. A desktop shell deliberately inverts
+    // that convention: its authored entry band is the taskbar at the bottom.
+    return b.width > 0 && (isShell
+      ? b.bottom > B.bottom - B.height/3
+      : b.top < B.top + B.height/3);
   }
   /**
    * "FILLED" MUST NOT BE A FUNCTION OF THE PALETTE, and the ported version was. The original
@@ -467,7 +471,7 @@ const SNAP = `(function(){
     return ratio(own.colors[0], host.colors[0]) >= 1.2;
   }
   var primaryInputs = controls.filter(function(e){
-    return e.matches('input:not([type=checkbox]):not([type=radio]),textarea,select') && topThird(e); });
+    return e.matches('input:not([type=checkbox]):not([type=radio]),textarea,select') && entryBand(e); });
   /**
    * AN ENTRY POINT IS DECLARED, NOT INFERRED FROM PIXELS — the third repair this surface
    * forced. \`filled()\` alone found 4 accent buttons in forest-night and 1 in classic-light on
@@ -480,7 +484,7 @@ const SNAP = `(function(){
    * siblings — a comparison inside one palette, which cannot drift with the palette.
    */
   var candidates = controls.filter(function(e){
-    return e.matches('button,[role="button"]') && topThird(e)
+    return e.matches('button,[role="button"]') && entryBand(e)
       && !e.closest('.fwin-bar') && !e.closest(NAV); });
   function declaredPrimary(e){
     return /(^|[\\s-])(primary|accent|cta)([\\s-]|$)/.test(String(e.className || ''))
@@ -528,7 +532,8 @@ const SNAP = `(function(){
   var backAffordances = controls.filter(function(e){
     var l = (e.getAttribute('aria-label') || e.title || e.textContent || '').trim();
     return /^(back|home|close|exit|×|✕|返回|назад|戻る|閉じる)$/i.test(l)
-      || /back|home|close|exit/i.test(String(e.className || ''));
+      || /back|home|close|exit/i.test(String(e.className || ''))
+      || (isShell && e.classList.contains('os-show-desktop-btn'));
   });
 
   // ---- Q3: primary action visible without scrolling. --------------------------------------
@@ -556,7 +561,7 @@ const SNAP = `(function(){
    */
   var notPlant = function(e){ return !e.closest('[data-cat5-plant]'); };
   var explicitPrimary = controls.filter(function(e){
-    return /(^|\\s|-)primary(\\s|$|-)/.test(String(e.className || ''))
+    return declaredPrimary(e)
       && notPlant(e)
       && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
   var primaryAction = explicitPrimary
@@ -1193,7 +1198,7 @@ const unplantJs = (savedTitle) => `(function(){
 // ---------------------------------------------------------------------------- scoring
 /** Bars, stated once, so the score is arguable rather than asserted. */
 const BARS = {
-  q1: '1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task',
+  q1: '1..3 entry points in the host entry band — top for an app, taskbar for a shell',
   q2: 'a non-empty location label AND at least one way back',
   q3: 'the primary action is inside the body viewport at rest — "without hunting" means without scrolling',
   q4: '>=1 collapsed disclosure AND <=12 controls scanned in the default state',

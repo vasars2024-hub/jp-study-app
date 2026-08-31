@@ -1798,3 +1798,26 @@ Open product question is unchanged and deliberately not papered over: Q1/Q2/Q3 n
 navigation decision (dominant task, current location/recovery, primary action). **RULE C remains
 5 of 16 passing cells.** `sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications,
 onboarding, help.
+
+## 2026-08-31 — codexA — cat5 Wired passes 10/10; the shell has a route home
+
+**Decision, implemented in `25f484af`.** A desktop shell's authored entry band is its taskbar,
+not an app page's top third. Start is the one declared primary entry; the selected desktop switch
+states the current location; a visible Show desktop button is the route home. This uses existing
+shell commands and the Windows taskbar idiom rather than inventing another navigation system.
+
+Show desktop captures only windows it changes and restores their exact optional `min` values.
+Live state began SIG-VID open / SYS open / CAP-50 already minimized; first click made all three
+minimized and flipped label/pressed state to Restore all; second click restored the three DOM
+class records **byte-identically**, including CAP-50 still minimized. Pure state tests **3/3**;
+focused shell/source regressions **27/27**.
+
+**cat5 · Wired = PASS 10/10.** Q1 has **1** entry point (`os-start-btn`); Q2 has one current
+location (`LOCAL NODE`) and **1** route home; Q3's explicit primary is visible; Q4 has **11**
+scanned controls and 2 collapsed disclosures. Q5 remains 0 failures in both tiers (minimum
+7.46/7.48); cat6 evidence remains 9/9 each mode and 0 round-trip diffs. Control failed Q2,
+Q3, Q4, Q5 and Q10 as required; residue 0 and the shell/theme/transparency state restored.
+
+**RULE C: 6 of 16 passing cells** — cat1 through cat6, all Wired. Next is cat7 then cat8 on
+Wired, followed by all eight on Blanc. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+notifications, onboarding, help.
