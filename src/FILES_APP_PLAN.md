@@ -495,6 +495,16 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    says so in different words from a recoverable delete.
 22. **View state persists.** Sort column, direction and view mode are remembered per folder
    across a restart.
+   <!-- status: closed; evidence: 2026-08-31 0ef89ef0 -- shared/filesApp/viewState.ts + renderer/filesViewStateStore.ts; 26 tests (19 pure + 7 on the real component across a real unmount with the store's memory fallback cleared); every "remembered" claim paired with a neighbour folder that must not have moved; adverse control collapsing folderViewKey to one global key turns 6 of 26 red, 3 of them restart tests -->
+   <!-- decision: view modes are `details` (the column table) and `compact` (name + kind, 24px
+        row), not a four-way Explorer set. The list is windowed by VirtualList on a fixed
+        `itemHeight`, so a tile grid is a second windowing mode rather than a class name, and
+        the gate asks about REMEMBERING the mode. A third value can be added to
+        FILES_VIEW_MODES later without touching the persistence contract. -->
+   <!-- finding, recorded not fixed: a folder can be sorted by a column its own view mode has
+        dropped, so compact renders no `aria-sort` anywhere. The toolbar select still names the
+        column and the order is correct — Explorer's List view behaves the same way. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (seventeenth) Progress entry.
 23. **Scan finds things in bulk.** Point it at a folder holding a mixed set — subtitles, an
    epub, a dictionary zip, a video — and it reports a count per destination. Report the number
    found, the number placed and the number left ambiguous; "scanned successfully" with no
@@ -1470,3 +1480,51 @@ consumers, CRLF-sensitive guards, and existing reader/canvas harness failures; n
 Gate-19/20 path. i18n **exit 0 / 11,879 keys**. Architecture reports the same **15** unclassified
 post-branch modules and no files-app identity. ESLint on the touched TS/TSX/catalog paths **exit
 0 / 0 warnings**; CSS is excluded because this ESLint configuration parses it as JavaScript.
+
+### 2026-08-31 (seventeenth) — gate 22 CLOSES: view state is remembered per FOLDER
+
+`0ef89ef0`. Sort column, direction and view mode moved out of component state into
+`shared/filesApp/viewState.ts` + `renderer/filesViewStateStore.ts`, on the same
+`filesDocStore` shape gates 16/18/19 use — so a write that did not land reports itself
+rather than passing and being gone at the next launch.
+
+**Per folder is the gate, and it is asserted from the neighbour.** One global sort would
+survive a restart too and would be a different feature, so every "remembered" claim is
+paired with a second folder that must NOT have moved. Measured on the real component:
+Video at size/desc reads `alpha, gamma, beta` after the restart while Text is still
+name/asc at `one, two` and Everything is still name — and the persisted document carries
+`category:sources/video -> size` and `category:sources/text -> modified/desc` as two rows.
+
+**The restart is a real unmount plus `resetViewStateMemoryForTests()`.** The store keeps a
+`memoryDoc` so a session survives a throwing `setItem`; a test that only remounted would
+read that copy back and pass with nothing ever reaching `localStorage`. That is the trap
+this gate is built to catch, so the suite also runs it in the negative: with `setItem`
+throwing, the mode is live, the notice says "restarts", and the restart really does show
+`details` again.
+
+**Adverse control.** Collapsing `folderViewKey` to a single global key turns **6 of 26**
+red — 3 of them restart tests on the production component — and restoring is
+byte-identical (md5 `5833e59f…` before and after).
+
+Decision, reversible: view modes are `details` (the column table) and `compact` (name +
+kind, 24px row), not Explorer's four. `VirtualList` windows on a fixed `itemHeight`, so a
+tile grid is a second windowing mode rather than a class name; a third value can join
+`FILES_VIEW_MODES` later without touching the persistence contract. Compact genuinely
+drops the three columns from the DOM (`.fa-cell-size` count 0, not `display:none`), and
+the row height moves with it or the windowing scrolls wrong.
+
+Finding, recorded not fixed: **a folder can be sorted by a column its own view mode has
+dropped**, so compact renders no `aria-sort` anywhere. The toolbar select still names the
+column and the order is correct — Explorer's List view is the same — so it is honest
+rather than hidden. Pinned as an assertion, not left to be rediscovered.
+
+Trap for the next worker: three `--lq-*` tokens I first reached for do not exist anywhere
+in the tree (`--lq-liquid-bg-active`, `--lq-status-danger`, `--lq-font-sm`). An undefined
+custom property makes the declaration invalid at computed-value time, so it inherits and
+the rule looks landed while painting nothing. This stylesheet says "on" and "wrong" with
+weight and `currentcolor`, never a hue token — `--lq-liquid-highlight` is `transparent` on
+at least one theme.
+
+Focused gates: **26/26** across the two new suites, ESLint **exit 0 / 0 warnings** on all
+10 touched TS/TSX paths, i18n **exit 0 at 11,885 keys**, architecture the same **15**
+pre-existing branch-divergence findings and no gate-22 identity among them.
