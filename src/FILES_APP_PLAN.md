@@ -1462,3 +1462,11 @@ selection clears when the batch settles so a second click cannot overwrite the f
 only recovery path. Focused production-component gate: **47/47 tests**, including the existing
 single-item mine and sort/a11y regressions. i18n **11,879 keys**, ESLint **0**, architecture
 the same 15 branch-divergence findings and no Gate-20 identity.
+
+Turn-wide gates after the last slice: full Vitest **926 passed / 1 skipped / 13 failed suites,
+12,191 passed / 6 skipped / 33 failed tests**. The failing suite/test set is the recorded
+worktree branch-divergence baseline (13/33 before this turn): missing post-branch Liquid CSS and
+consumers, CRLF-sensitive guards, and existing reader/canvas harness failures; none names a
+Gate-19/20 path. i18n **exit 0 / 11,879 keys**. Architecture reports the same **15** unclassified
+post-branch modules and no files-app identity. ESLint on the touched TS/TSX/catalog paths **exit
+0 / 0 warnings**; CSS is excluded because this ESLint configuration parses it as JavaScript.
