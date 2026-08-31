@@ -1,0 +1,83 @@
+{
+  "_readme": [
+    "Gate 8's REQUIRED 'before' capture. The gate's own words: memory and statistics must",
+    "render in the Files app with 'the same numbers the old Settings page produced, captured",
+    "**before** removal and compared after'. Removal has not happened yet, so this file is the",
+    "only chance to take it -- once settingsRegistry loses pageId:'memory' there is nothing left",
+    "to compare against.",
+    "",
+    "Measured 2026-08-31 through the running app's debug bridge (read-only; both probe globals",
+    "deleted afterwards; the app was NOT navigated, because it is another track's live",
+    "instrument -- every value below comes from the same call the page itself makes, not from",
+    "reading the rendered DOM).",
+    "",
+    "TRAP for whoever compares: four of these are LIVE MACHINE STATE and will not reproduce.",
+    "`freemem`, `used`, `quota` and every `stats.*` figure move on their own -- freemem by the",
+    "second, and the stats counters every time the user reads or watches anything. Compare the",
+    "STABLE keys exactly (`totalmem`, `platform`, `domainsAll`, `domainsPresent`, the inventory",
+    "ids), and compare the volatile ones only for shape: same source, same units, same",
+    "ordering, non-null. A Files-app panel that reports a DIFFERENT freemem is correct; one",
+    "that reports null, or bytes where the page showed a percentage, is not."
+  ],
+  "capturedAtIso": "2026-08-31T08:05:00Z",
+  "method": {
+    "bridge": "127.0.0.1:39273 /eval, two stash-then-read calls",
+    "note": "/eval is synchronous and a promise serializes to {} -- the result is parked on a window global by call 1 and read by call 2. See memory 'bridge-eval-is-synchronous'."
+  },
+  "memory": {
+    "renderedBy": "src/renderer/components/settings/pages/MemoryPage.tsx",
+    "settingsPageId": "memory",
+    "cardIds": [
+      "system-memory",
+      "storage-usage",
+      "storage-inventory",
+      "agent-memory",
+      "agent-history",
+      "backup",
+      "clear-data",
+      "factory-reset"
+    ],
+    "registryEntriesWithPageIdMemory": 9,
+    "systemGetMetrics": {
+      "totalmem": 31982632960,
+      "freemem": 7030161408,
+      "platform": "win32",
+      "_volatile": ["freemem", "cpuLoad", "uptime"]
+    },
+    "storageEstimate": {
+      "used": 5026721050,
+      "quota": 58303462682,
+      "_volatile": ["used", "quota"]
+    },
+    "settingsDomainInventory": {
+      "domainsAll": 30,
+      "domainsPresent": 24,
+      "totalBytes": 6054776,
+      "topSixByBytes": [
+        ["flashcards", 5202929],
+        ["clipboard", 522238],
+        ["study-progress", 151544],
+        ["media-study", 100413],
+        ["profiles", 50712],
+        ["lookups", 9307]
+      ],
+      "_stable": ["domainsAll", "domainsPresent", "the six ids and their order"]
+    }
+  },
+  "statistics": {
+    "renderedBy": "src/renderer/components/stats/StatsContent.tsx",
+    "section": "stats",
+    "getSummary": {
+      "totalSeconds": 21364.698,
+      "totalChars": 42748,
+      "totalWatchSeconds": 1844.45,
+      "recentDays": 14,
+      "_volatile": ["totalSeconds", "totalChars", "totalWatchSeconds"],
+      "_stable": ["recentDays"]
+    },
+    "knownWords": {
+      "listKnownEntries": 0,
+      "_note": "A measured zero, not a missing reader. It agrees with the Notebook's own `known: 0` stream count taken in the same session (gate 7's table), so two independent readers report the same empty store. A Files-app panel showing anything other than 0 here is reporting a different store."
+    }
+  }
+}

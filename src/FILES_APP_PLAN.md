@@ -1121,3 +1121,44 @@ ledger's vocabulary check reads the **type**, which is how it surfaced.
 **Gate 37 — the four full gates, after the last slice.** See the closing paragraph below.
 
 **Gate tags now: 9 closed (1–7, 13, 14) / 1 open (12) / 27 untagged.**
+
+### 2026-08-31 (eighth) — Gate 8's "before" capture, taken while it can still be taken
+
+Gate 8 requires the memory/statistics numbers "captured **before** removal and compared
+after". Once `settingsRegistry` loses `pageId: 'memory'` there is nothing left to compare
+against, so the capture is the FIRST slice of gate 8, not the last. It is now committed at
+`src/.coordination/files-app/gate8-before.json`.
+
+Measured through the running app's bridge, read-only, **without navigating it** — that app
+is the liquid track's live instrument and its handoff records an exact restored state. Every
+value comes from the same call the page itself makes (`navigator.storage.estimate()`,
+`window.api.systemGetMetrics()`, `listSettingsDomains()`, `getSummary()`,
+`listKnownEntries()`), not from reading rendered DOM. Both probe globals deleted after.
+
+**Memory** — 8 cards, 9 registry entries at `pageId: 'memory'`, 1 nav page.
+totalmem **31,982,632,960** · freemem 7,030,161,408 · win32 · storage used 5,026,721,050 of
+quota 58,303,462,682 · settings inventory **24 of 30 domains present, 6,054,776 B**, top six
+`flashcards 5,202,929 / clipboard 522,238 / study-progress 151,544 / media-study 100,413 /
+profiles 50,712 / lookups 9,307`.
+
+**Statistics** — totalSeconds 21,364.698 · totalChars 42,748 · totalWatchSeconds 1,844.45 ·
+recent **14** days · knownWords **0**.
+
+**The trap this file exists to stop.** Four of these are live machine state and will NOT
+reproduce: `freemem`, `used`, `quota` and every `stats.*` counter move on their own. Compare
+`totalmem`, `platform`, `domainsAll`, `domainsPresent`, `recentDays` and the inventory ids
+EXACTLY; compare the volatile ones for shape only — same source, same units, same ordering,
+non-null. A Files panel reporting a different `freemem` is correct; one reporting null, or
+bytes where the page showed a percentage, is not.
+
+**A cross-check that already paid off.** `listKnownEntries()` returns **0**, and the
+Notebook's own `known` stream measured **0** in the same session (gate 7's table). Two
+independent readers, same empty store — so the zero is measured, not a missing reader.
+
+**Gate 8's remaining work, in order, for the next turn:** (1) build the Files-app memory and
+statistics panels against `system/memory` and `system/statistics`, which gate 1 measured as
+the only two leaves still reading 0 with work owed; (2) remove the 9 registry entries and the
+nav page; (3) repoint every search entry that pointed at `pageId: 'memory'` — the gate is
+explicit that a search hit landing on a page that no longer holds the row is a FAIL;
+(4) flip the `memory` and `statistics` parity rows to `migrated` (both are already on
+`FILES_PERMITTED_MIGRATIONS`) and re-run the comparison against this file.
