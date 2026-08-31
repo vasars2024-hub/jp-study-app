@@ -11575,6 +11575,13 @@ export const ru: Catalog = {
     'Этот запрос встроен в приложение, поэтому его нельзя удалить. Свои — можно.',
   'filesApp.smart.error.saveFailed':
     'Не удалось сохранить ваши запросы. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
+  'filesApp.scan.skip.incomplete': 'Ещё скачивается — пропущено до завершения.',
+  'filesApp.scan.skip.unreadable': 'Не удалось прочитать.',
+  'filesApp.scan.skip.limit': 'Сканирование достигло предела по числу файлов и остановилось здесь.',
+  'filesApp.scan.summary':
+    'Найдено {found}: {placed} размещено, {ambiguous} требуют выбора, {unplaced} без места, {skipped} пропущено.',
+  'filesApp.scan.truncated':
+    'Сканирование остановилось на пределе по числу файлов, поэтому их может быть больше.',
   'filesApp.view.label': 'Вид',
   'filesApp.view.mode.details': 'Таблица',
   'filesApp.view.mode.compact': 'Компактно',

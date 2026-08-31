@@ -19,8 +19,10 @@ import { app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
+import type { FilesScanReport } from '../../shared/filesApp/scan';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
 import { readFilesMineSource } from './mineSource';
+import { scanRoots } from './scan';
 
 /** How long a built index is served before the next request rebuilds it. */
 const INDEX_TTL_MS = 15_000;
@@ -133,4 +135,20 @@ export function registerFilesAppIpc(): void {
       }
     },
   );
+
+  /**
+   * Gate 23 — bulk scan. Read-only by construction (`filesApp/scan.ts`'s
+   * header), so this handler imports nothing and confirms nothing: it answers
+   * with a report, and importing any part of it is a separate, later call.
+   *
+   * The root count is capped because each root is a full tree walk, and a
+   * caller that passed a hundred would hold the main process for minutes with
+   * no way to interrupt it.
+   */
+  ipcMain.handle('filesapp:scan', (_e, roots: unknown): FilesScanReport => {
+    const list = Array.isArray(roots)
+      ? roots.filter((r): r is string => typeof r === 'string' && r.length > 0).slice(0, 8)
+      : [];
+    return scanRoots(list);
+  });
 }

@@ -10695,6 +10695,13 @@ export const ja: Catalog = {
     'この検索はアプリに組み込まれているため削除できません。自分で保存したものは削除できます。',
   'filesApp.smart.error.saveFailed':
     '保存した検索を保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.scan.skip.incomplete': 'ダウンロード中のため、完了するまでスキップしました。',
+  'filesApp.scan.skip.unreadable': '読み取れませんでした。',
+  'filesApp.scan.skip.limit': 'スキャンがファイル数の上限に達し、ここで停止しました。',
+  'filesApp.scan.summary':
+    '{found} 件見つかりました。{placed} 件は振り分け済み、{ambiguous} 件は選択が必要、{unplaced} 件は行き先なし、{skipped} 件はスキップ。',
+  'filesApp.scan.truncated':
+    'スキャンはファイル数の上限で停止したため、これ以外にもある可能性があります。',
   'filesApp.view.label': '表示',
   'filesApp.view.mode.details': '詳細',
   'filesApp.view.mode.compact': 'コンパクト',

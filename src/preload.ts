@@ -10,6 +10,7 @@ import {
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
 import type { FilesMineSourceResult } from './shared/filesApp/mining';
+import type { FilesScanReport } from './shared/filesApp/scan';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -1019,6 +1020,13 @@ const api = {
     location: FilesLocation,
     kind: 'transcript' | 'subtitle' | 'book',
   ): Promise<FilesMineSourceResult> => ipcRenderer.invoke('filesapp:mine-source', location, kind),
+  /**
+   * Gate 23: classify a folder in bulk and report it grouped by destination.
+   * Read-only — this answers with counts and imports nothing, so calling it is
+   * always safe and the confirm step is a separate action.
+   */
+  filesScan: (roots: string[]): Promise<FilesScanReport> =>
+    ipcRenderer.invoke('filesapp:scan', roots),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open
