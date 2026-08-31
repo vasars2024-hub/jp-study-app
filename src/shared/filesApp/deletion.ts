@@ -23,9 +23,10 @@ export interface FilesDeletionTarget {
   /** Stable catalogue id. Also binds an explicit confirmation to one item. */
   id: string;
   name: string;
+  /** Authoritative catalogue kind; deletion risk is derived from this value. */
+  kind: string;
   location: FilesDeletionLocation;
   sizeBytes: number | null;
-  risk: FilesDeletionRisk;
 }
 
 export interface FilesDeletionPlan {
@@ -44,6 +45,13 @@ export function deletionModeForLocation(location: FilesDeletionLocation): FilesD
   return 'soft';
 }
 
+const IRREPLACEABLE_MEDIA_KINDS: ReadonlySet<string> = new Set(['video', 'audio']);
+
+/** The caller cannot downgrade media risk with a request field. */
+export function deletionRiskForKind(kind: string): FilesDeletionRisk {
+  return IRREPLACEABLE_MEDIA_KINDS.has(kind) ? 'irreplaceable-media' : 'replaceable';
+}
+
 /**
  * Build the copy and guard before presenting a delete action. The message keys
  * differ by recovery semantics; a non-recoverable refusal must never reuse the
@@ -51,9 +59,10 @@ export function deletionModeForLocation(location: FilesDeletionLocation): FilesD
  */
 export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPlan {
   const mode = deletionModeForLocation(target.location);
+  const risk = deletionRiskForKind(target.kind);
   const messageKey =
     mode === 'trash'
-      ? target.risk === 'irreplaceable-media'
+      ? risk === 'irreplaceable-media'
         ? 'filesApp.delete.confirmMediaTrash'
         : 'filesApp.delete.confirmTrash'
       : mode === 'soft'
@@ -63,10 +72,10 @@ export function planFilesDeletion(target: FilesDeletionTarget): FilesDeletionPla
   return {
     itemId: target.id,
     mode,
-    risk: target.risk,
+    risk,
     messageKey,
     messageValues: { name: target.name, sizeBytes: target.sizeBytes },
-    requiresExplicitConfirmation: target.risk === 'irreplaceable-media' && mode !== 'none',
+    requiresExplicitConfirmation: risk === 'irreplaceable-media' && mode !== 'none',
   };
 }
 

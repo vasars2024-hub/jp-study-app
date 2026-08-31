@@ -10,9 +10,9 @@ function target(overrides: Partial<FilesDeletionTarget> = {}): FilesDeletionTarg
   return {
     id: 'transcript:episode-3',
     name: 'Episode 3 transcript.json',
+    kind: 'transcript',
     location: { store: 'file', path: 'C:\\fixture\\Episode 3 transcript.json' },
     sizeBytes: 4_096,
-    risk: 'replaceable',
     ...overrides,
   };
 }
@@ -100,9 +100,9 @@ describe('Files app deletion policy', () => {
     const video = target({
       id: 'media:episode-3',
       name: 'Episode 3.mkv',
+      kind: 'video',
       location: { store: 'file', path: 'C:\\fixture\\Episode 3.mkv' },
       sizeBytes: 734_003_200,
-      risk: 'irreplaceable-media',
     });
 
     expect(await executeFilesDeletion(video, {}, deps)).toEqual({
@@ -117,8 +117,8 @@ describe('Files app deletion policy', () => {
     const deps = dependencies();
     const video = target({
       id: 'media:episode-3',
+      kind: 'video',
       location: { store: 'file', path: 'C:\\fixture\\Episode 3.mkv' },
-      risk: 'irreplaceable-media',
     });
 
     expect(
