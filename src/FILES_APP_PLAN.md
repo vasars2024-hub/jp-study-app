@@ -556,6 +556,23 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    ambiguous with reasons.
 29. **Re-scan is idempotent.** Running the same scan twice imports nothing the second time and
    says so — a duplicate library entry is a FAIL.
+   <!-- status: closed; evidence: 2026-08-31 -- shared/filesApp/importLedger.ts + renderer/filesImportLedgerStore.ts + a fourth `known` pile in planIngest; 19 tests. "Says so": the production component scans, imports, scans again, and reports the 3 that landed under Already brought in with auto empty, while the refused .csv stays offerable; the second confirm calls NO importer and reports 0 of 1. "Imports nothing": the real media:addPaths and library:importPaths handlers, called twice with the same paths, return the same row counts and exactly one row per source. Undo forgets, so the files are offered again. -->
+   <!-- decision: identity is path + SIZE, never path alone. A file replaced in
+        place — a re-download, a better rip under the same name — is a different
+        file and deserves to be offered again; the scan already has the size, so
+        recognising that costs nothing. mtime is deliberately excluded: some
+        copy tools change it while the bytes are identical, which would re-offer
+        something genuinely already held. -->
+   <!-- decision: `known` is its own pile rather than folded into `refused`. The
+        user is being told something different — "you already have this", a
+        previous run's success — and the disposition runs BEFORE the refusal so
+        a file whose classification changed since is answered by history rather
+        than re-judged into an import the importers would silently swallow. -->
+   <!-- trap: `localStorage.clear()` does NOT isolate a test of this store. It
+        keeps an in-module `memory` fallback so a quota error degrades to
+        "forgotten on restart" rather than to "gate 29 stops working"; that
+        fallback survives a cleared localStorage. Call `clearImportLedger()`. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (nineteenth) Progress entry.
 30. **Referenced items behave.** Removing a referenced item from the library leaves the user's
    original file on disk; moving the original produces a reported broken link rather than a
    crash or a silent disappearance.
@@ -1676,3 +1693,25 @@ imports anyway would pass a DOM-only test and fail the gate. (3) `MAX_STABILITY_
 Focused gates: **34/34** across the four new suites (18 model + 8 real-file + 8 component +
 4 import read-only), plus 72/72 across the touched renderer suites. ESLint exit 0 on every
 touched TS/TSX path. i18n exit 0 at **11,926 keys**.
+
+**Gate 29 closes in the same window.** Two halves, and only one of them is the importers'.
+"Imports nothing the second time" is theirs and is measured against the real handlers: called
+twice with the same paths, `media:addPaths` and `library:importPaths` return the same row
+counts and exactly one row per source. **"And says so" is new** — without it a second scan
+re-offers every file, the user confirms, the importers silently swallow the lot, and the
+report claims N imported when nothing happened. `shared/filesApp/importLedger.ts` plus a
+fourth `known` pile in `planIngest` is that half: the production component scans, imports,
+scans again, and reports the three that landed under **Already brought in** with the auto pile
+**empty**, while the refused `.csv` stays offerable and the second confirm calls **no**
+importer and reports **0 of 1**. Undo forgets, so a reversed import is offered again.
+
+Two decisions worth not re-deriving: identity is **path + size**, never path alone, so a file
+replaced in place is a different file and is offered again (mtime is excluded — some copy
+tools change it while the bytes are identical); and `known` runs BEFORE the refusal, so a file
+whose classification changed since is answered by history rather than re-judged into an import
+that would be swallowed.
+
+Trap: `localStorage.clear()` does **not** isolate a test of the ledger store. It keeps an
+in-module `memory` fallback so a quota error degrades to "forgotten on restart" rather than to
+"gate 29 stops working", and that fallback survives a cleared localStorage — two component
+tests failed on exactly that leak before `clearImportLedger()` was added to `beforeEach`.

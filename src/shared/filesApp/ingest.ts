@@ -31,6 +31,7 @@
  * is a table test rather than a live rehearsal.
  */
 import type { DropCandidate, DropConfidence, DropTargetId } from '../fileRouting';
+import { isAlreadyImported, type ImportLedger } from './importLedger';
 import type { FilesScanEntry, FilesScanReport } from './scan';
 import { DEFAULT_STABILITY_MS, MAX_STABILITY_MS } from './stability';
 
@@ -76,7 +77,13 @@ export const DEFAULT_INGEST_SETTINGS: IngestSettings = {
   stabilityMs: DEFAULT_STABILITY_MS,
 };
 
-export type IngestDisposition = 'auto' | 'review' | 'refused';
+/**
+ * Gate 29's fourth answer. `known` is kept out of the other three rather than
+ * folded into `refused`, because the user is being told something different:
+ * not "nothing can open this" but "you already have this", which is a
+ * successful outcome of a previous run rather than a failure of this one.
+ */
+export type IngestDisposition = 'auto' | 'review' | 'refused' | 'known';
 
 export const INGEST_AUTO_HIGH_CONFIDENCE = 'filesApp.ingest.auto.highConfidence';
 export const INGEST_AUTO_CATEGORY = 'filesApp.ingest.auto.category';
@@ -86,6 +93,7 @@ export const INGEST_REVIEW_AMBIGUOUS = 'filesApp.ingest.review.ambiguous';
 export const INGEST_REVIEW_ALWAYS = 'filesApp.ingest.review.alwaysReview';
 export const INGEST_REVIEW_CATEGORY = 'filesApp.ingest.review.category';
 export const INGEST_REFUSED_NO_DESTINATION = 'filesApp.ingest.refuse.noDestination';
+export const INGEST_KNOWN_ALREADY_IMPORTED = 'filesApp.ingest.known.alreadyImported';
 
 export interface IngestDecision {
   disposition: IngestDisposition;
@@ -122,9 +130,22 @@ export function isHighConfidence(entry: {
 
 /** Gate 27's decision for one scanned file. */
 export function dispositionFor(
-  entry: Pick<FilesScanEntry, 'target' | 'confidence' | 'candidateCount' | 'settlement'>,
+  entry: Pick<
+    FilesScanEntry,
+    'target' | 'confidence' | 'candidateCount' | 'settlement' | 'path' | 'sizeBytes'
+  >,
   settings: IngestSettings = DEFAULT_INGEST_SETTINGS,
+  ledger?: ImportLedger,
 ): IngestDecision {
+  /*
+   * Gate 29, and it runs FIRST — before the refusal, before the policy. A file
+   * already brought in is answered by history, not re-judged: if the router's
+   * table changed since, re-classifying it here would offer an import that the
+   * importers would then silently swallow, and the report would claim it landed.
+   */
+  if (ledger && entry.path && isAlreadyImported(ledger, { path: entry.path, sizeBytes: entry.sizeBytes })) {
+    return { disposition: 'known', reasonKey: INGEST_KNOWN_ALREADY_IMPORTED, warned: false };
+  }
   // No home at all. Nothing a review queue could ask about, so it is refused
   // by name rather than parked where a user would confirm it into nowhere.
   if (entry.target === 'unknown' || entry.settlement === 'unplaced') {
@@ -189,10 +210,13 @@ export interface IngestPlan {
   auto: IngestItem[];
   review: IngestItem[];
   refused: IngestItem[];
-  /** The three lists' lengths, so a caller can print them without recounting. */
+  /** Gate 29: files a previous run already brought in. */
+  known: IngestItem[];
+  /** The lists' lengths, so a caller can print them without recounting. */
   autoCount: number;
   reviewCount: number;
   refusedCount: number;
+  knownCount: number;
   /** How many auto rows were promoted past the router's own certainty. */
   warnedCount: number;
 }
@@ -209,14 +233,16 @@ export function planIngest(
   report: Pick<FilesScanReport, 'entries'>,
   settings: IngestSettings = DEFAULT_INGEST_SETTINGS,
   candidatesByPath?: ReadonlyMap<string, readonly DropCandidate[]>,
+  ledger?: ImportLedger,
 ): IngestPlan {
   const auto: IngestItem[] = [];
   const review: IngestItem[] = [];
   const refused: IngestItem[] = [];
+  const known: IngestItem[] = [];
   let warnedCount = 0;
 
   for (const entry of report.entries) {
-    const decision = dispositionFor(entry, settings);
+    const decision = dispositionFor(entry, settings, ledger);
     if (decision.warned) warnedCount += 1;
     const candidates = candidatesByPath?.get(entry.path);
     const item: IngestItem =
@@ -225,6 +251,7 @@ export function planIngest(
         : { entry, decision };
     if (decision.disposition === 'auto') auto.push(item);
     else if (decision.disposition === 'review') review.push(item);
+    else if (decision.disposition === 'known') known.push(item);
     else refused.push(item);
   }
 
@@ -232,9 +259,11 @@ export function planIngest(
     auto,
     review,
     refused,
+    known,
     autoCount: auto.length,
     reviewCount: review.length,
     refusedCount: refused.length,
+    knownCount: known.length,
     warnedCount,
   };
 }
@@ -244,7 +273,10 @@ export function ingestPlanBalances(
   report: Pick<FilesScanReport, 'entries'>,
   plan: IngestPlan,
 ): boolean {
-  return plan.autoCount + plan.reviewCount + plan.refusedCount === report.entries.length;
+  return (
+    plan.autoCount + plan.reviewCount + plan.refusedCount + plan.knownCount ===
+    report.entries.length
+  );
 }
 
 /**

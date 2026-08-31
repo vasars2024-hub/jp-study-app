@@ -10634,6 +10634,8 @@ export const zh: Catalog = {
   'filesApp.review.reviewHeading': '等待你确认（{count}）',
   'filesApp.review.refusedHeading': '无处安放（{count}）',
   'filesApp.review.skippedHeading': '未查看（{count}）',
+  'filesApp.review.knownHeading': '已经导入（{count}）',
+  'filesApp.ingest.known.alreadyImported': '这一项你已经有了。',
   'filesApp.review.warned': {
     other: '其中 {count} 项只是推测，并不确定。',
   },

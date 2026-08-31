@@ -209,11 +209,26 @@ describe('gate 24 — after a scan AND an import, the originals are untouched', 
     }
   });
 
-  it('re-importing the same paths does not touch them either', async () => {
-    // The second run is the one that would rewrite or re-extract if the
+  it('gate 29 — re-importing the same paths creates no second row, and touches nothing', async () => {
+    /*
+     * Gate 29's "imports nothing the second time" half. The review sheet's
+     * ledger stops the second offer, but the importers are what make a
+     * duplicate impossible even if it is offered, and that is the claim worth
+     * pinning here: `library:importPaths` skips a `sourcePath` it already
+     * holds, `media:addOrGetItem` gets-or-adds.
+     */
+    const mediaBefore = ((await call('media:addPaths', [])) as unknown[]).length;
+    const libraryBefore = ((await call('library:importPaths', [])) as unknown[]).length;
+
+    const media = (await call('media:addPaths', [VIDEO])) as { path?: string }[];
+    const library = (await call('library:importPaths', [MANGA])) as { sourcePath?: string }[];
+    expect(media).toHaveLength(mediaBefore);
+    expect(library).toHaveLength(libraryBefore);
+    expect(media.filter((r) => r.path === VIDEO)).toHaveLength(1);
+    expect(library.filter((r) => r.sourcePath === MANGA)).toHaveLength(1);
+
+    // And the second run is the one that would rewrite or re-extract if the
     // importers were not idempotent about their sources.
-    await call('media:addPaths', [VIDEO]);
-    await call('library:importPaths', [MANGA]);
     const after = fingerprint(sourceDir);
     for (const [file, sig] of before) expect(after.get(file)).toBe(sig);
   });

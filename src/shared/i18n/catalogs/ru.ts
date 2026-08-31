@@ -11615,6 +11615,8 @@ export const ru: Catalog = {
   'filesApp.review.reviewHeading': 'Ждёт вашего решения ({count})',
   'filesApp.review.refusedHeading': 'Некуда положить ({count})',
   'filesApp.review.skippedHeading': 'Не рассмотрено ({count})',
+  'filesApp.review.knownHeading': 'Уже добавлено ({count})',
+  'filesApp.ingest.known.alreadyImported': 'Это у вас уже есть.',
   'filesApp.review.warned': {
     one: '{count} из них — догадка, а не уверенность.',
     few: '{count} из них — догадки, а не уверенность.',

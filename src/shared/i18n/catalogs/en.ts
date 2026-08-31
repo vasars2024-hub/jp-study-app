@@ -11197,6 +11197,8 @@ export const en: Catalog = {
   'filesApp.review.reviewHeading': 'Waiting for you ({count})',
   'filesApp.review.refusedHeading': 'Nowhere to put these ({count})',
   'filesApp.review.skippedHeading': 'Not looked at ({count})',
+  'filesApp.review.knownHeading': 'Already brought in ({count})',
+  'filesApp.ingest.known.alreadyImported': 'You already have this one.',
   'filesApp.review.warned': {
     one: '{count} of these was a guess, not a certainty.',
     other: '{count} of these were guesses, not certainties.',

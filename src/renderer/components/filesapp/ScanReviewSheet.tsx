@@ -32,6 +32,12 @@ import type { FilesScanReport } from '../../../shared/filesApp/scan';
 import type { DropCandidate, DropTargetId } from '../../../shared/fileRouting';
 import { executeImport, undoImports, type ImportReceipt } from '../../fileImportExecute';
 import { announceFilesIndexChanged } from '../../filesIndexBus';
+import {
+  forgetImportedFiles,
+  loadImportLedger,
+  recordImportedFiles,
+} from '../../filesImportLedgerStore';
+import type { ImportLedger } from '../../../shared/filesApp/importLedger';
 
 const LAST_ROOT_KEY = 'jp-filesapp-scan-root-v1';
 
@@ -41,6 +47,8 @@ const SKIP = 'skip' as const;
 interface ImportOutcome {
   path: string;
   name: string;
+  sizeBytes: number;
+  target: DropTargetId;
   ok: boolean;
   /** Present on a refusal. Never a bare false. */
   reasonKey?: string;
@@ -76,13 +84,20 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
   const [state, setState] = useState<SheetState>({ status: 'idle' });
   /** Per-review-row decision: a destination, or SKIP. */
   const [picks, setPicks] = useState<Record<string, DropTargetId | typeof SKIP>>({});
+  /*
+   * Gate 29. Read once per scan rather than per render: the plan is a `useMemo`
+   * and a ledger object whose identity changed every render would rebuild it
+   * every time, which on a 5,000-row report is a scan's worth of work per
+   * keystroke in the root field.
+   */
+  const [ledger, setLedger] = useState<ImportLedger>(loadImportLedger);
 
   const effectiveSettings = settings ?? DEFAULT_INGEST_SETTINGS;
 
   const plan: IngestPlan | null = useMemo(() => {
     if (state.status !== 'report') return null;
-    return planIngest(state.report, effectiveSettings, state.candidates);
-  }, [state, effectiveSettings]);
+    return planIngest(state.report, effectiveSettings, state.candidates, ledger);
+  }, [state, effectiveSettings, ledger]);
 
   const onScan = useCallback(async () => {
     const target = root.trim();
@@ -110,7 +125,9 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
        * offer a choice, so they are re-fetched through the same classifier the
        * scan used. Capped at the classify handler's own 200-path limit.
        */
-      const provisional = planIngest(report, effectiveSettings);
+      const fresh = loadImportLedger();
+      setLedger(fresh);
+      const provisional = planIngest(report, effectiveSettings, undefined, fresh);
       const reviewPaths = provisional.review.map((i) => i.entry.path).slice(0, 200);
       const plans = reviewPaths.length ? await window.api.fileDropClassify(reviewPaths) : [];
       const candidates = new Map<string, DropCandidate[]>(
@@ -161,11 +178,19 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         });
         if (receipt) {
           receipts.push(receipt);
-          outcomes.push({ path: subject.path, name: subject.name, ok: true });
+          outcomes.push({
+            path: subject.path,
+            name: subject.name,
+            sizeBytes: job.item.entry.sizeBytes,
+            target: job.target,
+            ok: true,
+          });
         } else {
           outcomes.push({
             path: subject.path,
             name: subject.name,
+            sizeBytes: job.item.entry.sizeBytes,
+            target: job.target,
             ok: false,
             reasonKey: refusal ?? 'fileDrop.toast.noDestination',
           });
@@ -175,6 +200,8 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         outcomes.push({
           path: subject.path,
           name: subject.name,
+          sizeBytes: job.item.entry.sizeBytes,
+          target: job.target,
           ok: false,
           reasonKey: 'fileDrop.toast.failed',
         });
@@ -183,6 +210,18 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
     }
 
     if (receipts.length) {
+      /*
+       * Gate 29: only what actually landed is recorded. A refused row must stay
+       * offerable — recording it would make the second scan claim the app
+       * already holds a file no importer ever accepted.
+       */
+      setLedger(
+        recordImportedFiles(
+          outcomes
+            .filter((o) => o.ok)
+            .map((o) => ({ path: o.path, sizeBytes: o.sizeBytes, target: o.target })),
+        ),
+      );
       // After the imports resolve, never optimistically.
       announceFilesIndexChanged();
       onImported?.();
@@ -194,6 +233,8 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
     if (state.status !== 'imported' || !state.receipts.length) return;
     const count = state.receipts.length;
     await undoImports(state.receipts);
+    // An undo has to forget, or the next scan reports a reversed import as held.
+    setLedger(forgetImportedFiles(state.outcomes.filter((o) => o.ok).map((o) => o.path)));
     announceFilesIndexChanged();
     onImported?.();
     setState({ status: 'undone', count });
@@ -346,6 +387,22 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
               <h3>{t('filesApp.review.reviewHeading', { count: plan.reviewCount })}</h3>
               <ul>{plan.review.map(renderReviewRow)}</ul>
             </section>
+
+            {plan.knownCount > 0 ? (
+              <section className="fa-review-group fa-review-known">
+                <h3>{t('filesApp.review.knownHeading', { count: plan.knownCount })}</h3>
+                <ul>
+                  {plan.known.map((item) => (
+                    <li className="fa-review-row" key={item.entry.path}>
+                      <span className="fa-review-name" title={item.entry.path}>
+                        {item.entry.name}
+                      </span>
+                      <span className="fa-review-reason">{t(item.decision.reasonKey)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             {plan.refusedCount > 0 ? (
               <section className="fa-review-group fa-review-refused">

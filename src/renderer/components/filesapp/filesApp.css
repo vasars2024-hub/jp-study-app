@@ -1149,6 +1149,7 @@
 /* Refused rows are stated, not hidden. Dimming them would repeat the mistake
    the drop router's silent discard made. */
 .fa-review-refused .fa-review-row,
+.fa-review-known .fa-review-row,
 .fa-review-skips .fa-review-row {
   color: var(--lq-work-text-muted);
 }

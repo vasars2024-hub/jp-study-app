@@ -10733,6 +10733,8 @@ export const ja: Catalog = {
   'filesApp.review.reviewHeading': '確認待ち ({count})',
   'filesApp.review.refusedHeading': '置き場所なし ({count})',
   'filesApp.review.skippedHeading': '未確認 ({count})',
+  'filesApp.review.knownHeading': '取り込み済み ({count})',
+  'filesApp.ingest.known.alreadyImported': 'これはすでに取り込み済みです。',
   'filesApp.review.warned': {
     other: 'このうち {count} 件は確実ではなく推測です。',
   },

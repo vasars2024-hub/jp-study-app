@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScanReviewSheet } from '../components/filesapp/ScanReviewSheet';
 import { buildScanReport, scanEntryFor, type FilesScanReport } from '../../shared/filesApp/scan';
 import type { DropCandidate } from '../../shared/fileRouting';
+import { clearImportLedger } from '../filesImportLedgerStore';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -73,6 +74,11 @@ let root: Root | null = null;
 
 beforeEach(() => {
   localStorage.clear();
+  // `localStorage.clear()` alone does NOT isolate these tests: the ledger store
+  // keeps an in-module `memory` fallback so a quota error degrades to
+  // "forgotten on restart" rather than to "gate 29 stops working". That
+  // fallback survives a cleared localStorage, so the leak has to be cut here.
+  clearImportLedger();
   for (const fn of [
     filesScan,
     fileDropClassify,
@@ -311,6 +317,65 @@ describe('gate 24 — the import half, and its reversal', () => {
     expect(setWallpaperFromPath).toHaveBeenLastCalledWith('C:\\old.jpg');
     expect(removeMedia).toHaveBeenCalledWith('med-1');
     expect(q('.fa-review-summary').textContent).toContain('Reversed 3 imports');
+  });
+
+  it('gate 29 — a second scan reports what landed as already held', async () => {
+    await mount();
+    await scan();
+    await act(async () => {
+      q('.fa-review-confirm').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // Three landed (the .csv refused), so three are held and the .csv is not.
+    await scan();
+    expect(rowNames('.fa-review-known').sort()).toEqual(
+      ['ep01.srt', 'ep01.mkv', 'page001.png'].sort(),
+    );
+    expect(rowNames('.fa-review-auto')).toEqual([]);
+    expect(rowNames('.fa-review-queue')).toEqual(['vocab.csv']);
+
+    // And the second confirm calls no importer for the three it already has.
+    importPaths.mockClear();
+    addMediaPaths.mockClear();
+    setWallpaperFromPath.mockClear();
+    await act(async () => {
+      q('.fa-review-confirm').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(addMediaPaths).not.toHaveBeenCalled();
+    expect(setWallpaperFromPath).not.toHaveBeenCalled();
+    // Only the still-unheld .csv was attempted, and it refuses by name.
+    expect(q('.fa-review-outcomes .fa-review-summary').textContent).toContain('0 of 1');
+  });
+
+  it('gate 29 — an undo forgets, so the file is offered again', async () => {
+    await mount();
+    await scan();
+    await act(async () => {
+      q('.fa-review-confirm').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      q('.fa-review-undo').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await scan();
+    // Reversed imports are not held. Without the forget, these would read as
+    // already imported and the user could never bring them back.
+    expect(rowNames('.fa-review-known')).toEqual([]);
+    expect(rowNames('.fa-review-auto')).toEqual(['ep01.srt', 'ep01.mkv']);
   });
 
   it('one failing import does not abort the rest', async () => {
