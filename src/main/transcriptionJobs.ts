@@ -36,6 +36,11 @@ import {
   type TranscriptionResult,
 } from '../shared/transcriptionIpc';
 import type { SubtitleRecord } from '../shared/subtitleRecord';
+import {
+  TRANSCRIPTION_QUEUE_FILE,
+  SUBTITLE_LIBRARY_DIRECTORY,
+  subtitleStorageMediaId,
+} from '../shared/subtitleStorage';
 import type { MediaItem } from '../shared/types';
 import { parseSubtitles } from '../shared/subtitleCues';
 import { shiftCues } from '../shared/subtitleSync';
@@ -117,7 +122,7 @@ function scheduleDrain(delayMs: number): void {
 // ---------------------------------------------------------------------------
 
 function queuePath(): string {
-  return path.join(app.getPath('userData'), 'transcription-jobs.json');
+  return path.join(app.getPath('userData'), TRANSCRIPTION_QUEUE_FILE);
 }
 
 function saveQueue(): void {
@@ -499,7 +504,7 @@ function pickEnglishTrack(
 }
 
 function writeSubtitleFile(mediaId: string, fileName: string, contents: string): string {
-  const relativeDir = path.join('subtitles', mediaId.replace(/[^a-zA-Z0-9_-]/g, ''));
+  const relativeDir = path.join(SUBTITLE_LIBRARY_DIRECTORY, subtitleStorageMediaId(mediaId));
   const relative = path.join(relativeDir, fileName);
   fs.mkdirSync(path.join(app.getPath('userData'), relativeDir), { recursive: true });
   fs.writeFileSync(path.join(app.getPath('userData'), relative), contents, 'utf-8');

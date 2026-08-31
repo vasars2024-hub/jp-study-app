@@ -47,6 +47,11 @@ import {
   type SubtitleProviderExecutionId,
 } from '../shared/subtitleDiscoveryIpc';
 import type { SubtitleRecord, SubtitleSearchFailure } from '../shared/subtitleRecord';
+import {
+  SUBTITLE_DISCOVERY_SETTINGS_FILE,
+  SUBTITLE_LIBRARY_DIRECTORY,
+  subtitleStorageMediaId,
+} from '../shared/subtitleStorage';
 import type { MediaItem } from '../shared/types';
 import {
   extractEmbeddedSubtitle,
@@ -118,7 +123,7 @@ function broadcast(progress: SubtitleDiscoveryProgress): void {
 // ---------------------------------------------------------------------------
 
 function settingsPath(): string {
-  return path.join(app.getPath('userData'), 'subtitle-discovery.json');
+  return path.join(app.getPath('userData'), SUBTITLE_DISCOVERY_SETTINGS_FILE);
 }
 
 export function loadDiscoverySettings(): SubtitleDiscoverySettings {
@@ -144,8 +149,7 @@ export function saveDiscoverySettings(input: unknown): SubtitleDiscoverySettings
 // ---------------------------------------------------------------------------
 
 function cacheDirFor(mediaId: string): string {
-  const safe = mediaId.replace(/[^a-zA-Z0-9_-]/g, '');
-  return path.join('subtitles', safe);
+  return path.join(SUBTITLE_LIBRARY_DIRECTORY, subtitleStorageMediaId(mediaId));
 }
 
 /** Writes a cue file into the cache and returns its userData-relative path. */
@@ -219,7 +223,7 @@ export function pickPlaybackSubtitle(
 
 /** Drops cached subtitle files for the given media ids. */
 export function clearSubtitleCache(ids: Set<string>): void {
-  const root = path.join(app.getPath('userData'), 'subtitles');
+  const root = path.join(app.getPath('userData'), SUBTITLE_LIBRARY_DIRECTORY);
   if (!fs.existsSync(root)) return;
   for (const name of fs.readdirSync(root)) {
     if (ids.size > 0 && !ids.has(name)) continue;
