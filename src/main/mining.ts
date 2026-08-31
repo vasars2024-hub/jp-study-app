@@ -506,10 +506,37 @@ export function extractEpubSections(
   return { title, sectionCount: ordered.length, range, sections };
 }
 
-function splitSentences(text: string): string[] {
+/**
+ * Where one sentence ends and the next begins, in a Japanese-first way.
+ *
+ * The two halves are asymmetric ON PURPOSE, because the two scripts are:
+ *
+ * - **`。！？` split with no whitespace required.** Japanese does not put a
+ *   space after its full stop, so the old `[。！？!?.]\s+` rule — which needed
+ *   one — never fired on Japanese prose at all. A whole chapter came back as a
+ *   single "sentence", and since `sampleSentence` (below, three call sites) is
+ *   whatever chunk a token was found in, **every card mined from a Japanese
+ *   book carried an entire paragraph as its example sentence.** Measured
+ *   2026-08-31 on a one-chapter epub fixture: 1 sentence out, 2 expected.
+ * - **`.!?` still require whitespace.** That requirement is what keeps
+ *   `example.com` and `3.5` in one piece, and Latin text really does space its
+ *   sentences. Dropping it there would trade one defect for another.
+ *
+ * The lookahead is the second half of the Japanese rule: a terminator followed
+ * by a closing bracket, an ellipsis or another terminator is not a boundary, or
+ * `「行くぞ。」と彼は言った。` would shed a bare `」` as its own sentence and
+ * `えっ！？` would break in two.
+ *
+ * Exported for the Files app's one-click mine (`filesApp/mineSource.ts`), which
+ * reads epub text through `extractEpubSections` above and must split it the
+ * same way this analyzer does. A second splitter would give the two surfaces
+ * different sentence counts for the same book.
+ */
+const SENTENCE_BOUNDARY = /(?<=[。！？])(?![。！？」』）】…"'])|(?<=[!?.])\s+|\n+/;
+export function splitSentences(text: string): string[] {
   return text
     .replace(/\r/g, '')
-    .split(/(?<=[。！？!?.])\s+|\n+/)
+    .split(SENTENCE_BOUNDARY)
     .map((part) => part.trim())
     .filter(Boolean);
 }

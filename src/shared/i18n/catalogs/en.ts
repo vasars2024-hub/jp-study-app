@@ -11072,6 +11072,37 @@ export const en: Catalog = {
   'filesApp.status.size': 'Total {size}',
   'filesApp.status.selected': 'Selected: {name}',
 
+  'filesApp.action.mine': 'Mine to deck',
+  'filesApp.action.mining': 'Reading…',
+  'filesApp.action.undoMine': 'Undo',
+  'filesApp.mine.refuse.notFileBacked': 'This item is not a file, so there is no text to read.',
+  'filesApp.mine.refuse.brokenLink': 'The file this record points at is missing.',
+  'filesApp.mine.refuse.mediaHasNoText':
+    'A video or audio file carries no text. Mine its transcript instead — it is listed separately.',
+  'filesApp.mine.refuse.kindHasNoText': 'This kind of item holds no minable text.',
+  'filesApp.mine.refuse.unreadable': 'The file could not be read.',
+  'filesApp.mine.refuse.badTranscript': 'This transcript file is not in the shape this app writes.',
+  'filesApp.mine.refuse.badEpub': 'This book could not be opened.',
+  'filesApp.mine.refuse.notEpub': 'Only EPUB books hold text; a scanned volume would need OCR.',
+  'filesApp.mine.refuse.notAFile': 'That location is a folder, not a file.',
+  'filesApp.mine.refuse.tooLarge': 'That file is too large to read as text.',
+  'filesApp.mine.refuse.unknownSubtitleFormat': 'This subtitle format is not one this app reads.',
+  'filesApp.mine.refuse.noJapanese':
+    'Read {read} passages and none of them held any Japanese, so nothing was added.',
+  'filesApp.mine.refuse.allDuplicates':
+    'All {read} passages are already in your deck, so nothing was added.',
+  'filesApp.mine.added': {
+    one: 'Added {count} card from {read} passages.',
+    other: 'Added {count} cards from {read} passages.',
+  },
+  'filesApp.mine.skipped': 'Skipped {notJapanese} without Japanese, {duplicate} already in the deck.',
+  'filesApp.mine.capped': 'Stopped at the {max}-card limit; {overCap} more passages were not added.',
+  'filesApp.mine.machineMark': 'These cards are marked as machine-derived text.',
+  'filesApp.mine.undone': {
+    one: 'Removed {count} card again.',
+    other: 'Removed {count} cards again.',
+  },
+
 };
 
 

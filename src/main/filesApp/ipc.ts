@@ -17,7 +17,9 @@
 import { app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
+import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
+import { readFilesMineSource } from './mineSource';
 
 /** How long a built index is served before the next request rebuilds it. */
 const INDEX_TTL_MS = 15_000;
@@ -75,4 +77,41 @@ export function registerFilesAppIpc(): void {
     shell.showItemInFolder(target);
     return { ok: true };
   });
+
+  /**
+   * Gate 3's read half. Main hands back *passages*, never cards: the deck is
+   * renderer-owned localStorage, so a main-side "mine" handler would have
+   * nowhere to write. Splitting it here keeps one writer for the deck and
+   * leaves this handler pure enough to test against a fixture directory.
+   *
+   * The location is validated the same way `filesapp:reveal` validates it —
+   * through `revealTargetFor` — so a caller cannot hand this handler an
+   * arbitrary path and have it read a file the catalogue never indexed.
+   */
+  ipcMain.handle(
+    'filesapp:mine-source',
+    (_e, location: unknown, kind: unknown): FilesMineSourceResult => {
+      if (!location || typeof location !== 'object') {
+        return { ok: false, reasonKey: 'filesApp.mine.refuse.notFileBacked' };
+      }
+      const target = revealTargetFor(location as FilesLocation);
+      if (!target) {
+        return { ok: false, reasonKey: 'filesApp.mine.refuse.notFileBacked' };
+      }
+      if (kind !== 'transcript' && kind !== 'subtitle' && kind !== 'book') {
+        return { ok: false, reasonKey: 'filesApp.mine.refuse.kindHasNoText' };
+      }
+      try {
+        return readFilesMineSource(target, kind);
+      } catch (err) {
+        // A reader that throws must still answer. An unhandled rejection here
+        // would leave the button spinning with no message at all.
+        return {
+          ok: false,
+          reasonKey: 'filesApp.mine.refuse.unreadable',
+          detail: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 }

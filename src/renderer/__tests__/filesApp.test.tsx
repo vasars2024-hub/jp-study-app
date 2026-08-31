@@ -8,6 +8,44 @@ import {
   type FilesIndexSnapshot,
   type FilesItem,
 } from '../../shared/filesApp/catalog';
+import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
+import type { DeckFlashcard } from '../flashcardDeck';
+
+/**
+ * The deck, stood in for.
+ *
+ * `flashcardDeck.ts` pulls in IndexedDB mirroring, companion events and the
+ * Blanc console at module scope — none of which jsdom has, and none of which
+ * this gate is about. What the component OWES the deck is exactly three things,
+ * and a stub is what lets them be asserted: that it reads the existing cards
+ * before building drafts, that it writes the drafts it built, and that undo
+ * removes the ids it was handed back and nothing else. The store's own
+ * behaviour is `flashcardDeck`'s tests to prove, not this file's.
+ */
+const deck: DeckFlashcard[] = [];
+let nextDeckId = 0;
+
+vi.mock('../flashcardDeck', () => ({
+  loadDeck: () => [...deck],
+  addDeckCardsTracked: (entries: Omit<DeckFlashcard, 'id' | 'addedAt'>[]) => {
+    const created = entries.map((entry) => ({
+      ...entry,
+      id: `card-${(nextDeckId += 1)}`,
+      addedAt: nextDeckId,
+    })) as DeckFlashcard[];
+    // `[...created, ...store.cards]`, exactly as the real store writes it: the
+    // batch keeps its draft order and lands ahead of what was already there.
+    deck.unshift(...created);
+    return created;
+  },
+  removeDeckCards: (ids: readonly string[]) => {
+    const wanted = new Set(ids);
+    for (let i = deck.length - 1; i >= 0; i -= 1) {
+      if (wanted.has(deck[i].id)) deck.splice(i, 1);
+    }
+    return [...deck];
+  },
+}));
 
 /**
  * The Files app's live contract, measured on the real component.
@@ -39,6 +77,11 @@ class NoopResizeObserver {
   }
 }
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= NoopResizeObserver;
+
+// Without this React logs "not configured to support act(...)" for every state
+// update that lands after an await — which is every assertion about the mine's
+// result. The warning is noise, but noise that hides a real one.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -184,16 +227,20 @@ function snapshot(
 
 const filesIndex = vi.fn<(force?: boolean) => Promise<FilesIndexSnapshot>>();
 const filesReveal = vi.fn<(loc: unknown) => Promise<{ ok: boolean; reasonKey?: string }>>();
+const filesMineSource = vi.fn<(loc: unknown, kind: unknown) => Promise<FilesMineSourceResult>>();
 
 beforeEach(() => {
   filesIndex.mockReset();
   filesReveal.mockReset();
+  filesMineSource.mockReset();
+  deck.length = 0;
   filesIndex.mockImplementation(async () => snapshot());
   filesReveal.mockImplementation(async () => ({ ok: true }));
+  filesMineSource.mockImplementation(async () => ({ ok: true, passages: [], readCount: 0 }));
   Object.defineProperty(window, 'api', {
     configurable: true,
     writable: true,
-    value: { filesIndex, filesReveal },
+    value: { filesIndex, filesReveal, filesMineSource },
   });
 });
 
@@ -463,5 +510,171 @@ describe('Files app — the windowed grid declares its real size', () => {
     expect(shell?.getAttribute('data-has-toolbar')).toBe('true');
     expect(shell?.getAttribute('data-has-inspector')).toBe('true');
     expect(shell?.getAttribute('data-has-dock')).toBe('true');
+  });
+});
+
+/* ------------------------- gate 3: one-click mine ------------------------- */
+
+async function selectRow(name: string): Promise<void> {
+  await click(bodyRows().find((r) => r.textContent?.includes(name)));
+}
+
+function mineButton(): HTMLButtonElement | undefined {
+  return host?.querySelector<HTMLButtonElement>('.fa-action-mine') ?? undefined;
+}
+
+describe('Files app — one-click mine (gate 3)', () => {
+  it('offers the action on a transcript and refuses on a video, by name', async () => {
+    await mount(<FilesApp />);
+    await settle();
+
+    await selectRow('abc123');
+    expect(mineButton()).toBeTruthy();
+
+    // A video is file-backed and present, so a generic refusal would be wrong:
+    // its transcript IS in this index, and the message has to point there.
+    await selectRow('Episode 01');
+    expect(mineButton()).toBeFalsy();
+    expect(hasText('Mine its transcript instead')).toBe(true);
+  });
+
+  it('refuses a SQLite row as not-file-backed rather than offering a dead button', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('JMdict');
+    expect(mineButton()).toBeFalsy();
+    expect(hasText('not a file, so there is no text to read')).toBe(true);
+  });
+
+  it('reads passages, writes cards, and reports both numbers', async () => {
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 3,
+      passages: [
+        { index: 1, text: 'これはペンです', startMs: 1000 },
+        { index: 2, text: '[Music]' },
+        { index: 3, text: '猫が好き' },
+      ],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+
+    // Main is asked for THIS row's location and THIS row's kind — not a path
+    // the renderer reconstructed for itself.
+    expect(filesMineSource).toHaveBeenCalledWith(
+      { store: 'file', path: 'C:\\t\\abc.json' },
+      'transcript',
+    );
+    expect(deck).toHaveLength(2);
+    // Draft order, and the `[Music]` cue between them is simply not here.
+    expect(deck.map((c) => c.word)).toEqual(['これはペンです', '猫が好き']);
+    // Numbers, never adjectives: how many landed AND how many were read.
+    expect(hasText('Added 2 cards from 3 passages.')).toBe(true);
+    // The one that was dropped is accounted for, not silently absent.
+    expect(hasText('Skipped 1 without Japanese')).toBe(true);
+  });
+
+  it('marks transcript-derived cards, in the deck AND on the receipt', async () => {
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: 'これはペンです' }],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+
+    // The binding constraint from MINING_UNIFICATION_PLAN.md, on both halves.
+    expect(deck[0].textProvenance).toBe('transcript');
+    expect(hasText('marked as machine-derived text')).toBe(true);
+  });
+
+  it('undo removes exactly the cards this mine added', async () => {
+    deck.push({ id: 'pre-existing', word: '既存', reading: '', meaning: '', source: 'manual' } as DeckFlashcard);
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: 'これはペンです' }],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+    expect(deck).toHaveLength(2);
+
+    await click(host?.querySelector('.fa-action-undo'));
+    // The pre-existing card survives — undo is scoped to the returned ids, not
+    // to "cards that look like this batch".
+    expect(deck.map((c) => c.id)).toEqual(['pre-existing']);
+    expect(hasText('Removed 1 card again.')).toBe(true);
+  });
+
+  it('tells an empty read apart from an all-duplicates one', async () => {
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 2,
+      passages: [
+        { index: 1, text: '[Music]' },
+        { index: 2, text: '(applause)' },
+      ],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+    expect(deck).toHaveLength(0);
+    expect(hasText('none of them held any Japanese')).toBe(true);
+    expect(hasText('already in your deck')).toBe(false);
+  });
+
+  it('says so when everything was already mined', async () => {
+    deck.push({ id: 'old', word: 'これはペンです', sentence: 'これはペンです' } as DeckFlashcard);
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: 'これはペンです' }],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+    expect(deck).toHaveLength(1);
+    expect(hasText('already in your deck')).toBe(true);
+  });
+
+  it("surfaces main's refusal reason instead of a generic failure", async () => {
+    filesMineSource.mockImplementation(async () => ({
+      ok: false,
+      reasonKey: 'filesApp.mine.refuse.badTranscript',
+      detail: 'Unexpected token n',
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+    expect(deck).toHaveLength(0);
+    expect(hasText('not in the shape this app writes')).toBe(true);
+    expect(hasText('Unexpected token n')).toBe(true);
+  });
+
+  it('clears the previous item\u2019s result when the selection changes', async () => {
+    filesMineSource.mockImplementation(async () => ({
+      ok: true,
+      readCount: 1,
+      passages: [{ index: 1, text: 'これはペンです' }],
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    await selectRow('abc123');
+    await click(mineButton());
+    expect(hasText('Added 1 card from 1 passages.')).toBe(true);
+
+    // A receipt that survived the selection would read as a report about the
+    // newly selected item, which it is not.
+    await selectRow('Episode 01');
+    expect(hasText('Added 1 card')).toBe(false);
   });
 });

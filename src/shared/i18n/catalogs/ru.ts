@@ -11486,5 +11486,40 @@ export const ru: Catalog = {
   },
   'filesApp.status.size': 'Всего {size}',
   'filesApp.status.selected': 'Выбрано: {name}',
+
+  'filesApp.action.mine': 'Добавить в колоду',
+  'filesApp.action.mining': 'Чтение…',
+  'filesApp.action.undoMine': 'Отменить',
+  'filesApp.mine.refuse.notFileBacked': 'Этот элемент не является файлом, поэтому читать нечего.',
+  'filesApp.mine.refuse.brokenLink': 'Файл, на который ссылается эта запись, отсутствует.',
+  'filesApp.mine.refuse.mediaHasNoText':
+    'В самом видео или аудио нет текста. Обработайте его расшифровку — она указана в списке отдельно.',
+  'filesApp.mine.refuse.kindHasNoText': 'В элементах этого типа нет текста для добычи.',
+  'filesApp.mine.refuse.unreadable': 'Не удалось прочитать файл.',
+  'filesApp.mine.refuse.badTranscript': 'Этот файл расшифровки записан не в том виде, который создаёт приложение.',
+  'filesApp.mine.refuse.badEpub': 'Не удалось открыть эту книгу.',
+  'filesApp.mine.refuse.notEpub': 'Текст есть только в EPUB; для сканов нужен OCR.',
+  'filesApp.mine.refuse.notAFile': 'По этому пути находится папка, а не файл.',
+  'filesApp.mine.refuse.tooLarge': 'Этот файл слишком велик, чтобы читать его как текст.',
+  'filesApp.mine.refuse.unknownSubtitleFormat': 'Приложение не читает этот формат субтитров.',
+  'filesApp.mine.refuse.noJapanese':
+    'Прочитано фрагментов: {read}, японского текста нет ни в одном — ничего не добавлено.',
+  'filesApp.mine.refuse.allDuplicates':
+    'Все {read} фрагментов уже есть в колоде — ничего не добавлено.',
+  'filesApp.mine.added': {
+    one: 'Добавлена {count} карточка из {read} фрагментов.',
+    few: 'Добавлено {count} карточки из {read} фрагментов.',
+    many: 'Добавлено {count} карточек из {read} фрагментов.',
+    other: 'Добавлено {count} карточки из {read} фрагментов.',
+  },
+  'filesApp.mine.skipped': 'Пропущено без японского: {notJapanese}, уже в колоде: {duplicate}.',
+  'filesApp.mine.capped': 'Остановлено на пределе в {max} карточек; ещё {overCap} фрагментов не добавлено.',
+  'filesApp.mine.machineMark': 'Эти карточки помечены как текст машинного происхождения.',
+  'filesApp.mine.undone': {
+    one: 'Удалена {count} карточка.',
+    few: 'Удалено {count} карточки.',
+    many: 'Удалено {count} карточек.',
+    other: 'Удалено {count} карточки.',
+  },
 };
 

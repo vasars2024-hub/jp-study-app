@@ -9,6 +9,7 @@ import {
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
+import type { FilesMineSourceResult } from './shared/filesApp/mining';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -1009,6 +1010,15 @@ const api = {
    */
   filesReveal: (location: FilesLocation): Promise<{ ok: boolean; reasonKey?: string }> =>
     ipcRenderer.invoke('filesapp:reveal', location),
+  /**
+   * Read the text behind a catalogue row, for one-click mine. Passages, not
+   * cards: the deck is renderer localStorage, so the renderer stays the only
+   * writer and main stays the only file reader.
+   */
+  filesMineSource: (
+    location: FilesLocation,
+    kind: 'transcript' | 'subtitle' | 'book',
+  ): Promise<FilesMineSourceResult> => ipcRenderer.invoke('filesapp:mine-source', location, kind),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

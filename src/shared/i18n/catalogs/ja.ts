@@ -10615,5 +10615,34 @@ export const ja: Catalog = {
   },
   'filesApp.status.size': '合計 {size}',
   'filesApp.status.selected': '選択中: {name}',
+
+  'filesApp.action.mine': 'デッキに採取',
+  'filesApp.action.mining': '読み込み中…',
+  'filesApp.action.undoMine': '元に戻す',
+  'filesApp.mine.refuse.notFileBacked': 'この項目はファイルではないため、読み取れるテキストがありません。',
+  'filesApp.mine.refuse.brokenLink': 'この記録が指しているファイルが見つかりません。',
+  'filesApp.mine.refuse.mediaHasNoText':
+    '動画や音声そのものにはテキストがありません。文字起こしを採取してください（別の項目として一覧にあります）。',
+  'filesApp.mine.refuse.kindHasNoText': 'この種類の項目には採取できるテキストがありません。',
+  'filesApp.mine.refuse.unreadable': 'ファイルを読み取れませんでした。',
+  'filesApp.mine.refuse.badTranscript': 'この文字起こしファイルは、このアプリが書き出す形式ではありません。',
+  'filesApp.mine.refuse.badEpub': 'この書籍を開けませんでした。',
+  'filesApp.mine.refuse.notEpub': 'テキストを持つのは EPUB だけです。スキャン画像には OCR が必要です。',
+  'filesApp.mine.refuse.notAFile': 'その場所はファイルではなくフォルダーです。',
+  'filesApp.mine.refuse.tooLarge': 'このファイルはテキストとして読み込むには大きすぎます。',
+  'filesApp.mine.refuse.unknownSubtitleFormat': 'この字幕形式はこのアプリでは読み取れません。',
+  'filesApp.mine.refuse.noJapanese':
+    '{read} 件を読み取りましたが、日本語を含むものがなかったため何も追加されませんでした。',
+  'filesApp.mine.refuse.allDuplicates':
+    '{read} 件すべてがすでにデッキにあるため、何も追加されませんでした。',
+  'filesApp.mine.added': {
+    other: '{read} 件から {count} 枚のカードを追加しました。',
+  },
+  'filesApp.mine.skipped': '日本語なし {notJapanese} 件、デッキに既存 {duplicate} 件をスキップしました。',
+  'filesApp.mine.capped': '上限の {max} 枚で停止しました。残り {overCap} 件は追加されていません。',
+  'filesApp.mine.machineMark': 'これらのカードは機械由来のテキストとして印が付いています。',
+  'filesApp.mine.undone': {
+    other: '{count} 枚のカードを削除しました。',
+  },
 };
 

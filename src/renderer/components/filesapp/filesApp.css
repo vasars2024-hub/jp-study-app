@@ -298,6 +298,46 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* ------------------------- one-click mine ------------------------ */
+
+/* The receipt sits on a WORK surface, not a liquid one: it is a set of numbers
+   the user reads and acts on, and the plan's rule is that anything read for
+   content stays on a stable opaque anchor rather than behind glass. */
+.fa-mine-result {
+  margin-top: var(--lq-space-3);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-work-bg);
+  color: var(--lq-work-text);
+}
+
+.fa-mine-result p {
+  margin: 0 0 var(--lq-space-1);
+}
+
+.fa-mine-result .fa-details-note {
+  margin-top: 0;
+  color: var(--lq-work-text-muted);
+}
+
+/* Machine-derived text keeps the same mark the provenance column uses, so the
+   two never disagree about what a card is. */
+.fa-mine-result [data-machine='true'] {
+  color: var(--lq-work-text);
+  font-weight: 600;
+}
+
+.fa-mine-result .fa-action {
+  margin-top: var(--lq-space-2);
+}
+
+/* A refusal is a statement, not an error stripe: nothing went wrong, this item
+   simply has no text. It reads as ordinary muted copy for that reason. */
+.fa-mine-refusal {
+  overflow-wrap: anywhere;
+}
+
 /* ---------------------------- dock ------------------------------ */
 
 .fa-status {

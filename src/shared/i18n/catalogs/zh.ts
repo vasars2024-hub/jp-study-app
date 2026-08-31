@@ -10525,5 +10525,32 @@ export const zh: Catalog = {
   },
   'filesApp.status.size': '共计 {size}',
   'filesApp.status.selected': '已选择：{name}',
+
+  'filesApp.action.mine': '采集到卡组',
+  'filesApp.action.mining': '正在读取…',
+  'filesApp.action.undoMine': '撤销',
+  'filesApp.mine.refuse.notFileBacked': '该项目不是文件，因此没有可读取的文本。',
+  'filesApp.mine.refuse.brokenLink': '该记录指向的文件已丢失。',
+  'filesApp.mine.refuse.mediaHasNoText':
+    '视频或音频本身不含文本。请采集它的转录稿——它在列表中单独列出。',
+  'filesApp.mine.refuse.kindHasNoText': '这类项目不含可采集的文本。',
+  'filesApp.mine.refuse.unreadable': '无法读取该文件。',
+  'filesApp.mine.refuse.badTranscript': '该转录文件不是本应用写出的格式。',
+  'filesApp.mine.refuse.badEpub': '无法打开这本书。',
+  'filesApp.mine.refuse.notEpub': '只有 EPUB 含有文本；扫描版需要 OCR。',
+  'filesApp.mine.refuse.notAFile': '该位置是文件夹，不是文件。',
+  'filesApp.mine.refuse.tooLarge': '该文件过大，无法按文本读取。',
+  'filesApp.mine.refuse.unknownSubtitleFormat': '本应用无法读取这种字幕格式。',
+  'filesApp.mine.refuse.noJapanese': '读取了 {read} 条，均不含日文，因此没有添加任何内容。',
+  'filesApp.mine.refuse.allDuplicates': '{read} 条全部已在卡组中，因此没有添加任何内容。',
+  'filesApp.mine.added': {
+    other: '已从 {read} 条中添加 {count} 张卡片。',
+  },
+  'filesApp.mine.skipped': '跳过 {notJapanese} 条无日文、{duplicate} 条已在卡组中的内容。',
+  'filesApp.mine.capped': '已在 {max} 张上限处停止；另有 {overCap} 条未添加。',
+  'filesApp.mine.machineMark': '这些卡片已标记为机器生成的文本。',
+  'filesApp.mine.undone': {
+    other: '已移除 {count} 张卡片。',
+  },
 };
 

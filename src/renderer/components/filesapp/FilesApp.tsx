@@ -43,6 +43,13 @@ import {
   type FilesSortColumn,
   type FilesSortDirection,
 } from '../../../shared/filesApp/catalog';
+import {
+  FILES_MINE_MAX_CARDS,
+  buildFilesMineDrafts,
+  existingDeckKeys,
+  mineabilityOf,
+} from '../../../shared/filesApp/mining';
+import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
 import { useFilesIndex } from './useFilesIndex';
 import './filesApp.css';
 
@@ -78,6 +85,29 @@ function formatDate(ms: number | null, lang: UiLang): string {
   return new Date(ms).toLocaleString(LANG_TAGS[lang]);
 }
 
+/**
+ * The one-click mine's outcome, as a state rather than a string.
+ *
+ * A refusal and a zero-card success are DIFFERENT states and the plan calls
+ * conflating them a finding, so `refused` carries a reason key while `done`
+ * carries the four counts. Both render; neither is silent.
+ */
+type MineState =
+  | { status: 'idle' }
+  | { status: 'reading' }
+  | { status: 'refused'; reasonKey: string; detail?: string; values?: Record<string, number> }
+  | {
+      status: 'done';
+      added: number;
+      passagesRead: number;
+      skippedNotJapanese: number;
+      skippedDuplicate: number;
+      skippedOverCap: number;
+      machineDerived: boolean;
+      addedIds: string[];
+    }
+  | { status: 'undone'; count: number };
+
 export interface FilesAppProps {
   /**
    * Context entry: the category the caller came from. A filter, never a mode —
@@ -98,6 +128,12 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const [sortDirection, setSortDirection] = useState<FilesSortDirection>('asc');
   const [selectedId, setSelectedId] = useState<string | null>(initialFocusItemId);
   const [revealNote, setRevealNote] = useState<string | null>(null);
+  /**
+   * The last mine's outcome. `addedIds` is what makes it reversible — the plan
+   * requires a reversible action, and `addDeckCardsTracked` hands back exactly
+   * the new rows so undo removes those and nothing that happened to match.
+   */
+  const [mineState, setMineState] = useState<MineState>({ status: 'idle' });
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -158,6 +194,73 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     }
     setRevealNote(t(result.reasonKey ?? 'filesApp.reveal.notFileBacked'));
   }, [selected, t]);
+
+  /**
+   * Gate 3, the whole round trip: main reads the file into passages, `shared/`
+   * turns passages into drafts, and the renderer — the only owner of the deck —
+   * writes them. No card is invented here that the source did not carry.
+   */
+  const onMine = useCallback(async () => {
+    if (!selected) return;
+    const mineable = mineabilityOf(selected);
+    if (!mineable.mineable) {
+      setMineState({ status: 'refused', reasonKey: mineable.reasonKey });
+      return;
+    }
+    setMineState({ status: 'reading' });
+    const kind = selected.kind as 'transcript' | 'subtitle' | 'book';
+    const read = await window.api?.filesMineSource?.(selected.location, kind);
+    if (!read) {
+      setMineState({ status: 'refused', reasonKey: 'filesApp.mine.refuse.unreadable' });
+      return;
+    }
+    if (!read.ok) {
+      setMineState({ status: 'refused', reasonKey: read.reasonKey, detail: read.detail });
+      return;
+    }
+    const plan = buildFilesMineDrafts(selected, read.passages, {
+      existingWords: existingDeckKeys(loadDeck().map((card) => card.sentence || card.word)),
+    });
+    if (plan.drafts.length === 0) {
+      // Two different empty results, told apart rather than merged: nothing was
+      // Japanese, or everything was already mined. They need opposite actions.
+      setMineState({
+        status: 'refused',
+        reasonKey:
+          plan.skippedDuplicate > 0
+            ? 'filesApp.mine.refuse.allDuplicates'
+            : 'filesApp.mine.refuse.noJapanese',
+        values: { read: plan.passagesRead },
+      });
+      return;
+    }
+    const created = addDeckCardsTracked(plan.drafts);
+    setMineState({
+      status: 'done',
+      added: created.length,
+      passagesRead: plan.passagesRead,
+      skippedNotJapanese: plan.skippedNotJapanese,
+      skippedDuplicate: plan.skippedDuplicate,
+      skippedOverCap: plan.skippedOverCap,
+      machineDerived: isMachineDerived(selected.provenance),
+      addedIds: created.map((card) => card.id),
+    });
+  }, [selected]);
+
+  // Read outside the updater deliberately: React double-invokes state updaters
+  // in StrictMode, and a deck write is not something to run twice.
+  const onUndoMine = useCallback(() => {
+    if (mineState.status !== 'done') return;
+    removeDeckCards(mineState.addedIds);
+    setMineState({ status: 'undone', count: mineState.addedIds.length });
+  }, [mineState]);
+
+  /** A new selection invalidates the previous item's result, never carries it over. */
+  const selectItem = useCallback((id: string) => {
+    setSelectedId(id);
+    setMineState({ status: 'idle' });
+    setRevealNote(null);
+  }, []);
 
   /* ---------------------------- rail ---------------------------- */
 
@@ -315,11 +418,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             data-broken={item.flags.brokenLink ? 'true' : undefined}
             aria-selected={item.id === selectedId}
             tabIndex={0}
-            onClick={() => setSelectedId(item.id)}
+            onClick={() => selectItem(item.id)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setSelectedId(item.id);
+                selectItem(item.id);
               }
             }}
           >
@@ -360,7 +463,70 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   /* ------------------------- inspector -------------------------- */
 
-  const inspector = selected ? (
+  const mineability = selected ? mineabilityOf(selected) : null;
+
+  /**
+   * The mine's receipt. Every state reports NUMBERS — the plan's rule is
+   * numbers, never adjectives — and each skip bucket is named separately so a
+   * small `added` is explained rather than merely small.
+   */
+  const mineResult = (() => {
+    if (mineState.status === 'refused') {
+      return (
+        <p className="fa-details-note fa-mine-refusal" role="status">
+          {t(mineState.reasonKey, mineState.values)}
+          {mineState.detail ? <span className="fa-state-detail"> {mineState.detail}</span> : null}
+        </p>
+      );
+    }
+    if (mineState.status === 'undone') {
+      return (
+        <p className="fa-details-note" role="status">
+          {t('filesApp.mine.undone', { count: mineState.count })}
+        </p>
+      );
+    }
+    if (mineState.status !== 'done') return null;
+    const skipped = mineState.skippedNotJapanese + mineState.skippedDuplicate;
+    return (
+      <div className="fa-mine-result" role="status">
+        <p>
+          {t('filesApp.mine.added', {
+            count: mineState.added,
+            read: mineState.passagesRead,
+          })}
+        </p>
+        {skipped > 0 ? (
+          <p className="fa-details-note">
+            {t('filesApp.mine.skipped', {
+              notJapanese: mineState.skippedNotJapanese,
+              duplicate: mineState.skippedDuplicate,
+            })}
+          </p>
+        ) : null}
+        {mineState.skippedOverCap > 0 ? (
+          <p className="fa-details-note">
+            {t('filesApp.mine.capped', {
+              max: FILES_MINE_MAX_CARDS,
+              overCap: mineState.skippedOverCap,
+            })}
+          </p>
+        ) : null}
+        {/* The binding constraint, visible where the cards were made — not only
+            on the card itself, where a user who never opens the deck never sees it. */}
+        {mineState.machineDerived ? (
+          <p className="fa-details-note" data-machine="true">
+            {t('filesApp.mine.machineMark')}
+          </p>
+        ) : null}
+        <button type="button" className="fa-action fa-action-undo" onClick={onUndoMine}>
+          {t('filesApp.action.undoMine')}
+        </button>
+      </div>
+    );
+  })();
+
+  const inspector = selected && mineability ? (
     <div className="fa-details">
       <h2 className="fa-details-title">{selected.name}</h2>
       <dl className="fa-details-list">
@@ -389,6 +555,21 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         // Absent rather than present-and-failing: this store has no folder.
         <p className="fa-details-note">{t('filesApp.reveal.notFileBacked')}</p>
       )}
+      {/* Gate 3. Offered only where text can actually be read; where it cannot,
+          the reason is stated rather than the button being present and failing. */}
+      {mineability.mineable ? (
+        <button
+          type="button"
+          className="fa-action fa-action-mine"
+          onClick={onMine}
+          disabled={mineState.status === 'reading'}
+        >
+          {t(mineState.status === 'reading' ? 'filesApp.action.mining' : 'filesApp.action.mine')}
+        </button>
+      ) : (
+        <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
+      )}
+      {mineResult}
       <p className="fa-details-note">
         {t(`filesApp.delete.mode.${deleteModeFor(selected.location)}`)}
       </p>
