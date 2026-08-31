@@ -420,7 +420,15 @@
   padding: 0;
 }
 
+/* `min-height` and not more block padding: the chip's pointer region measured
+   42.5x29.5 against the rubric's 32 px floor, and its two blockers
+   (`.medialib-view__body`, `.medialib-chips`) mean an inset `::after` expander —
+   the `.fwin-b` trick — would have had to steal from the 4 px wrap gap. The row
+   grows 3 px once; nothing else moves. */
 .medialib-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
   padding: 4px var(--space-md);
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -577,7 +585,12 @@
   justify-content: center;
   font-size: var(--font-size-4xl);
   font-weight: 600;
-  color: rgb(255 255 255 / 0.18);
+  /* Was 0.18, which measured 1.79:1 on a live card — a watermark a sighted user
+     cannot actually read. The tile behind it is always `hsl(<derived> 32% 22%)`,
+     so the worst case over all 360 hues is hue 60; 0.45 is the smallest alpha
+     clearing 3:1 (large text) there, at 3.25:1. Still quiet enough to read as a
+     stand-in for artwork rather than as a label. */
+  color: rgb(255 255 255 / 0.45);
   user-select: none;
 }
 
