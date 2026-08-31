@@ -419,8 +419,10 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
    manual step.
+   <!-- status: closed; evidence: 2026-08-31 940cbbab -- deriveCrossStoreFlags; live 83 media / 49 with a derivable id / 2 transcripts -> exactly 2 marked; control with transcripts removed marks 0 -->
 5. Context entry from an epub page opens the Files app scoped to epubs with that book focused,
    and clearing the scope reveals the full tree in the same window.
+   <!-- status: closed; evidence: 2026-08-31 504f7863 -- reader Study menu -> openFilesAppForBook/Manga; 8 tests incl. consumed-on-read, live re-scope, and a refused unknown category -->
 6. Every action offered in the Files app is still reachable by its original route — enumerated
    route by route. A capability that became Files-app-only is a FAIL. The one permitted
    exception is memory/statistics (decision 1), which must be named explicitly in the report.
@@ -843,3 +845,64 @@ TRAPS, both cost time this turn:
    measurements to a file.
 
 **Gate tags now: 5 closed (1, 2, 3, 13, 14) / 1 open (12, half) / 31 untagged.**
+
+## 2026-08-31 (fourth) — Gates 4 and 5: derived state, and the way in
+
+**Gate 4 CLOSED, `940cbbab`.** Placement was already derived; *state* was not. A transcript
+row knew what it was and the video it belongs to knew nothing, because `yt-transcripts/` and
+`downloads/` are read by two enumerators that never see each other's output.
+`deriveCrossStoreFlags` runs once over the assembled index — inside an enumerator it would
+make that enumerator a second reader of a store it does not own, and the two would drift.
+
+Live, on the real profile: **1,977 main-side items, 83 media rows, 49 with a derivable
+YouTube id, 2 transcripts → exactly 2 videos marked**, and they are the two the transcripts
+name. **Negative control: the same derivation with the transcript rows removed marks 0.**
+
+**The first control was WRONG and is recorded so nobody rebuilds it.** It re-ran the
+derivation over `buildFilesIndex`'s *already-derived* output — which preserves the very flag
+it was meant to test — and reported 2, a pass that proved nothing. The real control strips
+the flag back off first. This is the `receipt-must-not-requery` shape in a new place.
+
+A video with no derivable id is left **ABSENT, not false**: "we could not tell" and "not
+transcribed" are different answers, and only one of them justifies a Transcribe button.
+`youtubeIdFromFileName` takes the LAST bracketed 11-char group, so a title's own `[4K]` or
+`[ENG SUB]` cannot be mistaken for an id.
+
+**Gate 5 CLOSED, `504f7863`.** The reader's Study menu opens the Files app on the book it is
+showing. Two things were decided here and both are load-bearing:
+
+1. **The scope travels BESIDE `os:open`, not inside it.** `detail` is a bare section string
+   and four hosts listen — DesktopShell, MiniShell, the `?popout=` window, Blanc. A richer
+   detail needs all four changed in lockstep or is silently dropped by the ones that were
+   not, which is the failure that reads as *"the button does nothing on Blanc"*.
+2. **Two delivery routes, because there are two states.** A closed window mounts and reads
+   the parked scope; an already-open window re-renders nothing, so a `filesapp:scope` event
+   carries it. Without the second, the gesture works once and looks dead every time after.
+
+Scope shows the WHOLE folder and merely highlights the focused row — a filter, not a mode —
+and is consumed on read, or the next plain open silently inherits the last caller's filter.
+An unrecognised category is REFUSED rather than opened unscoped.
+
+TRAPS:
+1. **`peekPendingFilesScope` must be pure.** React double-invokes lazy initialisers in
+   StrictMode; a consuming read there hands the second call `null` and loses the scope.
+2. **The reader toolbar is at 11 of a bar of 12** (rubric category 5). New reader controls go
+   in the `<details>` Study menu — which, being plain HTML, renders under every material set
+   where the AppChrome menu bar does not.
+
+**Gate 37 — the four full gates, run after the last slice.**
+- `npx vitest run`: **13 suites / 33 tests failed, 11,990 passed, 6 skipped.** Same shape as
+  the `b5da8f76` baseline (13 / 33). Proven by NAME: **zero contain `filesApp`**. The 11
+  `novelReaderCanvas` / `novelReaderProgressGuard` failures are the one real risk, because
+  this turn edited `NovelReader.tsx` — so they were re-run against **`940cbbab`, the commit
+  before that edit, and fail identically (11 of 11).** Cause is environmental:
+  `Denied ID …/pdfjs-dist/build/pdf.worker.min.mjs?url` and `AudioContext is not defined`.
+- `node tools/i18n-check.cjs` — exit 0, **11,748** keys. 32 new strings in all four languages.
+- `node tools/architecture-audit.cjs` — exit 0. **Six** unclassified findings now, up from
+  two: `AeroViewport`, `blancMasterSources`, `captureKindKeys`, `companionAssignments`,
+  `readingDiscoveryActions` (orphans) and `TourOverlay` (test-only). **All six are other
+  tracks' modules; none is a files-app path.** Whoever owns aero/blanc should baseline them.
+- `npx eslint` on all 13 touched paths — **0 errors.** The 9 warnings are pre-existing
+  non-null assertions in `NovelReader.tsx` at lines 1655–2166, far from this edit.
+
+**Gate tags now: 7 closed (1, 2, 3, 4, 5, 13, 14) / 1 open (12, half) / 29 untagged.**
