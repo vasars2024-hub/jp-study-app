@@ -8,6 +8,7 @@ import {
   type SeanimeStatus,
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
+import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -997,6 +998,17 @@ const api = {
     ipcRenderer.invoke('filedrop:listFolderImages', dirPath),
   fileDropFolderFiles: (dirPath: string): Promise<string[]> =>
     ipcRenderer.invoke('filedrop:listFolderFiles', dirPath),
+
+  // ----- Files app: the index over every store the app owns -----
+  filesIndex: (force?: boolean): Promise<FilesIndexSnapshot> =>
+    ipcRenderer.invoke('filesapp:index', force === true),
+  /**
+   * Reveal an item's real location. Refuses with a reason key for anything not
+   * file-backed rather than opening a folder that is not the item's — a
+   * dictionary row lives in a SQLite table and has no folder to show.
+   */
+  filesReveal: (location: FilesLocation): Promise<{ ok: boolean; reasonKey?: string }> =>
+    ipcRenderer.invoke('filesapp:reveal', location),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

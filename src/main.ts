@@ -23,6 +23,7 @@ import {
 } from './main/desktopWindows';
 import { registerDeskDragIpc } from './main/deskDrag';
 import { registerFileRouterIpc } from './main/fileRouter';
+import { registerFilesAppIpc } from './main/filesApp/ipc';
 import { registerTranslateIpc } from './main/translate';
 import { registerTranslateAnalysisIpc } from './main/translateAnalysis';
 import { registerSentenceAnalysisIpc } from './main/sentenceAnalysis';
@@ -1613,6 +1614,7 @@ app.whenReady().then(async () => {
   registerDesktopWindowsIpc();
   registerDeskDragIpc();
   registerFileRouterIpc();
+  registerFilesAppIpc();
   registerTranslateIpc();
   registerTranslateAnalysisIpc();
   registerSentenceAnalysisIpc();

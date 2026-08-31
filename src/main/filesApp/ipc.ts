@@ -1,0 +1,78 @@
+/**
+ * The Files app — main-process IPC.
+ *
+ * Two handlers and one cache. The index is built by walking real directories
+ * and a SQLite table, so rebuilding it on every keystroke in the search box
+ * would put a disk walk on the render path; it is cached and invalidated by
+ * time or by an explicit refresh, and the snapshot says when it was built so
+ * the UI can show that rather than implying it is live.
+ *
+ * `filesapp:reveal` is separate from the index on purpose. The plan's gate 12
+ * requires a non-file-backed item to refuse *honestly* rather than open the
+ * wrong folder, and the only way to guarantee that is for the reveal path to
+ * consult `revealTargetFor` — the same function the renderer uses to decide
+ * whether to offer the action — instead of trusting whatever path a caller
+ * hands it.
+ */
+import { app, ipcMain, shell } from 'electron';
+import { dictionaryDb } from '../dictionary/db';
+import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
+import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
+
+/** How long a built index is served before the next request rebuilds it. */
+const INDEX_TTL_MS = 15_000;
+
+let cached: FilesIndexSnapshot | null = null;
+
+export function defaultFilesContext(): FilesEnumeratorContext {
+  return {
+    userDataPath: app.getPath('userData'),
+    openDictionary: () => {
+      try {
+        return dictionaryDb() as unknown as FilesSqliteLike;
+      } catch {
+        // No dictionary database yet is an ordinary state on a fresh profile.
+        // The enumerator reports zero dictionaries; it does not fail the index.
+        return null;
+      }
+    },
+  };
+}
+
+/** Drop the cache. Called by whatever changes a store the index reads. */
+export function invalidateFilesIndex(): void {
+  cached = null;
+}
+
+export function getFilesIndex(force = false): FilesIndexSnapshot {
+  if (!force && cached && Date.now() - cached.builtAt < INDEX_TTL_MS) return cached;
+  cached = buildFilesIndex(defaultFilesContext());
+  return cached;
+}
+
+export interface FilesRevealResult {
+  ok: boolean;
+  /** i18n key naming why a refusal happened. Never a bare `false`. */
+  reasonKey?: string;
+}
+
+export function registerFilesAppIpc(): void {
+  ipcMain.handle('filesapp:index', (_e, force: unknown): FilesIndexSnapshot =>
+    getFilesIndex(force === true),
+  );
+
+  ipcMain.handle('filesapp:reveal', (_e, location: unknown): FilesRevealResult => {
+    if (!location || typeof location !== 'object') {
+      return { ok: false, reasonKey: 'filesApp.reveal.noLocation' };
+    }
+    const target = revealTargetFor(location as FilesLocation);
+    if (!target) {
+      // Gate 12's honest half: a dictionary row has no folder, and opening
+      // userData "so something happens" would be the wrong folder presented
+      // as a success.
+      return { ok: false, reasonKey: 'filesApp.reveal.notFileBacked' };
+    }
+    shell.showItemInFolder(target);
+    return { ok: true };
+  });
+}
