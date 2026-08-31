@@ -3158,6 +3158,15 @@ export default function DesktopShell({
                 taskCtx.win.min
                   ? { id: 'restore', label: t('desktop.task.restore'), onSelect: () => focus(taskCtx.win.id) }
                   : { id: 'minimize', label: t('desktop.task.minimize'), onSelect: () => minimize(taskCtx.win.id) },
+                ...(canPresentLiquid(taskCtx.win.section)
+                  ? [{
+                      id: 'toggle-liquid',
+                      label: isWinLiquid(taskCtx.win)
+                        ? t('desktop.returnToStandard')
+                        : t('desktop.makeLiquid'),
+                      onSelect: () => toggleLiquid(taskCtx.win.id),
+                    }]
+                  : []),
                 { id: 'sep-t1', separator: true, label: '' },
                 { id: 'close', label: t('desktop.task.closeThis'), danger: true, onSelect: () => close(taskCtx.win.id) },
                 {
