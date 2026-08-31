@@ -516,9 +516,11 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
         separate from `ambiguous` because they ask the user for different things. -->
 24. **Scan is read-only.** After a scan and an import, every original file is byte-identical and
    still in its original path — verified, not assumed.
-   <!-- status: open; evidence: 2026-08-31 8fca0963 -- the SCAN half is measured: size, mtime and full bytes of every fixture file captured before and compared after three scans including the zip-reading sniffer; identical, and nothing created or removed. Read-only is also structural (readdirSync/statSync/lstatSync only, no injectable fs, symlinks not descended). The IMPORT half needs the confirm-and-import path, which does not exist yet. -->
-   **1 of 2 clauses landed, gate still OPEN.** The import half opens when the review/confirm
-   surface lands (gate 27's slice).
+   <!-- status: closed; evidence: 2026-08-31 8fca0963 (scan half) + 38d26b93 (import half) -- the real media:addPaths and library:importPaths handlers, captured off a mocked ipcMain, run over a 4 KB .mkv and a real 3-page .cbz that live OUTSIDE userData; every source file byte-identical (size:mtime:bytes) and still at its own path, twice, and the rows reference the ORIGINALS (media.path === VIDEO, library.sourcePath === MANGA, pageCount 3 so the archive really was read). Instrument control: a same-length rewrite, a move and a deletion each detected. -->
+   **CLOSED 2026-08-31.** Both clauses measured. Two assertions, not one: byte-identity
+   alone would pass an importer that copied and then referenced the copy, so the row's
+   `sourcePath`/`path` is asserted against the original as well — the plan's decision (c),
+   reference in place, checked rather than assumed.
 25. **Watch picks up a live download.** A file appearing in a watched folder is recognised
    without a manual refresh, and the elapsed time is reported.
 26. **A partial download is never ingested.** A `.crdownload`/`.part`/`.!qB` file, and a file
@@ -533,6 +535,22 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 27. **Ambiguity goes to review, not into the library.** A file the router settles only by
    guessing lands in the review queue; a high-confidence match may auto-import. Both paths
    demonstrated with a real file each.
+   <!-- status: closed; evidence: 2026-08-31 30b13bfb (model) + 2e332b86 (surface) -- shared/filesApp/ingest.ts + components/filesapp/ScanReviewSheet.tsx; 34 tests. Real files through the production scanRoots/planForPath: .srt exact -> auto, .csv guessed -> review, .png ambiguous -> review carrying both real choices, a real Yomitan zip sniffed to exact -> auto, .xyz -> refused. The component's claims are asserted on the IMPORTER spies, not the DOM. Adverse control putting review rows in the auto pile turns 3 of 8 component tests red on "expected importPaths not to be called, called 1 times"; a second control (certain = settlement === 'placed') turns 8 of 26 model tests red. -->
+   <!-- FINDING that shaped the design, recorded so it is not re-derived: `placed` is NOT
+        the same as "safe to import unattended". `settlementOf` calls a single `likely`
+        candidate `placed`, and `likely` is defined by fileRouting.ts as "best guess". A
+        `.csv` is placed AND a guess. Reusing gate 23's settlement as the auto-import test
+        would import every guess — exactly what this gate forbids — so disposition reads the
+        router's CONFIDENCE instead. -->
+   <!-- decision: the scan root is typed, not browsed. A Browse button opens a native OS
+        directory dialog that nothing on this side can drive, so this gate's own evidence
+        would then depend on a human clicking. Reversible: a Browse button can be added
+        beside the field later without moving any of the sheet. -->
+   <!-- decision: nothing imports until Import is pressed, INCLUDING the auto pile. "May
+        auto-import" is the router's permission, not a licence for a scan to write to the
+        library while the report is still being read. The scan stays read-only (gate 24) and
+        the confirm is the one write. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (nineteenth) Progress entry.
 28. **Paste a folder sorts all of it.** A pasted folder is walked recursively, archives are
    expanded far enough to classify their contents, and the report names placed / skipped /
    ambiguous with reasons.
@@ -559,6 +577,17 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    Recycle-Bin-destined items are actually restorable from there.
 36. **Per-category ingest overrides work.** With subtitles set to auto-import and video set to
    review, a folder containing both routes each one differently in a single scan.
+   <!-- status: open; evidence: 2026-08-31 30b13bfb -- the MODEL half is measured on real
+        files: one scanRoots walk, one settings object {subtitle:'auto', media:'review'},
+        ep01.srt in the auto pile and ep01.mkv in the review pile, with a control that
+        removes the overrides and moves the video back. What is missing is "set to" as a
+        product surface — the folder settings that carry `byTarget`. -->
+   <!-- decision: a category set to `auto` NARROWS and never widens — it cannot promote a
+        guessed or ambiguous file past gate 27, or "auto-import subtitles" would repeal
+        gate 27 for every file that happens to rank a subtitle first. Widening is the
+        global `everything` confidence policy's job, and every row it promotes carries
+        `warned: true` so the surface can say so. -->
+   **The routing half is measured; the settings surface is what remains.**
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
@@ -1596,3 +1625,54 @@ mistaken for the feature working.
 
 Focused gates: **26/26** across the two new main suites, ESLint **exit 0** on every touched
 TS path, i18n **exit 0 at 11,894 keys**.
+
+### 2026-08-31 (nineteenth) — gates 27 and 24 CLOSE; 36 lands its routing half
+
+Commits `30b13bfb` (ingest model), `2e332b86` (review sheet + the one importer),
+`38d26b93` (gate 24's import half).
+
+**The finding gate 27 turns on: `placed` is not "safe to import unattended".** Gate 23's
+`settlementOf` calls a single `likely` candidate `placed` — and `fileRouting.ts` defines
+`likely` as "best guess, route but say what was assumed". A `.csv` is therefore `placed`
+AND, in gate 27's exact word, a guess. Reusing the settlement as the auto-import test would
+have put every guess straight into the library. So `shared/filesApp/ingest.ts` decides from
+the router's **confidence** instead: `exact` with one candidate may auto-import; `likely` is
+a guess and waits; `ambiguous` waits with its choices attached; target `unknown` is refused,
+because there is nowhere to review it INTO — the same reason gate 23 keeps `unplaced` apart
+from `ambiguous`.
+
+Both of gate 27's paths, on real files through the production `scanRoots` + `planForPath`:
+`ep01.srt` exact -> **auto**; `vocab.csv` likely, settlement asserted as `placed` -> **review**;
+`page001.png` -> **review** carrying both real candidates in the router's own order; a real
+Yomitan `.zip` sniffed to exact -> **auto** (the hardest auto row — bypass the sniffer and it
+sits in review); `notes.xyz` -> **refused**. Six files, three piles, `ingestPlanBalances` true.
+
+**One importer.** `DropRouter`'s dispatch table moved verbatim to
+`renderer/fileImportExecute.ts`; the review sheet calls it. A second importer would be the
+same defect as a second classifier, one step later — a file could land through a path the
+drop router never takes, with its own undo. Its one behaviour change is an improvement: an
+empty-folder import was a silent `null` and now refuses by name.
+
+**Gate 24 CLOSES.** The real `media:addPaths` and `library:importPaths` handlers, captured
+off a mocked `ipcMain`, over a 4 KB `.mkv` and a real 3-page `.cbz` living outside userData.
+Every source byte-identical and still at its own path, twice; and — the assertion that
+matters as much — `media.path === VIDEO` and `library.sourcePath === MANGA`, because
+byte-identity alone would pass an importer that copied and then referenced the copy.
+`pageCount` 3 proves the archive was actually opened. Instrument control: a same-length
+rewrite, a move and a deletion each detected.
+
+Gate 36's routing half is measured on one walk: `{subtitle:'auto', media:'review'}` puts the
+`.srt` in auto and the `.mkv` in review, with a control that removes the overrides and moves
+the video back. Its settings surface is what remains.
+
+Traps: (1) the review sheet re-fetches candidates through `filedrop:classify` because the
+scan report stores a candidate **count**, not the list — a 5,000-file report has to stay
+small; the refetch is capped at that handler's own 200 paths. (2) Component assertions are
+made on the importer spies, never on the DOM: a row that renders in the right list and
+imports anyway would pass a DOM-only test and fail the gate. (3) `MAX_STABILITY_MS` is new in
+`stability.ts`; there is deliberately no matching floor, because the lower bound is
+`stabilityVerdict`'s clause order rather than a number.
+
+Focused gates: **34/34** across the four new suites (18 model + 8 real-file + 8 component +
+4 import read-only), plus 72/72 across the touched renderer suites. ESLint exit 0 on every
+touched TS/TSX path. i18n exit 0 at **11,926 keys**.
