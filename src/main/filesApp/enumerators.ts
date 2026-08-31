@@ -31,13 +31,16 @@ import {
   type FilesItemKind,
   type FilesProvenance,
 } from '../../shared/filesApp/catalog';
-import { AUDIO_EXT, extOf } from '../../shared/mediaKind';
+import { AUDIO_EXT, SUBTITLE_EXT, VIDEO_EXT, extOf } from '../../shared/mediaKind';
+import { ANKI_DRAFT_SESSION_STORE_FILE } from '../../shared/ankiDraftSession';
 import {
+  MEDIA_DOWNLOAD_DIRECTORY,
   MEDIA_LIBRARY_STORE_FILE,
   mediaItemsFromStoredDocument,
 } from '../../shared/mediaLibraryEntries';
 import { AGENT_WORKSPACE_RELATIVE_PATH } from '../../shared/agentWorkspace';
 import {
+  isAutoCaptionName,
   readMediaSubtitleAssets,
   readSubtitleLibraryOrphanAssets,
   readYoutubeSubtitleCacheAssets,
@@ -359,9 +362,130 @@ export const mediaSubtitleEnumerator: FilesEnumerator = {
   },
 };
 
+/**
+ * `downloads/` — what yt-dlp put on disk, whether or not it was ever imported.
+ *
+ * The measured reason this exists: on 2026-08-30 this directory held **96 files
+ * / 5.14 GB, of which exactly 4 appear in `media.json`.** Indexing only the
+ * library therefore hid 5 GB of the user's own material behind a tree that
+ * looked complete — the plan calls out `downloads` by name for this reason.
+ *
+ * Files the media library already claims are skipped here rather than listed
+ * twice: two rows for one file would make the list and the count disagree, and
+ * the media row is the richer of the two (title, play history, subtitles).
+ *
+ * A `.mp4` here carries `unknown` provenance for the same reason a media row
+ * does — provenance is a property of text, and a video is not text. Its
+ * sidecar `.vtt` is text, and yt-dlp's `a.<lang>` marker is what separates a
+ * machine caption from a human-authored one.
+ */
+export const downloadsEnumerator: FilesEnumerator = {
+  source: 'downloads',
+  run(ctx) {
+    const root = path.join(ctx.userDataPath, MEDIA_DOWNLOAD_DIRECTORY);
+    const db = readJson<unknown>(path.join(ctx.userDataPath, MEDIA_LIBRARY_STORE_FILE), {});
+    const claimed = new Set<string>();
+    for (const row of mediaItemsFromStoredDocument(db) as unknown as MediaRow[]) {
+      if (typeof row?.path === 'string') claimed.add(path.resolve(row.path).toLowerCase());
+    }
+
+    const out: FilesItem[] = [];
+    const walk = (dir: string, depth: number): void => {
+      if (depth > 3) return;
+      for (const entry of listDir(dir)) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full, depth + 1);
+          continue;
+        }
+        if (claimed.has(path.resolve(full).toLowerCase())) continue;
+        const ext = extOf(entry.name);
+        const isSubtitle = SUBTITLE_EXT.has(ext);
+        const isAudio = AUDIO_EXT.has(ext);
+        const isVideo = VIDEO_EXT.has(ext);
+        if (!isSubtitle && !isAudio && !isVideo) continue;
+        out.push(
+          fileItem({
+            id: `download:${path.relative(root, full).replaceAll('\\', '/')}`,
+            name: entry.name,
+            kind: isSubtitle ? 'subtitle' : isAudio ? 'audio' : 'video',
+            filePath: full,
+            provenance: isSubtitle
+              ? isAutoCaptionName(entry.name)
+                ? 'auto-captions'
+                : 'human-subs'
+              : 'unknown',
+            source: 'downloads',
+            // Downloaded, not imported: the library does not know about it, and
+            // saying so is the difference between "5 GB you can find" and
+            // "5 GB the app is quietly sitting on".
+            flags: { orphan: true },
+          }),
+        );
+      }
+    };
+    walk(root, 0);
+    return out;
+  },
+};
+
 /* ------------------------------------------------------------------ *
  * Outputs.
  * ------------------------------------------------------------------ */
+
+interface DraftSessionRow {
+  id?: unknown;
+  label?: unknown;
+  status?: unknown;
+  sourceKind?: unknown;
+  createdAtMs?: unknown;
+  updatedAtMs?: unknown;
+  totalNotes?: unknown;
+}
+
+/**
+ * `anki-draft-sessions.json` — the deck workbench's resumable reads.
+ *
+ * 24 sessions exist in the live profile while `outputs/drafts` read 0, which is
+ * gate 1's FINDING shape exactly. A draft is the one output kind you come back
+ * to *because* it is unfinished, so an interrupted session is listed rather
+ * than hidden, flagged by its own recorded status.
+ */
+export const draftEnumerator: FilesEnumerator = {
+  source: 'drafts',
+  run(ctx) {
+    const store = readJson<{ sessions?: unknown }>(
+      path.join(ctx.userDataPath, ANKI_DRAFT_SESSION_STORE_FILE),
+      {},
+    );
+    return collectionValues<DraftSessionRow>(store?.sessions).flatMap((row) => {
+      const id = typeof row?.id === 'string' ? row.id : null;
+      if (!id) return [];
+      const label = typeof row.label === 'string' && row.label ? row.label : null;
+      const kindLabel = typeof row.sourceKind === 'string' ? row.sourceKind : null;
+      return [
+        {
+          id: `draft:${id}`,
+          name: label ?? (kindLabel ? `${kindLabel} draft` : id),
+          kind: 'draft' as const,
+          categoryId: categoryForKind('draft'),
+          provenance: 'app-generated' as const,
+          sizeBytes: null,
+          createdAt: typeof row.createdAtMs === 'number' ? row.createdAtMs : null,
+          modifiedAt: typeof row.updatedAtMs === 'number' ? row.updatedAtMs : null,
+          lastUsedAt: null,
+          location: {
+            store: 'json' as const,
+            file: ANKI_DRAFT_SESSION_STORE_FILE,
+            pointer: `/sessions/${id}`,
+          },
+          flags: { exported: row.status === 'complete' },
+          source: 'drafts',
+        },
+      ];
+    });
+  },
+};
 
 /**
  * `exports/` — what the app produced and handed back to the user. `.apkg`
@@ -649,7 +773,9 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   transcriptEnumerator,
   cachedSubtitleEnumerator,
   mediaSubtitleEnumerator,
+  downloadsEnumerator,
   exportsEnumerator,
+  draftEnumerator,
   dictionaryEnumerator,
   modelEnumerator,
   artworkEnumerator,

@@ -24,6 +24,16 @@ import type { MediaItem } from './types';
 export const MEDIA_LIBRARY_STORE_FILE = 'media.json';
 
 /**
+ * Where the yt-dlp downloader writes, relative to Electron userData.
+ *
+ * A downloaded file is NOT automatically a library row: measured against the
+ * real profile on 2026-08-30 this directory held 96 files / 5.14 GB of which
+ * exactly **4** appear in `media.json`. Anything read-only that wants to know
+ * what this app has on disk must walk the directory as well as the store.
+ */
+export const MEDIA_DOWNLOAD_DIRECTORY = 'downloads';
+
+/**
  * Read the item collection from the persisted media document.
  *
  * The live store is `{ items, watchFolder, relationships }`. A Files indexer

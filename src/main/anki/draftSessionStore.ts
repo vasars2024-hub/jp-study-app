@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  ANKI_DRAFT_SESSION_STORE_FILE,
   ANKI_DRAFT_SESSION_VERSION,
   cancelSession,
   describeSessionProgress,
@@ -49,7 +50,7 @@ interface SessionFile {
 let cache: AnkiDraftSession[] | null = null;
 
 function storePath(): string {
-  return path.join(app.getPath('userData'), 'anki-draft-sessions.json');
+  return path.join(app.getPath('userData'), ANKI_DRAFT_SESSION_STORE_FILE);
 }
 
 /**

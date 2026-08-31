@@ -56,7 +56,13 @@ function listFilesRecursive(root: string): string[] {
   return out.sort((a, b) => a.localeCompare(b));
 }
 
-function isAutoCaptionName(name: string): boolean {
+/**
+ * yt-dlp's own marker for a machine caption: `<title>.a.<lang>.<ext>`. It is
+ * the only signal in a downloaded track that separates YouTube's ASR output
+ * from a human-authored one, so every reader that meets a yt-dlp filename must
+ * ask the same question in the same place.
+ */
+export function isAutoCaptionName(name: string): boolean {
   return /\.a\.[a-z-]+\.[a-z0-9]+$/i.test(name);
 }
 

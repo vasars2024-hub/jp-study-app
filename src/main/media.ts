@@ -10,6 +10,7 @@ import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, 
 import { previewMediaOrganization } from '../shared/mediaHub';
 import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
 import {
+  MEDIA_DOWNLOAD_DIRECTORY,
   MEDIA_LIBRARY_STORE_FILE,
   mediaItemsFromStoredDocument,
 } from '../shared/mediaLibraryEntries';
@@ -230,7 +231,7 @@ export async function downloadYoutubeUrl(
       error: 'yt-dlp was not found on your PATH. Install it (e.g. `pip install -U yt-dlp`) and reopen the app.',
     };
   }
-  const outDir = path.join(app.getPath('userData'), 'downloads');
+  const outDir = path.join(app.getPath('userData'), MEDIA_DOWNLOAD_DIRECTORY);
   fs.mkdirSync(outDir, { recursive: true });
   const pathFile = path.join(outDir, `.out_${crypto.randomUUID()}.txt`);
   const format = opts.audioOnly

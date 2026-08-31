@@ -22,6 +22,13 @@ import type { AnkiDraftDiagnosticCode, AnkiDraftSourceKind } from './ankiDraft';
 export const ANKI_DRAFT_SESSION_VERSION = 1;
 
 /**
+ * Where `main/anki/draftSessionStore.ts` persists these, relative to Electron
+ * userData. Shared so a read-only catalogue points at the writer's own filename
+ * instead of a second copy that can drift.
+ */
+export const ANKI_DRAFT_SESSION_STORE_FILE = 'anki-draft-sessions.json';
+
+/**
  * `reading` is the only status a live process may hold, and it is the only one
  * that is not final-until-resumed. `interrupted` is distinct from `cancelled`
  * on purpose: the user chose one of them and did not choose the other, and the
