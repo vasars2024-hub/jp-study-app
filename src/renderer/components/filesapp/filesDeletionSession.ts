@@ -7,6 +7,7 @@ import {
   type FilesDeletionPlan,
   type FilesDeletionResult,
   type FilesDeletionTarget,
+  type FilesDeleteRequest,
 } from '../../../shared/filesApp/deletion';
 import {
   FILES_SOFT_DELETE_EVENT,
@@ -31,12 +32,8 @@ export interface FilesDeletionCatalogueItem {
  * authoritative row again; accepting a renderer-supplied path would turn an
  * XSS into an arbitrary Recycle Bin primitive.
  */
-export interface FilesTrashRequest extends FilesDeletionAuthorization {
-  itemId: string;
-}
-
 export interface FilesDeletionBridge {
-  trash(request: FilesTrashRequest): Promise<FilesDeletionResult>;
+  trash(request: FilesDeleteRequest): Promise<FilesDeletionResult>;
 }
 
 export function deletionTargetFromItem(item: FilesDeletionCatalogueItem): FilesDeletionTarget {

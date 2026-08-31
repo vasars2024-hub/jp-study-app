@@ -18,6 +18,7 @@ export type FilesDeletionLocation =
 
 export type FilesDeletionMode = 'trash' | 'soft' | 'none';
 export type FilesDeletionRisk = 'replaceable' | 'irreplaceable-media';
+export const FILES_DELETE_CHANNEL = 'filesapp:delete';
 
 export interface FilesDeletionTarget {
   /** Stable catalogue id. Also binds an explicit confirmation to one item. */
@@ -134,6 +135,11 @@ export interface FilesDeletionAuthorization {
    * selection can change while a confirmation dialog is open.
    */
   confirmedItemId?: string;
+}
+
+/** The complete renderer-to-main request. Paths and risk never cross IPC. */
+export interface FilesDeleteRequest extends FilesDeletionAuthorization {
+  itemId: string;
 }
 
 /**

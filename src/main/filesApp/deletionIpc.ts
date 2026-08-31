@@ -1,18 +1,13 @@
 import {
   executeFilesDeletion,
+  FILES_DELETE_CHANNEL,
   planFilesDeletion,
+  type FilesDeleteRequest,
   type FilesDeletionResult,
   type FilesDeletionTarget,
 } from '../../shared/filesApp/deletion';
 
-export const FILES_DELETE_CHANNEL = 'filesapp:delete';
-
-export interface FilesDeleteRequest {
-  /** The only catalogue identity accepted from the renderer. Never a path. */
-  itemId: string;
-  /** Exact id from the confirmation dialog, when the resolved item is media. */
-  confirmedItemId?: string;
-}
+export { FILES_DELETE_CHANNEL };
 
 export interface FilesDeletionMainDependencies {
   /** Resolve from the current main-process index, not from renderer fields. */
