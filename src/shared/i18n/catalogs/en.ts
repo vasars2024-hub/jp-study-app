@@ -10987,6 +10987,7 @@ export const en: Catalog = {
   'filesApp.delete.failed': 'The item could not be deleted. Nothing else was removed.',
   'filesApp.delete.trashed': '“{name}” was moved to the Recycle Bin.',
   'filesApp.delete.softDeleted': '“{name}” was removed from Files. Undo is available briefly.',
+  'filesApp.delete.undoRestored': 'The record was restored.',
   'filesApp.delete.undoExpired': 'The Undo window has expired; the record remains removed.',
   'filesApp.delete.undoFailed': 'The record could not be restored. It remains removed.',
 };

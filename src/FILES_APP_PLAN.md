@@ -556,6 +556,13 @@ with Undo, computed refusal, stale selection and failure are distinct messages; 
 to become the Files inspector's error UI. `i18n-check` passes at **11,811** English keys and the
 catalog/deletion guard passes **16 of 16** tests. Gate 21 remains open pending live integration.
 
+### 2026-08-31 — codexA, Gate 9/21 browser session outcomes
+
+The renderer session now adapts the typed preload, returns a named result for a stale bridge,
+and maps trash, soft-delete, failure, restored, expired and failed-Undo receipts to **19**
+localized outcome keys. Focused deletion result: **34 of 34 tests pass**. The exact remaining
+Gate 21 work is production inspector wiring plus one live trash-and-restore fixture.
+
 ### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
 
 Gate 1 remains **OPEN**. Debug-bridge evaluation against the running main renderer measured

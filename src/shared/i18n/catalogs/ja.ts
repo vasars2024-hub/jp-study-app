@@ -10531,6 +10531,7 @@ export const ja: Catalog = {
   'filesApp.delete.failed': '項目を削除できませんでした。他の項目は削除されていません。',
   'filesApp.delete.trashed': '「{name}」をごみ箱に移動しました。',
   'filesApp.delete.softDeleted': '「{name}」を Files から削除しました。短時間だけ元に戻せます。',
+  'filesApp.delete.undoRestored': '記録を復元しました。',
   'filesApp.delete.undoExpired': '元に戻せる時間が切れました。記録は削除されたままです。',
   'filesApp.delete.undoFailed': '記録を復元できませんでした。削除されたままです。',
 };

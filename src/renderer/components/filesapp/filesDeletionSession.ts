@@ -37,6 +37,74 @@ export interface FilesDeletionBridge {
   trash(request: FilesDeleteRequest): Promise<FilesDeletionResult>;
 }
 
+/** Structural window-api slice: tests and browser previews need no global cast. */
+export interface FilesDeletionWindowApi {
+  filesDelete?: (request: FilesDeleteRequest) => Promise<FilesDeletionResult>;
+}
+
+/**
+ * Adapt preload without pretending an old renderer bridge is usable.
+ *
+ * Main-process handlers require an app restart while renderer code hot reloads,
+ * so a stale preload is a routine development and upgrade state. Returning the
+ * normal named failure keeps the inspector out of an unhandled rejection and
+ * lets the same localized error surface as every other failed delete.
+ */
+export function filesDeletionBridgeFromApi(
+  api: FilesDeletionWindowApi | null | undefined,
+): FilesDeletionBridge {
+  return {
+    trash: async (request) => {
+      if (typeof api?.filesDelete !== 'function') {
+        return {
+          ok: false,
+          itemId: request.itemId,
+          reasonKey: 'filesApp.delete.failed',
+          detail: 'Files delete bridge unavailable',
+        };
+      }
+      return api.filesDelete(request);
+    },
+  };
+}
+
+export interface FilesDeletionNotice {
+  key: string;
+  values?: { name: string };
+  tone: 'ok' | 'error';
+  undoToken?: string;
+  undoExpiresAt?: number;
+}
+
+/** One exhaustive mapping from the result union to inspector-visible copy. */
+export function deletionNoticeForResult(
+  result: FilesDeletionResult,
+  itemName: string,
+): FilesDeletionNotice {
+  if (!result.ok) return { key: result.reasonKey, tone: 'error' };
+  if (result.mode === 'trash') {
+    return { key: 'filesApp.delete.trashed', values: { name: itemName }, tone: 'ok' };
+  }
+  return {
+    key: 'filesApp.delete.softDeleted',
+    values: { name: itemName },
+    tone: 'ok',
+    undoToken: result.undoToken,
+    undoExpiresAt: result.undoExpiresAt,
+  };
+}
+
+export function deletionNoticeForUndo(result: FilesSoftDeleteUndoResult): FilesDeletionNotice {
+  if (result.ok) return { key: 'filesApp.delete.undoRestored', tone: 'ok' };
+  return {
+    key:
+      result.reason === 'expired'
+        ? 'filesApp.delete.undoExpired'
+        : 'filesApp.delete.undoFailed',
+    tone: 'error',
+  };
+}
+
 export function deletionTargetFromItem(item: FilesDeletionCatalogueItem): FilesDeletionTarget {
   return {
     id: item.id,
@@ -158,6 +226,11 @@ export function createBrowserFilesDeletionSession(bridge: FilesDeletionBridge): 
     window.dispatchEvent(new CustomEvent(eventName));
   });
   return new FilesDeletionSession(bridge, persistence, () => window.crypto.randomUUID());
+}
+
+/** Production default kept behind a function so importing this module stays SSR-safe. */
+export function createWindowFilesDeletionSession(): FilesDeletionSession {
+  return createBrowserFilesDeletionSession(filesDeletionBridgeFromApi(window.api));
 }
 
 export { FILES_SOFT_DELETE_EVENT, FILES_SOFT_DELETE_STORAGE_KEY };

@@ -11399,6 +11399,7 @@ export const ru: Catalog = {
   'filesApp.delete.failed': 'Не удалось удалить элемент. Другие элементы не удалены.',
   'filesApp.delete.trashed': '«{name}» перемещён в Корзину.',
   'filesApp.delete.softDeleted': '«{name}» удалён из Files. Действие можно ненадолго отменить.',
+  'filesApp.delete.undoRestored': 'Запись восстановлена.',
   'filesApp.delete.undoExpired': 'Время для отмены истекло; запись остаётся удалённой.',
   'filesApp.delete.undoFailed': 'Не удалось восстановить запись. Она остаётся удалённой.',
 };

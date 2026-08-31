@@ -10438,6 +10438,7 @@ export const zh: Catalog = {
   'filesApp.delete.failed': '无法删除该项目。没有移除其他内容。',
   'filesApp.delete.trashed': '“{name}”已移到回收站。',
   'filesApp.delete.softDeleted': '“{name}”已从文件应用中移除，可在短时间内撤销。',
+  'filesApp.delete.undoRestored': '该记录已恢复。',
   'filesApp.delete.undoExpired': '撤销期限已过；该记录仍处于移除状态。',
   'filesApp.delete.undoFailed': '无法恢复该记录；它仍处于移除状态。',
 };
