@@ -180,10 +180,13 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // lists differing by `visualizer`, so a visualizer window could render
     // `.fwin-liquid` with the toggle button not rendered at all. The guard is
     // that `liquid` is derived FROM `canGoLiquid` — any re-expansion into a
-    // second `!isNote && ...` chain fails here.
+    // second `!isNote && ...` chain fails here. The taskbar menu is the second
+    // sanctioned consumer: it must call this same predicate rather than grow
+    // another section list.
     expect(SHELL).toMatch(/const canGoLiquid = canPresentLiquid\(win\.section\);/);
     expect(SHELL).toMatch(/const liquid = isWinLiquid\(win\) && canGoLiquid;/);
-    expect(SHELL.match(/canPresentLiquid\(/g) ?? []).toHaveLength(1);
+    expect(SHELL.match(/canPresentLiquid\(/g) ?? []).toHaveLength(2);
+    expect(SHELL).toMatch(/canPresentLiquid\(taskCtx\.win\.section\)/);
     // And the load-side converter is handed the section, or a blob on a
     // non-presentable window survives in memory and is written straight back.
     expect(SHELL).toMatch(

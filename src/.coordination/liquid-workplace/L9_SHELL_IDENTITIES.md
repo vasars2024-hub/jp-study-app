@@ -44,3 +44,11 @@ Focused verification passed 10/10 across the new two-path focus suite and the ex
 action suite. Live Electron used the Search tray button as the launcher: Toolbox opened with
 the input focused and localized prompt, Escape removed the dialog, and focus returned to that
 same tray element. L9's first timeline bullet remains OPEN pending the full entry-point rubric.
+
+## 2026-08-30 — Turn-gate predicate correction
+
+The full suite exposed one new guard failure: the original fidelity test equated “one shared
+predicate” with “one call site.” The taskbar is now a legitimate second consumer of the same
+`canPresentLiquid` predicate. The guard permits exactly those two calls and asserts the second
+targets `taskCtx.win.section`; hand-written eligibility lists remain forbidden. Focused fidelity,
+taskbar, and presentation suites pass 52/52 after the correction.
