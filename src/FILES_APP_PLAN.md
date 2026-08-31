@@ -534,6 +534,13 @@ two pull against each other anywhere else, this rule wins and the plan is wrong.
 
 ## Progress
 
+### 2026-08-31 — codexA, Gate 9/21 main-lane checkpoint map
+
+Product commits: `00d1648a` absolute target validation; `1f33f52a` typed preload bridge;
+`e5664e2d` 18 localized deletion outcomes; `fe619969` browser adapter and result mapping.
+Turn-wide gates after all four: **949/1** Vitest files, **12,271/6** tests, i18n **11,812**,
+architecture **Nothing new**, ESLint **0 errors**. Gates 9/21 remain open for live integration.
+
 ### 2026-08-31 — codexA, Gate 9/21 absolute-target boundary
 
 The privileged deletion boundary now refuses relative and drive-relative paths from a malformed
