@@ -5,7 +5,7 @@
 // by the shortcut manager; mounted once in App.tsx so it works on the desktop,
 // in pop-outs and inside the reader.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Icon, { type IconName } from './Icons';
 import {
   COMMAND_CATALOG,
@@ -90,6 +90,7 @@ export default function CommandPalette() {
   const [grammarItems, setGrammarItems] = useState<UngroupedItem[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   // Open/close via the shortcut manager's events.
   useEffect(() => {
@@ -107,6 +108,20 @@ export default function CommandPalette() {
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const active = document.activeElement;
+    returnFocusRef.current = active instanceof HTMLElement && active !== document.body
+      ? active
+      : null;
+
+    return () => {
+      const target = returnFocusRef.current;
+      returnFocusRef.current = null;
+      if (target?.isConnected) target.focus({ preventScroll: true });
+    };
   }, [open]);
 
   // Grammar is a large data module — pull it in only when search mode opens.

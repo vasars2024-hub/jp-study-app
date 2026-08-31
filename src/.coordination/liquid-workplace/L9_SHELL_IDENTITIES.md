@@ -33,3 +33,14 @@ Focused verification passed 2/2 source/catalog guards plus the repository i18n g
 11,782 English keys with complete JA/ZH/RU coverage. Live Electron rendered the real desktop
 menu as six rows, including the five catalog-backed labels and the existing Close-all action.
 This is an entry-point completeness slice, not an L9 timeline-bullet close.
+
+## 2026-08-30 — Command-palette focus restoration
+
+The shared command palette now captures its launcher before focusing the search field and
+restores that exact connected element when Escape or the backdrop closes the overlay. Command
+execution remains deferred until after unmount, so destination commands can still take focus.
+
+Focused verification passed 10/10 across the new two-path focus suite and the existing palette
+action suite. Live Electron used the Search tray button as the launcher: Toolbox opened with
+the input focused and localized prompt, Escape removed the dialog, and focus returned to that
+same tray element. L9's first timeline bullet remains OPEN pending the full entry-point rubric.
