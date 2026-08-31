@@ -22,6 +22,9 @@ export default function NotificationBell() {
       className="os-tray-btn os-tray-btn-bell"
       title={dnd ? t('notifications.title.dnd') : t('notifications.title')}
       aria-label={showBadge ? `${t('notifications.title')}, ${count}` : t('notifications.title')}
+      // The bell opens the Notification Center, which owns its own open state, so this
+      // declares the popup without claiming an expanded state it cannot read.
+      aria-haspopup="dialog"
       onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleNotifications'))}
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

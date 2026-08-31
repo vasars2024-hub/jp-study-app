@@ -3035,9 +3035,19 @@ export default function DesktopShell({
       >
         {taskbarMode === 'full' && (
           <>
+            {/* The shell's popup-owning chrome declares itself. Measured 2026-08-31 on
+                the Wired shell: Start, Widgets, Search, Clipboard, Quick settings and the
+                bell all open a menu or a flyout and not one of them carried
+                `aria-haspopup`, so nothing but sighted pointer use could tell a launcher
+                from a plain command. `aria-expanded` is set only where this component
+                genuinely owns the open state — a stale expanded state is worse than none,
+                and the four dispatch-only tray buttons keep their panels' state in the
+                panels themselves. */}
             <button
               className={`os-start-btn ${startOpen ? 'active' : ''}`}
               title={wired ? 'NODE ROUTER' : t('desktop.start')}
+              aria-haspopup="menu"
+              aria-expanded={startOpen}
               onClick={() => setStartOpen((o) => !o)}
             >
               <Icon name="logo" size={22} />
@@ -3048,10 +3058,12 @@ export default function DesktopShell({
                 exactly the ownership collision the single-writer rule avoids. */}
             {!secondary && (
               <div className="os-desktop-switches">
-                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
+                {/* `active` was a class and nothing else: which desktop you are on was
+                    carried only in paint. `aria-pressed` states it programmatically. */}
+                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} aria-pressed={activeDesktop === 0} onClick={() => void switchDesktop(0)}>
                   {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
                 </button>
-                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
+                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} aria-pressed={activeDesktop === 1} onClick={() => void switchDesktop(1)}>
                   {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
                 </button>
               </div>
@@ -3173,6 +3185,7 @@ export default function DesktopShell({
             className="os-tray-btn"
             title={t('palette.searchPlaceholder')}
             aria-label={t('palette.searchPlaceholder')}
+            aria-haspopup="dialog"
             onClick={() => window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
@@ -3180,12 +3193,13 @@ export default function DesktopShell({
               <path d="M21 21l-4.3-4.3" />
             </svg>
           </button>
-          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} onClick={() => setGalleryOpen((o) => !o)}>
+          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} aria-haspopup="dialog" aria-expanded={galleryOpen} onClick={() => setGalleryOpen((o) => !o)}>
             <Icon name="app" size={18} />
           </button>
           <button
             className="os-tray-btn"
             title={t('desktop.clipboardHistory')}
+            aria-haspopup="dialog"
             onClick={() => window.dispatchEvent(new CustomEvent('clipboard:open'))}
           >
             <Icon name="clipboard" size={18} />
@@ -3198,6 +3212,7 @@ export default function DesktopShell({
             className="os-tray-btn"
             title={t('quickSettings.title')}
             aria-label={t('quickSettings.title')}
+            aria-haspopup="dialog"
             onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

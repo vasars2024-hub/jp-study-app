@@ -1,0 +1,133 @@
+/**
+ * L9 bullet 4 — the shell taskbar's popup-owning chrome must declare itself.
+ *
+ * Measured live on the Wired shell 2026-08-31 through the debug bridge: every one of
+ * `os-start-btn`, the two `os-desktop-switch` buttons and all six `os-tray-btn` buttons read
+ * `aria-expanded=null` and `aria-haspopup=null`. Six of those nine open a menu or a flyout
+ * (Start, Search, Widgets, Clipboard history, Quick settings, Notifications) and two are a
+ * two-state desktop selector whose selected-ness lived only in a CSS class. So nothing but
+ * sighted pointer use could tell the shell's launcher from a plain command, or say which
+ * desktop you were on.
+ *
+ * `aria-expanded` is asserted only where the rendering component genuinely owns the open
+ * state — Start and Widgets. The other four dispatch a CustomEvent and their panels own the
+ * state, and a button that claims `aria-expanded="false"` while its panel is open is worse
+ * than one that claims nothing. That split is the deliberate part of this slice, so it is
+ * pinned here rather than left to drift.
+ *
+ * A source scan, not a render: `vitest.config.ts` is `environment: 'node'` and
+ * `DesktopShell.tsx` pulls the whole shell tree at module eval — the same reason
+ * `desktopShellTrayNoDuplicates.test.ts` scans. The control block is what stops a scan whose
+ * matcher silently found nothing from reporting a pass forever.
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const REPO = resolve(__dirname, '../../..');
+const SHELL = 'src/renderer/components/DesktopShell.tsx';
+const BELL = 'src/renderer/components/shell/NotificationBell.tsx';
+
+const read = (rel: string): string => readFileSync(resolve(REPO, rel), 'utf8');
+
+/**
+ * The JSX element that opens with `<button`, up to the `>` that closes its ATTRIBUTE LIST.
+ *
+ * Brace- and quote-aware, and that is not defensive polish: the first draft took
+ * `indexOf('>')` and every handler's `() => …` arrow ended the tag two attributes in, so
+ * `switchDesktop(0)` was never inside any tag and the desktop-switch assertion read `''`.
+ * That failure is reproduced in the control below rather than described.
+ */
+function buttonTag(source: string, marker: string): string {
+  for (const m of source.matchAll(/<button\b/g)) {
+    let depth = 0;
+    let quote = '';
+    let end = -1;
+    for (let i = m.index; i < source.length; i += 1) {
+      const ch = source[i];
+      if (quote) { if (ch === quote) quote = ''; continue; }
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') depth -= 1;
+      else if (ch === '>' && depth === 0) { end = i; break; }
+    }
+    if (end < 0) continue;
+    const tag = source.slice(m.index, end);
+    if (tag.includes(marker)) return tag;
+  }
+  return '';
+}
+
+describe('the shell taskbar declares its popups', () => {
+  it('the Start button is a menu button with a live expanded state', () => {
+    const tag = buttonTag(read(SHELL), 'os-start-btn');
+    expect(tag).toContain('aria-haspopup="menu"');
+    expect(tag).toContain('aria-expanded={startOpen}');
+  });
+
+  it('the Widgets tray button is a dialog button with a live expanded state', () => {
+    const tag = buttonTag(read(SHELL), "t('desktop.widgets')");
+    expect(tag).toContain('aria-haspopup="dialog"');
+    expect(tag).toContain('aria-expanded={galleryOpen}');
+  });
+
+  it.each([
+    ['search', "t('palette.searchPlaceholder')"],
+    ['clipboard history', "t('desktop.clipboardHistory')"],
+    ['quick settings', "t('quickSettings.title')"],
+  ])('the %s tray button declares its popup and claims no expanded state it cannot read', (_name, marker) => {
+    const tag = buttonTag(read(SHELL), marker);
+    expect(tag).toContain('aria-haspopup="dialog"');
+    expect(tag).not.toContain('aria-expanded');
+  });
+
+  it('the notification bell declares its popup and claims no expanded state it cannot read', () => {
+    const tag = buttonTag(read(BELL), 'os-tray-btn-bell');
+    expect(tag).toContain('aria-haspopup="dialog"');
+    expect(tag).not.toContain('aria-expanded');
+  });
+
+  it('the desktop switches carry their selected-ness programmatically, not only as a class', () => {
+    const source = read(SHELL);
+    for (const n of [0, 1]) {
+      const tag = buttonTag(source, `switchDesktop(${n})`);
+      expect(tag).toContain(`aria-pressed={activeDesktop === ${n}}`);
+    }
+  });
+
+  it('the Settings tray button opens a window, so it stays a plain command', () => {
+    // The one tray button that is NOT a popup. Pinned so a future sweep that adds
+    // `aria-haspopup` to everything in the tray has to argue with a test rather than a
+    // comment: it opens the settings WINDOW through `open('settings')`.
+    const tag = buttonTag(read(SHELL), "t('palette.section.settings')");
+    expect(tag).toContain('os-tray-btn');
+    expect(tag).not.toContain('aria-haspopup');
+  });
+});
+
+describe('controls — so the scan cannot pass vacuously', () => {
+  it('reads a shell file that actually contains the taskbar', () => {
+    const source = read(SHELL);
+    expect(source).toContain('os-tray');
+    expect(source).toContain('os-task-wins');
+    expect(source.length).toBeGreaterThan(10_000);
+  });
+
+  it('buttonTag survives an arrow handler, stops at its own >, and returns empty for an absent marker', () => {
+    // Four failures this must be able to see: an attribute AFTER a `() =>` handler lost
+    // (the real defect this helper was rewritten for), the wrong button matched, children
+    // read as attributes, and a marker that no longer exists reported as a pass. The last
+    // is the one that would make every assertion above vacuous, because `''` contains
+    // nothing — which is exactly what the `not.toContain` cases assert.
+    const fixture = [
+      '<button className="a" onClick={() => go(0)} aria-pressed={n === 0}>A</button>',
+      '<button className="b">B<span/></button>',
+    ].join('\n');
+    expect(buttonTag(fixture, 'go(0)')).toContain('aria-pressed={n === 0}');
+    expect(buttonTag(fixture, 'className="b"')).toBe('<button className="b"');
+    expect(buttonTag(fixture, 'className="b"')).not.toContain('span');
+    expect(buttonTag(fixture, 'className="zzz"')).toBe('');
+    // …so a positive assertion on a missing marker FAILS rather than passing silently.
+    expect(buttonTag(fixture, 'className="zzz"')).not.toContain('aria-haspopup');
+  });
+});
