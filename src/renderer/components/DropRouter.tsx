@@ -17,6 +17,7 @@ import type { DropTargetId } from '../../shared/fileRouting';
 import { extOf } from '../../shared/mediaKind';
 import { useT } from '../i18n';
 import { loadFileDropPrefs, onFileDropPrefsChanged, type FileDropPrefs } from '../fileDropPrefs';
+import { announceFilesIndexChanged } from '../filesIndexBus';
 import { showOsToast } from './ToastHost';
 import Icon from './Icons';
 import { importApkgCards } from '../apkgImport';
@@ -54,7 +55,7 @@ export default function DropRouter({
   /** Focus the app that just received the file. */
   onOpenSection?: (section: string) => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [prefs, setPrefs] = useState<FileDropPrefs>(loadFileDropPrefs);
   const [dragging, setDragging] = useState(false);
   const [triage, setTriage] = useState<DropPlan[] | null>(null);
@@ -186,6 +187,9 @@ export default function DropRouter({
         /* a partially-reversible plan still reverses what it can */
       }
     }
+    // Gate 11 in reverse: the Files tree has to lose the row again, or an undo
+    // leaves a window showing an item that no longer exists.
+    announceFilesIndexChanged();
     showOsToast(t('fileDrop.toast.undone'), 'ok');
   }, [t]);
 
@@ -205,6 +209,9 @@ export default function DropRouter({
       }
 
       if (!done.length) return;
+      // Gate 11: fired AFTER the imports resolve, never optimistically. A tree
+      // that added a row and then had to take it away is worse than a stale one.
+      announceFilesIndexChanged();
       const summary =
         done.length === 1
           ? t('fileDrop.toast.routedOne', { name: plans[0]?.name ?? '', target: done[0].label })
@@ -253,11 +260,28 @@ export default function DropRouter({
           }
         })
         .filter(Boolean);
-      if (!paths.length) return;
+      /*
+       * Gate 11: "a file the router cannot place gets a named refusal, not a
+       * silent drop." These two returns WERE the silent drop — real files were
+       * released onto the window and nothing whatever happened, which reads as
+       * a broken app rather than as a refusal.
+       *
+       * They are distinct failures and get distinct sentences. No path means
+       * Electron would not give one for the dragged object (a virtual item from
+       * an archive or a mail client is the usual cause); no plan means the
+       * router itself returned nothing, which is a fault on this side.
+       */
+      if (!paths.length) {
+        showOsToast(t('fileDrop.toast.noPath', { count: files.length }), 'warn');
+        return;
+      }
 
       void (async () => {
         const plans = await window.api.fileDropClassify(paths);
-        if (!plans.length) return;
+        if (!plans.length) {
+          showOsToast(t('fileDrop.toast.notClassified', { count: paths.length }), 'err');
+          return;
+        }
         const mustAsk =
           !prefs.autoRoute ||
           prefs.alwaysTriage ||
@@ -289,7 +313,10 @@ export default function DropRouter({
       window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [prefs, runPlans]);
+    // `lang`, never `t`: `t`'s identity is stable by design, so a listener
+    // closed over it keeps the language it was registered with and the two new
+    // refusals below would speak the old one after a UI-language switch.
+  }, [prefs, runPlans, t, lang]);
 
   return (
     <>

@@ -1259,6 +1259,13 @@ export const zh: Catalog = {
   'fileDrop.toast.routedOne': '{name} → {target}',
   'fileDrop.toast.routedMany': { other: '已归位 {count} 个文件' },
   'fileDrop.toast.noDestination': '目前还没有能打开 {name} 的地方。',
+  'fileDrop.toast.noPath': {
+    other:
+      'Windows 没有告知这 {count} 个项目的位置，因此无法导入。请从文件夹中拖动，而不是从压缩包或邮件里。',
+  },
+  'fileDrop.toast.notClassified': {
+    other: '已收到 {count} 个文件，但无法检查其内容，因此未导入任何内容。',
+  },
   'fileDrop.toast.failed': '无法导入 {name}。',
   'fileDrop.toast.undone': '已撤销。',
   'desktop.task.onDesktop': '{name} — 位于 {desktop}',

@@ -1374,6 +1374,16 @@ export const en: Catalog = {
     other: '{count} files filed',
   },
   'fileDrop.toast.noDestination': 'Nothing here can open {name} yet.',
+  // Gate 11: the two ways a drop used to end in nothing at all.
+  'fileDrop.toast.noPath': {
+    one: 'Windows did not say where that item is, so it could not be imported. Try dragging it from a folder rather than from inside an archive or an email.',
+    other:
+      'Windows did not say where those {count} items are, so they could not be imported. Try dragging them from a folder rather than from inside an archive or an email.',
+  },
+  'fileDrop.toast.notClassified': {
+    one: 'The file was received but could not be examined, so nothing was imported.',
+    other: 'The {count} files were received but could not be examined, so nothing was imported.',
+  },
   'fileDrop.toast.failed': 'Could not import {name}.',
   'fileDrop.toast.undone': 'Undone.',
   'desktop.task.onDesktop': '{name} — on {desktop}',

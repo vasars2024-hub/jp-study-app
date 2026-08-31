@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import type { FilesIndexSnapshot } from '../../../shared/filesApp/catalog';
+import { onFilesIndexChanged } from '../../filesIndexBus';
 import { withRendererItems } from './rendererEnumerators';
 
 export type FilesIndexState =
@@ -63,6 +64,16 @@ export function useFilesIndex(): UseFilesIndex {
   useEffect(() => {
     void load(false);
   }, [load]);
+
+  /**
+   * Gate 11. An import that landed elsewhere in the app rebuilds the index
+   * here, so a dragged-in file appears in the tree with no manual refresh.
+   *
+   * `force: true` is required, not a precaution — main caches the snapshot, so
+   * a non-forced reload would return the very build that predates the import
+   * and the tree would refuse to change while looking like it had tried.
+   */
+  useEffect(() => onFilesIndexChanged(() => void load(true)), [load]);
 
   const refresh = useCallback(() => {
     void load(true);

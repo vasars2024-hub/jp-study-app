@@ -1262,6 +1262,13 @@ export const ja: Catalog = {
   'fileDrop.toast.routedOne': '{name} → {target}',
   'fileDrop.toast.routedMany': { other: '{count} 件を振り分けました' },
   'fileDrop.toast.noDestination': '{name} を開けるものがまだありません。',
+  'fileDrop.toast.noPath': {
+    other:
+      'その {count} 件の場所を Windows が伝えなかったため、取り込めませんでした。書庫やメールの中からではなく、フォルダーからドラッグしてみてください。',
+  },
+  'fileDrop.toast.notClassified': {
+    other: 'ファイル {count} 件を受け取りましたが、内容を調べられなかったため何も取り込みませんでした。',
+  },
   'fileDrop.toast.failed': '{name} を取り込めませんでした。',
   'fileDrop.toast.undone': '取り消しました。',
   'desktop.task.onDesktop': '{name} — {desktop} にあります',
