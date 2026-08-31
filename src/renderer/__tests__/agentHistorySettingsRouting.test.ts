@@ -21,8 +21,14 @@ import { AGENT_SETTINGS_GUIDED_TARGETS } from '../../shared/agentNavigation';
 import { AGENT_NAVIGATION_INDEX } from '../../shared/agentNavigationIndex';
 import { en, ja, ru, zh } from '../../shared/i18n/catalogs/all';
 
+/**
+ * The card MOVED — gate 8 / decision 1. `MemoryPage.tsx` is deleted and the
+ * Files app is memory's only home, so this file follows the card rather than
+ * the page. That is the whole point of deriving these assertions from source:
+ * the route had to be re-proved at its new address, not merely re-declared.
+ */
 const MEMORY_PAGE = readFileSync(
-  join(__dirname, '..', 'components', 'settings', 'pages', 'MemoryPage.tsx'),
+  join(__dirname, '..', 'components', 'filesapp', 'panels', 'FilesMemoryPanel.tsx'),
   'utf8',
 );
 
@@ -40,11 +46,18 @@ function cardTranslationKeys(): string[] {
 }
 
 describe('agent operation history settings routing', () => {
-  it('is mounted as a card on the page its registry entry names', () => {
+  it('is mounted as a card on the surface its registry entry now routes to', () => {
     const entry = SETTINGS_REGISTRY.find((item) => item.id === 'agent-history');
-    expect(entry).toMatchObject({ pageId: 'memory', titleKey: 'search.agentHistory' });
+    // `pageId` is now the card's HISTORICAL coordinate and `movedTo` is what
+    // routes the hit; both are asserted, because dropping either one is how a
+    // migrated entry silently becomes unreachable.
+    expect(entry).toMatchObject({
+      pageId: 'memory',
+      titleKey: 'search.agentHistory',
+      movedTo: 'files',
+    });
     expect(MEMORY_PAGE).toContain(`id="${entry?.id}"`);
-    expect(MEMORY_PAGE).toContain(`focusSettingId === '${entry?.id}'`);
+    expect(MEMORY_PAGE).toContain(`focusCardId === '${entry?.id}'`);
   });
 
   it('answers a search for what the agent did', () => {
@@ -60,7 +73,7 @@ describe('agent operation history settings routing', () => {
     expect(results[0]?.id).toBe('agent-memory');
   });
 
-  it('is a guided target and a navigation destination on the memory page', () => {
+  it('keeps its guided-target and navigation coordinate after the move', () => {
     expect(AGENT_SETTINGS_GUIDED_TARGETS.memory).toContain('agent-history');
     const destination = AGENT_NAVIGATION_INDEX.find(
       (row) => row.section === 'settings' && row.controlId === 'agent-history',

@@ -17,6 +17,26 @@ import { en } from '../../../shared/i18n/catalogs';
  * `AERO_THEME_ID` / `WIRED_ARCHIVE_THEME_ID`, which is where the drift would
  * otherwise hide.
  */
+/**
+ * Settings pages whose whole content MOVED to the Files app — gate 8, and
+ * decision 1's single sanctioned exception to the not-a-gatekeeper rule.
+ *
+ * The page id stays a valid `SettingsPageId` and stays on every entry that used
+ * to live there, because it is still a real coordinate: `SettingsApp.navigate`
+ * redirects it into the Files app, so a search hit, a stale deep link and the
+ * Agent's guided-navigation index all keep working. What it is NOT any more is
+ * a row in `SETTINGS_NAV` or a branch in the page switch.
+ *
+ * Exported so the routing tests can tell a migration from a rot: an id here is
+ * checked against the Files-app panel that renders it, and an id NOT here that
+ * has no sidebar page is still the bug those tests were written to catch.
+ */
+export const SETTINGS_PAGES_MOVED_TO_FILES = ['memory'] as const;
+
+export function settingsPageMovedToFiles(pageId: string): boolean {
+  return (SETTINGS_PAGES_MOVED_TO_FILES as readonly string[]).includes(pageId);
+}
+
 export const AERO_SHELL_THEME = 'frutiger-aero';
 export const WIRED_SHELL_THEME = 'wired-archive';
 export const SECRET_SHELL_THEMES = [AERO_SHELL_THEME, WIRED_SHELL_THEME];
@@ -179,13 +199,14 @@ export const SETTINGS_NAV: SettingsNavPage[] = [
     group: 'System',
     descKey: 'settings.nav.storage.desc',
   },
-  {
-    id: 'memory',
-    labelKey: 'settings.nav.memory',
-    icon: 'folder',
-    group: 'System',
-    descKey: 'settings.nav.memory.desc',
-  },
+  // NO `memory` PAGE. Gate 8 / decision 1: memory and statistics moved OUT of
+  // Settings and the Files app is their only home. The nine registry entries
+  // that pointed here are still in `SETTINGS_REGISTRY` — deleting them would
+  // cost a user who types "factory reset" the ability to find it at all — but
+  // they carry `movedTo: 'files'` and the search box opens the Files app on
+  // them. `SettingsPageId` keeps `'memory'` as their historical coordinate so
+  // the agent's guided-navigation index and any stale deep link still resolve;
+  // `SettingsApp` renders a signpost for that id rather than the old page.
   // Audit T1: the plan's own file list names a Help section here, as the home
   // for "Replay tour". Without it the tour is unrepeatable once dismissed.
   {
@@ -1110,6 +1131,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
       'settings inventory',
     ],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1118,6 +1140,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.systemMemory.desc',
     keywords: ['ram', 'memory', 'cpu', 'uptime', 'system'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1126,6 +1149,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.storageUsage.desc',
     keywords: ['usage', 'quota', 'disk', 'space', 'used', 'app storage'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1134,6 +1158,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.storageInventory.desc',
     keywords: ['inventory', 'list', 'size', 'indexeddb', 'localstorage'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1142,6 +1167,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.backup.desc',
     keywords: ['backup', 'export', 'import', 'restore', 'json'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1150,6 +1176,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.clearData.desc',
     keywords: ['clear', 'delete', 'decks', 'csv', 'clipboard', 'lyrics', 'calendar', 'cache'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1158,6 +1185,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.factoryReset.desc',
     keywords: ['factory', 'reset', 'wipe', 'erase', 'fresh'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
 
@@ -1412,6 +1440,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.agentMemory.desc',
     keywords: ['agent memory', 'local agent memory', 'assistant', 'remembers', 'forget', 'offline'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
   {
@@ -1420,6 +1449,7 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     descKey: 'search.agentHistory.desc',
     keywords: ['agent history', 'operation history', 'what the agent did', 'audit', 'delete history', 'activity'],
     pageId: 'memory',
+    movedTo: 'files',
     group: 'System',
   },
 

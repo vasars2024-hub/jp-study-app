@@ -46,6 +46,31 @@ function sourceFiles(dir: string, out: Record<string, string> = {}): Record<stri
 
 const SRC = sourceFiles(SETTINGS_DIR);
 
+/**
+ * The Files-app system panels — gate 8's destination.
+ *
+ * Memory moved OUT of Settings (decision 1's one sanctioned migration), so the
+ * cards that used to anchor inside `SETTINGS_DIR` now anchor here. Scanned as
+ * its own map rather than folded into `SRC`, so a settings entry can only be
+ * excused by this directory when it explicitly carries `movedTo: 'files'`.
+ */
+const PANELS_DIR = join(__dirname, '..', 'components', 'filesapp', 'panels');
+const panelAnchors = ((): Map<string, Set<string>> => {
+  const found = new Map<string, Set<string>>();
+  for (const entry of readdirSync(PANELS_DIR, { withFileTypes: true })) {
+    if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+    const text = readFileSync(join(PANELS_DIR, entry.name), 'utf8');
+    const add = (id: string): void => {
+      const bucket = found.get(id) ?? new Set<string>();
+      bucket.add(entry.name);
+      found.set(id, bucket);
+    };
+    for (const m of text.matchAll(/<FilesPanelCard\b[^>]*?\bid="([^"{]+)"/gs)) add(m[1]);
+    for (const m of text.matchAll(/focusCardId === '([^']+)'/g)) add(m[1]);
+  }
+  return found;
+})();
+
 const SCRAPER_DIR = join(__dirname, '..', 'components', 'scraper');
 const scraperSrc = ((): Record<string, string> => {
   const out: Record<string, string> = {};
@@ -153,8 +178,17 @@ describe('settings search reachability', () => {
   it('lands every registry entry on a page that answers to its id', () => {
     const misrouted: string[] = [];
     const unanchored: string[] = [];
+    const migrated: string[] = [];
     for (const entry of SETTINGS_REGISTRY) {
       if (entry.id.startsWith('page-')) continue; // navigates to the page itself
+      // Gate 8: an entry whose card MOVED must anchor in a Files-app panel.
+      // `SettingsApp.navigate` redirects `pageId: 'memory'` into the Files app
+      // carrying this id, so the anchor is what makes the hit land on the row
+      // instead of merely on the app — the gate's own FAIL condition.
+      if (entry.movedTo === 'files') {
+        if (!panelAnchors.get(entry.id)?.size) migrated.push(`${entry.id} -> files (no panel card)`);
+        continue;
+      }
       const owners = anchors.get(entry.id);
       const reachable = pageFiles.get(entry.pageId);
       if (!owners?.size) unanchored.push(`${entry.id} -> '${entry.pageId}'`);
@@ -164,6 +198,9 @@ describe('settings search reachability', () => {
     }
     expect(misrouted).toEqual([]);
     expect(unanchored).toEqual([]);
+    expect(migrated).toEqual([]);
+    // Vacuity guard: the migration is real, so the branch above must have run.
+    expect(SETTINGS_REGISTRY.filter((e) => e.movedTo === 'files').length).toBeGreaterThan(0);
   });
 
   /**

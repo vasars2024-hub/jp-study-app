@@ -70,7 +70,6 @@ import MonitorsPage from './pages/MonitorsPage';
 import FileDropsPage from './pages/FileDropsPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import MotionPage from './pages/MotionPage';
-import MemoryPage from './pages/MemoryPage';
 import HelpPage from './pages/HelpPage';
 import MiniModePage from './pages/MiniModePage';
 import LockscreenPage from './pages/LockscreenPage';
@@ -100,6 +99,10 @@ import {
   normalizeAgentSettingsNavigationLink,
 } from './agentSettingsNavigation';
 import { handOffToAgent, settingsRouteAgentContext } from '../../agentContextHandoff';
+import {
+  openFilesAppForMemory,
+  openFilesAppForSystemCard,
+} from '../filesapp/filesAppScope';
 
 /**
  * Appearance is the heaviest Settings page: its isolated preview and complete theme grid mount
@@ -154,6 +157,21 @@ export default function SettingsApp(props: SettingsWallProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   const navigate = useCallback((next: SettingsPageId, settingId?: string) => {
+    /**
+     * Gate 8 / decision 1. `memory` is no longer a Settings page: memory and
+     * statistics moved to the Files app, which is now their only home.
+     *
+     * The redirect lives HERE rather than in the search box because four
+     * callers reach this function — the search box, the nav rail, the agent's
+     * guided navigation and the recent-pages list — and a redirect in one of
+     * them would leave the other three dead-ending on a page that renders
+     * nothing. The card id is carried across, so a hit for "factory reset"
+     * lands on the factory-reset card rather than merely on the app.
+     */
+    if (next === 'memory') {
+      if (!(settingId && openFilesAppForSystemCard(settingId))) openFilesAppForMemory();
+      return;
+    }
     setGuidedPage(null);
     setGuidedControlId(null);
     setPage(next);
@@ -470,10 +488,11 @@ export default function SettingsApp(props: SettingsWallProps) {
           onSelect: () => navigate('transcription'),
         },
         {
+          // Gate 8: the destination is the Files app now, so this can never be
+          // the page you are already on — `navigate` redirects it there.
           id: 'memory',
           label: 'Memory and storage',
           icon: <Icon name="folder" size={14} />,
-          disabled: page === 'memory',
           onSelect: () => navigate('memory'),
         },
         {
@@ -621,7 +640,6 @@ export default function SettingsApp(props: SettingsWallProps) {
               {page === 'display' && <DisplayPage />}
               {page === 'motion' && <MotionPage />}
               {page === 'storage' && <StoragePage />}
-              {page === 'memory' && <MemoryPage />}
               {page === 'help' && <HelpPage />}
             </div>
           </div>

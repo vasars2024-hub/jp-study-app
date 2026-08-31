@@ -97,6 +97,22 @@ export interface SettingsRegistryEntry {
    * renders for everyone.
    */
   discovered?: 'aero' | 'wired';
+  /**
+   * This entry's card no longer lives in Settings — gate 8's memory/statistics
+   * migration, and decision 1's single sanctioned exception to the
+   * not-a-gatekeeper rule.
+   *
+   * The entry STAYS in the registry on purpose. Deleting it would mean a user
+   * who types "factory reset" into Settings gets nothing, which is a capability
+   * lost rather than a capability moved. `pageId` is kept as the card's
+   * HISTORICAL page so a stale deep link and the agent's guided-navigation
+   * index still resolve; `movedTo` is what actually routes the hit, and the
+   * search UI opens the Files app on the card's own id instead of navigating a
+   * settings page.
+   *
+   * `shared/filesApp/systemPanels.ts` owns the card → panel table.
+   */
+  movedTo?: 'files';
 }
 
 export interface UserWallThumb {

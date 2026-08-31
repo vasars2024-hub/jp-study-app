@@ -22,7 +22,11 @@ import {
   AGENT_NAVIGATION_SECTION_LABEL_KEYS,
   AGENT_SETTINGS_GUIDED_TARGETS,
 } from '../../shared/agentNavigation';
-import { SETTINGS_NAV, SETTINGS_REGISTRY } from '../components/settings/settingsRegistry';
+import {
+  SETTINGS_NAV,
+  SETTINGS_REGISTRY,
+  settingsPageMovedToFiles,
+} from '../components/settings/settingsRegistry';
 import { LEGACY_WIN_SECTION_ALIASES } from '../../shared/desktop';
 import { en } from '../../shared/i18n/catalogs';
 
@@ -96,6 +100,23 @@ function allowedWords(entry: AgentNavigationIndexEntry): Set<string> {
     add(entry.page);
     add(englishText(page?.labelKey));
     add(englishText(page?.descKey));
+    // Gate 8: a MOVED page has no sidebar row, so its label and description are
+    // gone as a source of words. What the destination actually holds now is the
+    // set of cards that still name it, and those are read from the registry
+    // rather than listed here — a term is excused only by a card that exists.
+    if (settingsPageMovedToFiles(entry.page)) {
+      add(englishText(entry.titleKey));
+      // The same `<labelKey>.desc` convention every SETTINGS_NAV row follows,
+      // applied to the index entry's own key. The strings that described the
+      // page still describe the destination; only the sidebar row is gone.
+      add(englishText(`${entry.titleKey}.desc`));
+      for (const card of SETTINGS_REGISTRY) {
+        if (card.pageId !== entry.page) continue;
+        add(englishText(card.titleKey));
+        add(englishText(card.descKey));
+        for (const keyword of card.keywords) add(keyword);
+      }
+    }
     return out;
   }
 
@@ -134,6 +155,14 @@ describe('agent navigation index mirrors the live Settings surface', () => {
         expect(entry.titleKey, `${coord} titleKey drifted from SETTINGS_REGISTRY`)
           .toBe(registered?.titleKey);
       } else if (entry.page) {
+        if (settingsPageMovedToFiles(entry.page)) {
+          // Gate 8: the page moved to the Files app, so it has no SETTINGS_NAV
+          // row to drift from. Its label key must still resolve, which the
+          // catalog test below enforces for every entry including this one.
+          expect(entry.titleKey, `${coord} carries no titleKey after its move`)
+            .toBeTruthy();
+          continue;
+        }
         const nav = SETTINGS_NAV.find((p) => p.id === entry.page);
         expect(entry.titleKey, `${coord} titleKey drifted from SETTINGS_NAV`)
           .toBe(nav?.labelKey);
@@ -157,6 +186,11 @@ describe('agent navigation index mirrors the live Settings surface', () => {
   it('points every page at a real sidebar page', () => {
     for (const entry of AGENT_NAVIGATION_INDEX) {
       if (!entry.page || entry.controlId) continue;
+      // A page that MOVED is still a real coordinate — `SettingsApp.navigate`
+      // redirects it into the Files app — but it is deliberately not a sidebar
+      // row any more. Only that named set is exempt; an unlisted page with no
+      // sidebar row is still the rot this assertion exists to catch.
+      if (settingsPageMovedToFiles(entry.page)) continue;
       expect(
         SETTINGS_NAV.some((nav) => nav.id === entry.page),
         `${entry.page} is not in SETTINGS_NAV`,
