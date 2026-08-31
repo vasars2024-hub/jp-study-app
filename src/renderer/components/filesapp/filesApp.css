@@ -356,6 +356,49 @@
   overflow-wrap: anywhere;
 }
 
+/* --------------------------- gate 10: open ---------------------- */
+
+.fa-details .fa-action-open {
+  margin-bottom: var(--lq-space-2);
+}
+
+/* The ranked list. Stacked in the router's own order, top first, because the
+   order IS the answer — a grid or a row would flatten the ranking away. */
+.fa-open-choose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  margin: var(--lq-space-2) 0;
+}
+
+.fa-open-candidate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  /* Two lines of copy, so the shared single-line action height is a floor here
+     rather than a fixed height. */
+  height: auto;
+  padding: var(--lq-space-2) var(--lq-space-3);
+  text-align: left;
+}
+
+.fa-open-candidate-name {
+  color: var(--lq-liquid-text);
+  font-weight: 600;
+}
+
+.fa-open-candidate-why {
+  color: var(--lq-liquid-text-muted);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+.fa-open-refusal,
+.fa-open-opened {
+  overflow-wrap: anywhere;
+}
+
 /* ---------------------------- dock ------------------------------ */
 
 .fa-status {

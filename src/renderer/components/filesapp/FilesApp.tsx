@@ -51,6 +51,14 @@ import {
   existingDeckKeys,
   mineabilityOf,
 } from '../../../shared/filesApp/mining';
+import {
+  filesOpenDecision,
+  isRoutableLocation,
+  openFor,
+  type FilesOpenDecision,
+} from '../../../shared/filesApp/openPlan';
+import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
+import { openSectionSurface } from '../../sectionSurface';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
 import {
   FILES_SCOPE_EVENT,
@@ -171,6 +179,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
   const [revealNote, setRevealNote] = useState<string | null>(null);
   /**
+   * Gate 10's open result. `null` is "not asked yet"; a `choose` decision parks
+   * the ranked candidates here and NOTHING opens until the user picks one, which
+   * is the gate's own rule about not silently choosing.
+   */
+  const [openState, setOpenState] = useState<
+    { status: 'idle' } | { status: 'routing' } | { status: 'settled'; decision: FilesOpenDecision }
+  >({ status: 'idle' });
+  /**
    * Gate 8: the panel card a settings-search hit named, so the hit lands on its
    * own row rather than merely on the app. Cleared when the scope moves, which
    * is what stops a stale highlight following the user around the tree.
@@ -271,6 +287,47 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   }, [selected, t]);
 
   /**
+   * Gate 10. The routing decision is taken in `shared/filesApp/openPlan.ts`; all
+   * this does is feed it the real path through the file router and act on the
+   * answer. Opening never imports — see that module's header for why re-running
+   * `DropRouter`'s switch on an already-indexed row would be a defect.
+   */
+  const runOpenDecision = useCallback((decision: FilesOpenDecision) => {
+    setOpenState({ status: 'settled', decision });
+    if (decision.mode === 'open') openSectionSurface(decision.section);
+  }, []);
+
+  /**
+   * Takes the item rather than reading `selected`, because the double-click
+   * route selects and opens in one gesture and the state has not committed yet
+   * at that point — reading `selected` there would open the PREVIOUS row.
+   */
+  const openItem = useCallback(
+    async (item: FilesItem) => {
+      if (!isRoutableLocation(item.location)) {
+        runOpenDecision(filesOpenDecision(item, null));
+        return;
+      }
+      setOpenState({ status: 'routing' });
+      const plans = await window.api?.fileDropClassify?.([item.location.path]);
+      // A missing plan is NOT downgraded to the kind table: for a file the
+      // router is the authority, and guessing from the extension is what
+      // sniffing exists to avoid. `filesOpenDecision(item, null)` refuses here.
+      runOpenDecision(filesOpenDecision(item, plans?.[0] ?? null));
+    },
+    [runOpenDecision],
+  );
+
+  const onOpen = useCallback(async () => {
+    if (selected) await openItem(selected);
+  }, [selected, openItem]);
+
+  const onChooseCandidate = useCallback(
+    (candidate: DropCandidate) => runOpenDecision(openFor(candidate, false)),
+    [runOpenDecision],
+  );
+
+  /**
    * Gate 3, the whole round trip: main reads the file into passages, `shared/`
    * turns passages into drafts, and the renderer — the only owner of the deck —
    * writes them. No card is invented here that the source did not carry.
@@ -335,6 +392,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     setSelectedId(id);
     setMineState({ status: 'idle' });
     setRevealNote(null);
+    setOpenState({ status: 'idle' });
   }, []);
 
   /* ---------------------------- rail ---------------------------- */
@@ -558,6 +616,13 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             aria-selected={item.id === selectedId}
             tabIndex={0}
             onClick={() => selectItem(item.id)}
+            /* Gate 10, the filing-system gesture: single click selects, double
+               click opens. Both routes end in the same `openItem`, so there is
+               one decision path and not a shortcut that skips the router. */
+            onDoubleClick={() => {
+              selectItem(item.id);
+              void openItem(item);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -603,6 +668,62 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   /* ------------------------- inspector -------------------------- */
 
   const mineability = selected ? mineabilityOf(selected) : null;
+
+  /**
+   * Gate 10's receipt. The `choose` branch is the gate's own requirement, so it
+   * renders the RANKED order the router returned — no re-sort here, because the
+   * ranking is the router's answer and reordering it in the view would make the
+   * two disagree about which home is likeliest.
+   */
+  const openResult = (() => {
+    if (openState.status !== 'settled') return null;
+    const { decision } = openState;
+    if (decision.mode === 'refuse') {
+      return (
+        <p className="fa-details-note fa-open-refusal" role="status">
+          {t(decision.reasonKey)}
+        </p>
+      );
+    }
+    if (decision.mode === 'choose') {
+      return (
+        <div className="fa-open-choose" role="group" aria-label={t('filesApp.open.choose')}>
+          <p className="fa-details-note">{t('filesApp.open.choose')}</p>
+          {decision.candidates.map((candidate) => (
+            <button
+              key={candidate.target}
+              type="button"
+              className="fa-action fa-open-candidate"
+              data-target={candidate.target}
+              onClick={() => onChooseCandidate(candidate)}
+            >
+              <span className="fa-open-candidate-name">{t(targetLabelKey(candidate.target))}</span>
+              <span className="fa-open-candidate-why">{t(candidate.reasonKey)}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="fa-action fa-open-cancel"
+            onClick={() => setOpenState({ status: 'idle' })}
+          >
+            {t('filesApp.open.chooseCancel')}
+          </button>
+        </div>
+      );
+    }
+    return (
+      <p className="fa-details-note fa-open-opened" role="status">
+        {/* `palette.section.*` is the app-name key family the Start menu and the
+            command palette already use — a second set of names for the same
+            twenty-five apps is exactly the kind of drift i18n hides well. */}
+        {t('filesApp.open.opened', { app: t(`palette.section.${decision.section}`) })}
+        <span className="fa-state-detail"> {t(decision.reasonKey)}</span>
+        {decision.sniffed ? (
+          <span className="fa-state-detail fa-open-sniffed"> {t('filesApp.open.sniffed')}</span>
+        ) : null}
+      </p>
+    );
+  })();
 
   /**
    * The mine's receipt. Every state reports NUMBERS — the plan's rule is
@@ -686,6 +807,18 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <dt>{t('filesApp.details.source')}</dt>
         <dd>{selected.source}</dd>
       </dl>
+      {/* Gate 10. Always offered — every row has SOME answer, and where that
+          answer is "nothing opens this", the refusal is the honest outcome and
+          is more useful than a hidden button. */}
+      <button
+        type="button"
+        className="fa-action fa-action-open"
+        onClick={onOpen}
+        disabled={openState.status === 'routing'}
+      >
+        {t(openState.status === 'routing' ? 'filesApp.action.opening' : 'filesApp.action.open')}
+      </button>
+      {openResult}
       {revealTargetFor(selected.location) ? (
         <button type="button" className="fa-action" onClick={onReveal}>
           {t('filesApp.action.reveal')}

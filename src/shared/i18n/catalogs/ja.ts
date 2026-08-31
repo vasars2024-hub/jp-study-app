@@ -10647,6 +10647,19 @@ export const ja: Catalog = {
     other: '{count} 枚のカードを削除しました。',
   },
 
+  'filesApp.action.open': '開く',
+  'filesApp.action.opening': '振り分け中…',
+  'filesApp.open.choose': 'このファイルには複数の開き先があります。どちらでしょうか。',
+  'filesApp.open.chooseCancel': 'キャンセル',
+  'filesApp.open.opened': '{app} で開きました。',
+  'filesApp.open.sniffed': '拡張子ではなく、ファイルの中身から判断しました。',
+  'filesApp.open.reason.byKind': '種類から開きました。振り分けるファイルがありません。',
+  'filesApp.open.refuse.unrouted': 'このファイルを開けるアプリは見つかりませんでした。',
+  'filesApp.open.refuse.noOwner': 'この種類の項目を単体で開けるものはありません。',
+  'filesApp.open.refuse.shortcut':
+    'これはこのアプリの外を指すショートカットなので、ここで開けるものはありません。',
+  'filesApp.open.refuse.folder': 'これはフォルダーです。中身はすでに表示されています。',
+
   'filesApp.system.memory.title': 'メモリ',
   'filesApp.system.memory.desc':
     'このPCにアプリが保存している内容と、その確認・書き出し・消去の方法です。',

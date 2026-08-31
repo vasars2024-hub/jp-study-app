@@ -11105,6 +11105,22 @@ export const en: Catalog = {
     other: 'Removed {count} cards again.',
   },
 
+  // Gate 10 — opening an item routes through the file router, so an ambiguous
+  // extension is settled by content sniffing and a file with two honest homes
+  // asks instead of guessing.
+  'filesApp.action.open': 'Open',
+  'filesApp.action.opening': 'Routing…',
+  'filesApp.open.choose': 'This file has more than one home. Which one did you mean?',
+  'filesApp.open.chooseCancel': 'Cancel',
+  'filesApp.open.opened': 'Opened in {app}.',
+  'filesApp.open.sniffed': 'Chosen by reading the file, not its extension.',
+  'filesApp.open.reason.byKind': 'Opened by what this item is; it has no file to route.',
+  'filesApp.open.refuse.unrouted': 'This file could not be matched to any app that opens it.',
+  'filesApp.open.refuse.noOwner': 'Nothing in this app opens this kind of item on its own.',
+  'filesApp.open.refuse.shortcut':
+    'This is a shortcut to something outside this app, so there is nothing here to open.',
+  'filesApp.open.refuse.folder': 'This is a folder. You are already looking at what is inside it.',
+
   // Gate 8 — memory and statistics, which MOVED here out of Settings
   // (decision 1, the one sanctioned migration). The panels reuse the existing
   // `settings.memory.*`, `search.*` and `stats.*` keys wherever the old page

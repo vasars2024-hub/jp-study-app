@@ -10555,6 +10555,18 @@ export const zh: Catalog = {
     other: '已移除 {count} 张卡片。',
   },
 
+  'filesApp.action.open': '打开',
+  'filesApp.action.opening': '正在识别…',
+  'filesApp.open.choose': '这个文件有多个归属。你指的是哪一个？',
+  'filesApp.open.chooseCancel': '取消',
+  'filesApp.open.opened': '已在{app}中打开。',
+  'filesApp.open.sniffed': '这是根据文件内容判断的，而非扩展名。',
+  'filesApp.open.reason.byKind': '按项目类型打开；它没有可识别的文件。',
+  'filesApp.open.refuse.unrouted': '找不到能打开这个文件的应用。',
+  'filesApp.open.refuse.noOwner': '本应用中没有能单独打开这类项目的地方。',
+  'filesApp.open.refuse.shortcut': '这是指向本应用之外的快捷方式，这里没有可打开的内容。',
+  'filesApp.open.refuse.folder': '这是一个文件夹。你已经在看它的内容了。',
+
   'filesApp.system.memory.title': '内存与存储',
   'filesApp.system.memory.desc': '本应用在这台电脑上保存的内容，以及查看、导出或清除它们的所有方式。',
   'filesApp.system.statistics.title': '统计',

@@ -235,23 +235,45 @@ function snapshot(
 const filesIndex = vi.fn<(force?: boolean) => Promise<FilesIndexSnapshot>>();
 const filesReveal = vi.fn<(loc: unknown) => Promise<{ ok: boolean; reasonKey?: string }>>();
 const filesMineSource = vi.fn<(loc: unknown, kind: unknown) => Promise<FilesMineSourceResult>>();
+/** Gate 10: the file router, which is what decides where an item opens. */
+const fileDropClassify = vi.fn<(paths: string[]) => Promise<unknown[]>>();
+
+/**
+ * Gate 10's observable outcome. `openSectionSurface` dispatches `os:open` and
+ * falls back to `api.popOut`; neither exists in jsdom, so the event IS the
+ * receipt — and it is the same event the real shells listen for.
+ */
+const opened: string[] = [];
+function recordOpen(ev: Event) {
+  opened.push(String((ev as CustomEvent).detail));
+}
 
 beforeEach(() => {
   filesIndex.mockReset();
   filesReveal.mockReset();
   filesMineSource.mockReset();
+  fileDropClassify.mockReset();
+  opened.length = 0;
+  window.addEventListener('os:open', recordOpen);
   deck.length = 0;
   filesIndex.mockImplementation(async () => snapshot());
   filesReveal.mockImplementation(async () => ({ ok: true }));
   filesMineSource.mockImplementation(async () => ({ ok: true, passages: [], readCount: 0 }));
+  fileDropClassify.mockImplementation(async (paths: string[]) => [
+    {
+      path: paths[0],
+      candidates: [{ target: 'media', confidence: 'exact', reasonKey: 'fileDrop.reason.media' }],
+    },
+  ]);
   Object.defineProperty(window, 'api', {
     configurable: true,
     writable: true,
-    value: { filesIndex, filesReveal, filesMineSource },
+    value: { filesIndex, filesReveal, filesMineSource, fileDropClassify },
   });
 });
 
 afterEach(async () => {
+  window.removeEventListener('os:open', recordOpen);
   if (root) await act(async () => root?.unmount());
   host?.remove();
   root = null;
@@ -375,6 +397,139 @@ describe('Files app — one search across everything', () => {
     await typeSearch('JMdict');
     expect(railButton(/^Video$/)?.querySelector('.fa-tree-count')?.textContent).toBe('0');
     expect(railButton(/^Dictionaries$/)?.querySelector('.fa-tree-count')?.textContent).toBe('1');
+  });
+});
+
+describe('Files app — opening routes through the file router (gate 10)', () => {
+  /** Every button currently in the inspector, by its visible label. */
+  function buttonLabels(): string[] {
+    return Array.from(host?.querySelectorAll('button') ?? []).map((b) => b.textContent ?? '');
+  }
+  function openButton(): Element | undefined {
+    return Array.from(host?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent === 'Open',
+    );
+  }
+
+  it('hands the router the real path and opens the app it names', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await click(bodyRows().find((r) => r.textContent?.includes('Episode 01')));
+    await click(openButton());
+    await settle();
+
+    expect(fileDropClassify).toHaveBeenCalledWith(['C:\\media\\ep1.mkv']);
+    // `media` -> `player`, which is what DropRouter opens for the same file.
+    expect(opened).toEqual(['player']);
+    expect(hasText('Opened in Media.')).toBe(true);
+  });
+
+  it('a row with no file never asks the router, and opens by its kind', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await click(bodyRows().find((r) => r.textContent?.includes('JMdict')));
+    await click(openButton());
+    await settle();
+
+    // Calling the router with a SQLite row would mean inventing a path.
+    expect(fileDropClassify).not.toHaveBeenCalled();
+    expect(opened).toEqual(['dictionary']);
+    expect(hasText('Opened by what this item is; it has no file to route.')).toBe(true);
+  });
+
+  it('two candidates offer the ranked list and open NOTHING until one is picked', async () => {
+    fileDropClassify.mockImplementation(async (paths: string[]) => [
+      {
+        path: paths[0],
+        candidates: [
+          { target: 'anki-cards', confidence: 'likely', reasonKey: 'fileDrop.reason.apkgCards' },
+          { target: 'anki-level', confidence: 'ambiguous', reasonKey: 'fileDrop.reason.apkgLevel' },
+        ],
+      },
+    ]);
+    await mount(<FilesApp />);
+    await settle();
+    await click(bodyRows().find((r) => r.textContent?.includes('Episode 01')));
+    await click(openButton());
+    await settle();
+
+    // The gate's own words: "offers the ranked list rather than silently
+    // choosing". Nothing has opened yet, and that is the assertion.
+    expect(opened).toEqual([]);
+    expect(hasText('This file has more than one home. Which one did you mean?')).toBe(true);
+    const ranked = Array.from(host?.querySelectorAll('.fa-open-candidate') ?? []);
+    expect(ranked.map((b) => b.getAttribute('data-target'))).toEqual([
+      'anki-cards',
+      'anki-level',
+    ]);
+
+    await click(ranked[1]);
+    await settle();
+    expect(opened).toEqual(['anki']);
+  });
+
+  it('CONTROL: a router that answers nothing refuses instead of guessing the kind', async () => {
+    fileDropClassify.mockImplementation(async () => []);
+    await mount(<FilesApp />);
+    await settle();
+    // A video row: the kind table WOULD have an answer for it, so a refusal
+    // here is the router's authority being respected rather than an empty case.
+    await click(bodyRows().find((r) => r.textContent?.includes('Episode 01')));
+    await click(openButton());
+    await settle();
+
+    expect(opened).toEqual([]);
+    expect(hasText('This file could not be matched to any app that opens it.')).toBe(true);
+  });
+
+  it('double-clicking a row selects and opens it in one gesture', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    const row = bodyRows().find((r) => r.textContent?.includes('Episode 01'));
+    expect(row).toBeTruthy();
+    await act(async () => {
+      (row as HTMLElement).dispatchEvent(
+        new MouseEvent('dblclick', { bubbles: true, cancelable: true }),
+      );
+    });
+    await settle();
+
+    // The row it opened is the row that was double-clicked, NOT the previously
+    // selected one — the trap that made `openItem` take the item as an argument.
+    expect(fileDropClassify).toHaveBeenCalledWith(['C:\\media\\ep1.mkv']);
+    expect(opened).toEqual(['player']);
+  });
+
+  it('double-clicking a DIFFERENT row than the selected one opens the new row', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await click(bodyRows().find((r) => r.textContent?.includes('Episode 01')));
+    const other = bodyRows().find((r) => r.textContent?.includes('Episode 02'));
+    await act(async () => {
+      (other as HTMLElement).dispatchEvent(
+        new MouseEvent('dblclick', { bubbles: true, cancelable: true }),
+      );
+    });
+    await settle();
+    // ep2, not ep1. Reading `selected` inside the handler would give ep1, and
+    // the paths differ by one character, so this is the assertion that catches it.
+    expect(fileDropClassify).toHaveBeenCalledWith(['C:\\media\\ep2.mkv']);
+    expect(fileDropClassify).toHaveBeenCalledTimes(1);
+  });
+
+  it('the result is dropped when the selection moves', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await click(bodyRows().find((r) => r.textContent?.includes('Episode 01')));
+    await click(openButton());
+    await settle();
+    expect(hasText('Opened in Media.')).toBe(true);
+
+    await click(bodyRows().find((r) => r.textContent?.includes('JMdict')));
+    // A receipt that followed the user to the next row would be describing an
+    // item they are no longer looking at.
+    expect(hasText('Opened in Media.')).toBe(false);
+    expect(buttonLabels()).toContain('Open');
   });
 });
 

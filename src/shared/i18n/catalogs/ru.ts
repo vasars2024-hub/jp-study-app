@@ -11524,6 +11524,19 @@ export const ru: Catalog = {
     other: 'Удалено {count} карточки.',
   },
 
+  'filesApp.action.open': 'Открыть',
+  'filesApp.action.opening': 'Определяем…',
+  'filesApp.open.choose': 'У этого файла несколько подходящих мест. Какое вы имели в виду?',
+  'filesApp.open.chooseCancel': 'Отмена',
+  'filesApp.open.opened': 'Открыто в разделе «{app}».',
+  'filesApp.open.sniffed': 'Выбрано по содержимому файла, а не по расширению.',
+  'filesApp.open.reason.byKind': 'Открыто по типу записи: у неё нет файла для разбора.',
+  'filesApp.open.refuse.unrouted': 'Не нашлось приложения, которое открывает этот файл.',
+  'filesApp.open.refuse.noOwner': 'В этом приложении нечему открывать записи такого типа.',
+  'filesApp.open.refuse.shortcut':
+    'Это ярлык на что-то за пределами приложения, поэтому здесь открывать нечего.',
+  'filesApp.open.refuse.folder': 'Это папка. Её содержимое вы уже видите.',
+
   'filesApp.system.memory.title': 'Память',
   'filesApp.system.memory.desc':
     'Что приложение хранит на этом компьютере и как это просмотреть, выгрузить или очистить.',
