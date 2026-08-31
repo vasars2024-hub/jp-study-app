@@ -32,6 +32,11 @@ import {
   type FilesProvenance,
 } from '../../shared/filesApp/catalog';
 import { AUDIO_EXT, SUBTITLE_EXT, extOf } from '../../shared/mediaKind';
+import {
+  MEDIA_LIBRARY_STORE_FILE,
+  mediaItemsFromStoredDocument,
+} from '../../shared/mediaLibraryEntries';
+import { AGENT_WORKSPACE_RELATIVE_PATH } from '../../shared/agentWorkspace';
 
 /** The narrow slice of `better-sqlite3` the dictionary enumerator needs. */
 export interface FilesSqliteLike {
@@ -212,12 +217,14 @@ interface MediaRow {
 export const mediaEnumerator: FilesEnumerator = {
   source: 'media',
   run(ctx) {
-    // `media.json` is an OBJECT — `{ items, watchFolder, relationships }`, the
-    // shape `main/media.ts`'s `MediaDb` writes. Reading it as a bare array
-    // returned zero videos against a real 39-item library and looked exactly
-    // like an empty one, which is the false zero gate 1 exists to catch.
-    const db = readJson<{ items?: unknown }>(path.join(ctx.userDataPath, 'media.json'), {});
-    const rows = (Array.isArray(db?.items) ? db.items : []) as MediaRow[];
+    // `media.json` is an OBJECT — `{ items, watchFolder, relationships }`, not a
+    // bare array; reading it as one returned zero videos against a real 39-item
+    // library and looked exactly like an empty one. The filename and the
+    // extraction both come from `shared/mediaLibraryEntries`, beside the module
+    // that defines the media model, so this indexer and the store's writer share
+    // one contract instead of each carrying its own copy of the shape.
+    const db = readJson<unknown>(path.join(ctx.userDataPath, MEDIA_LIBRARY_STORE_FILE), {});
+    const rows = mediaItemsFromStoredDocument(db) as unknown as MediaRow[];
     const out: FilesItem[] = [];
     for (const row of rows) {
       const id = typeof row?.id === 'string' ? row.id : null;
@@ -531,9 +538,14 @@ interface ConversationRow {
  * Agent study workspaces.
  *
  * The store is `agent/workspace-v1.json`, not `agent-workspaces.json`, and its
- * collection is `conversations` keyed by id — measured, after the guessed path
- * produced a permanent, silent zero for the whole Workspaces group. An agent
- * conversation IS the study workspace this app owns; there is no second store.
+ * collection is `conversations` — measured, after the guessed path produced a
+ * permanent, silent zero for the whole Workspaces group. The path now comes from
+ * `AGENT_WORKSPACE_RELATIVE_PATH`, which the store's own writer uses, so there is
+ * no second filename to drift. An agent conversation IS the study workspace this
+ * app owns; there is no other store.
+ *
+ * `conversations` is read through `collectionValues` because the normalized
+ * in-memory type is an ARRAY while the document on disk is a record keyed by id.
  *
  * Archived conversations are enumerated too, flagged rather than hidden: the
  * Files app is a finder, and a workspace you archived is exactly the thing you
@@ -543,7 +555,7 @@ export const workspaceEnumerator: FilesEnumerator = {
   source: 'workspaces',
   run(ctx) {
     const store = readJson<{ conversations?: unknown }>(
-      path.join(ctx.userDataPath, 'agent', 'workspace-v1.json'),
+      path.join(ctx.userDataPath, ...AGENT_WORKSPACE_RELATIVE_PATH),
       {},
     );
     const rows = collectionValues<ConversationRow>(store?.conversations);
