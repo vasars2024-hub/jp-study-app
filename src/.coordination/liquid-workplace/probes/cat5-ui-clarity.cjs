@@ -202,6 +202,25 @@ const SNAP = `(function(){
     return /transparent|^none$/.test(String(s)) ? 0 : 1;
   }
   /**
+   * Split a \`background-image\` value into its layers on TOP-LEVEL commas only. Commas inside
+   * \`rgba()\`, \`color()\` and a gradient's own argument list are not layer separators, so a
+   * plain \`.split(',')\` shreds one gradient into four fragments. Depth-counted, which is all
+   * that is needed: computed values carry no quoted strings for a comma to hide in, and any
+   * \`url()\` has already returned UNMEASURABLE before this is reached.
+   */
+  function splitLayers(v){
+    var out = [], depth = 0, cur = '';
+    for (var i = 0; i < v.length; i++) {
+      var ch = v[i];
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+      cur += ch;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+  /**
    * Trap 5: .fwin-body computes transparent — the fill is an ancestor's. Walk up until it paints.
    *
    * TRAP 6, FOUND BY THIS HARNESS'S OWN FIRST RUN AND FIXED BEFORE ANY SCORE WAS BANKED. A
@@ -234,20 +253,39 @@ const SNAP = `(function(){
         // 1 in both cells and so VOIDed Q5's theme axis on a surface whose \`failingCount\` had
         // in fact moved 19 -> 5. A stop keeps its own alpha, a fully transparent stop paints
         // nothing at all, and only a gradient that is opaque everywhere may stop the walk.
-        var raw = img.match(/(rgba?\\([^)]*\\)|color\\([^)]*\\))/g) || [];
-        var stops = [], alphas = [];
-        for (var gi = 0; gi < raw.length; gi++) {
-          var ga = alphaOf(raw[gi]);
-          if (ga <= 0.004) continue;
-          var gc = parseRgb(raw[gi]);
-          if (gc) { stops.push(gc); alphas.push(ga); }
-        }
-        if (stops.length) {
+        //
+        // CORRECTION 27, Video/classic-light 2026-08-31 — the SAME family again, one level up:
+        // trap 7's other half fixed the per-STOP alpha and left the per-LAYER one.
+        // \`cs.backgroundImage\` is ONE string holding EVERY layer, so the regex above harvested
+        // stops across all of them into a single list and \`min(alphas)\` was the most transparent
+        // stop of the most transparent LAYER. \`--mc-stage-plate\` is
+        // \`radial-gradient(<accent>/0.1 …), linear-gradient(opaque, opaque)\`: min is the 10%
+        // bloom, so the walk did NOT stop at an opaque lower layer and it composited
+        // \`.mc-video-stage\`'s dark fill under a plate that hides it completely — reporting
+        // \`22 failing, minRatio 1.01\` on a plate verified white by a live computed-style read.
+        // Layers are scored SEPARATELY, in paint order (CSS lists topmost first, which is the
+        // order this array already wants), and the walk stops when ANY ONE layer is opaque
+        // everywhere. A layer that drops a fully transparent stop is not opaque everywhere and
+        // may not seal, even if every stop it retained is opaque.
+        var imgLayers = splitLayers(img), sealed = false;
+        for (var li = 0; li < imgLayers.length && !sealed; li++) {
+          if (!/gradient\\(/.test(imgLayers[li])) continue;
+          var raw = imgLayers[li].match(/(rgba?\\([^)]*\\)|color\\([^)]*\\))/g) || [];
+          var stops = [], alphas = [], holed = false;
+          for (var gi = 0; gi < raw.length; gi++) {
+            var ga = alphaOf(raw[gi]);
+            if (ga <= 0.004) { holed = true; continue; }
+            var gc = parseRgb(raw[gi]);
+            if (gc) { stops.push(gc); alphas.push(ga); }
+          }
+          if (!stops.length) continue;
           layers.push({ stops: stops, alphas: alphas, a: Math.max.apply(null, alphas) });
-          from.push('gradient on ' + name(n));
-          // Falls through to this same element's background-color, which a gradient paints OVER.
-          if (Math.min.apply(null, alphas) >= 0.996) break;
+          from.push('gradient layer ' + (li + 1) + ' of ' + imgLayers.length + ' on ' + name(n));
+          if (!holed && Math.min.apply(null, alphas) >= 0.996) sealed = true;
         }
+        // Falls through to this same element's background-color, which a gradient paints OVER —
+        // unless one of its layers already sealed, in which case nothing below it is visible.
+        if (sealed) break;
       }
       var a = alphaOf(cs.backgroundColor);
       if (a > 0.004) {

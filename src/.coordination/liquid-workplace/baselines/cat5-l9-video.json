@@ -2,7 +2,7 @@
   "surface": "Video",
   "label": "l9-video",
   "control": false,
-  "at": "2026-08-31T08:01:50.907Z",
+  "at": "2026-08-31T09:53:05.456Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -104,11 +104,11 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 0,
-        "scannedControls": 24,
+        "scannedControls": 34,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 29,
+        "chromeControlsRaw": 39,
         "summaryHeaders": 1,
         "behindDisclosure": 4,
         "disclosures": {
@@ -143,14 +143,14 @@
     {
       "id": 5,
       "q": "every readable surface has stable contrast",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
       "numbers": {
-        "verdict": "NO",
+        "verdict": "YES",
         "cells": [
           {
             "theme": "forest-night",
-            "measured": 85,
+            "measured": 89,
             "unmeasurable": 0,
             "minRatio": 4.74,
             "failingCount": 0,
@@ -164,77 +164,20 @@
           },
           {
             "theme": "classic-light",
-            "measured": 85,
+            "measured": 89,
             "unmeasurable": 0,
-            "minRatio": 1.01,
-            "failingCount": 22,
+            "minRatio": 4.78,
+            "failingCount": 0,
             "worst": {
               "el": "button.mc-button",
-              "ratio": 1.01,
+              "ratio": 4.78,
               "bar": 4.5,
-              "bg": "button.mc-button@4% over gradient on div.mc-video-empty over div.mc-video-stage@100%",
-              "text": "Browse folder"
+              "bg": "gradient layer 1 of 1 on button.mc-button",
+              "text": "Open video"
             }
           }
         ],
-        "failing": [
-          {
-            "el": "strong.",
-            "ratio": 1.09,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Video plays in the media"
-          },
-          {
-            "el": "p.",
-            "ratio": 2.86,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Open the workspace to wa"
-          },
-          {
-            "el": "strong.",
-            "ratio": 1.09,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Choose what to watch"
-          },
-          {
-            "el": "p.",
-            "ratio": 2.86,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Open a local video, brow"
-          },
-          {
-            "el": "button.mc-button",
-            "ratio": 1.01,
-            "bar": 4.5,
-            "bg": "button.mc-button@4% over gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Browse folder"
-          },
-          {
-            "el": "span.mc-eyebrow",
-            "ratio": 1.87,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Library queue"
-          },
-          {
-            "el": "h2.",
-            "ratio": 1.09,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "Up next"
-          },
-          {
-            "el": "span.",
-            "ratio": 2.86,
-            "bar": 4.5,
-            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
-            "text": "37 videos"
-          }
-        ],
+        "failing": [],
         "themeAxisMoved": true
       }
     },
@@ -252,12 +195,12 @@
           "measuredIn": "liquid",
           "restoredTo": "standard"
         },
-        "liquidRegions": 4,
-        "byBackdropFilter": 5,
-        "byContextualPaint": 4,
-        "carryingATransition": 4,
+        "liquidRegions": 7,
+        "byBackdropFilter": 6,
+        "byContextualPaint": 7,
+        "carryingATransition": 7,
         "infiniteAnimationsOnLiquid": 0,
-        "liquidMaterialTotal": 7,
+        "liquidMaterialTotal": 10,
         "decoratedLeaves": [
           "span.mc-tile-episode",
           "span.mc-tile-episode",
@@ -266,11 +209,14 @@
         "regionList": [
           "aside.lq-contextual",
           "header.lq-contextual",
+          "footer.lq-contextual",
           "nav.lq-contextual",
-          "aside.lq-contextual"
+          "aside.lq-contextual",
+          "div.lq-contextual",
+          "div.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 2
+        "inStandardPresentation": 3
       }
     },
     {
@@ -362,12 +308,12 @@
     "q2": "YES",
     "q3": "YES",
     "q4": "NO",
-    "q6": "YES",
+    "q6": "NO",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 41,
+    "controlsPainted": 51,
     "q1": {
       "entryPoints": 2,
       "primaryInputs": 1,
@@ -381,11 +327,11 @@
     },
     "q4": {
       "collapsedDisclosures": 0,
-      "scannedControls": 24,
+      "scannedControls": 34,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 29,
+      "chromeControlsRaw": 39,
       "summaryHeaders": 1,
       "behindDisclosure": 4,
       "disclosures": {
@@ -417,12 +363,12 @@
       ]
     },
     "q6": {
-      "liquidRegions": 2,
-      "byBackdropFilter": 5,
-      "byContextualPaint": 2,
+      "liquidRegions": 3,
+      "byBackdropFilter": 6,
+      "byContextualPaint": 3,
       "carryingATransition": 2,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 5,
+      "liquidMaterialTotal": 6,
       "decoratedLeaves": [
         "span.mc-tile-episode",
         "span.mc-tile-episode",
@@ -430,9 +376,12 @@
       ],
       "regionList": [
         "aside.lq-contextual",
-        "header.lq-contextual"
+        "header.lq-contextual",
+        "footer.lq-contextual"
       ],
-      "withoutTransition": []
+      "withoutTransition": [
+        "footer.lq-contextual"
+      ]
     },
     "q10": {
       "identityMarkers": {
@@ -466,12 +415,11 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 41,
+  "controlsPaintedA": 51,
   "findings": [
-    "Q4 advanced tools discoverable without cluttering",
-    "Q5 every readable surface has stable contrast"
+    "Q4 advanced tools discoverable without cluttering"
   ],
   "voided": [],
-  "score": 8,
-  "verdict": "8/10 — 2 question(s) answer NO"
+  "score": 9,
+  "verdict": "9/10 — 1 question(s) answer NO"
 }

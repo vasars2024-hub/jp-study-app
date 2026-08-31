@@ -35,6 +35,17 @@
    */
   --mc-muted: #969bab;
   --mc-dim: #7f8598;
+  /*
+   * Tile and row TITLE ink. `.mc-tile-copy strong` and `.mc-study-row-copy strong`
+   * each hardcoded #dfe0e6 — a near-white literal that never remapped — so in
+   * `classic-light` the seven recent-media titles in the Video empty state painted
+   * rgb(223,224,230) on the now-white `--mc-stage-plate`: measured 1.09:1 against a
+   * 4.5 bar, the WHOLE of that shelf unreadable. It is not `--mc-text` because the
+   * dark literal is a deliberate step below body ink; the literal below IS the
+   * previous value, so every dark palette is pixel-identical, and the light and
+   * high-contrast blocks at the bottom of this file re-source it like the plate.
+   */
+  --mc-tile-ink: #dfe0e6;
   --mc-accent: #d84a68;
   --mc-accent-2: #ff6a83;
   --mc-accent-soft: rgba(216, 74, 104, 0.14);
@@ -1170,7 +1181,7 @@
 }
 
 .mc-tile-copy strong {
-  color: #dfe0e6;
+  color: var(--mc-tile-ink);
   font-size: var(--mc-fs-body, 13px);
   line-height: 1.3;
 }
@@ -2171,7 +2182,7 @@
 .mc-study-row-copy strong {
   margin-top: 3px;
   overflow: hidden;
-  color: #dfe0e6;
+  color: var(--mc-tile-ink);
   font-size: var(--mc-fs-body, 13px);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6604,6 +6615,7 @@
   --mc-stage-plate:
     radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 26%),
     linear-gradient(145deg, var(--panel), var(--panel-2));
+  --mc-tile-ink: var(--text);
 }
 
 /* High contrast is the one theme that must not blur or tint anything: the
@@ -6654,6 +6666,7 @@
      contrast ratios, and the one theme whose whole point is that nothing is
      translucent should not have one. */
   --mc-stage-plate: var(--panel);
+  --mc-tile-ink: var(--text);
 }
 
 /* A user who has asked the OS for less transparency gets the same treatment in
