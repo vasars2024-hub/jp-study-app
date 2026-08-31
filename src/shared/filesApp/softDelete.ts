@@ -37,17 +37,28 @@ function parseState(raw: string | null): FilesSoftDeleteStateV1 {
     if (candidate.version !== 1 || !Array.isArray(candidate.tombstones)) {
       return { version: 1, tombstones: [] };
     }
-    const tombstones = candidate.tombstones.filter(
-      (row): row is FilesSoftDeleteTombstone =>
-        Boolean(row) &&
-        typeof row === 'object' &&
-        typeof (row as FilesSoftDeleteTombstone).itemId === 'string' &&
-        (row as FilesSoftDeleteTombstone).itemId.length > 0 &&
-        typeof (row as FilesSoftDeleteTombstone).undoToken === 'string' &&
-        (row as FilesSoftDeleteTombstone).undoToken.length > 0 &&
-        isFiniteTimestamp((row as FilesSoftDeleteTombstone).deletedAt) &&
-        isFiniteTimestamp((row as FilesSoftDeleteTombstone).undoExpiresAt),
-    );
+    const tombstones: FilesSoftDeleteTombstone[] = [];
+    const itemIds = new Set<string>();
+    const undoTokens = new Set<string>();
+    for (const row of candidate.tombstones) {
+      if (!row || typeof row !== 'object') continue;
+      const tombstone = row as FilesSoftDeleteTombstone;
+      if (
+        typeof tombstone.itemId !== 'string' ||
+        !tombstone.itemId ||
+        typeof tombstone.undoToken !== 'string' ||
+        !tombstone.undoToken ||
+        !isFiniteTimestamp(tombstone.deletedAt) ||
+        !isFiniteTimestamp(tombstone.undoExpiresAt) ||
+        itemIds.has(tombstone.itemId) ||
+        undoTokens.has(tombstone.undoToken)
+      ) {
+        continue;
+      }
+      itemIds.add(tombstone.itemId);
+      undoTokens.add(tombstone.undoToken);
+      tombstones.push(tombstone);
+    }
     return { version: 1, tombstones };
   } catch {
     return { version: 1, tombstones: [] };
@@ -87,6 +98,9 @@ export class FilesSoftDeleteStore {
 
     const undoToken = this.createToken();
     if (!undoToken) throw new Error('Files soft-delete requires a non-empty undo token');
+    if (state.tombstones.some((row) => row.undoToken === undoToken)) {
+      throw new Error('Files soft-delete requires a unique undo token');
+    }
     const tombstone: FilesSoftDeleteTombstone = {
       itemId,
       deletedAt: now,

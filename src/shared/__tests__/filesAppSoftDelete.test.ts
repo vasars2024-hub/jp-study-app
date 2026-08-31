@@ -140,6 +140,36 @@ describe('FilesSoftDeleteStore', () => {
     expect(store.isDeleted('bad:time')).toBe(false);
   });
 
+  it('keeps the first row when persisted item ids or undo tokens collide', () => {
+    const persistence = memoryPersistence(
+      JSON.stringify({
+        version: 1,
+        tombstones: [
+          { itemId: 'note:1', undoToken: 'undo:1', deletedAt: 1, undoExpiresAt: 10 },
+          { itemId: 'note:1', undoToken: 'undo:2', deletedAt: 2, undoExpiresAt: 11 },
+          { itemId: 'note:2', undoToken: 'undo:1', deletedAt: 3, undoExpiresAt: 12 },
+          { itemId: 'note:3', undoToken: 'undo:3', deletedAt: 4, undoExpiresAt: 13 },
+        ],
+      }),
+    );
+    const store = new FilesSoftDeleteStore(persistence, () => 'unused');
+
+    expect(store.list().map(({ itemId, undoToken }) => ({ itemId, undoToken }))).toEqual([
+      { itemId: 'note:1', undoToken: 'undo:1' },
+      { itemId: 'note:3', undoToken: 'undo:3' },
+    ]);
+  });
+
+  it('refuses a generated token collision rather than making Undo ambiguous', () => {
+    const persistence = memoryPersistence();
+    const first = new FilesSoftDeleteStore(persistence, () => 'undo:shared');
+    first.delete('note:1', 1);
+    const second = new FilesSoftDeleteStore(persistence, () => 'undo:shared');
+
+    expect(() => second.delete('note:2', 2)).toThrow('unique undo token');
+    expect(second.list().map((row) => row.itemId)).toEqual(['note:1']);
+  });
+
   it('treats unknown schema versions and invalid JSON as empty, never as delete-all', () => {
     const future = memoryPersistence(JSON.stringify({ version: 2, tombstones: [{ itemId: 'x' }] }));
     expect(new FilesSoftDeleteStore(future, () => 'token').list()).toEqual([]);
