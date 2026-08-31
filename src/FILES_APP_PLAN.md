@@ -482,8 +482,10 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    
 18. **Favorites.** Pin an item and a location; both appear under Favorites and survive a
    restart. Unpinning removes them and deletes nothing.
+   <!-- status: closed; evidence: 2026-08-31 5827f201 -- 14 real-component tests pin an item plus derived/user location, remount against persisted localStorage, unpin, and re-find the unchanged item/folder; 18 pure/store tests pin the one-list target shape and stale-row retention -->
 19. **Smart folders stay live.** A saved search such as *Untranscribed videos* changes its
    membership after a video is transcribed, with the count before and after both reported.
+   <!-- status: closed; evidence: 2026-08-31 9286bf90 -- production component rail and body report Untranscribed videos 2 -> 1 and Transcribed videos 0 -> 1 after a real forced index refresh; unchanged Broken links is the negative control; criteria, never membership, persist -->
 20. **Bulk actions.** Select several items and mine them in one action; the result names the
    per-item outcome, and one failure does not silently abort the rest.
 21. **Deletion is recoverable.** Deleting a file-backed item places it in the Windows Recycle
@@ -1425,3 +1427,22 @@ Passing the capital-A path to eslint produces five bogus `import/no-unresolved` 
 not match" errors on imports you never touched. Lint the lowercase path. `collections.ts`'s
 `pending` entry is removed from `tools/architecture-baseline.json` — FilesApp imports it now;
 audit still 15 unclassified, the identical pre-existing set.
+
+### 2026-08-31 (fifteenth) — interrupted-work recovery closes gates 18 and 19
+
+`5827f201` (gate 18, recovered as already committed) + `9286bf90` (gate 19, recovered from
+12 unstaged files left at the session-limit boundary). Gate 18 closes on **14 UI + 18 model
+tests**: item and location pins survive a real unmount/remount with store memory cleared;
+unpinning then re-finds the unchanged item/folder. Stale targets remain counted and removable.
+
+Gate 19 closes on the gate's exact numbers in the production component: **Untranscribed
+videos 2 -> 1**, **Transcribed videos 0 -> 1** after a transcript arrives and a forced index
+refresh; the open folder's rows change from 2 -> 1 too. **Broken links stays unchanged** as the
+negative control. The store persists only criteria, never members or counts, so every render
+re-asks the live index. A saved search also survives remount; preset deletion and an unfiltered
+save both refuse by name.
+
+Recovery finding: the unfinished `toggleFavorite` rename was load-bearing. Reverting it made
+architecture report a new duplicate-export against `clipboardHistory.ts`; the final unique
+`toggleFilesFavorite` name returns the audit to the same 15 pre-existing unclassified modules.
+Focused verification: **4 files / 56 tests**, i18n **11,868 keys**, ESLint **0 warnings/errors**.
