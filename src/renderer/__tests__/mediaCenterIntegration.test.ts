@@ -321,21 +321,22 @@ describe('Media Center video stage', () => {
     // bar of `>=1 collapsed AND <=12`. Unflagged after: **1 and 17**; with the same
     // `.mc-sidebar,.mc-topbar,.mc-playerbar` shell exclusion Music's Q4 closed under, page-
     // scanned **7** and shell 15, so cat5 on Video is PASS 10/10.
-    const details = source.match(/<details className="mc-inspector-advanced">[\s\S]*?<\/details>/);
-    expect(details?.[0], 'the disclosure must exist as one block').toBeTruthy();
+    const match = source.match(/<details className="mc-inspector-advanced">[\s\S]*?<\/details>/);
+    expect(match?.[0], 'the disclosure must exist as one block').toBeTruthy();
+    const details = match?.[0] ?? '';
     // Uncontrolled and CLOSED by default: an `open`/`defaultOpen` prop would put the
     // fourteen setup controls straight back above the fold and score the same 34.
-    expect(details![0]).not.toMatch(/<details className="mc-inspector-advanced"[^>]*open/);
+    expect(details).not.toMatch(/<details className="mc-inspector-advanced"[^>]*open/);
     // A disclosure HIDES, it does not unmount — both blocks stay inside it, so the watch
     // folder keeps watching and a running transcription keeps reporting while it is shut.
-    expect(details![0]).toContain("t('mediaCenter.video.subtitleTranscription')");
-    expect(details![0]).toContain('<MediaTranscriptionControls state={state} />');
-    expect(details![0]).toContain('<MediaWatchFolder state={state} />');
-    expect(details![0]).toContain("t('mediaCenter.video.youtube')");
-    expect(details![0]).toContain('<MediaYoutubeBar state={state} />');
+    expect(details).toContain("t('mediaCenter.video.subtitleTranscription')");
+    expect(details).toContain('<MediaTranscriptionControls state={state} />');
+    expect(details).toContain('<MediaWatchFolder state={state} />');
+    expect(details).toContain("t('mediaCenter.video.youtube')");
+    expect(details).toContain('<MediaYoutubeBar state={state} />');
     // The two blocks the rail keeps in the default state are NOT swept in with them.
-    expect(details![0]).not.toContain("t('mediaCenter.video.learningControls')");
-    expect(details![0]).not.toContain("t('mediaCenter.video.nowStudying')");
+    expect(details).not.toContain("t('mediaCenter.video.learningControls')");
+    expect(details).not.toContain("t('mediaCenter.video.nowStudying')");
   });
 
   it('translates the three new stage keys in all four catalogues', () => {
