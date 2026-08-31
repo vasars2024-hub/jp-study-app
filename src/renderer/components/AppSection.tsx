@@ -153,5 +153,11 @@ export default function AppSection({
 
 export function VisualizerWidget() {
   const { viz, playing } = useVisualizer();
-  return <VizStage settings={viz} playing={playing} />;
+  return (
+    <VizStage
+      settings={viz}
+      playing={playing}
+      onOpenMusic={() => window.dispatchEvent(new CustomEvent('os:open', { detail: 'music' }))}
+    />
+  );
 }

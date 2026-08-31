@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import VisualizerCanvas from '../VisualizerCanvas';
 import Icon from '../Icons';
+import { useT } from '../../i18n';
 import { isPlaying as isMusicPlaying, onPlayingChanged } from '../../audioBus';
 import {
   loadVizSettings,
@@ -59,20 +60,26 @@ export function VizStage({
   settings,
   playing,
   classes = OS_VIZ_CLASSES,
+  onOpenMusic,
 }: {
   settings: VizSettings;
   playing: boolean;
   classes?: VizStageClasses;
+  onOpenMusic?: () => void;
 }) {
+  const { t } = useT();
+  const hint = (
+    <>
+      <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+      {t('commands.nav.open.music')}
+    </>
+  );
   return (
     <div className={classes.root}>
       <VisualizerCanvas className={classes.canvas} settings={settings} idleBaseline />
-      {!playing && (
-        <span className={classes.hint}>
-          <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-          play a song in Music
-        </span>
-      )}
+      {!playing && (onOpenMusic
+        ? <button type="button" className={classes.hint} onClick={onOpenMusic}>{hint}</button>
+        : <span className={classes.hint}>{hint}</span>)}
     </div>
   );
 }

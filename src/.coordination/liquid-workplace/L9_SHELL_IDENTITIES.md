@@ -77,3 +77,14 @@ i18n passed 11,783 keys; touched-path ESLint had 0 errors. Live: Standard palett
 Standard 0; text stayed `L9 note reverse path`, geometry stayed `380,172,260x220`, blue persisted;
 Cancel kept 1 note and Remove left 0, with Cancel initially focused. Note remains open for the
 related-item dock decision and its controlled 80/80 receipt.
+
+## 2026-08-30 — Visualizer idle recovery action
+
+Visualizer's idle hint was raw English and described an action without offering one. The shared
+stage now resolves the existing four-locale `commands.nav.open.music` key; Study OS injects a real
+button that opens Music, while Blanc may keep its own injected navigation and presentation.
+
+Focused verification passed 2/2 and touched-path ESLint had 0 errors; i18n remains complete at
+11,783 keys. Live Electron rendered one focusable BUTTON labelled `Open Music`; focusing and
+activating it opened a real Music floating window while Visualizer remained mounted. Visualizer's
+style/settings edge controls and full rubric receipt remain open.
