@@ -47,10 +47,13 @@ describe('files app index — gate 1, a count per category that matches what is 
     const audioPath = write('outside/song.mp3', 'audio bytes');
     write(
       'media.json',
-      JSON.stringify([
-        { id: 'v1', title: 'Episode 1', path: videoPath, kind: 'video', addedAt: 500 },
-        { id: 'a1', title: 'Song', path: audioPath, kind: 'audio', addedAt: 600 },
-      ]),
+      JSON.stringify({
+        items: [
+          { id: 'v1', title: 'Episode 1', path: videoPath, kind: 'video', addedAt: 500 },
+          { id: 'a1', title: 'Song', path: audioPath, kind: 'audio', addedAt: 600 },
+        ],
+        relationships: [],
+      }),
     );
 
     write('yt-transcripts/abc123.json', '[]');
@@ -63,8 +66,11 @@ describe('files app index — gate 1, a count per category that matches what is 
 
     write('models/whisper/tiny.bin', 'model');
     write('wallpapers/bg.jpg', 'img');
-    write('profiles.json', JSON.stringify({ profiles: [{ id: 'p1', name: 'Default', createdAt: 10 }] }));
-    write('agent-workspaces.json', JSON.stringify({ workspaces: [{ id: 'w1', title: 'Study', createdAt: 20 }] }));
+    write('profiles.json', JSON.stringify({ profiles: { p1: { id: 'p1', label: 'Default' } } }));
+    write(
+      'agent/workspace-v1.json',
+      JSON.stringify({ conversations: { w1: { id: 'w1', title: 'Study', createdAt: 20 } } }),
+    );
 
     const snapshot = buildFilesIndex(ctx());
     const by = new Map(snapshot.counts.map((c) => [c.categoryId, c.total]));
@@ -107,7 +113,7 @@ describe('files app index — gate 1, a count per category that matches what is 
   });
 
   it('reports the failing enumerator by name instead of blanking the index', () => {
-    write('media.json', JSON.stringify([{ id: 'v1', title: 'kept', path: 'x.mkv' }]));
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'kept', path: 'x.mkv' }] }));
     const exploding = {
       source: 'explodes',
       run(): never {
@@ -127,7 +133,7 @@ describe('files app index — gate 1, a count per category that matches what is 
 
   it('a malformed store reads as empty rather than throwing', () => {
     write('library.json', 'not json at all');
-    write('media.json', JSON.stringify({ notAnArray: true }));
+    write('media.json', JSON.stringify({ items: 'not an array' }));
     const snapshot = buildFilesIndex(ctx());
     expect(snapshot.items).toEqual([]);
     expect(snapshot.enumerators.every((r) => r.error === undefined)).toBe(true);
@@ -161,10 +167,82 @@ describe('files app index — gate 1, a count per category that matches what is 
   });
 });
 
+/**
+ * These four are the shapes the REAL stores use, checked against
+ * `%APPDATA%/jp-study-app` on 2026-08-30. Every one of them was originally
+ * guessed wrong, and none of the guesses failed loudly — each returned `[]` and
+ * gave its category a permanent, plausible zero. Fixtures written by the same
+ * hand as the reader cannot catch that, so the shapes are pinned here.
+ */
+describe('files app index — the real store shapes, not the guessed ones', () => {
+  it('reads media.json as { items }, not as a bare array', () => {
+    write(
+      'media.json',
+      JSON.stringify({
+        items: [{ id: 'v1', title: 'Ep 1', path: write('o/e.mkv', 'x'), kind: 'video' }],
+        relationships: [],
+      }),
+    );
+    const items = buildFilesIndex(ctx()).items;
+    expect(items).toHaveLength(1);
+    expect(items[0].name).toBe('Ep 1');
+  });
+
+  it('reads profiles.profiles as a record keyed by id, titled by `label`', () => {
+    write(
+      'profiles.json',
+      JSON.stringify({
+        schemaVersion: 3,
+        profiles: {
+          p1: { id: 'p1', label: 'Japanese' },
+          p2: { id: 'p2', label: 'Mandarin' },
+        },
+      }),
+    );
+    const items = buildFilesIndex(ctx()).items;
+    expect(items.map((i) => i.name).sort()).toEqual(['Japanese', 'Mandarin']);
+    // Not the id: 28 real profiles would otherwise render titled with their uuids.
+    expect(items.every((i) => i.name !== i.id)).toBe(true);
+  });
+
+  it('reads workspaces from agent/workspace-v1.json conversations', () => {
+    write(
+      'agent/workspace-v1.json',
+      JSON.stringify({
+        version: 1,
+        conversations: { c1: { id: 'c1', title: 'Grammar drill', createdAt: 5, updatedAt: 9 } },
+      }),
+    );
+    const items = buildFilesIndex(ctx()).items;
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toBe('workspace');
+    expect(items[0].categoryId).toBe('workspaces/studies');
+    expect(items[0].location).toEqual({
+      store: 'json',
+      file: 'agent/workspace-v1.json',
+      pointer: '/conversations/c1',
+    });
+    expect(items[0].modifiedAt).toBe(9);
+  });
+
+  it('still reads library.json as the bare array it actually is', () => {
+    write('library.json', JSON.stringify([{ id: 'b1', title: 'Kokoro', kind: 'book' }]));
+    expect(buildFilesIndex(ctx()).items.map((i) => i.name)).toEqual(['Kokoro']);
+  });
+
+  it('an array-shaped media store is still accepted rather than crashing', () => {
+    // Defensive, not aspirational: a store written by an older build must read
+    // as empty, not throw and take the whole index down with it.
+    write('media.json', JSON.stringify([{ id: 'v1', path: 'x.mkv' }]));
+    const snapshot = buildFilesIndex(ctx());
+    expect(snapshot.enumerators.find((r) => r.source === 'media')?.error).toBeUndefined();
+  });
+});
+
 describe('files app index — what each row records', () => {
   it('a file-backed row carries real size and mtime from disk', () => {
     const videoPath = write('outside/ep1.mkv', 'video bytes here');
-    write('media.json', JSON.stringify([{ id: 'v1', title: 'Ep 1', path: videoPath, kind: 'video' }]));
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Ep 1', path: videoPath, kind: 'video' }] }));
 
     const item = buildFilesIndex(ctx()).items[0];
     expect(item.sizeBytes).toBe(fs.statSync(videoPath).size);
@@ -174,7 +252,7 @@ describe('files app index — what each row records', () => {
   });
 
   it('a record pointing at a missing file is flagged broken, not dropped (gate 34)', () => {
-    write('media.json', JSON.stringify([{ id: 'v1', title: 'Gone', path: path.join(root, 'nope.mkv') }]));
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Gone', path: path.join(root, 'nope.mkv') }] }));
     const item = buildFilesIndex(ctx()).items[0];
     expect(item.flags.brokenLink).toBe(true);
     expect(item.sizeBytes).toBeNull();
@@ -202,7 +280,7 @@ describe('files app index — what each row records', () => {
   });
 
   it('media rows do not claim a text provenance they cannot know', () => {
-    write('media.json', JSON.stringify([{ id: 'v1', title: 'Ep', path: write('o/e.mkv', 'x') }]));
+    write('media.json', JSON.stringify({ items: [{ id: 'v1', title: 'Ep', path: write('o/e.mkv', 'x') }] }));
     expect(buildFilesIndex(ctx()).items[0].provenance).toBe('unknown');
   });
 });

@@ -76,6 +76,23 @@ function statOf(file: string): fs.Stats | null {
   }
 }
 
+/**
+ * The rows of a collection, whichever way its store shaped it.
+ *
+ * This app persists collections BOTH ways and neither is wrong: `library.json`
+ * is a bare array, `media.json` wraps one in `items`, and `profiles.json` and
+ * `agent/workspace-v1.json` use a record keyed by id. An enumerator that
+ * assumes one shape does not fail loudly — it returns `[]` and its category
+ * reads a permanent, plausible zero. Two of the three shapes here were found
+ * that way, against real data, after the tests passed on fixtures the reader
+ * itself had defined.
+ */
+function collectionValues<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object') return Object.values(value as Record<string, T>);
+  return [];
+}
+
 function listDir(dir: string): fs.Dirent[] {
   try {
     return fs.readdirSync(dir, { withFileTypes: true });
@@ -195,8 +212,12 @@ interface MediaRow {
 export const mediaEnumerator: FilesEnumerator = {
   source: 'media',
   run(ctx) {
-    const rows = readJson<MediaRow[]>(path.join(ctx.userDataPath, 'media.json'), []);
-    if (!Array.isArray(rows)) return [];
+    // `media.json` is an OBJECT — `{ items, watchFolder, relationships }`, the
+    // shape `main/media.ts`'s `MediaDb` writes. Reading it as a bare array
+    // returned zero videos against a real 39-item library and looked exactly
+    // like an empty one, which is the false zero gate 1 exists to catch.
+    const db = readJson<{ items?: unknown }>(path.join(ctx.userDataPath, 'media.json'), {});
+    const rows = (Array.isArray(db?.items) ? db.items : []) as MediaRow[];
     const out: FilesItem[] = [];
     for (const row of rows) {
       const id = typeof row?.id === 'string' ? row.id : null;
@@ -446,23 +467,38 @@ export const artworkEnumerator: FilesEnumerator = {
  * System and workspaces.
  * ------------------------------------------------------------------ */
 
-interface ProfileStoreShape {
-  profiles?: Array<{ id?: unknown; name?: unknown; createdAt?: unknown }>;
+interface ProfileRow {
+  id?: unknown;
+  /** The store calls it `label`; there is no `name` field. */
+  label?: unknown;
+  name?: unknown;
+  createdAt?: unknown;
 }
 
-/** `profiles.json` — the System group's one enumerable store. */
+/**
+ * `profiles.json` — the System group's one enumerable store.
+ *
+ * `profiles` is a RECORD keyed by id, not an array, and each row's display
+ * string is `label`. Both were measured against the real store (28 profiles);
+ * an array read returned zero and a `name` read would have rendered 28 rows
+ * titled with their own ids.
+ */
 export const profileEnumerator: FilesEnumerator = {
   source: 'profiles',
   run(ctx) {
-    const store = readJson<ProfileStoreShape>(path.join(ctx.userDataPath, 'profiles.json'), {});
-    const rows = Array.isArray(store?.profiles) ? store.profiles : [];
+    const store = readJson<{ profiles?: unknown }>(
+      path.join(ctx.userDataPath, 'profiles.json'),
+      {},
+    );
+    const rows = collectionValues<ProfileRow>(store?.profiles);
     return rows.flatMap((row) => {
       const id = typeof row?.id === 'string' ? row.id : null;
       if (!id) return [];
+      const label = typeof row.label === 'string' && row.label ? row.label : null;
       return [
         {
           id: `profile:${id}`,
-          name: typeof row.name === 'string' && row.name ? row.name : id,
+          name: label ?? (typeof row.name === 'string' && row.name ? row.name : id),
           kind: 'profile' as const,
           categoryId: categoryForKind('profile'),
           provenance: 'app-generated' as const,
@@ -483,19 +519,34 @@ export const profileEnumerator: FilesEnumerator = {
   },
 };
 
+interface ConversationRow {
+  id?: unknown;
+  title?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  archived?: unknown;
+}
+
 /**
- * Agent study workspaces — `agent-workspaces.json`, the Workspaces group's
- * first real contributor. Kept deliberately shallow: this reads the store the
- * workspace module already writes and does not reach into its internals.
+ * Agent study workspaces.
+ *
+ * The store is `agent/workspace-v1.json`, not `agent-workspaces.json`, and its
+ * collection is `conversations` keyed by id — measured, after the guessed path
+ * produced a permanent, silent zero for the whole Workspaces group. An agent
+ * conversation IS the study workspace this app owns; there is no second store.
+ *
+ * Archived conversations are enumerated too, flagged rather than hidden: the
+ * Files app is a finder, and a workspace you archived is exactly the thing you
+ * later come here to find.
  */
 export const workspaceEnumerator: FilesEnumerator = {
   source: 'workspaces',
   run(ctx) {
-    const store = readJson<{ workspaces?: Array<{ id?: unknown; title?: unknown; createdAt?: unknown; updatedAt?: unknown }> }>(
-      path.join(ctx.userDataPath, 'agent-workspaces.json'),
+    const store = readJson<{ conversations?: unknown }>(
+      path.join(ctx.userDataPath, 'agent', 'workspace-v1.json'),
       {},
     );
-    const rows = Array.isArray(store?.workspaces) ? store.workspaces : [];
+    const rows = collectionValues<ConversationRow>(store?.conversations);
     return rows.flatMap((row) => {
       const id = typeof row?.id === 'string' ? row.id : null;
       if (!id) return [];
@@ -512,8 +563,8 @@ export const workspaceEnumerator: FilesEnumerator = {
           lastUsedAt: null,
           location: {
             store: 'json' as const,
-            file: 'agent-workspaces.json',
-            pointer: `/workspaces/${id}`,
+            file: 'agent/workspace-v1.json',
+            pointer: `/conversations/${id}`,
           },
           flags: {},
           source: 'workspaces',
