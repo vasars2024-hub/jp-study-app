@@ -284,6 +284,87 @@
   background: color-mix(in srgb, currentcolor 12%, transparent);
 }
 
+/* ---------- Toast severity, dismissal and held countdowns ----------------
+   `styles.css` gave `.os-toast` rules for `.ok` and `.muted` only, so the two
+   kinds that report a FAILURE — `err` and `warn`, both dispatched for real from
+   `DropRouter.tsx:130`, `:139` and `:169` — drew with the neutral border and
+   read exactly like a success. The edge is the whole signal here: the toast has
+   no icon, no title and 2.8 seconds. */
+
+.os-toast.err,
+.os-toast.error {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.4),
+    inset 3px 0 0 var(--danger);
+}
+
+.os-toast.warn,
+.os-toast.warning {
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.4),
+    inset 3px 0 0 var(--warning);
+}
+
+/*
+ * Only an ACTIONED toast opts the whole box back into hit-testing. The host is
+ * `pointer-events: none` so an informational toast never swallows a click meant
+ * for the desktop under it (see `.os-toast-action` above), and hover-to-hold is
+ * worth that cost exactly once: on the box carrying a nine-second Undo, whose
+ * countdown used to keep running while the pointer travelled to the button.
+ */
+.os-toast.has-action {
+  pointer-events: auto;
+}
+
+/*
+ * Every toast now has an intentional close, not only a timeout. Same
+ * `pointer-events` opt-in as the action button and for the same reason; at
+ * 22px it is small enough that a click-through toast stays click-through
+ * everywhere except this corner.
+ */
+.os-toast-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  opacity: 0.62;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.os-toast-close:hover,
+.os-toast-close:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentcolor 12%, transparent);
+  border-color: color-mix(in srgb, currentcolor 34%, transparent);
+}
+
+/*
+ * Settings > Display > Transparency, which `styles.css:1280` honours through a
+ * list naming `.os-start`, `.os-taskbar` and `.fwin` only. The toast is the one
+ * surface in that tier a user cannot dismiss by looking away, and it carried an
+ * unconditional `backdrop-filter: blur(12px)`.
+ */
+html[data-display-transparency='reduced'] .os-toast {
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--panel) 98%, transparent);
+}
+
+html[data-display-transparency='off'] .os-toast {
+  backdrop-filter: none;
+  background: var(--panel);
+}
+
 /* ---------- Monitors settings page ---------- */
 
 .os-monitors-list {

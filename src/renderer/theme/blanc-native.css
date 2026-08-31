@@ -121,3 +121,114 @@
   background: var(--blanc-accent);
   border-radius: var(--blanc-radius-pill);
 }
+
+/* 7. Notifications.
+      ------------------------------------------------------------------------
+      `blancMain.tsx` mounts the SAME `ToastHost` Study OS does, and calls
+      `installNotificationCapture()` beside it — but every `.os-toast` rule in
+      this app lives in `styles.css` and `multiMonitor.css`, and blancMain
+      deliberately loads neither. So a Blanc toast was an unstyled div in the
+      normal document flow: no fixed position, no z-index, no background. It
+      became partially styled only after a ported Library/Media panel lazily
+      pulled `studyos-compat.css`, and even then from `@layer(studyos)`, which
+      loses to every unlayered rule. A notification that is invisible, or
+      visible only depending on which panel you happened to open first, is not
+      an honest state.
+
+      Blanc-native rather than an import: §8 of the Liquid plan is explicit that
+      Blanc implements the semantic contract in its own language and never
+      imports Study OS chrome. `html.blanc-shell` is the boundary — this sheet
+      reaches BOTH renderers through `blanc.css`, so an unqualified `.os-toast`
+      here would repaint Study OS's own toasts. */
+html.blanc-shell {
+  /* Blanc's palette carries danger and success but never needed a warning until
+     the toast surface arrived with one. Desaturated to sit beside #ff8f8f and
+     #7ecb9a rather than borrowed from Study OS's #e3a008. */
+  --blanc-warning: #e0bd7a;
+}
+
+html.blanc-shell .os-toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  z-index: 30000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(420px, 92vw);
+}
+
+html.blanc-shell .os-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px 9px 14px;
+  border-radius: var(--blanc-radius-md);
+  border: 1px solid var(--blanc-border-strong);
+  background: var(--blanc-panel-raised);
+  box-shadow: var(--blanc-shadow);
+  color: var(--blanc-text);
+  font-size: 12.5px;
+}
+
+html.blanc-shell .os-toast-text {
+  min-width: 0;
+}
+
+html.blanc-shell .os-toast.err,
+html.blanc-shell .os-toast.error {
+  box-shadow:
+    var(--blanc-shadow),
+    inset 3px 0 0 var(--blanc-danger);
+}
+
+html.blanc-shell .os-toast.warn,
+html.blanc-shell .os-toast.warning {
+  box-shadow:
+    var(--blanc-shadow),
+    inset 3px 0 0 var(--blanc-warning);
+}
+
+html.blanc-shell .os-toast.muted {
+  color: var(--blanc-muted);
+}
+
+html.blanc-shell .os-toast.has-action {
+  pointer-events: auto;
+}
+
+html.blanc-shell :is(.os-toast-action, .os-toast-close) {
+  flex: none;
+  border-radius: var(--blanc-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+html.blanc-shell .os-toast-action {
+  padding: 3px 10px;
+  font-weight: 600;
+  border-color: var(--blanc-border-strong);
+}
+
+html.blanc-shell .os-toast-close {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0.62;
+}
+
+html.blanc-shell :is(.os-toast-action, .os-toast-close):hover,
+html.blanc-shell :is(.os-toast-action, .os-toast-close):focus-visible {
+  opacity: 1;
+  background: var(--blanc-hover);
+  border-color: var(--blanc-border-strong);
+}
