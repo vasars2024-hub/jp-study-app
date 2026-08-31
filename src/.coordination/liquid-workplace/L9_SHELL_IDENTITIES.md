@@ -1537,3 +1537,49 @@ be measured with it ON.**
 
 **RULE C standing: 2 of 16 cells closed — cat1 PASS, cat2 PASS, both on Wired. 14 to run
 (cat3–cat8 on Wired, all 8 on Blanc).**
+
+## 2026-08-31 — backup — cat3 Wired 10/10, and the taskbar was never contextual chrome
+
+**cat3 · Wired = PASS 10/10** (`67594273`, corrected by `32c099bf`). denseWorkOnTranslucent
+**0**, treated **1/1**, shared primitive **1/1**. Plant control base `[0,1,1,1,0]` → planted
+`[1,1,1,2,1]` → restored `[0,1,1,1,0]`, both bars falsified while planted, cleaned true.
+Banked `cat3-l9b4-wired.json`.
+
+**The product defect, and it was in the one element every shell renders.** `.os-taskbar` is a
+bare `<div>` — no landmark, no role, no shared Liquid primitive. On Wired that is a 1264x56 bar
+with **12 focusables** classifying as a plain `Anchor`, so `eligibleTotal` was **0**: the
+shell's primary transport chrome sat outside category 3's denominator entirely and was
+invisible to landmark navigation. §2.3 names transport as what Liquid is FOR. Fixed once, in
+`DesktopShell.tsx`: `role="navigation"` + `aria-label` + `data-lq-role="liquid"` (the contract
+`LiquidAppScaffold` already marks its rail and dock with), plus a blur-backed material in
+`liquid-tokens.css` driven entirely by `--lq-*`. `styles.css:14654`'s old note — "translucent
+mix showed the dark wallpaper through" — is *why* it is blur-backed and not an alpha mix; every
+degradation tier already zeroes `--lq-liquid-blur` and makes `--lq-liquid-bg` opaque, so the
+fallback is the old solid chrome. Reused `settings.monitors.taskbar` rather than adding a key:
+all four catalogs are foreign-dirty and one word does not justify the blob recipe.
+
+**A false credit, withdrawn (`32c099bf`).** `wired-shell.css:90` ends its background stack in a
+flat `#020b12`, same specificity (0,2,1), loading later — so it won, and the Wired bar computed
+`rgb(2,11,18)` **alpha 1 while declaring `blur(6px)`**. cat3 scored that as treated anyway,
+because `liquidTreatedEligible` counts `translucentBacking || ownBackdrop`. A PASS on a material
+nobody can see. Only the backstop now yields, to the token Wired itself remaps; the cyan wash
+and 18px scan grid are untouched. After: `color(srgb .0235 .0706 .102 / 0.72)` + `blur(6px)`.
+
+**cat1 · Wired re-scored on the changed tree: still PASS 10/10** — 13 text nodes, minRatio
+**7.65** (was 7.67 opaque; the translucent bar costs 0.02 against a 4.5 bar), 0 failing,
+smallest target 34px, control back to baseline.
+
+**THREE instrument corrections, all one bug: containment mistaken for ownership.** A shell root
+CONTAINS floating windows, so every `root.querySelector` for window-owned furniture found a
+nested window's. **32** — `readPresentation` matched two nested toggles ('SIG-VID / Signal
+Archive', 'SYS / Service Panel') and REFUSED; category 3 could not be scored on ANY shell
+surface, and its `--presentation liquid` escape would have clicked a foreign window's toggle.
+**33** — `l1-surface-roles.js` walked from a nested 0x0 minimised `.fwin-body` and returned
+`regions: 0` on a 1264x821 desktop. **33b** — cat3's own path resolver and plant host, same
+line: the plant mounted 145px nodes into that 0x0 body, `planted` came back identical to `base`,
+and the run scored VOID while the product bars were passing. All three now require the nearest
+presentable host to BE the root. **This unblocks cat3 on Blanc and Aero too.**
+
+**RULE C standing: 3 of 16 cells closed — cat1, cat2, cat3, all Wired. 13 to run (cat4–cat8 on
+Wired, all 8 on Blanc).** `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+notifications, onboarding, help.
