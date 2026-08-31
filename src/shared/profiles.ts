@@ -166,7 +166,27 @@ export interface ProfileSnapshot {
 
 // ----- Constants -----------------------------------------------------------
 
+/** Main-owned profile document, relative to Electron userData. */
+export const PROFILE_STORE_FILE = 'profiles.json';
+
 export const DEFAULT_ANKI_URL = 'http://127.0.0.1:8765';
+
+/**
+ * Read-only consumers use the durable record shape instead of assuming an
+ * array. Invalid entries stay out of inventories without mutating the store.
+ */
+export function profileValuesFromStoredDocument(value: unknown): StudyProfile[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const profiles = (value as { profiles?: unknown }).profiles;
+  if (!profiles || typeof profiles !== 'object' || Array.isArray(profiles)) return [];
+  return Object.values(profiles).filter(
+    (profile): profile is StudyProfile =>
+      Boolean(profile) &&
+      typeof profile === 'object' &&
+      typeof (profile as { id?: unknown }).id === 'string' &&
+      typeof (profile as { label?: unknown }).label === 'string',
+  );
+}
 
 export const CARD_CONTENTS: readonly CardContent[] = [
   'term',

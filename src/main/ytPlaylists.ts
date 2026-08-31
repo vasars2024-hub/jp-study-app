@@ -32,6 +32,11 @@ import {
 } from '../shared/ytPlaylists';
 import type { YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
 import {
+  YOUTUBE_PLAYLIST_STORE_FILE,
+  YOUTUBE_PLAYLIST_SUBTITLE_DIRECTORY,
+  YOUTUBE_TRANSCRIPT_DIRECTORY,
+} from '../shared/youtubeStorage';
+import {
   downloadYoutubeUrl,
   findYtDlp,
   ytDlpJson,
@@ -40,21 +45,18 @@ import {
 } from './media';
 import { registerYoutubeDiscoveryIpc } from './youtubeDiscovery';
 
-const STORE_FILE = 'yt-playlists.json';
-const TRANSCRIPTS_DIR = 'yt-transcripts';
-const SUBS_CACHE_DIR = 'yt-subs';
 const DEFAULT_AUTO_UPDATE_HOURS = 12;
 
 function storePath(): string {
-  return path.join(app.getPath('userData'), STORE_FILE);
+  return path.join(app.getPath('userData'), YOUTUBE_PLAYLIST_STORE_FILE);
 }
 
 function transcriptsDir(): string {
-  return path.join(app.getPath('userData'), TRANSCRIPTS_DIR);
+  return path.join(app.getPath('userData'), YOUTUBE_TRANSCRIPT_DIRECTORY);
 }
 
 function subsCacheDir(): string {
-  return path.join(app.getPath('userData'), SUBS_CACHE_DIR);
+  return path.join(app.getPath('userData'), YOUTUBE_PLAYLIST_SUBTITLE_DIRECTORY);
 }
 
 function transcriptPath(youtubeId: string): string {

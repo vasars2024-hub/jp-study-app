@@ -19,6 +19,7 @@ import {
   DEFAULT_ANKI_URL,
   JLPT_TARGETS,
   LOOKUP_PIPELINES,
+  PROFILE_STORE_FILE,
   makeCustomProfile,
 } from '../shared/profiles';
 import {
@@ -275,7 +276,7 @@ export class ProfileStore {
   // ----- Persistence (invariant P-1: atomic tmp + rename) --------------------------
 
   private storePath(): string {
-    return path.join(app.getPath('userData'), 'profiles.json');
+    return path.join(app.getPath('userData'), PROFILE_STORE_FILE);
   }
 
   private persistSchema(schema: ProfileStoreSchema): void {
