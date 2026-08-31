@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FilesDeletionPlan } from '../../../shared/filesApp/deletion';
 import {
   deletionNoticeForResult,
@@ -36,10 +36,12 @@ export function FilesDeletionControls({
   const [pending, setPending] = useState<FilesDeletionPlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<FilesDeletionNotice | null>(null);
+  const operationGeneration = useRef(0);
 
   // Selection can change while the inspector remains mounted. Never carry a
   // confirmation or an Undo receipt onto the newly selected row.
   useEffect(() => {
+    operationGeneration.current += 1;
     setPending(null);
     setNotice(null);
     setBusy(false);
@@ -47,8 +49,13 @@ export function FilesDeletionControls({
 
   const confirmDelete = async () => {
     if (!pending || busy) return;
+    const generation = operationGeneration.current;
     setBusy(true);
     const result = await session.delete(item, { confirmedItemId: pending.itemId });
+    if (generation !== operationGeneration.current) {
+      if (result.ok) await onChanged();
+      return;
+    }
     setBusy(false);
     setPending(null);
     setNotice(deletionNoticeForResult(result, item.name));
@@ -57,8 +64,13 @@ export function FilesDeletionControls({
 
   const undo = async () => {
     if (!notice?.undoToken || busy) return;
+    const generation = operationGeneration.current;
     setBusy(true);
     const result = session.undo(notice.undoToken);
+    if (generation !== operationGeneration.current) {
+      if (result.ok) await onChanged();
+      return;
+    }
     setBusy(false);
     setNotice(deletionNoticeForUndo(result));
     if (result.ok) await onChanged();
@@ -126,4 +138,3 @@ export function FilesDeletionControls({
     </div>
   );
 }
-
