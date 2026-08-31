@@ -850,7 +850,7 @@ export function BlancStatisticsPanel() {
   const s = state.summary;
 
   return (
-    <div className="blanc-tool-detail">
+    <div className="blanc-tool-detail blanc-statistics-panel">
       <fieldset>
         <legend>Totals</legend>
         <div className="blanc-status-row">

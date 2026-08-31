@@ -22,6 +22,94 @@
 }
 
 /* Dense transport controls and form controls stay on stable opaque islands. */
-.blanc-root .blanc-top.lq-liquid > :is(.focus-music-bar, .blanc-top-tools) {
+.blanc-root .blanc-top-context {
+  display: contents;
+}
+
+.blanc-root .blanc-compact-tools-toggle {
+  display: none;
+}
+
+.blanc-root .blanc-top.lq-liquid :is(.focus-music-bar, .blanc-top-tools) {
   background: var(--lq-anchor-bg);
+}
+
+.blanc-root .blanc-statistics-panel {
+  width: 100%;
+  max-width: none;
+  display: block;
+  column-width: 360px;
+  column-gap: var(--blanc-s4);
+}
+
+.blanc-root .blanc-statistics-panel > fieldset {
+  break-inside: avoid;
+  margin-bottom: var(--blanc-s4);
+}
+
+@media (max-width: 780px) and (max-height: 420px) {
+  .blanc-root {
+    flex-direction: column;
+  }
+
+  .blanc-root > .blanc-taskbar.lq-liquid {
+    width: 100%;
+    min-height: 48px;
+    flex: 0 0 48px;
+    flex-direction: row;
+    padding: var(--blanc-s1) var(--blanc-s2);
+  }
+
+  .blanc-root .blanc-brand,
+  .blanc-root .blanc-taskbar-toggle,
+  .blanc-root .blanc-exit {
+    display: none;
+  }
+
+  .blanc-root .blanc-nav {
+    width: 100%;
+    flex-direction: row;
+  }
+
+  .blanc-root .blanc-nav-btn {
+    min-width: 0;
+    min-height: 36px;
+    flex: 1 1 0;
+    padding: var(--blanc-s1);
+  }
+
+  .blanc-root .blanc-top.lq-liquid {
+    min-height: 48px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .blanc-root .blanc-compact-tools-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .blanc-root .blanc-top-context {
+    display: none;
+  }
+
+  .blanc-root .blanc-top-context.is-open {
+    position: absolute;
+    z-index: 30;
+    inset: calc(100% + var(--blanc-s1)) var(--blanc-s2) auto;
+    max-height: calc(100vh - 108px);
+    overflow: auto;
+    display: grid;
+    gap: var(--blanc-s2);
+    padding: var(--blanc-s2);
+    border: 1px solid var(--lq-anchor-border);
+    border-radius: var(--blanc-radius-md);
+    background: var(--lq-anchor-bg);
+    box-shadow: var(--blanc-shadow);
+  }
+
+  .blanc-root .blanc-content,
+  .blanc-root .blanc-statistics-panel > fieldset {
+    padding: var(--blanc-s1);
+  }
 }

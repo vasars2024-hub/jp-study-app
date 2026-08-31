@@ -1920,3 +1920,21 @@ regions **3/3**; shared primitives **3/3**. Control moved one violation **0→1�
 all-glass arm moved **all 5** Work regions and restored them.
 
 **RULE C: 11 of 16 passing cells** — all eight Wired plus cat1–cat3 Blanc. Next: cat4 Blanc.
+
+## 2026-08-31 — codexB — cat4 Blanc passes at the OS minimum through maximized
+
+First run: default/compact/max dead regions **18.7/13.5/21.4%**, plus **12** clipped compact
+nav/icon elements. A first equal-row grid fixed neither packing nor the 190.5px compact top bar;
+it was rejected rather than recorded.
+
+Final layout uses balanced Stats columns, a 48px horizontal icon rail at short+narrow sizes, and a
+keyboard-accessible Context tools disclosure. Desktop retains inline context controls; compact
+users can open/close the same controls in a bounded overlay. Short-window content/fieldset padding
+uses Blanc's 4px step. Focused guards: **27/27**.
+
+**cat4 · Blanc = PASS 10/10.** Default/compact/max dead regions **8.1/14.0/13.1%**;
+clips **0/0/0**, overlaps **0/0/0**, horizontal scrollers **0/0/0**; all sizes and bounds restore.
+Controls: injected clip 0→1→0; art plate counted only as art; foreground plant made 10 overlaps
+and restored 0.
+
+**RULE C: 12 of 16 passing cells** — all eight Wired plus cat1–cat4 Blanc. Next: cat5 Blanc.

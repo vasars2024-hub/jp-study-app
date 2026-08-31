@@ -93,6 +93,11 @@ describe('Blanc-native Liquid adapter', () => {
     expect(SHELL_ADAPTER).toMatch(/\.blanc-root \.blanc-top\.lq-liquid/);
     expect(SHELL_ADAPTER).toMatch(/border-radius:\s*0/);
     expect(SHELL_ADAPTER).toMatch(/:is\(\.focus-music-bar, \.blanc-top-tools\)[^{]*\{[^}]*background:\s*var\(--lq-anchor-bg\)/s);
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-statistics-panel\s*\{[^}]*max-width:\s*none;[^}]*column-width:\s*360px/s);
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-statistics-panel > fieldset\s*\{[^}]*break-inside:\s*avoid/s);
+    expect(SHELL_ADAPTER).toMatch(/@media \(max-width: 780px\) and \(max-height: 420px\)[\s\S]*\.blanc-nav\s*\{[^}]*flex-direction:\s*row/s);
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-top-context\.is-open\s*\{[^}]*position:\s*absolute;[^}]*overflow:\s*auto/s);
+    expect(SHELL_ADAPTER).toMatch(/\.blanc-content,\s*\.blanc-root \.blanc-statistics-panel > fieldset\s*\{[^}]*padding:\s*var\(--blanc-s1\)/s);
     expect(ADAPTER_BODY).not.toContain('.blanc-taskbar');
     expect(ADAPTER_BODY).not.toContain('.blanc-top');
   });

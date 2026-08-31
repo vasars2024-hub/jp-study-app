@@ -230,6 +230,7 @@ export default function BlancShell({
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [workspaceFull, setWorkspaceFull] = useState(false);
   const [taskbarHidden, setTaskbarHidden] = useState(false);
+  const [compactToolsOpen, setCompactToolsOpen] = useState(false);
   const deferredNavFrame = useRef<number | null>(null);
   const [tab, setTab] = useState<BlancTabId>(() => {
     const savedMemory = loadBlancMemory();
@@ -386,8 +387,21 @@ export default function BlancShell({
             )}
             <span>{title}</span>
           </div>
-          <FocusMusicBar />
-          <div className="blanc-top-tools">
+          <button
+            type="button"
+            className="blanc-compact-tools-toggle"
+            aria-expanded={compactToolsOpen}
+            aria-controls="blanc-top-context"
+            onClick={() => setCompactToolsOpen((open) => !open)}
+          >
+            Context tools
+          </button>
+          <div
+            id="blanc-top-context"
+            className={`blanc-top-context${compactToolsOpen ? ' is-open' : ''}`}
+          >
+            <FocusMusicBar />
+            <div className="blanc-top-tools">
             {canExpandWorkspace && (
               <button
                 type="button"
@@ -418,6 +432,7 @@ export default function BlancShell({
             <time className="blanc-clock">
               {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </time>
+            </div>
           </div>
         </header>
 

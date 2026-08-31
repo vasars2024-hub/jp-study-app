@@ -27,4 +27,11 @@ describe('Blanc native shell accessibility', () => {
     expect(SHELL).toContain('onClick={() => chooseNavTab(id)}');
     expect(SHELL).toContain('window.cancelAnimationFrame(deferredNavFrame.current)');
   });
+
+  it('keeps short-window context tools behind a reversible disclosure', () => {
+    expect(SHELL).toContain('className="blanc-compact-tools-toggle"');
+    expect(SHELL).toContain('aria-expanded={compactToolsOpen}');
+    expect(SHELL).toContain('aria-controls="blanc-top-context"');
+    expect(SHELL).toContain("compactToolsOpen ? ' is-open' : ''");
+  });
 });
