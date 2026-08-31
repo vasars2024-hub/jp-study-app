@@ -1641,3 +1641,66 @@ Two measured blockers, neither settled by widening an exclusion:
 
 **RULE C: 4 of 16 cells — cat1, cat2, cat3, cat4, all Wired. 12 to run.** `sampled-out:` Aero
 shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+
+## 2026-08-31 — primary — cat6 Wired 10/10 (a fifth host), and the taskbar's close ink
+
+**RECOVERY FIRST, and it was a no-op.** The relay flagged `primary2` as ending mid-turn at
+12:22:26 with 0 chars. Nothing was stranded: `primary2` wrote its own handoff at **12:50**,
+*after* that failure, and `jp-wt-filesapp` is **0 dirty paths** on `wt/files-app` at `b02e35dc`.
+Boss audit `audit-20260831-043527` is likewise settled — findings 1/2/3 repaired by
+`a6f61698`/`c47feb3f`/`7795f921`/`c7c0b711`, with 9 architecture orphans left open *honestly*
+because their consumers sit inside another track's uncommitted rewrites.
+
+**cat6 · Wired = PASS 10/10** (`f9d19517`). Category 6 knew 22 apps and no shells, so the cell
+was unreachable. Added host **`shell`**, with the axis decided rather than assumed:
+
+- **The axis is NOT the theme.** A shell renders no `.fwin-b-liquid`, and driving
+  wired-archive → Study OS → back would mutate a persisted global through a transition for a
+  reading the rubric never asked for. Category 6's own 10-requirement names the answer — the
+  trip must preserve "**taskbar identity**", which is a shell property. So the axis is a HOSTED
+  window's flip, and the claim is that making a window Liquid does not break the shell.
+- **The proxy must be VISIBLE.** All three hosted windows sat at 0x0; a minimised window still
+  carries its toggle at `display: none`, so an unguarded find flips a window nobody can see.
+- **The shell CONTAINS its windows**, so rows and snapshot are scoped outside `.fwin` (`shq`).
+  Unscoped, the round trip diffs on the flipped window's contents and blames the desktop.
+
+Numbers: **9/9 rows in BOTH presentations**, `rowsAgree` true, `onlyInOne` empty; round trip
+liquid→standard→liquid with **0 diffs**, `fieldsHeld`/`shellHeld` true, 1264x821 either side.
+Control: **all 8 mutations fell exactly their own row**, 9/9→8/9, every one restored to 9/9.
+
+Two instrument defects the first run caught, fixed not banked. **25 — trap 1, three rows at
+once:** steps clicked and counted in ONE synchronous `/eval`, so `openStart` read `opened=0`
+while the menu opened, `closeStart` saw that 1 and read `after=1`, and `taskbarRaise` read rank
+3 of 3 on a window it had just correctly raised — a working shell scored **6/9**. Act and read
+are now separate driver POSTs. **26 — the `shellIdentity` control proved nothing:** it detached
+one of the two elements the row reads, `owned > 0` held, no row fell.
+
+**Cleared by reading, not repair:** cat6, cat7-collection-weight and cat8 carry **no**
+`root.querySelector('.fwin-body')` site at all, and cat7-perf's one use is fully qualified. The
+correction-22 class that cost cat3/cat4/cat5 a repair each does **not** recur in the rest.
+
+**cat5 · Wired — one real product fix, cell still VOID** (`cb204f3f`). Q5 measured
+`span.os-task-close` at **3.47:1** (bar 4.5). A specificity accident: Wired brightens the active
+button's ink to `#e9feff`, but `styles.css:14784` gives the close a flat `var(--muted)` at 0,2,0
+which outranks inheritance — so the control that DESTROYS a window was the dimmest thing on it.
+Fixed by `color: inherit` (`:not(:hover)`, or the shared red destructive hover, also 0,3,0, would
+be decided by source order). Live: close ink now *equals* label ink, rest `rgb(109,241,255)` and
+active `rgb(233,254,255)`. **wired-archive failingCount 2 → 1**, os-task-close gone.
+
+cat5 is **7 of 10** and NOT closed. Q7/Q8/Q9 flipped VOID → YES on `f9d19517`'s baseline, and
+Q1/Q2/Q3 now read YES. Three open, none of them the above:
+1. **Q4 = 47 controls scanned against a bar of 12** — and the scanned list is the hosted Media
+   Center's nav rail, menubar and search. A shell must be scored on the chrome it AUTHORS: those
+   windows are separately-scored surfaces, so this charges them twice and makes the shell's
+   number a function of which windows happen to be open. Same principle as cat6 decision 3;
+   needs `shq`-style scoping plus a control proving it can still fail.
+2. **Q5's alt-theme leg is measuring a combination the product never renders.** `classic-light`
+   reports 79 failures, every one hosted-window content — but `.os-desktop-wired` exists ONLY
+   while a wired theme is applied. A shell's alt must come from its own identity family.
+3. **Q6 NO-SUBJECT**, refusing with "surface reads null" — the shell root has no
+   `data-presentation`. cat6's shell proxy is the shape that resolves it.
+Q5's last wired failure, `span.` "Home" at 1.75 on `button.os-set-nav-item`, is inside the hosted
+Settings window — real, but a different surface's cell.
+
+**RULE C: 5 of 16 cells — cat1, cat2, cat3, cat4, cat6, all Wired. 11 to run.** `sampled-out:`
+Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
