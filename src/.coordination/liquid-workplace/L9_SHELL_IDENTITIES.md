@@ -1051,3 +1051,43 @@ only presentation the surface has — one of them `div.reading-garden-sky-consol
 console correction 21 already excludes from category 4. cat5 does not yet honour that attribute.**
 
 Banked as `cat5-l9-video.json` (8/10) and `cat5-l9-city.json` (VOID), so **cells stay 10 of 16.**
+
+## 2026-08-31 — primary — cat5 Q5 on Video: forest-night 3.92 → 4.74, failing 3 → 0. classic-light is an INSTRUMENT defect.
+
+**Product fix 1 — `.mc-button-primary`'s gradient.** A gradient under text is a RANGE of contrast
+ratios and the bar is the worst stop, not the average. White on `#d9516e → #b83355` measured
+**3.92:1 at the top stop and 5.77:1 at the bottom** (14px/400, bar 4.5), so the upper third of every
+primary button in this shell was below AA while its lower third was clear. The mid-gradient reading
+a simpler instrument takes is 4.75:1 — which is why cat1 banked `failingCount 0` on this same
+surface and theme and never reached these buttons. Both stops stepped down to `#c94061 → #a82c4b`
+(hover `#cc4464 → #b63354`, still lighter than rest so the affordance reads). **Re-scored:
+forest-night `minRatio` 3.92 → 4.74, `failingCount` 3 → 0.**
+
+**Product fix 2 — `--mc-stage-plate`.** `.mc-video-empty` inlined a literal dark gradient, so in a
+light palette the ink correctly went dark and the plate stayed near-black. Now a token, defaulting
+to the identical literal (dark palettes pixel-identical) and re-sourced in the light and
+high-contrast blocks exactly like the four glass tokens above it. **Verified live** by setting
+`data-theme='classic-light'` and reading the computed value on the element:
+
+    linear-gradient(145deg, rgb(255, 255, 255), rgb(243, 243, 243))   text rgb(30, 30, 30)
+
+A white plate under near-black text. The base layer is opaque there, not 0.9/0.98: with the dark
+default's alphas kept, the light plate still composited the dark stage beneath and `strong` moved
+only 1.13 → 1.09 — the plate had changed and the reading had not.
+
+**CORRECTION 27, NOT YET APPLIED — cat5's gradient parser flattens multi-layer backgrounds, and it
+is why classic-light still reports 22 failing on a plate that is provably white.**
+`cs.backgroundImage` is ONE string holding both layers. The parser regex harvests every colour token
+across ALL layers into one stop list, then decides whether to stop walking with
+`min(alphas) >= 0.996`. My plate is `radial-gradient(accent @ 0.1), linear-gradient(opaque, opaque)`:
+`min` is the top layer's 10% bloom, so the walk does NOT stop at an opaque lower layer and it
+composites `.mc-video-stage`'s dark fill underneath a plate that hides it completely. The banked
+`classic-light: 22 failing, minRatio 1.01` in `cat5-l9-video.json` is **partly fabricated and must
+not be treated as a product finding.** The fix: split `backgroundImage` on TOP-LEVEL commas (commas
+inside `rgba()`, `color()` and the gradient's own arguments do not count), score each layer on its
+own alphas, and stop the walk when ANY layer is opaque everywhere. This is the same family as the
+2026-08-28 Games correction quoted in that branch's own comment, which fixed the per-STOP alpha and
+left the per-LAYER one.
+
+**Video's cat5 stays 8/10 and is NOT closed**: Q5 pending correction 27's re-score, Q4 (`24`
+controls scanned against a bar of 12, `collapsedDisclosures 0`) untouched. **Cells still 10 of 16.**

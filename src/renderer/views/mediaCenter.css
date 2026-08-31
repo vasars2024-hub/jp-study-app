@@ -102,6 +102,18 @@
   --mc-panel-glass: rgba(19, 22, 31, 0.78);
   --mc-panel-glass-mid: rgba(19, 22, 31, 0.76);
   --mc-panel-glass-soft: rgba(19, 22, 31, 0.74);
+  /*
+   * The video stage's empty plate. It was a literal dark gradient inlined on
+   * `.mc-video-empty`, and rubric category 5 measured what that costs: at
+   * `classic-light` the surrounding ink correctly goes dark while this plate stayed
+   * near-black, so the empty state's own copy read `strong` 1.13:1 and `p` 2.97:1 —
+   * 18 failing runs on one page. The literal below IS the previous value, so every
+   * dark palette is pixel-identical; the light and high-contrast blocks at the
+   * bottom of this file re-source it, exactly like the four glass tokens above.
+   */
+  --mc-stage-plate:
+    radial-gradient(circle at 50% 36%, rgba(216, 74, 104, 0.1), transparent 26%),
+    linear-gradient(145deg, rgba(9, 11, 17, 0.9), rgba(5, 7, 11, 0.98));
 
   /*
    * The one type scale for Media Center.
@@ -731,16 +743,28 @@
   cursor: default;
 }
 
+/*
+ * A GRADIENT UNDER TEXT IS A RANGE OF CONTRAST RATIOS, and the bar is the worst
+ * stop, not the average. White on the old `#d9516e -> #b83355` measured 3.92:1 at
+ * the top and 5.77:1 at the bottom (rubric category 5, forest-night, 14px/400 —
+ * bar 4.5), so the upper third of every primary button in this shell was below
+ * WCAG AA while its lower third was comfortably clear. The mid-gradient reading a
+ * simpler instrument would take is 4.75:1, which is why this passed unnoticed:
+ * cat1 banked `failingCount 0` on the same surface and never reached these
+ * buttons. Both stops are stepped down until the TOP one clears 4.5; hue and
+ * direction are unchanged, and hover stays lighter than rest so the affordance
+ * still reads.
+ */
 .mc-button-primary {
   border-color: rgba(255, 106, 131, 0.44);
-  background: linear-gradient(180deg, #d9516e, #b83355);
+  background: linear-gradient(180deg, #c94061, #a82c4b);
   color: #fff;
   box-shadow: 0 6px 18px rgba(164, 43, 73, 0.17);
 }
 
 .mc-button-primary:hover {
   border-color: rgba(255, 133, 153, 0.62);
-  background: linear-gradient(180deg, #e15c78, #c13d5d);
+  background: linear-gradient(180deg, #cc4464, #b63354);
 }
 
 .mc-wide {
@@ -1422,9 +1446,7 @@
   overflow: auto;
   padding: 30px;
   text-align: center;
-  background:
-    radial-gradient(circle at 50% 36%, rgba(216, 74, 104, 0.1), transparent 26%),
-    linear-gradient(145deg, rgba(9, 11, 17, 0.9), rgba(5, 7, 11, 0.98));
+  background: var(--mc-stage-plate);
 }
 
 .mc-video-empty > span {
@@ -6569,6 +6591,19 @@
   --mc-panel-glass: color-mix(in srgb, var(--panel-2) 78%, transparent);
   --mc-panel-glass-mid: color-mix(in srgb, var(--panel-2) 76%, transparent);
   --mc-panel-glass-soft: color-mix(in srgb, var(--panel-2) 74%, transparent);
+  /* Same two layers and the same accent bloom, light tint — the stage keeps its
+     diagonal fall, it simply stops being a near-black slab under ink that has
+     correctly gone dark.
+
+     The base layer is OPAQUE here, unlike the dark default's 0.9/0.98. Measured:
+     with the alphas kept, the light plate still composited over `.mc-video-stage`
+     beneath it and the empty state's `strong` only moved 1.13:1 -> 1.09:1 — the
+     plate had changed and the reading had not. A 2% hole in a light plate over a
+     dark stage is enough to keep the text unreadable, so the palette's own
+     `--panel`/`--panel-2` are used flat. */
+  --mc-stage-plate:
+    radial-gradient(circle at 50% 36%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 26%),
+    linear-gradient(145deg, var(--panel), var(--panel-2));
 }
 
 /* High contrast is the one theme that must not blur or tint anything: the
@@ -6615,6 +6650,10 @@
   --mc-panel-glass: var(--panel);
   --mc-panel-glass-mid: var(--panel);
   --mc-panel-glass-soft: var(--panel);
+  /* One flat fill, no bloom and no fall: a gradient under text is a range of
+     contrast ratios, and the one theme whose whole point is that nothing is
+     translucent should not have one. */
+  --mc-stage-plate: var(--panel);
 }
 
 /* A user who has asked the OS for less transparency gets the same treatment in

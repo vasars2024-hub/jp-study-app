@@ -2,7 +2,7 @@
   "surface": "Video",
   "label": "l9-video",
   "control": false,
-  "at": "2026-08-31T07:55:48.029Z",
+  "at": "2026-08-31T08:01:50.907Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
@@ -152,25 +152,25 @@
             "theme": "forest-night",
             "measured": 85,
             "unmeasurable": 0,
-            "minRatio": 3.92,
-            "failingCount": 3,
+            "minRatio": 4.74,
+            "failingCount": 0,
             "worst": {
-              "el": "button.mc-button",
-              "ratio": 3.92,
+              "el": "p.mc-muted",
+              "ratio": 4.74,
               "bar": 4.5,
-              "bg": "gradient on button.mc-button",
-              "text": "Open video"
+              "bg": "section.mc-inspector-block@100%",
+              "text": "Choose a file from your "
             }
           },
           {
             "theme": "classic-light",
             "measured": 85,
             "unmeasurable": 0,
-            "minRatio": 1.03,
-            "failingCount": 18,
+            "minRatio": 1.01,
+            "failingCount": 22,
             "worst": {
               "el": "button.mc-button",
-              "ratio": 1.03,
+              "ratio": 1.01,
               "bar": 4.5,
               "bg": "button.mc-button@4% over gradient on div.mc-video-empty over div.mc-video-stage@100%",
               "text": "Browse folder"
@@ -179,81 +179,60 @@
         ],
         "failing": [
           {
-            "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Open video"
-          },
-          {
-            "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Open in the media worksp"
-          },
-          {
-            "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Select a video"
-          },
-          {
-            "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Open video"
-          },
-          {
             "el": "strong.",
-            "ratio": 1.13,
+            "ratio": 1.09,
             "bar": 4.5,
             "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
             "text": "Video plays in the media"
           },
           {
             "el": "p.",
-            "ratio": 2.97,
+            "ratio": 2.86,
             "bar": 4.5,
             "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
             "text": "Open the workspace to wa"
           },
           {
-            "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Open in the media worksp"
-          },
-          {
             "el": "strong.",
-            "ratio": 1.13,
+            "ratio": 1.09,
             "bar": 4.5,
             "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
             "text": "Choose what to watch"
           },
           {
             "el": "p.",
-            "ratio": 2.97,
+            "ratio": 2.86,
             "bar": 4.5,
             "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
             "text": "Open a local video, brow"
           },
           {
             "el": "button.mc-button",
-            "ratio": 3.92,
-            "bar": 4.5,
-            "bg": "gradient on button.mc-button",
-            "text": "Select a video"
-          },
-          {
-            "el": "button.mc-button",
-            "ratio": 1.03,
+            "ratio": 1.01,
             "bar": 4.5,
             "bg": "button.mc-button@4% over gradient on div.mc-video-empty over div.mc-video-stage@100%",
             "text": "Browse folder"
+          },
+          {
+            "el": "span.mc-eyebrow",
+            "ratio": 1.87,
+            "bar": 4.5,
+            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
+            "text": "Library queue"
+          },
+          {
+            "el": "h2.",
+            "ratio": 1.09,
+            "bar": 4.5,
+            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
+            "text": "Up next"
+          },
+          {
+            "el": "span.",
+            "ratio": 2.86,
+            "bar": 4.5,
+            "bg": "gradient on div.mc-video-empty over div.mc-video-stage@100%",
+            "text": "37 videos"
           }
         ],
         "themeAxisMoved": true
@@ -301,6 +280,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "parity": {
           "standard": "10/10",
           "liquid": "10/10",
@@ -319,6 +299,9 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
         "roundTrip": {
           "diffs": []
         }
@@ -331,6 +314,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "rowsAgree": true,
         "onlyInOne": []
       }
