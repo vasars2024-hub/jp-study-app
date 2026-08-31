@@ -169,6 +169,33 @@ const LOOKUP = IS_SELECTOR
      })[0]`;
 const ROOT_EXPR = `((${PIN} && ${PIN}.isConnected) ? ${PIN} : (${LOOKUP}))`;
 
+/**
+ * CORRECTION (2026-08-31, primary): THE ROOT'S OWN BODY, not the first one inside it.
+ * Both uses in this file were `root.querySelector('.fwin-body') || root` — a DESCENDANT search,
+ * right for a `.fwin` root and wrong for every SHELL root, which CONTAINS floating windows and
+ * therefore contains their bodies. Measured live on `@.os-desktop-wired`: the old expression
+ * returned a **0x0** body owned by the 'SIG-VID / Signal Archive' window on a 1264x821 desktop.
+ *
+ * Same bug class as corrections 32/33/33b in `cat3-liquid-utilization.cjs` and
+ * `l1-surface-roles.js` (`67594273`) and correction 22 in `cat4-use-of-space.cjs` (`1b937fc9`) —
+ * containment mistaken for ownership. It is worse than a refusal in both sites here: the
+ * SNAPSHOT reads `B`, the body viewport that Q3 ("the primary action is inside the body viewport
+ * at rest") and Q4 are scored against, so a shell would be scored against a minimised window's
+ * empty box; and the PLANT would mount its control nodes into that same 0x0 box, where nothing
+ * renders, no bar moves, and the control reports "DID NOT FAIL" on a falsifiable question.
+ *
+ * Ownership, not containment: a `.fwin-body` belongs to this root only when the `.fwin` it
+ * belongs to IS this root. A chromeless root owns none and IS its own body.
+ */
+const OWN_BODY_FN = `function(root){
+  if (!root) return root;
+  var bodies = [].slice.call(root.querySelectorAll('.fwin-body'));
+  for (var i = 0; i < bodies.length; i += 1) {
+    if (bodies[i].closest('.fwin') === root) return bodies[i];
+  }
+  return root;
+}`;
+
 // ---------------------------------------------------------------------------- the snapshot
 /**
  * The eight §10.4 questions answerable from one rendered frame, plus the contrast population
@@ -333,7 +360,7 @@ const SNAP = `(function(){
   }
 
   var isFwin = root.classList && root.classList.contains('fwin');
-  var body = root.querySelector('.fwin-body') || root;
+  var body = (${OWN_BODY_FN})(root);
   var B = body.getBoundingClientRect();
   /**
    * TRAP 6 — "AT REST" IS NOT WHATEVER THE LAST PROBE LEFT BEHIND, and this one had already
@@ -439,10 +466,35 @@ const SNAP = `(function(){
   // ---- Q3: primary action visible without scrolling. --------------------------------------
   // Prefer a control the app itself marks primary; taking accentButtons[0] answered YES about
   // the wrong element on two surfaces (a JA/ZH grammar toggle, a nav row).
+  /*
+   * THE HARNESS'S OWN PLANTS ARE NOT THE PRODUCT'S PRIMARY ACTION — the third repair to this
+   * one term, and the same defect as the two above it in a shape the pin could not cover.
+   * Pinning fixed "the plant moved a different node"; moving every branch fixed "the plant
+   * promoted the next node". Both reason about nodes that exist when the pin is taken. The Q10
+   * dashboard plant CREATES six new controls (className cat5ctl-kind-N, inside its
+   * data-cat5-plant="dashboard" grid), and they are appended to the body AFTER the pin. So on a
+   * surface with no explicit primary and no accent button, the planted read resolves
+   * primaryAction to input.cat5ctl-kind-1 — a control the harness itself put there, inside the
+   * viewport by construction — and Q3 stays YES no matter what the Q3 plant moved.
+   *
+   * Measured on the Wired shell: the Q3 plant correctly found and moved button.os-start-btn
+   * (primariesMoved 1), and Q3 still answered YES on input.cat5ctl-kind-1. Verdict
+   * "CONTROL DID NOT FAIL on Q3" on a question that is perfectly falsifiable.
+   *
+   * Q4 is why this is scoped to Q3 rather than filtered globally: its clutter plants are MEANT
+   * to be counted in scannedControls, and excluding them everywhere would disarm that control.
+   * The attribute is spelled out because SNAP is defined above the PLANT const and cannot
+   * interpolate it — if PLANT ever changes, this string changes with it.
+   */
+  var notPlant = function(e){ return !e.closest('[data-cat5-plant]'); };
   var explicitPrimary = controls.filter(function(e){
     return /(^|\\s|-)primary(\\s|$|-)/.test(String(e.className || ''))
+      && notPlant(e)
       && !e.closest('.fwin-bar') && !e.closest(NAV); })[0];
-  var primaryAction = explicitPrimary || accentButtons[0] || primaryInputs[0] || null;
+  var primaryAction = explicitPrimary
+    || accentButtons.filter(notPlant)[0]
+    || primaryInputs.filter(notPlant)[0]
+    || null;
   var primaryVisible = primaryAction ? inBody(primaryAction) : false;
   /*
    * PINNED FOR THE CONTROL, and this is a repair, not an optimisation. The Q3 plant used to
@@ -806,7 +858,7 @@ const PLANT = 'data-cat5-plant';
 const PLANT_JS = `(function(){
   var root = ${ROOT_EXPR};
   if (!root) return JSON.stringify({ refuse: 'surface not found for control injection' });
-  var body = root.querySelector('.fwin-body') || root;
+  var body = (${OWN_BODY_FN})(root);
   var isFwin = root.classList && root.classList.contains('fwin');
 
   /*
