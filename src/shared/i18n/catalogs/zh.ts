@@ -4916,6 +4916,10 @@ export const zh: Catalog = {
   'music.repeat.one': '单曲',
   'music.controls.addToLiked': '添加到喜欢',
   'music.controls.volume': '音量',
+  'music.controls.play': '播放',
+  'music.controls.pause': '暂停',
+  'music.controls.lyrics': '歌词',
+  'music.widget.empty': '当前没有播放',
   'music.controls.openWidget': '打开迷你播放器小组件',
 
   // Media view

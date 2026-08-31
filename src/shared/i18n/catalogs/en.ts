@@ -5221,6 +5221,10 @@ export const en: Catalog = {
   'music.repeat.one': 'one',
   'music.controls.addToLiked': 'Add to Liked',
   'music.controls.volume': 'Volume',
+  'music.controls.play': 'Play',
+  'music.controls.pause': 'Pause',
+  'music.controls.lyrics': 'Lyrics',
+  'music.widget.empty': 'Nothing playing',
   'music.controls.openWidget': 'Open the mini-player widget',
 
   // Media view

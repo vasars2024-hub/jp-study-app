@@ -5441,6 +5441,10 @@ export const ru: Catalog = {
   'music.repeat.one': 'одна',
   'music.controls.addToLiked': 'Добавить в понравившиеся',
   'music.controls.volume': 'Громкость',
+  'music.controls.play': 'Воспроизвести',
+  'music.controls.pause': 'Пауза',
+  'music.controls.lyrics': 'Текст песни',
+  'music.widget.empty': 'Ничего не воспроизводится',
   'music.controls.openWidget': 'Открыть виджет мини-плеера',
 
   // Media view

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import type { DesktopWinSection } from '../../shared/desktop';
 import { useT } from '../i18n';
+import { openSectionSurface } from '../sectionSurface';
 import MusicWidget from './MusicWidget';
 import { useVisualizer, VizStage } from './visualizer/VisualizerContent';
 import { WALL_PRESETS } from '../environment/wallCatalog';
@@ -157,7 +158,10 @@ export function VisualizerWidget() {
     <VizStage
       settings={viz}
       playing={playing}
-      onOpenMusic={() => window.dispatchEvent(new CustomEvent('os:open', { detail: 'music' }))}
+      // Both widgets render here AND inside their own `?popout=…` window, which
+      // mounts no DesktopShell — so a bare `os:open` dispatch was a dead button
+      // in the pop-out. `openSectionSurface` falls back to main's pop-out route.
+      onOpenMusic={() => openSectionSurface('music')}
     />
   );
 }

@@ -8,6 +8,7 @@ import { guessSongMeta } from '../lyrics';
 import { useLiveLyrics, type LyricsState } from '../liveLyrics';
 import { loadVizSettings, onVizSettingsChanged } from '../visualizerSettings';
 import { loadMusicWidgetSettings, onMusicWidgetSettingsChanged, toggleShowLyrics } from '../musicWidgetSettings';
+import { openSectionSurface } from '../sectionSurface';
 import { useT } from '../i18n';
 
 // Mini-player desktop widget: a live little version of the Music app.
@@ -25,7 +26,15 @@ function fmt(sec: number): string {
 }
 
 /** Compact, always-exactly-two-line karaoke strip: current line + the one after it. */
-function LyricsStrip({ lyrics, activeIndex }: { lyrics: LyricsState; activeIndex: number }) {
+function LyricsStrip({
+  lyrics,
+  activeIndex,
+  t,
+}: {
+  lyrics: LyricsState;
+  activeIndex: number;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
   if (lyrics.kind === 'synced' && activeIndex >= 0) {
     const cur = lyrics.cues[activeIndex]?.text ?? '';
     const next = lyrics.cues[activeIndex + 1]?.text ?? '';
@@ -51,7 +60,7 @@ function LyricsStrip({ lyrics, activeIndex }: { lyrics: LyricsState; activeIndex
   return (
     <div className="mwidget-lyrics">
       <span className="mwidget-lyrics-hint muted">
-        {lyrics.kind === 'loading' ? 'Finding lyrics…' : 'No lyrics found'}
+        {lyrics.kind === 'loading' ? t('music.lyricsLoading') : t('music.noLyrics')}
       </span>
     </div>
   );
@@ -122,27 +131,58 @@ export default function MusicWidget() {
     if (ps.current) setLiked(toggleLiked(ps.current.id));
   };
 
+  const repeatLabel = t('music.controls.repeatTitle', { mode: t(`music.repeat.${ps.repeat}`) });
+
+  // Every control carries its own accessible name, and the three real toggles
+  // carry `aria-pressed` rather than only the `on` class. The name of a toggle
+  // button stays CONSTANT and its state is the attribute — a name that flips
+  // between "Add to Liked" and "Unlike" makes the same control announce as two
+  // different ones, and a class conveys nothing to a screen reader at all.
+  // Repeat is a three-way cycle, not a toggle, so it keeps the Music app's own
+  // "Repeat: {mode}" name, which already states the state it is in.
+  const playLabel = t(ps.playing ? 'music.controls.pause' : 'music.controls.play');
   const controls = (
     <div className="mwidget-controls">
       <button
         className={`mwidget-btn ${ps.shuffle ? 'on' : ''}`}
-        title="Shuffle"
+        title={t('music.controls.shuffle')}
+        aria-label={t('music.controls.shuffle')}
+        aria-pressed={ps.shuffle}
         onClick={player.toggleShuffle}
       >
         <Icon name="shuffle" size={13} />
       </button>
-      <button className="mwidget-btn" title="Previous" onClick={player.prev} disabled={!ps.current}>
+      <button
+        className="mwidget-btn"
+        title={t('music.controls.previous')}
+        aria-label={t('music.controls.previous')}
+        onClick={player.prev}
+        disabled={!ps.current}
+      >
         <Icon name="skip-back" size={13} />
       </button>
-      <button className="mwidget-btn mwidget-play" onClick={player.toggle} disabled={!ps.current}>
+      <button
+        className="mwidget-btn mwidget-play"
+        title={playLabel}
+        aria-label={playLabel}
+        onClick={player.toggle}
+        disabled={!ps.current}
+      >
         <Icon name={ps.playing ? 'pause' : 'player'} size={15} />
       </button>
-      <button className="mwidget-btn" title="Next" onClick={player.next} disabled={!ps.current}>
+      <button
+        className="mwidget-btn"
+        title={t('music.controls.next')}
+        aria-label={t('music.controls.next')}
+        onClick={player.next}
+        disabled={!ps.current}
+      >
         <Icon name="skip-forward" size={13} />
       </button>
       <button
         className={`mwidget-btn mwidget-repeat ${ps.repeat !== 'off' ? 'on' : ''}`}
-        title={`Repeat: ${ps.repeat}`}
+        title={repeatLabel}
+        aria-label={repeatLabel}
         onClick={player.cycleRepeat}
       >
         <Icon name="repeat" size={13} />
@@ -150,7 +190,9 @@ export default function MusicWidget() {
       </button>
       <button
         className={`mwidget-btn mwidget-heart ${liked ? 'on' : ''}`}
-        title={liked ? 'Unlike' : 'Add to Liked'}
+        title={t('music.controls.addToLiked')}
+        aria-label={t('music.controls.addToLiked')}
+        aria-pressed={liked}
         onClick={heart}
         disabled={!ps.current}
       >
@@ -158,12 +200,14 @@ export default function MusicWidget() {
       </button>
       <button
         className={`mwidget-btn mwidget-lyrics-toggle ${widgetSettings.showLyrics ? 'on' : ''}`}
-        title={widgetSettings.showLyrics ? 'Hide lyrics' : 'Show lyrics'}
+        title={t('music.controls.lyrics')}
+        aria-label={t('music.controls.lyrics')}
+        aria-pressed={widgetSettings.showLyrics}
         onClick={() => setWidgetSettings(toggleShowLyrics())}
       >
         <Icon name="caption" size={13} />
       </button>
-      <div className="mwidget-vol" title="Volume">
+      <div className="mwidget-vol" title={t('music.controls.volume')}>
         <Icon name="volume" size={13} />
         <input
           type="range"
@@ -210,9 +254,21 @@ export default function MusicWidget() {
         <VisualizerCanvas className="mwidget-viz" settings={viz} idleBaseline={false} />
       )}
       {!ps.current ? (
+        // L9: the old copy read "Nothing playing — pick a song in Music", which
+        // named an action and offered none — the same dead end the Visualizer
+        // idle hint had. The route goes through `openSectionSurface` because
+        // this widget also renders inside a `?popout=musicwidget` window, where
+        // a bare `os:open` dispatch has no listener at all.
         <div className="mwidget-empty muted">
           <Icon name="music" size={26} />
-          <span>Nothing playing — pick a song in Music</span>
+          <span>{t('music.widget.empty')}</span>
+          <button
+            type="button"
+            className="btn small mwidget-empty-open"
+            onClick={() => openSectionSurface('music')}
+          >
+            {t('commands.nav.open.music')}
+          </button>
         </div>
       ) : big ? (
         <div className="mwidget-grid">
@@ -224,7 +280,7 @@ export default function MusicWidget() {
           {progress}
           {controls}
           {widgetSettings.showLyrics && (
-            <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} />
+            <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} t={t} />
           )}
         </div>
       ) : (
@@ -240,7 +296,7 @@ export default function MusicWidget() {
           <div className="mwidget-bar-progress">{progress}</div>
           {widgetSettings.showLyrics && (
             <div className="mwidget-bar-lyrics">
-              <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} />
+              <LyricsStrip lyrics={liveLyrics.lyrics} activeIndex={liveLyrics.activeIndex} t={t} />
             </div>
           )}
         </div>

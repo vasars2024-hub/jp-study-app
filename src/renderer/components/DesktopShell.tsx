@@ -25,6 +25,7 @@ import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport
 import { fitNewWindowRect } from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
 import { createRenderIdentityCache } from '../renderIdentityCache';
+import { markSectionOpenHandled } from '../sectionSurface';
 import {
   canPresentLiquid,
   isWinLiquid,
@@ -1622,13 +1623,17 @@ export default function DesktopShell({
         // host consumes the retained handoff after its first render.
         publishReadingWorkspaceRoute(readingRequest.route);
         openRef.current(readingRequest.host);
+        markSectionOpenHandled(e);
         return;
       }
       // A Reading-shaped handoff that failed schema validation is not a
       // desktop window id. Ignore it rather than mounting an object/string as a
-      // section and leaving behind an empty persisted window.
+      // section and leaving behind an empty persisted window. It is also the one
+      // path that must NOT be marked handled: a caller's pop-out fallback is
+      // only suppressed by a host that actually opened something.
       if (isReadingWorkspaceOpenDetail(detail)) return;
       openRef.current(detail as WinSection);
+      markSectionOpenHandled(e);
     };
     window.addEventListener('os:open', h);
     return () => window.removeEventListener('os:open', h);

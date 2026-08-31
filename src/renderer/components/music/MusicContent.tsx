@@ -790,7 +790,16 @@ export function MusicControls({
       >
         <Icon name="skip-back" size={15} />
       </button>
-      <button className="btn primary music-play" onClick={player.toggle} disabled={!ps.current}>
+      {/* The transport's most important control had no accessible name in either
+          host: an icon-only button with no title and no label announces as
+          "button". Named from state, and the name is the one the widget uses. */}
+      <button
+        className="btn primary music-play"
+        onClick={player.toggle}
+        disabled={!ps.current}
+        title={t(ps.playing ? 'music.controls.pause' : 'music.controls.play')}
+        aria-label={t(ps.playing ? 'music.controls.pause' : 'music.controls.play')}
+      >
         <Icon name={ps.playing ? 'pause' : 'player'} size={16} />
       </button>
       <button

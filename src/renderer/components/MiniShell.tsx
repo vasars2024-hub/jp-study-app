@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon, { type IconName } from './Icons';
+import { markSectionOpenHandled } from '../sectionSurface';
 import {
   loadMiniMode,
   onMiniModeChanged,
@@ -260,11 +261,13 @@ export default function MiniShell({
       if (typeof id !== 'string' || !id) return;
       if (isMiniAppId(id)) {
         openAppRef.current(id);
+        markSectionOpenHandled(ev);
         return;
       }
       // Not pinnable in Mini, but still pop-out capable: the main process
       // validates the section and ignores anything that is not.
       void window.api.popOut(id as DesktopWinSection);
+      markSectionOpenHandled(ev);
     };
     const onClipboard = () => setActiveInline('clipboard');
     window.addEventListener(BUDDY_TOAST_EVENT, onToast);

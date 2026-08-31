@@ -17,7 +17,12 @@ describe('Visualizer idle recovery action', () => {
     expect(content).toContain("t('commands.nav.open.music')");
     expect(content).not.toContain('play a song in Music');
     expect(content).toMatch(/onOpenMusic\s*\?\s*<button[^>]*onClick=\{onOpenMusic\}/);
-    expect(section).toContain("new CustomEvent('os:open', { detail: 'music' })");
+    // Was `new CustomEvent('os:open', …)` until L9's Music-widget slice. That
+    // dispatch is real on the desktop and a DEAD BUTTON inside
+    // `?popout=visualizer`/`?popout=musicwidget`, which mount no DesktopShell.
+    // `openSectionSurface` keeps the desktop route and adds the pop-out
+    // fallback, so the assertion moved rather than being dropped.
+    expect(section).toContain("openSectionSurface('music')");
   });
 
   it('keeps the reused label complete in every shared locale', () => {
