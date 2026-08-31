@@ -444,6 +444,8 @@ An app cannot pass unless the answer is “yes” to all:
 matches every bullet. Seeded from this plan's own explicit statements only — nothing inferred,
 nothing rounded up.
 
+**After L9 bullet 3 closed (`3f47bfa1`): 6 closed / 20 open / 20 unknown, of 46.**
+
 **Seed result: 5 closed / 21 open / 20 unknown, of 46.** This is **−2 against the relay pin's
 expected 7/19/20**, and the difference is L7. The pin seeds L7's two bullets `closed`; the L7
 status block at line 1174 says in its own words that Anki's "eight cells and the two
@@ -1217,7 +1219,7 @@ Full receipt map and negative-control numbers are in
 
 - Finish taskbar/context/command entry points without forcing Liquid.  <!-- status: open; evidence:  -->
 - Migrate Note, Visualizer, Music widget, City, notifications, onboarding, and help.  <!-- status: closed; evidence: 12d5a976 -->
-- Complete Aero, Wired, and Blanc-native Liquid adapters.  <!-- status: open; evidence:  -->
+- Complete Aero, Wired, and Blanc-native Liquid adapters.  <!-- status: closed; evidence: 3f47bfa1 -->
 - Verify Secret Aero/Wired lifecycle and Blanc cold-open boundaries.  <!-- status: open; evidence:  -->
 
 Gate: all theme/mode combinations in §8 pass without identity leakage.

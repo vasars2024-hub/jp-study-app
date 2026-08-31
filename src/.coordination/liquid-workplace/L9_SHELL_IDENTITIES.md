@@ -279,3 +279,53 @@ Gates after it, app idle: full `npx vitest run` **exit 0 — 12,162 passed / 6 s
 0 FAILED** (12,133 at the start of this turn); i18n exit 0 at **11,791** English keys
 complete in ja/zh/ru; `node tools/architecture-audit.cjs` exit 0, 2,378 modules, 26
 findings, **nothing new**; touched-path ESLint 0 errors.
+
+## 2026-08-31 — Bullet 3: the third adapter, which was never written
+
+The bullet is "Complete Aero, Wired, and Blanc-native Liquid adapters". Aero and
+Wired have had theirs since L2 as `:root[data-materials='aero'|'wired']` in
+`liquid-tokens.css`. **Blanc had none, and could not have had one there:**
+`blancMain.tsx` strips `data-materials` on purpose (plus a MutationObserver to
+re-strip it), so an attribute variant can never match; and Blanc's palette is on
+`.blanc-root`, a descendant, while `liquidTokens.test.ts` forbids that sheet any
+non-`:root` selector. Adapter lives in `theme/blanc-liquid.css` — the same seam
+`blanc.css` already uses to remap the shared `--accent`. Commit `3f47bfa1`.
+
+Worse than un-adapted: `liquid-tokens.css` was imported by `main.tsx` ALONE, so
+Blanc had no Liquid vocabulary at all. 7 of 7 sampled tokens resolved in the
+Study OS window and **0 of 7** in the Blanc window of the same running app.
+
+| rendered evidence | before | after |
+| --- | --- | --- |
+| Blanc `.cal-context-toolbar` gap | `normal` (0px) | 16px |
+| its 7 controls' `min-height` | `auto` x6, `0px` x1 | 32px x7 |
+| smallest control box | 28x30 | 32x32 |
+| Wired `.fwin-liquid` blur/sat/radius | 8px / 1.25 / 16px | 6px / 1 / 0px |
+| Aero `.fwin-liquid` blur/sat/radius | 8px / 1.25 / 16px | 14px / 1.38 / 8px |
+
+CONTROL: blanking the two remapped tokens on `.blanc-root` drove gap to 0px and
+min-height to 0px on all seven and shrank the icons to 28; restore returned every
+number and left no inline style (`inlineLeft: "(none)"`). Materials restore was
+byte-identical in every leg. `--lq-anchor-blur` stayed `0px` in all three shells —
+the anchor never picks up glass, which is §2.3's invariant.
+
+**Bullet 3 CLOSES.** Three adapters, each measured on a rendered surface, no
+identity leakage, geometry preserved across every materials switch.
+
+The coverage test found 4 `--lq-*` reads NOTHING declares — dead in every shell
+since they landed, each measured `""` live: `--lq-border-subtle` +
+`--lq-radius-control` (gameArena: the whole `border` shorthand dropped, radius 0),
+`--lq-radius-sm` x2 (stats panels hard-square), `--lq-radius-pill` (a pill that
+was a rectangle), and `--lq-focus-ring` — the pressed note-colour swatch had **no
+ring at all**. All repaired against tokens that exist. `--lq-reading-measure` is
+NOT one: it carries a `none` fallback. New suite scans all 14 shared liquid
+sheets for a bare `var()` of an undeclared token.
+
+TRAP 1: the bridge's `/eval` window key is **`window`**, not `win`. An unknown key
+does not error — it silently falls back to the FOCUSED window, so a two-window
+comparison reads identical and looks like a shared defect. It cost me a wrong
+"Study OS is broken too" reading before the control caught it.
+TRAP 2: **Aero scales the desk** — `DIV.os-viewport-frame` carries
+`matrix(0.855…)`. `getBoundingClientRect` therefore reports a fabricated geometry
+change across a materials switch. `offsetWidth/Height/Left` and the inline style
+are the app's real numbers and were identical (711x651 @ left 40) in all legs.
