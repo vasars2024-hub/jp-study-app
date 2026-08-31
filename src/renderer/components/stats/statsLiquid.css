@@ -55,7 +55,10 @@
   min-width: 132px;
   padding: var(--lq-space-2);
   border: 1px solid var(--border);
-  border-radius: var(--lq-radius-sm);
+  /* was `var(--lq-radius-sm)`, which nothing declares — the radius computed to 0
+     and these panels rendered hard-square in every shell. `--radius-sm` is the
+     real small step (10px) and Wired/Blanc already remap it. */
+  border-radius: var(--radius-sm);
   background: var(--panel);
   box-shadow: var(--lq-anchor-shadow);
 }
@@ -78,7 +81,10 @@
   margin-top: var(--lq-space-2);
   padding: var(--lq-space-2) var(--lq-space-3);
   border: 1px solid var(--border);
-  border-radius: var(--lq-radius-sm);
+  /* was `var(--lq-radius-sm)`, which nothing declares — the radius computed to 0
+     and these panels rendered hard-square in every shell. `--radius-sm` is the
+     real small step (10px) and Wired/Blanc already remap it. */
+  border-radius: var(--radius-sm);
   background: var(--panel);
 }
 

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import {
+  AGENT_WORKSPACE_RELATIVE_PATH,
   emptyAgentWorkspaceState,
   isAgentQueryProvenancedCard,
   normalizeAgentWorkspaceState,
@@ -13,8 +14,6 @@ import {
   getAgentSessionContextStore,
   type AgentSessionContextStore,
 } from './agentSessionContext';
-
-const WORKSPACE_FILE = 'workspace-v1.json';
 
 export interface AgentWorkspaceStore {
   readonly filePath: string;
@@ -174,7 +173,7 @@ export function createAgentWorkspaceStore(
   rootDirectory: string,
   session: AgentSessionContextStore = getAgentSessionContextStore(),
 ): AgentWorkspaceStore {
-  const filePath = path.join(rootDirectory, 'agent', WORKSPACE_FILE);
+  const filePath = path.join(rootDirectory, ...AGENT_WORKSPACE_RELATIVE_PATH);
   let opened = false;
   const persisted = (): AgentWorkspaceState => {
     const state = readFile(filePath);

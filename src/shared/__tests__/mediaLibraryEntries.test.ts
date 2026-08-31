@@ -7,6 +7,8 @@ import {
   groupingForCategory,
   isExtraRelease,
   isWatched,
+  MEDIA_LIBRARY_STORE_FILE,
+  mediaItemsFromStoredDocument,
   watchedFraction,
 } from '../mediaLibraryEntries';
 
@@ -24,6 +26,24 @@ const episode = (n: number, extra: Partial<MediaItem> = {}): MediaItem => ({
   episodeKind: 'episode',
   durationSec: 1440,
   ...extra,
+});
+
+describe('persisted media library contract', () => {
+  it('names the same userData document the main process owns', () => {
+    expect(MEDIA_LIBRARY_STORE_FILE).toBe('media.json');
+  });
+
+  it('reads the live object shape without mistaking it for an empty library', () => {
+    const items = [episode(1), episode(2)];
+    expect(mediaItemsFromStoredDocument({ items, relationships: [] })).toEqual(items);
+  });
+
+  it('accepts the legacy array and refuses malformed collection shapes', () => {
+    const items = [episode(1)];
+    expect(mediaItemsFromStoredDocument(items)).toEqual(items);
+    expect(mediaItemsFromStoredDocument({ items: 'not-an-array' })).toEqual([]);
+    expect(mediaItemsFromStoredDocument(null)).toEqual([]);
+  });
 });
 
 describe('grouping rules', () => {

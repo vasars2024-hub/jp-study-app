@@ -38,12 +38,26 @@ import { initAgentOperationalState } from './agentOperationalClient';
 // Blanc's own tokens + the base stylesheet its panels inherit from. Study OS's
 // theme packs (aero, wired, materials, environment, city) are deliberately absent.
 import './theme/tokens.css';
+// The Liquid vocabulary, earned by this file's own rule — three panels Blanc
+// mounts read `--lq-*`: GameArena (gameArenaLiquid.css), CalendarContent
+// (calendarLiquid.css) and TranscriptionCardOptions (transcriptionCards.css).
+// Without it every one of those declarations was guaranteed-invalid and simply
+// dropped: Blanc's calendar toolbar measured `gap: normal` and `min-height:
+// auto` where the sheet asks for `--lq-space-4` and `--lq-hit-target`. Tokens
+// only, ~2 KB, and it cannot restyle anything on its own (`liquidTokens.test.ts`
+// pins that structurally).
+import './theme/liquid-tokens.css';
 // styles.css is NOT booted here: it is 468 KB of Study OS rules that only the
 // ported panels need, and they pull it lazily via theme/studyos-compat.css.
 // Blanc's own page baseline now lives in theme/blanc.css.
 import './components/ui/ui.css';
 import './theme/a11y.css';
 import './theme/blanc.css';
+// AFTER blanc.css, because it reads `--blanc-*`: the Blanc-native remap of the
+// four Liquid roles. The base sheet above derives from `--panel`/`--glass-*`,
+// which still hold Study OS values in this window, so importing it alone would
+// have dressed Blanc in the Study OS material. This is the adapter that stops it.
+import './theme/blanc-liquid.css';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
