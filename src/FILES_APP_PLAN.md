@@ -438,6 +438,10 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    produced, captured **before** removal and compared after. Settings no longer carries them,
    and every search entry that pointed at `pageId: 'memory'` resolves to the Files app — a
    search hit landing on a page that no longer holds the row is a FAIL.
+   <!-- status: open; evidence: 2026-08-31 f26e9932 + d9bec5be -- both panels built on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files'; the "compared after" reading is NOT taken and needs a dev app started from this worktree -->
+   **3 of 4 clauses landed, gate still OPEN.** The before-capture exists
+   (`gate8-before.json`); the after-comparison does not. See the 2026-08-31 (ninth) Progress
+   entry for the two remaining items and the parity-row blocker.
 9. Deleting a derived item removes exactly it; the guard for irreplaceable media refuses without
    an explicit confirmation, proven by a refusal that actually fires.
 10. **Opening routes through `planForPath`.** Clicking an item of each handled type opens the
@@ -1162,3 +1166,77 @@ nav page; (3) repoint every search entry that pointed at `pageId: 'memory'` — 
 explicit that a search hit landing on a page that no longer holds the row is a FAIL;
 (4) flip the `memory` and `statistics` parity rows to `migrated` (both are already on
 `FILES_PERMITTED_MIGRATIONS`) and re-run the comparison against this file.
+
+### 2026-08-31 (ninth) — Gate 8's two surfaces are built and Settings no longer carries them
+
+`f26e9932` (build) + `d9bec5be` (removal). Gate 8 remains **OPEN**: three of its four
+clauses are landed, the fourth (the "compared after" reading, on a live app) is not.
+
+**The panels.** `system/memory` and `system/statistics` were the two leaves gate 1
+measured as still reading 0 with work owed. They are now PANELS, not item lists, and
+`FILES_PANEL_CATEGORY_IDS` in `catalog.ts` says so — the rail shows no count for them,
+because they hold no enumerable rows and a 0 there is an honest number answering a
+question nobody asked.
+
+**The readers are the OLD page's readers, and that is the gate, not a convenience.** Gate 8
+is "the same numbers the old Settings page produced"; a second implementation is the only
+way to produce a different number. Statistics composes `StatsContent`'s exported blocks —
+the THIRD host of that module after Study OS and Blanc. Memory calls the same five
+sources `MemoryPage` called (`listSettingsDomains`, `navigator.storage.estimate`,
+`window.api.systemGetMetrics`, `loadLocalAgentMemory`, `getAgentOperationHistorySnapshot`)
+and formats through the same `formatBytes`. A test asserts each by name.
+
+**Four traps this turn paid for, in order of what they cost:**
+
+1. **`SettingsCard` cannot cross.** It calls `useSettings()`, which THROWS outside
+   `SettingsProvider`. `FilesPanelCard` replaces it in `--lq-*` tokens only, and carries
+   `data-panel-card-id` so gate 8's search half has an anchor.
+2. **`lazy()` is load-bearing, not an optimisation.** `StatsContent` reaches `ankiSync`,
+   which calls `window.api.onAnkiIntervalsChanged` AT MODULE SCOPE. A static import killed
+   `filesApp.test.tsx` outright. `studyLedgerHarness.tsx` documents the same hazard.
+3. **The nine registry entries must NOT be deleted.** Deleting them costs a user who
+   types "factory reset" the ability to find it at all — capability lost, not moved. They
+   carry `movedTo: 'files'`; `pageId` stays `'memory'` as the historical coordinate the
+   agent index and stale deep links still speak.
+4. **The redirect belongs in `SettingsApp.navigate`, not the search box.** Four callers
+   reach it — search, nav rail, agent guided navigation, recent pages — and a redirect in
+   one leaves the other three dead-ending on a page that renders nothing.
+
+**And one that will bite the next turn.** A bash heredoc writing a `\b` into a regex
+emitted a REAL backspace byte (0x08); ESLint's `no-control-regex` was the only thing that
+caught it, and only PowerShell repaired it. Same family as memory
+`write-tool-emits-raw-nul`. Scan touched files for `[\x00-\x08\x0B\x0C\x0E-\x1F]`
+before committing.
+
+**Three routing tests were repointed, each stricter than before:**
+`settingsSearchReachability` now scans `filesapp/panels/` for `<FilesPanelCard id>` /
+`focusCardId ===` anchors and requires every `movedTo: 'files'` entry to anchor there,
+with a vacuity guard; `agentNavigationIndexMirror` exempts only pages named in the new
+`SETTINGS_PAGES_MOVED_TO_FILES` and builds their allowed words from the cards that still
+name them; `agentHistorySettingsRouting` follows the card to `FilesMemoryPanel.tsx`.
+
+**Gates:** `npx vitest run` **13 suites / 33 tests failed, 12,035 passed, 6 skipped** —
+the SAME 13 suites and 33 tests as the `56a421ec` baseline, checked by set and not by
+count; none names a path this turn touched. i18n **exit 0, 11,780 keys**. Architecture
+**exit 0, 15 findings**, identical set. ESLint **0 errors** on every touched path.
+
+#### Gate 8's remaining work, and the blocker the next turn must not re-derive
+
+(a) **The parity rows cannot be plain rows.** `filesAppRouteParity.test.ts` pins every
+non-`action:` capability 1:1 to an enumerator `source` id, and `memory`/`statistics` are
+not enumerator sources — adding them bare breaks that equality and its own control. The
+slot that fits is `action:memory` / `action:statistics`, which the equality excludes; that
+means `FILES_PERMITTED_MIGRATIONS` needs the `action:`-prefixed ids too (line 408 checks
+`row.capability` against that list). Decide the spelling once and write it down.
+
+(b) **The "compared after" reading needs a live app started from THIS worktree.** The
+main-tree app (PID 2040, bridge 39273) is the liquid track's instrument AND runs different
+code; it cannot answer for these panels. Start a dev app here, open Files →
+System → Memory, and compare against `src/.coordination/files-app/gate8-before.json`:
+`totalmem` **31,982,632,960**, `platform` **win32**, `domainsAll` **30**,
+`domainsPresent` **24**, the six inventory ids in order, `recentDays` **14**,
+`knownWords` **0** — EXACTLY. `freemem`, `used`, `quota` and every `stats.*` counter are
+live machine state; compare those for shape only (same source, same units, non-null).
+A panel reporting a different `freemem` is CORRECT; one reporting null is not.
+Then search Settings for "factory reset" and prove the hit lands on the factory-reset
+CARD in the Files app, not merely on the app — that is the gate's own FAIL condition.
