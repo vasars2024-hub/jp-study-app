@@ -11487,6 +11487,9 @@ export const ru: Catalog = {
   'filesApp.status.size': 'Всего {size}',
   'filesApp.status.selected': 'Выбрано: {name}',
 
+  'filesApp.entry.showInFiles': 'Показать в Файлах',
+  'filesApp.entry.fromBook': 'Открыть приложение Файлы на этой книге вместе со всем, что лежит рядом.',
+  'filesApp.entry.scoped': 'Показано: {category}. Выберите «Всё», чтобы увидеть всё дерево.',
   'filesApp.action.mine': 'Добавить в колоду',
   'filesApp.action.mining': 'Чтение…',
   'filesApp.action.undoMine': 'Отменить',

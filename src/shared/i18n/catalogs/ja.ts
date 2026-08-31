@@ -10616,6 +10616,9 @@ export const ja: Catalog = {
   'filesApp.status.size': '合計 {size}',
   'filesApp.status.selected': '選択中: {name}',
 
+  'filesApp.entry.showInFiles': 'ファイルで表示',
+  'filesApp.entry.fromBook': 'この本を中心に、関連ファイルをまとめてファイルアプリで開きます。',
+  'filesApp.entry.scoped': '{category} を表示中。「すべて」を選ぶとツリー全体に戻ります。',
   'filesApp.action.mine': 'デッキに採取',
   'filesApp.action.mining': '読み込み中…',
   'filesApp.action.undoMine': '元に戻す',

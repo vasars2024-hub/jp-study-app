@@ -11072,6 +11072,9 @@ export const en: Catalog = {
   'filesApp.status.size': 'Total {size}',
   'filesApp.status.selected': 'Selected: {name}',
 
+  'filesApp.entry.showInFiles': 'Show in Files',
+  'filesApp.entry.fromBook': 'Open the Files app on this book, with everything filed beside it.',
+  'filesApp.entry.scoped': 'Showing {category}. Select Everything to see the whole tree.',
   'filesApp.action.mine': 'Mine to deck',
   'filesApp.action.mining': 'Reading…',
   'filesApp.action.undoMine': 'Undo',

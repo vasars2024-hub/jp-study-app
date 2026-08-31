@@ -23,7 +23,7 @@
  * 3. **Scope is a filter, not a mode.** Selecting a category narrows the list;
  *    the root node clears it. Same window either way (gate 5's shape).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
@@ -32,6 +32,7 @@ import {
   FILES_SORT_COLUMNS,
   FILES_TREE,
   categoryContains,
+  categoryNode,
   countByCategory,
   deleteModeFor,
   isMachineDerived,
@@ -50,6 +51,12 @@ import {
   mineabilityOf,
 } from '../../../shared/filesApp/mining';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
+import {
+  FILES_SCOPE_EVENT,
+  clearPendingFilesScope,
+  peekPendingFilesScope,
+  type FilesScopeRequest,
+} from './filesAppScope';
 import { useFilesIndex } from './useFilesIndex';
 import './filesApp.css';
 
@@ -122,11 +129,26 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const { t, lang } = useT();
   const { state, refresh, refreshing } = useFilesIndex();
 
-  const [scope, setScope] = useState<FilesCategoryId | null>(initialScope);
+  /**
+   * Gate 5's entry. An explicit prop wins — a caller that mounted this
+   * component with a scope means it — and otherwise the scope a `openFilesApp*`
+   * gesture parked on its way here applies.
+   *
+   * `peekPendingFilesScope` is PURE, which is what makes it safe in a lazy
+   * initialiser: React double-invokes those in StrictMode, and a consuming read
+   * would hand the second call `null` and lose the scope. The clearing happens
+   * in the effect below, where running twice is harmless.
+   */
+  const [entryScope] = useState<FilesScopeRequest | null>(peekPendingFilesScope);
+  const [scope, setScope] = useState<FilesCategoryId | null>(
+    initialScope ?? entryScope?.categoryId ?? null,
+  );
   const [query, setQuery] = useState('');
   const [sortColumn, setSortColumn] = useState<FilesSortColumn>('name');
   const [sortDirection, setSortDirection] = useState<FilesSortDirection>('asc');
-  const [selectedId, setSelectedId] = useState<string | null>(initialFocusItemId);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialFocusItemId ?? entryScope?.focusItemId ?? null,
+  );
   const [revealNote, setRevealNote] = useState<string | null>(null);
   /**
    * The last mine's outcome. `addedIds` is what makes it reversible — the plan
@@ -134,6 +156,30 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * the new rows so undo removes those and nothing that happened to match.
    */
   const [mineState, setMineState] = useState<MineState>({ status: 'idle' });
+
+  /**
+   * The scope was read above; taking it is this effect's job, so the next plain
+   * open of the Files app does not silently inherit the last caller's filter.
+   *
+   * The listener is the other half of gate 5: a scoped-open gesture aimed at a
+   * window that is ALREADY on screen re-renders nothing, so without it the same
+   * button works once and then appears dead.
+   */
+  useEffect(() => {
+    clearPendingFilesScope();
+    const onScope = (event: Event) => {
+      const detail = (event as CustomEvent<FilesScopeRequest | null>).detail;
+      if (!detail) return;
+      clearPendingFilesScope();
+      setScope(detail.categoryId);
+      setSelectedId(detail.focusItemId ?? null);
+      // A scope arriving on an open window must not land inside a stale search:
+      // the caller asked for a folder, not for a folder minus whatever was typed.
+      setQuery('');
+    };
+    window.addEventListener(FILES_SCOPE_EVENT, onScope);
+    return () => window.removeEventListener(FILES_SCOPE_EVENT, onScope);
+  }, []);
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -332,6 +378,24 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
         {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
       </button>
+      {/* Gate 5: a narrowed list has to say it is narrowed. Without this the
+          same window shows a fraction of the tree and reads as a broken index
+          rather than as a filter someone asked for — and the way out is stated
+          in the same sentence rather than left to be discovered in the rail. */}
+      {scope ? (
+        <button
+          type="button"
+          className="fa-scope-clear"
+          onClick={() => setScope(null)}
+          title={t('filesApp.entry.scoped', {
+            category: t(categoryNode(scope)?.labelKey ?? 'filesApp.tree.everything'),
+          })}
+        >
+          {t('filesApp.entry.scoped', {
+            category: t(categoryNode(scope)?.labelKey ?? 'filesApp.tree.everything'),
+          })}
+        </button>
+      ) : null}
     </div>
   );
 

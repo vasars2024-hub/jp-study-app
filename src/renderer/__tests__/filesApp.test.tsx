@@ -9,6 +9,13 @@ import {
   type FilesItem,
 } from '../../shared/filesApp/catalog';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
+import {
+  clearPendingFilesScope,
+  openFilesAppForBook,
+  openFilesAppForManga,
+  openFilesAppScoped,
+  peekPendingFilesScope,
+} from '../components/filesapp/filesAppScope';
 import type { DeckFlashcard } from '../flashcardDeck';
 
 /**
@@ -676,5 +683,117 @@ describe('Files app — one-click mine (gate 3)', () => {
     // newly selected item, which it is not.
     await selectRow('Episode 01');
     expect(hasText('Added 1 card')).toBe(false);
+  });
+});
+
+/* ---------------------- gate 5: context entry ---------------------- */
+
+/** Books and manga are different leaves; the fixture needs one of each. */
+const SCOPED_ITEMS: FilesItem[] = [
+  item({ id: 'library:b1', name: 'A Novel', kind: 'book', categoryId: 'sources/books' }),
+  item({ id: 'library:b2', name: 'Another Novel', kind: 'book', categoryId: 'sources/books' }),
+  item({ id: 'library:m1', name: 'A Manga', kind: 'manga', categoryId: 'sources/manga' }),
+  item({ id: 'media:1', name: 'Episode 01', kind: 'video', categoryId: 'sources/video' }),
+];
+
+describe('Files app — context entry from another page (gate 5)', () => {
+  beforeEach(() => {
+    clearPendingFilesScope();
+    filesIndex.mockImplementation(async () => snapshot(SCOPED_ITEMS));
+  });
+  afterEach(() => clearPendingFilesScope());
+
+  it('opens scoped to the caller’s category with the item focused', async () => {
+    // The gesture an epub page makes. `library:b1` is the index id for that book.
+    openFilesAppForBook('b1');
+    await mount(<FilesApp />);
+    await settle();
+
+    // Scope is a FILTER and focus is a HIGHLIGHT — the whole Books folder is
+    // shown, not just the one item, or the caller could never see its siblings.
+    expect(names()).toEqual(['A Novel', 'Another Novel']);
+    expect(railButton(/^Books$/)?.getAttribute('data-selected')).toBe('true');
+    // ...and the inspector opens on the book the caller actually meant.
+    expect(host?.querySelector('.fa-details-title')?.textContent).toBe('A Novel');
+  });
+
+  it('clearing the scope reveals the whole tree in the SAME window', async () => {
+    openFilesAppForBook('b1');
+    await mount(<FilesApp />);
+    await settle();
+    expect(names()).toEqual(['A Novel', 'Another Novel']);
+
+    await click(host?.querySelector('.fa-scope-clear'));
+    // Every item back, and no second window: this is the same mounted root.
+    expect(names().length).toBe(SCOPED_ITEMS.length);
+    expect(railButton(/^Everything$/)?.getAttribute('data-selected')).toBe('true');
+  });
+
+  it('says WHY the list is short, and the way out is the same control', async () => {
+    openFilesAppForBook('b1');
+    await mount(<FilesApp />);
+    await settle();
+    const banner = host?.querySelector('.fa-scope-clear');
+    expect(banner?.textContent).toContain('Books');
+    expect(banner?.textContent).toContain('Everything');
+  });
+
+  it('is CONSUMED, so the next plain open is not still filtered', async () => {
+    openFilesAppForBook('b1');
+    await mount(<FilesApp />);
+    await settle();
+    expect(names()).toEqual(['A Novel', 'Another Novel']);
+    expect(peekPendingFilesScope()).toBeNull();
+
+    // A second mount with no gesture in front of it: the whole tree.
+    if (root) await act(async () => root?.unmount());
+    host?.remove();
+    await mount(<FilesApp />);
+    await settle();
+    expect(names().length).toBe(SCOPED_ITEMS.length);
+  });
+
+  it('re-scopes a window that is ALREADY open', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    expect(names().length).toBe(SCOPED_ITEMS.length);
+
+    // No remount happens here. Without the live listener this gesture would
+    // work once, from a closed window, and read as dead every time after.
+    await act(async () => {
+      openFilesAppForManga('m1');
+    });
+    expect(names()).toEqual(['A Manga']);
+    expect(railButton(/^Manga$/)?.getAttribute('data-selected')).toBe('true');
+  });
+
+  it('a live re-scope clears a stale search rather than intersecting with it', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    await typeSearch('Another');
+    expect(names()).toEqual(['Another Novel']);
+
+    await act(async () => {
+      openFilesAppForManga('m1');
+    });
+    // Had the query survived, this would be empty and the folder would look bare.
+    expect(names()).toEqual(['A Manga']);
+  });
+
+  it('routes manga to Manga and a book to Books — not both to Books', async () => {
+    // The negative control on the vocabulary: the two kinds are different
+    // leaves, and a manga scoped to Books opens on a folder without it.
+    openFilesAppForManga('m1');
+    expect(peekPendingFilesScope()?.categoryId).toBe('sources/manga');
+    clearPendingFilesScope();
+    openFilesAppForBook('b1');
+    expect(peekPendingFilesScope()?.categoryId).toBe('sources/books');
+  });
+
+  it('refuses an unknown category instead of opening the whole tree', async () => {
+    // Opening everything when the caller asked for one folder is a wrong answer
+    // wearing a success's clothes.
+    expect(openFilesAppScoped({ categoryId: 'sources/nope' as never })).toBe(false);
+    expect(peekPendingFilesScope()).toBeNull();
   });
 });

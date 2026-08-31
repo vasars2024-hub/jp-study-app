@@ -298,6 +298,24 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* A scope is a filter someone asked for, so it reads as a dismissible note
+   rather than as an error. Clicking it is how you leave. */
+.fa-scope-clear {
+  flex: 0 1 auto;
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg-raised);
+  color: var(--lq-liquid-text);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* ------------------------- one-click mine ------------------------ */
 
 /* The receipt sits on a WORK surface, not a liquid one: it is a set of numbers

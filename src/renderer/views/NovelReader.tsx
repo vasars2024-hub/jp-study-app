@@ -22,6 +22,10 @@ import ReaderLiquidToggle from '../components/liquid/ReaderLiquidToggle';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 import { useReaderPresentation } from '../readerPresentation';
 import { READING_CANVAS_FILL_POLICY } from '../../shared/liquidReadingCanvas';
+import {
+  openFilesAppForBook,
+  openFilesAppForManga,
+} from '../components/filesapp/filesAppScope';
 import DictionaryPopup from '../components/DictionaryPopup';
 import Icon from '../components/Icons';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
@@ -3092,6 +3096,30 @@ export default function NovelReader({ item, onClose }: Props) {
               {t('novel.tool.studyTools')}
             </summary>
             <div className="lq-overflow-body">
+          {/*
+            Gate 5 — context entry into the Files app. It lives in this menu and
+            not on the toolbar because that toolbar was deliberately cut from 21
+            visible controls to 11 against a bar of 12 (rubric category 5); a
+            twelfth would spend the whole margin on a navigation shortcut. This
+            is a `<details>`, plain HTML, so unlike the AppChrome menu bar it
+            renders under every material set.
+
+            Manga and books are different leaves in that tree, so the scope
+            follows the item's own kind — a manga volume scoped to Books would
+            open on a folder that does not contain it.
+          */}
+          <button
+            type="button"
+            className="btn small"
+            title={t('filesApp.entry.fromBook')}
+            onClick={() =>
+              item.kind === 'manga'
+                ? openFilesAppForManga(item.id)
+                : openFilesAppForBook(item.id)
+            }
+          >
+            {t('filesApp.entry.showInFiles')}
+          </button>
           <button
             type="button"
             className="btn small"

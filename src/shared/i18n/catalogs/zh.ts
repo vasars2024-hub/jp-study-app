@@ -10526,6 +10526,9 @@ export const zh: Catalog = {
   'filesApp.status.size': '共计 {size}',
   'filesApp.status.selected': '已选择：{name}',
 
+  'filesApp.entry.showInFiles': '在文件中显示',
+  'filesApp.entry.fromBook': '在文件应用中打开这本书，并显示与它归档在一起的内容。',
+  'filesApp.entry.scoped': '正在显示{category}。选择“全部”可查看整个树。',
   'filesApp.action.mine': '采集到卡组',
   'filesApp.action.mining': '正在读取…',
   'filesApp.action.undoMine': '撤销',
