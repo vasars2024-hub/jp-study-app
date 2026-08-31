@@ -897,7 +897,17 @@ function VideoPanel({
           <MediaGenerationStatus state={state} />
         </div>
 
-        <aside className="mc-video-inspector">
+        {/*
+          §2.3 names "temporary inspectors" as what Liquid is FOR, and category 3 measured
+          this rail as the one eligible region of four with no treatment and no shared
+          primitive (`liquidTreatedEligible 3/4`, `sharedPrimitiveEligible 3/4`) while the
+          sidebar, nav and topbar next to it already carried it. It takes the primitive
+          plainly rather than an exception: unlike `.medialib-rail` it is not flush — the
+          page insets it 20px on the right and the grid holds a 12px gutter to the stage —
+          so it really is an inset sheet, which is the geometry the shared rule draws.
+          The blocks inside stay OPAQUE anchors, because they hold the forms.
+        */}
+        <ContextualSurface as="aside" className="mc-video-inspector">
           <section className="mc-inspector-block">
             <div className="mc-section-head">
               <div><span className="mc-eyebrow">{t('mediaCenter.video.nowStudying')}</span><h2>{current?.title ?? t('mediaCenter.video.noneLoaded')}</h2></div>
@@ -953,7 +963,7 @@ function VideoPanel({
             <span className="mc-eyebrow">{t('mediaCenter.video.youtube')}</span>
             <MediaYoutubeBar state={state} />
           </section>
-        </aside>
+        </ContextualSurface>
       </div>
 
       <section className="mc-shelf mc-up-next">

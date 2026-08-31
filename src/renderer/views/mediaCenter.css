@@ -1431,11 +1431,24 @@
   gap: 9px;
 }
 
+/*
+ * The video inspector's blocks are ANCHORS, not glass.
+ *
+ * They hold the forms — six toggles in `.mc-toggle-list`, the transcription controls,
+ * the YouTube URL field — and §2.3 keeps editing and forms on stable opaque surfaces.
+ * `rgba(20, 23, 33, 0.78)` was neither: category 3 measured it as three dense-work
+ * regions on translucent backing (`.mc-toggle-list`, this block, `.media-yt`, all
+ * reading `alpha 0.78 on section.mc-inspector-block`), and the literal was a fixed
+ * blue-grey no palette could reach — the same defect the `--mc-glass-*` tokens above
+ * were introduced to fix. `--lq-anchor-bg` is opaque in every variant by construction
+ * and resolves through the active theme (measured rgb(18, 28, 23) under forest-night).
+ * The box itself is unchanged, so only the fill moves.
+ */
 .mc-inspector-block {
   padding: 12px;
   border: 1px solid var(--mc-line);
   border-radius: 11px;
-  background: rgba(20, 23, 33, 0.78);
+  background: var(--lq-anchor-bg);
 }
 
 .mc-inspector-block .mc-section-head {

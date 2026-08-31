@@ -602,3 +602,62 @@ file's own `verdict`: **4 of 16** (`cat1-l9-video`, `cat1-l9-city`, `cat2-l9-cit
 TRAP: the app must be RELOADED before measuring this, not trusted to HMR. The edit landed at
 00:59 and the window had been up since 22:12; a `/reload` is what put the measured code and the
 on-disk code in the same place.
+
+---
+
+## 2026-08-31 — category 3 on both RULE C surfaces: Video FAIL 3 bars → PASS, City PASS (vacuous, proven)
+
+**Video · category 3 · FAIL on all three bars as found**, in Liquid presentation
+(`--presentation liquid`, which the harness drives and restores — an `as-is` run on a
+standard window is correctly opaque and would report a defect that is not there):
+`denseWorkOnTranslucent 3` against a bar of 0, `liquidTreatedEligible 3/4`,
+`sharedPrimitiveEligible 3/4`. Both controls fired: `[3,3,3,4,5] → one-glass [4,…] →
+all-glass [5,4,…] → restored [3,3,3,4,5]`.
+
+Two defects, one repair each, and they are the same defect seen from two sides — the
+inspector rail was glass where it should be opaque and opaque where it should be glass.
+
+1. `section.mc-inspector-block` painted `rgba(20, 23, 33, 0.78)`, so the three regions
+   backed by it — `.mc-toggle-list` (6 toggles), the block itself, `.media-yt` (2 inputs) —
+   were dense FORM work on translucent material. Now `var(--lq-anchor-bg)`: opaque in every
+   variant by construction, and theme-resolved (rgb(18, 28, 23) under forest-night) where the
+   literal was a fixed blue-grey no palette could reach.
+2. `aside.mc-video-inspector` was the one eligible region of four with neither treatment nor a
+   shared primitive, while `.mc-sidebar`, `.mc-nav` and `.mc-topbar` beside it all carried
+   `ContextualSurface`. It now does too. No exception rule: unlike `.medialib-rail` it is not
+   flush — the page insets it 20px right and the grid holds a 12px gutter — so the shared
+   inset-sheet geometry is the correct one. Blocks 288→270 wide, rail 664→688 tall.
+
+**Video re-scored in this commit: PASS 10/10** — `denseWorkOnTranslucent 0`,
+`liquidTreatedEligible 4/4`, `sharedPrimitiveEligible 4/4`, controls
+`[0,4,4,4,5] → [1,…] → [5,…] → [0,4,4,4,5]`, `CONTROL FAILED AS REQUIRED`.
+
+**City returned `VOID - no runtime Work region exists to falsify`, and the VOID was the
+INSTRUMENT'S limit, not a defect.** Measured: 43 regions, `Work 0`, `Liquid-eligible 0`,
+`Anchor 4`, `Ambient 39` — a frameless full-bleed canvas garden. Controls A (blur one Work
+region) and B (all-glass, every Work region must fail) both need a Work region to perturb, so
+neither could run and the whole score voided with them.
+
+Fixed in the harness, generally rather than for City — the Visualizer, Note and the widget
+surfaces are the same shape. **Controls C and D falsify by PLANTING instead of perturbing:**
+C appends a `<nav>` carrying no `lq-` class (`eligibleTotal` must rise by 1, `sharedPrimitiveEligible`
+must NOT), D appends a translucent `<div>` holding an `<input>` (`denseWorkOnTranslucent` must
+rise by 1). Both are surface-agnostic, sized off the measured root to clear the 1% area floor,
+and removed by attribute in `finally`. Measured on City: base `[0,0,0,0,0]` → planted
+`[1,1,0,1,1]` → restored `[0,0,0,0,0]`, `barsWhilePlanted {denseWorkAnchored: false,
+sharedPrimitives: false}` — **the low score the rubric requires this category to be able to
+produce, produced on this surface.** With that proven, a contextual denominator of 0 is a
+MEASURED zero and the two contextual bars are satisfied vacuously; the run says so in
+`vacuousContextual: true` rather than silently. **City PASS 10/10.**
+
+Video was re-run against the amended harness and re-derives PASS 10/10 with controls A and B
+unchanged, so every cat3 baseline banked before this addition still reproduces.
+
+TRAP: `.reading-garden-sky-console` — City's only region with focusables — is **DEV-ONLY**
+(`if (!import.meta.env.DEV) return null;`, `ReadingGardenSkyEvents.tsx:293`). It is a sky-event
+debug panel with a hand-rolled glass material. Do not migrate it to the shared primitive and do
+not count it: in a packaged build City has 4 fewer regions than the numbers above. The `lq-hit-scope`
+class already on it is a category-1 fix a previous turn applied to a panel that does not ship.
+
+**Cells closed: 6 of 16**, counted by reading each `baselines/*l9*.json`'s own `verdict` —
+cat1 video/city, cat2 video/city, cat3 video/city, all `PASS 10/10`. Categories 4–8 unmeasured.
