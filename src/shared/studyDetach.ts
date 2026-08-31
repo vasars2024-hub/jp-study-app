@@ -59,7 +59,7 @@ export type HostedDetachBlockId = (typeof HOSTED_DETACH_BLOCKS)[number];
  * app does not know about.
  */
 export const APP_SECTION_DETACH_BLOCKS: Readonly<Partial<Record<StudyBlockId, string>>> = {
-  notes: 'notebook',
+  notes: 'files',
   library: 'library',
   statistics: 'stats',
   review: 'anki',

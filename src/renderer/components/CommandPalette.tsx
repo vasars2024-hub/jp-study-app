@@ -60,7 +60,6 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'reading', labelKey: 'palette.section.reading', glyph: 'search' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
-  { id: 'notebook', labelKey: 'palette.section.notebook', glyph: 'note' },
   { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
   { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
   { id: 'games', labelKey: 'palette.section.games', glyph: 'dice' },
@@ -71,7 +70,7 @@ const SECTIONS: { id: string; labelKey: string; glyph: IconName }[] = [
   { id: 'immersion', labelKey: 'palette.section.immersion', glyph: 'globe' },
   { id: 'scraper', labelKey: 'palette.section.scraper', glyph: 'sparkle' },
   { id: 'city', labelKey: 'palette.section.city', glyph: 'city' },
-  { id: 'files', labelKey: 'palette.section.files', glyph: 'resources' },
+  { id: 'files', labelKey: 'palette.section.files', glyph: 'folder' },
 ];
 
 function openSection(id: string): void {

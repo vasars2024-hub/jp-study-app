@@ -16,12 +16,20 @@
  *   a gate-6 failure: nothing was taken away. The `note` says what existed
  *   before, so "new" can never be used to paper over a removal.
  * - `migrated` — deliberately moved INTO the Files app and removed from its old
- *   home. This IS the failure condition in general, and the plan permits it for
- *   exactly one pair (decision 1: memory and statistics leave Settings, gate 8).
- *   `FILES_PERMITTED_MIGRATIONS` is that whitelist and nothing else may join it.
+ *   home. This IS the failure condition in general, and the plan permits it only
+ *   for capabilities on `FILES_PERMITTED_MIGRATIONS`.
  *
- * As of gate 6 there are ZERO `migrated` rows: gate 8 has not landed, memory and
- * statistics are still in Settings, so no exception is being used yet.
+ * As of gate 7b there is exactly ONE `migrated` row, `notebook`. Gate 8 has not
+ * landed, so memory and statistics are still in Settings and their permission is
+ * still unused.
+ *
+ * **The rule that decides `preserved` vs `migrated`, made explicit at gate 7b:**
+ * a route counts as preserved only if it exists in the DEFAULT shell. Blanc is
+ * an opt-in alternative shell (`blancMode`, off until the user enables it), so a
+ * capability whose only surviving route is a Blanc tool is `migrated`, not
+ * `preserved`. Without that rule `notebook` could have been scored `preserved`
+ * on Blanc's untouched `notebook` tool and the whole deletion would have gone
+ * unrecorded — which is precisely the regression this table exists to catch.
  */
 import type { DesktopWinSection } from '../desktop';
 
@@ -56,9 +64,23 @@ export interface FilesParityRow {
 
 /**
  * The only capabilities allowed to leave their old home for the Files app.
- * Plan decision 1. Adding to this list is a product decision, not a repair.
+ * Adding to this list is a product decision, not a repair.
+ *
+ * - `memory`, `statistics` — plan decision 1, gate 8: they leave Settings.
+ * - `notebook` — gate 7b. Distinct from the pair above in kind, not in degree:
+ *   memory and statistics are moved out of a Settings page that still exists,
+ *   whereas the Notebook's HOST is deleted. `FILES_APP_PLAN.md` opens with "a
+ *   folder application that REPLACES the Notebook section (deleted, its features
+ *   absorbed)", so the deletion is the user's instruction and the Files app is
+ *   where the material went. The status is still recorded rather than waived:
+ *   the row below has to name what survives elsewhere, and gate 7b's evidence
+ *   has to show each absorbed feature landing somewhere real.
  */
-export const FILES_PERMITTED_MIGRATIONS: readonly string[] = ['memory', 'statistics'];
+export const FILES_PERMITTED_MIGRATIONS: readonly string[] = [
+  'memory',
+  'statistics',
+  'notebook',
+];
 
 /**
  * Every i18n key that labels an interactive control in `FilesApp.tsx`.
@@ -228,13 +250,20 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
   },
   {
     capability: 'notebook',
-    status: 'preserved',
-    section: 'notebook',
-    module: 'src/renderer/views/NotebookView.tsx',
-    symbol: 'NotebookView',
+    status: 'migrated',
+    section: null,
+    module: '',
+    symbol: '',
     note:
-      'Still the Notebook section as of gate 6. Gate 7 deletes it and absorbs its features; '
-      + 'this row is what will have to change to `migrated` then, and the change is the gate.',
+      'Gate 7b deleted the Notebook section (AppSection case, NotebookView.tsx, and every '
+      + 'registry entry); shared/desktop.ts aliases the id to `files` so persisted layouts, '
+      + '--open=notebook, OS hotkeys and the browser extension all still land somewhere real. '
+      + 'What migrated is the AGGREGATED timeline and its lineage chains — Blanc keeps both, '
+      + 'from the same NotebookContent components, but Blanc is opt-in so that is not a default '
+      + 'route and this is honestly `migrated`. Its streams did not migrate: saved-words, '
+      + 'lookups, translations, known-words, clipboard, highlights and local-deck each keep '
+      + 'their own preserved row above. Live captions did not migrate either — gate 7b/1 moved '
+      + 'LiveCaptionsPanel to ReadingCapturesView, deliberately NOT into the Files app.',
   },
   {
     capability: 'local-deck',

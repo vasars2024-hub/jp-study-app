@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { parseHotkeyChord } from '../shared/osHotkeyChord';
+import { LEGACY_WIN_SECTION_ALIASES } from '../shared/desktop';
 
 export { parseHotkeyChord } from '../shared/osHotkeyChord';
 
@@ -73,7 +74,6 @@ const OPEN_SECTIONS = new Set([
   'reading',
   'dictionary',
   'grammar',
-  'notebook',
   'translate',
   'player',
   'video',
@@ -90,6 +90,10 @@ const OPEN_SECTIONS = new Set([
   'settings',
   'youtube',
   'scraper',
+  // Added at gate 7b, and required for the alias above to mean anything: the
+  // Files section shipped without ever reaching this list, so `--open=files`
+  // was rejected here while main.ts's own ARGV set accepted it.
+  'files',
 ]);
 
 function helperDir(): string {
@@ -206,9 +210,13 @@ function buildConfig(bindings: OsHotkeyBindings): OsHotkeyConfigV2 | { error: st
   }
 
   for (const open of normalized.opens || []) {
-    const section = String(open.section || '')
+    const requested = String(open.section || '')
       .trim()
       .toLowerCase();
+    // The config on disk outlives a section. A user who bound a chord to the
+    // Notebook before gate 7b deleted it keeps a working hotkey, pointed at the
+    // Files app that absorbed it, rather than one that silently stops firing.
+    const section = LEGACY_WIN_SECTION_ALIASES[requested] ?? requested;
     if (!OPEN_SECTIONS.has(section)) continue;
     const chord = firstChord(open.chord);
     if (!chord || isMouseChord(chord)) continue;

@@ -22,7 +22,6 @@ const AnkiView = lazy(() => import('../views/AnkiView'));
 const FlashcardsView = lazy(() => import('../views/FlashcardsView'));
 const GameArenaView = lazy(() => import('../views/GameArenaView'));
 const GrammarView = lazy(() => import('../views/GrammarView'));
-const NotebookView = lazy(() => import('../views/NotebookView'));
 const StatisticsView = lazy(() => import('../views/StatisticsView'));
 const ResourcesView = lazy(() => import('../views/ResourcesView'));
 const ImmersionView = lazy(() => import('../views/ImmersionView'));
@@ -114,9 +113,6 @@ export default function AppSection({
       break;
     case 'grammar':
       view = <GrammarView />;
-      break;
-    case 'notebook':
-      view = <NotebookView />;
       break;
     case 'stats':
       view = <StatisticsView />;

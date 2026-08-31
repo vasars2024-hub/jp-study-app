@@ -303,7 +303,7 @@ export function TranslateHistoryList({
                     detail: e.resultText.slice(0, 120),
                     folder: 'Translations',
                     origin: e.origin,
-                    href: 'notebook',
+                    href: 'files',
                   });
                   onOpenNotebook();
                 }}

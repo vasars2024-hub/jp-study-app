@@ -105,7 +105,6 @@ const SECTION_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   { section: 'reading', titleKey: 'palette.section.reading', terms: ['reading', 'reading finder'] },
   { section: 'dictionary', titleKey: 'palette.section.dictionary', terms: ['dictionary'] },
   { section: 'grammar', titleKey: 'palette.section.grammar', terms: ['grammar'] },
-  { section: 'notebook', titleKey: 'palette.section.notebook', terms: ['notebook'] },
   { section: 'translate', titleKey: 'palette.section.translate', terms: ['translate'] },
   { section: 'player', titleKey: 'palette.section.player', terms: ['media', 'player'] },
   { section: 'video', titleKey: 'palette.section.video', terms: ['video'] },
@@ -134,7 +133,11 @@ const SECTION_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   // them, and an entry that matched those would quietly outscore an established
   // destination. A finder that hijacks the word for the thing being found is
   // worse than one that answers only to its own name.
-  { section: 'files', titleKey: 'palette.section.files', terms: ['files'] },
+  // `notebook` is here rather than on a section of its own: gate 7b deleted the
+  // Notebook and the Files app absorbed it, so a user who still asks for the
+  // notebook by name must land where their material actually is. Dropping the
+  // term would have turned a working request into `unknown-section`.
+  { section: 'files', titleKey: 'palette.section.files', terms: ['files', 'notebook'] },
 ];
 
 /** Settings pages, named by their own sidebar label and description. */

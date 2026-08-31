@@ -21,7 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DESKTOP_WIN_SECTIONS } from '../desktop';
+import { DESKTOP_WIN_SECTIONS, normalizeWinSection } from '../desktop';
 import {
   FILES_APP_CONTROL_KEYS,
   FILES_PERMITTED_MIGRATIONS,
@@ -98,14 +98,49 @@ describe('files app route parity (gate 6)', () => {
     expect(failures).toEqual([]);
   });
 
-  it('has no capability that became Files-app-only', () => {
+  it('has no capability that became Files-app-only without permission', () => {
     expect(filesParityViolations()).toEqual([]);
-    // Gate 6 is measured before gate 8 lands, so the permitted exception is not
-    // in use yet. When memory/statistics migrate, this flips to 2 and the rows
-    // must be present — it cannot silently stay at 0.
+    // Gate 7b migrated exactly one capability, and gate 8 has not landed, so
+    // memory/statistics are still in Settings. Asserted as the exact list rather
+    // than a count: a second silent migration cannot hide behind a `>= 1`.
     const migrated = FILES_ROUTE_PARITY.filter((r) => r.status === 'migrated');
-    expect(migrated.map((r) => r.capability).sort()).toEqual([]);
-    expect(FILES_PERMITTED_MIGRATIONS).toEqual(['memory', 'statistics']);
+    expect(migrated.map((r) => r.capability).sort()).toEqual(['notebook']);
+    expect(FILES_PERMITTED_MIGRATIONS).toEqual(['memory', 'statistics', 'notebook']);
+    // The permission is not a waiver: a migrated row still has to explain where
+    // the capability went, and gate 7b's own note names three destinations.
+    const notebook = filesParityRow('notebook')!;
+    expect(notebook.note).toMatch(/ReadingCapturesView/);
+    expect(notebook.note.length).toBeGreaterThan(200);
+  });
+
+  it('the Notebook section is really gone from every registry it was in', () => {
+    // The deletion half of gate 7b, re-derived from the files themselves rather
+    // than from the row above — the row is a claim, these are the call sites.
+    expect(APP_SECTION).not.toContain("case 'notebook':");
+    expect(existsSync(join(ROOT, 'src/renderer/views/NotebookView.tsx'))).toBe(false);
+    expect((DESKTOP_WIN_SECTIONS as readonly string[]).includes('notebook')).toBe(false);
+    for (const rel of [
+      'src/shared/agentNavigation.ts',
+      'src/renderer/components/CommandPalette.tsx',
+      'src/renderer/components/DesktopShell.tsx',
+      'src/renderer/desktopIconPresets.ts',
+      'src/main/osHotkeyHelper.ts',
+    ]) {
+      expect(read(rel), `${rel} still names the notebook section`).not.toMatch(/'notebook'/);
+    }
+    // The navigation index keeps the WORD, deliberately: `notebook` is a search
+    // term on the `files` entry so a user who still asks for it by name lands
+    // where their material is. What must be gone is the section entry itself.
+    const navIndex = read('src/shared/agentNavigationIndex.ts');
+    expect(navIndex).not.toMatch(/section: 'notebook'/);
+    expect(navIndex).toMatch(/section: 'files'[^\n]*'notebook'/);
+    // ...and the alias is what stops a persisted `section: 'notebook'` window
+    // from becoming an unavailable state on every existing install.
+    expect(normalizeWinSection('notebook')).toBe('files');
+    // Control: a section id that was never real still resolves to null, so the
+    // assertion above is testing the alias and not a function that says `files`
+    // to everything.
+    expect(normalizeWinSection('zzznotasection')).toBe(null);
   });
 
   it('accounts for every interactive control the Files app renders', () => {

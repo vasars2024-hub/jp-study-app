@@ -67,6 +67,7 @@ import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
 import type { AgentNavigationDestination } from './shared/agentNavigation';
+import { LEGACY_WIN_SECTION_ALIASES } from './shared/desktop';
 import {
   AGENT_NAVIGATION_CHANNELS,
   AGENT_SETTINGS_DELIVERY_ATTEMPT_MS,
@@ -129,7 +130,7 @@ let pendingOpenSection: string | null = null;
 
 /** Pop-out sections allowed on `--open=` / `--popout=` (mirrors createPopoutWindow). */
 const ARGV_OPEN_SECTIONS = new Set([
-  'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
+  'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
   'calendar', 'settings', 'youtube', 'scraper', 'files',
 ]);
@@ -150,7 +151,11 @@ export function argvOpenSection(argv: string[] = process.argv): string | null {
     else if (a.startsWith('--popout=')) raw = a.slice('--popout='.length);
     else if ((a === '--open' || a === '--popout') && argv[i + 1]) raw = argv[++i]!;
     if (raw == null) continue;
-    const section = raw.trim().toLowerCase();
+    const requested = raw.trim().toLowerCase();
+    // A shortcut pinned before gate 7b still carries `--open=notebook`. The
+    // alias table points it at the Files app that absorbed the section, so it
+    // opens the user's material instead of silently doing nothing.
+    const section = LEGACY_WIN_SECTION_ALIASES[requested] ?? requested;
     if (ARGV_OPEN_SECTIONS.has(section)) return section;
   }
   return null;
@@ -1332,7 +1337,7 @@ function registerLockscreenIpc(): void {
 // in the desktop shell; excludes desktop-only trinkets (note/visualizer).
 const POPOUT_SECTIONS = new Set([
   'agent',
-  'library', 'novels', 'reading', 'dictionary', 'grammar', 'notebook', 'translate', 'player', 'video', 'music',
+  'library', 'novels', 'reading', 'dictionary', 'grammar', 'translate', 'player', 'video', 'music',
   'anki', 'flashcards', 'games', 'stats', 'resources', 'city', 'musicwidget', 'immersion',
   'calendar', 'settings', 'youtube', 'scraper', 'files',
 ]);
@@ -1360,7 +1365,10 @@ function broadcastPopoutState(): void {
 // caller ignores it; the Agent's permission-gated navigation does not, because
 // "the window opened" is the only honest thing it can report back to a user who
 // just approved a destination.
-function createPopoutWindow(section: string): boolean {
+function createPopoutWindow(requested: string): boolean {
+  // Same reason as `argvOpenSection`: a persisted desktop layout, an OS hotkey
+  // and the Agent all hand this a section id that may predate gate 7b.
+  const section = LEGACY_WIN_SECTION_ALIASES[requested] ?? requested;
   if (!POPOUT_SECTIONS.has(section)) return false;
   const existing = popoutWindows.get(section);
   if (existing && !existing.isDestroyed()) {

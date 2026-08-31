@@ -56,7 +56,7 @@ describe('resolveExtensionUiOpen', () => {
     expect(resolveExtensionUiOpen('grammar-practice', false)).toEqual({ kind: 'grammar-practice' });
     expect(resolveExtensionUiOpen('notebook', false)).toEqual({
       kind: 'os-section',
-      section: 'notebook',
+      section: 'files',
     });
     expect(resolveExtensionUiOpen('inbox', false)).toEqual({ kind: 'os-inbox' });
     expect(resolveExtensionUiOpen('library', false)).toEqual({ kind: 'os-inbox' });

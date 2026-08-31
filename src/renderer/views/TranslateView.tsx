@@ -165,7 +165,7 @@ export default function TranslateView() {
   );
 
   const openNotebook = (): void => {
-    window.dispatchEvent(new CustomEvent('os:open', { detail: 'notebook' }));
+    window.dispatchEvent(new CustomEvent('os:open', { detail: 'files' }));
   };
 
   const historyPanel = (

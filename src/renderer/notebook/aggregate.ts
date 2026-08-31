@@ -179,7 +179,10 @@ export function aggregateNotebook(sources: NotebookSources = {}): NotebookOvervi
       folder: 'Live captions',
       ts: script.startedAt,
       origin: 'app',
-      href: 'notebook',
+      // The Reading workspace, not Files: gate 7b moved LiveCaptionsPanel to
+      // ReadingCapturesView, and this row is a caption script, so the section
+      // that can actually show its text is the one that mounts the panel.
+      href: 'reading',
       meta: {
         text,
         lineCount: script.lines.length,

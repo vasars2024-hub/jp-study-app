@@ -36,7 +36,7 @@ export const ICON_PRESETS: IconPreset[] = [
     id: 'study',
     labelKey: 'settings.desktop.preset.study',
     descKey: 'settings.desktop.preset.study.desc',
-    sections: ['dictionary', 'grammar', 'flashcards', 'anki', 'reading', 'notebook', 'stats', 'settings'],
+    sections: ['dictionary', 'grammar', 'flashcards', 'anki', 'reading', 'files', 'stats', 'settings'],
     columns: 2,
   },
   {
@@ -59,7 +59,7 @@ export const ICON_PRESETS: IconPreset[] = [
     descKey: 'settings.desktop.preset.everything.desc',
     sections: [
       'player', 'video', 'youtube', 'music', 'dictionary', 'immersion', 'scraper',
-      'library', 'novels', 'reading', 'translate', 'grammar', 'notebook', 'anki',
+      'library', 'novels', 'reading', 'translate', 'grammar', 'files', 'anki',
       'flashcards', 'games', 'stats', 'calendar', 'resources', 'settings', 'city',
     ],
     columns: 3,

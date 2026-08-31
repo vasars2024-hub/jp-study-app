@@ -131,7 +131,10 @@ export function resolveExtensionUiOpen(target: string, inBlanc: boolean): Extens
   if (t === 'statistics' || t === 'stats') return { kind: 'os-section', section: 'stats' };
   if (t === 'grammar-practice') return { kind: 'grammar-practice' };
   if (t === 'grammar') return { kind: 'os-section', section: 'grammar' };
-  if (t === 'notebook') return { kind: 'os-section', section: 'notebook' };
+  // Gate 7b deleted the Notebook section. The extension still sends this
+  // target -- an installed extension is not upgraded in lockstep with the app --
+  // so it resolves to the Files app that absorbed it rather than to nothing.
+  if (t === 'notebook') return { kind: 'os-section', section: 'files' };
   if (t === 'translate' || t === 'translate-history') return { kind: 'os-section', section: 'translate' };
   if (t === 'inbox' || t === 'library') return { kind: 'os-inbox' };
   if (t === 'youtube') return { kind: 'os-youtube' };

@@ -26,7 +26,6 @@ export const DESKTOP_WIN_SECTIONS = [
   'novels',
   'dictionary',
   'grammar',
-  'notebook',
   'translate',
   'player',
   'video',
@@ -64,9 +63,17 @@ export type DesktopWinSection = (typeof DESKTOP_WIN_SECTIONS)[number];
  *
  * Every media entry point opens the same shell (see `AppSection`'s `player`
  * case), so `player` is what `media` meant.
+ *
+ * `notebook` joined it at gate 7b (`FILES_APP_PLAN.md`): the Notebook section is
+ * deleted and the Files app is what it meant. Aliasing rather than dropping is
+ * load-bearing here — a persisted desktop layout carries `section: 'notebook'`
+ * windows on every existing install, and userData has no restore point, so a
+ * drop would silently delete part of the user's desktop. The alias reopens the
+ * window on the surface that absorbed the section.
  */
 export const LEGACY_WIN_SECTION_ALIASES: Readonly<Record<string, DesktopWinSection>> = {
   media: 'player',
+  notebook: 'files',
 };
 
 /**

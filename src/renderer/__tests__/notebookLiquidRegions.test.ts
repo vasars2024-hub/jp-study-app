@@ -1,15 +1,19 @@
 /**
  * L7 — Notebook adopts Liquid for navigation and summaries, never for records.
  *
- * The view tabs, stream-count summary, review/refresh actions and folder navigation
- * are contextual. Capture scripts and the 400-row history are dense records, so
- * they stay on the existing opaque anchors in both Study OS and Blanc.
+ * The view tabs, stream-count summary and folder navigation are contextual. The
+ * 400-row history is a dense record, so it stays on the existing opaque anchor.
+ *
+ * **Scope narrowed at gate 7b** (`FILES_APP_PLAN.md`): Study OS's Notebook section
+ * and its `NotebookView.tsx` are deleted, so every assertion that read that file
+ * is gone with it. `NotebookContent.tsx` and `notebookLiquid.css` are NOT — Blanc's
+ * own `notebook` tool renders them and is a separate surface. This file is now the
+ * guard on the shared half only.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const VIEW = readFileSync(resolve(__dirname, '../views/NotebookView.tsx'), 'utf8');
 const CONTENT = readFileSync(
   resolve(__dirname, '../components/notebook/NotebookContent.tsx'),
   'utf8',
@@ -24,10 +28,6 @@ describe('Notebook Liquid regions', () => {
     expect(CONTENT).toContain("import { ContextualSurface } from '../liquid/LiquidSurface';");
     expect(CONTENT).toContain('<ContextualSurface\n      as="nav"');
     expect(CONTENT).toContain('className="gx-notebook-views"');
-    expect(VIEW).toContain(
-      "import { ContextualSurface } from '../components/liquid/LiquidSurface';",
-    );
-    expect(VIEW).toContain('<ContextualSurface as="details" className="gx-notebook-filters">');
   });
 
   it('preserves the tab-list landmark and interaction contract', () => {
@@ -41,23 +41,11 @@ describe('Notebook Liquid regions', () => {
     );
   });
 
-  it('progressively discloses filters and keeps captured records outside them', () => {
-    expect(VIEW).toMatch(
-      /<ContextualSurface as="details" className="gx-notebook-filters">[\s\S]*<NotebookStreamCounts state=\{state\} \/>[\s\S]*<ContextualSurface as="div" className="gx-notebook-folders">[\s\S]*<NotebookFolders state=\{state\} \/>[\s\S]*<div className="gx-notebook-body gx-notebook-body-timeline">[\s\S]*<section className="gx-notebook-timeline">/,
-    );
-    expect(VIEW.indexOf('className="gx-notebook-actions"')).toBeLessThan(
-      VIEW.indexOf('<NotebookViewTabs state={state} />'),
-    );
-    expect(VIEW).toContain('<LiveCaptionsPanel />');
-    expect(VIEW).toContain('<NotebookTimeline state={state} onOpen={studyOsOpenHref} />');
-    expect(VIEW.match(/<ContextualSurface/g)).toHaveLength(2);
+  it('keeps the timeline itself off the contextual primitive', () => {
     expect(CSS).toMatch(
       /\.gx-notebook-filters\[open\] \{[\s\S]*max-height: 220px;[\s\S]*overflow: auto;/,
     );
-    expect(VIEW.indexOf('<section className="gx-notebook-timeline">')).toBeGreaterThan(
-      VIEW.lastIndexOf('</ContextualSurface>'),
-    );
-    expect(VIEW).not.toContain('lq-liquid');
+    expect(CONTENT).not.toContain('lq-liquid');
     expect(CONTENT.match(/<ContextualSurface/g)).toHaveLength(1);
     expect(CONTENT.indexOf('className="gx-notebook-list"')).toBeGreaterThan(
       CONTENT.indexOf('</ContextualSurface>'),

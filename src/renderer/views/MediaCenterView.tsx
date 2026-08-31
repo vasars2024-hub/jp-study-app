@@ -152,7 +152,7 @@ function readNavToolsOpen(): boolean {
  * render time rather than strings frozen at module evaluation.
  */
 const STUDY_HANDOFFS: Array<{ app: string; labelKey: string; hintKey: string; icon: IconName }> = [
-  { app: 'notebook', labelKey: 'mediaCenter.home.handoffNotebook', hintKey: 'mediaCenter.home.handoffNotebookHint', icon: 'note' },
+  { app: 'files', labelKey: 'mediaCenter.home.handoffFiles', hintKey: 'mediaCenter.home.handoffFilesHint', icon: 'folder' },
   { app: 'anki', labelKey: 'mediaCenter.home.handoffAnki', hintKey: 'mediaCenter.home.handoffAnkiHint', icon: 'anki' },
   { app: 'stats', labelKey: 'mediaCenter.home.handoffStats', hintKey: 'mediaCenter.home.handoffStatsHint', icon: 'chart-bar' },
 ];

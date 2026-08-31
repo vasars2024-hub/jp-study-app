@@ -61,7 +61,6 @@ export const AGENT_NAVIGABLE_SECTIONS: readonly DesktopWinSection[] = [
   'reading',
   'dictionary',
   'grammar',
-  'notebook',
   'translate',
   'player',
   'video',
@@ -173,7 +172,6 @@ export const AGENT_NAVIGATION_SECTION_LABEL_KEYS: Record<DesktopWinSection, stri
   reading: 'palette.section.reading',
   dictionary: 'palette.section.dictionary',
   grammar: 'palette.section.grammar',
-  notebook: 'palette.section.notebook',
   translate: 'palette.section.translate',
   player: 'palette.section.player',
   video: 'palette.section.video',
@@ -192,8 +190,10 @@ export const AGENT_NAVIGATION_SECTION_LABEL_KEYS: Record<DesktopWinSection, stri
   scraper: 'palette.section.scraper',
   files: 'palette.section.files',
   // Present so the record stays exhaustive over `DesktopWinSection`; neither is
-  // navigable, so neither key is ever resolved.
-  note: 'palette.section.notebook',
+  // navigable, so neither key is ever resolved. `note` borrowed the Notebook
+  // section's key until gate 7b deleted that section; it now names the sticky
+  // note it actually is.
+  note: 'desktop.stickyNote',
   visualizer: 'palette.section.music',
 };
 

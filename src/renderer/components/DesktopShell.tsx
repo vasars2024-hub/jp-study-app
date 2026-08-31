@@ -120,7 +120,7 @@ import {
 
 type WinSection =
   | 'agent'
-  | 'library' | 'novels' | 'dictionary' | 'grammar' | 'notebook' | 'translate'
+  | 'library' | 'novels' | 'dictionary' | 'grammar' | 'files' | 'translate'
   | 'player' | 'video' | 'music' | 'anki' | 'flashcards' | 'stats' | 'resources' | 'settings' | 'note'
   | 'games' | 'visualizer' | 'musicwidget' | 'city' | 'immersion' | 'calendar' | 'reading' | 'youtube'
   | 'scraper';
@@ -203,7 +203,11 @@ const APPS: { id: WinSection; labelKey: string; glyph: IconName }[] = [
   { id: 'reading', labelKey: 'palette.section.reading', glyph: 'scan' },
   { id: 'translate', labelKey: 'palette.section.translate', glyph: 'translate' },
   { id: 'grammar', labelKey: 'palette.section.grammar', glyph: 'grammar' },
-  { id: 'notebook', labelKey: 'palette.section.notebook', glyph: 'note' },
+  // Gate 7b replaced the Notebook entry with the Files app that absorbed it.
+  // `files` had never reached this list at all — it shipped reachable only from
+  // the command palette and the Agent — so removing Notebook without adding it
+  // would have left the desktop with no way in.
+  { id: 'files', labelKey: 'palette.section.files', glyph: 'folder' },
   { id: 'anki', labelKey: 'palette.section.anki', glyph: 'anki' },
   { id: 'flashcards', labelKey: 'palette.section.flashcards', glyph: 'flashcards' },
   { id: 'games', labelKey: 'palette.section.games', glyph: 'dice' },
@@ -234,7 +238,7 @@ const START_HINTS: Partial<Record<WinSection, string>> = {
   music: 'Media Center · Music',
   dictionary: 'Lookup and pitch',
   grammar: 'Reference, Practice, guides',
-  notebook: 'Unified study history',
+  files: 'Everything the app stores',
   immersion: 'Live reader browser',
   library: 'Local files & Reader Inbox',
   novels: 'Reading shelf',
@@ -427,7 +431,7 @@ const START_GROUPS: { id: string; labelKey: string; sections: WinSection[] }[] =
   {
     id: 'study',
     labelKey: 'desktop.startCategory.study',
-    sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'notebook', 'anki', 'flashcards'],
+    sections: ['agent', 'dictionary', 'grammar', 'reading', 'translate', 'files', 'anki', 'flashcards'],
   },
   { id: 'library', labelKey: 'desktop.startCategory.library', sections: ['library', 'novels', 'immersion'] },
   { id: 'media', labelKey: 'desktop.startCategory.media', sections: ['player', 'video', 'youtube', 'music', 'scraper'] },

@@ -133,7 +133,6 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   reading: 'Reading Finder',
   dictionary: 'Dictionary',
   grammar: 'Grammar',
-  notebook: 'Notebook',
   translate: 'Translate',
   player: 'Media Center',
   scraper: 'Scraper',

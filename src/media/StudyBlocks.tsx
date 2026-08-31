@@ -29,7 +29,7 @@ import { useT } from '../renderer/i18n';
  * ------------------------------------------------------------------------------ */
 
 const APP_SECTION: Readonly<Record<string, string>> = {
-  notes: 'notebook',
+  notes: 'files',
   library: 'library',
   statistics: 'stats',
   review: 'anki',
