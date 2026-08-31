@@ -6483,3 +6483,30 @@
     --mc-glass-player-blur: none;
   }
 }
+
+/* The in-app equivalent of the query above, which it was missing. The OS
+   preference was honoured; Settings > Display > Transparency
+   (`displayPrefs.ts:207` writes `data-display-transparency`) reached nothing
+   here, so a user who set it to Off kept `blur(24px)` on the sidebar, 18 on the
+   top bar and 22 on the player bar — measured live 2026-08-30 on the running
+   Media Center, which is where all three of this app's remaining painted glass
+   regions happened to be.
+
+   `off` opacifies the tint as well as dropping the blur: the setting is named
+   for the transparency, and a 0.72 top bar with no blur behind it is the worst
+   of both. `reduced` keeps the tint and matches the 6px the shared `.fwin` rule
+   already uses, so the two ladders cannot disagree. */
+:root[data-display-transparency='reduced'] :is(.mc-app-chrome, .mc-root) {
+  --mc-glass-sidebar-blur: blur(6px);
+  --mc-glass-topbar-blur: blur(6px);
+  --mc-glass-player-blur: blur(6px);
+}
+
+:root[data-display-transparency='off'] :is(.mc-app-chrome, .mc-root) {
+  --mc-glass-sidebar: var(--panel);
+  --mc-glass-sidebar-blur: none;
+  --mc-glass-topbar: var(--panel);
+  --mc-glass-topbar-blur: none;
+  --mc-glass-player: var(--panel);
+  --mc-glass-player-blur: none;
+}

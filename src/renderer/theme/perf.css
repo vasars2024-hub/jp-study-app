@@ -57,3 +57,38 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
+
+/* ---------- Settings > Display > Transparency ----------------------------
+   Measured 2026-08-30: the shipped three-way control (displayPrefs.ts:207) was
+   honoured by ONE rule naming three selectors — .os-start, .os-taskbar and
+   .fwin (styles.css:1280). Every other translucent surface in the app kept
+   its blur at 'off': 38 of them, including the command palette, the dictionary
+   popup, clipboard history, mini mode, the lockscreen, widgets, and all five
+   ui-* platform primitives. A setting that names its own effect and does not
+   have it is the honest-states rubric failing in Settings itself.
+
+   Graded through the same tokens this file's perf ladder already grades, rather
+   than through 38 more selectors: --glass-blur and the --blur-* scale are
+   what those surfaces read, so one ladder reaches all of them and cannot drift
+   out of sync the way a hand-written list does. Surfaces that hardcode a pixel
+   blur are NOT reached — that is a known remainder, not a claim.
+
+   Last in this file on purpose: at equal (0,2,0) specificity an explicit
+   accessibility request outranks whichever perf tier the machine picked.
+   liquid-tokens.css is imported after this and sets its own --lq-* answer. */
+:root[data-display-transparency='reduced'] {
+  --glass-blur: 6px;
+  --blur-sm: 4px;
+  --blur-md: 6px;
+  --blur-lg: 6px;
+  --blur-xl: 6px;
+  --blur-max: 6px;
+}
+:root[data-display-transparency='off'] {
+  --glass-blur: 0px;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+  --blur-xl: 0px;
+  --blur-max: 0px;
+}
