@@ -998,3 +998,56 @@ sweep writes where no style attribute existed; it applies nothing and React drop
 presentable surface** — nothing that passed before passes for a new reason.
 
 **Category 6 CLOSED for L9 bullet 1. Cells: 10 of 16.** `sampled-out:` unchanged.
+
+## 2026-08-31 — primary — category 5 measured on both L9 surfaces: Video 8/10, City VOID. Both diagnosed.
+
+`cat6-l9-video.json` and `cat6-l9-city.json` now exist, so Q7/Q8/Q9 stopped reading `MEASURE` and
+category 5 became reachable on both.
+
+| Q | Video | City |
+| --- | --- | --- |
+| 1 dominant task obvious | YES | **NO** — `entryPoints 0` |
+| 2 location and way back | YES | **NO** — `titleText ""` |
+| 3 primary action visible | YES | **NO** — `primaryAction null` |
+| 4 tools without clutter | **NO** — `collapsedDisclosures 0`, `scannedControls 24 > 12` | YES |
+| 5 stable contrast | **NO** | **NO** |
+| 6 motion explains | YES | **NO-SUBJECT** → VOID |
+| 7 / 8 / 9 (from cat6) | YES | YES |
+| 10 not a card dashboard | YES | YES |
+
+**Correction 26 — Q7/Q8/Q9 on a `fwin-no-liquid` host.** Left alone, City scored **three fabricated
+`NO`s**: `parity.equal` and `parity.rowsAgree` are `null` on that host, and Q8 fell on the single
+`zIndex` diff a minimize/restore trip legitimately produces. They now read that baseline's own bars.
+Q8 is answered by **proved absence** — the discriminating query that found a neighbouring window
+rendering `.fwin-b-liquid` while this one does not — plus the lifecycle trip holding, and the output
+carries a `basis` field saying so. **Known weakening, on the record: on this host Q7 and Q9 share
+their evidence**, because a surface with one presentation has one row set.
+
+**Q5 is a real defect on BOTH surfaces, and the theme axis is what exposes it.** `themeAxisMoved
+true` on both, so this is a measurement and not a stuck reading.
+
+- **Video, `forest-night`: `button.mc-button-primary` 3.92 at the top of its gradient**, bar 4.5,
+  white on `linear-gradient(rgb(217,81,110), rgb(184,51,85))` — 3.92 at the top stop, 5.77 at the
+  bottom. Three buttons. **cat1 banked `minRatio 4.24 / failingCount 0` on this same surface and
+  theme**, so the two instruments disagree and cat5 is the stricter: it scores the WORST stop under
+  the text, cat1 did not reach these buttons at all (100 runs vs 85 — different sets).
+- **Video, `classic-light`: 18 failing, worst 1.03**, `strong` at 1.13 and `p` at 2.97 over
+  `gradient on div.mc-video-empty`. The stage's empty state paints a fixed dark gradient that does
+  not remap with the palette, so in a light theme its own copy is unreadable.
+- **City, `classic-light`: 3 failing at 1.61** — every glyph of `.fwin-frameless-controls`
+  (`⧉ ─ ×`) at 72% over the window. A frameless window's ONLY chrome is invisible in a light theme.
+
+**Video Q4 is real too.** `scannedControls 24` against a bar of 12, `collapsedDisclosures 0`: the
+Video tab presents the shell nav, the topbar's four actions, both stage empties' actions and the
+whole inspector rail at once, with nothing collapsed.
+
+**City Q1/Q2/Q3 are the instrument meeting a canvas surface, and are NOT yet adjudicated.** Q1
+counts accent buttons in the top third; City's one control is a mushroom near the ground. Q2 wants a
+title; a frameless window renders none by design and bullet 1 closed on exactly that. Q3 wants an
+element explicitly marked primary. Each is either a real product gap or a dense-surface assumption —
+the next turn decides each on its own evidence and does not waive them as a group.
+**City Q6 is `NO-SUBJECT` because the toggle leg refuses, yet `liquidRegions 2` were found in the
+only presentation the surface has — one of them `div.reading-garden-sky-console-body`, the DEV-ONLY
+console correction 21 already excludes from category 4. cat5 does not yet honour that attribute.**
+
+Banked as `cat5-l9-video.json` (8/10) and `cat5-l9-city.json` (VOID), so **cells stay 10 of 16.**

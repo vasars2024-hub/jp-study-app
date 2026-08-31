@@ -1136,6 +1136,7 @@ function scoreSnapshot(s) {
   };
 
   const fromC6 = (term, ok) => (c6 ? (ok ? 'YES' : 'NO') : 'MEASURE');
+  const noLiquidHost = !!(c6 && c6.host === 'fwin-no-liquid' && c6.bars);
   const questions = [
     { id: 1, q: 'dominant task immediately obvious', verdict: live.q1, bar: BARS.q1, numbers: A_CELL.q1 },
     { id: 2, q: 'current location and way back obvious', verdict: live.q2, bar: BARS.q2, numbers: A_CELL.q2 },
@@ -1147,15 +1148,44 @@ function scoreSnapshot(s) {
       numbers: { measuredIn: q6cell ? q6cell.presentation : null, leg: q6leg,
         ...(q6cell ? q6cell.q6 : A_CELL.q6),
         inStandardPresentation: A_CELL.q6.liquidRegions } },
+    /*
+     * CORRECTION 26, 2026-08-31. On a `fwin-no-liquid` host (`canPresentLiquid` refuses the
+     * section, so the window has one presentation and no toggle — category 6's correction
+     * 24) these three read from that baseline's own bars instead. Left alone, Q7 and Q9
+     * scored `NO` because `parity.equal` and `parity.rowsAgree` are `null` there, and Q8
+     * scored `NO` on the single `zIndex` diff that a minimize/restore trip legitimately
+     * produces — three fabricated findings on a surface category 6 measured as complete.
+     *
+     * Q8 is the one to read carefully. "Liquid can be turned off without losing state" is
+     * answered by PROVED ABSENCE — `liquidAbsenceProved`, the discriminating query that
+     * showed a neighbouring window rendering the control while this one does not — plus the
+     * reversible transition the window does have holding. It is not a free YES, but it is a
+     * weaker question than the one a presentable surface answers, and `basis` says so in
+     * the output rather than in a comment.
+     *
+     * KNOWN WEAKENING, stated rather than hidden: on this host Q7 and Q9 share their
+     * evidence, because a surface with one presentation has one row set. Two of ten
+     * questions are therefore less independent here than on a presentable surface.
+     */
     { id: 7, q: 'standard mode remains fully normal', bar: BARS.q7,
-      verdict: fromC6('parity', c6 && c6.parity && c6.parity.equal && (c6.parity.failing || []).length === 0),
-      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', parity: c6 && c6.parity } },
+      verdict: noLiquidHost
+        ? (c6.bars.allRowsReachable && (c6.parity.failing || []).length === 0 ? 'YES' : 'NO')
+        : fromC6('parity', c6 && c6.parity && c6.parity.equal && (c6.parity.failing || []).length === 0),
+      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', basis: noLiquidHost ? 'no-liquid-host: the only presentation is standard' : null, parity: c6 && c6.parity } },
     { id: 8, q: 'Liquid can be turned off without losing state', bar: BARS.q8,
-      verdict: fromC6('roundTrip', c6 && c6.roundTrip && (c6.roundTrip.diffs || []).length === 0),
-      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', roundTrip: c6 && c6.roundTrip && { order: c6.roundTrip.order, diffs: c6.roundTrip.diffs } } },
+      verdict: noLiquidHost
+        ? (c6.bars.liquidAbsenceProved && c6.bars.roundTripHeld ? 'YES' : 'NO')
+        : fromC6('roundTrip', c6 && c6.roundTrip && (c6.roundTrip.diffs || []).length === 0),
+      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs',
+        basis: noLiquidHost ? 'no-liquid-host: absence proved against a neighbour that renders the control, plus the minimize/restore trip' : null,
+        liquidAbsence: noLiquidHost ? c6.liquidAbsence : null,
+        lifecycleTrip: noLiquidHost ? c6.lifecycleTrip : null,
+        roundTrip: c6 && c6.roundTrip && { order: c6.roundTrip.order, diffs: c6.roundTrip.diffs } } },
     { id: 9, q: 'all pre-migration features reachable and functional', bar: BARS.q9,
-      verdict: fromC6('rowsAgree', c6 && c6.parity && c6.parity.rowsAgree === true && (c6.parity.onlyInOne || []).length === 0),
-      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', rowsAgree: c6 && c6.parity && c6.parity.rowsAgree, onlyInOne: c6 && c6.parity && c6.parity.onlyInOne } },
+      verdict: noLiquidHost
+        ? (c6.bars.allRowsReachable && (c6.parity.failing || []).length === 0 ? 'YES' : 'NO')
+        : fromC6('rowsAgree', c6 && c6.parity && c6.parity.rowsAgree === true && (c6.parity.onlyInOne || []).length === 0),
+      numbers: { drivenBy: 'probes/cat6-feature-parity.cjs', basis: noLiquidHost ? 'no-liquid-host: shares Q7 evidence — one presentation, one row set' : null, rowsAgree: c6 && c6.parity && c6.parity.rowsAgree, onlyInOne: c6 && c6.parity && c6.parity.onlyInOne } },
     { id: 10, q: 'still feels like itself, not a generic card dashboard', verdict: live.q10, bar: BARS.q10, numbers: A_CELL.q10 },
   ];
   out.questions = questions;
