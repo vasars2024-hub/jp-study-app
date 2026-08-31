@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emptyAgentWorkspaceState } from '../../shared/agentWorkspace';
+import {
+  AGENT_WORKSPACE_RELATIVE_PATH,
+  emptyAgentWorkspaceState,
+} from '../../shared/agentWorkspace';
 import { createAgentSessionContextStore } from '../agentSessionContext';
 import {
   createAgentWorkspaceStore,
@@ -178,6 +181,7 @@ afterEach(() => {
 
 describe('main-owned Agent workspace store', () => {
   it('starts empty for missing, corrupt, or future documents', () => {
+    expect(store.filePath).toBe(path.join(root, ...AGENT_WORKSPACE_RELATIVE_PATH));
     expect(store.read()).toEqual(emptyAgentWorkspaceState());
     fs.mkdirSync(path.dirname(store.filePath), { recursive: true });
     fs.writeFileSync(store.filePath, '{bad json', 'utf8');

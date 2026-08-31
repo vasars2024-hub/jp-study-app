@@ -5,6 +5,13 @@ export const AGENT_WORKSPACE_SCHEMA_VERSION = 1 as const;
 
 export type AgentWorkspaceMode = 'ask' | 'navigate' | 'study' | 'analyze' | 'create' | 'automate';
 
+/**
+ * Main-owned location of the persisted workspace document, relative to
+ * Electron userData. Consumers that only index the store must share this
+ * contract with its writer instead of guessing a second filename.
+ */
+export const AGENT_WORKSPACE_RELATIVE_PATH = ['agent', 'workspace-v1.json'] as const;
+
 export interface AgentReusablePrompt {
   id: string;
   title: string;
