@@ -21,11 +21,29 @@ export interface Annotation {
   createdAt: number;
 }
 
-const PREFIX = 'jp-annotations:';
+/** Prefix for the per-book highlight stores, shared with read-only catalogue consumers. */
+export const ANNOTATIONS_STORAGE_PREFIX = 'jp-annotations:';
 export const ANNOTATIONS_EVENT = 'annotations-changed';
 
-function key(bookId: string): string {
-  return `${PREFIX}${bookId}`;
+export function annotationStorageKey(bookId: string): string {
+  return `${ANNOTATIONS_STORAGE_PREFIX}${bookId}`;
+}
+
+/**
+ * Parse one per-book store with the exact acceptance rule used by the reader.
+ * Files can enumerate highlights without inventing a second, stricter parser
+ * that makes legacy marks disappear during Notebook absorption.
+ */
+export function parseAnnotations(raw: string | null): Annotation[] {
+  try {
+    if (!raw) return [];
+    const list = JSON.parse(raw) as Annotation[];
+    return Array.isArray(list)
+      ? list.filter((annotation) => annotation && typeof annotation.id === 'string')
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Snapshot every per-book annotation list for IDB + export inventory. */
@@ -34,15 +52,11 @@ export function collectAllAnnotationsMap(): Record<string, Annotation[]> {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k?.startsWith(PREFIX)) continue;
-      const bookId = k.slice(PREFIX.length);
+      if (!k?.startsWith(ANNOTATIONS_STORAGE_PREFIX)) continue;
+      const bookId = k.slice(ANNOTATIONS_STORAGE_PREFIX.length);
       if (!bookId) continue;
-      try {
-        const list = JSON.parse(localStorage.getItem(k) ?? '[]') as Annotation[];
-        if (Array.isArray(list) && list.length) out[bookId] = list;
-      } catch {
-        /* skip corrupt */
-      }
+      const list = parseAnnotations(localStorage.getItem(k));
+      if (list.length) out[bookId] = list;
     }
   } catch {
     /* private mode */
@@ -61,9 +75,7 @@ export function flushAnnotationsMirror(): void {
 
 export function loadAnnotations(bookId: string): Annotation[] {
   try {
-    const raw = localStorage.getItem(key(bookId));
-    const list = raw ? (JSON.parse(raw) as Annotation[]) : [];
-    return Array.isArray(list) ? list.filter((a) => a && typeof a.id === 'string') : [];
+    return parseAnnotations(localStorage.getItem(annotationStorageKey(bookId)));
   } catch {
     return [];
   }
@@ -79,7 +91,7 @@ export async function restoreAnnotationsFromIdb(): Promise<void> {
     if (!map || typeof map !== 'object') return;
     for (const [bookId, list] of Object.entries(map)) {
       if (!bookId || !Array.isArray(list) || !list.length) continue;
-      const k = key(bookId);
+      const k = annotationStorageKey(bookId);
       try {
         if (!localStorage.getItem(k)) {
           localStorage.setItem(k, JSON.stringify(list));
@@ -95,8 +107,8 @@ export async function restoreAnnotationsFromIdb(): Promise<void> {
 
 function save(bookId: string, list: Annotation[]): void {
   try {
-    if (list.length === 0) localStorage.removeItem(key(bookId));
-    else localStorage.setItem(key(bookId), JSON.stringify(list));
+    if (list.length === 0) localStorage.removeItem(annotationStorageKey(bookId));
+    else localStorage.setItem(annotationStorageKey(bookId), JSON.stringify(list));
   } catch {
     /* ignore */
   }

@@ -549,3 +549,11 @@ This checkpoint exports `FLASHCARD_DECK_STORAGE_KEY`, `FLASHCARD_DECK_EVENT`, th
 shape, and the exact over-encoding-aware parser used by the deck itself. Focused regression:
 **28/28 passed** across the live-store draft and write suites. Next: after `wt/files-app` merges,
 add the renderer contribution for deck cards and Notebook rows, then repeat the live receipt.
+
+### 2026-08-30 — codexA, Gate 1 highlight-store contract
+
+The renderer-store census also found **15** real highlights across 3 per-book keys (12 + 2 +
+1); the main snapshot's `outputs/highlights` leaf is empty. The existing annotation owner now
+exports its prefix, key builder, and legacy-compatible pure parser, and uses that parser for both
+single-book and all-book reads. **12/12 focused tests passed**, including malformed-row and
+unrelated-key negative controls. Gate 1 remains open pending the renderer/main snapshot merge.
