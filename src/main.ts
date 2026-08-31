@@ -21,6 +21,11 @@ import {
   registerDesktopWindowsIpc,
   syncDesktopWindows,
 } from './main/desktopWindows';
+import {
+  closeAllStudyBlockWindows,
+  configureStudyBlockWindows,
+  registerStudyBlockWindowIpc,
+} from './main/studyBlockWindows';
 import { registerDeskDragIpc } from './main/deskDrag';
 import { registerFileRouterIpc } from './main/fileRouter';
 import { registerTranslateIpc } from './main/translate';
@@ -728,6 +733,9 @@ const createWindow = (restore?: {
     // Secondary desktops are layered on the main window, not peers of it —
     // they must never keep the app alive on their own (B5).
     closeAllDesktopWindows();
+    // A detached block is a panel of the player, not a peer of the app — it must not
+    // survive the window that was feeding it, or it sits there showing a dead episode.
+    closeAllStudyBlockWindows();
     stopBuddyScheduler();
   });
 
@@ -1611,6 +1619,21 @@ app.whenReady().then(async () => {
     mainWindow: () => mainWindow,
   });
   registerDesktopWindowsIpc();
+  // Detached Study Blocks. Registering the handlers opens nothing — a window exists
+  // only once a workspace actually asks for one.
+  configureStudyBlockWindows({
+    rendererUrl,
+    attachNavGuards,
+    forwardConsole: forwardRendererConsole,
+    isDevServer: isDevServer(),
+    // "Send to Display" must mean the same thing for the Notebook window a Notes block
+    // opened as it does for a detached transcript, and app pop-outs live in this file.
+    popoutWindow: (section) => {
+      const win = popoutWindows.get(section);
+      return win && !win.isDestroyed() ? win : null;
+    },
+  });
+  registerStudyBlockWindowIpc();
   registerDeskDragIpc();
   registerFileRouterIpc();
   registerTranslateIpc();
