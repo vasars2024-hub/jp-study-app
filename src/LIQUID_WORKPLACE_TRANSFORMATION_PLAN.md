@@ -439,24 +439,43 @@ An app cannot pass unless the answer is “yes” to all:
 
 ## 11. Phased implementation timeline
 
+**Every bullet below carries a machine-readable status marker** (relay RULE A, seeded
+2026-08-31). Count it with `grep -c "<!-- status: closed;"` and its siblings; `^- ` still
+matches every bullet. Seeded from this plan's own explicit statements only — nothing inferred,
+nothing rounded up.
+
+**Seed result: 5 closed / 21 open / 20 unknown, of 46.** This is **−2 against the relay pin's
+expected 7/19/20**, and the difference is L7. The pin seeds L7's two bullets `closed`; the L7
+status block at line 1174 says in its own words that Anki's "eight cells and the two
+system-wide L7 bullets **remain counted and open**", advancing the ladder under the
+human-blocked exception "without calling the L7 Gate closed". RULE A says seed from explicit
+statements only, so they are tagged `open` with `evidence: plan:1174`. L7 is human-blocked
+(Anki desktop is not installed; 127.0.0.1:8765 refuses), so it does not gate the ladder — but
+it is not closed, and marking it closed to reach the pin's 7 is exactly the fabrication RULE A
+exists to stop.
+
+The 20 `unknown` are L0, L2, L3, L4 and L5: no status line exists for them anywhere in this
+plan. They are all *behind* current work and do not block 2026-09-06. Audit at most 4 per turn
+as a side-slice.
+
 ### L0 — Relay cleanup, live baseline, and freeze map
 
 Dependency: complete the current relay’s clean-HEAD repair instructions first.
 
-- Reconcile the active dirty tree without staging foreign work.
-- Capture fresh player and all-app baselines.
-- Inventory routes, controls, commands, settings, tests, and visual states.
-- Create the feature parity ledger and protected-system matrix.
-- Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.
+- Reconcile the active dirty tree without staging foreign work.  <!-- status: unknown; evidence:  -->
+- Capture fresh player and all-app baselines.  <!-- status: unknown; evidence:  -->
+- Inventory routes, controls, commands, settings, tests, and visual states.  <!-- status: unknown; evidence:  -->
+- Create the feature parity ledger and protected-system matrix.  <!-- status: unknown; evidence:  -->
+- Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.  <!-- status: unknown; evidence:  -->
 
 Gate: no Liquid product code until the baseline and parity ledger exist.
 
 ### L1 — Design contract and reference calibration
 
-- Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.
-- Confirm the four surface roles and orientation-spine behavior.
-- Approve standard/Liquid entry, exit, and recovery UX.
-- Produce static layout studies for compact, default, and maximized states.
+- Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.  <!-- status: open; evidence: plan:464 -->
+- Confirm the four surface roles and orientation-spine behavior.  <!-- status: open; evidence: plan:464 -->
+- Approve standard/Liquid entry, exit, and recovery UX.  <!-- status: open; evidence: plan:464 -->
+- Produce static layout studies for compact, default, and maximized states.  <!-- status: open; evidence: plan:464 -->
 
 Gate: the layout studies score 80/80 on `src/LIQUID_UI_RUBRIC.md` against Video and Dictionary
 before shared primitives are built. (Was "user approves"; amended 2026-08-16, see §10.4.)
@@ -594,28 +613,28 @@ refusal already driven), its dead-control and fabricated-value counts, and the l
 
 ### L2 — Semantic tokens and shared primitives
 
-- Add Liquid semantic tokens without changing existing app output.
-- Implement Anchor/Work/Liquid/Ambient surfaces, scaffold, dock, inspector, adaptive rail, and context toolbar.
-- Map default, Aero, Wired, high-contrast, performance, and motion variants.
-- Build focused harnesses and accessibility tests.
+- Add Liquid semantic tokens without changing existing app output.  <!-- status: unknown; evidence:  -->
+- Implement Anchor/Work/Liquid/Ambient surfaces, scaffold, dock, inspector, adaptive rail, and context toolbar.  <!-- status: unknown; evidence:  -->
+- Map default, Aero, Wired, high-contrast, performance, and motion variants.  <!-- status: unknown; evidence:  -->
+- Build focused harnesses and accessibility tests.  <!-- status: unknown; evidence:  -->
 
 Gate: primitives pass contrast, keyboard, motion, and performance checks in isolation.
 
 ### L3 — Opt-in per-window infrastructure
 
-- Extend the existing window snapshot with backward-compatible presentation state.
-- Add explicit Make Liquid / Return to standard commands.
-- Preserve geometry, focus, z-order, pin, pop-out, snap, monitor transfer, and taskbar behavior.
-- Add corrupt-state recovery and mode round-trip tests.
+- Extend the existing window snapshot with backward-compatible presentation state.  <!-- status: unknown; evidence:  -->
+- Add explicit Make Liquid / Return to standard commands.  <!-- status: unknown; evidence:  -->
+- Preserve geometry, focus, z-order, pin, pop-out, snap, monitor transfer, and taskbar behavior.  <!-- status: unknown; evidence:  -->
+- Add corrupt-state recovery and mode round-trip tests.  <!-- status: unknown; evidence:  -->
 
 Gate: an unchanged sample app can switch modes and back with byte-for-byte app data and equivalent observable state.
 
 ### L4 — Media shell repair and Video pilot
 
-- Restore/confirm the coherent Media shell first.
-- Refine the player through §6, using the concept hierarchy and current workspace capabilities.
-- Validate every player feature in standard and Liquid modes.
-- Score the video result on the rubric before calling it the system pattern.
+- Restore/confirm the coherent Media shell first.  <!-- status: unknown; evidence:  -->
+- Refine the player through §6, using the concept hierarchy and current workspace capabilities.  <!-- status: unknown; evidence:  -->
+- Validate every player feature in standard and Liquid modes.  <!-- status: unknown; evidence:  -->
+- Score the video result on the rubric before calling it the system pattern.  <!-- status: unknown; evidence:  -->
 
 Gate: complete §6.5 acceptance matrix and 80/80 on `src/LIQUID_UI_RUBRIC.md`, driven live on a
 real playback state. (Was "user visual approval"; amended 2026-08-16, see §10.4.)
@@ -624,9 +643,9 @@ real playback state. (Was "user visual approval"; amended 2026-08-16, see §10.4
 
 Order: Dictionary → Grammar → Translate → Agent.
 
-- Establish the common selection/context-inspector contract.
-- Keep results, prose, forms, and conversation anchored.
-- Move only contextual actions and deep detail into Liquid regions.
+- Establish the common selection/context-inspector contract.  <!-- status: unknown; evidence:  -->
+- Keep results, prose, forms, and conversation anchored.  <!-- status: unknown; evidence:  -->
+- Move only contextual actions and deep detail into Liquid regions.  <!-- status: unknown; evidence:  -->
 
 Gate: feature ledgers complete; cross-app handoffs retain context.
 
@@ -634,8 +653,8 @@ Gate: feature ledgers complete; cross-app handoffs retain context.
 
 Order: Reading → Novels → Library → Immersion → manga/PDF/EPUB/VN suites.
 
-- Establish the common content canvas and reading-side-tool contract.
-- Preserve progress, capture, dictionary, mining, source, and deep-link behavior.
+- Establish the common content canvas and reading-side-tool contract.  <!-- status: closed; evidence: plan:831 -->
+- Preserve progress, capture, dictionary, mining, source, and deep-link behavior.  <!-- status: closed; evidence: plan:831 -->
 
 Gate: content remains legible and stable at all sizes; no tool obscures the document.
 
@@ -842,8 +861,8 @@ records were restored. Full evidence: `L6_READING_ECOSYSTEM.md` and `cat7-*-perf
 
 Order: Flashcards → Anki → Notebook → Statistics → Calendar → Games.
 
-- Keep review/input surfaces spatially fixed during active tasks.
-- Use Liquid only for context, preview, scheduling detail, and session summaries.
+- Keep review/input surfaces spatially fixed during active tasks.  <!-- status: open; evidence: plan:1174 -->
+- Use Liquid only for context, preview, scheduling detail, and session summaries.  <!-- status: open; evidence: plan:1174 -->
 
 Gate: timing-sensitive input and study state do not shift unexpectedly.
 
@@ -1178,8 +1197,8 @@ agent-owned ladder to Resources without calling the L7 Gate closed.
 
 Order: Resources → Scraper → Settings → YouTube → Music.
 
-- Apply progressive disclosure without burying configuration or operational state.
-- Preserve logs, errors, cancellation, and recovery visibly.
+- Apply progressive disclosure without burying configuration or operational state.  <!-- status: closed; evidence: plan:1186 -->
+- Preserve logs, errors, cancellation, and recovery visibly.  <!-- status: closed; evidence: plan:1186 -->
 
 Gate: every setting and scraper action remains searchable and keyboard reachable.
 
@@ -1196,38 +1215,38 @@ Full receipt map and negative-control numbers are in
 
 ### L9 — Shell, widgets, and alternate identities
 
-- Finish taskbar/context/command entry points without forcing Liquid.
-- Migrate Note, Visualizer, Music widget, City, notifications, onboarding, and help.
-- Complete Aero, Wired, and Blanc-native Liquid adapters.
-- Verify Secret Aero/Wired lifecycle and Blanc cold-open boundaries.
+- Finish taskbar/context/command entry points without forcing Liquid.  <!-- status: open; evidence:  -->
+- Migrate Note, Visualizer, Music widget, City, notifications, onboarding, and help.  <!-- status: closed; evidence: 12d5a976 -->
+- Complete Aero, Wired, and Blanc-native Liquid adapters.  <!-- status: open; evidence:  -->
+- Verify Secret Aero/Wired lifecycle and Blanc cold-open boundaries.  <!-- status: open; evidence:  -->
 
 Gate: all theme/mode combinations in §8 pass without identity leakage.
 
 ### L10 — System-wide smart minimalism pass
 
-- Remove redundant chrome and card nesting identified by the visual census.
-- Reconcile toolbar labels, icon semantics, spacing, motion, empty states, and responsive breakpoints.
-- Ensure the command palette and search expose moved secondary/expert actions.
-- Confirm no feature is duplicated into competing control systems.
+- Remove redundant chrome and card nesting identified by the visual census.  <!-- status: open; evidence:  -->
+- Reconcile toolbar labels, icon semantics, spacing, motion, empty states, and responsive breakpoints.  <!-- status: open; evidence:  -->
+- Ensure the command palette and search expose moved secondary/expert actions.  <!-- status: open; evidence:  -->
+- Confirm no feature is duplicated into competing control systems.  <!-- status: open; evidence:  -->
 
 Gate: one coherent workplace language with individual app character preserved.
 
 ### L11 — Accessibility, performance, and long-session hardening
 
-- Full keyboard and screen-reader pass.
-- High contrast, zoom, text scaling, compact widths, and reduced/disabled motion.
-- Drag/resize at target frame rate while media, dictionaries, and large lists are active.
-- Blur fallback, GPU-loss recovery, multi-monitor, restart persistence, and long-session memory checks.
+- Full keyboard and screen-reader pass.  <!-- status: open; evidence:  -->
+- High contrast, zoom, text scaling, compact widths, and reduced/disabled motion.  <!-- status: open; evidence:  -->
+- Drag/resize at target frame rate while media, dictionaries, and large lists are active.  <!-- status: open; evidence:  -->
+- Blur fallback, GPU-loss recovery, multi-monitor, restart persistence, and long-session memory checks.  <!-- status: open; evidence:  -->
 
 Gate: no regression against L0 performance and interaction baselines — scored as rubric
 category 7, measured after a real restart, not asked of a human.
 
 ### L12 — Visual certification and release handoff
 
-- Run every app’s standard/Liquid/theme/state screenshot matrix.
-- Close every feature-ledger row.
-- Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.
-- Produce a final visual atlas and remaining-risk report.
+- Run every app’s standard/Liquid/theme/state screenshot matrix.  <!-- status: open; evidence:  -->
+- Close every feature-ledger row.  <!-- status: open; evidence:  -->
+- Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.  <!-- status: open; evidence:  -->
+- Produce a final visual atlas and remaining-risk report.  <!-- status: open; evidence:  -->
 
 Gate: only then may Road to v1.01 Phase 10 call the Liquid Workplace release-ready.
 
