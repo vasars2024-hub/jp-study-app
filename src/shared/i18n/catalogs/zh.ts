@@ -3486,6 +3486,7 @@ export const zh: Catalog = {
   'help.tour.body': '简要介绍桌面、阅读透镜以及学习材料的去向。在新的配置文件上只会运行一次。',
   'help.tour.replay': '重新播放引导',
   'help.tour.replayed': '引导将立即重新开始。',
+  'help.tour.armed': '导览已重新启用，将在下次打开桌面窗口时开始。',
   'help.tour.lastRun': '上次完成于 {date}',
   'help.tour.neverRun': '尚未完成',
   'errorBoundary.title': '出现了问题。',

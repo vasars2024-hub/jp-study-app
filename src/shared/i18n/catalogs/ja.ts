@@ -3499,6 +3499,7 @@ export const ja: Catalog = {
   'help.tour.body': 'デスクトップ、リーディングレンズ、学習素材の行き先を短く案内します。新しいプロファイルで一度だけ実行されます。',
   'help.tour.replay': 'ツアーを再生',
   'help.tour.replayed': 'ツアーをもう一度開始します。',
+  'help.tour.armed': 'ツアーを再有効化しました。次にデスクトップウィンドウを開いたときに始まります。',
   'help.tour.lastRun': '前回の完了: {date}',
   'help.tour.neverRun': 'まだ完了していません',
   'errorBoundary.title': '問題が発生しました。',

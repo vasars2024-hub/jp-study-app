@@ -9,19 +9,39 @@
  */
 import { useState } from 'react';
 import SettingsCard from '../SettingsCard';
-import { loadOnboarding, replayTour } from '../../../onboardingStore';
+import { loadOnboarding, onTourStarted, replayTour } from '../../../onboardingStore';
 import { LANG_TAGS } from '../../../../shared/i18n/core';
 import { useT } from '../../../i18n';
+
+/**
+ * `idle` before the button is used; `started` only when an overlay actually
+ * raised its receipt in this window; `armed` when the store was re-armed and
+ * nothing answered — which is the truth on a branch with no overlay, and in a
+ * popped-out Settings window, whose sibling desktop window cannot answer
+ * synchronously.
+ */
+type ReplayOutcome = 'idle' | 'started' | 'armed';
 
 export default function HelpPage() {
   const { t, lang } = useT();
   const [state, setState] = useState(loadOnboarding);
-  const [replayed, setReplayed] = useState(false);
+  const [outcome, setOutcome] = useState<ReplayOutcome>('idle');
 
   const onReplay = (): void => {
-    replayTour();
+    // Synchronous by construction: `replayTour` dispatches, a mounted overlay
+    // handles it and announces, all inside this call. Anything that answers
+    // later is correctly reported as "armed" rather than as "started".
+    let started = false;
+    const stop = onTourStarted(() => {
+      started = true;
+    });
+    try {
+      replayTour();
+    } finally {
+      stop();
+    }
     setState(loadOnboarding());
-    setReplayed(true);
+    setOutcome(started ? 'started' : 'armed');
   };
 
   return (
@@ -41,7 +61,11 @@ export default function HelpPage() {
           {t('help.tour.replay')}
         </button>
       </div>
-      {replayed ? <p className="muted">{t('help.tour.replayed')}</p> : null}
+      {outcome === 'idle' ? null : (
+        <p className="muted" role="status">
+          {t(outcome === 'started' ? 'help.tour.replayed' : 'help.tour.armed')}
+        </p>
+      )}
     </SettingsCard>
   );
 }

@@ -66,8 +66,71 @@ export function rememberStep(stepId: string): void {
   save({ ...loadOnboarding(), lastStepId: stepId });
 }
 
+/**
+ * Fired when the armed/disarmed state changes in THIS window. `TourOverlay`
+ * reads `shouldRunTour()` once, at mount, so before this existed Settings →
+ * Help → Replay wrote `completedAt: null`, printed "The tour will start again
+ * now." and rendered nothing — measured live 2026-08-30: `.tour-root` stayed at
+ * 0 while `replays` went 8 → 9. The message was true only of the NEXT app
+ * start, which is not what "now" means.
+ */
+const REPLAY_EVENT = 'jp:onboarding-replay';
+
+/**
+ * The overlay's receipt: raised by whatever actually put a tour on screen.
+ *
+ * It exists because the status line is not the receipt. On THIS branch the
+ * measurement is starker than a stale flag — `git cat-file -e
+ * HEAD:src/renderer/components/onboarding/TourOverlay.tsx` fails: the overlay,
+ * its stylesheet, its step script and its `App.tsx` mount are all untracked
+ * work stranded since 2026-08-05, present only on the archive snapshot
+ * `c41e78b8`. `HelpPage` and this store were committed without them in
+ * `b63846ea`, so the shipped branch has a "Replay tour" button that says "The
+ * tour will start again now" and CANNOT start anything.
+ *
+ * So the button reports what happened rather than what it asked for: armed, or
+ * armed AND started. That is honest today, and becomes the success message on
+ * its own the moment the overlay lands — no second change needed.
+ */
+const STARTED_EVENT = 'jp:onboarding-started';
+
+/** Called by an overlay that has just put itself on screen. */
+export function announceTourStarted(): void {
+  window.dispatchEvent(new CustomEvent(STARTED_EVENT));
+}
+
+/** Subscribe to that receipt. Returns an unsubscribe fn. */
+export function onTourStarted(cb: () => void): () => void {
+  const handler = (): void => cb();
+  window.addEventListener(STARTED_EVENT, handler);
+  return () => window.removeEventListener(STARTED_EVENT, handler);
+}
+
+/**
+ * Subscribe to re-arming. Two sources, because the tour and the button that
+ * re-arms it are not always in the same renderer:
+ *
+ * - the same-window `CustomEvent`, for Settings inside a desktop `.fwin`;
+ * - the cross-window `storage` event, for `?popout=settings`, which is its own
+ *   BrowserWindow and shares only the origin's localStorage. Without the second
+ *   one the same false success comes back for anyone who pops Settings out.
+ */
+export function onTourArmChanged(cb: () => void): () => void {
+  const onCustom = (): void => cb();
+  const onStorage = (event: StorageEvent): void => {
+    if (event.key === null || event.key === KEY) cb();
+  };
+  window.addEventListener(REPLAY_EVENT, onCustom);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(REPLAY_EVENT, onCustom);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
 /** Settings → Help → Replay. Re-arms the tour without erasing that it ran. */
 export function replayTour(): void {
   const current = loadOnboarding();
   save({ completedAt: null, replays: current.replays + 1, lastStepId: null });
+  window.dispatchEvent(new CustomEvent(REPLAY_EVENT));
 }

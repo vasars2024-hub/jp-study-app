@@ -3694,6 +3694,7 @@ export const en: Catalog = {
   'help.tour.body': 'A short walkthrough of the desktop, the Reading Lens and where study material goes. It runs once on a new profile.',
   'help.tour.replay': 'Replay tour',
   'help.tour.replayed': 'The tour will start again now.',
+  'help.tour.armed': 'The tour is armed. It starts the next time the desktop window opens.',
   'help.tour.lastRun': 'Last completed {date}',
   'help.tour.neverRun': 'Not completed yet',
   'errorBoundary.title': 'Something went wrong.',
