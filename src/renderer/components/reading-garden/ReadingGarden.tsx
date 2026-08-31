@@ -6,6 +6,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
 } from "react";
 
 import { useT } from "../../i18n";
@@ -329,10 +331,13 @@ export function MushroomStage({
   stage,
   onActivate,
   expanded = false,
+  activateRef,
 }: {
   stage: number;
   onActivate?: () => void;
   expanded?: boolean;
+  /** The garden returns focus here when the dossier closes. */
+  activateRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -455,6 +460,7 @@ export function MushroomStage({
         <button
           className="reading-garden-mushroom-hitbox"
           type="button"
+          ref={activateRef}
           onClick={onActivate}
           aria-label={
             expanded ? t("mooncap.info.hide") : t("mooncap.info.show")
@@ -822,7 +828,34 @@ export default function ReadingGarden({
     loadMooncapMusicSettings(),
   );
   const rootRef = useRef<HTMLElement>(null);
+  const infoTriggerRef = useRef<HTMLButtonElement>(null);
   useGardenWorld(rootRef);
+
+  /**
+   * The dossier is an `aria-expanded` disclosure, and it was missing both
+   * halves of that contract: Escape did not close it, and closing it dropped
+   * focus on `document.body` — so a keyboard user who opened the mushroom had
+   * to Tab back through the whole garden to reach anything.
+   *
+   * Scoped to the garden's own `onKeyDown` rather than a `window` listener on
+   * purpose. React bubbles synthetic events to this element from BOTH the
+   * trigger and the panel, which are the only two places focus can be while
+   * the dossier is open, and a window-level Escape here would race the shell's
+   * own Escape in every other window this component can be mounted in.
+   */
+  const closeInfo = useCallback(() => {
+    setIsInfoOpen(false);
+    infoTriggerRef.current?.focus();
+  }, []);
+
+  const onGardenKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (event.key !== "Escape" || !isInfoOpen) return;
+      event.stopPropagation();
+      closeInfo();
+    },
+    [closeInfo, isInfoOpen],
+  );
 
   useEffect(() => {
     mooncapMusicPlayer.configure(mooncapMusicUrl);
@@ -895,6 +928,7 @@ export default function ReadingGarden({
       ref={rootRef}
       className={`reading-garden stage-band-${Math.floor((stage - 1) / 10) + 1}`}
       style={cameraStyleForStage(stage)}
+      onKeyDown={onGardenKeyDown}
       aria-label={t("mooncap.info.ariaGarden", {
         stage: phasePad,
         max: READING_GARDEN_MAX_STAGE,
@@ -964,6 +998,7 @@ export default function ReadingGarden({
         <div className="reading-garden-hero-focus" aria-hidden="true" />
         <MushroomStage
           stage={stage}
+          activateRef={infoTriggerRef}
           onActivate={() => {
             mooncapMusicPlayer.unlockFromGesture();
             setIsInfoOpen((open) => !open);
@@ -994,7 +1029,7 @@ export default function ReadingGarden({
             <button
               className="reading-garden-info-close"
               type="button"
-              onClick={() => setIsInfoOpen(false)}
+              onClick={closeInfo}
               aria-label={t("mooncap.info.close")}
             >
               ×
