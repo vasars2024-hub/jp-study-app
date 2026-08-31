@@ -107,3 +107,53 @@ describe.each(IDENTITIES)('secret shell identity scope — $attr', ({ attr, scop
     ).toEqual([]);
   });
 });
+
+/**
+ * L9 bullet 4's other half: the Blanc cold-open boundary.
+ *
+ * Blanc shares the persisted theme id, and `bootTheme()` stamps
+ * `data-theme='wired-archive'` on its root like everyone else's. It defends
+ * itself two ways: `blancMain.tsx:92` strips `data-materials` and a
+ * MutationObserver keeps it stripped, and the entry imports a SIX-SHEET set
+ * that excludes `styles.css` and every secret material pack — so the
+ * `:root[data-theme='wired-archive']` palette block does not exist in that
+ * document at all.
+ *
+ * The second defence is the load-bearing one and nothing guarded it. Measured
+ * live in the Study OS window, where those sheets ARE loaded, with
+ * `data-materials` absent — i.e. Blanc's exact attribute state: setting
+ * `data-theme='wired-archive'` alone moved `--bg` #0c1410 → #02070d, `--text`
+ * → #d8fbff, `--panel` → #06121a, and `frutiger-aero` moved `--bg` → #9ed8f2.
+ * So stripping the materials attribute does NOT stop the palette; only the
+ * absent sheet does. One import added to blancMain.tsx re-opens it silently.
+ */
+describe('Blanc cold-open boundary', () => {
+  const ENTRY = readFileSync(resolve(__dirname, '..', 'blancMain.tsx'), 'utf8');
+  const imported = [...ENTRY.matchAll(/^import\s+'(\.[^']+\.css)';/gm)].map((m) => m[1]);
+
+  it('reads the real entry, with its real sheet list', () => {
+    // main.ts:545 loads `blanc.html?blanc=1`, and blanc.html:14 points here.
+    expect(imported.length).toBeGreaterThan(3);
+  });
+
+  it('never pulls a secret material pack or the Study OS sheet into Blanc', () => {
+    const forbidden = imported.filter((p) =>
+      /(^|\/)styles\.css$/.test(p) || /\/(wired|aero|frutiger)[a-z-]*\.css$/.test(p),
+    );
+    expect(
+      forbidden,
+      `Blanc keeps data-theme, so importing any sheet that declares a ` +
+        `:root[data-theme='wired-archive'|'frutiger-aero'] palette hands Blanc the ` +
+        `secret shell's colours on cold open — stripping data-materials does not ` +
+        `stop it:\n${forbidden.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('still strips the material attribute, and keeps it stripped', () => {
+    // Belt AND suspenders: the sheet list is the palette defence, this is the
+    // defence for everything keyed on [data-materials] that Blanc does import
+    // (liquid-tokens.css declares aero/wired variants of the --lq-* roles).
+    expect(ENTRY).toMatch(/removeAttribute\('data-materials'\)/);
+    expect(ENTRY).toMatch(/MutationObserver/);
+  });
+});

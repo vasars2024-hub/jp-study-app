@@ -201,8 +201,19 @@ bootAeroSafeMode();
 // (aero/wired). Strip `data-materials` after bootTheme and keep it stripped, so
 // `useAeroMaterials()`/`useWiredMaterials()` stay false and Blanc renders its
 // own flat, sharp look regardless of the shared theme choice. The dedicated
-// blancMain.tsx entry does the same; this covers the fallback entry that is
-// actually loaded today.
+// blancMain.tsx entry does the same.
+//
+// CORRECTION (L9 bullet 4): this used to say the fallback entry "is actually
+// loaded today". It is not, and has not been since the Pillar 1 bundle split —
+// `main.ts:545` loads `blanc.html?blanc=1` in dev and packaged alike,
+// `blanc.html:14` points at blancMain.tsx, and `blanc-harness.html:175` does
+// too. Nothing in the tree now loads main.tsx with `?blanc=1`. Kept anyway,
+// because if anything ever does, this is the ONLY defence in that window:
+// main.tsx imports styles.css and every secret material pack, so it really does
+// own a `:root[data-theme='wired-archive']` palette block, and stripping
+// data-materials does NOT stop that palette (measured: --bg #0c1410 → #02070d
+// with materials already absent). blancMain.tsx is safe instead by NOT
+// importing those sheets — guarded by `__tests__/secretIdentityScope.test.ts`.
 if (isBlancWindow()) {
   const stripStudyOsMaterials = (): void =>
     document.documentElement.removeAttribute('data-materials');
