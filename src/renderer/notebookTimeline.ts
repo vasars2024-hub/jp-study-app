@@ -33,7 +33,15 @@ export interface NotebookTimelineEntry {
   meta?: Record<string, string | number | boolean | undefined>;
 }
 
-const KEY = 'jp-grammarx-notebook-timeline-v1';
+/**
+ * Stable persistence key shared with the Files app migration.
+ *
+ * Notebook used to own this key privately. Exporting the existing key, rather
+ * than teaching Files a second literal, keeps the migration pointed at the
+ * store that current producers still write while the old route is being
+ * absorbed.
+ */
+export const NOTEBOOK_TIMELINE_STORAGE_KEY = 'jp-grammarx-notebook-timeline-v1';
 const MAX = 500;
 export const NOTEBOOK_TIMELINE_EVENT = 'notebook-timeline-changed';
 
@@ -41,9 +49,15 @@ function newId(): string {
   return `nb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function loadNotebookTimeline(): NotebookTimelineEntry[] {
+/**
+ * Parse the persisted timeline without changing its legacy acceptance rule.
+ *
+ * Older Notebook builds only required a string id when reading. Keeping that
+ * rule here is deliberate: tightening it during the Files migration could
+ * make an existing note disappear before the migration can report its count.
+ */
+export function parseNotebookTimeline(raw: string | null): NotebookTimelineEntry[] {
   try {
-    const raw = localStorage.getItem(KEY);
     if (!raw) return [];
     const list = JSON.parse(raw) as NotebookTimelineEntry[];
     return Array.isArray(list) ? list.filter((e) => e && typeof e.id === 'string') : [];
@@ -52,9 +66,17 @@ export function loadNotebookTimeline(): NotebookTimelineEntry[] {
   }
 }
 
+export function loadNotebookTimeline(): NotebookTimelineEntry[] {
+  try {
+    return parseNotebookTimeline(localStorage.getItem(NOTEBOOK_TIMELINE_STORAGE_KEY));
+  } catch {
+    return [];
+  }
+}
+
 function persist(list: NotebookTimelineEntry[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX)));
+    localStorage.setItem(NOTEBOOK_TIMELINE_STORAGE_KEY, JSON.stringify(list.slice(0, MAX)));
   } catch {
     /* ignore */
   }
