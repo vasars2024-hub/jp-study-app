@@ -11158,6 +11158,14 @@ export const en: Catalog = {
     'This search is built into the app, so it cannot be deleted. Yours can be.',
   'filesApp.smart.error.saveFailed':
     'Your saved searches could not be saved. This change works now but will be gone when the app restarts.',
+  'filesApp.view.label': 'View',
+  'filesApp.view.mode.details': 'Details',
+  'filesApp.view.mode.compact': 'Compact',
+  'filesApp.view.error.saveFailed':
+    'This folder’s view could not be saved. It works now but will be back to the default when the app restarts.',
+  'filesApp.view.error.unknownFolder':
+    'This view belongs to no folder, so there is nothing to remember it against.',
+  'filesApp.view.error.unknownValue': 'That is not a view this list can show.',
   'filesApp.bulk.selection': 'Bulk selection',
   'filesApp.bulk.selectItem': 'Select {name} for bulk actions',
   'filesApp.bulk.mine': 'Mine selected ({count})',

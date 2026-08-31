@@ -52,7 +52,6 @@ import {
   type FilesCategoryId,
   type FilesItem,
   type FilesSortColumn,
-  type FilesSortDirection,
 } from '../../../shared/filesApp/catalog';
 import {
   FILES_MINE_MAX_CARDS,
@@ -117,6 +116,20 @@ import {
   newSmartFolderId,
   onSmartFoldersChanged,
 } from '../../filesSmartFoldersStore';
+import {
+  FILES_VIEW_MODES,
+  folderView,
+  folderViewKey,
+  setFolderView,
+  type FilesFolderView,
+  type FilesViewMode,
+  type FilesViewStateDoc,
+} from '../../../shared/filesApp/viewState';
+import {
+  commitViewState,
+  loadViewStateDoc,
+  onViewStateChanged,
+} from '../../filesViewStateStore';
 import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
 import { openSectionSurface } from '../../sectionSurface';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
@@ -149,6 +162,24 @@ const FilesStatisticsPanel = lazy(() =>
 );
 
 const ROW_HEIGHT = 32;
+
+/**
+ * Gate 22's two presentations, as data rather than as CSS.
+ *
+ * `compact` genuinely drops the three columns rather than hiding them with
+ * `display:none`: a hidden `gridcell` is still announced by some assistive
+ * technology and still costs a `formatSize`/`formatDate` call per visible row,
+ * so a "view mode" that only styles would be a mode in name. The row height
+ * changes with it because `VirtualList` windows on a fixed `itemHeight` — a
+ * shorter row that the windowing does not know about scrolls wrong.
+ */
+const COMPACT_ROW_HEIGHT = 24;
+const DETAILS_COLUMNS = ['name', 'kind', 'provenance', 'size', 'modified'] as const;
+const COMPACT_COLUMNS = ['name', 'kind'] as const;
+
+function columnsFor(mode: FilesViewMode): readonly FilesSortColumn[] {
+  return mode === 'compact' ? COMPACT_COLUMNS : DETAILS_COLUMNS;
+}
 
 /**
  * Gate 16's drag payload.
@@ -278,8 +309,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     initialScope ?? entryScope?.categoryId ?? null,
   );
   const [query, setQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState<FilesSortColumn>('name');
-  const [sortDirection, setSortDirection] = useState<FilesSortDirection>('asc');
+  /* Gate 22 owns the sort column, the direction and the view mode. They are NOT
+     component state: they are read from the view-state document keyed by the
+     folder on screen, further down where all three scopes are known. */
   const [selectedId, setSelectedId] = useState<string | null>(
     initialFocusItemId ?? entryScope?.focusItemId ?? null,
   );
@@ -341,6 +373,44 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const [savingSearch, setSavingSearch] = useState(false);
   const [searchNameDraft, setSearchNameDraft] = useState('');
 
+  /* ------------------------- gate 22 state ------------------------ */
+
+  /**
+   * Gate 22. The document is the source of truth for sort and view mode, not a
+   * cache of component state — so a folder the user has never opened this
+   * session already shows what it was last set to, with no effect to run first
+   * and no frame where it shows the default and then jumps.
+   */
+  const [viewStateDoc, setViewStateDoc] = useState<FilesViewStateDoc>(loadViewStateDoc);
+  const [viewNotice, setViewNotice] = useState<string | null>(null);
+
+  /**
+   * Which folder's view is on screen. The precedence — smart, then collection,
+   * then category, then root — is the same order `visible` resolves the list in,
+   * and the two must not drift: a key naming a folder the list is not showing
+   * would store the setting faithfully against the wrong row, which reads as a
+   * setting that does not persist.
+   */
+  const folderKey = useMemo(
+    () => folderViewKey({ scope, collectionId: collectionScope, smartId: smartScope }),
+    [scope, collectionScope, smartScope],
+  );
+
+  const { sortColumn, sortDirection, viewMode } = folderView(viewStateDoc, folderKey);
+
+  /** One place every view write lands, so a refusal and a failed save differ. */
+  const applyView = useCallback(
+    (patch: Partial<FilesFolderView>) => {
+      const commit = commitViewState((doc) => setFolderView(doc, folderKey, patch, Date.now()));
+      setViewStateDoc(commit.doc);
+      // The change IS live either way — the document above already carries it —
+      // but gate 22 is a restart gate, so a write that did not land has to say
+      // so rather than hand back a receipt that is false tomorrow.
+      setViewNotice(commit.errorKey ?? commit.storageErrorKey ?? null);
+    },
+    [folderKey],
+  );
+
   /**
    * The scope was read above; taking it is this effect's job, so the next plain
    * open of the Files app does not silently inherit the last caller's filter.
@@ -379,6 +449,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   useEffect(() => onCollectionsChanged(() => setCollectionsDoc(loadCollectionsDoc())), []);
   useEffect(() => onFavoritesChanged(() => setFavoritesDoc(loadFavoritesDoc())), []);
   useEffect(() => onSmartFoldersChanged(() => setSmartDoc(loadSmartFoldersDoc())), []);
+  useEffect(() => onViewStateChanged(() => setViewStateDoc(loadViewStateDoc())), []);
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -456,18 +527,21 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     [visible],
   );
 
+  /**
+   * The column-header gesture: the same column flips direction, a new column
+   * starts ascending. One `applyView` call and not two, because two would be two
+   * `setItem`s and two change events for one click — and the second would be
+   * written against the document the first had already replaced.
+   */
   const toggleSort = useCallback(
     (column: FilesSortColumn) => {
-      setSortColumn((prev) => {
-        if (prev === column) {
-          setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-          return prev;
-        }
-        setSortDirection('asc');
-        return column;
-      });
+      applyView(
+        column === sortColumn
+          ? { sortDirection: sortDirection === 'asc' ? 'desc' : 'asc' }
+          : { sortColumn: column, sortDirection: 'asc' },
+      );
     },
-    [],
+    [applyView, sortColumn, sortDirection],
   );
 
   const onReveal = useCallback(async () => {
@@ -1443,7 +1517,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             <span className="fa-visually-hidden">{t('filesApp.sort.label')}</span>
             <select
               value={sortColumn}
-              onChange={(e) => setSortColumn(e.target.value as FilesSortColumn)}
+              onChange={(e) => applyView({ sortColumn: e.target.value as FilesSortColumn })}
             >
               {FILES_SORT_COLUMNS.map((column) => (
                 <option key={column} value={column}>
@@ -1455,11 +1529,33 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <button
             type="button"
             className="fa-sort-dir"
-            onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            onClick={() => applyView({ sortDirection: sortDirection === 'asc' ? 'desc' : 'asc' })}
             aria-label={t(sortDirection === 'asc' ? 'filesApp.sort.asc' : 'filesApp.sort.desc')}
           >
             {sortDirection === 'asc' ? '↑' : '↓'}
           </button>
+          {/* Gate 22's third remembered control. A radio group and not a select:
+              two values with one visible at a time is what `aria-pressed` on a
+              pair of buttons says, and it is one click rather than two. */}
+          <div className="fa-view-mode" role="group" aria-label={t('filesApp.view.label')}>
+            {FILES_VIEW_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className="fa-view-mode-button"
+                data-mode={mode}
+                aria-pressed={viewMode === mode}
+                onClick={() => applyView({ viewMode: mode })}
+              >
+                {t(`filesApp.view.mode.${mode}`)}
+              </button>
+            ))}
+          </div>
+          {viewNotice ? (
+            <p className="fa-view-notice" role="status">
+              {t(viewNotice)}
+            </p>
+          ) : null}
           <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
             {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
           </button>
@@ -1520,7 +1616,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       <span role="columnheader" aria-sort="none" className="fa-cell fa-cell-select">
         <span className="fa-visually-hidden">{t('filesApp.bulk.selection')}</span>
       </span>
-      {(['name', 'kind', 'provenance', 'size', 'modified'] as const).map((column) => (
+      {columnsFor(viewMode).map((column) => (
         <button
           key={column}
           type="button"
@@ -1583,6 +1679,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       <div
         className="fa-list"
         role="grid"
+        data-view={viewMode}
         aria-label={t('filesApp.list.label')}
         aria-rowcount={visible.length + 1}
       >
@@ -1606,7 +1703,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         ) : null}
         <VirtualList
           items={visible}
-          itemHeight={ROW_HEIGHT}
+          itemHeight={viewMode === 'compact' ? COMPACT_ROW_HEIGHT : ROW_HEIGHT}
           className="fa-rows"
           getKey={(item) => item.id}
           // Written inline, like every other VirtualList call site in this
@@ -1671,19 +1768,24 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             <span role="gridcell" className="fa-cell fa-cell-kind">
               {t(`filesApp.kind.${item.kind}`)}
             </span>
-            <span
-              role="gridcell"
-              className="fa-cell fa-cell-provenance"
-              data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
-            >
-              {t(`filesApp.provenance.${item.provenance}`)}
-            </span>
-            <span role="gridcell" className="fa-cell fa-cell-size">
-              {formatSize(item.sizeBytes, t, lang)}
-            </span>
-            <span role="gridcell" className="fa-cell fa-cell-modified">
-              {formatDate(item.modifiedAt, lang)}
-            </span>
+            {/* Gate 22: compact really drops these three — see `columnsFor`. */}
+            {viewMode === 'details' ? (
+              <>
+                <span
+                  role="gridcell"
+                  className="fa-cell fa-cell-provenance"
+                  data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
+                >
+                  {t(`filesApp.provenance.${item.provenance}`)}
+                </span>
+                <span role="gridcell" className="fa-cell fa-cell-size">
+                  {formatSize(item.sizeBytes, t, lang)}
+                </span>
+                <span role="gridcell" className="fa-cell fa-cell-modified">
+                  {formatDate(item.modifiedAt, lang)}
+                </span>
+              </>
+            ) : null}
           </div>
           )}
           gridRole="rowgroup"

@@ -10695,6 +10695,14 @@ export const ja: Catalog = {
     'この検索はアプリに組み込まれているため削除できません。自分で保存したものは削除できます。',
   'filesApp.smart.error.saveFailed':
     '保存した検索を保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
+  'filesApp.view.label': '表示',
+  'filesApp.view.mode.details': '詳細',
+  'filesApp.view.mode.compact': 'コンパクト',
+  'filesApp.view.error.saveFailed':
+    'このフォルダーの表示設定を保存できませんでした。今は有効ですが、アプリを再起動すると既定に戻ります。',
+  'filesApp.view.error.unknownFolder':
+    'この表示はどのフォルダーにも属していないため、記憶しておく対象がありません。',
+  'filesApp.view.error.unknownValue': 'このリストではその表示は使えません。',
   'filesApp.bulk.selection': '一括選択',
   'filesApp.bulk.selectItem': '{name} を一括操作に選択',
   'filesApp.bulk.mine': '選択項目を採取（{count}）',

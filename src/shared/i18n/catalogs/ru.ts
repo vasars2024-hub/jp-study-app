@@ -11575,6 +11575,14 @@ export const ru: Catalog = {
     'Этот запрос встроен в приложение, поэтому его нельзя удалить. Свои — можно.',
   'filesApp.smart.error.saveFailed':
     'Не удалось сохранить ваши запросы. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
+  'filesApp.view.label': 'Вид',
+  'filesApp.view.mode.details': 'Таблица',
+  'filesApp.view.mode.compact': 'Компактно',
+  'filesApp.view.error.saveFailed':
+    'Не удалось сохранить вид этой папки. Он действует сейчас, но вернётся к обычному после перезапуска приложения.',
+  'filesApp.view.error.unknownFolder':
+    'Этот вид не относится ни к одной папке, поэтому запоминать его не для чего.',
+  'filesApp.view.error.unknownValue': 'Такой вид этот список показать не может.',
   'filesApp.bulk.selection': 'Множественный выбор',
   'filesApp.bulk.selectItem': 'Выбрать {name} для массовых действий',
   'filesApp.bulk.mine': 'Добыть выбранное ({count})',

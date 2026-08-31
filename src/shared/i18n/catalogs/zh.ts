@@ -10600,6 +10600,13 @@ export const zh: Catalog = {
   'filesApp.smart.error.presetLocked': '此搜索内置于应用中，无法删除。你自己保存的可以删除。',
   'filesApp.smart.error.saveFailed':
     '无法保存你的已保存搜索。此更改现在有效，但重启应用后会丢失。',
+  'filesApp.view.label': '视图',
+  'filesApp.view.mode.details': '详细信息',
+  'filesApp.view.mode.compact': '紧凑',
+  'filesApp.view.error.saveFailed':
+    '无法保存此文件夹的视图设置。现在有效，但重启应用后会恢复默认。',
+  'filesApp.view.error.unknownFolder': '此视图不属于任何文件夹，没有可记住的对象。',
+  'filesApp.view.error.unknownValue': '此列表无法显示该视图。',
   'filesApp.bulk.selection': '批量选择',
   'filesApp.bulk.selectItem': '选择 {name} 进行批量操作',
   'filesApp.bulk.mine': '采集所选项目（{count}）',

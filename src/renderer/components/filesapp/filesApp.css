@@ -417,6 +417,51 @@
   opacity: 0.7;
 }
 
+/* Gate 22 — the view-mode pair. A segmented control, so which of the two is on
+   is visible without reading the labels; `aria-pressed` carries the same fact
+   for anyone who is not looking at it. */
+.fa-view-mode {
+  display: flex;
+  flex: none;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg-raised);
+}
+
+.fa-view-mode-button {
+  min-height: calc(var(--lq-hit-target) - 4px);
+  padding: 0 var(--lq-space-3);
+  border: 0;
+  /* The on/off difference is carried by text weight and an underline in
+     `currentColor`, never by a background token: `--lq-liquid-highlight` is
+     `transparent` on at least one theme, so a pressed state painted with it
+     would be invisible exactly where the theme is flattest. */
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lq-liquid-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-view-mode-button[aria-pressed='true'] {
+  border-bottom-color: currentcolor;
+  color: var(--lq-liquid-text);
+  font-weight: 600;
+}
+
+/* Same shape as `.fa-folder-notice[data-tone='error']`: this stylesheet says
+   "wrong" with weight rather than with a hue, so it survives a theme that has
+   no danger colour of its own. */
+.fa-view-notice {
+  flex: none;
+  margin: 0;
+  color: var(--lq-liquid-text);
+  font-weight: 600;
+}
+
 /* ---------------------------- list ------------------------------ */
 
 .fa-list {
@@ -443,6 +488,14 @@
   height: 32px;
   border-bottom: 1px solid var(--lq-work-border);
   cursor: default;
+}
+
+/* Gate 22's compact presentation. The three dropped columns are gone from the
+   DOM, so the track list has to shrink with them or the two remaining cells
+   would be laid out against six tracks and sit in the left third. */
+.fa-list[data-view='compact'] .fa-row {
+  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr);
+  height: 24px;
 }
 
 .fa-cell-select {
