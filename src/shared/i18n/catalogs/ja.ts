@@ -10656,6 +10656,23 @@ export const ja: Catalog = {
     '「{category}」は各項目の内容から導かれるため、移動先がありません。',
   'filesApp.derived.cannotAdd':
     '「{category}」に項目が現れるのは、入れたからではなく内容によるものです。代わりにマイフォルダーへ追加してください。',
+  'filesApp.favorites.heading': 'お気に入り',
+  'filesApp.favorites.empty': 'まだ何もピン留めされていません。',
+  'filesApp.favorites.pinItem': 'お気に入りにピン留め',
+  'filesApp.favorites.unpinItem': 'お気に入りから外す',
+  'filesApp.favorites.pinLocation': 'このフォルダーをお気に入りにピン留め',
+  'filesApp.favorites.unpinLocation': 'このフォルダーをお気に入りから外す',
+  'filesApp.favorites.pinned': '「{name}」をピン留めしました。',
+  'filesApp.favorites.unpinned': '「{name}」のピン留めを外しました。何も削除していません。',
+  'filesApp.favorites.unknownItem': 'ライブラリにもうない項目',
+  'filesApp.favorites.unknownCollection': 'もう存在しないフォルダー',
+  'filesApp.favorites.stale': {
+    other: 'お気に入りのうち {count} 件は、存在しないものを指しています。',
+  },
+  'filesApp.favorite.error.noSuchTarget': 'ピン留めできるものがありません。',
+  'filesApp.favorite.error.notPinned': 'それはピン留めされていません。',
+  'filesApp.favorite.error.saveFailed':
+    'お気に入りを保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

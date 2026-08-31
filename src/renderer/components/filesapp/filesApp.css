@@ -108,6 +108,64 @@
   color: var(--lq-liquid-text-muted);
 }
 
+/* ------------------------ gate 18: Favorites ------------------------ */
+
+.fa-favorites {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: var(--lq-space-3);
+  padding-top: var(--lq-space-2);
+  border-top: 1px solid var(--lq-liquid-border);
+}
+
+.fa-favorite-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-1);
+}
+
+.fa-favorite-node {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Dimmed AND still visible: a shortcut that vanished on its own is
+   indistinguishable from one the user forgot they made. */
+.fa-favorite-row[data-stale='true'] .fa-favorite-node {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.fa-favorite-unpin,
+.fa-favorite-pin-location {
+  flex: none;
+  min-height: var(--lq-hit-target);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-2);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: transparent;
+  color: var(--lq-liquid-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-favorite-unpin:hover,
+.fa-favorite-pin-location:hover {
+  background: var(--lq-liquid-bg-raised);
+}
+
+.fa-favorite-pin-location[aria-pressed='true'] {
+  background: var(--lq-liquid-highlight);
+}
+
+.fa-favorites-stale {
+  margin: var(--lq-space-1) 0 0;
+  padding: 0 var(--lq-space-2);
+  color: var(--lq-liquid-text-muted);
+}
+
 /* --------- gate 16: the folders the user writes, not derives --------- */
 
 /* A visible seam, because these two halves of the tree behave differently:

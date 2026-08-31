@@ -11533,6 +11533,26 @@ export const ru: Catalog = {
     '«{category}» выводится из свойств самих элементов, поэтому перемещать её некуда.',
   'filesApp.derived.cannotAdd':
     'Элементы попадают в «{category}» из-за того, чем они являются, а не потому что их туда положили. Добавьте элемент в свою папку.',
+  'filesApp.favorites.heading': 'Избранное',
+  'filesApp.favorites.empty': 'Пока ничего не закреплено.',
+  'filesApp.favorites.pinItem': 'Закрепить в избранном',
+  'filesApp.favorites.unpinItem': 'Убрать из избранного',
+  'filesApp.favorites.pinLocation': 'Закрепить эту папку в избранном',
+  'filesApp.favorites.unpinLocation': 'Убрать эту папку из избранного',
+  'filesApp.favorites.pinned': '«{name}» закреплено.',
+  'filesApp.favorites.unpinned': '«{name}» убрано из избранного. Ничего не удалено.',
+  'filesApp.favorites.unknownItem': 'Элемент, которого больше нет в библиотеке',
+  'filesApp.favorites.unknownCollection': 'Папка, которой больше нет',
+  'filesApp.favorites.stale': {
+    one: '{count} элемент избранного указывает на то, чего больше нет.',
+    few: '{count} элемента избранного указывают на то, чего больше нет.',
+    many: '{count} элементов избранного указывают на то, чего больше нет.',
+    other: '{count} элемента избранного указывают на то, чего больше нет.',
+  },
+  'filesApp.favorite.error.noSuchTarget': 'Здесь нечего закреплять.',
+  'filesApp.favorite.error.notPinned': 'Это не закреплено.',
+  'filesApp.favorite.error.saveFailed':
+    'Не удалось сохранить избранное. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 

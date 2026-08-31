@@ -10562,6 +10562,23 @@ export const zh: Catalog = {
   'filesApp.derived.cannotMove': '“{category}”由每个项目本身的性质推导而来，没有可移动的去处。',
   'filesApp.derived.cannotAdd':
     '项目出现在“{category}”是因为它们本身的性质，而不是被放进去的。请改为添加到你自己的文件夹。',
+  'filesApp.favorites.heading': '收藏夹',
+  'filesApp.favorites.empty': '还没有固定任何内容。',
+  'filesApp.favorites.pinItem': '固定到收藏夹',
+  'filesApp.favorites.unpinItem': '从收藏夹取消固定',
+  'filesApp.favorites.pinLocation': '把此文件夹固定到收藏夹',
+  'filesApp.favorites.unpinLocation': '把此文件夹从收藏夹取消固定',
+  'filesApp.favorites.pinned': '已固定“{name}”。',
+  'filesApp.favorites.unpinned': '已取消固定“{name}”。没有删除任何东西。',
+  'filesApp.favorites.unknownItem': '已不在库里的项目',
+  'filesApp.favorites.unknownCollection': '已不存在的文件夹',
+  'filesApp.favorites.stale': {
+    other: '有 {count} 个收藏指向已经不存在的东西。',
+  },
+  'filesApp.favorite.error.noSuchTarget': '这里没有可固定的东西。',
+  'filesApp.favorite.error.notPinned': '那个并未被固定。',
+  'filesApp.favorite.error.saveFailed':
+    '无法保存你的收藏夹。此更改现在有效，但重启应用后会丢失。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',

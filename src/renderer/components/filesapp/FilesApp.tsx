@@ -85,6 +85,19 @@ import {
   newCollectionId,
   onCollectionsChanged,
 } from '../../filesCollectionsStore';
+import {
+  favoriteKey,
+  isPinned,
+  resolveFavorites,
+  toggleFavorite,
+  type FilesFavoritesDoc,
+  type FilesFavoriteTarget,
+} from '../../../shared/filesApp/favorites';
+import {
+  commitFavorites,
+  loadFavoritesDoc,
+  onFavoritesChanged,
+} from '../../filesFavoritesStore';
 import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
 import { openSectionSurface } from '../../sectionSurface';
 import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
@@ -283,6 +296,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  /** Gate 18. Same store shape as the folders, same restart guarantee. */
+  const [favoritesDoc, setFavoritesDoc] = useState<FilesFavoritesDoc>(loadFavoritesDoc);
+
   /**
    * The scope was read above; taking it is this effect's job, so the next plain
    * open of the Files app does not silently inherit the last caller's filter.
@@ -318,6 +334,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    * so this one re-reads rather than trusting the copy it made on mount.
    */
   useEffect(() => onCollectionsChanged(() => setCollectionsDoc(loadCollectionsDoc())), []);
+  useEffect(() => onFavoritesChanged(() => setFavoritesDoc(loadFavoritesDoc())), []);
 
   const allItems = state.snapshot?.items ?? [];
 
@@ -697,6 +714,93 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
   }, [scopedCollection, selected, runCollectionOp]);
 
+  /* ------------------------ gate 18 actions ----------------------- */
+
+  /**
+   * The folder currently open, as a favorite target — or `null` at the root,
+   * which is not a location anyone needs a shortcut to.
+   */
+  const scopeAsFavorite: FilesFavoriteTarget | null =
+    folderSelection.kind === 'derived'
+      ? { type: 'category', categoryId: folderSelection.id }
+      : folderSelection.kind === 'collection'
+        ? { type: 'collection', collectionId: folderSelection.id }
+        : null;
+
+  const onToggleFavorite = useCallback(
+    (target: FilesFavoriteTarget, name: string) => {
+      const wasPinned = isPinned(favoritesDoc, target);
+      const commit = commitFavorites((doc) => toggleFavorite(doc, target, Date.now()));
+      setFavoritesDoc(commit.doc);
+      const errorKey = commit.errorKey ?? commit.storageErrorKey;
+      setFolderNotice(
+        errorKey
+          ? { key: errorKey, tone: 'error' }
+          : {
+              // Read BEFORE the commit: the toggle has already flipped by now,
+              // so asking the new document what happened reports the opposite.
+              key: wasPinned ? 'filesApp.favorites.unpinned' : 'filesApp.favorites.pinned',
+              values: { name },
+              tone: 'ok',
+            },
+      );
+    },
+    [favoritesDoc],
+  );
+
+  /**
+   * Favorites, resolved against the world this render.
+   *
+   * A pinned item that left the index and a pinned folder the user deleted are
+   * both STALE, not gone — the count is shown and the row keeps its place, for
+   * the same reason a collection reports its missing ids rather than shrinking.
+   */
+  const favorites = useMemo(
+    () =>
+      resolveFavorites(favoritesDoc, {
+        knownItemIds: new Set(allItems.map((i) => i.id)),
+        knownCollectionIds: new Set(collectionsDoc.collections.map((c) => c.id)),
+      }),
+    [favoritesDoc, allItems, collectionsDoc],
+  );
+
+  /** A favorite's own label, resolved from whichever store owns its target. */
+  const favoriteLabel = useCallback(
+    (target: FilesFavoriteTarget): string => {
+      if (target.type === 'category') {
+        return t(categoryNode(target.categoryId)?.labelKey ?? 'filesApp.tree.everything');
+      }
+      if (target.type === 'collection') {
+        return (
+          collectionsDoc.collections.find((c) => c.id === target.collectionId)?.name ??
+          t('filesApp.favorites.unknownCollection')
+        );
+      }
+      return allItems.find((i) => i.id === target.itemId)?.name ?? t('filesApp.favorites.unknownItem');
+    },
+    [collectionsDoc, allItems, t, lang],
+  );
+
+  /** Open whatever a favorite points at. An item selects it; a place scopes to it. */
+  const onOpenFavorite = useCallback((target: FilesFavoriteTarget) => {
+    setFolderNotice(null);
+    if (target.type === 'item') {
+      setScope(null);
+      setCollectionScope(null);
+      selectItem(target.itemId);
+      return;
+    }
+    if (target.type === 'category') {
+      setScope(target.categoryId);
+      setCollectionScope(null);
+      setFocusCardId(null);
+      return;
+    }
+    setScope(null);
+    setCollectionScope(target.collectionId);
+    setFocusCardId(null);
+  }, [selectItem]);
+
   /* ---------------------------- rail ---------------------------- */
 
   /**
@@ -806,6 +910,71 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           )}
         </button>
       ))}
+
+      {/* ---------------- gate 18: Favorites ---------------- */}
+      <div className="fa-favorites">
+        <div className="fa-collections-head">
+          <h3 className="fa-collections-title">{t('filesApp.favorites.heading')}</h3>
+          {/* Pinning a LOCATION is the gate's second half, and this is where a
+              user would look for it: on the folder they are standing in. */}
+          {scopeAsFavorite ? (
+            <button
+              type="button"
+              className="fa-favorite-pin-location"
+              aria-pressed={isPinned(favoritesDoc, scopeAsFavorite)}
+              onClick={() =>
+                onToggleFavorite(scopeAsFavorite, favoriteLabel(scopeAsFavorite))
+              }
+            >
+              {t(
+                isPinned(favoritesDoc, scopeAsFavorite)
+                  ? 'filesApp.favorites.unpinLocation'
+                  : 'filesApp.favorites.pinLocation',
+              )}
+            </button>
+          ) : null}
+        </div>
+        {favoritesDoc.favorites.length === 0 ? (
+          <p className="fa-collections-empty">{t('filesApp.favorites.empty')}</p>
+        ) : (
+          favoritesDoc.favorites.map((favorite) => {
+            const key = favoriteKey(favorite.target);
+            const isStale = favorites.stale.some((f) => favoriteKey(f.target) === key);
+            return (
+              <div key={key} className="fa-favorite-row" data-stale={isStale ? 'true' : undefined}>
+                <button
+                  type="button"
+                  className="fa-tree-node fa-favorite-node"
+                  data-favorite={key}
+                  /* A stale favorite is still clickable — it just cannot lead
+                     anywhere, and disabling it would remove the only thing that
+                     explains why. It is marked, and it can be unpinned. */
+                  disabled={isStale}
+                  onClick={() => onOpenFavorite(favorite.target)}
+                >
+                  <span className="fa-tree-label">{favoriteLabel(favorite.target)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="fa-favorite-unpin"
+                  aria-label={t('filesApp.favorites.unpinItem')}
+                  title={t('filesApp.favorites.unpinItem')}
+                  onClick={() => onToggleFavorite(favorite.target, favoriteLabel(favorite.target))}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })
+        )}
+        {favorites.stale.length > 0 ? (
+          // Kept and counted, never swept: a shortcut that vanished on its own
+          // is indistinguishable from one the user forgot they made.
+          <p className="fa-favorites-stale" role="status">
+            {t('filesApp.favorites.stale', { count: favorites.stale.length })}
+          </p>
+        ) : null}
+      </div>
 
       {/* ---- gate 16: the only folders in this tree the user writes ---- */}
       <div className="fa-collections">
@@ -1392,6 +1561,22 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <p className="fa-details-note fa-mine-refusal">{t(mineability.reasonKey)}</p>
       )}
       {mineResult}
+      {/* Gate 18's first half. A toggle, because pin and unpin are one gesture
+          and two buttons would let the app show both at once. */}
+      <button
+        type="button"
+        className="fa-action fa-favorite-toggle"
+        aria-pressed={isPinned(favoritesDoc, { type: 'item', itemId: selected.id })}
+        onClick={() =>
+          onToggleFavorite({ type: 'item', itemId: selected.id }, selected.name)
+        }
+      >
+        {t(
+          isPinned(favoritesDoc, { type: 'item', itemId: selected.id })
+            ? 'filesApp.favorites.unpinItem'
+            : 'filesApp.favorites.pinItem',
+        )}
+      </button>
       {/* Gate 16's keyboard path into a folder, and gate 17's "not offered" in
           its plainest form: the options are the user's OWN folders and nothing
           else, so a derived folder is never on the menu to begin with. */}

@@ -11118,6 +11118,24 @@ export const en: Catalog = {
     '"{category}" is derived from what each item is, so there is nowhere to move it to.',
   'filesApp.derived.cannotAdd':
     'Items appear in "{category}" because of what they are, not because they were put there. Add it to one of your own folders instead.',
+  'filesApp.favorites.heading': 'Favorites',
+  'filesApp.favorites.empty': 'Nothing pinned yet.',
+  'filesApp.favorites.pinItem': 'Pin to Favorites',
+  'filesApp.favorites.unpinItem': 'Unpin from Favorites',
+  'filesApp.favorites.pinLocation': 'Pin this folder to Favorites',
+  'filesApp.favorites.unpinLocation': 'Unpin this folder from Favorites',
+  'filesApp.favorites.pinned': 'Pinned "{name}".',
+  'filesApp.favorites.unpinned': 'Unpinned "{name}". Nothing was deleted.',
+  'filesApp.favorites.unknownItem': 'An item that is no longer in the library',
+  'filesApp.favorites.unknownCollection': 'A folder that no longer exists',
+  'filesApp.favorites.stale': {
+    one: '{count} favorite points at something that is gone.',
+    other: '{count} favorites point at something that is gone.',
+  },
+  'filesApp.favorite.error.noSuchTarget': 'There is nothing here to pin.',
+  'filesApp.favorite.error.notPinned': 'That is not pinned.',
+  'filesApp.favorite.error.saveFailed':
+    'Your favorites could not be saved. This change works now but will be gone when the app restarts.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':
