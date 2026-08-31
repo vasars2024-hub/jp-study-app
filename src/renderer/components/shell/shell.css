@@ -889,6 +889,23 @@ html.reduce-motion .fwin .fwin-b {
   background: var(--lq-liquid-bg);
   border-top: 1px solid var(--lq-liquid-border);
   backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate, 1));
+  /* The three properties this rule sets, and nothing else — so the transition is a
+     STATE CHANGE by construction rather than ambient motion. All three genuinely
+     change under the shell without the element moving: every degradation tier in
+     `liquid-tokens.css` (high contrast, battery, Aero safe mode) zeroes
+     `--lq-liquid-blur` and hands back an opaque `--lq-liquid-bg`, and each material
+     remaps all three. Measured 2026-08-31 on the Wired shell: this bar is the shell's
+     ONLY Liquid-treated region and its `transition-duration` read `0s`, so glass
+     snapped to solid chrome in one frame and the user saw a repaint rather than the
+     same object changing. `--lq-motion-move` collapses to 0.001ms under both
+     `prefers-reduced-motion` and the in-app `html.reduce-motion`, so displacement-free
+     users get the snap back without a second media query here. Dropping
+     `data-lq-role` in `DesktopShell` still reverts the material and its motion
+     together. */
+  transition:
+    background-color var(--lq-motion-move) var(--lq-ease-move),
+    border-top-color var(--lq-motion-move) var(--lq-ease-move),
+    backdrop-filter var(--lq-motion-move) var(--lq-ease-move);
 }
 
 /* ---- P2.2 taskbar ---------------------------------------------------------
