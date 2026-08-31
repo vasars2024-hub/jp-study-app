@@ -76,17 +76,24 @@ function isKnowledgeStorageKey(key: string | null): boolean {
   return key === knowledgeKey('ja') || key === knowledgeKey('zh');
 }
 
-window.addEventListener('storage', (e) => {
-  if (isKnowledgeStorageKey(e.key)) {
+// Both of these register a listener at IMPORT time, and both reach `window`.
+// The Files app's renderer enumerators read this store, and their suite runs in
+// vitest's node environment — an unguarded listener there is not a failing
+// assertion, it is a module that cannot be imported at all. In a real renderer
+// `window` always exists, so the guarded and unguarded behaviour are identical.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (isKnowledgeStorageKey(e.key)) {
+      cache = null;
+      cacheLang = null;
+    }
+  });
+
+  onStudyLangChanged(() => {
     cache = null;
     cacheLang = null;
-  }
-});
-
-onStudyLangChanged(() => {
-  cache = null;
-  cacheLang = null;
-});
+  });
+}
 
 export function getLevel(word: string): WkLevel {
   return db()[word]?.l ?? 0;

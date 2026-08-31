@@ -49,6 +49,9 @@ function checkRow(row: FilesParityRow): string[] {
   if (row.status === 'preserved') {
     if (!row.section) {
       problems.push('preserved row names no section');
+    } else if (row.section === 'global') {
+      // Mounted outside the section switch. The module+symbol below still has
+      // to hold, so this is not an escape hatch — only a different container.
     } else if (!(DESKTOP_WIN_SECTIONS as readonly string[]).includes(row.section)) {
       problems.push(`section '${row.section}' is not a DesktopWinSection`);
     } else if (!APP_SECTION.includes(`case '${row.section}':`)) {
@@ -76,10 +79,10 @@ describe('files app route parity (gate 6)', () => {
       ...scanSources('src/main/filesApp/enumerators.ts'),
       ...scanSources('src/renderer/components/filesapp/rendererEnumerators.ts'),
     ];
-    // 17 main + 3 renderer, the same split the gate-1 census reported. Asserted
-    // as a number so a regex that silently stops matching cannot pass by
-    // comparing one empty list against another.
-    expect(sources).toHaveLength(20);
+    // 17 main + 8 renderer. Gate 1 closed at 17 + 3; gate 7 added five renderer
+    // stores the Notebook aggregated. Asserted as a number so a regex that
+    // silently stops matching cannot pass by comparing two empty lists.
+    expect(sources).toHaveLength(25);
     const declared = FILES_ROUTE_PARITY.map((r) => r.capability).filter(
       (c) => !c.startsWith('action:'),
     );

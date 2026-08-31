@@ -28,7 +28,13 @@ export interface LookupRecordInput {
   lang?: 'ja' | 'zh';
 }
 
-const KEY = 'jp-lookup-history';
+/**
+ * Exported so the Files app can name this store's real location without
+ * carrying a second copy of the literal. Same reason `NOTEBOOK_TIMELINE_STORAGE_KEY`
+ * and `FLASHCARD_DECK_STORAGE_KEY` are exported: two literals drift, one does not.
+ */
+export const LOOKUP_HISTORY_STORAGE_KEY = 'jp-lookup-history';
+const KEY = LOOKUP_HISTORY_STORAGE_KEY;
 const MAX = 40;
 const MAX_TIMES_PER_ENTRY = 8;
 export const REPEATED_LOOKUP_WINDOW_MS = 30 * 86_400_000;

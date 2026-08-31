@@ -12,7 +12,9 @@ export interface TranslationHistoryEntry {
   origin: TranslationOrigin;
 }
 
-const KEY = 'jp-grammarx-translation-history-v1';
+/** Exported for the Files app's location column — see `lookupHistory.ts`. */
+export const TRANSLATION_HISTORY_STORAGE_KEY = 'jp-grammarx-translation-history-v1';
+const KEY = TRANSLATION_HISTORY_STORAGE_KEY;
 const MAX = 200;
 export const TRANSLATION_HISTORY_EVENT = 'translation-history-changed';
 

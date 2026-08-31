@@ -42,6 +42,20 @@ import {
   collectAllAnnotationsMap,
   type Annotation,
 } from '../../annotations';
+import { LEGACY_SAVED_KEY, loadSaved, savedWordsKey, type SavedWord } from '../../savedWords';
+import {
+  LOOKUP_HISTORY_STORAGE_KEY,
+  loadLookupHistory,
+  type LookupHistoryEntry,
+} from '../../lookupHistory';
+import {
+  TRANSLATION_HISTORY_STORAGE_KEY,
+  loadTranslationHistory,
+  type TranslationHistoryEntry,
+} from '../../translationHistory';
+import { knowledgeKey, listKnownEntries } from '../../knownWords';
+import { loadClipboardHistory, type ClipboardEntry } from '../../clipboardHistory';
+import { LS_KEYS } from '../../storage/storage';
 
 /**
  * Which Notebook streams are highlights rather than notes.
@@ -271,6 +285,215 @@ export function annotationFilesItems(
   return out;
 }
 
+/* ------------------------------------------------------------------ *
+ * The four study-record streams Notebook aggregated and Files could not see.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Gate 7's absorption half, and why these live here rather than in main.
+ *
+ * `notebook/aggregate.ts` merges twelve streams into one timeline. Four of them
+ * — saved words, dictionary lookups, translations and known words — plus the
+ * clipboard are renderer `localStorage` stores that had **no Files enumerator
+ * at all**, so deleting the Notebook section without them would take a real
+ * capability away rather than absorb it. The other seven streams are already
+ * covered: `flashcards`/`mining` by `local-deck`, `anki` by the main `decks` and
+ * `drafts` enumerators, `highlights` by `highlights`, and `ocr`/`audio`/
+ * `extension`/`media` by the timeline store itself, which `notebook` reads.
+ *
+ * Every row here is `provenance: 'app-generated'` for one reason, stated once:
+ * provenance in this catalogue is a claim about how a piece of *text* was
+ * produced, and none of these records is mined text. A lookup is a thing the
+ * app wrote down about an action. Stamping `book-text` on one because its
+ * context sentence came from a book would put a trust mark on a row that makes
+ * no such claim.
+ *
+ * `createdAt` is never synthesised. The Notebook gives known words
+ * `Date.now() - level * 1000` so they sort; that number means nothing, and a
+ * catalogue that shows it in a Date column is showing an invented value. Here
+ * it stays `null`, which gate 14 already sorts predictably (nulls last, both
+ * directions).
+ */
+function studyRecord(
+  id: string,
+  name: string,
+  key: string,
+  pointer: string,
+  source: string,
+  times: { createdAt?: number | null; modifiedAt?: number | null; lastUsedAt?: number | null },
+  flags: FilesItem['flags'] = {},
+): FilesItem {
+  return {
+    id,
+    name,
+    kind: 'note',
+    categoryId: categoryForKind('note'),
+    provenance: 'app-generated',
+    // A row in a JSON blob has no size of its own; dividing the store's bytes
+    // by the row count would be an invented number.
+    sizeBytes: null,
+    createdAt: times.createdAt ?? null,
+    modifiedAt: times.modifiedAt ?? null,
+    lastUsedAt: times.lastUsedAt ?? null,
+    location: { store: 'localStorage', key, pointer },
+    flags,
+    source,
+  };
+}
+
+/** A word the user saved from the dictionary. `word` is the store's own key. */
+export function savedWordFilesItems(
+  entries: readonly SavedWord[] = loadSavedWordsSafely(),
+  key: string = savedWordsKeySafely(),
+): FilesItem[] {
+  return entries.flatMap((entry) => {
+    const word = typeof entry?.word === 'string' ? entry.word.trim() : '';
+    if (!word) return [];
+    const reading = typeof entry.reading === 'string' ? entry.reading.trim() : '';
+    return [
+      studyRecord(
+        `saved-word:${word}`,
+        reading && reading !== word ? `${word}（${reading}）` : word,
+        key,
+        word,
+        'saved-words',
+        { createdAt: typeof entry.addedAt === 'number' ? entry.addedAt : null },
+        { hasNotes: Boolean(entry.meaning) },
+      ),
+    ];
+  });
+}
+
+/**
+ * One row per dictionary lookup.
+ *
+ * `firstAt` is when it was created and `at` is when it was last looked up, so
+ * both columns say something true and different — this store is the one place
+ * in the app where a "looked up 9 times" row exists, and it is exactly what a
+ * user comes to a filing system to find again.
+ */
+export function lookupHistoryFilesItems(
+  entries: readonly LookupHistoryEntry[] = loadLookupHistorySafely(),
+): FilesItem[] {
+  return entries.flatMap((entry) => {
+    const lemma = typeof entry?.lemma === 'string' ? entry.lemma.trim() : '';
+    const query = typeof entry?.query === 'string' ? entry.query.trim() : '';
+    const name = lemma || query;
+    if (!name) return [];
+    return [
+      studyRecord(
+        `lookup:${query || lemma}`,
+        name,
+        LOOKUP_HISTORY_STORAGE_KEY,
+        query || lemma,
+        'lookups',
+        {
+          createdAt: typeof entry.firstAt === 'number' ? entry.firstAt : null,
+          lastUsedAt: typeof entry.at === 'number' ? entry.at : null,
+        },
+        { hasNotes: Boolean(entry.meaning) },
+      ),
+    ];
+  });
+}
+
+/** One row per translation, named by its source text rather than its id. */
+export function translationHistoryFilesItems(
+  entries: readonly TranslationHistoryEntry[] = loadTranslationHistorySafely(),
+): FilesItem[] {
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry.id !== 'string') return [];
+    const source = typeof entry.sourceText === 'string' ? entry.sourceText.trim() : '';
+    return [
+      studyRecord(
+        `translation:${entry.id}`,
+        source.slice(0, 120) || entry.id,
+        TRANSLATION_HISTORY_STORAGE_KEY,
+        entry.id,
+        'translations',
+        { createdAt: typeof entry.ts === 'number' ? entry.ts : null },
+        { hasNotes: Boolean(entry.resultText) },
+      ),
+    ];
+  });
+}
+
+/**
+ * One row per known word, at level 1 or higher.
+ *
+ * `listKnownEntries` already drops level 0 — an unknown word is not a record of
+ * anything — so the count here is the same one the Notebook's `known` stream
+ * reports, not a differently-filtered number that would read as a discrepancy.
+ */
+export function knownWordFilesItems(
+  entries: readonly { word: string; level: number }[] = listKnownEntriesSafely(),
+  key: string = knowledgeKeySafely(),
+): FilesItem[] {
+  return entries.flatMap((entry) => {
+    const word = typeof entry?.word === 'string' ? entry.word.trim() : '';
+    if (!word) return [];
+    return [
+      studyRecord(`known-word:${word}`, word, key, word, 'known-words', {}, {
+        // The level is the whole content of this row; without it the row is a
+        // bare word and the store it came from is unguessable.
+        hasNotes: entry.level > 0,
+      }),
+    ];
+  });
+}
+
+/**
+ * One row per clipboard capture.
+ *
+ * `pinned` and `favorite` are deliberately NOT mapped onto a flag: there is no
+ * `starred` in `FilesItemFlags` yet, and gate 18 is where Favorites is built.
+ * Borrowing `referenced` or `enabled` to carry it would put a wrong word in a
+ * column that means something else.
+ */
+export function clipboardFilesItems(
+  entries: readonly ClipboardEntry[] = loadClipboardHistorySafely(),
+): FilesItem[] {
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry.id !== 'string') return [];
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    return [
+      studyRecord(
+        `clipboard:${entry.id}`,
+        text.slice(0, 120) || entry.id,
+        LS_KEYS.clipboardHistory,
+        entry.id,
+        'clipboard',
+        { createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : null },
+        { hasNotes: Boolean(text) },
+      ),
+    ];
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Safe readers. Each owner's loader touches `localStorage` (and, for saved and
+ * known words, the study-language setting) at call time; in a test or a preview
+ * window neither need exist. A throwing enumerator would take the whole index
+ * down, and gate 1 wants an honest zero, not a failed build.
+ * ------------------------------------------------------------------ */
+
+function safely<T>(read: () => T, fallback: T): T {
+  try {
+    return read();
+  } catch {
+    return fallback;
+  }
+}
+
+const loadSavedWordsSafely = () => safely(loadSaved, [] as SavedWord[]);
+const savedWordsKeySafely = () => safely(() => savedWordsKey(), `${LEGACY_SAVED_KEY}-ja`);
+const loadLookupHistorySafely = () => safely(loadLookupHistory, [] as LookupHistoryEntry[]);
+const loadTranslationHistorySafely = () =>
+  safely(loadTranslationHistory, [] as TranslationHistoryEntry[]);
+const listKnownEntriesSafely = () => safely(listKnownEntries, [] as { word: string; level: number }[]);
+const knowledgeKeySafely = () => safely(() => knowledgeKey(), 'jp-word-knowledge-ja');
+const loadClipboardHistorySafely = () => safely(loadClipboardHistory, [] as ClipboardEntry[]);
+
 /** `localStorage.getItem` where a store may not exist at all (tests, preview). */
 function readLocalStorage(key: string): string | null {
   try {
@@ -288,6 +511,11 @@ export const RENDERER_FILES_ENUMERATORS: readonly {
   { source: 'notebook', run: () => notebookFilesItems() },
   { source: 'local-deck', run: () => flashcardDeckFilesItems() },
   { source: 'highlights', run: () => annotationFilesItems() },
+  { source: 'saved-words', run: () => savedWordFilesItems() },
+  { source: 'lookups', run: () => lookupHistoryFilesItems() },
+  { source: 'translations', run: () => translationHistoryFilesItems() },
+  { source: 'known-words', run: () => knownWordFilesItems() },
+  { source: 'clipboard', run: () => clipboardFilesItems() },
 ];
 
 /**

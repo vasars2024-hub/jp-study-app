@@ -5,8 +5,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   annotationFilesItems,
+  clipboardFilesItems,
   flashcardDeckFilesItems,
+  knownWordFilesItems,
+  lookupHistoryFilesItems,
   notebookFilesItems,
+  savedWordFilesItems,
+  translationHistoryFilesItems,
   withRendererItems,
 } from '../components/filesapp/rendererEnumerators';
 import { NOTEBOOK_TIMELINE_STORAGE_KEY, type NotebookTimelineEntry } from '../notebookTimeline';
@@ -84,6 +89,12 @@ describe('files app — renderer-owned enumerators', () => {
       'notebook',
       'local-deck',
       'highlights',
+      // Gate 7's absorption: the five Notebook streams that had no Files reader.
+      'saved-words',
+      'lookups',
+      'translations',
+      'known-words',
+      'clipboard',
     ]);
     const notes = merged.counts.find((c) => c.categoryId === 'outputs/notes');
     expect(notes?.total).toBe(0);
@@ -228,9 +239,14 @@ describe('files app — the joined snapshot, gate 1', () => {
   it('reports every renderer enumerator by name, including the ones reading zero', () => {
     const merged = withRendererItems(emptySnapshot());
     expect(merged.enumerators.map((r) => r.source).sort()).toEqual([
+      'clipboard',
       'highlights',
+      'known-words',
       'local-deck',
+      'lookups',
       'notebook',
+      'saved-words',
+      'translations',
     ]);
     // A category at 0 has to be distinguishable from a reader that never ran,
     // which is the whole shape of the gate-1 finding this layer exists for.
@@ -243,5 +259,142 @@ describe('files app — the joined snapshot, gate 1', () => {
     expect(mined?.total).toBe(
       merged.items.filter((i) => i.categoryId === 'outputs/mined').length,
     );
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Gate 7 — the five Notebook streams Files could not see.
+ * ------------------------------------------------------------------ */
+
+describe('files app — the absorbed study-record streams (gate 7)', () => {
+  it('saved words keep their reading, their timestamp and their real key', () => {
+    const items = savedWordFilesItems(
+      [
+        { word: '猫', reading: 'ねこ', meaning: 'cat', addedAt: 1700 },
+        { word: 'カレー', reading: 'カレー', meaning: 'curry', addedAt: 1800 },
+        { word: '   ', reading: '', meaning: '', addedAt: 1900 },
+      ],
+      'jp-saved-words-ja',
+    );
+    // The blank word is dropped, not rendered as an empty row.
+    expect(items).toHaveLength(2);
+    expect(items[0].name).toBe('猫（ねこ）');
+    // Reading identical to the word must not be repeated in brackets.
+    expect(items[1].name).toBe('カレー');
+    expect(items[0].createdAt).toBe(1700);
+    expect(items[0].categoryId).toBe('outputs/notes');
+    expect(items[0].location).toEqual({
+      store: 'localStorage',
+      key: 'jp-saved-words-ja',
+      pointer: '猫',
+    });
+  });
+
+  it('a lookup carries first-seen and last-seen as different columns', () => {
+    const [item] = lookupHistoryFilesItems([
+      {
+        query: 'ねこ',
+        lemma: '猫',
+        meaning: 'cat',
+        lang: 'ja',
+        at: 5000,
+        firstAt: 1000,
+        count: 9,
+        lookupTimes: [1000, 5000],
+      },
+    ]);
+    expect(item.name).toBe('猫');
+    expect(item.createdAt).toBe(1000);
+    expect(item.lastUsedAt).toBe(5000);
+    expect(item.location.store).toBe('localStorage');
+  });
+
+  it('a translation is named by its source text, never by its id', () => {
+    const [item] = translationHistoryFilesItems([
+      {
+        id: 'tr-1',
+        sourceLang: 'ja',
+        targetLang: 'en',
+        sourceText: '吾輩は猫である',
+        resultText: 'I am a cat',
+        ts: 4000,
+        origin: 'app',
+      },
+    ]);
+    expect(item.name).toBe('吾輩は猫である');
+    expect(item.createdAt).toBe(4000);
+  });
+
+  it('known words get a NULL date rather than the notebook synthetic one', () => {
+    const items = knownWordFilesItems(
+      [
+        { word: '猫', level: 3 },
+        { word: '犬', level: 1 },
+      ],
+      'jp-word-knowledge-ja',
+    );
+    expect(items).toHaveLength(2);
+    // `aggregate.ts` gives these `Date.now() - level * 1000` so the timeline can
+    // sort them. That number means nothing, and a Date column showing it would
+    // be showing an invented value.
+    expect(items.every((i) => i.createdAt === null && i.modifiedAt === null)).toBe(true);
+    expect(items[0].name).toBe('猫');
+  });
+
+  it('clipboard rows survive a truncation without losing their pointer', () => {
+    const long = 'あ'.repeat(400);
+    const [item] = clipboardFilesItems([
+      { id: 'cb-1', type: 'text', text: long, createdAt: 900, pinned: true },
+    ]);
+    expect(item.name).toHaveLength(120);
+    expect(item.location).toEqual({
+      store: 'localStorage',
+      key: 'jp-clipboard-history',
+      pointer: 'cb-1',
+    });
+    // Gate 18 owns Favorites; `pinned` must NOT be smuggled into another flag.
+    expect(item.flags).toEqual({ hasNotes: true });
+  });
+
+  it('every absorbed row is app-generated, and none claims mined provenance', () => {
+    const all = [
+      ...savedWordFilesItems([{ word: '猫', reading: '', meaning: '', addedAt: 1 }], 'k'),
+      ...lookupHistoryFilesItems([
+        { query: 'q', lemma: 'l', lang: 'ja', at: 2, firstAt: 1, count: 1, lookupTimes: [] },
+      ]),
+      ...translationHistoryFilesItems([
+        { id: 't', sourceLang: 'ja', targetLang: 'en', sourceText: 's', resultText: 'r', ts: 3, origin: 'app' },
+      ]),
+      ...knownWordFilesItems([{ word: 'w', level: 2 }], 'k'),
+      ...clipboardFilesItems([{ id: 'c', type: 'text', text: 't', createdAt: 4 }]),
+    ];
+    expect(all).toHaveLength(5);
+    expect(all.every((i) => i.provenance === 'app-generated')).toBe(true);
+    // Nothing here is mined text, so nothing may carry a trust mark.
+    expect(all.some((i) => i.provenance === 'book-text')).toBe(false);
+    // Ids are namespaced, so a word saved AND known cannot collide.
+    expect(new Set(all.map((i) => i.id)).size).toBe(5);
+  });
+
+  it('control — a malformed row is dropped, it does not become a blank item', () => {
+    // Each reader is handed exactly the shape that would slip past a naive
+    // `entries.map(...)` and render a row with no name.
+    expect(savedWordFilesItems([{ word: '', reading: '', meaning: '', addedAt: 1 }], 'k')).toEqual([]);
+    expect(
+      lookupHistoryFilesItems([
+        { query: '', lemma: '', lang: 'ja', at: 1, firstAt: 1, count: 1, lookupTimes: [] },
+      ]),
+    ).toEqual([]);
+    expect(translationHistoryFilesItems([{ id: 0 } as never])).toEqual([]);
+    expect(knownWordFilesItems([{ word: '  ', level: 1 }], 'k')).toEqual([]);
+    expect(clipboardFilesItems([null as never])).toEqual([]);
+  });
+
+  it('control — the same readers DO produce rows for well-formed input', () => {
+    // Without this the assertions above would also pass on a reader that
+    // returned [] unconditionally.
+    expect(savedWordFilesItems([{ word: '猫', reading: '', meaning: '', addedAt: 1 }], 'k')).toHaveLength(1);
+    expect(knownWordFilesItems([{ word: '猫', level: 1 }], 'k')).toHaveLength(1);
+    expect(clipboardFilesItems([{ id: 'c', type: 'text', text: 't', createdAt: 1 }])).toHaveLength(1);
   });
 });

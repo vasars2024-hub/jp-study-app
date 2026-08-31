@@ -38,8 +38,14 @@ export interface FilesParityRow {
    * The section this capability is still reachable in WITHOUT the Files app.
    * Required for `preserved`, and forbidden otherwise: a `new` or `migrated`
    * row that names a section is claiming a route it does not have.
+   *
+   * `'global'` is for a surface mounted outside the section switch — a desktop
+   * widget, or a panel `App.tsx` renders on every screen. It is a STRONGER
+   * claim than naming one section, not a weaker one, so the module+symbol are
+   * still required; only the `AppSection` case lookup is skipped, because there
+   * is no case to look up.
    */
-  section: DesktopWinSection | null;
+  section: DesktopWinSection | 'global' | null;
   /** Repo-relative file that proves the route. Empty for non-`preserved`. */
   module: string;
   /** A string that file must contain. Empty for non-`preserved`. */
@@ -245,6 +251,46 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
     module: 'src/renderer/views/NovelReader.tsx',
     symbol: 'loadAnnotations',
     note: 'Highlights still render and delete inside the book they were made in.',
+  },
+  {
+    capability: 'saved-words',
+    status: 'preserved',
+    section: 'flashcards',
+    module: 'src/renderer/components/flashcards/FlashcardsContent.tsx',
+    symbol: 'loadSaved',
+    note: 'Saved words are still listed and turned into cards in Flashcards.',
+  },
+  {
+    capability: 'lookups',
+    status: 'preserved',
+    section: 'global',
+    module: 'src/renderer/widgets/system.tsx',
+    symbol: 'loadLookupHistory',
+    note: 'Recent Lookups is a desktop widget, reachable from every section, not one.',
+  },
+  {
+    capability: 'translations',
+    status: 'preserved',
+    section: 'translate',
+    module: 'src/renderer/components/translate/TranslateContent.tsx',
+    symbol: 'loadTranslationHistory',
+    note: 'Translation history is still shown by the Translate app itself.',
+  },
+  {
+    capability: 'known-words',
+    status: 'preserved',
+    section: 'stats',
+    module: 'src/renderer/components/stats/StatsContent.tsx',
+    symbol: 'knowledgeCounts',
+    note: 'Statistics still counts them per level, and the dictionary still marks them.',
+  },
+  {
+    capability: 'clipboard',
+    status: 'preserved',
+    section: 'global',
+    module: 'src/renderer/components/ClipboardHistoryPanel.tsx',
+    symbol: 'loadClipboardHistory',
+    note: 'App.tsx mounts the clipboard panel on every screen; Blanc mounts it too.',
   },
 
   /* --------------------------- the actions ---------------------------- */
