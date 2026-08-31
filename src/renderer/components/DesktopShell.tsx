@@ -3120,8 +3120,8 @@ export default function DesktopShell({
           <button
             type="button"
             className="os-tray-btn"
-            title="Quick settings"
-            aria-label="Quick settings"
+            title={t('quickSettings.title')}
+            aria-label={t('quickSettings.title')}
             onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

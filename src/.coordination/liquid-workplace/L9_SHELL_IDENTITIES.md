@@ -52,3 +52,14 @@ predicate” with “one call site.” The taskbar is now a legitimate second co
 `canPresentLiquid` predicate. The guard permits exactly those two calls and asserts the second
 targets `taskCtx.win.section`; hand-written eligibility lists remain forbidden. Focused fidelity,
 taskbar, and presentation suites pass 52/52 after the correction.
+
+## 2026-08-30 — Quick Settings taskbar localization
+
+The L9 entry-point inventory found the taskbar Quick Settings button still carried raw English
+in both its tooltip and accessible name, despite the complete `quickSettings.title` catalog key.
+Both attributes now resolve that shared key, so EN/JA/ZH/RU stay aligned without new catalog data.
+
+Focused verification passed 2/2 shell localization tests and the repository i18n gate at 11,782
+English keys with complete JA/ZH/RU coverage. Live renderer read back the localized English title
+and accessible name from the real taskbar button. The first L9 bullet remains open for its full
+controlled rubric receipt.

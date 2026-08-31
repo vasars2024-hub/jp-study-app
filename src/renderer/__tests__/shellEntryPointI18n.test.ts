@@ -29,9 +29,11 @@ describe('shared shell entry-point localization', () => {
     for (const key of keys.slice(0, 5)) {
       expect(desktopSource).toContain(`t('${key}')`);
     }
+    expect(desktopSource.match(/t\('quickSettings\.title'\)/g)).toHaveLength(2);
     expect(paletteSource).toContain("t('palette.toolboxPlaceholder')");
 
     expect(desktopSource).not.toMatch(/label:\s*['"](?:New sticky note|New app shortcut|Widgets…|Personalize…|Desktop & display settings)/);
+    expect(desktopSource).not.toMatch(/(?:title|aria-label)="Quick settings"/);
     expect(paletteSource).not.toContain("? 'Search Toolbox commands'");
   });
 
