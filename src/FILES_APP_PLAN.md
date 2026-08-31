@@ -1352,3 +1352,28 @@ sources: the Files app names the SECTION and lets the shell mount `MediaCenterVi
 initialTab="music"` through the shared `openSectionSurface`; it imports no music module
 (`musicPlayer`, `MediaCenterView`, `audioEngine`, `musicLibrary` all absent from
 `FilesApp.tsx`). 22 tests in `filesAppOpenPlan.test.ts`, up from 18.
+
+### 2026-08-31 (thirteenth) — gate 16's model, half the gate, committable on its own
+
+`f2313736`. The pure collections model; the renderer store and the folder UI are the next
+slice. **A collection holds ITEM IDS, never items**, which is what makes the gate's "deleting
+the collection leaves every item in place" true by construction rather than by care — a test
+asserts it structurally, not only by outcome.
+
+**Deleting PROMOTES children to the parent.** Recursive delete would take containers the user
+never named, and a container has no soft-delete window (the plan's undo window is for index
+rows). The same rule runs on read: a parent that did not survive parsing promotes its children
+rather than orphaning them into an invisible branch.
+
+Decisions, each pinned: names unique among SIBLINGS not globally ("Season 1" under two shows
+is the ordinary case); a cycle guard on nesting, and `ancestorsOf` terminates on a document
+that already contains one — unreachable through the API, but a corrupt store can carry it and
+this runs during the first render; a stale item id is COUNTED by `resolveCollection`, never
+dropped; an unknown FUTURE version reads as EMPTY rather than being reinterpreted, because
+reading a newer shape with today's rules is how a downgrade eats the user's folders. Adding
+twice is idempotent; everything else refuses with a named key. 18 tests, the gate's own
+sentence walked end to end with the reopen as a real JSON round trip.
+
+`collections.ts` is classified `pending` in `tools/architecture-baseline.json` — the shape
+that file's readme already names for three other entries, "a pure layer that is built and
+tested but has no consumer yet". Remove the entry when `FilesApp` imports it.
