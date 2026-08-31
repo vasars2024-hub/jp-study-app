@@ -117,6 +117,7 @@
   const scraperState = specState('__LQP_SCRAPER_ORIG');
   const settingsState = specState('__LQP_SETTINGS_ORIG');
   const ytState = specState('__LQP_YT_ORIG');
+  const videoState = specState('__LQP_VIDEO_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -3096,6 +3097,270 @@
         lyricsRecovery: (w) => detach(q(w, '.music-hint p, .music-line-text'), 'no lyric state'),
         queueMirror: (w) => detach(q(w, '.mc-track-queue > button'), 'no queue rows'),
         youtubeDraft: (w) => detach(q(w, '.music-yt button'), 'no YouTube action'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /*
+     * L9's first RULE C surface — the Media Center's VIDEO tab, the densest presentable
+     * window in `CENSUS.md`. It shares a `.fwin` and a title bar with `music`, so it needs
+     * `notSel` for the same reason `vn` does: the Media Center is ONE window whose page
+     * swaps, and a title-only match on a drifting tab scores the tab that happens to be
+     * mounted. `rootSel: '.mc-video-page'` plus `notSel: '.mc-music-layout'` makes the
+     * identity exact, and `navReach` then asserts the drift is not happening rather than
+     * assuming it (L9 handoff trap 1: HMR resets the tab and every harness scores whatever
+     * it lands on).
+     *
+     * Every row is a CROSS-CHECK between two independently rendered places, because this
+     * surface's real failure mode is not a missing button — it is two renderings of one
+     * state disagreeing (`upNextShelf` guards exactly the "relocated, not duplicated"
+     * property that `04e51992` established, and `inspectorHonesty` guards the half-loaded
+     * inspector).
+     */
+    video: {
+      titleRe: /Video|ビデオ|视频|Виде/i,
+      rootSel: '.mc-video-page',
+      notSel: '.mc-music-layout',
+      features: [
+        {
+          // The stage's honest state: with no source there is no `<video>` element at all,
+          // and the file-entry empty offers its two real entry actions, both enabled. A
+          // stage that mounts a player with nothing to play is the dishonest half; an empty
+          // that names a dead end is the other.
+          id: 'stageHonesty',
+          f: (w) => {
+            const empties = qa(w, '.mc-video-empty');
+            const media = qa(w, '.mc-video-stage video').length;
+            // `:scope > div > button` and NOT a bare `button`: `04e51992` moved the
+            // up-next shelf INSIDE this empty state, so a descendant query counts its
+            // seven poster cards as entry actions — and the control then could not falsify
+            // the row, because removing one real action still left eight "actions". The
+            // empty's own action row is its direct `<div>` child.
+            const ENTRY = ':scope > div > button';
+            const entry = empties.find((e) => qa(e, ENTRY).length >= 2);
+            const acts = entry ? qa(entry, ENTRY) : [];
+            const live = acts.filter((b) => !b.disabled).length;
+            const titled = empties.filter((e) => txt(q(e, 'strong'))).length;
+            return {
+              ok: empties.length > 0 && titled === empties.length
+                && (media > 0 ? !entry : !!entry && acts.length >= 2 && live === acts.length),
+              ev: `empties=${empties.length} titled=${titled} video=${media} entryActions=${acts.length} enabled=${live}`,
+            };
+          },
+        },
+        {
+          // The mute-pair contract the topbar's own source argues for: a greyed action
+          // must carry its reason. Presence is not what is scored — the agreement between
+          // `disabled` and a non-empty `title` is, in both directions.
+          id: 'topbarActions',
+          f: (w) => {
+            const acts = qa(w, '.mc-video-actions button');
+            const off = acts.filter((b) => b.disabled);
+            const explained = off.filter((b) => (b.title || '').trim().length > 0).length;
+            const on = acts.length - off.length;
+            return {
+              ok: acts.length >= 4 && on >= 2 && explained === off.length,
+              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained}`,
+            };
+          },
+        },
+        {
+          // Driven: `step('toggle')` clicks the first learning toggle. The row asserts the
+          // flip landed AND that nothing else in the group moved — a group whose controls
+          // share one state would flip together, which is the defect a count cannot see.
+          id: 'learningToggles',
+          f: (w) => {
+            const g = videoState();
+            const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+            const now = boxes.map((b) => b.checked);
+            const was = g.toggles;
+            const flipped = was ? now.filter((v, i) => v !== was[i]).length : -1;
+            return {
+              ok: boxes.length >= 6 && !!was && flipped === 1 && now[0] !== was[0],
+              ev: `toggles=${boxes.length} before=${JSON.stringify(was)} after=${JSON.stringify(now)} flipped=${flipped}`,
+            };
+          },
+        },
+        {
+          // The transcription block's own model select — NOT the YouTube bar's, which
+          // shares the class and carries a different option list. Scored against the
+          // language segment beside it: exactly one active, and the select's value is a
+          // real option rather than a stale string the list no longer offers.
+          id: 'transcriptionModel',
+          f: (w) => {
+            const sel = q(w, '.mc-inspector-block > .media-model-select');
+            const opts = sel ? Array.from(sel.options).map((o) => o.value) : [];
+            const seg = qa(w, '.media-modelseg .sp-seg-btn');
+            const active = activeOf(seg, 'active');
+            return {
+              ok: !!sel && opts.length >= 2 && opts.includes(sel.value)
+                && seg.length >= 2 && active === 1,
+              ev: `options=${opts.length} value="${sel ? sel.value : 'absent'}" inList=${opts.includes(sel ? sel.value : '')} segments=${seg.length} active=${active}`,
+            };
+          },
+        },
+        {
+          id: 'watchFolder',
+          f: (w) => {
+            const btns = qa(w, '.media-watch button');
+            const live = btns.filter((b) => !b.disabled).length;
+            return { ok: btns.length > 0 && live === btns.length, ev: `controls=${btns.length} enabled=${live}` };
+          },
+        },
+        {
+          // Driven: `step('youtube')` drafts a URL. The row is the draft surviving in the
+          // field with its action live — a bar that clears what was typed is the failure.
+          id: 'youtubeDraft',
+          f: (w) => {
+            const g = videoState();
+            const input = q(w, '.media-yt-input');
+            const action = q(w, '.media-yt button');
+            return {
+              ok: !!input && !!g.ytTest && input.value === g.ytTest && !!action && !action.disabled,
+              ev: `drafted=${!!input && input.value === g.ytTest} actionEnabled=${!!action && !action.disabled}`,
+            };
+          },
+        },
+        {
+          /*
+           * EXACTLY ONE up-next shelf. `04e51992` moved the shelf INTO the empty stage to
+           * close category 4's dead region, and the property that makes that a relocation
+           * rather than a duplication is that one `upNext` value renders in one of two
+           * places — never both, never neither. A count of `>= 1` would pass the duplicate
+           * and a count of `<= 1` would pass the loss; only `=== 1` is the contract.
+           */
+          id: 'upNextShelf',
+          f: (w) => {
+            const shelves = qa(w, '.mc-up-next');
+            const cards = shelves.reduce((n, s) => n + qa(s, 'button, article, .mc-shelf-card').length, 0);
+            const shown = shelves.filter((s) => s.checkVisibility && s.checkVisibility()).length;
+            return {
+              ok: shelves.length === 1 && cards > 0 && shown === 1,
+              ev: `shelves=${shelves.length} cards=${cards} visible=${shown}`,
+            };
+          },
+        },
+        {
+          /*
+           * The inspector is either fully loaded or fully empty, never half. Four
+           * independently rendered signals — the score row, the MAL link, the meta line and
+           * the empty paragraph — all derive from one `current`, so any disagreement is a
+           * surface showing state it does not have.
+           */
+          id: 'inspectorHonesty',
+          f: (w) => {
+            const ins = q(w, '.mc-video-inspector');
+            if (!ins) return { ok: false, ev: 'no inspector rail' };
+            const score = !!q(ins, '.mc-inspector-score-row');
+            const meta = !!q(ins, '.mc-video-meta');
+            const mal = !!qa(ins, '.mc-section-head button')[0];
+            const empty = !!q(ins, '.mc-muted');
+            const loaded = score && meta && mal && !empty;
+            const blank = !score && !meta && !mal && empty;
+            return {
+              ok: loaded || blank,
+              ev: `scoreRow=${score} meta=${meta} malLink=${mal} emptyCopy=${empty} coherent=${loaded ? 'loaded' : blank ? 'blank' : 'MIXED'}`,
+            };
+          },
+        },
+        {
+          /*
+           * The tab this window is actually on, cross-checked against the title the window
+           * chrome advertises. L9 handoff trap 1: the Media Center tab DRIFTS (HMR resets
+           * it) and every harness silently scores whatever page it lands on. Two
+           * independently rendered strings agreeing is what makes the rest of this spec's
+           * numbers attributable to Video at all.
+           */
+          id: 'navReach',
+          f: (w) => {
+            const items = qa(w, '.mc-nav button');
+            const active = items.filter((b) => b.classList.contains('is-active'));
+            // The nav item is `<svg><span><strong>Video</strong><small>Immersion
+            // player</small></span></button>`. `textContent` concatenates with NO
+            // separator, so splitting on a newline yields "VideoImmersion player" and the
+            // comparison against the window title fails on a correct surface — measured,
+            // not reasoned. The `<strong>` is the label.
+            const label = active[0] ? txt(q(active[0], 'strong')) : '';
+            const title = txt(q(w, '.fwin-title-text'));
+            const page = q(w, '.mc-page');
+            return {
+              ok: items.length >= 6 && active.length === 1 && !!label && label === title
+                && !!page && page.classList.contains('mc-video-page'),
+              ev: `items=${items.length} active=${active.length} activeLabel="${label}" windowTitle="${title}" page="${page ? page.className : 'absent'}"`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        toggle: (w) => {
+          const g = videoState();
+          const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+          if (!boxes.length) return { refused: 'no learning toggles' };
+          if (!g.toggles) {
+            g.toggles = boxes.map((b) => b.checked);
+            g.prefsStorage = localStorage.getItem('jp-media-player-preferences-v1');
+          }
+          if (boxes[0].checked !== g.toggles[0]) return { already: true, now: boxes.map((b) => b.checked) };
+          boxes[0].click();
+          return { was: g.toggles[0], now: boxes[0].checked };
+        },
+        youtube: (w) => {
+          const g = videoState();
+          const input = q(w, '.media-yt-input');
+          if (!input) return { refused: 'no YouTube import field' };
+          // The runner dirties the first editable field BEFORE the drive, and on this
+          // surface that field IS this one. Recording the mark as the "original" would
+          // make undo restore the harness's own probe string into the live app, so a
+          // dirtied value is never captured as an original.
+          if (g.youtube == null) g.youtube = /lqp-roundtrip-/.test(input.value) ? '' : input.value;
+          g.ytTest = 'https://youtu.be/aaaaaaaaaaa';
+          typeInto(input, g.ytTest);
+          return { drafted: true };
+        },
+      },
+      drive: ['toggle', 'youtube'],
+      undo: {
+        video: (w) => {
+          const g = window.__LQP_VIDEO_ORIG;
+          if (!g) return null;
+          const done = [];
+          const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+          if (g.toggles && boxes.length === g.toggles.length) {
+            boxes.forEach((b, i) => { if (b.checked !== g.toggles[i]) { b.click(); done.push(`toggle${i}`); } });
+          }
+          const input = q(w, '.media-yt-input');
+          if (input && g.youtube != null && input.value !== g.youtube) {
+            typeInto(input, g.youtube); done.push('youtube');
+          }
+          // The preference blob is written by the click's own effect, so it is put back on
+          // the next tick — after React has finished persisting the restored value.
+          setTimeout(() => {
+            if (g.prefsStorage == null) localStorage.removeItem('jp-media-player-preferences-v1');
+            else localStorage.setItem('jp-media-player-preferences-v1', g.prefsStorage);
+          }, 0);
+          window.__LQP_VIDEO_ORIG = null;
+          return done.length ? `video:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        stageHonesty: (w) => detach(
+          qa(w, '.mc-video-empty').filter((e) => qa(e, ':scope > div > button').length >= 2)
+            .map((e) => qa(e, ':scope > div > button')[1])[0],
+          'no multi-action empty state',
+        ),
+        topbarActions: (w) => stripAttr(
+          qa(w, '.mc-video-actions button').filter((b) => b.disabled)[0],
+          'title',
+          'every topbar action is enabled — no muted control to falsify',
+        ),
+        learningToggles: (w) => detach(q(w, '.mc-toggle-list .mc-toggle'), 'no learning toggles'),
+        transcriptionModel: (w) => removeClassAll(qa(w, '.media-modelseg .sp-seg-btn.active'), 'active'),
+        watchFolder: (w) => detach(q(w, '.media-watch button'), 'no watch-folder control'),
+        youtubeDraft: (w) => detach(q(w, '.media-yt button'), 'no YouTube action'),
+        upNextShelf: (w) => detach(q(w, '.mc-up-next'), 'no up-next shelf'),
+        inspectorHonesty: (w) => removeClassAll(qa(w, '.mc-video-inspector .mc-muted'), 'mc-muted'),
+        navReach: (w) => removeClassAll(qa(w, '.mc-nav .is-active'), 'is-active'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

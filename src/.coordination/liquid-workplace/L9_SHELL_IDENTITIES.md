@@ -885,3 +885,52 @@ on both surfaces — `injectedClip` 0 → 1 → 0, and the plate plant excused, 
 
 **Category 4 CLOSED for L9 bullet 1.** Remaining for the bullet: categories 5–8 × 2 surfaces.
 `sampled-out:` unchanged.
+
+## 2026-08-31 — primary — category 6 on Video: PASS 10/10, no product defect, two instrument corrections
+
+Category 5 needs a committed `cat6-<label>.json` or Q7/Q8/Q9 read `MEASURE` and the run is VOID,
+so category 6 is scored FIRST on both L9 surfaces. Neither existed: `l6-parity.js` had no spec for
+the Media Center's Video tab (its `music` sibling covers the Music tab only).
+
+**`video` spec — 10 rows, and every one is a cross-check between two independently rendered
+places**, because this surface's real failure mode is not a missing control, it is two renderings
+of one state disagreeing. `rootSel: '.mc-video-page'` + `notSel: '.mc-music-layout'` for the same
+reason `vn` needs one: the Media Center is ONE `.fwin` whose page swaps.
+
+| row | what earns it |
+| --- | --- |
+| `stageHonesty` | `video` elements 0 while the empty states show; the entry empty's 2 actions both enabled |
+| `topbarActions` | 4 actions, 2 enabled, and **every disabled one carries a non-empty `title`** (the mute-pair contract) |
+| `learningToggles` | driven: `toggle` clicks the first; exactly 1 of 6 moved, the other five unchanged |
+| `transcriptionModel` | the inspector's own select (4 options, value in list) + 1 of 2 language segments active |
+| `watchFolder` | 1 control, enabled |
+| `youtubeDraft` | driven: the drafted URL survives in the field and its action stays live |
+| `upNextShelf` | **exactly one** shelf, 7 cards, visible — the "relocated, not duplicated" property `04e51992` established |
+| `inspectorHonesty` | score row / MAL link / meta line / empty copy all agree — `blank`, never `MIXED` |
+| `navReach` | active nav `<strong>` === `.fwin-title-text` === the mounted `.mc-page` class |
+| `windowLifecycle` | shared: 5 chrome buttons, `aria-pressed` a real boolean |
+
+**Result: PASS 10/10.** parity `standard 10/10` vs `liquid 10/10`, equal, `rowsAgree true`, `na 0`.
+Round trip standard → liquid → standard: `fieldsHeld true`, `shellHeld true`, **0 diffs**, box
+`1080x700` in both presentations. Negative control: **all 10 mutations fell exactly their own row
+and every one returned to 10/10** — `CONTROL FAILED AS REQUIRED`. No product change was needed.
+
+**Correction 22 — the nav label is the `<strong>`, not `textContent.split('\n')`.** The item is
+`<svg><span><strong>Video</strong><small>Immersion player</small></span>`; `textContent`
+concatenates with NO separator, so `navReach` read `activeLabel "VideoImmersion player"` against
+`windowTitle "Video"` and scored a correct surface 9/10. Its own mutation then reported
+`fellRows: []` — a row that is already false cannot fall, which is how the instrument error was
+caught rather than filed as a defect.
+
+**Correction 23 — and it is my own cat4 fix biting back.** `stageHonesty`'s actions were queried
+as a bare descendant `button`. `04e51992` moved the up-next shelf INSIDE that empty state, so the
+query counted its **seven poster cards as entry actions**: detaching a real action still left
+eight, the row stayed true, and the control read VOID on a passing surface. Scoped to
+`:scope > div > button` — the empty's own action row. **A relocation changes what a descendant
+query means; re-read every harness that walks the region you moved something into.**
+
+Restored to exactly what was found: presentation `standard`, toggles
+`[false,false,false,true,false,false]`, YouTube field empty, `jp-media-player-preferences-v1`
+byte-identical, page still `mc-video-page`, 1080x700.
+
+**Cells: 9 of 16.** `sampled-out:` unchanged.
