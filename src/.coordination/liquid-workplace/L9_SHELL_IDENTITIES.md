@@ -232,7 +232,50 @@ Mutation control: deleting the prop fails exactly the two Escape cases.
 Commit `5d13f920`.
 
 L9 bullet 2's seven named surfaces are now all migrated — Note, Visualizer, Music
-widget, City, notifications, onboarding, help. Still open: bullet 1's controlled
-entry-point receipt, bullet 3 (Aero/Wired/Blanc-native adapters), bullet 4
-(Secret Aero/Wired lifecycle and Blanc cold-open boundaries), and the §8
-theme/mode gate.
+widget, City, notifications, onboarding, help.
+
+## 2026-08-30 — Bullet 1's third entry point, which did not exist
+
+The bullet is "taskbar/context/command entry points". Two shipped: the title-bar
+button and the taskbar context item, both of which HIDE the affordance on a
+section `canPresentLiquid` refuses. The COMMAND one was absent — grep for Liquid
+in `CommandPalette.tsx` returned nothing — so the one entry point a keyboard user
+reaches without pointing at a particular window could present nothing.
+
+`window.togglePresentation` joins the Window family on the same single `os:window`
+event the other twelve use. **No default chord**: conventional is the default and
+Liquid is entered deliberately, so a stray key must not present a window. A command
+list cannot hide per-window, so it REFUSES OUT LOUD — `canPresentLiquid(topWin
+.section)` first, then a localized dismissible toast naming the reason.
+
+Live through the palette itself: "liquid" → exactly 1 row, category Windows;
+Enter → Video gains `.fwin-liquid` at rect `[40,19,711,562]`; Enter again → back
+to standard at `[40,19,711,562]`, identical across all three readings, so the round
+trip is presentation only. CONTROL: with the garden on top the same gesture left
+`.fwin-liquid` at **0** and raised the refusal. Commit `b1e35170`.
+
+TRAP: `keyboardShortcuts.ts` is foreign-dirty — another track's monitor commands
+and a whole "Liquid Study Workspace" block sit in it uncommitted. `git add` on the
+path would have committed both ahead of their owner. Staged as a HEAD+edit blob;
+the reconstructed file parses with 0 TypeScript parse diagnostics.
+
+Still open in L9: bullet 1's full controlled rubric receipt across all three entry
+points, bullet 3 (Aero/Wired/Blanc-native adapters), bullet 4 (Secret Aero/Wired
+lifecycle and Blanc cold-open boundaries), and the §8 theme/mode gate.
+
+### Same turn, after the last slice — the full suite caught one of my own
+
+`liquidWindowSnapshotFidelity` pinned `canPresentLiquid(` at exactly **2** call sites in
+`DesktopShell.tsx`, so the command entry point turned it red by calling the very predicate
+the guard exists to enforce. The count was a proxy; the invariant is "one predicate, no
+second hand-written section list". The call-site SET is asserted by name now — chrome,
+taskbar item, command. Mutation control: substituting
+`topWin.section !== 'city' && topWin.section !== 'visualizer'` fails exactly that case, 13
+others green. A blanket "no `!== 'city'` anywhere" was tried and reverted in the same pass:
+window cycling legitimately reads that section at `DesktopShell.tsx:1696` to decide
+maximization, which is not presentability. Commit `3f310b51`.
+
+Gates after it, app idle: full `npx vitest run` **exit 0 — 12,162 passed / 6 skipped /
+0 FAILED** (12,133 at the start of this turn); i18n exit 0 at **11,791** English keys
+complete in ja/zh/ru; `node tools/architecture-audit.cjs` exit 0, 2,378 modules, 26
+findings, **nothing new**; touched-path ESLint 0 errors.
