@@ -1037,12 +1037,22 @@
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
+/*
+ * `clamp` on `left` rather than a bare 8px: the badge is a fixed 27px circle
+ * pinned to one edge, so on a poster narrower than 35px its right edge lands
+ * outside the art and `.medialib-card__art` reports `35>34`. The clamp slides
+ * it inward only once the art can no longer hold it at the normal inset — at
+ * every ordinary tile width `calc(100% - 27px)` is far above 8px and nothing
+ * moves. Shrinking the circle instead would make it an ellipse.
+ */
 .mc-tile-play {
   position: absolute;
-  left: 8px;
+  left: clamp(0px, 8px, calc(100% - 27px));
   bottom: 8px;
   width: 27px;
-  height: 27px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1061,16 +1071,29 @@
   transform: translateY(0);
 }
 
+/*
+ * `max-width` because these are shrink-to-fit boxes pinned to one edge: with
+ * only `left: 7px` set, `right` resolves to whatever is left over and goes
+ * NEGATIVE once the badge is wider than the art. Measured on a 36px compact
+ * tile in a 260x170 window, `EP …` sat at `right: -2.17px` and made
+ * `.medialib-card__art` report `36>34` under `overflow-x: hidden`. Truncating
+ * keeps the badge — it is the only thing distinguishing one tile from the next
+ * on a single-series shelf — where hiding it at a breakpoint would not.
+ */
 .mc-tile-level,
 .mc-tile-episode {
   position: absolute;
   top: 7px;
+  max-width: calc(100% - 14px);
+  overflow: hidden;
   padding: 3px 5px;
   border-radius: 5px;
   background: rgba(7, 9, 14, 0.72);
   color: #f1f2f5;
   font-size: var(--mc-fs-micro, 11px);
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   backdrop-filter: blur(8px);
 }
 
@@ -1325,8 +1348,18 @@
   margin-bottom: 13px;
 }
 
+/*
+ * `min-width: 0` only governs while the topbar is a ROW — it is the automatic
+ * minimum size along the main axis. Under `@container mc (max-width: 640px)`
+ * the bar flips to a column with `align-items: flex-start`, width becomes the
+ * CROSS axis, and this block reverted to fit-content: 156px of nowrap title in
+ * a 126px bar, which is where `main.mc-content 170>154` came from once the
+ * inspector below it had been fixed. `max-width: 100%` is inert in the row case
+ * and is the clamp in the column case; the `strong` below already ellipsises.
+ */
 .mc-video-topbar > div:first-child {
   min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -1369,6 +1402,15 @@
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
+/*
+ * `safe center` and `overflow: auto` are a pair, and both are needed the moment the
+ * queue moves in here (see `upNext` in MediaCenterView). A plain `center` in a
+ * scrolling flex column puts the overflow above the scroll origin, where no scrollbar
+ * can reach it; `safe` falls back to `flex-start` exactly when that would happen. The
+ * scroller is also what keeps the taller content out of the `clipped` bar — a box that
+ * escapes the surface with no scrollable ancestor is clipping, one with a scroller is
+ * not.
+ */
 .mc-video-empty {
   position: absolute;
   z-index: 3;
@@ -1376,7 +1418,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
+  overflow: auto;
   padding: 30px;
   text-align: center;
   background:
@@ -1408,8 +1451,20 @@
   line-height: 1.5;
 }
 
+/*
+ * The two actions are the whole point of the empty state, so they wrap rather
+ * than being hidden or clipped. Measured at 260x170: the row's min-content is
+ * 174px (80 + 7 + 87) against a 64px content box, and `nowrap` pushed
+ * `.mc-video-stage` to `149>124` under `overflow-x: hidden` — content shoved
+ * out of a box with no scrollbar to get it back, which is strictly worse than a
+ * scrollbar. Same shape as `.mc-lyrics-frame .music-hint-btns` below.
+ */
 .mc-video-empty > div {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+  min-width: 0;
   gap: 7px;
 }
 
@@ -1531,8 +1586,39 @@
   gap: 5px;
 }
 
+/*
+ * The shared `.media-model-select` in styles.css is `max-width: 200px` — a ceiling
+ * with no floor beneath it. A `select` has `white-space: pre`, so its min-content is
+ * its widest option label; clamped by that max-width it sits at a hard 200px however
+ * narrow the rail gets, and in a 260x170 window it was what floored the inspector's
+ * grid track at 226px inside a 126px box. `min(200px, 100%)` is inert at or above
+ * 200px of available width — every other measured case — and lets the control track a
+ * narrower parent instead of overflowing it.
+ *
+ * Scoped here rather than fixed at the shared rule on purpose: that rule is also worn
+ * by six Settings panels this slice has not measured, and `styles.css` is carrying
+ * another track's uncommitted work. Widening it is a separate, deliberate change.
+ */
+.mc-inspector-block .media-model-select {
+  min-width: 0;
+  max-width: min(200px, 100%);
+}
+
 .mc-up-next {
   margin-top: 17px;
+}
+
+/*
+ * The shelf keeps its own left-aligned reading order inside a centred empty state, and
+ * takes the full stage width rather than the fit-content width `align-items: center`
+ * would otherwise give it.
+ */
+.mc-video-empty > .mc-up-next {
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  margin-top: 22px;
+  text-align: left;
 }
 
 .mc-tile-row-small {
@@ -3070,9 +3156,10 @@
     grid-template-columns: 1fr;
   }
 
+  /* `minmax(0, …)`, not a bare `1fr`: see the ≤640 rule below for the measurement. */
   .mc-video-inspector {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .mc-music-layout {
@@ -3147,9 +3234,21 @@
     display: none;
   }
 
+  /*
+   * A bare `1fr` is `minmax(auto, 1fr)`, and that `auto` minimum is the widest
+   * child's MIN-CONTENT — a grid track cannot shrink past it however narrow the
+   * box is. Measured on the Video inspector in a 260x170 window: the track
+   * resolved to 226px inside a 126px box and pushed `main.mc-content` to
+   * `240>154`, a horizontal scrollbar on a surface with nothing to scroll to.
+   * The 226 came from `select.media-model-select`, whose `white-space: pre`
+   * makes its min-content the longest option label. `minmax(0, …)` lets the
+   * track take the box; the select's own `max-width: min(200px, 100%)` (in
+   * styles.css) is the other half — without it the select just overflows the
+   * block instead of the block overflowing the page.
+   */
   .mc-home-aside,
   .mc-video-inspector {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .mc-music-layout {
@@ -3193,6 +3292,38 @@
    the library's two contextual buttons use real 32px boxes instead of hit-area
    overhang that a narrow panel has nowhere to paint. */
 @container mc (max-width: 360px) {
+  /*
+   * 30px a side is 60 of a 124px stage. Wrapping the action row is not enough on
+   * its own — the wider button alone is 87px min-content — so the frame gives up
+   * padding before the buttons give up their labels.
+   */
+  .mc-video-empty {
+    padding: 12px;
+  }
+
+  /*
+   * Wrapping the row is not enough for a single button whose label alone is 108px of
+   * min-content in a 90px box — "Open in workspace" is one action, not two. The label
+   * wraps onto a second line before the card overflows. Same three declarations as
+   * `.mc-lyrics-frame .music-hint-btns > button` below, for the same reason.
+   */
+  .mc-video-empty .mc-button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  /*
+   * `space-between` has no space to put between at this width: the heading pair takes
+   * the row and the trailing count ("37 videos", 50px) is pushed 17px past the content
+   * edge — the last horizontal overflow left on the Video surface at 260x170. It drops
+   * to its own line instead of leaving the box. The count is a real number about the
+   * shelf below it, so it wraps rather than being hidden.
+   */
+  .mc-section-head {
+    flex-wrap: wrap;
+  }
+
   .mc-playerbar {
     grid-template-columns: minmax(0, 1fr);
     padding-inline: 4px;

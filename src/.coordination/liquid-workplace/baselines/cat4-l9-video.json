@@ -1,7 +1,7 @@
 {
   "label": "l9-video",
   "surface": "Video",
-  "win": "main",
+  "win": "(focused)",
   "rootKind": "floating window",
   "viewport": "1264x821",
   "sizes": [
@@ -12,7 +12,7 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 13,
+      "deadPctViewport": 4.1,
       "deadRegionBasis": "visible surface",
       "chromePct": 47.5,
       "dominantCanvasPct": 94.8,
@@ -29,8 +29,8 @@
       "box": "260x170",
       "clipped": 0,
       "overlaps": 0,
-      "horizontalScrollers": 1,
-      "hiddenOverflowX": 2,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
       "deadPctViewport": 0.6,
       "deadRegionBasis": "visible surface",
       "chromePct": 49.1,
@@ -38,7 +38,7 @@
       "bars": {
         "clipped": true,
         "overlaps": true,
-        "horizontal": false,
+        "horizontal": true,
         "deadRegion": true
       },
       "restored": true
@@ -50,7 +50,7 @@
       "overlaps": 0,
       "horizontalScrollers": 0,
       "hiddenOverflowX": 0,
-      "deadPctViewport": 17.1,
+      "deadPctViewport": 4.5,
       "deadRegionBasis": "visible surface",
       "chromePct": 42,
       "dominantCanvasPct": 95.3,
@@ -58,7 +58,7 @@
         "clipped": true,
         "overlaps": true,
         "horizontal": true,
-        "deadRegion": false
+        "deadRegion": true
       },
       "restored": true
     }
@@ -77,7 +77,7 @@
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "539x249 at grid 8,8",
+      "deadRegionBox": "216x200 at grid 32,17",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -92,17 +92,12 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 136;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 136;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
       "clippedList": [],
       "overlapList": [],
-      "horizontalScrollerList": [
-        "main.mc-content 240>154"
-      ],
-      "hiddenOverflowXList": [
-        "div.mc-video-stage 149>124",
-        "div.medialib-card__art 36>34"
-      ],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
       "deadRegionBox": "258x24 at grid 0,16",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
@@ -118,13 +113,13 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 136;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 140;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 168;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
       "hiddenOverflowXList": [],
-      "deadRegionBox": "694x256 at grid 7,7",
+      "deadRegionBox": "284x164 at grid 14,0",
       "deadRegionBasis": "visible surface",
       "chromeParts": [
         "div.fwin-bar",
@@ -137,17 +132,14 @@
   "bars": {
     "clipped": true,
     "overlaps": true,
-    "horizontal": false,
-    "deadRegion": false,
+    "horizontal": true,
+    "deadRegion": true,
     "contentGrowsNotChrome": true,
     "allThreeSizes": true,
     "restored": true
   },
-  "verdict": "FAIL",
-  "failedBars": [
-    "horizontal",
-    "deadRegion"
-  ],
+  "verdict": "PASS 10/10",
+  "failedBars": [],
   "unmeasuredBars": [],
   "visibleAtEveryRead": true,
   "notMeasuredHere": [
@@ -174,8 +166,8 @@
       "box": "200x140",
       "clipped": 0,
       "overlaps": 0,
-      "horizontalScrollers": 1,
-      "hiddenOverflowX": 5,
+      "horizontalScrollers": 3,
+      "hiddenOverflowX": 3,
       "restored": true
     }
   }

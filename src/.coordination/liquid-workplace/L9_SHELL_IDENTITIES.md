@@ -703,3 +703,55 @@ for a surface with no Work region.
 **Cells closed: still 6 of 16**, counted by reading each `baselines/*l9*.json`'s own
 `verdict` — cat1, cat2 and cat3 on both surfaces. cat4 measured and FAILING on both;
 categories 5–8 unmeasured.
+
+## 2026-08-31 — category 4 · Video: FAIL 2 bars → **PASS 10/10**, banked
+
+`cat4-l9-video.json` re-run and re-banked in this fix's own commit. All 7 bars true at all
+three sizes. **Cells: 7 of 16.** Control still valid: `injectedClip` 0→1→0 with removal
+proven, and `subMinimumShrink` at 200x140 (below the surface's floor) still reports
+`horizontalScrollers 3 / hiddenOverflowX 3` — the instrument can still see overflow, so the
+0s at 260x170 are a result and not a blind probe.
+
+**The previous entry's root cause for bar 1 was WRONG in its second half and is corrected
+here.** It named `LABEL.mc-toggle` at 200 min-content as the source of the 226px track. It is
+not: measured live, `label.mc-toggle` is **77** min-content and `.mc-toggle-list` is 108 — the
+200 was its *used* width in an already-226 track, read back as if it were a floor. The real
+226 is inspector block #3, and inside it `select.media-model-select` at exactly 200: a
+`<select>` has `white-space: pre`, so its min-content is its widest option label, and the
+shared rule in `styles.css` clamps that to `max-width: 200px` — a ceiling with no floor. So
+`minmax(0, 1fr)` IS sufficient once the select can shrink, and the toggle rows never needed to
+wrap. Read a min-content number off the element you are blaming, not off its parent's track.
+
+Five distinct chains, each measured before and after, none guessed:
+
+| chain | before | after |
+| --- | --- | --- |
+| `.mc-video-inspector` track vs box | 226 in 126 | 126 in 126 |
+| `.mc-video-stage` (empty-state action row, `nowrap`, min-content 174 in 64) | 149>124 | 124>124 |
+| `.medialib-card__art` (`.mc-tile-play` 27px circle in a 22px box; `span.mc-tile-episode` at `left: 7px` resolving `right: -2.17px`) | 36>34 | none |
+| `.mc-video-topbar > div:first-child` — `min-width: 0` governs the MAIN axis only, and the ≤640 query flips the bar to a column, so the nowrap title reverted to fit-content | 156 in 126 → `main.mc-content 170>154` | 126 in 126 |
+| `.mc-section-head` — `space-between` with no space to give; the trailing count sits 17px past the content edge | `div.mc-video-empty 119>114` | none |
+
+**`deadRegion` 17.1% → 4.5% maximized, 13.0% → 4.1% default.** Not a spacing tweak: the
+maximized stage was a 668x668 void with a 179px message block centred in it, while
+`.mc-shelf.mc-up-next` — the shelf that answers that message's own question, "Choose what to
+watch" — sat at y=855 in a 650px scroller, below the fold. The shelf now renders INSIDE the
+empty stage and not below it. **Relocated, not duplicated**: one `upNext` value, rendered in
+one of two places, so no state shows the same seven posters twice and none loses them.
+
+Two harness-shaped traps this cost real time to learn, both live:
+1. **The Media Center tab drifts, and every harness scores whatever tab it lands on.** A cat2
+   run reported `scrollTraps 2` (`span.medialib-card__title`, 17px unreachable) that read
+   exactly like a regression from this slice. It was the **Library** tab, unfiltered, measured
+   because HMR had reset the tab — and `cat2-l9-video.json`'s own banked task navigates to
+   Library and types `jojo`, which filters those long titles away. Re-run from the Video tab:
+   `scrollTraps 0`. Assert the tab before believing any L9 Video number.
+2. **cat2's first run after a tab switch is a cold outlier.** `worstRecv 105.8` over the 100
+   bar, then 76.0 / 81.8 / 76.6 / 88.9 on four repeats. One reading is not a latency finding.
+
+No regression in the three banked categories, all re-derived on the Video tab this turn:
+cat1 **PASS 10/10**, cat3 **PASS 10/10**, cat2 `failedBars []` (deadEnds 0, scrollTraps 0,
+worstRecv 88.9 < 100; `costParity` UNMEASURED because the presentation-parity leg was not
+re-driven, and it is unchanged in the bank).
+
+`sampled-out:` unchanged from the 2026-08-31 00:25 entry.
