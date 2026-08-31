@@ -280,6 +280,88 @@ export function ingestPlanBalances(
 }
 
 /**
+ * The writer's refusals, as keys.
+ *
+ * A parser and a writer answer a bad value differently on purpose, and the
+ * difference is the reason both exist. `normalizeIngestSettings` CLAMPS,
+ * because a corrupted document still has to yield a usable app. A setter
+ * REFUSES, because a number the user typed and watched change into a different
+ * number is a control that lies about what it stored.
+ */
+export const INGEST_SETTINGS_ERROR_STABILITY_RANGE = 'filesApp.settings.error.stabilityRange';
+export const INGEST_SETTINGS_ERROR_UNKNOWN_VALUE = 'filesApp.settings.error.unknownValue';
+
+/** `{ doc, errorKey? }`, matching the other Files documents' writer shape. */
+export interface IngestSettingsResult {
+  doc: IngestSettings;
+  errorKey?: string;
+}
+
+/** Gate 27's surface control: how much the router may act on unattended. */
+export function setIngestConfidence(
+  doc: IngestSettings,
+  policy: IngestConfidencePolicy,
+): IngestSettingsResult {
+  if (!INGEST_CONFIDENCE_POLICIES.includes(policy)) {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_UNKNOWN_VALUE };
+  }
+  if (doc.confidence === policy) return { doc };
+  return { doc: { ...doc, confidence: policy } };
+}
+
+/**
+ * Gate 36's surface control: one destination's own answer.
+ *
+ * `inherit` REMOVES the row rather than storing the word. A stored `inherit`
+ * and an absent one would be the same behaviour with two shapes, and the next
+ * reader of this document would have to know that — so the absence is the only
+ * representation, exactly as `normalizeIngestSettings` already assumes.
+ */
+export function setIngestCategoryPolicy(
+  doc: IngestSettings,
+  target: DropTargetId,
+  policy: IngestCategoryPolicy,
+): IngestSettingsResult {
+  if (policy !== 'auto' && policy !== 'review' && policy !== 'inherit') {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_UNKNOWN_VALUE };
+  }
+  if (target === 'unknown') {
+    // There is no destination to route INTO, so an override here would be a
+    // control that cannot do anything. Refused by name rather than accepted.
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_UNKNOWN_VALUE };
+  }
+  const byTarget = { ...doc.byTarget };
+  if (policy === 'inherit') {
+    if (!(target in byTarget)) return { doc };
+    delete byTarget[target];
+  } else {
+    if (byTarget[target] === policy) return { doc };
+    byTarget[target] = policy;
+  }
+  return { doc: { ...doc, byTarget } };
+}
+
+/**
+ * Gate 31's surface control: the stability window, in milliseconds.
+ *
+ * Out of range is refused rather than clamped — a user who types 9,999,999 and
+ * is silently given 600,000 has been told their setting was accepted when a
+ * different one was stored. The range itself is stated in the refusal's own
+ * message so the field does not need a second source of truth.
+ */
+export function setIngestStabilityMs(doc: IngestSettings, raw: number): IngestSettingsResult {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_STABILITY_RANGE };
+  }
+  if (raw < 0 || raw > MAX_STABILITY_MS) {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_STABILITY_RANGE };
+  }
+  const value = Math.round(raw);
+  if (doc.stabilityMs === value) return { doc };
+  return { doc: { ...doc, stabilityMs: value } };
+}
+
+/**
  * Settings normalisation, shared by the store and by anything reading a value
  * out of a settings file. Kept here rather than in the renderer store so the
  * clamp is one implementation and gate 31's "does not bypass the completeness

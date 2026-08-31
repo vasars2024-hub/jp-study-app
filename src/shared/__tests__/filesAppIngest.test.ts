@@ -24,11 +24,15 @@ import {
   INGEST_REVIEW_AMBIGUOUS,
   INGEST_REVIEW_CATEGORY,
   INGEST_REVIEW_GUESSED,
+  INGEST_SETTINGS_ERROR_STABILITY_RANGE,
   dispositionFor,
   ingestPlanBalances,
   isHighConfidence,
   normalizeIngestSettings,
   planIngest,
+  setIngestCategoryPolicy,
+  setIngestConfidence,
+  setIngestStabilityMs,
   type IngestSettings,
 } from '../filesApp/ingest';
 import { MAX_STABILITY_MS, DEFAULT_STABILITY_MS } from '../filesApp/stability';
@@ -262,5 +266,46 @@ describe('normalizeIngestSettings', () => {
     const s = normalizeIngestSettings({ stabilityMs: 0 });
     expect(s.stabilityMs).toBe(0);
     expect(s.confidence).toBe('high-confidence');
+  });
+});
+
+describe('the settings writers — gate 31 and 36 as a "set to"', () => {
+  it('a writer never mutates the document it was handed', () => {
+    // The store loads, applies and saves; an operation that mutated in place
+    // would leave the fallback and the stored copy agreeing on a value nobody
+    // committed, which is how a refused change appears to have landed.
+    const doc: IngestSettings = { confidence: 'high-confidence', byTarget: {}, stabilityMs: 3_000 };
+    setIngestStabilityMs(doc, 9_000);
+    setIngestConfidence(doc, 'always-review');
+    setIngestCategoryPolicy(doc, 'subtitle', 'auto');
+    expect(doc).toEqual({ confidence: 'high-confidence', byTarget: {}, stabilityMs: 3_000 });
+  });
+
+  it('the writer REFUSES what the parser clamps — the pair is deliberate', () => {
+    const doc = DEFAULT_INGEST_SETTINGS;
+    expect(setIngestStabilityMs(doc, 9e9).errorKey).toBe(INGEST_SETTINGS_ERROR_STABILITY_RANGE);
+    expect(normalizeIngestSettings({ stabilityMs: 9e9 }).stabilityMs).toBe(MAX_STABILITY_MS);
+    expect(setIngestStabilityMs(doc, -1).errorKey).toBe(INGEST_SETTINGS_ERROR_STABILITY_RANGE);
+    expect(normalizeIngestSettings({ stabilityMs: -1 }).stabilityMs).toBe(0);
+  });
+
+  it('an unchanged value hands back the SAME document, so nothing churns', () => {
+    const doc: IngestSettings = { confidence: 'high-confidence', byTarget: {}, stabilityMs: 3_000 };
+    expect(setIngestStabilityMs(doc, 3_000).doc).toBe(doc);
+    expect(setIngestConfidence(doc, 'high-confidence').doc).toBe(doc);
+    expect(setIngestCategoryPolicy(doc, 'subtitle', 'inherit').doc).toBe(doc);
+  });
+
+  it('the two overrides gate 36 names round-trip through the writers', () => {
+    const one = setIngestCategoryPolicy(DEFAULT_INGEST_SETTINGS, 'subtitle', 'auto').doc;
+    const two = setIngestCategoryPolicy(one, 'media', 'review').doc;
+    expect(two.byTarget).toEqual({ subtitle: 'auto', media: 'review' });
+    // And the routing they produce is the gate's own sentence.
+    expect(dispositionFor(entry({ target: 'subtitle', confidence: 'exact' }), two).disposition).toBe(
+      'auto',
+    );
+    expect(dispositionFor(entry({ target: 'media', confidence: 'exact' }), two).disposition).toBe(
+      'review',
+    );
   });
 });
