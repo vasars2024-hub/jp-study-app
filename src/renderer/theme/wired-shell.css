@@ -88,9 +88,9 @@
 
 /* Taskbar machine rail ---------------------------------------------------- */
 /* The backstop layer is `--lq-liquid-bg`, not a flat `#020b12`, and the reason is
-   honesty rather than uniformity. `liquid-tokens.css` gives `.os-taskbar` a
-   blur-backed material because §2.3 makes transport chrome what Liquid is FOR;
-   this rule has the same specificity (0,2,1) and loads later, so a flat fill here
+   honesty rather than uniformity. `components/shell/shell.css` gives `.os-taskbar`
+   a blur-backed material because §2.3 makes transport chrome what Liquid is FOR;
+   this rule outranks it (0,3,0 against 0,2,0), so a flat fill here
    won every tie and left the bar declaring `backdrop-filter: blur(6px)` over an
    opaque background — measured 2026-08-31: `rgb(2,11,18)` alpha 1, a blur that
    cannot be seen, which category 3 was nonetheless crediting as Liquid treatment.

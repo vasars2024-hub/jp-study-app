@@ -854,6 +854,43 @@ html.reduce-motion .fwin .fwin-b {
   transition: none !important;
 }
 
+/* ---- The taskbar is transport chrome, under EVERY material -----------------
+   §2.3 of the Liquid plan names navigation and transport as what Liquid is FOR,
+   and the shell's taskbar is the largest instance of both in the product. It was
+   opaque under every material: measured 2026-08-31 on the Wired shell,
+   `rgb(2,11,18)` at alpha 1 with `backdrop-filter: none`.
+
+   `styles.css:14654` deliberately made it solid, and that note — "translucent
+   mix showed the dark wallpaper through" — is correct, and is the reason this
+   rule is BLUR-backed rather than a plain alpha mix. `--lq-liquid-blur` is the
+   whole difference between the two, and every degradation tier in
+   `liquid-tokens.css` already zeroes it (high contrast, battery, Aero safe
+   mode), at which point `--lq-liquid-bg` is itself opaque and the taskbar
+   returns to solid chrome on its own. The fallback is the old behaviour, not a
+   broken middle.
+
+   WHY IT LIVES HERE rather than in `liquid-tokens.css`, where it was first
+   written (`67594273`, moved 2026-08-31): that sheet is L2's "tokens without
+   changing existing app output" gate and is structurally forbidden to paint —
+   `renderer/__tests__/liquidTokens.test.ts` requires every selector to be
+   `:root` and every declaration a `--lq-*` property. The rule went red there on
+   the next full run. Its natural home is the sheet that already styles this
+   element, and the selector is unchanged by the move.
+
+   This rule is deliberately NOT material-scoped: it is the cross-shell default,
+   driven entirely by `--lq-*` tokens that each material remaps, so no shell's
+   colour is hardcoded. Specificity is (0,2,0) — class + attribute. Wired's own
+   `:root[data-materials='wired'] .os-taskbar` is (0,3,0) and still wins the
+   `background` it needs for the cyan wash and scan grid; it composites over
+   `var(--lq-liquid-bg)` as its backstop for exactly that reason (see
+   `wired-shell.css`, "Taskbar machine rail"). Dropping `data-lq-role` in
+   `DesktopShell` reverts the material with it. */
+.os-taskbar[data-lq-role='liquid'] {
+  background: var(--lq-liquid-bg);
+  border-top: 1px solid var(--lq-liquid-border);
+  backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate, 1));
+}
+
 /* ---- P2.2 taskbar ---------------------------------------------------------
    Baseline problems this addresses:
      - `.os-start-btn` carried `border: 1px solid var(--accent)` while IDLE and
