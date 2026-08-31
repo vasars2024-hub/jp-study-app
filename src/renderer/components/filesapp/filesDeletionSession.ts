@@ -95,10 +95,20 @@ export class FilesDeletionSession {
     if (refusal) return refusal;
 
     if (plan.mode === 'trash') {
-      const result = await this.bridge.trash({
-        itemId: target.id,
-        confirmedItemId: authorization.confirmedItemId,
-      });
+      let result: FilesDeletionResult;
+      try {
+        result = await this.bridge.trash({
+          itemId: target.id,
+          confirmedItemId: authorization.confirmedItemId,
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          itemId: target.id,
+          reasonKey: 'filesApp.delete.failed',
+          detail: error instanceof Error ? error.message : String(error),
+        };
+      }
       // A stale or compromised bridge reply must not be attached to the row
       // currently selected in the renderer.
       if (result.itemId !== target.id) {

@@ -133,4 +133,16 @@ describe('FilesDeletionSession', () => {
       reasonKey: 'filesApp.delete.failed',
     });
   });
+
+  it('turns a rejected trash bridge into the named failure state', async () => {
+    const { session, trash } = setup();
+    trash.mockRejectedValueOnce(new Error('Files delete bridge unavailable'));
+
+    await expect(session.delete(item())).resolves.toEqual({
+      ok: false,
+      itemId: 'transcript:one',
+      reasonKey: 'filesApp.delete.failed',
+      detail: 'Files delete bridge unavailable',
+    });
+  });
 });
