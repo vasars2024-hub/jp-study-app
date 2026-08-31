@@ -180,13 +180,31 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // lists differing by `visualizer`, so a visualizer window could render
     // `.fwin-liquid` with the toggle button not rendered at all. The guard is
     // that `liquid` is derived FROM `canGoLiquid` — any re-expansion into a
-    // second `!isNote && ...` chain fails here. The taskbar menu is the second
-    // sanctioned consumer: it must call this same predicate rather than grow
-    // another section list.
+    // second `!isNote && ...` chain fails here.
+    //
+    // This used to pin the call count at 2, which was a proxy for the real
+    // invariant and went red the moment L9 bullet 1 added the THIRD sanctioned
+    // consumer — the `window.togglePresentation` command — even though that
+    // consumer calls this very predicate, which is what the guard wants. The
+    // count is gone; every call site is named instead, so a NEW one has to be
+    // added here deliberately and a hand-written section list still fails.
     expect(SHELL).toMatch(/const canGoLiquid = canPresentLiquid\(win\.section\);/);
     expect(SHELL).toMatch(/const liquid = isWinLiquid\(win\) && canGoLiquid;/);
-    expect(SHELL.match(/canPresentLiquid\(/g) ?? []).toHaveLength(2);
-    expect(SHELL).toMatch(/canPresentLiquid\(taskCtx\.win\.section\)/);
+    const callSites = SHELL.match(/canPresentLiquid\([^)]*\)/g) ?? [];
+    expect(new Set(callSites)).toEqual(
+      new Set([
+        'canPresentLiquid(win.section)', // the window chrome
+        'canPresentLiquid(taskCtx.win.section)', // the taskbar context item
+        'canPresentLiquid(topWin.section)', // the command entry point
+      ]),
+    );
+    // A re-expanded section list is already caught by the two `toMatch`es
+    // above: `canGoLiquid` must BE the predicate call and `liquid` must be
+    // derived from it, so a hand-written chain cannot reach either name. A
+    // blanket "no `!== 'city'` anywhere" was tried here and is a false
+    // positive — window cycling legitimately reads that section at
+    // `DesktopShell.tsx:1696` to decide maximization, which is not
+    // presentability.
     // And the load-side converter is handed the section, or a blob on a
     // non-presentable window survives in memory and is written straight back.
     expect(SHELL).toMatch(
