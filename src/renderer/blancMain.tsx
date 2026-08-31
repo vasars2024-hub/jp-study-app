@@ -59,6 +59,8 @@ import './theme/blanc.css';
 // which still hold Study OS values in this window, so importing it alone would
 // have dressed Blanc in the Study OS material. This is the adapter that stops it.
 import './theme/blanc-liquid.css';
+// Native component accessibility repairs belong outside the token-only adapter.
+import './theme/blanc-shell-a11y.css';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 

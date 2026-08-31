@@ -1870,3 +1870,21 @@ was never opened or mutated, so badge 7 and unread IDs 66–72 remained intact.
 
 **RULE C: 8 of 16 passing cells** — all eight Wired cells. Next is all eight categories on Blanc.
 `sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+
+## 2026-08-31 — codexA — cat1 Blanc passes after three native-shell repairs
+
+The first live run was **FAIL**: the 14px clock used `--blanc-faint` at **3.17:1**, four Focus
+Music buttons rendered 30.5px hit boxes, and two checkbox labels rendered 21.5px high. The shared
+bar is 4.5:1 and 32px; these were product defects, not identity exceptions.
+
+Repairs live in `blanc-shell-a11y.css`, after the token-only adapter. A first draft put component
+rules in `blanc-liquid.css`; its 2/12 test failures correctly rejected that because the adapter's
+contract is vocabulary-only. The invariant was kept and the rules moved, not baselined.
+
+**cat1 · Blanc = PASS 10/10.** At 1264×761: 118 text runs, minimum contrast **5.27:1**,
+25/25 controls keyboard reachable, smallest effective target **32.5px**, 0 WCAG 2.5.8 failures,
+and 29 motion owners collapsed to 0 under reduced motion then restored. The control moved all six
+sensitivity terms and restored the surface (`[0,2,0,0,0] → [2,5,2,1,3]`). Focused guards **13/13**.
+
+**RULE C: 9 of 16 passing cells** — all eight Wired cells plus cat1 Blanc. Next: cat2 Blanc.
+`sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.

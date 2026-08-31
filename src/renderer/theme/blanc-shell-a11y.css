@@ -1,0 +1,17 @@
+/* Blanc shell accessibility guardrails — L9 bullet 4, rubric category 1.
+
+   The token-only Liquid adapter owns vocabulary, not component styling. These
+   native shell rules consume its universal 32px floor after Blanc's compact
+   defaults, and keep ordinary 14px clock text on the readable muted colour. */
+.blanc-root .blanc-top .focus-music-btn {
+  min-width: var(--lq-hit-target);
+  min-height: var(--lq-hit-target);
+}
+
+.blanc-root .blanc-check {
+  min-height: var(--lq-hit-target);
+}
+
+.blanc-root .blanc-clock {
+  color: var(--blanc-muted);
+}
