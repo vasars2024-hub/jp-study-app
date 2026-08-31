@@ -755,3 +755,76 @@ worstRecv 88.9 < 100; `costParity` UNMEASURED because the presentation-parity le
 re-driven, and it is unchanged in the bank).
 
 `sampled-out:` unchanged from the 2026-08-31 00:25 entry.
+
+## 2026-08-31 — category 4 · City: the INSTRUMENT was wrong on 4 of 5 bars. Two corrections, both controlled.
+
+City's `FAIL 5 bars` was mostly `cat4-use-of-space.cjs` meeting a shape it was never written
+against. Fixed in the harness, not in the art — and the fix is inert on a dense surface, which
+is the number that makes it trustworthy: **Video re-runs PASS 10/10 with `excused 0/0/0` at all
+three sizes.** Nothing that passed before is passing for a new reason.
+
+**Correction 19 — a frameless window has no third size, and that is the product.** `allThreeSizes`
+and `restored` were false because the maximize leg refused. City is `.fwin-frameless` and
+`DesktopShell` forces `max: false` for section `city` in two places, so no state of the app paints
+it maximized. `sizesExpected` is now 2, with the refusal carrying its own evidence:
+`chromeButtons 3`, `chromeButtonTitles ["Pop out into its own window","Minimize","Close"]`,
+`frameless true` — three real buttons and no Maximize among them. `contentGrowsNotChrome` was
+UNMEASURED for want of a second end; it now compares **compact → default** and names the pair in
+`contentGrowsNotChromePair`. Both bars PASS on evidence, not by waiver.
+
+> **The first version of this proof was vacuous and is recorded so nobody rebuilds it.** It counted
+> `.fwin-btns .fwin-b` and got **0** for City — whose controls live in `.fwin-frameless-controls` —
+> and would have returned 0, and therefore exonerated, for *any* window whose chrome sits anywhere
+> else. It now scans every `.fwin-b` in the window and asks whether any is titled Maximize. A framed
+> window missing only that button still fails, which is the case this must not launder.
+
+**Correction 20 — an ambient art plate is not clipping, and two stacked are not an overlap.**
+`cat2-clunkiness.cjs` has carried this judgement since its correction 5; cat4 had none. The rule
+is asked of the nearest OUT-OF-FLOW ancestor-or-self, not of the element — City's clouds and fog
+are absolutely-positioned sprites holding a `position: static` canvas, and an element-only test
+still scored 7 clips and 215 overlaps of pure parallax. For clipping the question is cat2's, not
+"does it contain a control": **is anything readable or actionable stranded outside the surface**.
+That distinction is the whole value — the world layer holds the mushroom hitbox in the middle of
+the visible scene at default (excused) and outside the window at 260x170 (**correctly still
+marked**). Overlap asks a different question, because two boxes hide things from each other
+regardless of the surface edge: both sides out of flow AND at least one pure paint.
+
+| bar | before | after |
+| --- | --- | --- |
+| clipped, default 680x709 | 24 | **0** (24 excused as plates) |
+| overlaps, default | 397 | **3** (336 excused) |
+| clipped, compact 260x170 | 55 | 13 (45 excused) |
+| overlaps, compact | 266 | **0** (225 excused) |
+| horizontal, default | `main.reading-garden 947>678` | **0** — excused, every crossing box is a plate |
+
+**Both controls fire, in opposite directions, and that pair is the point.** `injectedClip` now
+plants text (`lq control: stranded content`) because the old empty plant would have been excused
+by correction 20 and the control would have gone quiet: it still moves `clipped` 0 → 1 → 0. The new
+`artPlateExclusion` leg plants the same box at the same place hanging out by the same 279px but
+empty and out of flow: `clipped` does NOT rise, `artPlateClipCount` 24 → 25 → 24, and the plant is
+named in `artPlateClips`. Narrow the exclusion to a no-op and the second fails; widen it into an
+amnesty and the first fails. *Trap: `namedInArtPlateClips` must be computed in-page over the
+UNTRUNCATED list — the reported array is capped at 8 and City has 24 plates, so the plant is not
+in it and the control read false while working correctly.*
+
+**City remains FAIL — 3 bars, and both remaining causes are now REAL, not instrument.** Banked as
+`cat4-l9-city.json` with verdict FAIL, so the cell count does not move.
+
+1. **compact 260x170 strands the scene's only control.** `clipped 13`, and the list names
+   `button.reading-garden-mushroom-hitbox` and `button.reading-garden-sky-console-toggle` along
+   with `main.reading-garden`, `world` and `mushroom`; `hox` follows for the same reason
+   (`main.reading-garden 459>258` is no longer all-plates once the hitbox is stranded). City IS
+   resizable to that size — it carries a `.fwin-resize` grip and `min-width: 0px` — so this is a
+   size a user can reach, and 19 other surfaces bank a PASS at it. The camera already has a scale
+   (`--garden-camera-scale-a/b`, `1.26 - progress * 0.26`, `ReadingGarden.tsx:493`); a fit-to-window
+   factor multiplied into it is the shape of the repair. **Not attempted here**: it is parallax
+   camera maths on art that cannot be verified by measurement alone, and a rushed pass would break
+   what it was meant to protect.
+2. **default 680x709 keeps 3 overlaps, and all three are the DEV-ONLY console** —
+   `div.reading-garden-world x div.reading-garden-sky-console{,-body,-actions}`.
+   `ReadingGardenSkyEvents.tsx:293` is `if (!import.meta.env.DEV) return null;`, so a packaged
+   build has **0**. Not excused: hardcoding that class into a parameterised harness is exactly the
+   surface-specific special case RULE 1 forbids, and quietly excusing "debug overlays" as a
+   category would hide real inspectors. Disclosed instead, and the number stands as measured.
+
+**Cells: still 7 of 16** — cat4 closes on Video only. `sampled-out:` unchanged.

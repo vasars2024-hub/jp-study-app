@@ -64,6 +64,10 @@
     }
   ],
   "refusedLegs": [],
+  "sizesExpected": 3,
+  "sizesRan": 3,
+  "sizesUnreachable": [],
+  "contentGrowsNotChromePair": "default -> maximized",
   "detail": [
     {
       "kind": "default",
@@ -84,7 +88,13 @@
         "aside.lq-contextual",
         "header.lq-contextual",
         "aside.lq-contextual"
-      ]
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": []
     },
     {
       "kind": "compact",
@@ -92,8 +102,8 @@
       "requested": "260x170",
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -105,7 +115,13 @@
         "aside.lq-contextual",
         "header.lq-contextual",
         "aside.lq-contextual"
-      ]
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": []
     },
     {
       "kind": "maximized",
@@ -113,8 +129,8 @@
       "requested": null,
       "achieved": null,
       "clampedByOsMinimum": null,
-      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 164;",
-      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 168;",
+      "restoredFrom": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 182;",
+      "restoredTo": "left: 60px; top: 24px; width: 1080px; height: 700px; z-index: 188;",
       "clippedList": [],
       "overlapList": [],
       "horizontalScrollerList": [],
@@ -126,7 +142,13 @@
         "aside.lq-contextual",
         "header.lq-contextual",
         "aside.lq-contextual"
-      ]
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": []
     }
   ],
   "bars": {
@@ -151,6 +173,24 @@
       "moved": true,
       "backToBaseline": true,
       "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "artPlateExclusion": {
+      "hangsOutBy": 279,
+      "plantIsPlate": true,
+      "clippedDidNotRise": true,
+      "countedAsPlate": true,
+      "namedInArtPlateClips": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 0,
+        "restored": 0
+      },
+      "artPlateClipCount": {
         "base": 0,
         "dirty": 1,
         "restored": 0
