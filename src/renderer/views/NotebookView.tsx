@@ -13,7 +13,7 @@ import {
   StatusBarSpacer,
   useAeroMaterials,
 } from '../components/ui';
-import LiveCaptionsPanel from '../components/notebook/LiveCaptionsPanel';
+import LiveCaptionsPanel from '../components/reading/LiveCaptionsPanel';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
 
 export default function NotebookView() {

@@ -3,6 +3,7 @@ import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
 import VirtualList from '../components/VirtualList';
+import LiveCaptionsPanel from '../components/reading/LiveCaptionsPanel';
 import {
   ReadingCanvas,
   useReadingDocumentCover,
@@ -91,6 +92,12 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   // Open by default: this is the section's navigation, and a cold open with the
   // list closed shows an empty reader and no visible way to fill it.
   const [listOpen, setListOpen] = useState(true);
+  /**
+   * Closed by default, unlike the capture list: Live Captions is an arming
+   * control the user reaches for deliberately, and opening a second sheet on a
+   * cold open would cover the passage this section exists to show.
+   */
+  const [captionsOpen, setCaptionsOpen] = useState(false);
   const cover = useReadingDocumentCover();
 
   const load = useCallback(() => {
@@ -351,7 +358,22 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
    * turns the list into a dismissible sheet and gives the passage all 500 px.
    */
   const tools = useMemo<ReadingCanvasTool[]>(() => {
-    if (!listOpen) return [];
+    const open: ReadingCanvasTool[] = [];
+    if (captionsOpen) {
+      // Trailing, and after the list in source order: it is a producer of
+      // passages, not navigation into one, so `leading` would be a lie about
+      // what it does and would push the capture list off its own edge.
+      open.push({
+        id: 'live-captions',
+        label: t('reading.liveCaptions.title'),
+        side: 'trailing',
+        minWidth: 260,
+        preferredWidth: 340,
+        onClose: () => setCaptionsOpen(false),
+        content: <LiveCaptionsPanel headless />,
+      });
+    }
+    if (!listOpen) return open;
     return [
       {
         id: 'captures',
@@ -381,8 +403,9 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
         ),
         content: listBody,
       },
+      ...open,
     ];
-  }, [listOpen, listBody, load, t]);
+  }, [listOpen, captionsOpen, listBody, load, t]);
 
   return (
     <div className="reading-captures">
@@ -403,6 +426,16 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
               onClick={() => setListOpen((open) => !open)}
             >
               <Icon name="clipboard" size={14} />
+            </button>
+            <button
+              type="button"
+              className="reading-captures-list-toggle"
+              aria-pressed={captionsOpen}
+              aria-label={t('reading.liveCaptions.title')}
+              title={t('reading.liveCaptions.title')}
+              onClick={() => setCaptionsOpen((open) => !open)}
+            >
+              <Icon name="caption" size={14} />
             </button>
             {selected ? (
               <>

@@ -1,16 +1,20 @@
 /**
- * Live Captions panel for the Notebook.
- *
- * The notebook timeline can only show a dated row per script — its rows are a
- * single click-through button with no room for a transcript. This panel is the
- * reading surface for what capture collected, and the one place capture is
- * armed.
+ * Live Captions — arming the capture, and reading what it collected.
  *
  * Arming matters more than it looks: the Windows Live Captions window holds
  * only ~12 lines and evicts them within seconds, so nothing is recoverable
  * after the fact. Capture has to be running *before* the conversation, which is
- * why the toggle lives next to the scripts rather than buried in Settings, and
+ * why the toggle sits next to the scripts rather than buried in Settings, and
  * why the state persists across restarts.
+ *
+ * **Rehomed at gate 7b** (`FILES_APP_PLAN.md`). Its only mount used to be
+ * `NotebookView`, which that gate deletes. It is a *capture* control, not a
+ * file, so it does not become a Files row — and putting it in the Files app
+ * would have made an existing capability Files-app-only, which gate 6 forbids.
+ * The Reading workspace's Captures surface already declares itself the home for
+ * captured text belonging to no work (`ReadingCapturesView`'s header comment),
+ * which is exactly what a caption script is, so it lands there as a second
+ * reading tool beside the capture list.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
@@ -29,12 +33,12 @@ import {
  * call `useT()`, and a language switch has to re-label these groups.
  */
 const LANG_LABEL_KEYS: Record<CaptionLang, string> = {
-  ja: 'notebook.liveCaptions.lang.ja',
-  zh: 'notebook.liveCaptions.lang.zh',
-  ko: 'notebook.liveCaptions.lang.ko',
-  ru: 'notebook.liveCaptions.lang.ru',
-  en: 'notebook.liveCaptions.lang.en',
-  und: 'notebook.liveCaptions.lang.und',
+  ja: 'reading.liveCaptions.lang.ja',
+  zh: 'reading.liveCaptions.lang.zh',
+  ko: 'reading.liveCaptions.lang.ko',
+  ru: 'reading.liveCaptions.lang.ru',
+  en: 'reading.liveCaptions.lang.en',
+  und: 'reading.liveCaptions.lang.und',
 };
 
 /**
@@ -50,7 +54,18 @@ function formatRange(script: CaptionScript, lang: UiLang): string {
   return `${start.toLocaleDateString(LANG_TAGS[lang])} ${hhmm(start)}–${hhmm(end)}`;
 }
 
-export default function LiveCaptionsPanel() {
+export interface LiveCaptionsPanelProps {
+  /**
+   * Drop the panel's own `<h3>` when the host already names it — a
+   * `ReadingCanvasTool` renders `label` as the sheet heading, and stacking a
+   * second one is the commonest way a migration adds chrome while claiming to
+   * remove it (`ReadingCanvas.tsx`'s `actions` comment). The description line
+   * stays: it is the instruction for a control most users meet once.
+   */
+  headless?: boolean;
+}
+
+export default function LiveCaptionsPanel({ headless = false }: LiveCaptionsPanelProps = {}) {
   const { t, lang } = useT();
   const [status, setStatus] = useState<LiveCaptionsStatus | null>(null);
   const [scripts, setScripts] = useState<CaptionScript[]>([]);
@@ -148,29 +163,29 @@ export default function LiveCaptionsPanel() {
   if (status && !status.supported) {
     return (
       <section className="gx-lc-panel">
-        <p className="muted">{t('notebook.liveCaptions.unsupported')}</p>
+        <p className="muted">{t('reading.liveCaptions.unsupported')}</p>
       </section>
     );
   }
 
   const capturing = Boolean(status?.capturing);
   const stateLabel = !capturing
-    ? t('notebook.liveCaptions.stateOff')
+    ? t('reading.liveCaptions.stateOff')
     : status?.attached
-      ? t('notebook.liveCaptions.stateReading')
-      : t('notebook.liveCaptions.stateWaiting');
+      ? t('reading.liveCaptions.stateReading')
+      : t('reading.liveCaptions.stateWaiting');
 
   return (
     <section className="gx-lc-panel">
       <div className="gx-lc-head">
         <div className="gx-lc-headings">
-          <h3 className="gx-lc-title">{t('notebook.liveCaptions.title')}</h3>
-          <p className="muted gx-lc-desc">{t('notebook.liveCaptions.desc')}</p>
+          {headless ? null : <h3 className="gx-lc-title">{t('reading.liveCaptions.title')}</h3>}
+          <p className="muted gx-lc-desc">{t('reading.liveCaptions.desc')}</p>
         </div>
         <div className="gx-lc-actions">
           <span className={`gx-lc-state${capturing ? ' is-live' : ''}`}>{stateLabel}</span>
           <button type="button" className="btn primary" onClick={toggle} disabled={busy}>
-            {capturing ? t('notebook.liveCaptions.stop') : t('notebook.liveCaptions.start')}
+            {capturing ? t('reading.liveCaptions.stop') : t('reading.liveCaptions.start')}
           </button>
           <button
             type="button"
@@ -178,25 +193,25 @@ export default function LiveCaptionsPanel() {
             onClick={clear}
             disabled={busy || scripts.length === 0}
           >
-            {t('notebook.liveCaptions.clear')}
+            {t('reading.liveCaptions.clear')}
           </button>
         </div>
       </div>
 
       {actionError ? (
         <p className="gx-lc-error">
-          {t('notebook.liveCaptions.actionFailed', { message: actionError })}
+          {t('reading.liveCaptions.actionFailed', { message: actionError })}
         </p>
       ) : null}
 
       {status?.error ? <p className="gx-lc-error">{status.error}</p> : null}
 
       {capturing && !status?.attached ? (
-        <p className="muted gx-lc-hint">{t('notebook.liveCaptions.openCaptions')}</p>
+        <p className="muted gx-lc-hint">{t('reading.liveCaptions.openCaptions')}</p>
       ) : null}
 
       {scripts.length === 0 ? (
-        <p className="muted gx-lc-empty">{t('notebook.liveCaptions.empty')}</p>
+        <p className="muted gx-lc-empty">{t('reading.liveCaptions.empty')}</p>
       ) : (
         groups.map((group) => (
           <section key={group.lang} className="gx-lc-group">
@@ -222,7 +237,7 @@ export default function LiveCaptionsPanel() {
                       </span>
                       <span className="muted gx-lc-item-meta">
                         {formatRange(script, lang)} ·{' '}
-                        {t('notebook.liveCaptions.lineCount', { count: script.lines.length })}
+                        {t('reading.liveCaptions.lineCount', { count: script.lines.length })}
                       </span>
                     </button>
                     {open ? <pre className="gx-lc-text">{scriptText(script)}</pre> : null}
