@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FilesDeletionTarget } from '../../shared/filesApp/deletion';
 import {
   FILES_DELETE_CHANNEL,
+  createFilesDeletionMainDependencies,
   deleteFilesItemInMain,
   lookupFilesDeletionTarget,
   registerFilesDeletionIpc,
@@ -27,6 +28,30 @@ function dependencies(row: FilesDeletionTarget | null = target()) {
 }
 
 describe('Files app main-process deletion boundary', () => {
+  it('binds each lookup to the current index and invalidates only after success', async () => {
+    let rows = [target({ id: 'transcript:first' })];
+    const access = {
+      getItems: vi.fn(() => rows),
+      invalidate: vi.fn(),
+      trashItem: vi.fn(async () => undefined),
+    };
+    const deps = createFilesDeletionMainDependencies(access);
+
+    await expect(deleteFilesItemInMain({ itemId: 'transcript:first' }, deps)).resolves.toMatchObject({
+      ok: true,
+      itemId: 'transcript:first',
+    });
+    rows = [target({ id: 'transcript:second' })];
+    await expect(deleteFilesItemInMain({ itemId: 'transcript:second' }, deps)).resolves.toMatchObject({
+      ok: true,
+      itemId: 'transcript:second',
+    });
+
+    expect(access.getItems).toHaveBeenCalledTimes(2);
+    expect(access.trashItem).toHaveBeenNthCalledWith(1, 'C:\\owned\\episode-1.json');
+    expect(access.invalidate).toHaveBeenCalledTimes(2);
+  });
+
   it('adapts the authoritative snapshot without losing reference ownership', () => {
     const rows = [
       {
@@ -134,6 +159,20 @@ describe('Files app main-process deletion boundary', () => {
       reasonKey: 'filesApp.delete.failed',
     });
     expect(deps.onTrashed).not.toHaveBeenCalled();
+  });
+
+  it('does not report false failure after trashing when cache invalidation throws', async () => {
+    const deps = dependencies();
+    deps.onTrashed.mockImplementationOnce(() => {
+      throw new Error('cache unavailable');
+    });
+
+    await expect(deleteFilesItemInMain({ itemId: 'transcript:one' }, deps)).resolves.toEqual({
+      ok: true,
+      itemId: 'transcript:one',
+      mode: 'trash',
+    });
+    expect(deps.trashItem).toHaveBeenCalledOnce();
   });
 
   it('rejects malformed requests and a mismatched lookup result', async () => {

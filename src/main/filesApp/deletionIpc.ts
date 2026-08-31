@@ -52,6 +52,32 @@ export function lookupFilesDeletionTarget(
   };
 }
 
+export interface FilesDeletionIndexAccess {
+  /** Return the authoritative snapshot used for this operation. */
+  getItems(): readonly FilesDeletionIndexItem[];
+  /** Invalidate the snapshot only after a successful filesystem change. */
+  invalidate(): void;
+  /** Production supplies Electron `shell.trashItem`. */
+  trashItem(path: string): Promise<void>;
+}
+
+/**
+ * Bind the generic delete boundary to the production Files index.
+ *
+ * This is deliberately a factory instead of duplicated closures in main.ts:
+ * every invocation asks the index access for its current rows, and the only
+ * filesystem primitive it exposes is the Recycle Bin operation.
+ */
+export function createFilesDeletionMainDependencies(
+  access: FilesDeletionIndexAccess,
+): FilesDeletionMainDependencies {
+  return {
+    lookupItem: (itemId) => lookupFilesDeletionTarget(access.getItems(), itemId),
+    trashItem: (path) => access.trashItem(path),
+    onTrashed: () => access.invalidate(),
+  };
+}
+
 function sanitizeRequest(value: unknown): FilesDeleteRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const raw = value as { itemId?: unknown; confirmedItemId?: unknown };
@@ -123,7 +149,13 @@ export async function deleteFilesItemInMain(
     // The filesystem changed underneath the 15-second Files index cache. A
     // stale snapshot would briefly put the deleted row back after the UI's
     // optimistic removal, so invalidate only after trashItem resolves.
-    dependencies.onTrashed?.(target);
+    try {
+      dependencies.onTrashed?.(target);
+    } catch {
+      // The OS already accepted the destructive operation. Cache maintenance
+      // failing must not turn that success into a false "nothing changed"
+      // error; the TTL remains the safe fallback.
+    }
   }
   return result;
 }
