@@ -11061,6 +11061,10 @@ export const en: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'This item is not a file, so there is no folder to open.',
   'filesApp.reveal.noLocation': 'This item records no location.',
+  // Gate 12: a record whose file is gone is still file-backed, so Explorer
+  // would have opened the nearest surviving ancestor and called that a success.
+  'filesApp.reveal.missing':
+    'The file this record points at is no longer there, so there is no folder to open.',
 
   'filesApp.delete.mode.trash': 'Deleting this sends the file to the Recycle Bin.',
   'filesApp.delete.mode.soft': 'Deleting this removes the record, with an undo window.',

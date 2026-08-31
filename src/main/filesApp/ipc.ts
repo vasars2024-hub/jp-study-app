@@ -14,6 +14,7 @@
  * whether to offer the action — instead of trusting whatever path a caller
  * hands it.
  */
+import fs from 'node:fs';
 import { app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
@@ -73,6 +74,24 @@ export function registerFilesAppIpc(): void {
       // userData "so something happens" would be the wrong folder presented
       // as a success.
       return { ok: false, reasonKey: 'filesApp.reveal.notFileBacked' };
+    }
+    /*
+     * Gate 12's other wrong folder, and the one that was still open.
+     *
+     * `brokenLink` is a flag the index already sets — a record whose backing
+     * file is gone — and those rows ARE file-backed, so `revealTargetFor`
+     * returns a path for them and this handler used to reveal it and answer
+     * `ok: true`. What Explorer does with a path that no longer exists is
+     * open the nearest ancestor that does, silently, which is a different
+     * folder than the one the user asked for, reported as a success. That is
+     * the exact shape the gate forbids.
+     *
+     * Checked here rather than trusting the flag: the index is cached for 15
+     * seconds and the file may have gone in between, so the flag is a hint and
+     * the filesystem is the answer.
+     */
+    if (!fs.existsSync(target)) {
+      return { ok: false, reasonKey: 'filesApp.reveal.missing' };
     }
     shell.showItemInFolder(target);
     return { ok: true };

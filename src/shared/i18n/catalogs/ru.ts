@@ -11476,6 +11476,8 @@ export const ru: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'Это не файл, поэтому открывать нечего.',
   'filesApp.reveal.noLocation': 'У этого элемента не записано расположение.',
+  'filesApp.reveal.missing':
+    'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 
   'filesApp.delete.mode.trash': 'Удаление отправит файл в корзину.',
   'filesApp.delete.mode.soft': 'Удаление уберёт запись, с возможностью отмены.',

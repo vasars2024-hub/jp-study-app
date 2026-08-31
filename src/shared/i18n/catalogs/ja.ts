@@ -10603,6 +10603,8 @@ export const ja: Catalog = {
 
   'filesApp.reveal.notFileBacked': 'この項目はファイルではないため、開けるフォルダーはありません。',
   'filesApp.reveal.noLocation': 'この項目には場所が記録されていません。',
+  'filesApp.reveal.missing':
+    'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 
   'filesApp.delete.mode.trash': '削除するとファイルはごみ箱へ移動します。',
   'filesApp.delete.mode.soft': '削除すると記録が消えます（取り消し可能な時間があります）。',

@@ -10513,6 +10513,7 @@ export const zh: Catalog = {
 
   'filesApp.reveal.notFileBacked': '该项目不是文件，因此没有可打开的文件夹。',
   'filesApp.reveal.noLocation': '该项目没有记录位置。',
+  'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',
   'filesApp.delete.mode.soft': '删除会移除该记录，并有一段可撤销的时间。',

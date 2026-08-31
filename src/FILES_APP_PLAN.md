@@ -438,23 +438,26 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    produced, captured **before** removal and compared after. Settings no longer carries them,
    and every search entry that pointed at `pageId: 'memory'` resolves to the Files app — a
    search hit landing on a page that no longer holds the row is a FAIL.
-   <!-- status: open; evidence: 2026-08-31 f26e9932 + d9bec5be -- both panels built on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files'; the "compared after" reading is NOT taken and needs a dev app started from this worktree -->
+   <!-- status: open; evidence: 2026-08-31 f26e9932 + d9bec5be + cd9ae66d -- panels on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files', parity rows landed as panel:system/memory (migrated) + panel:system/statistics (preserved); the "compared after" reading needs an EXCLUSIVE app and is blocked on the mergeback -->
    **3 of 4 clauses landed, gate still OPEN.** The before-capture exists
-   (`gate8-before.json`); the after-comparison does not. See the 2026-08-31 (ninth) Progress
-   entry for the two remaining items and the parity-row blocker.
+   (`gate8-before.json`); the after-comparison does not. Blocker (a), the parity rows, is
+   RESOLVED — see the 2026-08-31 (tenth) entry. Blocker (b) needs an app this worker cannot
+   start without evicting another track's instrument; same entry says why and what clears it.
 9. Deleting a derived item removes exactly it; the guard for irreplaceable media refuses without
    an explicit confirmation, proven by a refusal that actually fires.
 10. **Opening routes through `planForPath`.** Clicking an item of each handled type opens the
    app that owns it, and a type with more than one candidate offers the ranked list rather than
    silently choosing. Proven with a file whose extension is ambiguous and whose handler is
    settled by content sniffing (`sniffZip`/`sniffJson`), so the sniffing path is exercised.
+   <!-- status: closed; evidence: 2026-08-31 c8fac9ea + e3816480 -- shared/filesApp/openPlan.ts; 18 tests on real .zip/.json through the real planForPath, both sniffers, 12 of 15 targets own an app and 3 refuse by name, 4 controls; filesApp.test.tsx 39 -> 46 -->
 11. **Import from the real filesystem.** A file dragged in from Explorer is routed, lands in the
    correct category, and appears in the tree without a manual refresh. A file the router cannot
    place gets a named refusal, not a silent drop.
+   <!-- status: closed; evidence: 2026-08-31 8bc72866 -- renderer/filesIndexBus.ts + useFilesIndex force:true reload; the two silent returns in DropRouter now refuse by name with distinct severities; 10 tests incl. DropRouter's first coverage and 3 controls -->
 12. **Reveal out.** An item opens its real location in Explorer, for at least one file-backed
    and one non-file-backed kind — the latter must refuse honestly rather than open the wrong
    folder.
-   <!-- status: open; evidence: 2026-08-30 refusal half proven (revealTargetFor null, Reveal absent for a SQLite row); the Explorer half needs a live click -->
+   <!-- status: closed; evidence: 2026-08-31 -- filesAppReveal.test.ts, 7 tests on the handler with shell.showItemInFolder SPIED: exact recorded path for a file, refused-without-asking for sqlite/json/localStorage/derived, a malformed location, and a store shape carrying a path. Found and fixed a SECOND wrong folder: a brokenLink row is file-backed, so the old handler revealed a dead path and Explorer opened the nearest surviving ancestor as ok:true -->
 13. **The assistant can reach it.** A natural-language request resolves to a scoped Files view
    through `AGENT_NAVIGATION_INDEX`, not a bespoke path.
    <!-- status: closed; evidence: 2026-08-30 'files' in DESKTOP_WIN_SECTIONS/AGENT_NAVIGABLE_SECTIONS/palette/POPOUT_SECTIONS/AGENT_NAVIGATION_INDEX; both directions tested -->
@@ -1240,3 +1243,88 @@ live machine state; compare those for shape only (same source, same units, non-n
 A panel reporting a different `freemem` is CORRECT; one reporting null is not.
 Then search Settings for "factory reset" and prove the hit lands on the factory-reset
 CARD in the Files app, not merely on the app — that is the gate's own FAIL condition.
+
+### 2026-08-31 (tenth) — gate 8's parity blocker, and gates 10 and 11 land
+
+`cd9ae66d` (gate 8 parity rows) · `c8fac9ea` + `e3816480` (gate 10) · `8bc72866` (gate 11).
+
+**Blocker (a) resolved by a THIRD capability shape.** `filesAppRouteParity.test.ts` pins
+every non-`action:` capability 1:1 against the 25 enumerator `source` ids, so a bare
+`memory` row broke the equality. The spelling, decided and written down: `panel:<categoryId>`,
+and `isEnumeratorCapability` (exported, so table and test cannot drift) filters on the colon.
+
+**And the half the previous turn assumed: only ONE of the pair migrated.** Decision 1 names
+"memory and statistics", but statistics never had a Settings page to lose — its home is the
+top-level `stats` section and `AppSection.tsx` still routes `case 'stats'` to
+`StatisticsView`. So `panel:system/statistics` is **preserved**, and
+`FILES_PERMITTED_MIGRATIONS` carries `panel:system/memory` alone. Listing statistics would
+have licensed a future removal of the Statistics section nobody decided. Three assertions in
+the draft were backwards; the sharpest was `pageId: 'memory'` asserted ABSENT when it is
+deliberately present on all nine entries, and is now pinned at 9.
+
+**Gate 10 CLOSED.** Opening routes through `planForPath`. `shared/filesApp/openPlan.ts` maps
+a `DropTargetId` to the section `DropRouter` itself opens and **calls no importer** — an
+indexed row is already imported, and re-running that switch would create a second library
+entry for the book on screen. A test asserts the seven importer names are DropRouter's and
+absent from FilesApp. Three decisions recorded: the ranked-list trigger is a **count**, not
+`needsTriage` (an `.apkg`'s two homes rank `likely` then `ambiguous`, so a confidence read
+would have opened one silently); 12 of 15 targets own an app and the other three refuse with
+their **own** keys; a failed router call refuses rather than falling back to the kind table.
+Single click selects, double click opens, both through one `openItem(item)` — which takes the
+item because in the double-click gesture `selected` has not committed and reading it opens the
+PREVIOUS row. 18 tests on real `.zip`/`.json` fixtures through the real `planForPath`, both
+sniffers, 4 controls; `filesApp.test.tsx` 39 → 46.
+
+**Gate 11 CLOSED.** Routing already worked (DropRouter listens on `window`); two halves did
+not. (1) The tree never learned an import happened — `renderer/filesIndexBus.ts` is the one
+name for it, raised after `runPlans` resolves and after an undo, and the reload is
+**`force: true`** because `getFilesIndex` serves a cached build inside its TTL and a
+non-forced reload returns the pre-import snapshot while looking like it reloaded. (2) Two
+returns in the drop handler rendered NOTHING for real files — now `noPath` (warn, Electron
+could not resolve a virtual item) and `notClassified` (err, our fault), distinct sentences and
+severities. An empty drop still stays silent; a control asserts it. First tests DropRouter
+has ever had.
+
+**Trap, i18n:** the drop listener depended on `t`. `t`'s identity is stable by design, so the
+closure kept whichever language it registered with — it now depends on `lang`.
+
+**Gate 8 (b) is STILL BLOCKED and the reason changed.** Not "needs a dev app" — it needs an
+**exclusive** one. The main-tree app (PID 2040) holds bridge port 39273, which is a hardcoded
+const, and shares the 8.6 GB userData whose leveldb takes a single-writer lock, so a second
+instance from this worktree would read `domainsPresent: 0` and the comparison would be
+meaningless. Killing PID 2040 would destroy the liquid track's deliberately-arranged
+instrument. The clean route: `ClaudeRelayMergeback` has REFUSED four passes in a row
+(07:10–07:55, "a main-tree dispatch is running"); once `wt/files-app` merges, the panels are
+live in that same app and any worker can take the reading through the bridge it already has.
+Do not start a second Electron here to force it.
+
+**Gate 9 is CODEX's lane, not this worker's.** `feat/nyaa-subtitles` carries seven files-app
+deletion commits not on this branch (`64d66b86` … `2c27c144`), including
+`filesDeletionSession.ts`. Building gate 9 here would duplicate them and conflict at the
+merge. This worker took 10 and 11 instead.
+
+### 2026-08-31 (eleventh) — gate 12 CLOSES, and the second wrong folder it was hiding
+
+`<this commit>`. The refusal half was already proven from the renderer (button absent for a
+SQLite row). Checking the HANDLER — which nobody had — found a second wrong folder the
+renderer cannot see: **a `brokenLink` row IS file-backed**, so `revealTargetFor` hands back a
+path, and `shell.showItemInFolder` on a path that no longer exists opens the nearest
+surviving ANCESTOR, silently, reported as `ok: true`. That is the exact shape gate 12
+forbids, and it survived because the renderer only ever asked whether the action should be
+offered. Fixed with an `fs.existsSync` check and `filesApp.reveal.missing`; the filesystem
+decides, not the index flag, because the index is cached for 15 s and the file can go in
+between.
+
+**Every assertion is on the SPY, not the return value.** "Refuses honestly" means Explorer
+was not asked; a handler could answer `ok: false` having already asked. 7 tests: exact path
+for a real file, refused-without-asking for `sqlite`/`json`/`localStorage`/`derived`, a
+missing file, a live delete flipping the answer mid-session, four malformed locations
+including a bare string path, and a `{ store: 'zzz', path: <real> }` that cannot smuggle a
+path through.
+
+**The boundary, stated so an auditor can disagree with it.** Every line of THIS APP's code on
+the reveal path is now exercised: the renderer test proves the click calls
+`filesReveal(<the real location>)`, and this one proves the handler calls
+`showItemInFolder(<exactly that path>)`. The only unobserved step is Electron's own shell
+API opening a window, which is not this app's code and which no headless agent can watch.
+Gate 12 is closed on that basis rather than on a click nobody can record.
