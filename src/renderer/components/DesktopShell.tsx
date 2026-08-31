@@ -3194,10 +3194,10 @@ export default function DesktopShell({
         y={ctxPos?.y ?? 0}
         onClose={() => setCtxPos(null)}
         items={[
-          { id: 'new-note', label: 'New sticky note', onSelect: () => openNote() },
-          { id: 'new-shortcut', label: 'New app shortcut…', onSelect: () => void addShortcut() },
+          { id: 'new-note', label: t('desktop.context.newNote'), onSelect: () => openNote() },
+          { id: 'new-shortcut', label: t('desktop.context.newShortcut'), onSelect: () => void addShortcut() },
           { id: 'sep1', separator: true, label: '' },
-          { id: 'widgets', label: 'Widgets…', onSelect: () => setGalleryOpen(true) },
+          { id: 'widgets', label: t('desktop.context.widgets'), onSelect: () => setGalleryOpen(true) },
           { id: 'sep2', separator: true, label: '' },
           {
             id: 'close-all-apps',
@@ -3207,8 +3207,8 @@ export default function DesktopShell({
             onSelect: () => winsRef.current.forEach((w) => close(w.id)),
           },
           { id: 'sep3', separator: true, label: '' },
-          { id: 'personalize', label: 'Personalize…', onSelect: () => open('settings') },
-          { id: 'display', label: 'Desktop & display settings', onSelect: () => open('settings') },
+          { id: 'personalize', label: t('desktop.context.personalize'), onSelect: () => open('settings') },
+          { id: 'display', label: t('desktop.context.displaySettings'), onSelect: () => open('settings') },
         ]}
       />
     </div>

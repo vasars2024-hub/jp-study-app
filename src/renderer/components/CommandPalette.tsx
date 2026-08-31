@@ -291,7 +291,7 @@ export default function CommandPalette() {
           <input
             ref={inputRef}
             className="palette-input"
-            placeholder={mode === 'search' ? t('palette.searchPlaceholder') : mode === 'toolbox' ? 'Search Toolbox commands' : t('palette.commandPlaceholder')}
+            placeholder={mode === 'search' ? t('palette.searchPlaceholder') : mode === 'toolbox' ? t('palette.toolboxPlaceholder') : t('palette.commandPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}

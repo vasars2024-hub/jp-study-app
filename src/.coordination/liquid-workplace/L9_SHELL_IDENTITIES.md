@@ -22,3 +22,14 @@ presentation round-trip/presentability suite.
 L9's first bullet remains OPEN: this closes the taskbar presentation route, not the whole
 taskbar/context/command entry-point inventory. Next: desktop context-menu and command-palette
 language/identity gaps, then score the entry-point group rather than declaring it from source.
+
+## 2026-08-30 — Shared entry-point localization
+
+The desktop context menu's five shell actions and the command palette's Toolbox prompt no
+longer bypass shared i18n. Six explicit keys now cover EN/JA/ZH/RU; application code resolves
+them with `t()` and does not import the combined catalog.
+
+Focused verification passed 2/2 source/catalog guards plus the repository i18n gate at
+11,782 English keys with complete JA/ZH/RU coverage. Live Electron rendered the real desktop
+menu as six rows, including the five catalog-backed labels and the existing Close-all action.
+This is an entry-point completeness slice, not an L9 timeline-bullet close.
