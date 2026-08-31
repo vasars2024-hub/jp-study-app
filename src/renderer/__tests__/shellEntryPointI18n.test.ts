@@ -22,6 +22,7 @@ const keys = [
   'desktop.context.personalize',
   'desktop.context.displaySettings',
   'palette.toolboxPlaceholder',
+  'desktop.deleteNoteConfirm',
 ] as const;
 
 describe('shared shell entry-point localization', () => {

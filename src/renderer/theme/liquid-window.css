@@ -85,6 +85,35 @@
   background: transparent;
 }
 
+/* L9 Note: paper remains the opaque editing anchor. Opting into Liquid changes
+   only the frame and reveals a compact edge palette; Standard renders neither
+   this dock nor any of its spacing. */
+.fwin.fwin-liquid.fwin-note .desk-note-palette {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+  padding: var(--lq-space-1);
+  border-radius: var(--lq-radius-pill);
+}
+
+.fwin.fwin-liquid.fwin-note .desk-note-color {
+  width: var(--lq-hit-target);
+  height: var(--lq-hit-target);
+  padding: 0;
+  border: 2px solid color-mix(in srgb, var(--lq-liquid-text) 32%, transparent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.fwin.fwin-liquid.fwin-note .desk-note-color[aria-pressed='true'] {
+  border-color: var(--lq-liquid-text);
+  box-shadow: 0 0 0 2px var(--lq-focus-ring);
+}
+
 /*
  * L5 — the interior half of rule 1, and the only place `.lq-contextual` is ever
  * painted.

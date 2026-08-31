@@ -3628,6 +3628,7 @@ export const ja: Catalog = {
   'desktop.notePlaceholder': 'メモを書く…（閉じると削除されます）',
   'desktop.stickyNote': '付箋',
   'desktop.deleteNote': 'メモを削除',
+  'desktop.deleteNoteConfirm': 'このメモを削除しますか？元に戻せません。',
   'desktop.popOut': '別ウィンドウで開く',
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',

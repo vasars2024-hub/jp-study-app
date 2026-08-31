@@ -195,7 +195,7 @@ describe('liquid window presentation — loading a persisted blob', () => {
 describe('presentability and reversibility are the same predicate', () => {
   const LIQUID = { v: 1 as const, mode: 'liquid' as const, standardRect: { x: 1, y: 2, w: 3, h: 4 } };
 
-  it.each(['note', 'city', 'visualizer'])('%s can never present liquid', (section) => {
+  it.each(['city', 'visualizer'])('%s can never present liquid', (section) => {
     expect(canPresentLiquid(section)).toBe(false);
     // The state the audit found reachable from a hand-edited layout file: a
     // well-formed blob that `parsePresentation` accepts. The gate is the
@@ -211,6 +211,11 @@ describe('presentability and reversibility are the same predicate', () => {
       expect(presentationToSnapshot({ section, presentation: LIQUID })).toEqual({ presentation: LIQUID });
     },
   );
+
+  it('keeps Note conventional by default but permits its explicit reversible Liquid palette', () => {
+    expect(canPresentLiquid('note')).toBe(true);
+    expect(presentationToSnapshot({ section: 'note', presentation: LIQUID })).toEqual({ presentation: LIQUID });
+  });
 
   it('a window with no section at all is presentable, not silently stripped', () => {
     // Pop-outs and fixtures use `PresentableWin` structurally, without a

@@ -289,6 +289,13 @@ function wiredModuleLabel(section: WinSection): string {
 const WALLPAPERS = SELECTABLE_WALL_PRESETS;
 
 const NOTE_COLORS = ['#fff3a3', '#ffd6a5', '#ffb3ba', '#c9f2c7', '#cfe0ff'];
+const NOTE_COLOR_LABEL_KEYS = [
+  'lens.read.color.yellow',
+  'lens.read.color.orange',
+  'lens.read.color.red',
+  'lens.read.color.green',
+  'lens.read.color.blue',
+] as const;
 // BOOK_DROP / MEDIA_DROP removed with the two-bucket drop handler. The extension
 // tables now live in `shared/mediaKind.ts`, one copy, consulted by
 // `shared/fileRouting.ts` — which is also what the importers accept, so the
@@ -1418,7 +1425,18 @@ export default function DesktopShell({
     [],
   );
 
-  const close = (id: string) => {
+  const close = async (id: string): Promise<void> => {
+    const target = winsRef.current.find((w) => w.id === id);
+    if (target?.section === 'note') {
+      const ok = await confirmDialog({
+        title: t('desktop.deleteNote'),
+        message: t('desktop.deleteNoteConfirm'),
+        confirmLabel: t('common.remove'),
+        cancelLabel: t('common.cancel'),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     const delay = winPhaseMs(false);
     if (delay > 0) {
       if (winAnim[id] === 'closing') return;
@@ -1427,6 +1445,14 @@ export default function DesktopShell({
       return;
     }
     removeWin(id);
+  };
+  const closeMany = async (ids: string[]): Promise<void> => {
+    for (const id of ids) {
+      // Destructive note confirmations must be sequential; concurrent dialogs
+      // would let one answer apply while another confirmation obscures it.
+      // eslint-disable-next-line no-await-in-loop
+      await close(id);
+    }
   };
   const removeWin = (id: string, opts?: { silent?: boolean }) => {
     const closing = winsRef.current.find((w) => w.id === id);
@@ -2594,6 +2620,12 @@ export default function DesktopShell({
           hidden={!!w.min}
           deskRef={deskRef}
           noteColor={w.section === 'note' ? notes[w.id]?.color : undefined}
+          onNoteColor={w.section === 'note'
+            ? (color) => setNotes((current) => ({
+                ...current,
+                [w.id]: { text: '', ...current[w.id], color },
+              }))
+            : undefined}
           {...winHandlerCache.get(w.id, w.section)}
         >
           {w.section === 'note' ? (
@@ -3168,21 +3200,20 @@ export default function DesktopShell({
                     }]
                   : []),
                 { id: 'sep-t1', separator: true, label: '' },
-                { id: 'close', label: t('desktop.task.closeThis'), danger: true, onSelect: () => close(taskCtx.win.id) },
+                { id: 'close', label: t('desktop.task.closeThis'), danger: true, onSelect: () => void close(taskCtx.win.id) },
                 {
                   id: 'close-others',
                   label: t('desktop.task.closeOthers'),
                   disabled: wins.length < 2,
-                  onSelect: () =>
-                    winsRef.current.forEach((other) => {
-                      if (other.id !== taskCtx.win.id) close(other.id);
-                    }),
+                  onSelect: () => void closeMany(winsRef.current
+                    .filter((other) => other.id !== taskCtx.win.id)
+                    .map((other) => other.id)),
                 },
                 {
                   id: 'close-all',
                   label: t('desktop.task.closeAll'),
                   danger: true,
-                  onSelect: () => winsRef.current.forEach((other) => close(other.id)),
+                  onSelect: () => void closeMany(winsRef.current.map((other) => other.id)),
                 },
               ]
             : []
@@ -3204,7 +3235,7 @@ export default function DesktopShell({
             label: t('desktop.task.closeAll'),
             danger: true,
             disabled: wins.length === 0,
-            onSelect: () => winsRef.current.forEach((w) => close(w.id)),
+            onSelect: () => void closeMany(winsRef.current.map((w) => w.id)),
           },
           { id: 'sep3', separator: true, label: '' },
           { id: 'personalize', label: t('desktop.context.personalize'), onSelect: () => open('settings') },
@@ -3272,7 +3303,7 @@ function TaskbarClock({
 type ResizeMode = 'corner' | 'right' | 'bottom';
 
 const FloatingWindow = memo(function FloatingWindow({
-  win, animPhase, focused, hidden, deskRef, noteColor,
+  win, animPhase, focused, hidden, deskRef, noteColor, onNoteColor,
   onFocus, onClose, onMinimize, onMaximize, onToggleLiquid, onPopOut, onPatch, children,
 }: {
   win: Win;
@@ -3281,6 +3312,7 @@ const FloatingWindow = memo(function FloatingWindow({
   hidden: boolean;
   deskRef: React.RefObject<HTMLDivElement>;
   noteColor?: string;
+  onNoteColor?: (color: string) => void;
   onFocus: () => void;
   onClose: () => void;
   onMinimize: () => void;
@@ -3299,10 +3331,11 @@ const FloatingWindow = memo(function FloatingWindow({
   const isMusicWidget = win.section === 'musicwidget';
   const isGarden = win.section === 'city';
   const isMaximized = Boolean(win.max) && !isGarden;
-  // Liquid presentation is opt-in per window and reversible. Notes, the
-  // frameless garden and the visualizer have no conventional chrome to swap, so
-  // they do not offer it — their absence of the control is not a disabled
-  // feature. ONE predicate, so "renders liquid" and "can leave liquid" cannot
+  // Liquid presentation is opt-in per window and reversible. The frameless
+  // garden and visualizer have no conventional chrome to swap, so they do not
+  // offer it. Note keeps conventional paper as its default and uses Liquid only
+  // for its compact color edge palette. ONE predicate means "renders liquid"
+  // and "can leave liquid" cannot
   // disagree (boss audit 2026-08-17 finding 2).
   const canGoLiquid = canPresentLiquid(win.section);
   const liquid = isWinLiquid(win) && canGoLiquid;
@@ -3466,11 +3499,11 @@ const FloatingWindow = memo(function FloatingWindow({
       {!isGarden && (
         <div
           className="fwin-bar"
-          style={isNote && noteColor ? { background: noteColor, borderBottomColor: 'rgba(0,0,0,0.15)' } : undefined}
+          style={isNote && noteColor && !liquid ? { background: noteColor, borderBottomColor: 'rgba(0,0,0,0.15)' } : undefined}
           onPointerDown={dragStart}
           onDoubleClick={() => !isNote && onMaximize()}
         >
-          <span className="fwin-title" style={isNote ? { color: '#3a3320' } : undefined}>
+          <span className="fwin-title" style={isNote && !liquid ? { color: '#3a3320' } : undefined}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
             <span className="fwin-title-text">{title}</span>
           </span>
@@ -3511,7 +3544,7 @@ const FloatingWindow = memo(function FloatingWindow({
             )}
             <button
               className="fwin-b lq-hit fwin-close"
-              style={isNote ? { color: '#3a3320' } : undefined}
+              style={isNote && !liquid ? { color: '#3a3320' } : undefined}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
             >
@@ -3537,6 +3570,22 @@ const FloatingWindow = memo(function FloatingWindow({
             </button>
           </div>
         </>
+      )}
+      {isNote && liquid && (
+        <div className="desk-note-palette lq-contextual" role="toolbar" aria-label={t('theme.group.color')}>
+          {NOTE_COLORS.map((color, index) => (
+            <button
+              key={color}
+              type="button"
+              className="desk-note-color lq-hit"
+              style={{ background: color }}
+              title={t(NOTE_COLOR_LABEL_KEYS[index])}
+              aria-label={t(NOTE_COLOR_LABEL_KEYS[index])}
+              aria-pressed={noteColor === color}
+              onClick={() => onNoteColor?.(color)}
+            />
+          ))}
+        </div>
       )}
       <div
         className={`fwin-body ${isNote ? 'fwin-body-note' : ''} ${isVisualizer || isMusicWidget || win.section === 'music' || isGarden ? 'fwin-body-flush' : ''} ${isGarden ? 'fwin-body-frameless' : ''}`}

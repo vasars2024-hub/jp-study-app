@@ -3911,6 +3911,7 @@ export const ru: Catalog = {
   'desktop.notePlaceholder': 'Напишите заметку… (закрытие удаляет её)',
   'desktop.stickyNote': 'Стикер',
   'desktop.deleteNote': 'Удалить заметку',
+  'desktop.deleteNoteConfirm': 'Удалить эту заметку? Это действие нельзя отменить.',
   'desktop.popOut': 'Открыть в отдельном окне',
   'desktop.minimize': 'Свернуть',
   'desktop.maximize': 'Развернуть',

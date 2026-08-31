@@ -52,8 +52,10 @@ export interface PresentableWin {
 /**
  * The ONE predicate for "this section can be presented as Liquid at all".
  *
- * Sticky notes and the frameless garden and visualizer trinkets have no
- * conventional chrome to swap, so they never offer the toggle. Before this was
+ * The frameless garden and visualizer trinkets have no conventional chrome to
+ * swap, so they never offer the toggle. Sticky notes deliberately do: their
+ * conventional paper stays the default, while Liquid reveals the compact color
+ * edge palette required by the Note transformation contract. Before this was
  * one function the shell carried two hand-written lists that differed by
  * `visualizer` (boss audit 2026-08-17, finding 2): a visualizer window whose
  * persisted blob validated rendered Liquid while the button that leaves Liquid
@@ -66,7 +68,7 @@ export interface PresentableWin {
  * act on.
  */
 export function canPresentLiquid(section?: string): boolean {
-  return section !== 'note' && section !== 'city' && section !== 'visualizer';
+  return section !== 'city' && section !== 'visualizer';
 }
 
 /**

@@ -3828,6 +3828,7 @@ export const en: Catalog = {
   'desktop.notePlaceholder': 'Write a note… (closing deletes it)',
   'desktop.stickyNote': 'Sticky note',
   'desktop.deleteNote': 'Delete note',
+  'desktop.deleteNoteConfirm': 'Delete this note? This cannot be undone.',
   'desktop.popOut': 'Pop out into its own window',
   'desktop.minimize': 'Minimize',
   'desktop.maximize': 'Maximize',

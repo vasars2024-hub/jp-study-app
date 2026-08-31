@@ -63,3 +63,17 @@ Focused verification passed 2/2 shell localization tests and the repository i18n
 English keys with complete JA/ZH/RU coverage. Live renderer read back the localized English title
 and accessible name from the real taskbar button. The first L9 bullet remains open for its full
 controlled rubric receipt.
+
+## 2026-08-30 — Note reversible Liquid palette and safe deletion
+
+Note now remains conventional by default but is eligible for the same explicit Standard/Liquid
+command as other windows. Liquid reveals a compact five-color edge palette; the paper textarea
+stays opaque. Color, text, position and size persist through the reverse transition. Every close,
+close-others and close-all path now serializes destructive Note confirmations instead of deleting
+immediately or stacking dialogs.
+
+Focused verification passed 56/56 across presentation, snapshot fidelity, taskbar and i18n guards;
+i18n passed 11,783 keys; touched-path ESLint had 0 errors. Live: Standard palette 0 -> Liquid 5 ->
+Standard 0; text stayed `L9 note reverse path`, geometry stayed `380,172,260x220`, blue persisted;
+Cancel kept 1 note and Remove left 0, with Cancel initially focused. Note remains open for the
+related-item dock decision and its controlled 80/80 receipt.

@@ -194,6 +194,20 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     );
   });
 
+  it('keeps Note paper conventional until opt-in, then exposes a reversible color palette', () => {
+    expect(SHELL).toContain('{isNote && liquid && (');
+    expect(SHELL).toContain('className="desk-note-palette lq-contextual"');
+    expect(SHELL).toContain('aria-pressed={noteColor === color}');
+    expect(SHELL).toContain('onClick={() => onNoteColor?.(color)}');
+    expect(SHELL).toMatch(/style=\{isNote && noteColor && !liquid/);
+  });
+
+  it('confirms Note deletion and serializes multi-window destructive prompts', () => {
+    expect(SHELL).toMatch(/target\?\.section === 'note'[\s\S]{0,400}?desktop\.deleteNoteConfirm/);
+    expect(SHELL).toMatch(/const closeMany = async[\s\S]{0,300}?await close\(id\)/);
+    expect(SHELL).toContain('void closeMany(winsRef.current.map((w) => w.id))');
+  });
+
   it('the toggle changes presentation and nothing else — not even z', () => {
     // L6 category-6 drive, 2026-08-17. Standard -> Liquid -> Standard came back
     // identical in geometry, focus, relative z-order and all 66 controls, and

@@ -3613,6 +3613,7 @@ export const zh: Catalog = {
   'desktop.notePlaceholder': '写点什么…（关闭即删除）',
   'desktop.stickyNote': '便签',
   'desktop.deleteNote': '删除便签',
+  'desktop.deleteNoteConfirm': '删除此便签？此操作无法撤销。',
   'desktop.popOut': '在独立窗口中打开',
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',
