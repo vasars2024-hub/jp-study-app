@@ -440,9 +440,11 @@ An app cannot pass unless the answer is “yes” to all:
 ## 11. Phased implementation timeline
 
 **Every bullet below carries a machine-readable status marker** (relay RULE A, seeded
-2026-08-31). Count it with `grep -c "<!-- status: closed;"` and its siblings; `^- ` still
-matches every bullet. Seeded from this plan's own explicit statements only — nothing inferred,
-nothing rounded up.
+2026-08-31). Count it with `grep -c '^- .*status: closed;'` and its `open`/`unknown` siblings.
+The `^- ` anchor is load-bearing, not decoration: an unanchored pattern also matches this
+paragraph and reports one closed bullet too many. The three counts must sum to 46, and `^- `
+still matches every bullet. Seeded from this plan's own explicit statements only — nothing
+inferred, nothing rounded up.
 
 **After L9 bullet 3 closed (`3f47bfa1`): 6 closed / 20 open / 20 unknown, of 46.**
 
