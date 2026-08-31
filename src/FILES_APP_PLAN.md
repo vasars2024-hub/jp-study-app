@@ -471,8 +471,15 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 16. **Collections are real folders.** Create a folder, add items of two different kinds to it,
    nest it, reopen the app and it survives. Deleting the collection leaves every item in place —
    proven by re-finding one of them afterwards.
+   <!-- status: closed; evidence: 2026-08-31 f2313736 (model) + 64abd9d8 (store) + 733ce361 (UI) -- 20 UI tests, every survival claim asserted after a real unmount/remount with the store's memory fallback cleared; delete re-finds the item in Everything; a stale id is COUNTED under the list; control: removing setItem turns 12 of 20 red -->
 17. **Derived folders refuse honestly.** Renaming or deleting a derived folder is refused with a
    named message; it does not silently no-op. Adding an item to one by hand is not offered.
+   <!-- status: closed; evidence: 2026-08-31 733ce361 -- rename/delete/move stay PRESENT on a derived node so they have somewhere to refuse, each naming the folder; the "not offered" half is the absence of preventDefault on dragover, asserted as event.defaultPrevented false, with the user's own folder as the true control; the Add menu lists only the user's own folders -->
+   <!-- decision: the refusal controls are shared rather than per-node. A control that
+        vanishes on a derived folder cannot say why, and gate 17 asks for a named message
+        rather than an absence. Reversible: per-node menus can be added later without
+        moving the refusal logic. -->
+   
 18. **Favorites.** Pin an item and a location; both appear under Favorites and survive a
    restart. Unpinning removes them and deletes nothing.
 19. **Smart folders stay live.** A saved search such as *Untranscribed videos* changes its
@@ -1377,3 +1384,44 @@ sentence walked end to end with the reopen as a real JSON round trip.
 `collections.ts` is classified `pending` in `tools/architecture-baseline.json` — the shape
 that file's readme already names for three other entries, "a pure layer that is built and
 tested but has no consumer yet". Remove the entry when `FilesApp` imports it.
+
+### 2026-08-31 (fourteenth) — gates 16 and 17 CLOSE, and two wiring findings
+
+`64abd9d8` the store, `733ce361` the UI. Gate 16 is a **restart** gate, so every survival
+claim in the 20 new UI tests is asserted after a real unmount/remount against the same
+`localStorage` with the store's in-memory fallback cleared. A React-state assertion cannot
+tell "persisted" from "still mounted", and that is the whole gate.
+
+**`persisted` is the store's load-bearing field.** `localStorage.setItem` throws on quota, so
+a folder created in memory and never written passes every in-session check and is silently
+gone at the next launch. `saveFailed` is a DIFFERENT i18n key from the model's refusals — a
+refusal is fixable by retyping, a failed save is not — and the change event does not fire on
+a write that did not happen. Control: removing `setItem` turns **12 of 20** UI tests red.
+
+**Gate 17's design decision, pinned.** Rename / delete / move stay PRESENT on a derived
+folder so they have somewhere to refuse, each naming the folder. A control that vanishes
+cannot say why it is not there, and the gate's words are "refused with a named message; it
+does not silently no-op". The *other* half is the opposite shape: a derived node deliberately
+does **not** call `preventDefault` on `dragover`, so the browser never fires `drop` on it —
+the test asserts `event.defaultPrevented === false`, the mechanism, not the cursor. The
+user's own folder is the control at `true`. The inspector's Add menu lists only the user's
+own folders, so a derived category is never on it to begin with.
+
+Two findings the wiring produced, both fixed in `733ce361`:
+
+1. **A gate-5 scoped-open set `scope` without clearing `collectionScope`** — a caller's
+   category would have been intersected with whatever folder happened to be open. Two
+   filters, one of which nobody asked for.
+2. **A collection scope had no entry in the "you are narrowed" toolbar line**, so the only
+   route out of a folder would have been the rail. Both narrowings now share one label.
+
+`--fa-depth` renders nesting from the same walk the model computes, so screen and model
+cannot disagree; anything the walk does not reach is appended at depth 0 rather than dropped,
+because an invisible folder cannot be deleted. A missing item id is COUNTED under the list.
+
+Trap, and it cost a false lint reading: the tracked directory is
+`src/renderer/components/**filesapp**/` (lowercase), while Windows lets `filesApp` resolve.
+Passing the capital-A path to eslint produces five bogus `import/no-unresolved` "casing does
+not match" errors on imports you never touched. Lint the lowercase path. `collections.ts`'s
+`pending` entry is removed from `tools/architecture-baseline.json` — FilesApp imports it now;
+audit still 15 unclassified, the identical pre-existing set.
