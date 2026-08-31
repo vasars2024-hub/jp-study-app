@@ -1218,3 +1218,45 @@ clean run's 0 and 66.8. The recorder is seeing real frames, so the zeros above a
 
 Cells **13 of 16** (cat1-cat6 both, cat8 Video, cat7 Video). Next: cat7 · City, then cat8's
 third-surface substitution.
+
+## 2026-08-31 — primary — category 7 · City: PASS 10/10. cat7 CLOSES on both RULE C surfaces.
+
+**Correction 29 is proven by the gesture record, not asserted.** Both gesture legs report
+`title: "@.fwin-frameless"` with `before`/`after` = `128px / 84px / 680x679` and
+`closedLoop: true` — the probe gripped **City's own inline geometry** and put it back. That is
+the discriminating fact: had the selector fallen through to the largest window it would have
+been Video's geometry in the record. `.fwin-drag-strip` supplied the handle; a window with
+neither grip still refuses.
+
+**City's heavy leg is the honest one for a canvas surface.** Its load runs UNPROMPTED — 13
+`<canvas>` layers, 48 stars and 22 dust motes paint whether or not anyone touches it. The only
+user-driven work on top is the mushroom hitbox toggling the dossier
+(`ReadingGarden.tsx:461-469`). The sky console's Star / Asteroid / Ice-barrage buttons were
+**not** used: correction 28 established they are `import.meta.env.DEV`-gated `data-dev-only`
+debug controls, so firing them would score the product against a panel no user has.
+
+Ceiling p50 **16.6** / p95 17.1, `noiseFloorOver100 0`. Scene 3 windows / 1,115 elements,
+stable on all three gestures; the City window is 131 elements. `uptimeSec 33,601` (9.3 h).
+
+| leg | p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| drag | 16.7 | 33.1 | 66.8 | 0 | 9.8 |
+| resize | 16.7 | 17.1 | 66.5 | 0 | 12.0 |
+| theme | 16.6 | 17.3 | 50.4 | 0 | 10.9 |
+| theme CONTROL (root hidden) | 16.6 | 17.2 | 50.3 | 0 | 12.3 |
+
+Heavy leg main max **12.9 ms** against the 500 ms bar, `span_ms 3008` of a declared 3000.
+Idle after: max 8.5. Proof: `toggled the dossier 20 times (10 open / 10 closed) over 13
+animating canvases, restored`. Memory: main RSS 72.0 → 84.2 MB, heap 317.0 MB.
+Collection: `nodes 120`, and its `INERT` verdict is an artifact of asking a canvas stack a
+list question — the 1,122 px "spacer" is the parallax world layer. Recorded, not a defect.
+
+**CONTROL FIRED.** `--jank`: **8 frames over 100 ms, max 116.8** against the clean run's 0 and
+66.8.
+
+**OBSERVATION for L11, not a finding here.** Both surfaces returned drag `p95 ≈ 33 ms` — two
+frames at a 16.6 ms ceiling — against a bar of `p95 x 2 = 34.2`. Identical on a 316-element
+window and a 131-element one, so it is the SHELL's drag cost, not either surface's, and it sits
+one millisecond under the bar. L11's "drag/resize at target frame rate" bullet owns it.
+
+**cat7 CLOSES on this pair. Cells 14 of 16.** Only cat8's third-surface substitution is left.
