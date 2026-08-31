@@ -24,6 +24,15 @@
  * **Zero bytes is never complete.** An empty file is what every writer produces
  * in its first millisecond, and importing one yields a library row for nothing.
  * It stays refused until it has content AND has held it.
+ *
+ * **The filesystem can supply the earlier reading.** A one-shot scan has no
+ * previous pass of its own, and refusing every file on that ground would mean a
+ * user has to scan a folder twice before it shows anything — so `changedAtHint`
+ * accepts the one earlier reading that is already recorded, `mtimeMs`. That is
+ * not a weakening: mtime IS the moment the size last changed, recorded by the
+ * writer rather than inferred by a poller. What it does not do is repeal the
+ * lower bound, because a file being written right now has `mtime === now`, so
+ * the hint collapses into the first-sighting refusal exactly when it should.
  */
 
 /** How long a size must hold before the file counts as finished writing. */
@@ -35,10 +44,25 @@ export const DEFAULT_STABILITY_MS = 3_000;
  * Ten minutes is generous for the case the plan names — a slow external drive
  * or a network share — and still short enough that a mistyped value cannot
  * park a watched folder for a day with no visible reason. There is no matching
- * floor constant on purpose: the lower bound is `stabilityVerdict`'s clause
- * order, not a number, so nothing can be tuned past it.
+ * floor on the WINDOW on purpose: the lower bound is `stabilityVerdict`'s
+ * clause order, not a number, so nothing can be tuned past it.
+ * `MIN_CHANGE_EVIDENCE_MS` below is a floor on the evidence, which is a
+ * different thing and is not settable at all.
  */
 export const MAX_STABILITY_MS = 600_000;
+
+/**
+ * How old a `changedAtHint` must be before it counts as an earlier reading.
+ *
+ * This is a floor on the EVIDENCE, not on the window — the distinction matters.
+ * `stabilityMs` stays freely settable down to zero; what cannot be set is
+ * whether a timestamp from the instant we looked counts as proof the writer has
+ * stopped. A file whose `mtime` is a millisecond old is exactly the file a
+ * torrent client is writing right now, so its own timestamp is worth nothing
+ * and it falls back to being a first sighting, which `stabilityVerdict` refuses
+ * before it ever consults the window.
+ */
+export const MIN_CHANGE_EVIDENCE_MS = 1_000;
 
 /** The refusals, as keys. A skipped file always says which of these it was. */
 export const STABILITY_REASON_FIRST_SIGHTING = 'filesApp.stability.firstSighting';
@@ -70,18 +94,28 @@ export interface StabilityVerdict {
  *
  * `previous` being absent is a first sighting, and the size is recorded as
  * having "changed" now — a file first seen at 4 GB is not thereby finished, it
- * is a file nobody has watched yet.
+ * is a file nobody has watched yet. `changedAtHint` (in practice `mtimeMs`) is
+ * the one exception, and only on a first sighting: a timestamp the writer left
+ * behind is a genuine earlier reading — but only once it is at least
+ * `MIN_CHANGE_EVIDENCE_MS` old. A hint in the FUTURE, or one that is not a
+ * finite number, is discarded rather than trusted: a clock-skewed file would
+ * otherwise report itself as having held its size for hours.
  */
 export function observeSize(
   previous: StabilityObservation | undefined,
-  reading: { path: string; sizeBytes: number; at: number },
+  reading: { path: string; sizeBytes: number; at: number; changedAtHint?: number },
 ): StabilityObservation {
   if (!previous || previous.path !== reading.path) {
+    const hint = reading.changedAtHint;
+    const usable =
+      typeof hint === 'number' &&
+      Number.isFinite(hint) &&
+      hint <= reading.at - MIN_CHANGE_EVIDENCE_MS;
     return {
       path: reading.path,
       sizeBytes: reading.sizeBytes,
       observedAt: reading.at,
-      changedAt: reading.at,
+      changedAt: usable ? (hint as number) : reading.at,
       readings: 1,
     };
   }
@@ -115,8 +149,15 @@ export function stabilityVerdict(
   if (observation.sizeBytes <= 0) {
     return { stable: false, reasonKey: STABILITY_REASON_EMPTY };
   }
-  if (observation.readings < 2) {
-    // One reading cannot distinguish "finished" from "caught mid-write".
+  /*
+   * One reading cannot distinguish "finished" from "caught mid-write" — unless
+   * that reading carries a moment of change that PREDATES it, which is what an
+   * mtime hint is. `changedAt === observedAt` is the file whose size moved at
+   * the instant we looked, and that is refused here, before `stabilityMs` is
+   * consulted at all. Gate 31's "setting it lower does not bypass the
+   * completeness check entirely" is this clause order, not a floor constant.
+   */
+  if (observation.readings < 2 && observation.changedAt >= observation.observedAt) {
     return { stable: false, reasonKey: STABILITY_REASON_FIRST_SIGHTING };
   }
   const held = at - observation.changedAt;
@@ -147,8 +188,13 @@ export function stabilityVerdict(
 export class StabilityLedger {
   private readonly seen = new Map<string, StabilityObservation>();
 
-  observe(path: string, sizeBytes: number, at: number): StabilityObservation {
-    const next = observeSize(this.seen.get(path), { path, sizeBytes, at });
+  observe(
+    path: string,
+    sizeBytes: number,
+    at: number,
+    changedAtHint?: number,
+  ): StabilityObservation {
+    const next = observeSize(this.seen.get(path), { path, sizeBytes, at, changedAtHint });
     this.seen.set(path, next);
     return next;
   }

@@ -40,6 +40,8 @@ import {
 import {
   DEFAULT_STABILITY_MS,
   StabilityLedger,
+  observeSize,
+  stabilityVerdict,
   type StabilityVerdict,
 } from '../../shared/filesApp/stability';
 
@@ -76,6 +78,15 @@ export interface FilesScanOptions {
    */
   stability?: StabilityLedger;
   stabilityMs?: number;
+  /**
+   * Gate 31's production half. With no ledger a one-shot scan has no earlier
+   * reading of its own — but the filesystem has one, so `mtimeMs` seeds the
+   * moment the size last changed and the window is measured against that. Off
+   * by default: a caller that supplies its own ledger across passes is already
+   * making the judgement, and the tests that measure the ledger's own clause
+   * order must not have a second source of "earlier" folded into them.
+   */
+  stabilityFromMtime?: boolean;
 }
 
 /**
@@ -94,6 +105,7 @@ export function scanRoots(
   const now = options.now ?? Date.now;
   const stability = options.stability;
   const stabilityMs = options.stabilityMs ?? DEFAULT_STABILITY_MS;
+  const fromMtime = options.stabilityFromMtime ?? false;
   const startedAt = now();
 
   const entries: FilesScanEntry[] = [];
@@ -167,17 +179,23 @@ export function scanRoots(
       // client writing `ep01.mkv` in place produces an ordinary name for a file
       // that is only partly there. This runs BEFORE the classifier, so a
       // half-written archive is never opened and sniffed.
-      if (stability) {
-        let size: number;
+      if (stability || fromMtime) {
+        let stat: fs.Stats;
         try {
-          size = fs.statSync(full).size;
+          stat = fs.statSync(full);
         } catch {
           skips.push({ path: full, reasonKey: SCAN_SKIP_UNREADABLE });
           continue;
         }
         const at = now();
-        stability.observe(full, size, at);
-        const verdict: StabilityVerdict = stability.verdict(full, at, stabilityMs);
+        const hint = fromMtime ? stat.mtimeMs : undefined;
+        // With a ledger, its own record wins on the second and later passes and
+        // the hint only ever seeds a first sighting — `observeSize` ignores it
+        // once there is a previous reading for this path.
+        const observation = stability
+          ? stability.observe(full, stat.size, at, hint)
+          : observeSize(undefined, { path: full, sizeBytes: stat.size, at, changedAtHint: hint });
+        const verdict: StabilityVerdict = stabilityVerdict(observation, at, stabilityMs);
         if (!verdict.stable) {
           skips.push({ path: full, reasonKey: verdict.reasonKey ?? SCAN_SKIP_INCOMPLETE });
           continue;

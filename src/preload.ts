@@ -1025,8 +1025,11 @@ const api = {
    * Read-only — this answers with counts and imports nothing, so calling it is
    * always safe and the confirm step is a separate action.
    */
-  filesScan: (roots: string[]): Promise<FilesScanReport> =>
-    ipcRenderer.invoke('filesapp:scan', roots),
+  filesScan: (
+    roots: string[],
+    /** Gate 31: the ingest settings document's stability window, in ms. */
+    options?: { stabilityMs?: number },
+  ): Promise<FilesScanReport> => ipcRenderer.invoke('filesapp:scan', roots, options),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

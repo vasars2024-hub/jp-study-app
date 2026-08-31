@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import { app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
+import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReport } from '../../shared/filesApp/scan';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
@@ -145,10 +146,21 @@ export function registerFilesAppIpc(): void {
    * caller that passed a hundred would hold the main process for minutes with
    * no way to interrupt it.
    */
-  ipcMain.handle('filesapp:scan', (_e, roots: unknown): FilesScanReport => {
+  ipcMain.handle('filesapp:scan', (_e, roots: unknown, options: unknown): FilesScanReport => {
     const list = Array.isArray(roots)
       ? roots.filter((r): r is string => typeof r === 'string' && r.length > 0).slice(0, 8)
       : [];
-    return scanRoots(list);
+    /*
+     * Gate 31. The window arrives from the renderer's settings document, so it
+     * is re-clamped HERE through the same shared normaliser rather than
+     * trusted: a renderer with a corrupted document could otherwise ask for a
+     * negative window, and "the completeness check is off" is not a state this
+     * handler will enter on a caller's say-so.
+     */
+    const stabilityMs = normalizeIngestSettings(options).stabilityMs;
+    // `stabilityFromMtime` is what makes the window mean anything on a one-shot
+    // scan: see `FilesScanOptions`. Without it this handler passed no stability
+    // judgement at all and the setting would have been decorative.
+    return scanRoots(list, { stabilityMs, stabilityFromMtime: true });
   });
 }
