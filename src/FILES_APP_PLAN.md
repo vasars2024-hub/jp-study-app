@@ -408,6 +408,11 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 
 1. The index enumerates real items across all five groups, reporting a count per category that
    matches what is on disk / in the tables. A category reading 0 while items exist is a FINDING.
+   <!-- status: open; evidence: 2026-08-30 census omitted 19 live subtitles/<mediaId> files -->
+   **2026-08-30 retraction:** the 1,760-item census proved five non-empty groups, but its Text
+   readers omit the populated `subtitles/<mediaId>/` store, scan nested `yt-subs` as flat, and
+   omit the distinct `subs-cache` flow. Gate 1 remains open until those readers and the live
+   count are corrected; empty YouTube cache roots today are not a valid negative control.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
