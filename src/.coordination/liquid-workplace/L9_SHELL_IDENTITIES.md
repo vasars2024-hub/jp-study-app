@@ -1482,3 +1482,15 @@ carrying **51** controls and **51 inline SVGs**. NOT repaired this turn — a pe
 shared shell component is not a slice to start in a turn's last minutes.
 
 **RULE C standing: cat1 PASS 10/10, cat2 FAIL (banked, unrepaired). 14 of 16 cells not yet run.**
+
+**Four gates, after the last slice.** `npx vitest run` **exit 0 — 947 files passed / 1 skipped,
+12,247 tests passed / 6 skipped / 0 FAILED** (was 12,244; the +3 delta is exactly this turn's
+three desktop-reachability tests). `node tools/i18n-check.cjs` exit 0 at **11,793** English keys
+complete in ja/zh/ru — no new UI strings were added this turn, deliberately, because the four
+catalogs are dirty with another track's work. `node tools/architecture-audit.cjs` exit 0, 2,397
+modules, 28 findings, **Nothing new**. ESLint 0 errors on the touched TS.
+
+**Boss audit 2026-08-31 11:35 MSK: all three findings CLOSED**, re-derived rather than trusted.
+Findings 1 and 2 by `a6f61698`, finding 3 by `c7c0b711`; the architecture gate is exit 0 and every
+orphan module the audit named resolves to a production consumer in a HEAD blob. Recorded here
+because neither track's handoff mentioned it and the next worker would otherwise re-audit it.
