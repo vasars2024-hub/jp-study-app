@@ -11527,7 +11527,7 @@ export const ru: Catalog = {
   'filesApp.action.open': 'Открыть',
   'filesApp.action.opening': 'Определяем…',
   'filesApp.open.choose': 'У этого файла несколько подходящих мест. Какое вы имели в виду?',
-  'filesApp.open.chooseCancel': 'Отмена',
+  'filesApp.action.openCancel': 'Отмена',
   'filesApp.open.opened': 'Открыто в разделе «{app}».',
   'filesApp.open.sniffed': 'Выбрано по содержимому файла, а не по расширению.',
   'filesApp.open.reason.byKind': 'Открыто по типу записи: у неё нет файла для разбора.',

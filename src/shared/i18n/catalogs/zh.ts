@@ -10558,7 +10558,7 @@ export const zh: Catalog = {
   'filesApp.action.open': '打开',
   'filesApp.action.opening': '正在识别…',
   'filesApp.open.choose': '这个文件有多个归属。你指的是哪一个？',
-  'filesApp.open.chooseCancel': '取消',
+  'filesApp.action.openCancel': '取消',
   'filesApp.open.opened': '已在{app}中打开。',
   'filesApp.open.sniffed': '这是根据文件内容判断的，而非扩展名。',
   'filesApp.open.reason.byKind': '按项目类型打开；它没有可识别的文件。',

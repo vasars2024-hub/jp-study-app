@@ -205,6 +205,12 @@ describe('files app route parity (gate 6)', () => {
       rendered.add(m[1]);
     }
     expect([...rendered].sort()).toEqual([...FILES_APP_CONTROL_KEYS].sort());
+    // Gate 10's ranked list labels its buttons with the DROP ROUTER's own
+    // target names rather than a second set. Asserted here because those keys
+    // are outside the `filesApp.*` prefix the scan above covers, so without
+    // this line they would be controls nothing accounts for.
+    expect(FILES_APP).toContain('targetLabelKey(candidate.target)');
+    expect(read('src/shared/fileRouting.ts')).toContain('`fileDrop.target.${target}`');
   });
 
   it('names the mine action once per mineable kind', () => {

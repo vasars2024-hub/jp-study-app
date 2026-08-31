@@ -10650,7 +10650,7 @@ export const ja: Catalog = {
   'filesApp.action.open': '開く',
   'filesApp.action.opening': '振り分け中…',
   'filesApp.open.choose': 'このファイルには複数の開き先があります。どちらでしょうか。',
-  'filesApp.open.chooseCancel': 'キャンセル',
+  'filesApp.action.openCancel': 'キャンセル',
   'filesApp.open.opened': '{app} で開きました。',
   'filesApp.open.sniffed': '拡張子ではなく、ファイルの中身から判断しました。',
   'filesApp.open.reason.byKind': '種類から開きました。振り分けるファイルがありません。',

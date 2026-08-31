@@ -11111,7 +11111,7 @@ export const en: Catalog = {
   'filesApp.action.open': 'Open',
   'filesApp.action.opening': 'Routing…',
   'filesApp.open.choose': 'This file has more than one home. Which one did you mean?',
-  'filesApp.open.chooseCancel': 'Cancel',
+  'filesApp.action.openCancel': 'Cancel',
   'filesApp.open.opened': 'Opened in {app}.',
   'filesApp.open.sniffed': 'Chosen by reading the file, not its extension.',
   'filesApp.open.reason.byKind': 'Opened by what this item is; it has no file to route.',

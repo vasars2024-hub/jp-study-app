@@ -706,7 +706,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             className="fa-action fa-open-cancel"
             onClick={() => setOpenState({ status: 'idle' })}
           >
-            {t('filesApp.open.chooseCancel')}
+            {t('filesApp.action.openCancel')}
           </button>
         </div>
       );

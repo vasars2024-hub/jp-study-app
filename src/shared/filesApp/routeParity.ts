@@ -134,6 +134,15 @@ export const FILES_APP_CONTROL_KEYS: readonly string[] = [
   'filesApp.action.mine',
   'filesApp.action.mining',
   'filesApp.action.undoMine',
+  'filesApp.action.open',
+  'filesApp.action.opening',
+  /*
+   * Named `action.openCancel` and not `open.chooseCancel` on purpose: the guard
+   * over this list scans for `filesApp.(action|sort|search|entry).*`, so a
+   * button parked under any other prefix is a control the list cannot account
+   * for. The rest of the `filesApp.open.*` family is prose, not controls.
+   */
+  'filesApp.action.openCancel',
   'filesApp.entry.scoped',
 ];
 
@@ -364,6 +373,20 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
       'No per-item "show in folder" existed. shell.showItemInFolder was reachable only after a '
       + 'scraper export (main/scraper/exports.ts), and desktop:launch opens a file the user had '
       + 'already picked in a native dialog. Nothing lost it; the Files app added it.',
+  },
+  {
+    capability: 'action:open',
+    status: 'new',
+    section: null,
+    module: '',
+    symbol: '',
+    note:
+      'Gate 10. No route lost anything here: the file router already existed, but only a DROP '
+      + 'could reach it (DropRouter.tsx, on a dragenter), so there was no way to ask "which app '
+      + 'owns this file" about a file already in the app. The Files app added the question. What '
+      + 'it deliberately did NOT add is a second import path — shared/filesApp/openPlan.ts maps a '
+      + 'DropTargetId to the section DropRouter itself opens and calls no importer, so opening an '
+      + 'indexed row cannot create a duplicate of it.',
   },
   {
     capability: 'action:mine.book',
