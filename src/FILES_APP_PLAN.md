@@ -534,6 +534,15 @@ two pull against each other anywhere else, this rule wins and the plan is wrong.
 
 ## Progress
 
+### 2026-08-31 — codexB, Gate 21 inspector integration checkpoint
+
+Product commits: `f42f2860` adds the reusable inspector confirmation/Undo surface;
+`1e192d1b` prevents a delayed delete receipt from leaking onto a changed selection;
+`5b5ec40e` keeps the destructive confirmation on an opaque Liquid Work anchor.
+Focused deletion boundary: **6/6 files, 48/48 tests**; touched-path ESLint **0 errors**.
+Gate 21 remains open: primary2 must wire this control into `FilesApp.tsx` after sync-down,
+then a self-created file must be trashed and actually restored from the Windows Recycle Bin.
+
 ### 2026-08-31 — codexA, Gate 9/21 main-lane checkpoint map
 
 Product commits: `00d1648a` absolute target validation; `1f33f52a` typed preload bridge;
