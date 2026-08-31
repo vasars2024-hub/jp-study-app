@@ -1,0 +1,131 @@
+/* =============================================================================
+   Blanc-native Liquid adapter — L9 bullet 3
+   -----------------------------------------------------------------------------
+   `src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` L9: "Complete Aero, Wired, and
+   Blanc-native Liquid adapters." Aero and Wired have had theirs since L2 —
+   `liquid-tokens.css` carries `:root[data-materials='aero']` and
+   `:root[data-materials='wired']`. Blanc had NOTHING, and could not have had one
+   in that file, for a reason worth stating so nobody moves this block there:
+
+     1. `blancMain.tsx` deliberately STRIPS `data-materials` (and re-strips it on
+        every theme change, with a MutationObserver as belt and suspenders), so
+        an attribute-qualified variant can never match in this window.
+     2. Blanc's palette (`--blanc-*`) is declared on `.blanc-root`, a DESCENDANT
+        of the root — `blanc.css` says so in as many words at its own line 27 —
+        while `liquidTokens.test.ts` structurally forbids that sheet from
+        carrying any selector but `:root`. Referencing `--blanc-*` from there is
+        impossible without either weakening a real gate or hardcoding Blanc's
+        colours into a shared sheet, which plan §8 forbids outright.
+
+   MEASURED BEFORE (live, both windows of one running app, 2026-08-31):
+     token              Study OS window        Blanc window
+     --lq-hit-target    32px                   ""   (empty)
+     --lq-space-4       12px                   ""
+     --lq-space-2       4px                    ""
+     --lq-work-bg       #0c1410                ""
+     --lq-liquid-bg     color-mix(... 72% ...) ""
+     --lq-liquid-blur   8px                    ""
+     --lq-anchor-bg     #121c17                ""
+   7 of 7 present in Study OS, 0 of 7 in Blanc, because `liquid-tokens.css` was
+   imported by `main.tsx` alone. Three components Blanc actually mounts read
+   those tokens — `GameArena` (`gameArenaLiquid.css`, 19 reads),
+   `CalendarContent` (`calendarLiquid.css`, 8) and `TranscriptionCardOptions`
+   (`transcriptionCards.css`, 1) — and a `var()` with no declaration is
+   guaranteed-invalid, so the whole declaration is dropped rather than degraded.
+   The consequence was not cosmetic: Blanc's live calendar toolbar measured
+   `gap: normal` (0 px, from a dead `var(--lq-space-4)`) and `min-height: auto`
+   on 6 of its 7 controls with `0px` on the 7th, from a dead `--lq-hit-target`.
+
+   WHAT THIS SHEET IS NOT. It does not give Blanc the Study OS look. Importing
+   `liquid-tokens.css` alone would have: its base `:root` derives from `--panel`,
+   `--bg` and `--glass-*`, which in this window still hold Study OS values.
+   Blanc is flat, neutral and glassless by identity, so every role is remapped
+   onto `--blanc-*` below and every blur is driven to 0.
+   ========================================================================== */
+
+/* Identity-wide and palette-independent, so it can sit at the root and also
+   cover what mounts OUTSIDE `.blanc-root` — the toast host, the global
+   dictionary overlay, the lockscreen. Blanc has no glass in any role, ever. */
+:root.blanc-shell {
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-ambient-blur: 0px;
+  --lq-ambient-saturate: 1;
+  --lq-anchor-saturate: 1;
+  --lq-work-saturate: 1;
+}
+
+/* The colour, geometry and motion roles, on the element that owns `--blanc-*`.
+   Same seam and same reasoning as `blanc.css`'s existing Study OS accent
+   neutralization block: remap the shared vocabulary once, here, rather than
+   branch on the shell inside every shared component. */
+.blanc-root {
+  /* ---- anchor — reading, forms, tables, calendars. Opaque by contract. ---- */
+  --lq-anchor-bg: var(--blanc-panel);
+  --lq-anchor-bg-raised: var(--blanc-panel-raised);
+  --lq-anchor-border: var(--blanc-border);
+  --lq-anchor-text: var(--blanc-text);
+  --lq-anchor-text-muted: var(--blanc-muted);
+  --lq-anchor-radius: var(--blanc-radius-lg);
+  --lq-anchor-shadow: var(--blanc-shadow-soft);
+
+  /* ---- work — the primary canvas -------------------------------------- */
+  --lq-work-bg: var(--blanc-bg);
+  --lq-work-bg-raised: var(--blanc-panel-soft);
+  --lq-work-border: var(--blanc-border);
+  --lq-work-text: var(--blanc-text);
+  --lq-work-text-muted: var(--blanc-muted);
+  --lq-work-radius: var(--blanc-radius-md);
+  --lq-work-shadow: none;
+
+  /* ---- liquid — translucent everywhere else, a RAISED PANEL here --------
+     The role still means "navigation, transport, contextual tools, temporary
+     inspectors": what changes is the material carrying it. Blanc separates
+     surfaces "through background contrast and spacing, not heavy outlines"
+     (`blanc.css`), so the role reads as the raised panel plus the strong
+     hairline border, and the specular highlight is dropped rather than
+     recoloured — there is no light source in Blanc's language to justify it. */
+  --lq-liquid-bg: var(--blanc-panel-raised);
+  --lq-liquid-bg-raised: var(--blanc-panel);
+  --lq-liquid-border: var(--blanc-border-strong);
+  --lq-liquid-highlight: transparent;
+  --lq-liquid-text: var(--blanc-text);
+  --lq-liquid-text-muted: var(--blanc-muted);
+  --lq-liquid-radius: var(--blanc-radius-lg);
+  --lq-liquid-shadow: var(--blanc-shadow);
+
+  /* ---- ambient — decorative; never the sole carrier of text ------------- */
+  --lq-ambient-bg: var(--blanc-bg);
+  --lq-ambient-border: transparent;
+  --lq-ambient-radius: var(--blanc-radius-lg);
+  --lq-ambient-shadow: none;
+
+  /* ---- spacing — Blanc's own scale, which is deliberately roomier -------
+     4/8/12/16/22/30 against Study OS's 2/4/8/12/16/24. That is not drift: the
+     scale exists because Blanc's own comment asks for "generous by default;
+     screens should breathe". Mapping to Study OS's numbers instead would make
+     the shared panels read tighter here than every Blanc-native panel beside
+     them, which is the identity leakage §8's gate is about. */
+  --lq-space-1: var(--blanc-s1);
+  --lq-space-2: var(--blanc-s2);
+  --lq-space-3: var(--blanc-s3);
+  --lq-space-4: var(--blanc-s4);
+  --lq-space-5: var(--blanc-s5);
+  --lq-space-6: var(--blanc-s6);
+
+  /* ---- motion — 180ms ease-out, Blanc's single curve -------------------- */
+  --lq-motion-enter: var(--blanc-dur);
+  --lq-motion-exit: var(--blanc-dur);
+  --lq-motion-move: var(--blanc-dur);
+  --lq-ease-enter: var(--blanc-ease);
+  --lq-ease-exit: var(--blanc-ease);
+  --lq-ease-move: var(--blanc-ease);
+
+  /* DELIBERATELY NOT REMAPPED, and a later worker should not "finish" the list:
+     `--lq-hit-target` is an accessibility floor scored by rubric category 1, not
+     an identity choice, so it must read 32px in every shell — it inherits the
+     base. `--lq-anchor-blur` / `--lq-work-blur` are the 0px invariant
+     `liquidTokens.test.ts` pins; restating them here would only give a future
+     edit somewhere to go wrong. `--lq-measure`, the rail/dock/inspector widths
+     and `--lq-toolbar-height` are scaffold geometry shared by every shell. */
+}

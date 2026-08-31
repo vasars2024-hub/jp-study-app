@@ -97,7 +97,9 @@
   flex-direction: column;
   gap: var(--lq-space-1);
   padding: var(--lq-space-1);
-  border-radius: var(--lq-radius-pill);
+  /* was `var(--lq-radius-pill)` — undeclared, so the strip computed to a hard
+     square rather than the pill this rule names. `--radius-pill` is the real one. */
+  border-radius: var(--radius-pill);
 }
 
 .fwin.fwin-liquid.fwin-note .desk-note-color {
@@ -111,7 +113,12 @@
 
 .fwin.fwin-liquid.fwin-note .desk-note-color[aria-pressed='true'] {
   border-color: var(--lq-liquid-text);
-  box-shadow: 0 0 0 2px var(--lq-focus-ring);
+  /* was `var(--lq-focus-ring)`, which nothing declares. A `var()` failure kills
+     the WHOLE declaration, so the pressed swatch had no ring at all — the only
+     thing distinguishing the selected note colour from the other five was a
+     border-colour shift. `--accent` is what this file's own `:focus-visible`
+     rule already uses, and every shell remaps it. */
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /*

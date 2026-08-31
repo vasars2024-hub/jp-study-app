@@ -52,10 +52,19 @@
   align-self: flex-start;
 }
 
+/* `--lq-border-subtle` and `--lq-radius-control` were never declared — not in
+   `liquid-tokens.css`, not anywhere — so both declarations here were dropped as
+   guaranteed-invalid in EVERY shell: no border painted at all (a `var()` failure
+   kills the whole `border` shorthand) and the radius computed to 0. Measured
+   live in the Study OS and Blanc windows of one running app, both `""`.
+   Fixed against the vocabulary that exists rather than by inventing the two
+   missing names: this details box sits inside `.game-stage`, which is the work
+   role, so it takes the work role's border and radius and follows Aero, Wired
+   and Blanc for free. */
 .game-ready-options {
   align-self: stretch;
-  border: 1px solid var(--lq-border-subtle);
-  border-radius: var(--lq-radius-control);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
 }
 
 .game-ready-options > summary {
