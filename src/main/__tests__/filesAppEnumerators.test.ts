@@ -6,6 +6,8 @@ import {
   FILES_ENUMERATORS,
   buildFilesIndex,
   dictionaryEnumerator,
+  readingLensEnumerator,
+  scraperJobEnumerator,
   type FilesEnumeratorContext,
 } from '../filesApp/enumerators';
 import { deleteModeFor, revealTargetFor } from '../../shared/filesApp/catalog';
@@ -467,5 +469,146 @@ describe('files app index — enumeration is read-only (gate 24 groundwork)', ()
     const before = fs.readdirSync(root).sort();
     buildFilesIndex(ctx());
     expect(fs.readdirSync(root).sort()).toEqual(before);
+  });
+});
+
+describe('files app index — scrape jobs (workspaces/queue)', () => {
+  it('reads the durable index and sizes each job by its own result file', () => {
+    write(
+      'scraper/history.json',
+      JSON.stringify({
+        jobs: [
+          { id: 'j1', titleEn: 'Yuru Camp', titleJa: 'ゆるキャン△', finishedAt: 5000 },
+          { id: 'j2', titleEn: '', titleJa: '蟲師', finishedAt: 6000 },
+        ],
+      }),
+    );
+    write('scraper/results/j1.json', '{"rows":[]}');
+
+    const items = scraperJobEnumerator.run(ctx());
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.categoryId === 'workspaces/queue')).toBe(true);
+    expect(byId.get('scraper-job:j1')?.name).toBe('Yuru Camp');
+    // An empty English title falls through to the Japanese one, not to the id.
+    expect(byId.get('scraper-job:j2')?.name).toBe('蟲師');
+    expect(byId.get('scraper-job:j1')?.sizeBytes).toBe(11);
+    // The job is real; only its detail file is gone. That is a broken link to
+    // the detail, not grounds for dropping the row.
+    expect(byId.get('scraper-job:j2')?.sizeBytes).toBeNull();
+    expect(byId.get('scraper-job:j2')?.flags.brokenLink).toBe(true);
+    expect(byId.get('scraper-job:j1')?.flags.brokenLink).toBeUndefined();
+  });
+
+  it('names a result file with no indexed job as an orphan rather than a job', () => {
+    write('scraper/history.json', JSON.stringify({ jobs: [{ id: 'kept', finishedAt: 1 }] }));
+    write('scraper/results/kept.json', '{}');
+    write('scraper/results/pruned.json', '{}');
+
+    const items = scraperJobEnumerator.run(ctx());
+    const orphan = items.find((i) => i.id === 'scraper-result:pruned');
+
+    // Two rows, not three: the indexed job is claimed once, by the index.
+    expect(items).toHaveLength(2);
+    expect(orphan?.flags.orphan).toBe(true);
+    expect(orphan?.location).toEqual({
+      store: 'file',
+      path: path.join(root, 'scraper', 'results', 'pruned.json'),
+    });
+    // Negative control: the claimed result must NOT also appear as an orphan.
+    expect(items.some((i) => i.id === 'scraper-result:kept')).toBe(false);
+  });
+
+  it('reads a corrupt or wrongly-shaped index as zero jobs, not as a throw', () => {
+    write('scraper/history.json', '{ not json');
+    expect(scraperJobEnumerator.run(ctx())).toEqual([]);
+    write('scraper/history.json', JSON.stringify({ jobs: 'nope' }));
+    expect(scraperJobEnumerator.run(ctx())).toEqual([]);
+    write('scraper/history.json', JSON.stringify({ jobs: [{ noId: true }] }));
+    expect(scraperJobEnumerator.run(ctx())).toEqual([]);
+  });
+});
+
+describe('files app index — Reading Lens captures (outputs/highlights)', () => {
+  function capture(over: Record<string, unknown>) {
+    return {
+      captureId: 'c1',
+      source: 'screen',
+      sourceLabel: '',
+      sourceRef: '',
+      capturedAt: 1000,
+      language: 'ja',
+      engine: 'tesseract',
+      hash: 'h1',
+      text: '吾輩は猫である',
+      lineCount: 2,
+      seenCount: 1,
+      pinned: false,
+      ...over,
+    };
+  }
+
+  it('marks an OCR capture as machine-read and a clipboard one as making no claim', () => {
+    write(
+      'reading-lens-history.json',
+      JSON.stringify({
+        schemaVersion: 1,
+        entries: [
+          capture({ captureId: 'ocr', source: 'screen' }),
+          capture({ captureId: 'clip', source: 'clipboard', lineCount: 0 }),
+        ],
+      }),
+    );
+
+    const items = readingLensEnumerator.run(ctx());
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    expect(items).toHaveLength(2);
+    expect(items.every((i) => i.categoryId === 'outputs/highlights')).toBe(true);
+    // OCR produced this text from a signal and can have misread it; a card
+    // mined off it must carry that mark for the same reason a caption one does.
+    expect(byId.get('reading-lens:ocr')?.provenance).toBe('auto-captions');
+    // Clipboard text is text the user already had. It makes no OCR claim, and
+    // claiming `book-text` would be an invention.
+    expect(byId.get('reading-lens:clip')?.provenance).toBe('unknown');
+  });
+
+  it('prefers the capture label over the body, and the body over the id', () => {
+    write(
+      'reading-lens-history.json',
+      JSON.stringify({
+        entries: [
+          capture({ captureId: 'labelled', sourceLabel: 'Chapter 3' }),
+          capture({ captureId: 'bare', hash: 'h2' }),
+        ],
+      }),
+    );
+    const byId = new Map(readingLensEnumerator.run(ctx()).map((i) => [i.id, i]));
+    expect(byId.get('reading-lens:labelled')?.name).toBe('Chapter 3');
+    expect(byId.get('reading-lens:bare')?.name).toBe('吾輩は猫である');
+  });
+
+  it('does not rewrite the history file it reads', () => {
+    const file = write(
+      'reading-lens-history.json',
+      JSON.stringify({ retentionDays: 7, entries: [capture({})] }),
+    );
+    const before = fs.readFileSync(file);
+    const mtime = fs.statSync(file).mtimeMs;
+
+    // The owner prunes on load and persists; an index build must not. A row
+    // still on disk is a row the tree has to be able to account for.
+    readingLensEnumerator.run(ctx());
+    readingLensEnumerator.run(ctx());
+
+    expect(fs.readFileSync(file).equals(before)).toBe(true);
+    expect(fs.statSync(file).mtimeMs).toBe(mtime);
+  });
+
+  it('reads a missing or corrupt history as zero captures', () => {
+    expect(readingLensEnumerator.run(ctx())).toEqual([]);
+    write('reading-lens-history.json', 'not json');
+    expect(readingLensEnumerator.run(ctx())).toEqual([]);
   });
 });

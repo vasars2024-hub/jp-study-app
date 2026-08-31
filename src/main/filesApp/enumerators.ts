@@ -44,6 +44,19 @@ import {
   mediaItemsFromStoredDocument,
 } from '../../shared/mediaLibraryEntries';
 import { AGENT_WORKSPACE_RELATIVE_PATH } from '../../shared/agentWorkspace';
+// Both of these come from `shared/`, not from their main-process owners: those
+// import `electron`, and this module is bundled and run outside Electron by
+// gate 1's census. The owners re-export every name, so there is still exactly
+// one definition of each filename in the tree.
+import {
+  SCRAPER_HISTORY_INDEX_FILE,
+  SCRAPER_HISTORY_RESULTS_DIRECTORY,
+  scraperHistoryJobsFromStoredDocument,
+} from '../../shared/scraperHistoryStore';
+import {
+  READING_LENS_HISTORY_FILE,
+  normalizeReadingLensHistory,
+} from '../../shared/readingLensHistory';
 import {
   isAutoCaptionName,
   readMediaSubtitleAssets,
@@ -843,6 +856,132 @@ export const workspaceEnumerator: FilesEnumerator = {
   },
 };
 
+/**
+ * Finished scrape jobs — `workspaces/queue`.
+ *
+ * The index is `scraper/history.json`, read through the History page's own
+ * `scraperHistoryJobsFromStoredDocument` so a legacy row that History still
+ * renders cannot vanish from the catalogue because Files invented a stricter
+ * rule. Its location comes from `SCRAPER_HISTORY_INDEX_FILE`, not a literal.
+ *
+ * The full result of each job is a separate file under `results/<jobId>.json`,
+ * which is where the bytes are — so the row's size is that file's size, and a
+ * job whose result file has been pruned reports `null` rather than 0.
+ *
+ * `scraper/results/` holds result files with no indexed job (the index is
+ * capped at 50 runs and prunes older ones). Those are enumerated as `orphan`
+ * rather than promoted to jobs: a result with no summary is a real thing on
+ * disk, but it is not a run this app can still describe.
+ */
+export const scraperJobEnumerator: FilesEnumerator = {
+  source: 'scraper-jobs',
+  run(ctx) {
+    const root = path.join(ctx.userDataPath, 'scraper');
+    const jobs = scraperHistoryJobsFromStoredDocument(
+      readJson<unknown>(path.join(root, SCRAPER_HISTORY_INDEX_FILE), null),
+    );
+    const resultsDir = path.join(root, SCRAPER_HISTORY_RESULTS_DIRECTORY);
+    const out: FilesItem[] = [];
+    const claimed = new Set<string>();
+
+    for (const job of jobs) {
+      if (typeof job?.id !== 'string' || !job.id) continue;
+      claimed.add(`${job.id}.json`);
+      const resultFile = path.join(resultsDir, `${job.id}.json`);
+      const stat = statOf(resultFile);
+      const title =
+        (typeof job.titleEn === 'string' && job.titleEn) ||
+        (typeof job.titleJa === 'string' && job.titleJa) ||
+        job.id;
+      out.push({
+        id: `scraper-job:${job.id}`,
+        name: title,
+        kind: 'job',
+        categoryId: categoryForKind('job'),
+        // A scrape job is this app's own record of a run it performed. What it
+        // FETCHED carries its own provenance, on those rows, not on this one.
+        provenance: 'app-generated',
+        sizeBytes: stat ? stat.size : null,
+        createdAt: typeof job.finishedAt === 'number' ? job.finishedAt : null,
+        modifiedAt: stat ? Math.round(stat.mtimeMs) : null,
+        lastUsedAt: null,
+        location: {
+          store: 'json',
+          file: `scraper/${SCRAPER_HISTORY_INDEX_FILE}`,
+          pointer: `/jobs/${job.id}`,
+        },
+        // A job whose result file is gone is still a real job; the index row is
+        // the record, so this is a broken link to its detail, not a dead row.
+        flags: stat ? {} : { brokenLink: true },
+        source: 'scraper-jobs',
+      });
+    }
+
+    for (const entry of listDir(resultsDir)) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+      if (claimed.has(entry.name)) continue;
+      const jobId = entry.name.slice(0, -'.json'.length);
+      out.push(
+        fileItem({
+          id: `scraper-result:${jobId}`,
+          name: jobId,
+          kind: 'job',
+          filePath: path.join(resultsDir, entry.name),
+          provenance: 'app-generated',
+          source: 'scraper-jobs',
+          flags: { orphan: true },
+        }),
+      );
+    }
+
+    return out;
+  },
+};
+
+/**
+ * Reading Lens captures — `outputs/highlights`.
+ *
+ * A capture is text the user pointed the lens at and kept; that is the same
+ * thing a book highlight is, so it shares the leaf rather than getting a third
+ * one. Read through `normalizeReadingLensHistory`, the shared validator the
+ * main store itself uses, which means a row Files lists is exactly a row the
+ * history surface lists — including its de-duplication by `captureId`.
+ *
+ * Retention pruning is deliberately NOT applied here. `listCaptures` prunes on
+ * load and rewrites the file; an index build must not have that side effect,
+ * and a row still on disk is a row the tree has to be able to account for.
+ */
+export const readingLensEnumerator: FilesEnumerator = {
+  source: 'reading-lens',
+  run(ctx) {
+    const file = path.join(ctx.userDataPath, READING_LENS_HISTORY_FILE);
+    const entries = normalizeReadingLensHistory(readJson<unknown>(file, null));
+    return entries.map((entry) => ({
+      id: `reading-lens:${entry.captureId}`,
+      name: entry.sourceLabel || entry.text.slice(0, 80) || entry.captureId,
+      kind: 'highlight' as const,
+      categoryId: categoryForKind('highlight'),
+      // OCR is machine-read text. `auto-captions` is the catalogue's existing
+      // name for "a machine produced this text from a signal", and a card mined
+      // off a misread character must carry that mark for the same reason a
+      // caption-derived one does. A clipboard capture is text the user already
+      // had, so it makes no OCR claim.
+      provenance: (entry.source === 'clipboard' ? 'unknown' : 'auto-captions') as FilesProvenance,
+      sizeBytes: null,
+      createdAt: entry.capturedAt,
+      modifiedAt: null,
+      lastUsedAt: null,
+      location: {
+        store: 'json' as const,
+        file: READING_LENS_HISTORY_FILE,
+        pointer: `/entries/${entry.captureId}`,
+      },
+      flags: { hasNotes: entry.lineCount > 0 },
+      source: 'reading-lens',
+    }));
+  },
+};
+
 /* ------------------------------------------------------------------ *
  * The registry and the build.
  * ------------------------------------------------------------------ */
@@ -867,6 +1006,8 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   artworkEnumerator,
   profileEnumerator,
   workspaceEnumerator,
+  scraperJobEnumerator,
+  readingLensEnumerator,
 ];
 
 /**

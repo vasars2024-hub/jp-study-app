@@ -16,47 +16,36 @@ import type { ScrapeJobSummary, ScrapeResult } from '../../shared/scraperResults
 import { scraperLog } from './logBus';
 import { readScraperJson, scraperStorePath, writeScraperJson } from './store';
 
-/** Persisted locations shared with read-only catalogues such as Files. */
-export const SCRAPER_HISTORY_INDEX_FILE = 'history.json';
-export const SCRAPER_HISTORY_RESULTS_DIRECTORY = 'results';
+/**
+ * The persisted locations, shape and parser moved to `shared/scraperHistoryStore`
+ * on 2026-08-31 and are re-exported here so every existing importer is unchanged.
+ *
+ * They had to leave `main/`: this module imports `./store`, which imports
+ * `electron`, and the Files index is bundled and run OUTSIDE Electron by gate
+ * 1's census harness. Reaching for the constant from here would have pulled
+ * `app.getPath` into a plain-Node bundle, and the alternative — a second copy
+ * of the filename in the enumerator — is the drift this contract exists to stop.
+ */
+import {
+  SCRAPER_HISTORY_INDEX_FILE,
+  SCRAPER_HISTORY_RESULTS_DIRECTORY,
+  scraperHistoryJobsFromStoredDocument,
+  type ScraperHistoryFile,
+  type StoredScrapeJobSummary,
+} from '../../shared/scraperHistoryStore';
+
+export {
+  SCRAPER_HISTORY_INDEX_FILE,
+  SCRAPER_HISTORY_RESULTS_DIRECTORY,
+  scraperHistoryJobsFromStoredDocument,
+  type StoredScrapeJobSummary,
+  type ScraperHistoryFile,
+};
+
 /** Runs kept on disk. Older ones are dropped with their result files. */
 const MAX_HISTORY = 50;
 
-export interface StoredScrapeJobSummary extends ScrapeJobSummary {
-  /** Absolute time, so age is computed on read instead of going stale. */
-  finishedAt: number;
-}
-
-export interface ScraperHistoryFile {
-  jobs: StoredScrapeJobSummary[];
-}
-
 const EMPTY: ScraperHistoryFile = { jobs: [] };
-
-/**
- * Read the durable index without assuming a fixture-authored shape.
- *
- * Files consumes the same stored rows as History. A corrupt top-level object,
- * a non-array `jobs`, or a malformed row becomes an honest omission instead of
- * taking down either surface. Only identity is required for legacy rows; an old
- * row without `finishedAt` remains visible with epoch 0 rather than disappearing.
- */
-export function scraperHistoryJobsFromStoredDocument(value: unknown): StoredScrapeJobSummary[] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-  const jobs = (value as { jobs?: unknown }).jobs;
-  if (!Array.isArray(jobs)) return [];
-  return jobs.flatMap((candidate) => {
-    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return [];
-    const row = candidate as Partial<StoredScrapeJobSummary>;
-    if (typeof row.id !== 'string' || !row.id) return [];
-    return [{
-      ...row,
-      finishedAt: typeof row.finishedAt === 'number' && Number.isFinite(row.finishedAt)
-        ? row.finishedAt
-        : 0,
-    } as StoredScrapeJobSummary];
-  });
-}
 
 /**
  * Provider URLs are commonly signed and provider headers may contain cookies

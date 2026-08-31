@@ -33,7 +33,16 @@ import {
 import { normalizeReadingLensCapture } from '../shared/readingLens';
 
 /** Persisted location shared with read-only catalogues such as Files. */
-export const READING_LENS_HISTORY_FILE = 'reading-lens-history.json';
+/**
+ * Moved to `shared/readingLensHistory` on 2026-08-31 and re-exported here, so
+ * every existing importer is unchanged. It had to leave `main/`: this module
+ * imports `electron` for `app.getPath`, and gate 1's Files census bundles the
+ * index and runs it outside Electron. The alternative was a second copy of the
+ * filename inside the enumerator, which is the drift this constant prevents.
+ */
+import { READING_LENS_HISTORY_FILE } from '../shared/readingLensHistory';
+
+export { READING_LENS_HISTORY_FILE };
 
 /**
  * Loaded once and kept in memory. The file is at most a few hundred short

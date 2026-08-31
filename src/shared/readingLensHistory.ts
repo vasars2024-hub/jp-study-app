@@ -23,6 +23,16 @@ import { READING_LENS_SOURCES } from './readingLens';
 export const READING_LENS_HISTORY_VERSION = 1 as const;
 
 /**
+ * The file under `userData` that holds this history.
+ *
+ * Here rather than beside its main-process owner because read-only catalogues
+ * — the Files index — need the location without importing `electron`, and a
+ * second copy of the filename is how two readers end up pointed at different
+ * files. The owner re-exports it, so its own callers are unaffected.
+ */
+export const READING_LENS_HISTORY_FILE = 'reading-lens-history.json';
+
+/**
  * How many captures are kept. A lens scan is cheap and frequent, so this is a
  * ring rather than an archive: enough to cover a reading session and the days
  * around it, small enough that the whole file is read and searched in one go
