@@ -1,0 +1,255 @@
+{
+  "label": "l9-palette",
+  "surface": "@.palette",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "620x509",
+  "textRuns": 143,
+  "devOnlyRuns": 0,
+  "wordRuns": 143,
+  "textHash": 1220890951,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9760,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9760 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 143,
+        "textHash": 1220890951,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 143,
+        "textHash": 56154608,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 115,
+        "diffExamples": [
+          {
+            "i": 1,
+            "was": "Open command palette",
+            "now": "コマンドパレットを開く"
+          },
+          {
+            "i": 2,
+            "was": "Navigation",
+            "now": "ナビゲーション"
+          },
+          {
+            "i": 4,
+            "was": "Commands",
+            "now": "コマンド"
+          },
+          {
+            "i": 5,
+            "was": "Global search",
+            "now": "全体検索"
+          },
+          {
+            "i": 6,
+            "was": "Navigation",
+            "now": "ナビゲーション"
+          },
+          {
+            "i": 8,
+            "was": "Commands",
+            "now": "コマンド"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 143,
+        "textHash": -1968320150,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 115,
+        "diffExamples": [
+          {
+            "i": 1,
+            "was": "Open command palette",
+            "now": "打开命令面板"
+          },
+          {
+            "i": 2,
+            "was": "Navigation",
+            "now": "导航"
+          },
+          {
+            "i": 4,
+            "was": "Commands",
+            "now": "命令"
+          },
+          {
+            "i": 5,
+            "was": "Global search",
+            "now": "全局搜索"
+          },
+          {
+            "i": 6,
+            "was": "Navigation",
+            "now": "导航"
+          },
+          {
+            "i": 8,
+            "was": "Commands",
+            "now": "命令"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 143,
+        "textHash": -569767524,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 115,
+        "diffExamples": [
+          {
+            "i": 1,
+            "was": "Open command palette",
+            "now": "Открыть палитру команд"
+          },
+          {
+            "i": 2,
+            "was": "Navigation",
+            "now": "Навигация"
+          },
+          {
+            "i": 4,
+            "was": "Commands",
+            "now": "Команды"
+          },
+          {
+            "i": 5,
+            "was": "Global search",
+            "now": "Глобальный поиск"
+          },
+          {
+            "i": 6,
+            "was": "Navigation",
+            "now": "Навигация"
+          },
+          {
+            "i": 8,
+            "was": "Commands",
+            "now": "Команды"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 115,
+    "baseRuns": 143,
+    "diffShare": 0.8042
+  },
+  "drive": {
+    "input": ".palette-input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "restoredAfterEscape": null,
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 2,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "Nothing matches “zzqqxxnosuchthing”. Try a shorter word, or press Esc to close."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

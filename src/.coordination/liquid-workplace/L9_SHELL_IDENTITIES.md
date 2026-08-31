@@ -1260,3 +1260,52 @@ window and a 131-element one, so it is the SHELL's drag cost, not either surface
 one millisecond under the bar. L11's "drag/resize at target frame rate" bullet owns it.
 
 **cat7 CLOSES on this pair. Cells 14 of 16.** Only cat8's third-surface substitution is left.
+
+## 2026-08-31 — primary — cat8's third surface: the Command Palette. FAIL 0 of 1 state → PASS 10/10.
+
+**RULE C substitution, and why this surface.** City is UNMEASURABLE for cat8 (correction 28:
+`wordRuns 0`), and an unmeasurable cell is not a repairable failure, so cat8 alone expands to a
+third surface. The **command palette** is the honest choice rather than a convenient one: it is
+literally bullet 1's own third entry point ("taskbar/**context**/**command**"), it is the one a
+keyboard user reaches without pointing at a window, and it is dense with localized text —
+`textRuns 143`, all of them word runs, `devOnlyRuns 0`. Opened with
+`window.dispatchEvent(new CustomEvent('palette:open', {detail:'commands'}))`; 40 rows, 388 nodes.
+
+**FIRST RUN: FAIL, on `statesNamed 0 of 1 observable`.** Driven with `--drive-input
+.palette-input`, the empty state rendered but carried NO message: `{hosts: 1, messages: []}`.
+The cause is `palette.noMatches` = **"No matches."** — 11 characters, under correction 12's
+weighted 12-char bar, and more to the point it names neither what was searched nor the way out.
+Every other surface scored in L9 names its empty state.
+
+**Product fix, not a harness change.** `palette.noMatchesFor` echoes the query so a typo is
+visible and names Esc, because the backdrop click is the only other exit; `palette.noMatches`
+becomes a real sentence for the no-query case. Four catalogs, `i18n-check` exit 0 at **11,793**
+English keys complete in ja/zh/ru. Live before the re-score: `Nothing matches
+“zzqqxxnosuchthing”. Try a shorter word, or press Esc to close.`
+
+**RE-SCORE, in the fix's own commit: PASS 10/10.** `rawKeyCount 0` in all four languages
+(catalog union 9,760 keys, `keyShapedNonCatalog 0`), `placeholderCount 0`, `mutePairCount 0`,
+`statesNamed 1 of 1` (loading/error/offline correctly `notObservable`), langs **4 distinct
+hashes** with `diffShare 0.804` and ja/zh/ru each differing on **115 of 143** runs; language
+restored `en → en`, asserted. Drive leg `surfaceChanged true`, `restored true`.
+
+**CONTROL FIRED**, same root: injected key + `Lorem ipsum` + unexplained disabled button moved
+the counts `[0,0,0] → [1,1,1] → [0,0,0]` and `backToBaseline true`.
+
+**TRAP, and it cost a run.** The HMR reload that delivered the catalog fix also **reset the
+Settings window to Home**, so the next `--langs` leg refused on "no ui-language card on screen".
+The surface the langs leg drives is not the surface being scored, and HMR resets it silently.
+Re-navigate Settings > Appearance after any renderer edit, before any `--langs` run.
+
+`sampled-out:` for cat8's expansion — Note, Visualizer, Music widget, notifications, onboarding,
+Help, and the Aero/Wired/Blanc adapters. Not scored, named rather than truncated.
+
+**Cell arithmetic, stated exactly rather than rounded up.** Of the 16 cells on the RULE C pair,
+**15 are scored and all PASS 10/10** (cat1-cat7 on both surfaces, cat8 on Video). The 16th —
+cat8 · City — is UNMEASURABLE, not failed, and is **replaced** by cat8 · Palette PASS 10/10.
+So bullet 1 carries **16 scored cells, one of them on a substituted surface**, and closes.
+
+What the sample does and does not cover, so nobody over-reads it: the two host windows carry
+the title-bar button and the taskbar context item, and the palette IS the command entry point,
+so all three of the bullet's entry points are represented — but only the command one was scored
+as a surface in its own right.

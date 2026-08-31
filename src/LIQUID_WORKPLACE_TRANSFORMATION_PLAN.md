@@ -1230,7 +1230,7 @@ Full receipt map and negative-control numbers are in
 
 ### L9 — Shell, widgets, and alternate identities
 
-- Finish taskbar/context/command entry points without forcing Liquid.  <!-- status: open; evidence:  -->
+- Finish taskbar/context/command entry points without forcing Liquid.  <!-- status: closed; evidence: b1e35170 shipped the third (command) entry point; RULE C rubric receipt in L9_SHELL_IDENTITIES.md — 16 scored cells all 10/10 across Video, City and (cat8 substitution for City's UNMEASURABLE cell) the command palette -->
 - Migrate Note, Visualizer, Music widget, City, notifications, onboarding, and help.  <!-- status: closed; evidence: 12d5a976 -->
 - Complete Aero, Wired, and Blanc-native Liquid adapters.  <!-- status: closed; evidence: 3f47bfa1 -->
 - Verify Secret Aero/Wired lifecycle and Blanc cold-open boundaries.  <!-- status: open; evidence:  -->
