@@ -1,7 +1,7 @@
 {
   "label": "l9b4-wired",
   "surface": "@.os-desktop-wired",
-  "win": "main",
+  "win": "(focused)",
   "theme": "wired-archive",
   "presentation": null,
   "box": "1264x821",
@@ -14,7 +14,7 @@
   "text": {
     "measured": 13,
     "unmeasurable": 0,
-    "minRatio": 7.67,
+    "minRatio": 7.65,
     "minOwner": "span.os-clock-date \"Aug 31\" 10.5px",
     "failingCount": 0,
     "worst": [],
@@ -125,7 +125,7 @@
     "occluded": [],
     "disabledCount": 0,
     "disabled": [],
-    "disclosedForRun": 2,
+    "disclosedForRun": 1,
     "disclosuresRestored": true,
     "scrollLeaks": [],
     "deferredRestore": {
