@@ -1583,3 +1583,61 @@ presentable host to BE the root. **This unblocks cat3 on Blanc and Aero too.**
 **RULE C standing: 3 of 16 cells closed — cat1, cat2, cat3, all Wired. 13 to run (cat4–cat8 on
 Wired, all 8 on Blanc).** `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
 notifications, onboarding, help.
+
+## 2026-08-31 — primary — cat4 Wired 10/10, and cat5's instrument repaired
+
+**RECOVERY FIRST.** `backup` died ten seconds after writing its handoff, part-way through the
+one full `vitest` run its turn owed. That run finished here: **2 failed of 12,280**, both in
+`renderer/__tests__/liquidTokens.test.ts`, both caused by `67594273`. L2's gate makes
+`liquid-tokens.css` structurally incapable of painting — every selector `:root`, every
+declaration a `--lq-*` property — and the taskbar rule put a real `.os-taskbar[...]` block in
+it. Rule kept verbatim, moved to `components/shell/shell.css` beside the rest of the taskbar's
+styling (`176debcf`). Selector unchanged, so cascade is unchanged; verified on the running app
+rather than assumed: `background color(srgb .0235 .0706 .102 / 0.72)`, `backdrop-filter
+blur(6px) saturate(1)`, `role=navigation`, 1264x56 — byte-identical to the reading `32c099bf`
+banked. 11/11 green. `wired-shell.css`'s note pointed at the old file and now names the real
+one; its specificity claim was wrong too (Wired wins **0,3,0 vs 0,2,0**, not by loading later
+at an equal 0,2,1 — which is *why* compositing over `--lq-liquid-bg` was the necessary fix and
+a reorder would not have been).
+
+**cat4 · Wired = PASS 10/10** (`1b937fc9`). default 1264x821 / compact 924x561 / maximized
+1600x1000; clipped 0, overlaps 0, horizontalScrollers 0, hiddenOverflowX 0, restored 3/3. It
+first FAILED on `overlaps` and `deadRegion`; both were the instrument.
+
+- **22 — ownership, cat4's three sites.** `win.querySelector('.fwin-body')` on a shell root
+  returned a **0x0** body owned by 'SIG-VID / Signal Archive'. Silent, not refusing: the reader
+  took correction 17's content viewport from a foreign window and both controls planted inside
+  a minimised window, where nothing strands and the run VOIDs while the product passes.
+- **23 — a decorative backdrop is not a collision.** `div.wired-wall-atmosphere` is the whole
+  desktop (1264x821 at 0,0, absolute, `pointer-events: none`, 0 controls) and failed
+  `purePaint` on **19 characters of ornamental kana**. A full-surface layer intersects every
+  element's box, so any surface with one failed regardless of layout. Test is the app's own
+  declaration: `aria-hidden=true` + inert + painted BEHIND (z auto vs **200000**;
+  `elementFromPoint` at the bar's centre returns its own button). All 12 excused rows are named
+  in the artifact and every one is the wall or its kana behind taskbar chrome.
+  Control — inert, aria-hidden, control-free, but `z-index 999999` i.e. IN FRONT — must NOT be
+  excused: overlaps **0 → 3 → 0**. It carries text so correction 20 cannot excuse it first.
+- **24 — a desktop's free workspace is not dead space.** 59.5 / 54.0 / 63.4 pct against
+  `chromePct 0`, with all three hosted `.fwin` minimised to 0x0, so the room they would take
+  was empty by definition. `NOT-APPLICABLE`, kept distinct from `UNMEASURED` (whose rule is
+  "measure it or score 0, never 10"); the percentages travel at every size.
+
+**cat5 · Wired — instrument repaired, CELL NOT CLOSED** (`14fad326`). Same ownership bug at its
+two sites. Its Q3 control was being falsified by the harness's own furniture: the Q10 dashboard
+plant creates six `cat5ctl-kind-N` controls and appends them AFTER the pin, so the planted read
+resolved `primaryAction` to `input.cat5ctl-kind-1` — inside the viewport by construction — and
+Q3 stayed YES though the plant had correctly moved `button.os-start-btn`. Third repair to this
+one term; the first two both reasoned about nodes existing at pin time. Q3 now skips
+`[data-cat5-plant]` descendants, scoped to Q3 because Q4's clutter plants are *meant* to count.
+After: **CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10** (was VOID on Q3), residue 0.
+
+Two measured blockers, neither settled by widening an exclusion:
+1. **Q7/Q8/Q9 VOID — no `cat6-l9b4-wired*.json`.** They are MEASURE terms driven by
+   `cat6-feature-parity.cjs`. **For a shell, cat6 must run BEFORE cat5**, not the plan's
+   cat5 → cat6 reading.
+2. At rest: Q1 NO / Q2 NO / Q3 NO / Q4 NO / Q5 NO / Q10 NO, with Q3 `primaryAction` **null** —
+   no explicitly-primary control, no accent button, no primary input. Product or instrument is
+   the next question; correction 24's precedent does not transfer to it.
+
+**RULE C: 4 of 16 cells — cat1, cat2, cat3, cat4, all Wired. 12 to run.** `sampled-out:` Aero
+shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
