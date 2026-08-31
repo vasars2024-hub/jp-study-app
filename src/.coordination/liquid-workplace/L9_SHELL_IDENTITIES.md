@@ -1394,3 +1394,58 @@ Guard: `renderer/__tests__/secretIdentityScope.test.ts`, **12 tests**.
 **BULLET 4 STAYS OPEN.** Its RULE C receipt — 2 surfaces × 8 categories — is not started. What
 this turn bought is that the leak the categories would have hunted is already gone, and the
 `unknown` half of the bullet's ground truth is now measured rather than assumed.
+
+## 2026-08-31 — primary — bullet 4's receipt opens: cat1 Wired 10/10, and a one-way door in the shell
+
+**RULE C surfaces, and why these two.** The **Wired shell** (`@.os-desktop-wired`) is the densest
+secret identity — root `os-desktop os-desktop-wired`, 22 wired nodes, the atmosphere wall, the
+tray lamps, and every taskbar entry renamed (Start → `NODE ROUTER`, windows → `SIG-VID / Signal
+Archive`, `SYS / Service Panel`, `CAP-50 / Mooncap Garden`). **Blanc** is the most different: its
+own HTML entry, its own six sheets, and the cold-open boundary `f62c614e` already measured.
+`sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+
+**Instrument.** The theme is applied through `applyTheme`'s own three effects in its own order —
+`data-theme` + `data-materials` from the registry entry (`wired-archive.ts`: `materialSet:'wired'`,
+no `dataAttrs`), `jp-os-theme` persisted, `jp-theme-changed` dispatched — so the React branches
+that render the identity actually re-render. Attribute-setting alone does not: the wired shell is
+a React branch, not only a CSS gate.
+
+**cat1 · Wired — FAIL → PASS 10/10 (`bc7816d6`), instrument repaired, not the art.** First run
+VOIDed at −39 (83 of 116 controls occluded) because three `.fwin` sat over the desktop; minimised
+through their own Minimize controls, which is the shell's own path. Then FAIL on contrast, one
+element: `span.wired-wall-kana` at **1.46** — the wallpaper watermark at `DesktopShell.tsx:2591`,
+inside an `aria-hidden` atmosphere layer. **Correction 30** adds the half of WCAG 1.4.3's
+Incidental exemption this harness lacked: it applied "inactive user interface component" and not
+"pure decoration". Exempt only when the nearest `aria-hidden="true"` host holds nothing focusable;
+every exempted row is PRINTED with its ratio (`decorativeSkipped` 4, `decorativeWorst` names the
+1.46). After: minRatio **7.67** (`span.os-clock-date`), failing **0**, targets/2.5.8/keyboard/
+motion all clear. Control moved all six legs and returned to baseline — and the sharp half is that
+`contrast` still went 0 → **2**: the injected plain span AND an `aria-hidden` wrapper around a
+REAL focusable button were both caught, so the exemption is proven narrow in the same pass.
+
+**cat2 opened a genuine product defect, and it is a one-way door.** cat2's first run VOIDed on
+"the surface changes with no input"; it did **not** reproduce (`rawChurns:false` both phases) and
+12 samples over 5 s with cat2's own `painted()` filter found no churn. One idle reading is noise —
+do not chase it. Driving the shell's own dominant task then hit the real thing:
+`switchDesktop(0)` fails forever with **`desktop-on-another-display`**, and `DesktopShell.tsx:2424`
+answers with `console.error` alone, so the button silently does nothing.
+
+Measured, not inferred: `Screen::AllScreens` reports **one** physical display (1920x1080 primary),
+while `desktopGetLayout()` carries **six** assignment rows from earlier sessions — including
+`display|1920x1080|1` holding desktop 0 `enabled:true`, and `dell-up3017|2560x1600|1` holding
+desktop 3. No display answers the first key and no secondary window exists for it (`/health`: one
+window). `isDesktopClaimedBySecondary` read the assignment RECORD; `syncDesktopWindows` only ever
+builds windows for displays in `listDisplays()`. The two disagreed, and because the guard inspects
+only the TARGET the disagreement was a trap door: leaving desktop 0 was allowed and returning
+never was, stranding that desktop's windows, icons, notes and widgets with no route back. I hit it
+live and could not undo it from the UI.
+
+**Fix `<pending>`**: the guard now also asks `isDisplayAttached`, factored out of
+`syncAssignments`'s own `isStaleKey` so "attached" means exactly what "absent" means everywhere
+else (exact key → base key without `#n` → the primary alias). Before the display service has
+reported once the cache is `null` and every key reads attached, keeping the older behaviour rather
+than opening the guard during startup. An assignment still outlives its monitor, which is the
+documented intent (`resolveDisplayKey`: "the user unplugged a monitor, they did not reset its
+configuration"). **3 tests** added; the adverse control reverts the one clause and exactly the two
+new presence tests go red (2 failed / 31 passed) while both pre-existing guard tests stay green —
+so the fix cannot silently become a deletion of the guard.
