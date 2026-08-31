@@ -426,6 +426,8 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 6. Every action offered in the Files app is still reachable by its original route — enumerated
    route by route. A capability that became Files-app-only is a FAIL. The one permitted
    exception is memory/statistics (decision 1), which must be named explicitly in the report.
+   <!-- status: closed; evidence: 2026-08-31 -- 29 rows in shared/filesApp/routeParity.ts, 22 preserved / 7 new / 0 migrated; all 111 branch deletions audited, 0 removed routes; 6 negative controls -->
+
 7. Notebook is deleted with its features absorbed: notes survive the migration with a stated
    count, and `DesktopWinSection`, the palette, agent navigation and all four i18n catalogs are
    consistent afterwards (`node tools/i18n-check.cjs` exit 0).
@@ -906,3 +908,51 @@ TRAPS:
   non-null assertions in `NovelReader.tsx` at lines 1655–2166, far from this edit.
 
 **Gate tags now: 7 closed (1, 2, 3, 4, 5, 13, 14) / 1 open (12, half) / 29 untagged.**
+
+## 2026-08-31 (fifth) — Gate 6 closes: nothing became Files-app-only
+
+**Gate 6 CLOSED.** `src/shared/filesApp/routeParity.ts` — **29 rows, 22 `preserved` / 7 `new` /
+0 `migrated`** — plus `shared/__tests__/filesAppRouteParity.test.ts`, 11 tests, which re-derives
+every row from a file the table does not own rather than restating it.
+
+**The regression half, measured backwards.** The branch is `93b85109..f0b883de`, 8,288 insertions
+and **111 deletions**. Every deletion was read:
+- `preload.ts` 49 — a reorder. The 13 removed `api` keys were extracted mechanically and **all 13
+  still exist at HEAD**; a fabricated key correctly reported MISSING (control).
+- `scraper/history.ts` 37 — moved to `shared/scraperHistoryStore.ts` (54 added) and re-exported
+  from `history.ts:30-40`.
+- the remaining 8 — two `ARGV/POPOUT` list lines reflowed to append `'files'` (nothing dropped,
+  the diff is `+ 'files'`), three path constants moved to shared modules, `READING_LENS_HISTORY_FILE`
+  moved, and `splitSentences`'s signature + regex (the analyzer fix).
+**Zero routes removed.** The Files app has so far been purely additive.
+
+**The forward half, route by route.** 20 stores = 17 main + 3 renderer enumerators, scanned from
+both registries so a new enumerator without a parity row fails the test. 19 of 20 are `preserved`
+with a section that `AppSection.tsx` actually routes and a symbol the named file actually contains.
+
+**The one FINDING, and it is favourable.** `transcripts` is `new`, not preserved — and the reason
+is a real defect in the pre-Files app: **`yt-transcripts/<id>.json` was WRITE-ONLY.**
+`ytPlaylists.ts` uses `transcriptPath` exactly three times — the definition (:62), an `existsSync`
+that sets `transcribed: true` (:256), and the write in `yt:markTranscribed` (:772). **No handler
+ever reads the cues back**, and `grep -rn markTranscribed src` finds one renderer call site
+(`MediaContent.tsx:893`) which writes from in-memory cues at the end of a Whisper run. So in-session
+the cues are live in `MediaContent` state and mineable through the player panel; **after a restart
+they were unreachable.** The Files app is the first reader of that store. That is an added
+capability, not a moved one — it cannot fail gate 6, and the row says so in words.
+
+**The permitted exception, named as the gate requires: memory/statistics (decision 1) IS NOT IN
+USE.** Gate 8 has not landed, both still render in Settings, and `notebook` is still `preserved`
+at the Notebook section. The test asserts `migrated` is currently **empty** and that
+`FILES_PERMITTED_MIGRATIONS` is exactly `['memory','statistics']` — so gates 7 and 8 cannot land
+their removals without flipping those rows, and cannot flip a row for anything else.
+
+**Six negative controls, each run through the same `checkRow` the real rows use:** a missing
+module, a symbol absent from the named module, a section `AppSection` does not route, a `new` row
+smuggling in a section, a `migrated` capability outside the whitelist, and dropping one row from
+the coverage set. The honest control row passes; all six falsifications fail.
+
+TRAP for gate 7: `notebook`'s parity row is the one that must change, and changing it to
+`migrated` will FAIL the whitelist check on purpose — `notebook` is not `memory` or `statistics`.
+Gate 7 absorbs Notebook's features rather than moving a capability into Files-only, so those
+features stay `preserved` and point at their new homes; if any of them genuinely cannot, that is
+the gate-7 finding and it must be reported, not whitelisted.
