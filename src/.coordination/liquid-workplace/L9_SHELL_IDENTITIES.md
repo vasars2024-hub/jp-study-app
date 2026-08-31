@@ -95,3 +95,66 @@ The broad suite caught Note's desktop eligibility leaking into the manually addr
 helper. Presentability is now host-aware: Note is eligible only on the desktop that owns its state;
 pop-out and reader helpers reject it, while all other prior policies are unchanged. The exact
 presentation boundary suite passes 93/93 after correction.
+
+## 2026-08-30 — Every degradation trigger reaches the Liquid role
+
+§8's last two rows have four triggers in this shell and all four are hand-written
+selector lists: `a11y.css:100` (high-contrast theme), `perf.css:33` (battery tier),
+`styles.css:1280` (Settings > Display > Transparency) and `aero-safe-mode.css:21`.
+Two were answered by `liquid-tokens.css`; two were not. The transparency one was
+worse than unanswered — its list contains `.fwin`, and a Liquid window IS a `.fwin`,
+so `off` stripped that window's blur with `!important` while its background stayed
+`var(--glass-tint)`: see-through and unblurred, less legible than either endpoint.
+
+Answered at token level, not with three more lists. The guard DERIVES the trigger
+set from the shared sheets and asks whether the Liquid role answers each, so the
+next list written without `.lq-liquid` in it goes red instead of going quiet.
+
+Live on the Music window, Standard→Liquid→Standard: `full` 0.72 / blur(8px)
+saturate(1.25), `reduced` 0.88 / blur(6px), `off` opaque rgb(18,28,23) / none,
+reverse byte-identical, geometry 230,174,1032x589 unchanged throughout. Control:
+the standard Settings `.fwin` byte-identical across full/off, anchor and work blur
+0px in both. Guard mutation-checked — removing the two blocks names exactly the two
+triggers. Commit `27bcbf36`.
+
+## 2026-08-30 — Notifications, in both shells
+
+L9 bullet 2's `notifications` surface. Three dishonest states, each from source:
+`err`/`warn` are dispatched for real by `DropRouter` but only `.ok` and `.muted`
+had rules and one `aria-live="polite"` region carried everything, so a failure read
+and sounded like a success for 2,800 ms; no toast had a close; and the 9 s Undo
+counted down while the pointer travelled to it. Deadlines are now wall-clock,
+`role="alert"` nests inside the polite region for the urgent kinds, every toast has
+a labelled dismiss, and hover/focus-within holds the countdown. Only an actioned
+toast opts back into hit-testing, so an informational toast still never swallows a
+desktop click.
+
+Blanc mounts the same `ToastHost` and loads neither `styles.css` nor
+`multiMonitor.css`: its toasts were unstyled divs in the document flow, styled only
+after a ported panel lazily pulled `studyos-compat.css` and then from
+`@layer(studyos)`. Given a Blanc-native block scoped to `html.blanc-shell` rather
+than an import of Study OS chrome, per §8.
+
+Live: `err` → role=alert, aria-live=assertive, danger inset edge; control `ok` →
+none of the three. Held 14.2 s against a 9 s budget, then honoured the ~9 s it still
+owed rather than restarting. Guard mutation-checked. Commit `87b8da35`.
+
+## 2026-08-30 — The in-app Transparency control reaches what it names
+
+`data-display-transparency` is a shipped, localized three-way control and **38**
+translucent surfaces ignored it — command palette, dictionary popup, clipboard
+history, mini mode, lockscreen, widgets, all five `ui-*` primitives. Graded through
+the `--glass-blur`/`--blur-*` tokens `perf.css` already grades by tier, placed last
+so an explicit accessibility request outranks the machine's perf tier; verified live
+that it beats the active `data-perf='performance'`. Media Center keeps its own
+`--mc-glass-*` tokens and had handled `prefers-reduced-transparency` but not the
+in-app control; given the same ladder.
+
+Whole-app painted-blur scan at `off`: **1 of 5 regions → 4 of 5**. The remainder is
+`.fwin-bar`, which hardcodes `blur(6px)` in the foreign-dirty `styles.css` — named,
+not claimed. Sidebar measured full 0.94/blur(24px), reduced 0.94/blur(6px), off
+opaque/none, restored byte-identical. Commit `b77a3b08`.
+
+Open, deliberately: this ladder has no committed source guard of its own. L9 bullet
+2 still owes Music widget, City, onboarding and help; bullet 1 still owes its
+controlled entry-point receipt.
