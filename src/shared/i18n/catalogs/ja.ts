@@ -10613,6 +10613,8 @@ export const ja: Catalog = {
   'filesApp.collection.error.notInCollection': 'この項目はこのフォルダーに入っていません。',
   'filesApp.collection.error.selfNest': 'フォルダーを自分自身の中へは移動できません。',
   'filesApp.collection.error.cycle': 'フォルダーを、その中のフォルダーへは移動できません。',
+  'filesApp.collection.error.saveFailed':
+    'フォルダーを保存できませんでした。この変更は今は有効ですが、アプリを再起動すると失われます。',
   'filesApp.reveal.missing':
     'この記録が指すファイルはもうないため、開けるフォルダーがありません。',
 

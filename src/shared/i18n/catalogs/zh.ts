@@ -10523,6 +10523,8 @@ export const zh: Catalog = {
   'filesApp.collection.error.notInCollection': '该项目不在这个文件夹里。',
   'filesApp.collection.error.selfNest': '文件夹不能移动到它自己里面。',
   'filesApp.collection.error.cycle': '文件夹不能移动到它自己的子文件夹里。',
+  'filesApp.collection.error.saveFailed':
+    '无法保存你的文件夹。此更改现在有效，但重启应用后会丢失。',
   'filesApp.reveal.missing': '这条记录指向的文件已不存在，因此没有可打开的文件夹。',
 
   'filesApp.delete.mode.trash': '删除后文件将移入回收站。',

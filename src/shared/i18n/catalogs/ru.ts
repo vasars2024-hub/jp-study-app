@@ -11486,6 +11486,8 @@ export const ru: Catalog = {
   'filesApp.collection.error.notInCollection': 'Этого элемента нет в этой папке.',
   'filesApp.collection.error.selfNest': 'Папку нельзя переместить внутрь самой себя.',
   'filesApp.collection.error.cycle': 'Папку нельзя переместить в одну из её собственных папок.',
+  'filesApp.collection.error.saveFailed':
+    'Не удалось сохранить ваши папки. Изменение действует сейчас, но пропадёт после перезапуска приложения.',
   'filesApp.reveal.missing':
     'Файла, на который ссылается эта запись, больше нет, поэтому открывать нечего.',
 

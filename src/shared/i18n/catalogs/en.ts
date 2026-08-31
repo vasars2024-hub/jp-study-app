@@ -11074,6 +11074,8 @@ export const en: Catalog = {
   'filesApp.collection.error.notInCollection': 'That item is not in this folder.',
   'filesApp.collection.error.selfNest': 'A folder cannot be moved inside itself.',
   'filesApp.collection.error.cycle': 'A folder cannot be moved inside one of its own folders.',
+  'filesApp.collection.error.saveFailed':
+    'Your folders could not be saved. This change works now but will be gone when the app restarts.',
   // Gate 12: a record whose file is gone is still file-backed, so Explorer
   // would have opened the nearest surviving ancestor and called that a success.
   'filesApp.reveal.missing':
