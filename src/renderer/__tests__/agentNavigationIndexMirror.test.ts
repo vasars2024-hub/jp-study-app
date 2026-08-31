@@ -23,6 +23,7 @@ import {
   AGENT_SETTINGS_GUIDED_TARGETS,
 } from '../../shared/agentNavigation';
 import { SETTINGS_NAV, SETTINGS_REGISTRY } from '../components/settings/settingsRegistry';
+import { LEGACY_WIN_SECTION_ALIASES } from '../../shared/desktop';
 import { en } from '../../shared/i18n/catalogs';
 
 const catalog = en as unknown as Record<string, unknown>;
@@ -75,6 +76,14 @@ function allowedWords(entry: AgentNavigationIndexEntry): Set<string> {
   if (!entry.page) {
     add(entry.section);
     add(englishText(AGENT_NAVIGATION_SECTION_LABEL_KEYS[entry.section]));
+    // ...and the id of any section this one absorbed. Gate 7b deleted the
+    // Notebook into the Files app, so "notebook" is a name the destination
+    // genuinely answers to — but only because the alias table says so. Read
+    // from `LEGACY_WIN_SECTION_ALIASES` rather than listed here, so a term
+    // cannot be excused by a synonym nobody actually wired up.
+    for (const [legacy, target] of Object.entries(LEGACY_WIN_SECTION_ALIASES)) {
+      if (target === entry.section) add(legacy);
+    }
     return out;
   }
 

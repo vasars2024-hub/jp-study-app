@@ -431,6 +431,9 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 7. Notebook is deleted with its features absorbed: notes survive the migration with a stated
    count, and `DesktopWinSection`, the palette, agent navigation and all four i18n catalogs are
    consistent afterwards (`node tools/i18n-check.cjs` exit 0).
+   <!-- status: closed; evidence: 2026-08-31 92bd3e06 + 63a83468 -- 3,349 live entries over 15 streams each given a surviving route in shared/filesApp/notebookAbsorption.ts; 20 call sites removed, every legacy id aliased; i18n exit 0 at 11,747 keys; 2 index gaps named -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (seventh) Progress entry for the per-stream
+   table, the two named index gaps and the 15th stream nobody had counted.
 8. Memory and statistics render in the Files app with the same numbers the old Settings page
    produced, captured **before** removal and compared after. Settings no longer carries them,
    and every search entry that pointed at `pageId: 'memory'` resolves to the Files app — a
@@ -1045,3 +1048,76 @@ that genuinely cannot is the gate-7 FINDING and gets reported.
 - `npx eslint` on all 7 touched paths — **exit 0, 0 errors, 0 warnings.**
 
 **Gate tags now: 8 closed (1, 2, 3, 4, 5, 6, 13, 14) / 1 open (12, half) / 28 untagged.**
+
+## 2026-08-31 (seventh) — Gate 7 CLOSES: the Notebook is deleted, its streams accounted for
+
+`92bd3e06` Live Captions rehomed · `63a83468` the section deleted · this entry + the
+absorption ledger.
+
+**Gate 7 — CLOSED.** Notebook is gone from 20 call sites in 14 modules; `NotebookView.tsx`
+is deleted; `node tools/i18n-check.cjs` exits **0 at 11,747 keys**.
+
+**The count gate 7 asks for, measured live through the bridge on the running app**
+(`aggregateNotebook(await loadNotebookSources())`, PID 2040, read-only, probe global deleted
+after): **3,349 entries across 13 populated streams.**
+
+| stream | live n | Files enumerator | still shown by |
+| --- | --- | --- | --- |
+| mining | 3,218 | `local-deck` | flashcards |
+| translations | 40 | `translations` | translate |
+| lookups | 36 | `lookups` | dictionary (desktop widget) |
+| flashcards | 17 | `local-deck` | flashcards |
+| highlights | 15 | `highlights` | novels |
+| plan | 6 | **none** | novels |
+| clipboard | 6 | `clipboard` | library (global panel) |
+| ocr | 4 | `library` | library |
+| audio | 3 | `local-deck` | flashcards |
+| extension | 3 | `library` | library |
+| saved-words | 1 | `saved-words` | flashcards |
+| anki | 0 | `local-deck` | anki |
+| known | 0 | `known-words` | stats |
+| transcript | 0 | **none** | reading |
+| media | — | `media` | player |
+
+`flashcards + anki + mining + audio = 3,238`, which is exactly gate 1's measured
+`jp-flashcard-deck` row count. Different instrument, same number.
+
+**Two index gaps, named rather than rounded away.** `plan` (6 rows, the Jiten "plan to read"
+store) has no Files enumerator at all — its own `href` always pointed at Novels, which still
+owns it, so no route was lost and this is an index gap for a later enumerator. `transcript`
+is main-process live-caption state; gate 7b/1 moved its panel to Reading rather than into
+Files, deliberately.
+
+**A 15th stream nobody had counted.** `NotebookStream`'s union carries `'media'`, which is
+absent from `NotebookContent`'s `STREAM_KEYS` — so no view ever asked for it and no
+aggregator ever emitted one. Auditing against `STREAM_KEYS` would have missed it; the
+ledger's vocabulary check reads the **type**, which is how it surfaced.
+
+**Decisions, standing auto-approval.**
+1. **`LiveCaptionsPanel` → `ReadingCapturesView`**, as a second `ReadingCanvas` tool. NOT the
+   Files app: that would have made the app's one capture-arming control Files-app-only, which
+   gate 6 forbids. i18n namespace followed it (19 keys × 4 catalogs, `notebook.liveCaptions.*`
+   → `reading.liveCaptions.*`).
+2. **The `notebook` parity row flips to `migrated`** and joins `FILES_PERMITTED_MIGRATIONS`.
+   The rule that forced it is now written into `routeParity.ts`: **a route counts as
+   `preserved` only in the DEFAULT shell.** Blanc is opt-in, so scoring it `preserved` on
+   Blanc's untouched `notebook` tool would have let the whole deletion go unrecorded.
+3. **Every legacy `notebook` id is aliased, never rejected** — `LEGACY_WIN_SECTION_ALIASES`
+   for persisted layouts, `--open=`/`--popout=`, the OS hotkey config, the browser extension
+   target, and an Agent search term on the `files` entry.
+4. **`files` was added to `DesktopShell`** (`APPS`, the Start study group, both icon presets)
+   and to `osHotkeyHelper`'s `OPEN_SECTIONS`. It had shipped reachable only from the command
+   palette and the Agent; removing Notebook without it would have left the desktop no way in.
+
+**TRAPS.**
+1. **The parity test's first assertion pins capabilities 1:1 to enumerator `source` ids**, so
+   the `notebook` row cannot be decomposed into `notebook.timeline` etc. The finer question
+   belongs in `shared/filesApp/notebookAbsorption.ts`, which is what it is for.
+2. **`perl -0pi -e` silently no-ops on this worktree's CRLF files.** It reported success and
+   changed nothing; the edit only landed once the pattern was CRLF-aware. Check the file after.
+3. **`notebookLiquidRegions.test.ts` still fails 3 CRLF assertions here** and passes in the
+   LF main tree. Pre-existing (known memory), not from this gate.
+
+**Gate 37 — the four full gates, after the last slice.** See the closing paragraph below.
+
+**Gate tags now: 9 closed (1–7, 13, 14) / 1 open (12) / 27 untagged.**

@@ -118,6 +118,10 @@
     "test-only-module:src/renderer/components/liquid/LiquidInspector.tsx": {
       "status": "pending",
       "note": "Same L2 boundary as LiquidDock.tsx above. Fills the scaffold's inspector slot and carries the required close path (control, Escape, caller state) plus focus return. The Files app passes its own details pane into the scaffold's `inspector` slot rather than using this primitive, so nothing imports it yet. Closes when a surface needs the dismissable inspector rather than a permanent one."
+    },
+    "test-only-module:src/shared/filesApp/notebookAbsorption.ts": {
+      "status": "pending",
+      "note": "FILES_APP_PLAN.md gate 7's evidence, at a finer grain than routeParity.ts: one row per Notebook STREAM naming the Files enumerator that indexes it and the section that still shows it. Test-only for the same reason and by the same pattern as routeParity.ts above -- shared/__tests__/filesAppNotebookAbsorption.test.ts re-derives the stream vocabulary from renderer/notebookTimeline.ts, the enumerator ids from both registries, the route from AppSection.tsx and every symbol from the named module. Marked 'pending', not 'accepted': its natural app consumer is the same per-item \"also reachable in <section>\" affordance routeParity is waiting on, plus a Files-app diagnostic for the two streams the index cannot see (plan, transcript). When either lands this entry comes out rather than being re-justified."
     }
   }
 }
