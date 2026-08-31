@@ -29,7 +29,23 @@ import { describe, expect, it } from 'vitest';
  */
 
 const THEME_DIR = resolve(__dirname, '..', 'theme');
-const SCOPE = "[data-materials='wired']";
+
+/**
+ * Identity attribute prefix → the material scope its rules must carry, and the
+ * floor of gates the corpus must contain for the check to mean anything.
+ *
+ * Aero is here because it is currently CLEAN and must stay that way: every
+ * `[data-aero-*]` and `[data-app-border]` rule in the tree already carries
+ * `[data-materials='aero']`, which is what made the unscoped wired set legible
+ * as an oversight rather than a design. `data-app-border` belongs to Aero by
+ * design — `AppearancePage.tsx:89`: "Both cards are inert outside Aero and
+ * always were".
+ */
+const IDENTITIES = [
+  { attr: '[data-wired-', scope: "[data-materials='wired']", floor: 40 },
+  { attr: '[data-aero-', scope: "[data-materials='aero']", floor: 10 },
+  { attr: '[data-app-border', scope: "[data-materials='aero']", floor: 10 },
+] as const;
 
 /** Strip comments so prose naming an attribute cannot fail or satisfy a match. */
 const stripComments = (source: string): string => source.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -56,48 +72,37 @@ const sheets = [
   { name: 'styles.css', text: readFileSync(resolve(THEME_DIR, '..', 'styles.css'), 'utf8') },
 ];
 
-describe('wired identity scope', () => {
-  it('reads a corpus that actually contains the wired gates', () => {
-    // Without this the whole suite passes by matching nothing — the shape of
+describe.each(IDENTITIES)('secret shell identity scope — $attr', ({ attr, scope, floor }) => {
+  const gated = sheets.flatMap((s) => selectors(s.text).map((sel) => ({ sheet: s.name, sel })))
+    .filter((g) => g.sel.includes(attr));
+
+  it('reads a corpus that actually contains the gates', () => {
+    // Without this the whole block passes by matching nothing — the shape of
     // false pass this repo has already produced three separate ways.
-    const gated = sheets.flatMap((s) => selectors(s.text)).filter((s) => s.includes('[data-wired-'));
-    expect(gated.length).toBeGreaterThan(40);
+    expect(gated.length).toBeGreaterThan(floor);
   });
 
-  it('never lets a data-wired-* rule apply outside the wired material set', () => {
-    const leaks: string[] = [];
-    for (const sheet of sheets) {
-      for (const selector of selectors(sheet.text)) {
-        if (!selector.includes('[data-wired-')) continue;
-        if (selector.includes(SCOPE)) continue;
-        leaks.push(`${sheet.name}: ${selector}`);
-      }
-    }
+  it('never lets the rule apply outside its own material set', () => {
+    const leaks = gated.filter((g) => !g.sel.includes(scope)).map((g) => `${g.sheet}: ${g.sel}`);
     expect(
       leaks,
-      `a data-wired-* preference is stamped on <html> under EVERY theme, so an ` +
-        `unscoped rule restyles Study OS, Aero and Blanc from a Wired-only setting. ` +
-        `Prefix with ${SCOPE}:\n${leaks.join('\n')}`,
+      `these preferences are stamped on <html> under EVERY theme, so an unscoped ` +
+        `rule restyles Study OS, the other secret shell, and Blanc from a setting ` +
+        `that belongs to one identity. Prefix with ${scope}:\n${leaks.join('\n')}`,
     ).toEqual([]);
   });
 
   it('keeps the scope on the root, where the attribute is actually stamped', () => {
-    // `[data-materials='wired'] :root[data-wired-...]` would type-check as
-    // "scoped" above while matching nothing at all — a gate that silently
-    // deletes the feature reads the same as one that fixes the leak.
-    const misplaced: string[] = [];
-    for (const sheet of sheets) {
-      for (const selector of selectors(sheet.text)) {
-        if (!selector.includes('[data-wired-')) continue;
-        if (!selector.includes(SCOPE)) continue;
-        if (!new RegExp(`^:root\\${'['}data-materials='wired'\\]`).test(selector)) {
-          misplaced.push(`${sheet.name}: ${selector}`);
-        }
-      }
-    }
+    // `[data-materials='wired'] :root[data-wired-...]` would read as "scoped"
+    // above while matching nothing at all — a gate that silently deletes the
+    // feature looks the same as one that fixes the leak.
+    const prefix = `:root${scope}`;
+    const misplaced = gated
+      .filter((g) => g.sel.includes(scope) && !g.sel.startsWith(prefix))
+      .map((g) => `${g.sheet}: ${g.sel}`);
     expect(
       misplaced,
-      `the wired material scope must sit on :root itself — engine.ts:121 stamps ` +
+      `the material scope must sit on :root itself — engine.ts:121 stamps ` +
         `data-materials on <html>:\n${misplaced.join('\n')}`,
     ).toEqual([]);
   });

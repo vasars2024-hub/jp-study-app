@@ -517,7 +517,7 @@
    Measured on the running app before the scope was added: `data-wired-motion:
    off` took a real `.fwin.fwin-anim-opening` from `fwinIn`/0.14s to `none`/0s
    with no Wired root mounted. The subjects below are shell-wide, not wired-only.
-   Guarded by `renderer/__tests__/wiredIdentityScope.test.ts`. */
+   Guarded by `renderer/__tests__/secretIdentityScope.test.ts`. */
 :root[data-materials='wired'][data-wired-motion='reduced'] .fwin.fwin-anim-opening,
 :root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-body,
 :root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text,
