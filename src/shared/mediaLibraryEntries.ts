@@ -16,6 +16,7 @@
 import { mediaCategory, type MediaCategory } from './mediaCategories';
 import { METADATA_ACCEPT_CONFIDENCE } from './mediaMetadataMatch';
 import { hasJapaneseSubtitles, subtitleLanguages } from './subtitleRecord';
+import type { SubtitleRecord } from './subtitleRecord';
 import { sortMediaItems, seriesLabel } from './mediaSorting';
 import type { MediaItem } from './types';
 
@@ -36,6 +37,34 @@ export function mediaItemsFromStoredDocument(value: unknown): MediaItem[] {
   if (!value || typeof value !== 'object') return [];
   const items = (value as { items?: unknown }).items;
   return Array.isArray(items) ? items as MediaItem[] : [];
+}
+
+export interface StoredMediaSubtitle {
+  mediaId: string;
+  mediaTitle: string;
+  record: SubtitleRecord;
+}
+
+/**
+ * Flatten the subtitle records held inside `media.json` without discarding the
+ * owning media identity. Files catalogues need both: the record supplies the
+ * real path/provenance, while the owner supplies a useful title and stable id.
+ */
+export function mediaSubtitleRecordsFromStoredDocument(value: unknown): StoredMediaSubtitle[] {
+  const out: StoredMediaSubtitle[] = [];
+  for (const item of mediaItemsFromStoredDocument(value)) {
+    if (typeof item?.id !== 'string' || !Array.isArray(item.subtitles)) continue;
+    const mediaTitle = typeof item.title === 'string' && item.title.trim()
+      ? item.title.trim()
+      : typeof item.fileName === 'string' && item.fileName.trim()
+        ? item.fileName.trim()
+        : item.id;
+    for (const record of item.subtitles) {
+      if (!record || typeof record.id !== 'string' || typeof record.path !== 'string') continue;
+      out.push({ mediaId: item.id, mediaTitle, record });
+    }
+  }
+  return out;
 }
 
 export type LibraryGrouping = 'series' | 'album' | 'none';
