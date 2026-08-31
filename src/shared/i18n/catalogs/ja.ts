@@ -3476,6 +3476,7 @@ export const ja: Catalog = {
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'tour.progress': 'ステップ {current}/{total}',
   'tour.next': '次へ',
+  'tour.back': '戻る',
   'tour.skip': 'ツアーをスキップ',
   'tour.done': '完了',
   'tour.welcome.title': 'ようこそ',

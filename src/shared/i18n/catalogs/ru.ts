@@ -3751,6 +3751,7 @@ export const ru: Catalog = {
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'tour.progress': 'Шаг {current} из {total}',
   'tour.next': 'Далее',
+  'tour.back': 'Назад',
   'tour.skip': 'Пропустить',
   'tour.done': 'Готово',
   'tour.welcome.title': 'Добро пожаловать',

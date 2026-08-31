@@ -3671,6 +3671,7 @@ export const en: Catalog = {
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'tour.progress': 'Step {current} of {total}',
   'tour.next': 'Next',
+  'tour.back': 'Back',
   'tour.skip': 'Skip tour',
   'tour.done': 'Finish',
   'tour.welcome.title': 'Welcome',

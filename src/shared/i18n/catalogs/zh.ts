@@ -3463,6 +3463,7 @@ export const zh: Catalog = {
   // First-boot guided tour (Phase 9.5 / audit T1) and its Settings entry.
   'tour.progress': '第 {current} 步，共 {total} 步',
   'tour.next': '下一步',
+  'tour.back': '返回',
   'tour.skip': '跳过引导',
   'tour.done': '完成',
   'tour.welcome.title': '欢迎',
