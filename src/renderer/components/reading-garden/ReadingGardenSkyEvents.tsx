@@ -292,8 +292,12 @@ export function MooncapSkyDevConsole() {
 
   if (!import.meta.env.DEV) return null;
 
+  // `lq-hit-scope` is L2's hit-area floor applied by container: the toggle rendered
+  // 62x22 and the four action buttons 146x29 against category 1's 32px pointer floor,
+  // and they arrive as a family. The expander is a centred transparent `::after`, so
+  // nothing in the console grows visually. No `overflow: hidden` in this chain.
   return (
-    <div className="reading-garden-sky-console" data-open={open ? "1" : "0"}>
+    <div className="reading-garden-sky-console lq-hit-scope" data-open={open ? "1" : "0"}>
       <button
         type="button"
         className="reading-garden-sky-console-toggle"

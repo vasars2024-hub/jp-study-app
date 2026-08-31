@@ -3580,16 +3580,25 @@ const FloatingWindow = memo(function FloatingWindow({
       {isGarden && (
         <>
           <div className="fwin-drag-strip" onPointerDown={dragStart} aria-hidden />
+          {/* `lq-hit` on each button, exactly as the framed bar above already does. It was
+              missing only here, and category 1 measured the consequence: the same `.fwin-b`
+              owns a 32x32.5 pointer region in `.fwin-bar` and 30.5x24.5 inside
+              `.fwin-frameless-controls`. The expander did not "fail to survive this host" —
+              it was never applied to it. */}
           <div className="fwin-frameless-controls">
             {canPopOut && (
-              <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
+              <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
               </button>
             )}
-            <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
+            <button className="fwin-b lq-hit" title={t('desktop.minimize')} onClick={onMinimize}>
               ─
             </button>
-            <button className="fwin-b fwin-close" title={t('common.close')} onClick={onClose}>
+            <button
+              className="fwin-b lq-hit fwin-close"
+              title={t('common.close')}
+              onClick={onClose}
+            >
               ×
             </button>
           </div>

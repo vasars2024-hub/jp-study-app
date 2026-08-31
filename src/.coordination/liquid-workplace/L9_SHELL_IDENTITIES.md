@@ -384,3 +384,63 @@ starts too early scores a surface whose worst element has not rendered.
 
 **Bullet 1 stays OPEN at 2 of 16 cells.** Next: repair City's 18 category-1 defects
 above, re-score, then categories 2–8 on both surfaces.
+
+## 2026-08-31 — primary — category 1 · City repaired: FAIL 0/10 → PASS 10/10
+
+All 18 defects closed, measured on the same window (`@.fwin-frameless`, 680x739,
+`forest-night`, `standard`). Re-scored AFTER the fix, in the fix's own commit.
+
+| bar | before | after |
+| --- | --- | --- |
+| `minRatio` | 3.54 (`small "Last:"`) | **4.62** (`p "Force sky events"`) |
+| `failingCount` | 7 of 31 | **0** |
+| `belowFloorByHit` | 11 of 12 | **0** |
+| `stolenCount` | 1 (`-close`, shrunk 10.5) | **0** |
+| `smallestHit` | 28.5x**16** | **32.0** (`button.fwin-b.lq-hit`) |
+| verdict | FAIL 0/10 | **PASS 10/10** |
+
+Control fired all five bars: `[0,10,0,0,0] → [1,12,2,1,2] → [0,10,0,0]`, `rectDrift 0`,
+`backToBaseline true`. `belowFloorByRect` is 10 and is NOT the bar — the rect is the
+recorded 98-false-failure mistake.
+
+**THE ROOT CAUSE WAS ONE LINE, AND IT WAS NOT IN THE GARDEN.** `main.reading-garden`
+carries `isolation: isolate` for its blended sky, which makes it a stacking context — so
+the info chrome's `z-index: 16` and the sky console's `18` are trapped BELOW
+`.fwin-drag-strip`'s `2`, which lives in the WINDOW's context. Measured:
+`elementFromPoint` down the close button's centre returned `DIV.fwin-drag-strip` at y+0,
++4 and +8, and `BUTTON` only from y+12. That is a 34px invisible band over the top of
+every frameless window, and it is why `-close` was the single `stolenCount`.
+
+`z-index: 2` on the root alone is a REGRESSION and was caught before shipping: the root
+paints an opaque `#050711`, so it swallowed the drag band —
+`elementFromPoint(400,40)` became `MAIN.reading-garden` and the window could no longer be
+dragged. `pointer-events: none` on the root gives the band back; all three interactive
+groups already re-enable `auto` explicitly against a `none` ancestor, so all 9 controls
+still own their own centres. Verified live before and after, with restore.
+
+**`.fwin-b`'s expander did not "fail to survive" `.fwin-frameless-controls` — it was
+never applied there.** The framed bar tags every button `lq-hit` (`DesktopShell.tsx`
+~3536); the frameless branch, added later, tagged none. One class each, and the frameless
+buttons now measure the identical 32x32.5 the framed ones do.
+
+Contrast: five declarations, each sized by solving for the minimum alpha of the SAME hue
+that clears 4.5 composited onto the garden's opaque `#050711`, then taking headroom.
+The three 0.52 rules (`dossier dt`, `observation > span`, `music-heading > span`) were
+inconsistent with their own family — `.reading-garden-info > p` uses the identical hue at
+0.58 and measures 4.62 — so 0.62 is that value plus margin, not an invention.
+
+Hit floors, all L2 primitives, no visual growth: `lq-hit-scope` on
+`.reading-garden-sky-console` (toggle + actions) and on `.reading-garden-info-music-toggle`;
+`lq-hit-placed` on `.reading-garden-info-close` (already `position: absolute` — plain
+`lq-hit` would have dropped it into flow); `min-height: var(--lq-hit-target)` on the volume
+`input[type=range]`, because a replaced element generates no `::after` and a scope over it
+reads as fixed while moving nothing.
+
+TRAP for the next worker: the WCAG relative-luminance divisor is **1.055**, not 2.055. A
+transposed digit made every ratio read ~2.4x too low and turned two PASSING elements into
+fabricated failures. The check that caught it: the corrected walk reproduces the harness's
+own 3.54 / 3.90 / 3.91 / 4.49 exactly. Reproduce a known number before trusting a
+hand-rolled contrast walk.
+
+**Bullet 1 is at 4 of 16 cells** — category 1 now PASSES on both RULE C surfaces.
+Next: categories 2–8 on Video and City.

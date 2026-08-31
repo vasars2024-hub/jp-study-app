@@ -1026,8 +1026,12 @@ export default function ReadingGarden({
             role="dialog"
             aria-label={organismName}
           >
+            {/* `lq-hit-placed`, not `lq-hit`: this button is already `position: absolute`,
+                and the plain variant declares `position: relative`, which would drop it into
+                flow. 28x28 rendered, 32px pointer region, and the panel's `overflow: auto`
+                does not clip it — the expander's 2px overhang stays inside the 12px padding. */}
             <button
-              className="reading-garden-info-close"
+              className="reading-garden-info-close lq-hit-placed"
               type="button"
               onClick={closeInfo}
               aria-label={t("mooncap.info.close")}
@@ -1085,7 +1089,12 @@ export default function ReadingGarden({
                 <span>{t("mooncap.info.musicLabel")}</span>
                 <small>{t("mooncap.info.musicTrack")}</small>
               </div>
-              <div className="reading-garden-info-music-toggle" role="group">
+              {/* `lq-hit-scope`: both buttons rendered 103x29 against category 1's 32px
+                  pointer floor. Scoped here rather than on `.reading-garden-info`, because
+                  that scope's `position: relative` would beat `.reading-garden-info-close`'s
+                  own `position: absolute` on specificity and drop the close button into flow —
+                  the exact hazard `.lq-hit-placed` exists for, and the close button uses it. */}
+              <div className="reading-garden-info-music-toggle lq-hit-scope" role="group">
                 <button
                   type="button"
                   aria-pressed={music.enabled}
