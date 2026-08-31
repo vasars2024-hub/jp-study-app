@@ -10646,5 +10646,44 @@ export const ja: Catalog = {
   'filesApp.mine.undone': {
     other: '{count} 枚のカードを削除しました。',
   },
+
+  'filesApp.system.memory.title': 'メモリ',
+  'filesApp.system.memory.desc':
+    'このPCにアプリが保存している内容と、その確認・書き出し・消去の方法です。',
+  'filesApp.system.statistics.title': '統計',
+  'filesApp.system.statistics.desc': 'この端末に記録された読書と視聴の活動です。',
+  'filesApp.system.knownWords.title': '単語の習得状況',
+  'filesApp.system.knownWords.desc':
+    '既知・見覚えあり・学習中として記録されている単語の数です。',
+  'filesApp.system.movedFromSettings':
+    'メモリと統計はここに移動しました。設定にはもうありません。',
+  'filesApp.system.agentMemory.categoryLabel': 'メモリの分類',
+  'filesApp.system.agentMemory.keyLabel': 'メモリの名前',
+  'filesApp.system.agentMemory.valueLabel': 'メモリの内容',
+  'filesApp.system.agentMemory.valuePlaceholder': 'エージェントに覚えさせたい内容は？',
+  'filesApp.system.agentMemory.cat.userPreference': 'ユーザー設定',
+  'filesApp.system.agentMemory.cat.learning': '学習',
+  'filesApp.system.agentMemory.cat.application': 'アプリ',
+  'filesApp.system.agentMemory.colCategory': '分類',
+  'filesApp.system.agentMemory.colMemory': 'メモリ',
+  'filesApp.system.agentMemory.colValue': '内容',
+  'filesApp.system.agentMemory.colUpdated': '更新',
+  'filesApp.system.agentMemory.empty': 'ローカルエージェントに保存されたメモリはありません。',
+  'filesApp.system.agentMemory.add': 'メモリを追加',
+  'filesApp.system.agentMemory.save': '変更を保存',
+  'filesApp.system.agentMemory.edit': '編集',
+  'filesApp.system.agentMemory.delete': '削除',
+  'filesApp.system.agentMemory.deleteTitle': 'エージェントのメモリを削除',
+  'filesApp.system.agentMemory.deleteMessage':
+    'ローカルエージェントのメモリから「{label}」を削除しますか？',
+  'filesApp.system.agentMemory.clear': 'エージェントのメモリを消去',
+  'filesApp.system.agentMemory.clearTitle': 'エージェントのメモリを消去',
+  'filesApp.system.agentMemory.clearMessage':
+    '保存されたエージェントの設定・学習メモ・アプリのメモリをすべて削除しますか？',
+  'filesApp.system.agentMemory.needsBoth': 'メモリの名前と内容の両方が必要です。',
+  'filesApp.system.agentMemory.added': 'エージェントのメモリを追加しました。',
+  'filesApp.system.agentMemory.updated': 'エージェントのメモリを更新しました。',
+  'filesApp.system.agentMemory.deleted': 'エージェントのメモリを削除しました。',
+  'filesApp.system.agentMemory.cleared': 'エージェントのメモリを消去しました。',
 };
 

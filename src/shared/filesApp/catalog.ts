@@ -191,6 +191,28 @@ export const FILES_TREE: readonly FilesCategoryNode[] = [
   leaf('workspaces/acquisitions'),
 ];
 
+/**
+ * The two leaves that are PANELS rather than item collections — gate 8's
+ * memory and statistics, decision 1's sanctioned migration out of Settings.
+ *
+ * They are in the tree because they are things the app stores and the user
+ * came here to find; they hold no enumerable rows, so no enumerator will ever
+ * fill them. That matters for gate 1, whose rule is "a category reading 0
+ * while items exist is a FINDING": these two have no items, so a rail count of
+ * 0 would be an honest number answering the wrong question. The rail renders
+ * them without a count instead, and selecting one shows its panel.
+ *
+ * Kept here rather than in the renderer so the parity and enumerator tests can
+ * see it: an enumerator that starts filing rows under one of these is a
+ * category conflict, not a feature.
+ */
+export const FILES_PANEL_CATEGORY_IDS = ['system/memory', 'system/statistics'] as const;
+export type FilesPanelCategoryId = (typeof FILES_PANEL_CATEGORY_IDS)[number];
+
+export function isFilesPanelCategory(id: FilesCategoryId): id is FilesPanelCategoryId {
+  return (FILES_PANEL_CATEGORY_IDS as readonly string[]).includes(id);
+}
+
 const NODE_BY_ID = new Map<FilesCategoryId, FilesCategoryNode>(
   FILES_TREE.map((node) => [node.id, node]),
 );

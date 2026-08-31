@@ -11523,5 +11523,44 @@ export const ru: Catalog = {
     many: 'Удалено {count} карточек.',
     other: 'Удалено {count} карточки.',
   },
+
+  'filesApp.system.memory.title': 'Память',
+  'filesApp.system.memory.desc':
+    'Что приложение хранит на этом компьютере и как это просмотреть, выгрузить или очистить.',
+  'filesApp.system.statistics.title': 'Статистика',
+  'filesApp.system.statistics.desc': 'Чтение и просмотр, записанные на этом устройстве.',
+  'filesApp.system.knownWords.title': 'Знание слов',
+  'filesApp.system.knownWords.desc':
+    'Сколько слов отмечено как известные, знакомые или изучаемые.',
+  'filesApp.system.movedFromSettings':
+    'Память и статистика теперь здесь. В настройках их больше нет.',
+  'filesApp.system.agentMemory.categoryLabel': 'Категория памяти',
+  'filesApp.system.agentMemory.keyLabel': 'Название записи',
+  'filesApp.system.agentMemory.valueLabel': 'Содержимое записи',
+  'filesApp.system.agentMemory.valuePlaceholder': 'Что ассистент должен запомнить?',
+  'filesApp.system.agentMemory.cat.userPreference': 'Предпочтение пользователя',
+  'filesApp.system.agentMemory.cat.learning': 'Обучение',
+  'filesApp.system.agentMemory.cat.application': 'Приложение',
+  'filesApp.system.agentMemory.colCategory': 'Категория',
+  'filesApp.system.agentMemory.colMemory': 'Запись',
+  'filesApp.system.agentMemory.colValue': 'Значение',
+  'filesApp.system.agentMemory.colUpdated': 'Обновлено',
+  'filesApp.system.agentMemory.empty': 'У локального ассистента нет сохранённых записей.',
+  'filesApp.system.agentMemory.add': 'Добавить запись',
+  'filesApp.system.agentMemory.save': 'Сохранить изменения',
+  'filesApp.system.agentMemory.edit': 'Изменить',
+  'filesApp.system.agentMemory.delete': 'Удалить',
+  'filesApp.system.agentMemory.deleteTitle': 'Удалить запись памяти ассистента',
+  'filesApp.system.agentMemory.deleteMessage':
+    'Удалить «{label}» из памяти локального ассистента?',
+  'filesApp.system.agentMemory.clear': 'Очистить память ассистента',
+  'filesApp.system.agentMemory.clearTitle': 'Очистить память ассистента',
+  'filesApp.system.agentMemory.clearMessage':
+    'Удалить все сохранённые предпочтения ассистента, заметки об обучении и записи приложения?',
+  'filesApp.system.agentMemory.needsBoth': 'Нужны и название записи, и её содержимое.',
+  'filesApp.system.agentMemory.added': 'Запись памяти ассистента добавлена.',
+  'filesApp.system.agentMemory.updated': 'Запись памяти ассистента обновлена.',
+  'filesApp.system.agentMemory.deleted': 'Запись памяти ассистента удалена.',
+  'filesApp.system.agentMemory.cleared': 'Память ассистента очищена.',
 };
 

@@ -23,7 +23,7 @@
  * 3. **Scope is a filter, not a mode.** Selecting a category narrows the list;
  *    the root node clears it. Same window either way (gate 5's shape).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
@@ -35,6 +35,7 @@ import {
   categoryNode,
   countByCategory,
   deleteModeFor,
+  isFilesPanelCategory,
   isMachineDerived,
   matchesQuery,
   revealTargetFor,
@@ -59,6 +60,25 @@ import {
 } from './filesAppScope';
 import { useFilesIndex } from './useFilesIndex';
 import './filesApp.css';
+
+/**
+ * Gate 8's two panels, loaded on demand — and the `lazy` is load-bearing, not
+ * an optimisation.
+ *
+ * `FilesStatisticsPanel` imports `StatsContent`, which reaches `ankiSync`, and
+ * `ankiSync` calls `window.api.onAnkiIntervalsChanged(...)` AT MODULE SCOPE. A
+ * static import therefore runs that line the moment anything touches this file
+ * — including `filesApp.test.tsx`, which mounts the list with no preload
+ * bridge and died on it. `studyLedgerHarness.tsx` documents the same hazard and
+ * takes the same way out. The panels are also two screens most sessions never
+ * open, so the file list no longer carries their readers in its chunk.
+ */
+const FilesMemoryPanel = lazy(() =>
+  import('./panels/FilesMemoryPanel').then((m) => ({ default: m.FilesMemoryPanel })),
+);
+const FilesStatisticsPanel = lazy(() =>
+  import('./panels/FilesStatisticsPanel').then((m) => ({ default: m.FilesStatisticsPanel })),
+);
 
 const ROW_HEIGHT = 32;
 
@@ -151,6 +171,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
   const [revealNote, setRevealNote] = useState<string | null>(null);
   /**
+   * Gate 8: the panel card a settings-search hit named, so the hit lands on its
+   * own row rather than merely on the app. Cleared when the scope moves, which
+   * is what stops a stale highlight following the user around the tree.
+   */
+  const [focusCardId, setFocusCardId] = useState<string | null>(
+    entryScope?.focusCardId ?? null,
+  );
+  /**
    * The last mine's outcome. `addedIds` is what makes it reversible — the plan
    * requires a reversible action, and `addDeckCardsTracked` hands back exactly
    * the new rows so undo removes those and nothing that happened to match.
@@ -173,6 +201,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       clearPendingFilesScope();
       setScope(detail.categoryId);
       setSelectedId(detail.focusItemId ?? null);
+      setFocusCardId(detail.focusCardId ?? null);
       // A scope arriving on an open window must not land inside a stale search:
       // the caller asked for a folder, not for a folder minus whatever was typed.
       setQuery('');
@@ -328,14 +357,32 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           type="button"
           className="fa-tree-node"
           data-leaf={node.isLeaf ? 'true' : undefined}
+          data-panel={isFilesPanelCategory(node.id) ? 'true' : undefined}
           data-selected={scope === node.id ? 'true' : undefined}
           aria-pressed={scope === node.id}
-          onClick={() => setScope(node.id)}
+          onClick={() => {
+            setScope(node.id);
+            // A tree click is not a search hit; it asked for the panel, not for
+            // one card inside it. Carrying the highlight over would leave the
+            // previous hit's row lit on a screen nobody searched for.
+            setFocusCardId(null);
+          }}
         >
           <span className="fa-tree-label">{t(node.labelKey)}</span>
           {/* Shown even at 0: a category that reads 0 while items exist is a
-              finding, and a hidden node cannot be seen to be wrong. */}
-          <span className="fa-tree-count">{countFor(node.id).toLocaleString(LANG_TAGS[lang])}</span>
+              finding, and a hidden node cannot be seen to be wrong. The two
+              PANEL leaves are the exception — they hold no enumerable rows at
+              all, so a count of 0 there would be an honest number answering a
+              question nobody asked. */}
+          {isFilesPanelCategory(node.id) ? (
+            <span className="fa-tree-count fa-tree-panel-mark" aria-hidden>
+              ›
+            </span>
+          ) : (
+            <span className="fa-tree-count">
+              {countFor(node.id).toLocaleString(LANG_TAGS[lang])}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -343,41 +390,50 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   /* -------------------------- toolbar --------------------------- */
 
+  const showListTools = scope === null || !isFilesPanelCategory(scope);
+
   const toolbar = (
     <div className="fa-toolbar">
-      <label className="fa-search">
-        <span className="fa-visually-hidden">{t('filesApp.search.label')}</span>
-        <input
-          type="search"
-          value={query}
-          placeholder={t('filesApp.search.placeholder')}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </label>
-      <label className="fa-sort">
-        <span className="fa-visually-hidden">{t('filesApp.sort.label')}</span>
-        <select
-          value={sortColumn}
-          onChange={(e) => setSortColumn(e.target.value as FilesSortColumn)}
-        >
-          {FILES_SORT_COLUMNS.map((column) => (
-            <option key={column} value={column}>
-              {t(`filesApp.column.${column}`)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        className="fa-sort-dir"
-        onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-        aria-label={t(sortDirection === 'asc' ? 'filesApp.sort.asc' : 'filesApp.sort.desc')}
-      >
-        {sortDirection === 'asc' ? '↑' : '↓'}
-      </button>
-      <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
-        {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
-      </button>
+      {/* Search, sort and refresh act on the item list. On a panel scope there
+          is no list for them to act on, and a control that is present and does
+          nothing is a worse answer than one that is absent. */}
+      {showListTools ? (
+        <>
+          <label className="fa-search">
+            <span className="fa-visually-hidden">{t('filesApp.search.label')}</span>
+            <input
+              type="search"
+              value={query}
+              placeholder={t('filesApp.search.placeholder')}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          <label className="fa-sort">
+            <span className="fa-visually-hidden">{t('filesApp.sort.label')}</span>
+            <select
+              value={sortColumn}
+              onChange={(e) => setSortColumn(e.target.value as FilesSortColumn)}
+            >
+              {FILES_SORT_COLUMNS.map((column) => (
+                <option key={column} value={column}>
+                  {t(`filesApp.column.${column}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="fa-sort-dir"
+            onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            aria-label={t(sortDirection === 'asc' ? 'filesApp.sort.asc' : 'filesApp.sort.desc')}
+          >
+            {sortDirection === 'asc' ? '↑' : '↓'}
+          </button>
+          <button type="button" className="fa-refresh" onClick={refresh} disabled={refreshing}>
+            {t(refreshing ? 'filesApp.action.refreshing' : 'filesApp.action.refresh')}
+          </button>
+        </>
+      ) : null}
       {/* Gate 5: a narrowed list has to say it is narrowed. Without this the
           same window shows a fraction of the tree and reads as a broken index
           rather than as a filter someone asked for — and the way out is stated
@@ -425,6 +481,25 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
 
   const canvas = (() => {
+    /**
+     * Gate 8. The two system leaves are PANELS, not item lists, so they render
+     * before any index state is consulted — memory and statistics read their own
+     * stores and are perfectly available while the file index is still loading
+     * or has failed outright. Gating them on `state.status` would make an
+     * unrelated enumerator failure hide the app's own diagnostics, which is the
+     * screen you most want when something is broken.
+     */
+    if (scope && isFilesPanelCategory(scope)) {
+      return (
+        <Suspense fallback={<p className="fa-state">{t('filesApp.state.loading')}</p>}>
+          {scope === 'system/memory' ? (
+            <FilesMemoryPanel focusCardId={focusCardId} />
+          ) : (
+            <FilesStatisticsPanel focusCardId={focusCardId} />
+          )}
+        </Suspense>
+      );
+    }
     if (state.status === 'loading') {
       return <p className="fa-state">{t('filesApp.state.loading')}</p>;
     }
@@ -649,21 +724,34 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   /* ---------------------------- dock ---------------------------- */
 
+  const onPanel = scope !== null && isFilesPanelCategory(scope);
+
   const dock = (
     <div className="fa-status" role="status">
-      <span>{t('filesApp.status.items', { count: visible.length })}</span>
-      <span>{t('filesApp.status.size', { size: formatSize(totalSize, t, lang) })}</span>
-      {selected ? <span>{t('filesApp.status.selected', { name: selected.name })}</span> : null}
+      {onPanel ? (
+        // "0 items, total 0 B" is true of a panel and says nothing; the honest
+        // line names where these numbers came from instead.
+        <span>{t('filesApp.system.movedFromSettings')}</span>
+      ) : (
+        <>
+          <span>{t('filesApp.status.items', { count: visible.length })}</span>
+          <span>{t('filesApp.status.size', { size: formatSize(totalSize, t, lang) })}</span>
+          {selected ? <span>{t('filesApp.status.selected', { name: selected.name })}</span> : null}
+        </>
+      )}
     </div>
   );
 
   return (
     <LiquidAppScaffold
-      className="fa-shell"
+      className={`fa-shell${onPanel ? ' fa-shell-panel' : ''}`}
       rail={rail}
       railLabel={t('filesApp.tree.label')}
       toolbar={toolbar}
-      inspector={inspector}
+      // A panel occupies the whole canvas and has no per-row selection, so the
+      // inspector is dropped rather than left showing "nothing selected" beside
+      // a screen where selecting is not a thing that happens.
+      inspector={onPanel ? undefined : inspector}
       inspectorLabel={t('filesApp.details.label')}
       dock={dock}
     >

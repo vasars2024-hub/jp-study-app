@@ -23,6 +23,7 @@ import {
   isFilesCategoryId,
   type FilesCategoryId,
 } from '../../../shared/filesApp/catalog';
+import { filesPanelForCard } from '../../../shared/filesApp/systemPanels';
 import { openSectionSurface } from '../../sectionSurface';
 
 export interface FilesScopeRequest {
@@ -34,6 +35,17 @@ export interface FilesScopeRequest {
    * simply highlights nothing, which is why it is optional rather than guessed.
    */
   focusItemId?: string | null;
+  /**
+   * The panel CARD to scroll to and highlight, for the two panel-backed leaves
+   * (`system/memory`, `system/statistics`). Gate 8's search half needs this:
+   * a hit that used to land on `data-setting-id="factory-reset"` inside
+   * Settings must still land on that card here, and "opened the Files app" is
+   * not the same answer as "showed the row you searched for".
+   *
+   * The strings are deliberately the OLD settings registry ids, so no
+   * translation table sits between the two worlds.
+   */
+  focusCardId?: string | null;
 }
 
 /**
@@ -83,6 +95,7 @@ export function openFilesAppScoped(request: FilesScopeRequest): boolean {
   pending = {
     categoryId: request.categoryId,
     ...(request.focusItemId ? { focusItemId: request.focusItemId } : {}),
+    ...(request.focusCardId ? { focusCardId: request.focusCardId } : {}),
   };
   const claimed = openSectionSurface('files');
   if (typeof window !== 'undefined') {
@@ -140,4 +153,27 @@ export function openFilesAppForDictionaries(): boolean {
 /** From the deck or flashcards surface. */
 export function openFilesAppForDecks(): boolean {
   return openFilesAppScoped({ categoryId: 'outputs/decks' });
+}
+
+/**
+ * Gate 8's redirect: a settings-search hit for a card that MOVED here.
+ *
+ * Returns false for a card the Files app does not own, and opens nothing —
+ * rerouting an unrelated settings entry into this app would be the same
+ * misroute the gate forbids, only pointing the other way.
+ */
+export function openFilesAppForSystemCard(cardId: string): boolean {
+  const categoryId = filesPanelForCard(cardId);
+  if (!categoryId) return false;
+  return openFilesAppScoped({ categoryId, focusCardId: cardId });
+}
+
+/** From anywhere that used to link at the Settings "Memory" page. */
+export function openFilesAppForMemory(): boolean {
+  return openFilesAppScoped({ categoryId: 'system/memory' });
+}
+
+/** From anywhere that used to open the Statistics section. */
+export function openFilesAppForStatistics(): boolean {
+  return openFilesAppScoped({ categoryId: 'system/statistics' });
 }

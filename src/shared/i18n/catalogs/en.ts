@@ -11105,6 +11105,50 @@ export const en: Catalog = {
     other: 'Removed {count} cards again.',
   },
 
+  // Gate 8 — memory and statistics, which MOVED here out of Settings
+  // (decision 1, the one sanctioned migration). The panels reuse the existing
+  // `settings.memory.*`, `search.*` and `stats.*` keys wherever the old page
+  // already had one, so only genuinely new strings are declared below — and
+  // fourteen of them are the raw English literals the old agent-memory block
+  // shipped untranslated.
+  'filesApp.system.memory.title': 'Memory',
+  'filesApp.system.memory.desc':
+    'What this app stores on this PC, and every way to inspect, export or clear it.',
+  'filesApp.system.statistics.title': 'Statistics',
+  'filesApp.system.statistics.desc': 'Reading and watching activity recorded on this device.',
+  'filesApp.system.knownWords.title': 'Word knowledge',
+  'filesApp.system.knownWords.desc': 'How many words are tracked as known, familiar or learning.',
+  'filesApp.system.movedFromSettings':
+    'Memory and Statistics live here now. Settings no longer carries them.',
+  'filesApp.system.agentMemory.categoryLabel': 'Memory category',
+  'filesApp.system.agentMemory.keyLabel': 'Memory label',
+  'filesApp.system.agentMemory.valueLabel': 'Memory value',
+  'filesApp.system.agentMemory.valuePlaceholder': 'What should the agent remember?',
+  'filesApp.system.agentMemory.cat.userPreference': 'User preference',
+  'filesApp.system.agentMemory.cat.learning': 'Learning',
+  'filesApp.system.agentMemory.cat.application': 'Application',
+  'filesApp.system.agentMemory.colCategory': 'Category',
+  'filesApp.system.agentMemory.colMemory': 'Memory',
+  'filesApp.system.agentMemory.colValue': 'Value',
+  'filesApp.system.agentMemory.colUpdated': 'Updated',
+  'filesApp.system.agentMemory.empty': 'The local agent has no saved memories.',
+  'filesApp.system.agentMemory.add': 'Add memory',
+  'filesApp.system.agentMemory.save': 'Save changes',
+  'filesApp.system.agentMemory.edit': 'Edit',
+  'filesApp.system.agentMemory.delete': 'Delete',
+  'filesApp.system.agentMemory.deleteTitle': 'Delete agent memory',
+  'filesApp.system.agentMemory.deleteMessage':
+    'Delete “{label}” from the local agent’s memory?',
+  'filesApp.system.agentMemory.clear': 'Clear agent memory',
+  'filesApp.system.agentMemory.clearTitle': 'Clear agent memory',
+  'filesApp.system.agentMemory.clearMessage':
+    'Delete all saved agent preferences, learning notes and application memories?',
+  'filesApp.system.agentMemory.needsBoth': 'A memory label and value are both required.',
+  'filesApp.system.agentMemory.added': 'Agent memory added.',
+  'filesApp.system.agentMemory.updated': 'Agent memory updated.',
+  'filesApp.system.agentMemory.deleted': 'Agent memory deleted.',
+  'filesApp.system.agentMemory.cleared': 'Agent memory cleared.',
+
 };
 
 

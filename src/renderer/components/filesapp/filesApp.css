@@ -413,3 +413,199 @@
     transition: none;
   }
 }
+
+/* ---------------------- system panels (gate 8) ---------------------- */
+/*
+ * Memory and Statistics are PANELS, not item lists — decision 1's sanctioned
+ * migration out of Settings. They are read, filtered and acted on rather than
+ * scanned as a table, so they take the WORK surface role with a scroll of their
+ * own; the cards inside are anchors (opaque, stable) exactly as the design
+ * contract asks for tables, forms and logs. Universal glass is a failure here.
+ *
+ * Not one `os-set-*` class and not one literal colour: the whole point of
+ * `FilesPanelCard` is that no Settings chrome comes across with the panels.
+ */
+
+.fa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-3);
+  padding: var(--lq-space-4);
+  overflow-y: auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.fa-panel-card {
+  background: var(--lq-anchor-bg);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  color: var(--lq-anchor-text);
+  padding: var(--lq-space-3);
+  /* An anchor, so it does not blur what is behind it. */
+  box-shadow: var(--lq-anchor-shadow);
+}
+
+/* The search-hit landing mark. Same job `os-set-card.is-highlight` did on the
+   page these cards came from — without it a repointed hit opens the app and
+   leaves the user hunting for the row they typed. */
+.fa-panel-card.is-highlight {
+  border-color: var(--lq-liquid-highlight);
+  box-shadow: 0 0 0 2px var(--lq-liquid-highlight);
+}
+
+.fa-panel-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--lq-space-3);
+}
+
+.fa-panel-card-title {
+  margin: 0;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.fa-panel-card-desc,
+.fa-panel-note {
+  margin: var(--lq-space-1) 0 0;
+  color: var(--lq-anchor-text-muted);
+  font-size: 0.9em;
+}
+
+.fa-panel-card-body {
+  margin-top: var(--lq-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2);
+}
+
+.fa-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lq-space-2);
+  align-items: center;
+}
+
+.fa-panel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lq-space-2);
+  color: var(--lq-anchor-text-muted);
+  font-size: 0.9em;
+}
+
+.fa-panel-env strong {
+  font-weight: 600;
+}
+
+.fa-panel-status {
+  margin: 0;
+  color: var(--lq-anchor-text);
+  font-size: 0.9em;
+}
+
+/* ---- the meter ---- */
+
+.fa-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1);
+}
+
+.fa-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lq-space-2);
+}
+
+.fa-meter-label {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.fa-meter-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--lq-anchor-bg-raised);
+  border: 1px solid var(--lq-anchor-border);
+  overflow: hidden;
+}
+
+.fa-meter-fill {
+  height: 100%;
+  background: var(--lq-liquid-highlight);
+}
+
+/* ---- the inventory / history tables ---- */
+
+.fa-panel-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lq-space-2);
+}
+
+.fa-panel-filter input,
+.fa-panel-filter select {
+  min-width: 0;
+  flex: 1 1 12ch;
+  padding: var(--lq-space-1) var(--lq-space-2);
+  border-radius: var(--lq-work-radius);
+  border: 1px solid var(--lq-anchor-border);
+  background: var(--lq-anchor-bg-raised);
+  color: var(--lq-anchor-text);
+  font: inherit;
+}
+
+.fa-panel-editor input:last-of-type {
+  flex: 2 1 24ch;
+}
+
+.fa-panel-table-wrap {
+  overflow-x: auto;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-work-radius);
+}
+
+.fa-panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.fa-panel-table th,
+.fa-panel-table td {
+  text-align: start;
+  padding: var(--lq-space-1) var(--lq-space-2);
+  border-bottom: 1px solid var(--lq-anchor-border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.fa-panel-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--lq-anchor-bg-raised);
+  z-index: 1;
+}
+
+/* A domain with nothing in it is dimmed, not hidden — the same reason the tree
+   keeps its zeroes: a row you cannot see cannot be seen to be wrong. */
+.fa-panel-table tr[data-empty='true'] {
+  opacity: 0.55;
+}
+
+/* The panel owns its own scroll, so the canvas must not add a second one. */
+.fa-shell-panel > .lq-scaffold-canvas {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-meter-fill {
+    transition: none;
+  }
+}
