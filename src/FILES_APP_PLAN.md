@@ -956,3 +956,92 @@ TRAP for gate 7: `notebook`'s parity row is the one that must change, and changi
 Gate 7 absorbs Notebook's features rather than moving a capability into Files-only, so those
 features stay `preserved` and point at their new homes; if any of them genuinely cannot, that is
 the gate-7 finding and it must be reported, not whitelisted.
+
+## 2026-08-31 (sixth) — Gate 7a: the five Notebook streams Files could not see
+
+Gate 7 has two halves. This turn landed the ABSORPTION half; the DELETION half is surveyed
+below and is what the next turn opens on.
+
+**What was missing, counted.** `notebook/aggregate.ts` merges **twelve** streams into one
+timeline. Seven already had a Files reader — `flashcards`/`mining` via `local-deck`, `anki` via
+the main `decks` and `drafts` enumerators, `highlights` via `highlights`, and
+`ocr`/`audio`/`extension`/`media` via the timeline store `notebook` reads. **Five had none at
+all**: saved words, dictionary lookups, translations, known words, the clipboard. Deleting the
+Notebook section without them would have removed a capability, not absorbed one.
+
+`2b67e679` — five renderer enumerators. **17 main + 8 renderer = 25 sources**, up from 17 + 3.
+Each uses the owner's own loader and the owner's own key; `LOOKUP_HISTORY_STORAGE_KEY` and
+`TRANSLATION_HISTORY_STORAGE_KEY` are newly exported for that, on codexA's expose-the-contract
+pattern — two literals drift, one does not.
+
+Three decisions, each recorded where the next worker hits it:
+1. **`createdAt` is never synthesised.** `aggregate.ts` gives a known word
+   `Date.now() - level * 1000` purely so the timeline can sort it. That number means nothing and
+   a Date column showing it would be showing an invented value. It stays `null`; gate 14 already
+   sorts nulls last in both directions.
+2. **Every absorbed row is `app-generated`.** Provenance in this catalogue is a claim about how
+   *text* was produced, and none of these records is mined text. Stamping `book-text` on a lookup
+   because its context sentence came from a book would put a trust mark on a row making no claim.
+3. **Clipboard `pinned`/`favorite` are NOT mapped.** There is no `starred` in `FilesItemFlags`
+   and gate 18 owns Favorites; borrowing `referenced` or `enabled` would put a wrong word in a
+   column that means something else.
+
+**A module that could not be imported at all.** `knownWords.ts` registered a `storage` listener
+and an `onStudyLangChanged` subscription at module scope, both reaching `window`. Outside a DOM
+that is not a failing assertion, it is an import-time `ReferenceError`. Guarded; in a renderer
+`window` always exists so behaviour is identical.
+
+**10 new tests, two of them controls.** Malformed rows drop rather than render blank — AND the
+same readers still produce rows for well-formed input, so the drop assertions cannot pass on a
+reader that returns `[]` unconditionally.
+
+**The parity table is currently test-only, and that is recorded as debt, not hidden.**
+`architecture-audit` correctly flagged `shared/filesApp/routeParity.ts` as reachable only from
+its test. It is baselined **`pending`**, not `accepted`: the natural app consumer is the per-item
+"also reachable in \<section\>" affordance that gates 10 and 12 both want, and when that lands
+the entry comes out rather than being re-justified. Only that one entry was added by hand — the
+other **15** unclassified findings are media/aero/blanc/scraper orphans and were left alone.
+
+### Gate 7b — the deletion half, surveyed so the next turn can start editing
+
+`'notebook'` as a **section id** appears at **24 non-test call sites**, in five groups:
+- **section registries** — `shared/desktop.ts:29`, `shared/agentNavigation.ts:64`,
+  `shared/agentNavigationIndex.ts:108`, `main.ts:132` and `:1335` (ARGV / POPOUT),
+  `main/extensionServer.ts:161`, `main/osHotkeyHelper.ts:76`;
+- **the renderer switch** — `AppSection.tsx:118` and its `NotebookView` lazy import;
+- **entry points** — `CommandPalette.tsx:63`, `DesktopShell.tsx:123`/`:206`/`:430`,
+  `desktopIconPresets.ts:39`/`:62`, `extensionBridgeUi.ts:113`/`:134`,
+  `settingsRegistry.ts:629`;
+- **hand-offs INTO it** — `TranslateView.tsx:168`, `TranslateContent.tsx:306`,
+  `MediaCenterView.tsx:155`, `media/StudyBlocks.tsx:32`, `notebook/aggregate.ts:182` (`href`);
+- **Blanc's own tool**, which is a SEPARATE surface — `BlancShell.tsx:852`/`:921`/`:1131`,
+  `BlancStudyPanels.tsx:629`/`:695`. Deleting the Study OS section does not delete Blanc's
+  `notebook` tool, and conflating them would break Blanc.
+
+Plus all four i18n catalogs (`notebook.*`, `palette.section.notebook`).
+
+**The one feature with no home yet: `LiveCaptionsPanel`.** `NotebookView.tsx:63` is its only
+mount. It is a *capture* control, not a file, so it does not become a Files row — it needs a real
+destination or its deletion is a regression. Decide and record that before touching the registries.
+
+**The parity table is the guard.** `notebook`'s row is `preserved` at the Notebook section and
+the test re-derives that from `AppSection.tsx`'s own `case 'notebook':`. Deleting the case fails
+the test until the row is changed — and changing it to `migrated` fails the whitelist too, since
+`notebook` is not `memory` or `statistics`. That is deliberate: gate 7 absorbs features rather
+than moving a capability into Files-only, so each one must point at its new home, and anything
+that genuinely cannot is the gate-7 FINDING and gets reported.
+
+**Gate 37 — the four full gates, run after the last slice.**
+- `npx vitest run`: **13 suites / 33 tests failed, 12,009 passed, 6 skipped.** Byte-identical
+  shape to the `f0b883de` baseline (13 / 33). **Zero contain `filesApp`.** Several are this
+  worktree's CRLF: `statisticsLiquidRegions` fails `expected '/*\r\n…' to contain '…\n…'` — the
+  CSS-parsing guards were written in the LF main tree.
+- `node tools/i18n-check.cjs` — **exit 0, 11,748 keys.** No new strings this turn: enumerators
+  produce row names from the store's own data, which is study content and is not translated.
+- `node tools/architecture-audit.cjs` — **exit 1, 15 unclassified**, all
+  media/aero/blanc/scraper orphans. Mine was the 16th and is now baselined; the CLI no longer
+  names `routeParity`. Correcting the previous entry: it reported "exit 0, 6 unclassified" —
+  the real figure at that commit was 15, and the test has been failing on them for several turns.
+- `npx eslint` on all 7 touched paths — **exit 0, 0 errors, 0 warnings.**
+
+**Gate tags now: 8 closed (1, 2, 3, 4, 5, 6, 13, 14) / 1 open (12, half) / 28 untagged.**
