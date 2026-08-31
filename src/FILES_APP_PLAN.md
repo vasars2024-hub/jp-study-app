@@ -408,15 +408,10 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 
 1. The index enumerates real items across all five groups, reporting a count per category that
    matches what is on disk / in the tables. A category reading 0 while items exist is a FINDING.
-   <!-- status: open; evidence: 2026-08-31 merge — codexA's retraction stands: deck/highlight/scraper/reading-lens stores have no enumerator -->
-   **2026-08-30 retraction (codexA), and it is right.** Two rounds. First: the Text readers
-   omitted `subtitles/<mediaId>/`, scanned nested `yt-subs` as flat, and missed `subs-cache`.
-   Repaired 2026-08-31 — see that Progress entry, 1,926 items / 50.17 GB / 14 enumerators.
-   Second, and still open at the 2026-08-31 merge: the index reads **main** stores plus one
-   renderer enumerator (Notebook). Four populated stores have no enumerator at all —
-   `jp-flashcard-deck` (**3,238** cards), `jp-annotations:*` (**15** highlights),
-   scraper `history.json` (**10** jobs) and `reading-lens-history.json` (**42** captures).
-   Gate 1 closes only when every one of those joins the index through the store's own parser.
+   <!-- status: closed; evidence: 2026-08-31 live census 5,263 items / 17 main + 3 renderer enumerators; both retractions resolved, every zero measured -->
+   **CLOSED 2026-08-31, third attempt, at 5,263 items.** Two retractions preceded it and
+   both were right. See the 2026-08-31 (second) Progress entry for the table, the numbers
+   and the four remaining zeros, each measured against its own store.
 2. A video transcribed earlier is findable in the Files app **without navigating to that video**.
 3. One-click mine from the list works end to end for one item of each mineable kind.
 4. Categorisation is derived: a newly transcribed video appears in the right place with no
@@ -701,3 +696,68 @@ clipboard, 2 pinned) and is absent from the production Files snapshot. Its main-
 already exposes the validated synchronous list; this checkpoint exports the established file
 location so Files can retain the honest JSON pointer instead of guessing a second filename.
 The existing Reading Lens IPC/history suite is the regression gate. Gate 1 remains open.
+
+### 2026-08-31 — primary2, `wt/files-app` — gate 1 CLOSED (third attempt, 5,263 items)
+
+Commits: `c2f349f2` merge of codexA's store contracts · `709b9d14` the four missing
+enumerators · `4cc87a08` the transcription queue + `rendererCensus.ts`.
+
+**Gate 1 — CLOSED. 5,263 items, 20 enumerators (17 main + 3 renderer), 0 broken links.**
+Both retractions were correct and both are now resolved. The second one — codexA's — found
+four populated stores with **no reader at all**; the index had been measured only on the
+side that happened to have one.
+
+| store | rows | side | who could see it |
+| --- | --- | --- | --- |
+| `jp-flashcard-deck` | 3,238 cards + 2 folders, 1,334,057 B | renderer | localStorage; main never |
+| `jp-grammarx-notebook-timeline-v1` | 23 | renderer | localStorage; main never |
+| `jp-annotations:*` (3 book keys) | 15 | renderer | localStorage; main never |
+| `scraper/history.json` + `results/` | 15 = 10 jobs + 5 orphan results | main | had no reader |
+| `reading-lens-history.json` | 42 | main | had no reader |
+| `transcription-jobs.json` | 0 | main | had no reader; store really is `[]` |
+
+Every renderer figure was re-measured **through the production enumerators** and matches
+codexA's independent bridge measurement exactly — different instrument, same numbers.
+
+**The zero that had been explained rather than checked.** `outputs/mined` read 0 with the
+justification "no per-card store exists outside the Anki mirror; the mined cards ARE those
+27 decks' notes". That was wrong. `jp-flashcard-deck` *is* the per-card store — 3,238 rows
+— and it is renderer-owned, so the main-only census could never have contradicted it. A
+justified zero is only as good as the store it was checked against.
+
+**The four remaining zeros, each measured this turn:**
+- `sources/visual-novels` — `immersion/visual-novels.json` is `{version, entries: 0, captures: 0}`.
+- `workspaces/acquisitions` — **a finding.** No acquisition store exists anywhere in `main/`
+  or `shared/`; the pipeline is in-memory only, so an in-flight acquisition survives nothing.
+  Structural, not an unread store. Gate 25 will need this.
+- `system/memory` + `system/statistics` — gate 8's deliverable, decision 1's sanctioned
+  migration. The only two zeros with work still owed.
+
+**Decisions, under standing auto-approval:**
+1. **Deck cards go to `outputs/mined`, deck folders to `outputs/decks`** — the store holds
+   both and they are different things. This does not disturb the earlier "decks, not notes"
+   decision, which was about the *Anki* mirror's 87,260 note rows and still holds.
+2. **Two constants moved `main/` → `shared/`** (`SCRAPER_HISTORY_INDEX_FILE` and siblings →
+   `shared/scraperHistoryStore.ts`; `READING_LENS_HISTORY_FILE` → `shared/readingLensHistory.ts`),
+   both re-exported so no importer changed. Forced: their owners import `electron`, and the
+   index is bundled and run *outside* Electron by the census. The alternative — a second copy
+   of each filename in the enumerator — is the drift these contracts exist to prevent.
+3. **Provenance is mapped, never inferred.** The deck says `transcript` where the catalogue
+   says `whisper-transcript`; an **absent** value becomes `unknown`, not `book-text`, because
+   the field is additive and thousands of cards predate it. OCR captures are `auto-captions`
+   (a machine read them and can have misread); clipboard captures claim nothing.
+
+**TRAPS.**
+1. **`export { X } from '…'` does NOT bind `X` locally.** `clearScraperHistory` uses the
+   constant in the same file that re-exports it; 15 tests failed on a `ReferenceError` that
+   looks nothing like a missing import. Import *and* re-export.
+2. **The bridge `/eval` body key is `js`, not `expression`.** A wrong key returns
+   `{"ok":false,"error":"missing js"}` with HTTP **400** — not 200-with-null, so it is
+   catchable, but the message names the field you omitted rather than the one you sent.
+3. **`countByCategory` returns `own`/`total`, never `count`.** `c.count` is `undefined`, and
+   `expect(undefined).toBe(0)` is the only thing that catches it.
+4. **A fresh SRS state carries `lastReviewedAt: 0`**, which is a real epoch. Read literally,
+   every never-reviewed card sorts as 1970 instead of with the nulls.
+5. **`rendererCensus.ts` needs the raw store STRING**, not a parsed object — it feeds
+   `parseFlashcardDeckStore`, which unwraps the legacy over-encoding. Parsing first would
+   silently skip that repair and drop cards.
