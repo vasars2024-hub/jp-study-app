@@ -3,6 +3,7 @@ import type { FilesDeletionTarget } from '../../shared/filesApp/deletion';
 import {
   FILES_DELETE_CHANNEL,
   deleteFilesItemInMain,
+  lookupFilesDeletionTarget,
   registerFilesDeletionIpc,
   type FilesDeletionMainDependencies,
 } from '../filesApp/deletionIpc';
@@ -21,10 +22,35 @@ function target(overrides: Partial<FilesDeletionTarget> = {}): FilesDeletionTarg
 function dependencies(row: FilesDeletionTarget | null = target()) {
   const lookupItem = vi.fn((itemId: string) => (row?.id === itemId ? row : null));
   const trashItem = vi.fn(async () => undefined);
-  return { lookupItem, trashItem } satisfies FilesDeletionMainDependencies;
+  const onTrashed = vi.fn();
+  return { lookupItem, trashItem, onTrashed } satisfies FilesDeletionMainDependencies;
 }
 
 describe('Files app main-process deletion boundary', () => {
+  it('adapts the authoritative snapshot without losing reference ownership', () => {
+    const rows = [
+      {
+        id: 'media:referenced',
+        name: 'Episode 1.mkv',
+        kind: 'video',
+        location: { store: 'file' as const, path: 'D:\\Anime\\Episode 1.mkv' },
+        sizeBytes: 1_024,
+        flags: { referenced: true, transcribed: true },
+        rendererOnlyField: 'ignored',
+      },
+    ];
+
+    expect(lookupFilesDeletionTarget(rows, 'media:referenced')).toEqual({
+      id: 'media:referenced',
+      name: 'Episode 1.mkv',
+      kind: 'video',
+      location: { store: 'file', path: 'D:\\Anime\\Episode 1.mkv' },
+      sizeBytes: 1_024,
+      referenced: true,
+    });
+    expect(lookupFilesDeletionTarget(rows, 'media:missing')).toBeNull();
+  });
+
   it('resolves the path from the main index and trashes exactly that target', async () => {
     const deps = dependencies();
 
@@ -35,6 +61,7 @@ describe('Files app main-process deletion boundary', () => {
     });
     expect(deps.lookupItem).toHaveBeenCalledWith('transcript:one');
     expect(deps.trashItem).toHaveBeenCalledWith('C:\\owned\\episode-1.json');
+    expect(deps.onTrashed).toHaveBeenCalledWith(target());
   });
 
   it('ignores injected renderer path and kind fields', async () => {
@@ -67,11 +94,13 @@ describe('Files app main-process deletion boundary', () => {
       ),
     ).resolves.toMatchObject({ ok: false, reasonKey: 'filesApp.delete.confirmationMismatch' });
     expect(deps.trashItem).not.toHaveBeenCalled();
+    expect(deps.onTrashed).not.toHaveBeenCalled();
 
     await expect(
       deleteFilesItemInMain({ itemId: 'media:one', confirmedItemId: 'media:one' }, deps),
     ).resolves.toMatchObject({ ok: true, mode: 'trash' });
     expect(deps.trashItem).toHaveBeenCalledOnce();
+    expect(deps.onTrashed).toHaveBeenCalledOnce();
   });
 
   it('refuses unknown, referenced and index-only rows without touching the filesystem', async () => {
@@ -92,7 +121,19 @@ describe('Files app main-process deletion boundary', () => {
         reasonKey: 'filesApp.delete.refuseNotTrashable',
       });
       expect(deps.trashItem).not.toHaveBeenCalled();
+      expect(deps.onTrashed).not.toHaveBeenCalled();
     }
+  });
+
+  it('keeps the cached index when shell.trashItem fails', async () => {
+    const deps = dependencies();
+    deps.trashItem.mockRejectedValueOnce(new Error('Recycle Bin unavailable'));
+
+    await expect(deleteFilesItemInMain({ itemId: 'transcript:one' }, deps)).resolves.toMatchObject({
+      ok: false,
+      reasonKey: 'filesApp.delete.failed',
+    });
+    expect(deps.onTrashed).not.toHaveBeenCalled();
   });
 
   it('rejects malformed requests and a mismatched lookup result', async () => {

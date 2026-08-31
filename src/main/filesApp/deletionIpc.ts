@@ -14,6 +14,42 @@ export interface FilesDeletionMainDependencies {
   lookupItem(itemId: string): FilesDeletionTarget | null;
   /** Production supplies Electron `shell.trashItem`. */
   trashItem(path: string): Promise<void>;
+  /** Drop the Files index cache after the OS accepted a trash request. */
+  onTrashed?(target: FilesDeletionTarget): void;
+}
+
+/** Structural subset shared by the authoritative Files index and Delete. */
+export interface FilesDeletionIndexItem {
+  id: string;
+  name: string;
+  kind: string;
+  location: FilesDeletionTarget['location'];
+  sizeBytes: number | null;
+  flags?: { referenced?: boolean };
+}
+
+/**
+ * Resolve a fresh deletion target from the main-process snapshot.
+ *
+ * Keeping this adapter beside the privileged handler prevents its production
+ * caller from returning a renderer row or hand-copying the `referenced` flag.
+ * The returned object contains only deletion policy fields, so future display
+ * metadata cannot accidentally become part of the security decision.
+ */
+export function lookupFilesDeletionTarget(
+  items: readonly FilesDeletionIndexItem[],
+  itemId: string,
+): FilesDeletionTarget | null {
+  const item = items.find((candidate) => candidate.id === itemId);
+  if (!item) return null;
+  return {
+    id: item.id,
+    name: item.name,
+    kind: item.kind,
+    location: item.location,
+    sizeBytes: item.sizeBytes,
+    referenced: item.flags?.referenced === true,
+  };
 }
 
 function sanitizeRequest(value: unknown): FilesDeleteRequest | null {
@@ -71,7 +107,7 @@ export async function deleteFilesItemInMain(
     };
   }
 
-  return executeFilesDeletion(
+  const result = await executeFilesDeletion(
     target,
     { confirmedItemId: request.confirmedItemId },
     {
@@ -83,6 +119,13 @@ export async function deleteFilesItemInMain(
       },
     },
   );
+  if (result.ok && result.mode === 'trash') {
+    // The filesystem changed underneath the 15-second Files index cache. A
+    // stale snapshot would briefly put the deleted row back after the UI's
+    // optimistic removal, so invalidate only after trashItem resolves.
+    dependencies.onTrashed?.(target);
+  }
+  return result;
 }
 
 export interface FilesIpcHandleRegistrar {
