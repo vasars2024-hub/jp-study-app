@@ -405,8 +405,8 @@
   z-index: 2;
 }
 
-:root[data-wired-crt='clean'] .fwin::before,
-:root[data-wired-static='reduced'] .fwin::before {
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin::before,
+:root[data-materials='wired'][data-wired-static='reduced'] .fwin::before {
   opacity: 0.18;
 }
 
@@ -2326,13 +2326,13 @@
 /* Idle loops are opt-out: `data-wired-idle='off'` is the user's setting, and
    the OS-level reduced-motion preference overrides everything. Both must stop
    the ambient layers without hiding the instruments that carry real data. */
-:root[data-wired-idle='off'] .wired-found-matrix,
-:root[data-wired-idle='off'] .wired-found-particles {
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-matrix,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-particles {
   display: none;
 }
-:root[data-wired-motion='off'] .wired-found-ticker-track,
-:root[data-wired-motion='off'] .wired-found-radar-sweep,
-:root[data-wired-motion='off'] .wired-found-map-sweep {
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-ticker-track,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-radar-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-map-sweep {
   animation: none;
 }
 

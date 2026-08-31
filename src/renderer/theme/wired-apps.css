@@ -733,8 +733,8 @@
   mix-blend-mode: screen;
 }
 
-:root[data-wired-crt='clean'] .media-player::after,
-:root[data-wired-static='reduced'] .media-player::after {
+:root[data-materials='wired'][data-wired-crt='clean'] .media-player::after,
+:root[data-materials='wired'][data-wired-static='reduced'] .media-player::after {
   opacity: 0.16;
 }
 

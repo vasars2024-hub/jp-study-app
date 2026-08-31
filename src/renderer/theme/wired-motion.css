@@ -427,21 +427,21 @@
 
 /* ---- Clean CRT / reduced static: calm variants --------------------------- */
 
-:root[data-wired-crt='clean'] .fwin.fwin-anim-opening,
-:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-body,
-:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text,
-:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text::after,
-:root[data-wired-crt='clean'] .fwin-anim-opening .fwin-wired-status {
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin.fwin-anim-opening,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin-anim-opening .fwin-body,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin-anim-opening .fwin-wired-status {
   animation-duration: 0.12s;
   animation-delay: 0s;
 }
 
-:root[data-wired-crt='clean'] .fwin.fwin-anim-closing,
-:root[data-wired-crt='clean'] .fwin.fwin-anim-minimizing {
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin.fwin-anim-closing,
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin.fwin-anim-minimizing {
   animation: wm-scan-collapse 0.16s steps(3) both;
 }
 
-:root[data-wired-static='reduced'] .fwin-anim-opening .fwin-body {
+:root[data-materials='wired'][data-wired-static='reduced'] .fwin-anim-opening .fwin-body {
   animation-name: wm-scan-reveal;
   animation-duration: 0.2s;
 }
@@ -507,56 +507,66 @@
 
 /* Motion-level gate (§9 motionLevel setting → data-wired-motion). 'reduced'
    behaves like clean CRT timing; 'off' kills lifecycle + interaction motion
-   the same way OS reduced-motion does. */
-:root[data-wired-motion='reduced'] .fwin.fwin-anim-opening,
-:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-body,
-:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text,
-:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text::after,
-:root[data-wired-motion='reduced'] .fwin-anim-opening .fwin-wired-status {
+   the same way OS reduced-motion does.
+
+   Every `data-wired-*` gate in this file — and in wired-shell/apps/widgets/
+   archive — carries `[data-materials='wired']` as well, and must keep it.
+   `terminalModeSettings.applyWiredArchiveSettings()` stamps these six
+   attributes on <html> on EVERY boot under EVERY theme, and main.tsx imports
+   the wired sheets unconditionally, so an unscoped gate is live in forest-night.
+   Measured on the running app before the scope was added: `data-wired-motion:
+   off` took a real `.fwin.fwin-anim-opening` from `fwinIn`/0.14s to `none`/0s
+   with no Wired root mounted. The subjects below are shell-wide, not wired-only.
+   Guarded by `renderer/__tests__/wiredIdentityScope.test.ts`. */
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin.fwin-anim-opening,
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-body,
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text,
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin-anim-opening .fwin-wired-status {
   animation-duration: 0.12s;
   animation-delay: 0s;
 }
 
-:root[data-wired-motion='reduced'] .fwin.fwin-anim-closing,
-:root[data-wired-motion='reduced'] .fwin.fwin-anim-minimizing {
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin.fwin-anim-closing,
+:root[data-materials='wired'][data-wired-motion='reduced'] .fwin.fwin-anim-minimizing {
   animation: wm-scan-collapse 0.16s steps(3) both;
 }
 
-:root[data-wired-motion='off'] .fwin.fwin-anim-opening,
-:root[data-wired-motion='off'] .fwin-anim-opening .fwin-body,
-:root[data-wired-motion='off'] .fwin-anim-opening .fwin-title-text,
-:root[data-wired-motion='off'] .fwin-anim-opening .fwin-title-text::after,
-:root[data-wired-motion='off'] .fwin-anim-opening .fwin-wired-status,
-:root[data-wired-motion='off'] .fwin.fwin-anim-closing,
-:root[data-wired-motion='off'] .fwin.fwin-anim-minimizing,
-:root[data-wired-motion='off'] .os-task-win.anim-opening,
-:root[data-wired-motion='off'] .os-task-win.anim-minimizing,
-:root[data-wired-motion='off'] .os-task-win.anim-closing,
-:root[data-wired-motion='off'] .os-taskbar[data-pulse]::before,
-:root[data-wired-motion='off'] .ui-toast,
-:root[data-wired-motion='off'] .ui-toast__title,
-:root[data-wired-motion='off'] .ui-toast__msg,
-:root[data-wired-motion='off'] .wired-notif-closing,
-:root[data-wired-motion='off'] .flash-card.is-decrypt .flash-answer,
-:root[data-wired-motion='off'] .flash-card.is-resync,
-:root[data-wired-motion='off'] .stats-bar-fill,
-:root[data-wired-motion='off'] .stats-section,
-:root[data-wired-motion='off'] .dict-results article,
-:root[data-wired-motion='off'] .immersion-stage.is-settle,
-:root[data-wired-motion='off'] .widget-frame.widget-anim-mounting,
-:root[data-wired-motion='off'] .widget-frame.widget-anim-mounting .widget-title {
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-opening,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin-anim-opening .fwin-body,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin-anim-opening .fwin-title-text,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin-anim-opening .fwin-title-text::after,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin-anim-opening .fwin-wired-status,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-closing,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-minimizing,
+:root[data-materials='wired'][data-wired-motion='off'] .os-task-win.anim-opening,
+:root[data-materials='wired'][data-wired-motion='off'] .os-task-win.anim-minimizing,
+:root[data-materials='wired'][data-wired-motion='off'] .os-task-win.anim-closing,
+:root[data-materials='wired'][data-wired-motion='off'] .os-taskbar[data-pulse]::before,
+:root[data-materials='wired'][data-wired-motion='off'] .ui-toast,
+:root[data-materials='wired'][data-wired-motion='off'] .ui-toast__title,
+:root[data-materials='wired'][data-wired-motion='off'] .ui-toast__msg,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-notif-closing,
+:root[data-materials='wired'][data-wired-motion='off'] .flash-card.is-decrypt .flash-answer,
+:root[data-materials='wired'][data-wired-motion='off'] .flash-card.is-resync,
+:root[data-materials='wired'][data-wired-motion='off'] .stats-bar-fill,
+:root[data-materials='wired'][data-wired-motion='off'] .stats-section,
+:root[data-materials='wired'][data-wired-motion='off'] .dict-results article,
+:root[data-materials='wired'][data-wired-motion='off'] .immersion-stage.is-settle,
+:root[data-materials='wired'][data-wired-motion='off'] .widget-frame.widget-anim-mounting,
+:root[data-materials='wired'][data-wired-motion='off'] .widget-frame.widget-anim-mounting .widget-title {
   animation: none;
 }
 
-:root[data-wired-motion='off'] .fwin.fwin-anim-closing,
-:root[data-wired-motion='off'] .fwin.fwin-anim-minimizing {
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-closing,
+:root[data-materials='wired'][data-wired-motion='off'] .fwin.fwin-anim-minimizing {
   opacity: 0;
 }
 
 /* Idle-animation gate (§9 idleAnimations setting → data-wired-idle='off'). */
-:root[data-wired-idle='off'] .wired-globe-spin,
-:root[data-wired-idle='off'] .wired-wall-atmosphere::before,
-:root[data-wired-idle='off'] .wired-wall-node.node-b::after,
-:root[data-wired-idle='off'] .os-clock {
+:root[data-materials='wired'][data-wired-idle='off'] .wired-globe-spin,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-wall-atmosphere::before,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-wall-node.node-b::after,
+:root[data-materials='wired'][data-wired-idle='off'] .os-clock {
   animation: none;
 }

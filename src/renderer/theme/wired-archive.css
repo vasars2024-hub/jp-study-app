@@ -97,16 +97,16 @@
   animation: wired-static 180ms steps(2) infinite;
 }
 
-:root[data-wired-crt='clean'] .wired-boot-noise,
-:root[data-wired-crt='clean'] .lockscreen-wired-noise,
-:root[data-wired-static='reduced'] .wired-boot-noise,
-:root[data-wired-static='reduced'] .lockscreen-wired-noise {
+:root[data-materials='wired'][data-wired-crt='clean'] .wired-boot-noise,
+:root[data-materials='wired'][data-wired-crt='clean'] .lockscreen-wired-noise,
+:root[data-materials='wired'][data-wired-static='reduced'] .wired-boot-noise,
+:root[data-materials='wired'][data-wired-static='reduced'] .lockscreen-wired-noise {
   opacity: 0.045;
   animation-duration: 900ms;
 }
 
-:root[data-wired-crt='heavy'] .wired-boot-noise,
-:root[data-wired-crt='heavy'] .lockscreen-wired-noise {
+:root[data-materials='wired'][data-wired-crt='heavy'] .wired-boot-noise,
+:root[data-materials='wired'][data-wired-crt='heavy'] .lockscreen-wired-noise {
   opacity: 0.24;
 }
 
