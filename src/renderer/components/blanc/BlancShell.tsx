@@ -230,6 +230,7 @@ export default function BlancShell({
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [workspaceFull, setWorkspaceFull] = useState(false);
   const [taskbarHidden, setTaskbarHidden] = useState(false);
+  const deferredNavFrame = useRef<number | null>(null);
   const [tab, setTab] = useState<BlancTabId>(() => {
     const savedMemory = loadBlancMemory();
     return savedMemory.rememberLastTab ? loadBlancMode().lastTab : 'read';
@@ -244,6 +245,9 @@ export default function BlancShell({
   }, []);
   useEffect(() => onBlancModeChanged(setSettings), []);
   useEffect(() => onBlancMemoryChanged(setMemory), []);
+  useEffect(() => () => {
+    if (deferredNavFrame.current !== null) window.cancelAnimationFrame(deferredNavFrame.current);
+  }, []);
   useEffect(() => {
     void window.api.blancSetFullScreen(workspaceFull);
   }, [workspaceFull]);
@@ -300,6 +304,24 @@ export default function BlancShell({
     if (memory.rememberLastTab) setSettings(setBlancLastTab(next));
   };
 
+  const chooseNavTab = (next: BlancTabId): void => {
+    if (deferredNavFrame.current !== null) {
+      window.cancelAnimationFrame(deferredNavFrame.current);
+      deferredNavFrame.current = null;
+    }
+    if (next !== 'settings') {
+      chooseTab(next);
+      return;
+    }
+    // Settings owns the shell's largest synchronous mount. Let the pressed nav control paint
+    // before beginning that work; deep links still use chooseTab directly so their next-frame
+    // focus and scroll contract is unchanged.
+    deferredNavFrame.current = window.requestAnimationFrame(() => {
+      deferredNavFrame.current = null;
+      chooseTab(next);
+    });
+  };
+
   const patchDark = (on: boolean): void => {
     setSettings(setBlancDarkMode(on));
   };
@@ -333,7 +355,7 @@ export default function BlancShell({
               key={id}
               type="button"
               className={`blanc-nav-btn${!book && tab === id ? ' active' : ''}`}
-              onClick={() => chooseTab(id)}
+              onClick={() => chooseNavTab(id)}
               title={TAB_META[id].label}
             >
               <Icon name={TAB_META[id].icon} size={16} />

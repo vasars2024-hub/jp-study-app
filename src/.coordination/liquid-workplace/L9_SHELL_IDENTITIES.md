@@ -1888,3 +1888,19 @@ sensitivity terms and restored the surface (`[0,2,0,0,0] → [2,5,2,1,3]`). Focu
 
 **RULE C: 9 of 16 passing cells** — all eight Wired cells plus cat1 Blanc. Next: cat2 Blanc.
 `sampled-out:` Aero shell, Lockscreen, Mini widget, City, notifications, onboarding, help.
+
+## 2026-08-31 — codexB — cat2 Blanc passes after responsive Settings navigation
+
+The interrupted artifact was a real product finding: Settings navigation acknowledged at **191.7
+ms**, then reproduced warm at **462.4 ms** while the injected inert control took 2.5 ms. The shell's
+largest synchronous panel mount, not the bridge, crossed the 100 ms bar.
+
+Taskbar Settings now paints the pressed control before mounting that panel on the next frame; a
+different taskbar choice cancels the pending frame. Programmatic deep links retain synchronous
+`chooseTab`, preserving their next-frame focus/scroll contract. Focused guards: **14/14**.
+
+**cat2 · Blanc = PASS 10/10.** Settings cost 1 click, acknowledgment **0.3 ms**, dead ends 0,
+modal traps 0, scroll traps 0, and Stats restored the exact surface hash. Control moved all three
+defects **0/0/0 → 1/1/1 → 0/0/0**; inert acknowledgment 3.0 ms.
+
+**RULE C: 10 of 16 passing cells** — all eight Wired plus cat1–cat2 Blanc. Next: cat3 Blanc.
