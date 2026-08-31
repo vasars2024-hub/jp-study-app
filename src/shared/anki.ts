@@ -4,6 +4,13 @@
 import type { CardContent, FieldRole, ProfileId } from './profiles';
 import type { MineCardKind, MineCategory, MineLanguage, MineSource } from './profileRules';
 
+/**
+ * The cached mirror of the user's Anki collection, relative to Electron
+ * userData. Written by `main/anki/intervals.ts`; shared so a read-only
+ * catalogue names the writer's file instead of a second copy of the string.
+ */
+export const ANKI_INTERVALS_SNAPSHOT_FILE = 'anki-intervals.json';
+
 /** Byte-exact UI copy required on connection failure. Single source of truth. */
 export const ANKI_UNREACHABLE_MSG =
   "Can't reach Anki. Open Anki desktop and make sure the AnkiConnect add-on is installed.";

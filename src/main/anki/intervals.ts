@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import {
+  ANKI_INTERVALS_SNAPSHOT_FILE,
   ankiCardIsSuspended,
   ankiTagsContainLeech,
   mergeIntervalEntries,
@@ -329,7 +330,7 @@ function requireConfig(): IntervalsConfig {
 }
 
 function snapshotPath(): string {
-  return path.join(app.getPath('userData'), 'anki-intervals.json');
+  return path.join(app.getPath('userData'), ANKI_INTERVALS_SNAPSHOT_FILE);
 }
 
 function dedupe(values: string[]): string[] {

@@ -33,6 +33,7 @@ import {
 } from '../../shared/filesApp/catalog';
 import { AUDIO_EXT, SUBTITLE_EXT, VIDEO_EXT, extOf } from '../../shared/mediaKind';
 import { ANKI_DRAFT_SESSION_STORE_FILE } from '../../shared/ankiDraftSession';
+import { ANKI_INTERVALS_SNAPSHOT_FILE } from '../../shared/anki';
 import {
   MEDIA_DOWNLOAD_DIRECTORY,
   MEDIA_LIBRARY_STORE_FILE,
@@ -433,6 +434,63 @@ export const downloadsEnumerator: FilesEnumerator = {
  * Outputs.
  * ------------------------------------------------------------------ */
 
+/**
+ * The decks behind the cached Anki collection.
+ *
+ * `anki-intervals.json` is this app's mirror of the user's collection: on
+ * 2026-08-30 it held **87,260 entries over 155,384 notes across 28 deck
+ * queries** while `outputs/decks` read 0. That zero was a FINDING.
+ *
+ * **Decks, not notes — deliberate, and this is the tradeoff.** Enumerating the
+ * 87,260 note rows would grow the index ~46x, serialize all of it over IPC on
+ * every open, and put a 7.8 MB parse on the index build, which the plan's
+ * performance constraint forbids outright. A deck is also the honest unit: the
+ * notes are Anki's, not this app's, and a mined card's real home is the deck it
+ * was pushed to. The note total is reported on each deck instead of hidden.
+ *
+ * Their location is `derived`: a deck is an AnkiConnect query, not a file and
+ * not a row in a database this app owns, so gate 12's reveal correctly refuses.
+ */
+export const deckEnumerator: FilesEnumerator = {
+  source: 'decks',
+  run(ctx) {
+    const snapshot = readJson<{ sourceQueries?: unknown; noteCount?: unknown; generatedAt?: unknown }>(
+      path.join(ctx.userDataPath, ANKI_INTERVALS_SNAPSHOT_FILE),
+      {},
+    );
+    const queries = Array.isArray(snapshot?.sourceQueries)
+      ? (snapshot.sourceQueries as unknown[]).filter((q): q is string => typeof q === 'string')
+      : [];
+    const generatedAt = typeof snapshot?.generatedAt === 'number' ? snapshot.generatedAt : null;
+    return queries.flatMap((query) => {
+      // `deck:*` is the collection-wide sweep, not a deck. Listing it would put
+      // a row in the tree that duplicates every other row's contents.
+      const match = /^deck:"?(.+?)"?$/.exec(query.trim());
+      const name = match?.[1];
+      if (!name || name === '*') return [];
+      return [
+        {
+          id: `deck:${name}`,
+          name,
+          kind: 'deck' as const,
+          categoryId: categoryForKind('deck'),
+          provenance: 'app-generated' as const,
+          sizeBytes: null,
+          createdAt: null,
+          modifiedAt: generatedAt,
+          lastUsedAt: null,
+          location: {
+            store: 'derived' as const,
+            describes: query,
+          },
+          flags: {},
+          source: 'decks',
+        },
+      ];
+    });
+  },
+};
+
 interface DraftSessionRow {
   id?: unknown;
   label?: unknown;
@@ -775,6 +833,7 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   mediaSubtitleEnumerator,
   downloadsEnumerator,
   exportsEnumerator,
+  deckEnumerator,
   draftEnumerator,
   dictionaryEnumerator,
   modelEnumerator,
