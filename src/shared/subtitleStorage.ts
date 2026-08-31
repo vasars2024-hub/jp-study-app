@@ -1,3 +1,5 @@
+import type { SubtitleRecord } from './subtitleRecord';
+
 /** Persisted subtitle/transcription locations relative to Electron userData. */
 export const SUBTITLE_LIBRARY_DIRECTORY = 'subtitles';
 export const SUBTITLE_DISCOVERY_SETTINGS_FILE = 'subtitle-discovery.json';
@@ -10,4 +12,20 @@ export const TRANSCRIPTION_QUEUE_FILE = 'transcription-jobs.json';
  */
 export function subtitleStorageMediaId(mediaId: string): string {
   return mediaId.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+/** Provenance labels shared by the Files catalogue and mining surfaces. */
+export type StoredSubtitleProvenance = 'human-subs' | 'whisper-transcript';
+
+/**
+ * Derive provenance from the persisted record instead of its folder or name.
+ * Generated tracks are machine output even after a user edits them; every
+ * other `SubtitleRecord` originates in human-authored subtitle material.
+ */
+export function subtitleRecordProvenance(
+  record: Pick<SubtitleRecord, 'source' | 'machineGenerated' | 'derivation'>,
+): StoredSubtitleProvenance {
+  return record.source === 'generated' || record.machineGenerated === true
+    ? 'whisper-transcript'
+    : 'human-subs';
 }

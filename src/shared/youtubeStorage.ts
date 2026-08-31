@@ -14,3 +14,11 @@ export const YOUTUBE_SUBTITLE_DIRECTORIES = [
   YOUTUBE_PLAYLIST_SUBTITLE_DIRECTORY,
   YOUTUBE_MEDIA_SUBTITLE_DIRECTORY,
 ] as const;
+
+/**
+ * Both YouTube subtitle stores may contain per-video subdirectories. A flat
+ * `readdir` silently misses those tracks, so read-only catalogues must recurse.
+ */
+export const YOUTUBE_SUBTITLE_DIRECTORY_LAYOUTS = YOUTUBE_SUBTITLE_DIRECTORIES.map(
+  (directory) => ({ directory, recursive: true as const }),
+);
