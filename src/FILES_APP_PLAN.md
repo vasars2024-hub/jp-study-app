@@ -488,6 +488,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    <!-- status: closed; evidence: 2026-08-31 9286bf90 -- production component rail and body report Untranscribed videos 2 -> 1 and Transcribed videos 0 -> 1 after a real forced index refresh; unchanged Broken links is the negative control; criteria, never membership, persist -->
 20. **Bulk actions.** Select several items and mine them in one action; the result names the
    per-item outcome, and one failure does not silently abort the rest.
+   <!-- status: closed; evidence: 2026-08-31 88913972 -- production component selects 3 rows, attempts all 3 sequentially, catches an exception on item 2, then item 3 still adds; receipt names 2/3 succeeded, 2 cards, 1 failed plus every item outcome; bulk undo returns deck count 2 -> 0 -->
 21. **Deletion is recoverable.** Deleting a file-backed item places it in the Windows Recycle
    Bin (`shell.trashItem`) and it is restorable from there — verified by actually restoring one.
    An index-only row is soft-deleted with a working undo. Where neither applies, the confirm
@@ -1446,3 +1447,18 @@ Recovery finding: the unfinished `toggleFavorite` rename was load-bearing. Rever
 architecture report a new duplicate-export against `clipboardHistory.ts`; the final unique
 `toggleFilesFavorite` name returns the audit to the same 15 pre-existing unclassified modules.
 Focused verification: **4 files / 56 tests**, i18n **11,868 keys**, ESLint **0 warnings/errors**.
+
+### 2026-08-31 (sixteenth) — gate 20 CLOSES with failure isolation and one recovery path
+
+`88913972`. Three checked rows feed one action and one receipt. The measured adverse run is
+**3 selected / 3 attempted / 2 succeeded / 1 failed / 2 cards added**: item 2 throws while
+reading, item 3 is nevertheless called and adds its card. The receipt names all three items
+and their own outcomes; aggregate numbers cannot hide which source failed.
+
+Mining is sequential deliberately: each source re-reads the renderer-owned deck after the
+previous write, so identical cues in two selected files cannot race into duplicates. The batch
+stores exact added ids; Undo measures the deck **2 -> 0** and touches no pre-existing id. The
+selection clears when the batch settles so a second click cannot overwrite the first action's
+only recovery path. Focused production-component gate: **47/47 tests**, including the existing
+single-item mine and sort/a11y regressions. i18n **11,879 keys**, ESLint **0**, architecture
+the same 15 branch-divergence findings and no Gate-20 identity.
