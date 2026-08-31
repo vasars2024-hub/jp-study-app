@@ -135,7 +135,11 @@
     "wired.found.bounty.reward",
     "wired.found.magi.consensus",
     "yt.download.bar",
-    "yt.status.progress"
+    "yt.status.progress",
+    "filesApp.unit.b",
+    "filesApp.unit.kb",
+    "filesApp.unit.mb",
+    "filesApp.unit.gb"
   ],
   "zh": [
     "aero.boot.kicker.default",
@@ -271,7 +275,11 @@
     "wired.found.bounty.reward",
     "wired.found.magi.consensus",
     "yt.download.bar",
-    "yt.status.progress"
+    "yt.status.progress",
+    "filesApp.unit.b",
+    "filesApp.unit.kb",
+    "filesApp.unit.mb",
+    "filesApp.unit.gb"
   ],
   "ru": [
     "aero.boot.kicker.default",

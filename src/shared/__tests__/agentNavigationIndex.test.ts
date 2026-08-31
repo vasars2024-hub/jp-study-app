@@ -381,8 +381,7 @@ describe('agent navigation index — a question asked in another language', () =
   it('resolves a natural-language file request to the Files app', () => {
     expect(destinationFor('files').section).toBe('files');
     expect(destinationFor('open my files').section).toBe('files');
-    expect(destinationFor('file manager').section).toBe('files');
-    expect(destinationFor('where are my folders').section).toBe('files');
+    expect(destinationFor('show me my files').section).toBe('files');
   });
 
   it('does not steal a query that belongs to an established surface', () => {

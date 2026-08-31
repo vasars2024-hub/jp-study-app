@@ -25,6 +25,7 @@
  */
 import { useCallback, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
+import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
 import VirtualList from '../VirtualList';
 import {
@@ -47,8 +48,18 @@ import './filesApp.css';
 
 const ROW_HEIGHT = 32;
 
-/** Bytes, rendered with the unit the number actually deserves. */
-function formatSize(bytes: number | null, t: (k: string, v?: Record<string, string | number>) => string): string {
+type Translate = (k: string, v?: Record<string, string | number>) => string;
+
+/**
+ * Bytes, rendered with the unit the number actually deserves.
+ *
+ * `lang` is threaded in rather than read from the OS: a bare `toLocaleString()`
+ * formats digits and separators in the SYSTEM locale, which is independent of
+ * the UI-language setting, so a Japanese UI on a German machine renders
+ * `1.234,5`. `LANG_TAGS[lang]` is the same mapping `core.ts` uses for plural
+ * rules and number formatting, so all three agree.
+ */
+function formatSize(bytes: number | null, t: Translate, lang: UiLang): string {
   if (bytes === null) return '—';
   const units = ['filesApp.unit.b', 'filesApp.unit.kb', 'filesApp.unit.mb', 'filesApp.unit.gb'];
   let value = bytes;
@@ -59,12 +70,12 @@ function formatSize(bytes: number | null, t: (k: string, v?: Record<string, stri
   }
   // toFixed opts out of locale digit formatting; toLocaleString does not.
   const shown = unit === 0 ? value : Number(value.toFixed(1));
-  return t(units[unit], { n: shown.toLocaleString() });
+  return t(units[unit], { n: shown.toLocaleString(LANG_TAGS[lang]) });
 }
 
-function formatDate(ms: number | null): string {
+function formatDate(ms: number | null, lang: UiLang): string {
   if (ms === null) return '—';
-  return new Date(ms).toLocaleString();
+  return new Date(ms).toLocaleString(LANG_TAGS[lang]);
 }
 
 export interface FilesAppProps {
@@ -160,7 +171,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         onClick={() => setScope(null)}
       >
         <span className="fa-tree-label">{t('filesApp.tree.everything')}</span>
-        <span className="fa-tree-count">{allItems.length.toLocaleString()}</span>
+        <span className="fa-tree-count">{allItems.length.toLocaleString(LANG_TAGS[lang])}</span>
       </button>
       {FILES_TREE.map((node) => (
         <button
@@ -175,7 +186,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <span className="fa-tree-label">{t(node.labelKey)}</span>
           {/* Shown even at 0: a category that reads 0 while items exist is a
               finding, and a hidden node cannot be seen to be wrong. */}
-          <span className="fa-tree-count">{countFor(node.id).toLocaleString()}</span>
+          <span className="fa-tree-count">{countFor(node.id).toLocaleString(LANG_TAGS[lang])}</span>
         </button>
       ))}
     </div>
@@ -246,58 +257,6 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     </div>
   );
 
-  const renderRow = useCallback(
-    (item: FilesItem, index: number) => (
-      <div
-        role="row"
-        className="fa-row"
-        // VirtualList marks its own slots `presentation` in grid mode, so the
-        // real row count CANNOT come from it — a 4,000-row list windowed to 20
-        // announces twenty rows unless the caller supplies these. Row 1 is the
-        // header, so the body starts at 2.
-        aria-rowindex={index + 2}
-        data-selected={item.id === selectedId ? 'true' : undefined}
-        data-broken={item.flags.brokenLink ? 'true' : undefined}
-        aria-selected={item.id === selectedId}
-        tabIndex={0}
-        onClick={() => setSelectedId(item.id)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setSelectedId(item.id);
-          }
-        }}
-      >
-        <span role="gridcell" className="fa-cell fa-cell-name">
-          {item.name}
-          {item.flags.brokenLink ? (
-            <span className="fa-badge fa-badge-broken">{t('filesApp.flag.brokenLink')}</span>
-          ) : null}
-        </span>
-        <span role="gridcell" className="fa-cell fa-cell-kind">
-          {t(`filesApp.kind.${item.kind}`)}
-        </span>
-        <span
-          role="gridcell"
-          className="fa-cell fa-cell-provenance"
-          data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
-        >
-          {t(`filesApp.provenance.${item.provenance}`)}
-        </span>
-        <span role="gridcell" className="fa-cell fa-cell-size">
-          {formatSize(item.sizeBytes, t)}
-        </span>
-        <span role="gridcell" className="fa-cell fa-cell-modified">
-          {formatDate(item.modifiedAt)}
-        </span>
-      </div>
-    ),
-    // `lang` is here on purpose: every cell above is a `t()` call, and `t`'s
-    // identity is stable by design, so depending on it would go stale on a
-    // language switch instead of erroring.
-    [selectedId, t, lang],
-  );
-
   const canvas = (() => {
     if (state.status === 'loading') {
       return <p className="fa-state">{t('filesApp.state.loading')}</p>;
@@ -337,7 +296,57 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           itemHeight={ROW_HEIGHT}
           className="fa-rows"
           getKey={(item) => item.id}
-          renderItem={renderRow}
+          // Written inline, like every other VirtualList call site in this
+          // tree. `virtualListSemantics` reads the OPENING TAG to check that a
+          // windowed collection declares itself, so a role hidden in an
+          // extracted callback is invisible to it -- and a useCallback bought
+          // nothing here anyway: VirtualList calls renderItem during its own
+          // render and memoises on items, not on this.
+          renderItem={(item: FilesItem, index: number) => (
+          <div
+            role="row"
+            className="fa-row"
+            // VirtualList marks its own slots `presentation` in grid mode, so the
+            // real row count CANNOT come from it — a 4,000-row list windowed to 20
+            // announces twenty rows unless the caller supplies these. Row 1 is the
+            // header, so the body starts at 2.
+            aria-rowindex={index + 2}
+            data-selected={item.id === selectedId ? 'true' : undefined}
+            data-broken={item.flags.brokenLink ? 'true' : undefined}
+            aria-selected={item.id === selectedId}
+            tabIndex={0}
+            onClick={() => setSelectedId(item.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setSelectedId(item.id);
+              }
+            }}
+          >
+            <span role="gridcell" className="fa-cell fa-cell-name">
+              {item.name}
+              {item.flags.brokenLink ? (
+                <span className="fa-badge fa-badge-broken">{t('filesApp.flag.brokenLink')}</span>
+              ) : null}
+            </span>
+            <span role="gridcell" className="fa-cell fa-cell-kind">
+              {t(`filesApp.kind.${item.kind}`)}
+            </span>
+            <span
+              role="gridcell"
+              className="fa-cell fa-cell-provenance"
+              data-machine={isMachineDerived(item.provenance) ? 'true' : undefined}
+            >
+              {t(`filesApp.provenance.${item.provenance}`)}
+            </span>
+            <span role="gridcell" className="fa-cell fa-cell-size">
+              {formatSize(item.sizeBytes, t, lang)}
+            </span>
+            <span role="gridcell" className="fa-cell fa-cell-modified">
+              {formatDate(item.modifiedAt, lang)}
+            </span>
+          </div>
+          )}
           gridRole="rowgroup"
           emptyState={
             <p className="fa-state">
@@ -362,11 +371,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           {t(`filesApp.provenance.${selected.provenance}`)}
         </dd>
         <dt>{t('filesApp.column.size')}</dt>
-        <dd>{formatSize(selected.sizeBytes, t)}</dd>
+        <dd>{formatSize(selected.sizeBytes, t, lang)}</dd>
         <dt>{t('filesApp.column.created')}</dt>
-        <dd>{formatDate(selected.createdAt)}</dd>
+        <dd>{formatDate(selected.createdAt, lang)}</dd>
         <dt>{t('filesApp.column.modified')}</dt>
-        <dd>{formatDate(selected.modifiedAt)}</dd>
+        <dd>{formatDate(selected.modifiedAt, lang)}</dd>
         <dt>{t('filesApp.details.location')}</dt>
         <dd className="fa-details-location">{describeLocation(selected, t)}</dd>
         <dt>{t('filesApp.details.source')}</dt>
@@ -398,7 +407,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   const dock = (
     <div className="fa-status" role="status">
       <span>{t('filesApp.status.items', { count: visible.length })}</span>
-      <span>{t('filesApp.status.size', { size: formatSize(totalSize, t) })}</span>
+      <span>{t('filesApp.status.size', { size: formatSize(totalSize, t, lang) })}</span>
       {selected ? <span>{t('filesApp.status.selected', { name: selected.name })}</span> : null}
     </div>
   );

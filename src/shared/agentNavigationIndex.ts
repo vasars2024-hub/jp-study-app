@@ -123,14 +123,18 @@ const SECTION_ENTRIES: readonly AgentNavigationIndexEntry[] = [
   // page for that one section, so "settings" resolves to the Home page below.
   { section: 'youtube', titleKey: 'palette.section.youtube', terms: ['youtube'] },
   { section: 'scraper', titleKey: 'palette.section.scraper', terms: ['scraper'] },
-  // The Files app registers here rather than growing a bespoke resolver, so
-  // "show my transcripts" or "where is that epub" reaches it through the
-  // mechanism every other destination already uses (FILES_APP_PLAN gate 13).
-  {
-    section: 'files',
-    titleKey: 'palette.section.files',
-    terms: ['files', 'folders', 'file manager', 'explorer', 'my files', 'transcripts', 'library files'],
-  },
+  // The Files app registers here rather than growing a bespoke resolver, so a
+  // request for it reaches it through the mechanism every other destination
+  // already uses (FILES_APP_PLAN gate 13).
+  //
+  // `terms` is deliberately just the destination's own word. The richer list
+  // this started with — "folders", "explorer", "transcripts", "library files" —
+  // is what `agentNavigationIndexMirror` refuses, and it is right to: "library"
+  // belongs to the book library and "transcripts" to the surfaces that own
+  // them, and an entry that matched those would quietly outscore an established
+  // destination. A finder that hijacks the word for the thing being found is
+  // worse than one that answers only to its own name.
+  { section: 'files', titleKey: 'palette.section.files', terms: ['files'] },
 ];
 
 /** Settings pages, named by their own sidebar label and description. */
