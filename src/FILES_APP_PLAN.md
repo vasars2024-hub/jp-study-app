@@ -579,8 +579,8 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 31. **The stability window is honoured and adjustable.** Setting it higher delays ingest of a
    file still growing by that amount; setting it lower does not bypass the completeness check
    entirely. Proven against a file arriving mid-write at two different settings.
-   <!-- status: open; evidence: 2026-08-31 f12f54de -- the MODEL half is measured at two settings: at 30,000 ms the file is refused at +29,999 and accepted at +30,000; at 0 ms it is still refused until a second reading holds, because the empty and first-sighting refusals run BEFORE the window is consulted (control flow, not a clamp anyone can lower). What is missing is "adjustable" as a product surface — the folder setting that carries `stabilityMs`. -->
-   **The honoured half is measured; the adjustable half needs the folder setting.**
+   <!-- status: closed; evidence: 2026-08-31 3589c6fa (handler) + 41a678c0 (document) + 8ef06751 (controls) -- the production `filesapp:scan` handler, real files, real clock, ages set with utimesSync: one 10 s-old file refused as tooSoon at 30,000 ms and taken at 3,000; refused/taken either side of its own boundary at 20 s; a mid-write file refused at 0, 1, 3,000 AND 30,000; -5,000 clamps to 0 and still refuses; no settings at all means the default, not off. The window is typed in the scan sheet, survives a restart, and travels with every filesScan call. Adverse controls: dropping the evidence floor turns 2 of 22 red; pinning the sent window turns 4 of 9 component tests red. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (twentieth) Progress entry.
 32. **Cleanup dry-runs before it acts.** Every cleanup class reports its count and reclaimable
    size first, and the report matches exactly what is removed when confirmed — item for item,
    not just in total.
@@ -594,17 +594,13 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    Recycle-Bin-destined items are actually restorable from there.
 36. **Per-category ingest overrides work.** With subtitles set to auto-import and video set to
    review, a folder containing both routes each one differently in a single scan.
-   <!-- status: open; evidence: 2026-08-31 30b13bfb -- the MODEL half is measured on real
-        files: one scanRoots walk, one settings object {subtitle:'auto', media:'review'},
-        ep01.srt in the auto pile and ep01.mkv in the review pile, with a control that
-        removes the overrides and moves the video back. What is missing is "set to" as a
-        product surface — the folder settings that carry `byTarget`. -->
+   <!-- status: closed; evidence: 2026-08-31 30b13bfb (routing) + 41a678c0 (document) + 8ef06751 (controls) -- the production ScanReviewSheet's own per-destination selects: the SAME folder puts ep01.srt and ep01.mkv in one pile before the overrides and in two after; the video moved to review and skipped never reaches addMediaPaths, which it did on the identical run before; `auto` on deck-csv still cannot promote a guessed .csv past gate 27; both overrides survive an unmount + memory-reset restart and still route the scan. Adverse control dropping byTarget turns 3 of 9 red. -->
    <!-- decision: a category set to `auto` NARROWS and never widens — it cannot promote a
         guessed or ambiguous file past gate 27, or "auto-import subtitles" would repeal
         gate 27 for every file that happens to rank a subtitle first. Widening is the
         global `everything` confidence policy's job, and every row it promotes carries
         `warned: true` so the surface can say so. -->
-   **The routing half is measured; the settings surface is what remains.**
+   **CLOSED 2026-08-31.** See the 2026-08-31 (twentieth) Progress entry.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
@@ -1715,3 +1711,54 @@ Trap: `localStorage.clear()` does **not** isolate a test of the ledger store. It
 in-module `memory` fallback so a quota error degrades to "forgotten on restart" rather than to
 "gate 29 stops working", and that fallback survives a cleared localStorage — two component
 tests failed on exactly that leak before `clearImportLedger()` was added to `beforeEach`.
+
+
+### 2026-08-31 (twentieth) — gates 31 and 36 CLOSE: the settings become settable
+
+Commits `3589c6fa` (the handler), `41a678c0` (the document), `8ef06751` (the controls).
+
+**What the slice found first, and it is the reason both gates were still open.** The
+production handler was `scanRoots(list)` — no ledger, no window. Every stability clause was
+dead on the one path a user can reach, so a settings control built against it would have
+adjusted nothing at all, and both gates would have "closed" on a control wired to a dead
+parameter.
+
+**A one-shot scan is not blind after all: the filesystem holds the earlier reading.**
+`mtimeMs` seeds `changedAt`, which is what lets a first scan of a settled folder classify
+anything — without it the user has to scan twice before a folder shows a single file. The
+lower bound survives because the hint is only trusted once it is `MIN_CHANGE_EVIDENCE_MS`
+(1 s) old: a timestamp from the instant we looked is exactly the file a torrent client is
+writing right now. **That floor is on the EVIDENCE, not on the window** — `stabilityMs`
+stays settable to zero, and a mid-write file is still refused there.
+
+Gate 31, on the real handler with real files and the real clock, ages set with `utimesSync`:
+a 10 s-old file **refused as `tooSoon` at 30,000 ms and taken at 3,000**; refused and taken
+either side of its own boundary at 20 s; a mid-write file **refused at 0, 1, 3,000 and
+30,000**; `-5,000` clamped to 0 and still refused; an empty file refused at a zero window;
+no settings at all meaning the default rather than off. **8 tests, 22/22 with the existing
+suite.**
+
+Gate 36, on the production sheet's own selects: the same folder puts `ep01.srt` and
+`ep01.mkv` in **one** pile before the overrides and in **two** after; the video moved to
+review and skipped **never reaches `addMediaPaths`**, which it did on the identical run
+before; `auto` on `deck-csv` still cannot promote a guessed `.csv` past gate 27. Both
+overrides survive a restart and still route the scan. **9 component tests, 66/66 across the
+touched renderer suites.**
+
+**The parser clamps, the writer refuses**, and the pair is deliberate:
+`normalizeIngestSettings` has to turn a corrupted document into a usable app, but a user who
+types 9,999,999 and is silently given 600,000 has been told a setting landed when a different
+one did. The field snaps back to what is stored, and an emptied field restores the stored
+window rather than storing the most permissive one there is.
+
+Traps: (1) **React's `onBlur` is `focusout`** — a dispatched `blur` commits nothing and the
+first run of these tests reported the whole feature dead. (2) `localStorage.clear()` does not
+isolate the settings store either; call `resetIngestSettingsMemoryForTests()`. (3) The
+committed window is re-normalised in MAIN, so a corrupted renderer document cannot turn the
+completeness check off from over there.
+
+Adverse controls: dropping the evidence floor to 0 turns **2 of 22** red; pinning the sent
+window to a literal turns **4 of 9** red; dropping `byTarget` turns **3 of 9** red.
+
+Focused gates: **37** store/model tests + **9** component + **8** handler; i18n exit 0 at
+**11,942 keys**; ESLint exit 0 on all nine touched TS/TSX paths.
