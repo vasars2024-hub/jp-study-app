@@ -11586,6 +11586,16 @@ export const ru: Catalog = {
     'Найдено {found}: {placed} размещено, {ambiguous} требуют выбора, {unplaced} без места, {skipped} пропущено.',
   'filesApp.scan.truncated':
     'Сканирование остановилось на пределе по числу файлов, поэтому их может быть больше.',
+  'filesApp.ingest.auto.highConfidence': 'Распознано точно — добавлено без вопросов.',
+  'filesApp.ingest.auto.category': 'Для этой категории включено автоматическое добавление.',
+  'filesApp.ingest.auto.everything':
+    'Добавлено по догадке, потому что вы выбрали импортировать всё.',
+  'filesApp.ingest.review.guessed': 'Это была только догадка, поэтому файл ждёт вашего решения.',
+  'filesApp.ingest.review.ambiguous': 'Подходит несколько мест — выберите одно.',
+  'filesApp.ingest.review.alwaysReview': 'Вы попросили просматривать всё перед добавлением.',
+  'filesApp.ingest.review.category': 'Для этой категории включён предварительный просмотр.',
+  'filesApp.ingest.refuse.noDestination':
+    'В приложении нечем это открыть, поэтому положить его некуда.',
   'filesApp.view.label': 'Вид',
   'filesApp.view.mode.details': 'Таблица',
   'filesApp.view.mode.compact': 'Компактно',

@@ -29,6 +29,17 @@
 /** How long a size must hold before the file counts as finished writing. */
 export const DEFAULT_STABILITY_MS = 3_000;
 
+/**
+ * The ceiling the settings surface clamps to (gate 31's adjustable half).
+ *
+ * Ten minutes is generous for the case the plan names — a slow external drive
+ * or a network share — and still short enough that a mistyped value cannot
+ * park a watched folder for a day with no visible reason. There is no matching
+ * floor constant on purpose: the lower bound is `stabilityVerdict`'s clause
+ * order, not a number, so nothing can be tuned past it.
+ */
+export const MAX_STABILITY_MS = 600_000;
+
 /** The refusals, as keys. A skipped file always says which of these it was. */
 export const STABILITY_REASON_FIRST_SIGHTING = 'filesApp.stability.firstSighting';
 export const STABILITY_REASON_STILL_GROWING = 'filesApp.stability.stillGrowing';

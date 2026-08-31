@@ -10706,6 +10706,15 @@ export const ja: Catalog = {
     '{found} 件見つかりました。{placed} 件は振り分け済み、{ambiguous} 件は選択が必要、{unplaced} 件は行き先なし、{skipped} 件はスキップ。',
   'filesApp.scan.truncated':
     'スキャンはファイル数の上限で停止したため、これ以外にもある可能性があります。',
+  'filesApp.ingest.auto.highConfidence': '確実に判別できたため、確認なしで取り込みました。',
+  'filesApp.ingest.auto.category': 'この分類は自動で取り込む設定になっています。',
+  'filesApp.ingest.auto.everything': 'すべて取り込む設定のため、推測で取り込みました。',
+  'filesApp.ingest.review.guessed': '推測にとどまるため、確認をお待ちしています。',
+  'filesApp.ingest.review.ambiguous': '候補が複数あります。1つ選んでください。',
+  'filesApp.ingest.review.alwaysReview': '取り込む前にすべて確認する設定になっています。',
+  'filesApp.ingest.review.category': 'この分類は先に確認する設定になっています。',
+  'filesApp.ingest.refuse.noDestination':
+    'このアプリで開けるものがないため、置き場所がありません。',
   'filesApp.view.label': '表示',
   'filesApp.view.mode.details': '詳細',
   'filesApp.view.mode.compact': 'コンパクト',

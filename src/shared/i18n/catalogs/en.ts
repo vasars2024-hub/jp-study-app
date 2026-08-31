@@ -11169,6 +11169,16 @@ export const en: Catalog = {
     'Found {found}; {placed} placed, {ambiguous} need a choice, {unplaced} have no home, {skipped} skipped.',
   'filesApp.scan.truncated':
     'The scan stopped at its file limit, so there may be more than this.',
+  'filesApp.ingest.auto.highConfidence': 'Recognised exactly — brought in without asking.',
+  'filesApp.ingest.auto.category': 'This category is set to bring files in automatically.',
+  'filesApp.ingest.auto.everything':
+    'Brought in on a guess, because you chose to import everything.',
+  'filesApp.ingest.review.guessed': 'This was a best guess, so it is waiting for you.',
+  'filesApp.ingest.review.ambiguous': 'More than one place fits — choose one.',
+  'filesApp.ingest.review.alwaysReview': 'You asked to review everything before it is brought in.',
+  'filesApp.ingest.review.category': 'This category is set to be reviewed first.',
+  'filesApp.ingest.refuse.noDestination':
+    'Nothing in the app can open this, so there is nowhere to put it.',
   'filesApp.view.label': 'View',
   'filesApp.view.mode.details': 'Details',
   'filesApp.view.mode.compact': 'Compact',
