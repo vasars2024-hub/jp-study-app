@@ -31,12 +31,18 @@ import {
   type FilesItemKind,
   type FilesProvenance,
 } from '../../shared/filesApp/catalog';
-import { AUDIO_EXT, SUBTITLE_EXT, extOf } from '../../shared/mediaKind';
+import { AUDIO_EXT, extOf } from '../../shared/mediaKind';
 import {
   MEDIA_LIBRARY_STORE_FILE,
   mediaItemsFromStoredDocument,
 } from '../../shared/mediaLibraryEntries';
 import { AGENT_WORKSPACE_RELATIVE_PATH } from '../../shared/agentWorkspace';
+import {
+  readMediaSubtitleAssets,
+  readSubtitleLibraryOrphanAssets,
+  readYoutubeSubtitleCacheAssets,
+  type FilesTextAsset,
+} from './storageReaders';
 
 /** The narrow slice of `better-sqlite3` the dictionary enumerator needs. */
 export interface FilesSqliteLike {
@@ -285,29 +291,71 @@ export const transcriptEnumerator: FilesEnumerator = {
   },
 };
 
+/** Turn a `FilesTextAsset` from `storageReaders` into a catalogue row. */
+function textAssetItem(asset: FilesTextAsset, source: string): FilesItem {
+  return fileItem({
+    id: asset.id,
+    name: asset.name,
+    kind: 'subtitle',
+    filePath: asset.filePath,
+    provenance: asset.provenance,
+    source,
+    createdAt: asset.createdAt,
+    flags: {
+      ...(asset.orphan ? { orphan: true } : {}),
+      ...(asset.provenance === 'whisper-transcript' ? { transcribed: true } : {}),
+    },
+  });
+}
+
 /**
- * `yt-subs/` — captions fetched from YouTube rather than transcribed locally.
- * YouTube marks its machine captions in the track name (`a.<lang>`, the
- * yt-dlp convention), which is the one signal that separates auto-captions
- * from a human-authored track. A name that does not carry it is reported as
- * `human-subs`; a name that does is `auto-captions`.
+ * The two YouTube subtitle caches, at every depth.
+ *
+ * There are **two** of them and both are nested: the playlist manager writes
+ * `yt-subs/`, the media library writes `subs-cache/<videoId>/`. The first
+ * version of this reader walked one directory, flat, and would have reported a
+ * confident zero for content the other flow had written. YouTube marks its
+ * machine captions in the track name (`a.<lang>`, the yt-dlp convention), which
+ * is the one signal separating auto-captions from a human-authored track.
+ *
+ * Both roots are empty in the live profile today. That is an honest zero and it
+ * is NOT a negative control for this reader — the fixture test is, because it
+ * places a file two levels down in each layout and requires both back.
  */
 export const cachedSubtitleEnumerator: FilesEnumerator = {
   source: 'yt-subs',
   run(ctx) {
-    const dir = path.join(ctx.userDataPath, 'yt-subs');
-    return listDir(dir)
-      .filter((e) => !e.isDirectory() && SUBTITLE_EXT.has(extOf(e.name)))
-      .map((e) =>
-        fileItem({
-          id: `yt-sub:${e.name}`,
-          name: e.name,
-          kind: 'subtitle',
-          filePath: path.join(dir, e.name),
-          provenance: /\.a\.[a-z-]+\.[a-z0-9]+$/i.test(e.name) ? 'auto-captions' : 'human-subs',
-          source: 'yt-subs',
-        }),
-      );
+    return readYoutubeSubtitleCacheAssets(ctx.userDataPath).map((asset) =>
+      textAssetItem(asset, 'yt-subs'),
+    );
+  },
+};
+
+/**
+ * Subtitles the media library owns: every `SubtitleRecord` inside `media.json`,
+ * plus the files under `subtitles/` that no record claims.
+ *
+ * The persisted record is authoritative, not the folder. Seven of the nineteen
+ * records in the live profile point *outside* `subtitles/` (sidecars beside the
+ * user's own video file), and provider downloads share one media-id directory
+ * with generated tracks — so neither the path nor the folder name can tell a
+ * human track from Whisper output. `subtitleRecordProvenance` reads the record's
+ * own `source`/`machineGenerated`, which is the only field that knows.
+ *
+ * The orphan sweep runs second and is deduplicated against the record paths, so
+ * a file is never counted twice; what it finds is the fusion pipeline's
+ * intermediate tracks, which exist on disk and belong to nobody.
+ */
+export const mediaSubtitleEnumerator: FilesEnumerator = {
+  source: 'subtitles',
+  run(ctx) {
+    const db = readJson<unknown>(path.join(ctx.userDataPath, MEDIA_LIBRARY_STORE_FILE), {});
+    const records = readMediaSubtitleAssets(ctx.userDataPath, db);
+    const orphans = readSubtitleLibraryOrphanAssets(
+      ctx.userDataPath,
+      records.map((asset) => asset.filePath),
+    );
+    return [...records, ...orphans].map((asset) => textAssetItem(asset, 'subtitles'));
   },
 };
 
@@ -600,6 +648,7 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   mediaEnumerator,
   transcriptEnumerator,
   cachedSubtitleEnumerator,
+  mediaSubtitleEnumerator,
   exportsEnumerator,
   dictionaryEnumerator,
   modelEnumerator,

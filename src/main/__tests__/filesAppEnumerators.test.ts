@@ -269,6 +269,96 @@ describe('files app index — what each row records', () => {
     expect(human?.provenance).toBe('human-subs');
   });
 
+  /**
+   * The gate 1 retraction, as three tests. Each one fails against the reader
+   * that shipped on 2026-08-30: it walked `yt-subs` flat, never opened
+   * `subs-cache`, and never read `media.json`'s own subtitle records — where 19
+   * of the live profile's 19 subtitles actually live.
+   */
+  it('recurses BOTH YouTube caches, not one of them flat', () => {
+    write('yt-subs/playlist-a/clip.a.ja.vtt', 'WEBVTT');
+    write('subs-cache/UEqj3RRUlDA/track.ja.srt', '1');
+
+    const names = buildFilesIndex(ctx())
+      .items.filter((i) => i.kind === 'subtitle')
+      .map((i) => i.name)
+      .sort();
+    expect(names).toEqual(['clip.a.ja.vtt', 'track.ja.srt']);
+  });
+
+  it('reads subtitles from media.json records, including sidecars outside subtitles/', () => {
+    const sidecar = write('outside/show.ja.srt', '1');
+    write('subtitles/v1/whisper.ja.srt', '1');
+    write(
+      'media.json',
+      JSON.stringify({
+        items: [
+          {
+            id: 'v1',
+            title: 'Episode 1',
+            path: write('outside/ep1.mkv', 'v'),
+            kind: 'video',
+            subtitles: [
+              {
+                id: 's-gen',
+                lang: 'ja',
+                source: 'generated',
+                format: 'srt',
+                path: 'subtitles/v1/whisper.ja.srt',
+                machineGenerated: true,
+                addedAt: 7,
+              },
+              { id: 's-side', lang: 'ja', source: 'sidecar', format: 'srt', path: sidecar },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const subs = buildFilesIndex(ctx()).items.filter((i) => i.kind === 'subtitle');
+    expect(subs).toHaveLength(2);
+    // Provenance comes from the record, never the folder: both files sit in a
+    // different place and only `source`/`machineGenerated` knows which is which.
+    expect(subs.map((s) => s.provenance).sort()).toEqual(['human-subs', 'whisper-transcript']);
+    expect(subs.find((s) => s.provenance === 'whisper-transcript')?.flags.transcribed).toBe(true);
+    expect(subs.some((s) => s.location.store === 'file' && s.location.path === sidecar)).toBe(true);
+  });
+
+  it('reports a subtitle file no record claims as an orphan instead of dropping it', () => {
+    write('subtitles/v1/published.ja.srt', '1');
+    write('subtitles/v1/fused-ja.whisper-only.srt', '1');
+    write('subtitles/v1/fused-ja.meta.json', '{}');
+    write(
+      'media.json',
+      JSON.stringify({
+        items: [
+          {
+            id: 'v1',
+            title: 'Episode 1',
+            path: write('outside/ep1.mkv', 'v'),
+            kind: 'video',
+            subtitles: [
+              { id: 'p', lang: 'ja', source: 'provider', format: 'srt', path: 'subtitles/v1/published.ja.srt' },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const subs = buildFilesIndex(ctx()).items.filter((i) => i.kind === 'subtitle');
+    // The published track once, the unclaimed track once, the sidecar metadata
+    // never — it is not subtitle text and would inflate the count. A record-backed
+    // row is named from the record ("<owner> — <lang>"), an orphan from its file,
+    // because an orphan has no owner to name it after.
+    expect(subs.map((s) => s.name).sort()).toEqual(['Episode 1 — ja', 'fused-ja.whisper-only.srt']);
+    const orphan = subs.find((s) => s.name === 'fused-ja.whisper-only.srt');
+    expect(orphan?.flags.orphan).toBe(true);
+    // An orphan's provenance is genuinely unknown; guessing it would stamp a
+    // fabricated trust mark on whatever gets mined from it.
+    expect(orphan?.provenance).toBe('unknown');
+    expect(subs.find((s) => s.name === 'Episode 1 — ja')?.flags.orphan).toBeUndefined();
+  });
+
   it('a transcript is its own row, so a transcribed video is findable without its video (gate 2)', () => {
     write('yt-transcripts/dQw4w9WgXcQ.json', '[]');
     const items = buildFilesIndex(ctx()).items;

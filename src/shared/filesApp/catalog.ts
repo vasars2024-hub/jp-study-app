@@ -320,6 +320,12 @@ export interface FilesItemFlags {
   brokenLink?: boolean;
   /** Referenced in place rather than copied into userData. */
   referenced?: boolean;
+  /**
+   * A file this app wrote that no persisted record claims — the mirror image of
+   * `brokenLink`. Surfaced rather than hidden so the count in the tree can be
+   * reconciled against the count on disk.
+   */
+  orphan?: boolean;
 }
 
 export interface FilesItem {
