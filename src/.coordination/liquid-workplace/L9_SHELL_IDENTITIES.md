@@ -661,3 +661,45 @@ class already on it is a category-1 fix a previous turn applied to a panel that 
 
 **Cells closed: 6 of 16**, counted by reading each `baselines/*l9*.json`'s own `verdict` —
 cat1 video/city, cat2 video/city, cat3 video/city, all `PASS 10/10`. Categories 4–8 unmeasured.
+
+---
+
+## 2026-08-31 — category 4 measured on both surfaces: BOTH FAIL. Diagnosed, not repaired.
+
+Banked as `cat4-l9-video.json` / `cat4-l9-city.json` with verdict `FAIL`, so the cell count
+below does not move. Both failures are located with numbers; neither is repaired, and the
+next turn OPENS on Video's.
+
+**Video · FAIL 2 bars of 7.** Clipping 0, overlap 0, `contentGrowsNotChrome` true (chrome
+47.5 → 42.0% default → maximized, dominant canvas 94.8 → 95.3%), every leg `restored: true`.
+
+1. `horizontal` FAILS at compact **260x170**: `main.mc-content 240>154`, plus two
+   `hiddenOverflowX` — `div.mc-video-stage 149>124`, `div.medialib-card__art 36>34`.
+   Root cause measured, not guessed: at container width 222 the `@container mc (max-width:
+   640px)` block puts `.mc-video-inspector` on `grid-template-columns: 1fr`, and `1fr` floors
+   at min-content — the resolved track is **226px inside a 126px box**. Each
+   `.mc-inspector-block` is 226 wide there. The 226 comes from `LABEL.mc-toggle`, which
+   measures 200 min-content, so `minmax(0, 1fr)` on the inspector is necessary and NOT
+   sufficient: it lets the column shrink, and the overflow then reappears inside
+   `.mc-inspector-block`, which sets no `overflow`. The toggle rows have to wrap too.
+   19 other surfaces bank a PASS at this same 260x170, so the size is in scope.
+2. `deadRegion` FAILS at maximized 1264x765: **17.1%** against the 15% bar, largest dead box
+   `694x256 at grid 7,7`. Default is 13.0% (inside the bar) and compact 0.6%, so this is the
+   maximized layout not filling the extra height, not a constant.
+
+**City · FAIL 5 bars, and at least three of them are the INSTRUMENT, on the evidence.** It
+reports `clipped 24` and `overlaps 397` at 680x709. City is a parallax scene: 39 Ambient
+layers deliberately larger than the window and deliberately stacked — `world-back`,
+`background-master`, `sky-events`, `life` and `foreground-mask` all measure 910x1137 in a
+680x709 box. `cat2-clunkiness.cjs` already carries this exact exclusion for scroll traps
+("a clipped ART PLATE is not unreachable content", its correction 5) and cat4 has no
+equivalent. Do not "fix" City's art to satisfy this bar before the harness has the
+exclusion — that would delete a feature to pass a measurement.
+`allThreeSizes` and `restored` also fail for a structural reason: `rootKind` is
+`section inside a floating window` and a frameless window has no Maximize button, so only 2
+of 3 legs ran. cat4 needs a defined behaviour for that shape, the same way cat3 just got one
+for a surface with no Work region.
+
+**Cells closed: still 6 of 16**, counted by reading each `baselines/*l9*.json`'s own
+`verdict` — cat1, cat2 and cat3 on both surfaces. cat4 measured and FAILING on both;
+categories 5–8 unmeasured.

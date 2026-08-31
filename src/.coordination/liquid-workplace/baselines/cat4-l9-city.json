@@ -1,0 +1,177 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "rootKind": "section inside a floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "680x709",
+      "clipped": 24,
+      "overlaps": 397,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 1,
+      "deadPctViewport": 0,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 0,
+      "dominantCanvasPct": 99.4,
+      "bars": {
+        "clipped": false,
+        "overlaps": false,
+        "horizontal": false,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 55,
+      "overlaps": 266,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 1,
+      "deadPctViewport": 0,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 0,
+      "dominantCanvasPct": 98.1,
+      "bars": {
+        "clipped": false,
+        "overlaps": false,
+        "horizontal": false,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [
+    {
+      "kind": "maximized",
+      "refuse": "no Maximize button - refusing to fake it with an inline width"
+    }
+  ],
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [
+        "div.reading-garden-world",
+        "img.reading-garden-background-master",
+        "div.reading-garden-world",
+        "canvas.reading-garden-sky-events",
+        "div.reading-garden-moonbeam",
+        "div.reading-garden-environment-light"
+      ],
+      "overlapList": [
+        "div.reading-garden-sky x div.reading-garden-world (678x707)",
+        "div.reading-garden-sky x img.reading-garden-background-master (678x707)",
+        "div.reading-garden-sky x div.reading-garden-world (678x707)",
+        "div.reading-garden-sky x canvas.reading-garden-sky-events (678x707)",
+        "div.reading-garden-sky x div.reading-garden-stars (678x707)",
+        "div.reading-garden-sky x img.reading-garden-moon (129x129)"
+      ],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [
+        "main.reading-garden 985>678"
+      ],
+      "deadRegionBox": null,
+      "deadRegionBasis": "visible surface",
+      "chromeParts": []
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 135;",
+      "restoredTo": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 135;",
+      "clippedList": [
+        "main.reading-garden",
+        "div.reading-garden-sky",
+        "div.reading-garden-world",
+        "img.reading-garden-background-master",
+        "div.reading-garden-world",
+        "canvas.reading-garden-sky-events"
+      ],
+      "overlapList": [
+        "div.reading-garden-sky x div.reading-garden-world (258x168)",
+        "div.reading-garden-sky x img.reading-garden-background-master (258x168)",
+        "div.reading-garden-sky x div.reading-garden-world (258x168)",
+        "div.reading-garden-sky x canvas.reading-garden-sky-events (258x168)",
+        "div.reading-garden-sky x div.reading-garden-stars (258x168)",
+        "div.reading-garden-sky x img.reading-garden-planet (24x24)"
+      ],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [
+        "main.reading-garden 424>258"
+      ],
+      "deadRegionBox": null,
+      "deadRegionBasis": "visible surface",
+      "chromeParts": []
+    },
+    {
+      "kind": "maximized",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null
+    }
+  ],
+  "bars": {
+    "clipped": false,
+    "overlaps": false,
+    "horizontal": false,
+    "deadRegion": true,
+    "contentGrowsNotChrome": "UNMEASURED",
+    "allThreeSizes": false,
+    "restored": false
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "clipped",
+    "overlaps",
+    "horizontal",
+    "allThreeSizes",
+    "restored"
+  ],
+  "unmeasuredBars": [
+    "contentGrowsNotChrome"
+  ],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 24,
+        "dirty": 25,
+        "restored": 24
+      },
+      "removalProven": true
+    },
+    "provenPagerDeadRegion": {
+      "applicable": false,
+      "reason": "no proven pager on its last page"
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "200x140",
+      "clipped": 57,
+      "overlaps": 291,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 1,
+      "restored": true
+    }
+  }
+}
