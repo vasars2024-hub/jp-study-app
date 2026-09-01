@@ -9,6 +9,7 @@ import {
   enqueueTranscription,
   onMainTranscriptionProgress,
   registerTranscriptionIpc,
+  transcriptionArtifactStatus,
   transcriptionQueue,
 } from '../transcriptionJobs';
 import {
@@ -38,6 +39,63 @@ const {
   pickEnglishTrack,
   planNoWindowRetry,
 } = __transcriptionTestables;
+
+describe('extension transcription artifact status', () => {
+  it('counts the generated track written into the media row', () => {
+    const transcriptPath = path.join(tmpRoot, 'extension-generated-ja.srt');
+    fs.writeFileSync(
+      transcriptPath,
+      '1\n00:00:00,000 --> 00:00:01,000\n一つ\n\n2\n00:00:01,000 --> 00:00:02,000\n二つ\n',
+      'utf-8',
+    );
+    const media = {
+      id: 'extension-status-media',
+      title: 'Status source',
+      fileName: 'status.mp4',
+      path: '/tmp/status.mp4',
+      subtitles: [{
+        id: 'generated-ja',
+        lang: 'ja',
+        source: 'generated',
+        format: 'srt',
+        path: transcriptPath,
+        external: true,
+        derivation: 'whisper',
+        addedAt: 2,
+      }],
+    };
+    registerTranscriptionIpc({
+      listItems: () => [media],
+      patchItems: () => undefined,
+    } as never);
+
+    expect(transcriptionArtifactStatus(media.id).cueCount).toBe(2);
+  });
+
+  it('does not mistake a human or fused subtitle for the queue result', () => {
+    const media = {
+      id: 'extension-status-control',
+      title: 'Control source',
+      fileName: 'control.mp4',
+      path: '/tmp/control.mp4',
+      subtitles: [{
+        id: 'human-ja',
+        lang: 'ja',
+        source: 'sidecar',
+        format: 'srt',
+        path: '/tmp/human.srt',
+        external: true,
+        addedAt: 1,
+      }],
+    };
+    registerTranscriptionIpc({
+      listItems: () => [media],
+      patchItems: () => undefined,
+    } as never);
+
+    expect(transcriptionArtifactStatus(media.id).cueCount).toBeNull();
+  });
+});
 
 describe('timestamp', () => {
   it('formats SRT timestamps with a comma before the milliseconds', () => {

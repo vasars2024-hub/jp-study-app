@@ -19,6 +19,7 @@ import {
   EXTENSION_TRANSCRIBE_REFUSALS,
   countTranscriptCues,
   planExtensionTranscribe,
+  resolveExtensionTranscribeStatus,
   transcribeRefusalKey,
   type ExtensionTranscribeFacts,
 } from '../extensionTranscribe';
@@ -147,5 +148,43 @@ describe('gate 11 — the cue count comes from the file, not from a flag', () =>
     expect(countTranscriptCues('not json')).toBeNull();
     expect(countTranscriptCues('{"cues":[]}')).toBeNull();
     expect(countTranscriptCues('')).toBeNull();
+  });
+});
+
+describe('gate 11 — polling follows the queue sink', () => {
+  it('reports the generated media track before the legacy playlist file', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: 37,
+      playlistCueCount: 12,
+      active: false,
+    })).toEqual({ state: 'transcribed', cueCount: 37 });
+  });
+
+  it('preserves a real zero-cue result', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: 0,
+      playlistCueCount: null,
+      active: false,
+    })).toEqual({ state: 'transcribed', cueCount: 0 });
+  });
+
+  it('says pending only while the queue still owns the job', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: null,
+      active: true,
+    })).toEqual({ state: 'pending', cueCount: null });
+  });
+
+  it('a retired or failed job stops claiming it is pending', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: null,
+      active: false,
+    })).toEqual({
+      state: 'failed',
+      cueCount: null,
+      reason: 'job-ended-without-transcript',
+    });
   });
 });

@@ -128,3 +128,34 @@ export function countTranscriptCues(raw: string): number | null {
     return null;
   }
 }
+
+export interface ExtensionTranscribeStatusFacts {
+  /** Cue file written by the playlist-specific transcription path. */
+  playlistCueCount: number | null;
+  /** Generated subtitle record written by the shared media transcription queue. */
+  mediaCueCount: number | null;
+  /** Whether the shared queue still contains this video's media row. */
+  active: boolean;
+}
+
+export type ExtensionTranscribeStatus =
+  | { state: 'transcribed'; cueCount: number }
+  | { state: 'pending'; cueCount: null }
+  | { state: 'failed'; cueCount: null; reason: 'job-ended-without-transcript' };
+
+/**
+ * Resolve the polling state from both real transcript sinks.
+ *
+ * The media queue is the route used by `/v1/transcribe`; the playlist file is
+ * retained for backward compatibility. Once neither sink has cues, only an
+ * actually active queue entry may say `pending`. A retired or failed job must
+ * stop polling instead of claiming it is still running forever.
+ */
+export function resolveExtensionTranscribeStatus(
+  facts: ExtensionTranscribeStatusFacts,
+): ExtensionTranscribeStatus {
+  const cueCount = facts.mediaCueCount ?? facts.playlistCueCount;
+  if (cueCount !== null) return { state: 'transcribed', cueCount };
+  if (facts.active) return { state: 'pending', cueCount: null };
+  return { state: 'failed', cueCount: null, reason: 'job-ended-without-transcript' };
+}
