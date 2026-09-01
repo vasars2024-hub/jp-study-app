@@ -13,6 +13,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
 import { buildFilesIndex, FILES_ENUMERATORS, type FilesSqliteLike } from '../../main/filesApp/enumerators';
 import {
@@ -32,6 +33,18 @@ import {
   buildFilesMineNoteRequest,
   mineabilityOf,
 } from '../../shared/filesApp/mining';
+// `--gateAudio` only. The PRODUCTION dub decision, not a replica of it — the
+// same module `main/media.ts` calls before it builds a single yt-dlp argument.
+import {
+  audioLangMatches,
+  audioLangRefusalMessage,
+  listAudioTrackLanguages,
+  listAudioTracks,
+  normalizeYouTubeAudioLang,
+  planYoutubeAudioTrack,
+  youtubeFormatArgs,
+  type YtDlpFormat,
+} from '../../shared/ytAudioLang';
 // Reaches `main/mining.ts`, which imports `electron` at module scope — the
 // bundle aliases that to `./electron-stub`, exactly as the mineSource suite
 // stubs it with `vi.mock`. See this directory's README for the command.
@@ -929,4 +942,127 @@ if (process.argv.includes('--gate10')) {
 
   console.log('');
   console.log(`GATE 10 (catalogue contents): ${failures === 0 ? 'PASS' : 'FAIL'}`);
+}
+
+/**
+ * MINING gates 1 and 2 — the DUB, live against a real YouTube video.
+ *
+ *   node debug/filesapp-census.cjs --gateAudio <url> [wanted] [absent]
+ *
+ * It runs `yt-dlp -J` itself — no Electron, no app, no download — and feeds the
+ * manifest through the PRODUCTION `planYoutubeAudioTrack` / `youtubeFormatArgs`
+ * that `main/media.ts` calls. That is the point: if those helpers drift, this
+ * mode drifts with them, whereas a replica of the selection logic here could
+ * report a pass the app does not have.
+ *
+ * The three things it prints, in the gates' own terms:
+ *   gate 1 — the language of the track it selected, read from the video's
+ *            manifest, and the exact `-f` string that language produced.
+ *   gate 2 — the NEGATIVE CONTROL: a language the video demonstrably does not
+ *            ship must refuse by name, with no format string a caller could run
+ *            anyway. If the same video answers both, the pass is not a
+ *            coincidence of the video having every language.
+ *   control — `original` must produce args byte-identical to the pre-feature
+ *            strings, proving the new field cannot alter an ordinary download.
+ */
+if (process.argv.includes('--gateAudio')) {
+  const rest = process.argv.slice(process.argv.indexOf('--gateAudio') + 1).filter((a) => !a.startsWith('--'));
+  const url = rest[0] ?? '';
+  const wanted = normalizeYouTubeAudioLang(rest[1] ?? 'ja');
+  const absent = normalizeYouTubeAudioLang(rest[2] ?? 'ru');
+
+  void (async () => {
+    console.log('');
+    console.log('=== MINING gates 1 & 2 — which dub, live ===');
+    console.log('');
+    if (!url) {
+      console.log('FAIL: pass a video URL: --gateAudio <url> [wantedLang] [absentLang]');
+      return;
+    }
+    let failures = 0;
+    const fail = (why: string): void => {
+      failures += 1;
+      console.log(`  FAIL ${why}`);
+    };
+
+    const raw = await new Promise<string | null>((resolve) => {
+      const proc = spawn('yt-dlp', ['-J', '--no-playlist', '--no-warnings', url], { shell: true });
+      let out = '';
+      proc.stdout.on('data', (d: Buffer) => (out += d.toString()));
+      proc.on('error', () => resolve(null));
+      proc.on('close', (code) => resolve(code === 0 ? out : null));
+    });
+    let formats: YtDlpFormat[] | null = null;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as { formats?: unknown; title?: unknown };
+        console.log(`video:  ${String(parsed.title ?? '(untitled)')}`);
+        formats = Array.isArray(parsed.formats) ? (parsed.formats as YtDlpFormat[]) : null;
+      } catch {
+        formats = null;
+      }
+    }
+    console.log(`url:    ${url}`);
+    console.log(`formats in manifest: ${formats?.length ?? 0}`);
+    if (!formats) {
+      console.log('  the probe itself failed — that is `audioProbeFailed`, not a pass');
+    }
+    const tracks = formats ? listAudioTracks(formats) : [];
+    console.log(`tagged audio tracks: ${tracks.length}`);
+    for (const track of tracks) {
+      console.log(
+        `  ${track.formatId.padEnd(8)} ${track.language.padEnd(8)} ${String(track.abr ?? '-').padStart(5)} kbps  ${track.ext ?? ''}${track.isOriginal ? '  [original]' : ''}`,
+      );
+    }
+    console.log(`languages: ${JSON.stringify(formats ? listAudioTrackLanguages(formats) : [])}`);
+
+    console.log('');
+    console.log(`gate 1 — asked for "${wanted}":`);
+    const plan = planYoutubeAudioTrack(wanted, formats);
+    if (plan.action === 'select') {
+      console.log(`  selected format_id ${plan.track.formatId}, manifest language "${plan.track.language}"`);
+      console.log(`  -f ${youtubeFormatArgs(plan, false)[1]}`);
+      if (!audioLangMatches(plan.track.language, wanted)) fail('selected track does not match the request');
+      // The gate says "a video with TWO AUDIO TRACKS downloads the Japanese
+      // one". Counting formats is the wrong instrument and read PASS on a
+      // single-language video: `lSRBZNEjbpg` ships four ja formats (139/249/
+      // 140/251 — bitrates and codecs of one dub), which is not a choice
+      // between dubs at all. Count distinct LANGUAGES.
+      const distinct = formats ? listAudioTrackLanguages(formats).length : 0;
+      if (distinct < 2) {
+        fail(
+          `only ${distinct} distinct audio language across ${tracks.length} tagged formats — the gate needs a video with two DUBS, not two bitrates`,
+        );
+      }
+    } else if (plan.action === 'refuse') {
+      fail(`refused "${wanted}": ${plan.reason} — ${audioLangRefusalMessage(plan)}`);
+    } else {
+      fail('nothing was asked for');
+    }
+
+    console.log('');
+    console.log(`gate 2 — negative control, asked for "${absent}" on the SAME video:`);
+    const control = planYoutubeAudioTrack(absent, formats);
+    if (control.action === 'refuse') {
+      console.log(`  refused by name: ${control.reason} (${control.reasonKey})`);
+      console.log(`  message: ${audioLangRefusalMessage(control)}`);
+      if (control.reason === 'noSuchAudioLanguage' && control.available.length === 0) {
+        fail('refusal named no available languages, so it cannot tell the user what IS there');
+      }
+    } else {
+      fail(`"${absent}" did NOT refuse — the control is void, pick a language this video lacks`);
+    }
+
+    console.log('');
+    const defaultVideo = youtubeFormatArgs({ action: 'default' }, false);
+    const defaultAudio = youtubeFormatArgs({ action: 'default' }, true);
+    console.log('control (c) — "original" must not change an ordinary download:');
+    console.log(`  video: -f ${defaultVideo[1]}`);
+    console.log(`  audio: -f ${defaultAudio[1]}`);
+    if (defaultVideo[1] !== 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b') fail('default video args changed');
+    if (defaultAudio[1] !== 'ba[ext=m4a]/ba/b') fail('default audio args changed');
+
+    console.log('');
+    console.log(`GATES 1 & 2: ${failures === 0 ? 'PASS' : 'FAIL'}`);
+  })();
 }

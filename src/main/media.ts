@@ -5,7 +5,23 @@ import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
-import type { MediaAcquiredImport, MediaItem, MediaOpen, SubtitlePick, YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
+import type {
+  MediaAcquiredImport,
+  MediaDownloadError,
+  MediaItem,
+  MediaOpen,
+  SubtitlePick,
+  YouTubeAudioTrackReceipt,
+  YouTubeDownloadOptions,
+  YouTubeSubtitleLang,
+} from '../shared/types';
+import {
+  audioLangRefusalMessage,
+  normalizeYouTubeAudioLang,
+  planYoutubeAudioTrack,
+  youtubeFormatArgs,
+  type YtDlpFormat,
+} from '../shared/ytAudioLang';
 import type { MediaBackupContract, MediaOrganizationPreview, MediaRelationship, MediaDuplicateChoice } from '../shared/mediaHub';
 import { previewMediaOrganization } from '../shared/mediaHub';
 import { inferMediaCategory, parseMediaFileName } from '../shared/mediaFileIdentity';
@@ -211,6 +227,24 @@ export interface DownloadYoutubeResult {
   item: MediaItem;
   url: string;
   subtitle?: SubtitlePick;
+  /** Present only when a specific dub was asked for. MINING gate 1's receipt. */
+  audioTrack?: YouTubeAudioTrackReceipt;
+}
+
+/**
+ * Ask yt-dlp what audio tracks a video ships, without downloading anything.
+ *
+ * `null` means the probe could not be run — which `planYoutubeAudioTrack` turns
+ * into `audioProbeFailed` rather than a silent default track. The probe is
+ * skipped entirely (and reported as an empty list, never null) when no specific
+ * language was asked for, so an ordinary download costs no extra yt-dlp call.
+ */
+async function probeYoutubeAudioFormats(url: string, audioLang: unknown): Promise<YtDlpFormat[] | null> {
+  if (normalizeYouTubeAudioLang(audioLang) === 'original') return [];
+  const res = await ytDlpJson(['-J', '--no-playlist', '--no-warnings', url]);
+  if (!res.ok) return null;
+  const formats = (res.data as { formats?: unknown } | null)?.formats;
+  return Array.isArray(formats) ? (formats as YtDlpFormat[]) : null;
 }
 
 /**
@@ -221,7 +255,7 @@ export async function downloadYoutubeUrl(
   link: string,
   options: YouTubeDownloadOptions,
   onProgress?: (ev: { stage: string; percent: number }) => void,
-): Promise<DownloadYoutubeResult | { error: string }> {
+): Promise<DownloadYoutubeResult | MediaDownloadError> {
   const trimmed = typeof link === 'string' ? link.trim() : '';
   if (!isRemoteMediaLink(trimmed)) return { error: 'Please paste a valid video or media link.' };
   const opts = normalizeYoutubeDownloadOptions(options.audioOnly, options);
@@ -231,12 +265,23 @@ export async function downloadYoutubeUrl(
       error: 'yt-dlp was not found on your PATH. Install it (e.g. `pip install -U yt-dlp`) and reopen the app.',
     };
   }
+  // MINING gate 1: the dub is resolved to a real format id BEFORE downloading,
+  // from the video's own manifest, so the language reported afterwards is the
+  // manifest's and not an echo of the flag. Gate 2: a language the video does
+  // not have refuses here, by name, and nothing is fetched.
+  const audioPlan = planYoutubeAudioTrack(opts.audioLang, await probeYoutubeAudioFormats(trimmed, opts.audioLang));
+  if (audioPlan.action === 'refuse') {
+    return {
+      error: audioLangRefusalMessage(audioPlan),
+      errorKey: audioPlan.reasonKey,
+      errorParams: { lang: audioPlan.wanted, available: audioPlan.available.join(', ') },
+    };
+  }
   const outDir = path.join(app.getPath('userData'), MEDIA_DOWNLOAD_DIRECTORY);
   fs.mkdirSync(outDir, { recursive: true });
   const pathFile = path.join(outDir, `.out_${crypto.randomUUID()}.txt`);
-  const format = opts.audioOnly
-    ? ['-f', 'ba[ext=m4a]/ba/b', '-x', '--audio-format', 'm4a']
-    : ['-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b', '--merge-output-format', 'mp4'];
+  const formatIdFile = audioPlan.action === 'select' ? path.join(outDir, `.fmt_${crypto.randomUUID()}.txt`) : '';
+  const format = youtubeFormatArgs(audioPlan, Boolean(opts.audioOnly));
   const subtitleLangs = opts.audioOnly ? [] : resolveYtDlpSubtitleLangs(opts);
   // allSubs wins over the per-language list: take every track, including ASR
   // captions, so a video with no creator subs still yields usable text.
@@ -264,6 +309,13 @@ export async function downloadYoutubeUrl(
     '--print-to-file',
     'after_move:filepath',
     pathFile,
+    // A SECOND print file rather than widening the first: the existing reader
+    // treats the whole last line of `pathFile` as a path, and a title with a
+    // tab in it would have made that parse ambiguous. Only emitted on the
+    // select path, so the default download's args stay byte-identical.
+    ...(audioPlan.action === 'select' && formatIdFile
+      ? ['--print-to-file', 'after_move:format_id', formatIdFile]
+      : []),
   ]);
   return new Promise((resolve) => {
     const proc = spawn(bin, args);
@@ -287,8 +339,17 @@ export async function downloadYoutubeUrl(
       } catch {
         /* no path file */
       }
+      let usedFormatId = '';
+      if (formatIdFile) {
+        try {
+          usedFormatId = (fs.readFileSync(formatIdFile, 'utf-8').trim().split(/\r?\n/).pop() ?? '').trim();
+        } catch {
+          /* no format file */
+        }
+      }
       try {
         fs.rmSync(pathFile, { force: true });
+        if (formatIdFile) fs.rmSync(formatIdFile, { force: true });
       } catch {
         /* ignore */
       }
@@ -304,6 +365,16 @@ export async function downloadYoutubeUrl(
         item,
         url: `playfile://${tokenFor(item.path)}`,
         subtitle: findDownloadedSubtitle(file, primarySubtitleLang(opts)),
+        audioTrack:
+          audioPlan.action === 'select'
+            ? {
+                requestedLang: audioPlan.wanted,
+                // The manifest's own tag. Gate 1 reports THIS, not the flag.
+                language: audioPlan.track.language,
+                formatId: audioPlan.track.formatId,
+                usedFormatId: usedFormatId || null,
+              }
+            : undefined,
       });
     });
   });
@@ -650,6 +721,7 @@ function normalizeYoutubeDownloadOptions(audioOnly?: boolean, raw?: YouTubeDownl
     subtitleLang,
     subtitleLangs: subtitleLangs?.length ? subtitleLangs : undefined,
     allSubs: raw?.allSubs === true,
+    audioLang: normalizeYouTubeAudioLang(raw?.audioLang),
   };
 }
 
@@ -1499,14 +1571,14 @@ export function registerMediaIpc(): void {
     return { item, url: `playfile://${tokenFor(mp4)}` };
   });
 
-  ipcMain.handle('media:youtube', async (e, url: string, audioOnly?: boolean, rawOptions?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }> => {
+  ipcMain.handle('media:youtube', async (e, url: string, audioOnly?: boolean, rawOptions?: YouTubeDownloadOptions): Promise<MediaOpen | MediaDownloadError> => {
     const options = normalizeYoutubeDownloadOptions(audioOnly, rawOptions);
     const sender = e.sender;
     const result = await downloadYoutubeUrl(typeof url === 'string' ? url.trim() : '', options, (ev) => {
       sender.send('media:youtubeProgress', ev);
     });
     if ('error' in result) return result;
-    return { item: result.item, url: result.url, subtitle: result.subtitle };
+    return { item: result.item, url: result.url, subtitle: result.subtitle, audioTrack: result.audioTrack };
   });
 
   ipcMain.handle('media:pickSubtitle', async (): Promise<SubtitlePick | null> => {

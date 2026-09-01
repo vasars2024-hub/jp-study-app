@@ -30,7 +30,7 @@ import MediaLibraryActions from '../MediaLibraryActions';
 import MediaStudyActions from './MediaStudyActions';
 import VirtualGrid from '../VirtualGrid';
 import { translate } from '../../translator';
-import type { MediaItem, MediaOpen, YouTubeSubtitleLang } from '../../../shared/types';
+import type { MediaItem, MediaOpen, YouTubeAudioLang, YouTubeSubtitleLang } from '../../../shared/types';
 import type { MediaKind } from '../../../shared/mediaKind';
 import { buildMediaHubSections, diagnoseMediaPaths, searchMediaHub, type MediaCategory, type MediaHubDiagnostics, type MediaDuplicateChoice, type MediaOrganizationPreview, type MediaRelationship } from '../../../shared/mediaHub';
 import { resolveLocalMediaIdentities } from '../../../shared/mediaFileIdentity';
@@ -243,6 +243,8 @@ export interface MediaState {
   setYtUrl: (u: string) => void;
   ytSubLang: YouTubeSubtitleLang;
   setYtSubLang: (l: YouTubeSubtitleLang) => void;
+  ytAudioLang: YouTubeAudioLang;
+  setYtAudioLang: (l: YouTubeAudioLang) => void;
   yt: { stage: string; percent: number } | null;
   ytError: string;
   lineTrans: string;
@@ -357,7 +359,7 @@ export interface MediaState {
 }
 
 export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaState {
-  const { t } = useT();
+  const { t, lang } = useT();
   const initialPlayerPreferences = useRef(loadPlayerPreferences()).current;
   const videoRef = useRef<HTMLVideoElement>(null);
   const videoWrapRef = useRef<HTMLDivElement | null>(null);
@@ -437,6 +439,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
   const [genError, setGenError] = useState('');
   const [ytUrl, setYtUrl] = useState('');
   const [ytSubLang, setYtSubLang] = useState<YouTubeSubtitleLang>('none');
+  // MINING gate 1: which dub. 'original' is the neutral value and reproduces the
+  // app's pre-existing download exactly, so the default path is unchanged.
+  const [ytAudioLang, setYtAudioLang] = useState<YouTubeAudioLang>('original');
   const [yt, setYt] = useState<{ stage: string; percent: number } | null>(null);
   const [ytError, setYtError] = useState('');
   const [lineTrans, setLineTrans] = useState('');
@@ -999,10 +1004,13 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     if (!url) return;
     setYtError('');
     setYt({ stage: 'starting', percent: 0 });
-    const r = await window.api.downloadYouTube(url, false, { subtitleLang: ytSubLang });
+    const r = await window.api.downloadYouTube(url, false, { subtitleLang: ytSubLang, audioLang: ytAudioLang });
     setYt(null);
     if ('error' in r) {
-      setYtError(r.error);
+      // A refusal that carries a key is localised; the raw English `error` is
+      // still the fallback, because most of main/media.ts's failures predate
+      // the key and have none.
+      setYtError(r.errorKey ? t(r.errorKey, r.errorParams) : r.error);
       return;
     }
     setYtUrl('');
@@ -1015,7 +1023,9 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
         setSubStatus('No matching existing subtitles found. Generating subtitles instead.');
       void runGeneration(r.url);
     }
-  }, [ytUrl, ytSubLang, loadOpened, runGeneration]);
+    // `lang`, never `t` — `t`'s identity is stable by design, so depending on it
+    // goes stale silently after a language switch instead of erroring.
+  }, [ytUrl, ytSubLang, ytAudioLang, loadOpened, runGeneration, lang, t]);
 
   const chooseWatchFolder = useCallback(async () => {
     const r = await window.api.setMediaWatchFolder();
@@ -1680,6 +1690,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     setYtUrl,
     ytSubLang,
     setYtSubLang,
+    ytAudioLang,
+    setYtAudioLang,
     yt,
     ytError,
     lineTrans,
@@ -1911,6 +1923,23 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
           <option value="zh">{t('media.yt.subLang.zh')}</option>
           <option value="en">{t('media.yt.subLang.en')}</option>
           <option value="ru">{t('media.yt.subLang.ru')}</option>
+        </select>
+        {/* MINING gate 1 — which dub. Sits beside the subtitle picker because
+            the two answer the same question about the same download: which
+            language do I want this in, spoken and written. */}
+        <select
+          className="media-model-select"
+          value={state.ytAudioLang}
+          onChange={(e) => state.setYtAudioLang(e.target.value as YouTubeAudioLang)}
+          disabled={!!state.yt}
+          title={t('media.yt.audioLang.title')}
+          aria-label={t('media.yt.audioLang.label')}
+        >
+          <option value="original">{t('media.yt.audioLang.original')}</option>
+          <option value="ja">{t('media.yt.audioLang.ja')}</option>
+          <option value="zh">{t('media.yt.audioLang.zh')}</option>
+          <option value="en">{t('media.yt.audioLang.en')}</option>
+          <option value="ru">{t('media.yt.audioLang.ru')}</option>
         </select>
         <button
           className="btn"

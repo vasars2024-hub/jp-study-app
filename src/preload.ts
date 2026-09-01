@@ -52,6 +52,7 @@ import type {
   DictResult,
   ExampleResult,
   LibraryItem,
+  MediaDownloadError,
   MediaItem,
   MediaOpen,
   Progress,
@@ -1735,7 +1736,7 @@ const api = {
   /** Convert a non-playable file (e.g. MKV) to a playable MP4; returns a new URL. */
   convertMedia: (url: string): Promise<MediaOpen | null> => ipcRenderer.invoke('media:convert', url),
   /** Download a YouTube video (or just its audio) via yt-dlp into the library. */
-  downloadYouTube: (url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }> =>
+  downloadYouTube: (url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | MediaDownloadError> =>
     ipcRenderer.invoke('media:youtube', url, audioOnly, options),
   /** Subscribe to yt-dlp download progress. Returns an unsubscribe fn. */
   onYoutubeProgress: (cb: (p: { stage: string; percent: number }) => void): (() => void) => {

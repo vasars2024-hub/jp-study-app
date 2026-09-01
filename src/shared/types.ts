@@ -285,6 +285,19 @@ export interface ExampleResult {
   preferredSubtitleId?: string;
   }
 
+/**
+ * Which dub actually landed. MINING gate 1's receipt: `language` is the tag the
+ * video's own manifest carries on the chosen format, and `usedFormatId` is what
+ * yt-dlp reported it downloaded — so the two can be compared rather than the
+ * request being taken as its own proof.
+ */
+export interface YouTubeAudioTrackReceipt {
+  requestedLang: YouTubeAudioLang;
+  language: string;
+  formatId: string;
+  usedFormatId: string | null;
+}
+
 /** Returned when a media file is opened: the library item + a playable URL. */
 export interface MediaOpen {
   item: MediaItem;
@@ -292,6 +305,19 @@ export interface MediaOpen {
   url: string;
   /** Optional subtitle file downloaded beside remote media. */
   subtitle?: SubtitlePick;
+  /** Present only when a specific audio language was requested. */
+  audioTrack?: YouTubeAudioTrackReceipt;
+}
+
+/**
+ * A download that refused. `errorKey` carries the i18n key for refusals that
+ * have one, so the renderer localises them; `error` stays populated for every
+ * caller (and every log) that has no catalogue.
+ */
+export interface MediaDownloadError {
+  error: string;
+  errorKey?: string;
+  errorParams?: Record<string, string>;
 }
 
 export interface SubtitlePick {
@@ -319,8 +345,21 @@ export interface MediaAcquiredImport {
 
 export type YouTubeSubtitleLang = 'none' | 'ja' | 'zh' | 'en' | 'ru';
 
+/**
+ * Which dub to fetch. `'original'` — not `'none'` — is the neutral value: a
+ * video download always has audio, so declining to choose means "the uploader's
+ * primary track", never "omit it". See `shared/ytAudioLang.ts`.
+ */
+export type YouTubeAudioLang = 'original' | 'ja' | 'zh' | 'en' | 'ru';
+
 export interface YouTubeDownloadOptions {
   audioOnly?: boolean;
+  /**
+   * The audio track's language. Resolved to an exact yt-dlp format id by
+   * probing the video first, and REFUSED by name when the video has no such
+   * dub — never silently satisfied with the default track.
+   */
+  audioLang?: YouTubeAudioLang;
   /** Download existing creator-provided subtitles only; auto captions are not requested. */
   subtitleLang?: YouTubeSubtitleLang;
   /** Multiple official subtitle langs (playlist manager preferSubs). */

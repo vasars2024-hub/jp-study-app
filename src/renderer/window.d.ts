@@ -5,6 +5,7 @@ import type {
   DictResult,
   ExampleResult,
   LibraryItem,
+  MediaDownloadError,
   MediaItem,
   MediaOpen,
   Progress,
@@ -1006,7 +1007,7 @@ declare global {
         | { ok: false; error: string }
       >;
       convertMedia(url: string): Promise<MediaOpen | null>;
-      downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | { error: string }>;
+      downloadYouTube(url: string, audioOnly?: boolean, options?: YouTubeDownloadOptions): Promise<MediaOpen | MediaDownloadError>;
       onYoutubeProgress(cb: (p: { stage: string; percent: number }) => void): () => void;
       /**
        * The discovered subtitle track for a local video, by path and side-effect free.
