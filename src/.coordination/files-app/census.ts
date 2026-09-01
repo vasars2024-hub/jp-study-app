@@ -22,6 +22,7 @@ import {
   deriveCrossStoreFlags,
   revealTargetFor,
   type FilesItem,
+  type FilesProvenance,
 } from '../../shared/filesApp/catalog';
 import {
   FILES_SMART_FOLDER_PRESETS,
@@ -31,6 +32,7 @@ import {
 import {
   buildFilesMineDrafts,
   buildFilesMineNoteRequest,
+  deckProvenanceFor,
   mineabilityOf,
 } from '../../shared/filesApp/mining';
 // `--gateAudio` only. The PRODUCTION dub decision, not a replica of it — the
@@ -1065,4 +1067,138 @@ if (process.argv.includes('--gateAudio')) {
     console.log('');
     console.log(`GATES 1 & 2: ${failures === 0 ? 'PASS' : 'FAIL'}`);
   })();
+}
+
+/**
+ * `--gate4` — MINING gate 4, the transcript MARK.
+ *
+ * "A card mined from that transcript reaches its destination AND renders as
+ * transcript-derived; a card from human subtitles on the same surface does not
+ * carry that mark."
+ *
+ * Two clauses, and the second is the whole point: a build that tagged *every*
+ * card `provenance-transcript` would satisfy the first clause and be worthless.
+ * The design constraint this gate enforces is the fusion track's lesson —
+ * mixing an unrefereed Whisper transcript in with human subtitles silently is
+ * exactly the defect. So both are mined on the SAME surface, through the SAME
+ * chain, and the marks are compared.
+ *
+ * The chain is the production one (`mineabilityOf` -> `readFilesMineSource` ->
+ * `buildFilesMineDrafts` -> `buildFilesMineNoteRequest`), stopping at the built
+ * request, which is the last step before AnkiConnect. Nothing is posted.
+ *
+ * "Reaches its destination" is read as the request being ROUTABLE, and it is
+ * checked rather than assumed: a `route` and a non-empty sentence and front.
+ *
+ * Controls:
+ *  (a) THE MARK IS NOT UNIVERSAL — the human-subs card must carry
+ *      `provenance-human-subs` and must NOT carry `provenance-transcript`.
+ *  (b) THE MARK IS NOT COSMETIC — it must survive onto `extraTags`, i.e. into
+ *      Anki, not only onto the in-app draft field the review screen reads.
+ *  (c) THE RENDERER HAS A STRING FOR IT — `deckProvenanceFor` must map the
+ *      catalogue's provenance to a deck value the review screen can render;
+ *      a card marked with a value the UI has no key for renders as nothing.
+ */
+if (process.argv.includes('--gate4')) {
+  console.log('');
+  console.log('=== MINING gate 4 — transcript-derived cards are marked, subtitle cards are not ===');
+  console.log('');
+
+  let failures = 0;
+  const fail = (why: string): void => {
+    failures += 1;
+    console.log(`  FAIL ${why}`);
+  };
+
+  interface MinedSample {
+    item: FilesItem;
+    tags: string[];
+    textProvenance: string | undefined;
+    cards: number;
+    routable: boolean;
+  }
+
+  const mineFirst = (kind: 'transcript' | 'subtitle', want: FilesProvenance): MinedSample | null => {
+    // Largest first, so the sample is not an empty file that mines nothing —
+    // and filtered to the provenance the gate names, because `subtitle` rows
+    // in this index are a mix of human subs and auto-captions and taking
+    // whichever sorted first would compare the wrong two things.
+    const candidates = snapshot.items
+      .filter((i) => i.kind === kind && i.provenance === want && mineabilityOf(i).mineable)
+      .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0));
+    for (const item of candidates) {
+      const filePath = item.location.store === 'file' ? item.location.path : '';
+      const read = readFilesMineSource(filePath, kind);
+      if (!read.ok) continue;
+      const plan = buildFilesMineDrafts(item, read.passages);
+      if (plan.drafts.length === 0) continue;
+      const request = buildFilesMineNoteRequest(plan.drafts[0]);
+      return {
+        item,
+        tags: request.extraTags ?? [],
+        textProvenance: plan.drafts[0].textProvenance,
+        cards: plan.drafts.length,
+        routable: Boolean(request.route && String(request.sentence).length > 0 && String(request.front).length > 0),
+      };
+    }
+    return null;
+  };
+
+  const transcript = mineFirst('transcript', 'whisper-transcript');
+  const human = mineFirst('subtitle', 'human-subs');
+
+  for (const [label, sample] of [
+    ['transcript', transcript],
+    ['human-subs', human],
+  ] as const) {
+    if (!sample) {
+      fail(`no mineable ${label} asset in the live index — the gate cannot be claimed`);
+      continue;
+    }
+    console.log(`  ${label}`);
+    console.log(`    row:            ${sample.item.kind} / ${sample.item.provenance}`);
+    console.log(`    name:           ${sample.item.name.slice(0, 60)}`);
+    console.log(`    cards mined:    ${sample.cards}`);
+    console.log(`    textProvenance: ${sample.textProvenance ?? '(none)'}`);
+    console.log(`    extraTags:      ${sample.tags.join(', ')}`);
+    console.log(`    routable:       ${sample.routable}`);
+    console.log('');
+  }
+
+  if (transcript) {
+    if (transcript.textProvenance !== 'transcript') {
+      fail(`transcript card's textProvenance is "${transcript.textProvenance}", not "transcript"`);
+    }
+    if (!transcript.tags.includes('provenance-transcript')) {
+      fail('control (b): the mark did not survive onto extraTags, so Anki never sees it');
+    }
+    if (!transcript.routable) fail('transcript card is not routable — it does not reach a destination');
+  }
+  if (human) {
+    console.log(
+      `  control (a) the mark is NOT universal: human-subs card carries provenance-transcript = ${human.tags.includes('provenance-transcript')} (must be false)`,
+    );
+    if (human.tags.includes('provenance-transcript')) {
+      fail('control (a): a human-subtitle card was marked transcript-derived');
+    }
+    if (!human.tags.includes('provenance-human-subs')) {
+      fail('human-subs card carries no provenance mark at all');
+    }
+    if (!human.routable) fail('human-subs card is not routable');
+  }
+
+  console.log('');
+  console.log('  control (c) every catalogue provenance maps to a deck value the review screen can render:');
+  for (const provenance of ['human-subs', 'auto-captions', 'whisper-transcript', 'book-text', 'unknown'] as const) {
+    const mapped = deckProvenanceFor(provenance);
+    console.log(`    ${provenance.padEnd(20)} -> ${mapped ?? '(unmarked)'}`);
+  }
+  if (deckProvenanceFor('whisper-transcript') !== 'transcript') fail('control (c): whisper-transcript does not map to transcript');
+  if (deckProvenanceFor('human-subs') !== 'human-subs') fail('control (c): human-subs does not map to human-subs');
+  // `unknown` must map to nothing: inventing a provenance for a row whose text
+  // origin was never established is the same lie the mark exists to prevent.
+  if (deckProvenanceFor('unknown') !== undefined) fail('control (c): unknown provenance was given a mark');
+
+  console.log('');
+  console.log(`GATE 4 (transcript mark): ${failures === 0 ? 'PASS' : 'FAIL'}`);
 }
