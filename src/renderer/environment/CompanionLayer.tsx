@@ -28,7 +28,8 @@ import { hasDiscoveredWired, onWiredDiscoveryChanged } from '../wiredDiscovery';
 import { onCompanionEvent, type CompanionEventDetail } from './companionEvents';
 import { onPlayingChanged, isPlaying as musicIsPlaying } from '../audioBus';
 import { READING_RECORDED_EVENT } from '../stats';
-import { saveEnvironment } from './environmentStore';
+import { loadEnvironment, saveEnvironment } from './environmentStore';
+import { withLiveRoutineAssignments } from './companionAssignments';
 import { pushCompanionOsState } from './companionOsBridge';
 import { getZoomFactor } from '../appZoom';
 import { companionPhysics, loadMotionPrefs, onMotionPrefsChanged } from '../motion/motionPrefs';
@@ -358,8 +359,9 @@ export default function CompanionLayer({ env }: { env: EnvironmentSettings }) {
   const persist = useCallback((next: CompanionInstance[]) => {
     // Idle callback when available so we don't block drag/scroll on JSON write.
     const run = () => {
-      saveEnvironment({ companions: next });
-      pushCompanionOsState(next);
+      const merged = withLiveRoutineAssignments(next, loadEnvironment().companions ?? []);
+      saveEnvironment({ companions: merged });
+      pushCompanionOsState(merged);
     };
     const ric = (
       window as Window & {

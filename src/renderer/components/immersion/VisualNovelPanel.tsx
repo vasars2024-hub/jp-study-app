@@ -31,6 +31,7 @@ import {
 import { addMediaStudySentenceFlashcard, addVisualNovelStudyFlashcards, analyzeMediaStudyCues, createMediaLanguageProfile, type MediaStudyAnalysis } from '../../mediaStudyWorkflow';
 import { addMediaStudySessionProgress, loadMediaStudyDatabase, onMediaStudyDatabaseChanged, saveMediaLanguageProfile, startMediaStudySession } from '../../mediaStudyStore';
 import { isLookupClick, lookupWordFromMouseUp, noteLookupPointerDown } from '../../wordLookup';
+import { CAPTURE_KIND_KEYS } from './captureKindKeys';
 import DictionaryPopup from '../DictionaryPopup';
 import ReaderCollectionPanel from '../ReaderCollectionPanel';
 import { useT } from '../../i18n';
@@ -887,7 +888,7 @@ export default function VisualNovelPanel({ onClose }: { onClose: () => void }) {
                       aria-current={capture.id === selectedCapture?.id ? 'true' : undefined}
                       onClick={() => setSelectedCaptureId(capture.id)}
                     >
-                      <small>{displayCaptureContext(capture) || capture.kind}</small>
+                      <small>{displayCaptureContext(capture) || t(CAPTURE_KIND_KEYS[capture.kind])}</small>
                       <span>{capture.japanese}</span>
                       {capture.translation && <em>{capture.translation}</em>}
                     </button>
