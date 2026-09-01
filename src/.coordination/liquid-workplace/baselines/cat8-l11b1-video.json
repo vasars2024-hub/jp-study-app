@@ -1,0 +1,224 @@
+{
+  "label": "l11b1-video",
+  "surface": "@.fwin:has(.mc-video-page)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": null,
+  "rect": "1080x679",
+  "textRuns": 78,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 72,
+  "textHash": -1261799306,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 4,
+  "states": {
+    "empty": {
+      "hosts": 2,
+      "messages": [
+        "Video plays in the media workspaceOpen the workspace to watch with subtitles, transcript and mining. It reports the media server state itself. Open in the media workspace",
+        "Choose what to watchOpen a local video, browse a folder, or choose a title from your library. Select a video Browse folderLibrary queueUp next37 videosE38JoJo no Kimyou na Bouken - Ougon no Kaze 38 RAWJoJo's Bizarre Adventure: Golden Wind · 2018Emotion 感情表現 ｜ Japanese Podcast with Hana #13Video「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284VideoHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12VideoJoJo no Kimyou na Bouken - Ougon no Kaze 39-END RAWJoJo's Bizarre Adventure: Golden Wind · 2018E01The Big O - 01The Big O · 1999E02The Big O - 02The Big O · 1999"
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9784,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9784 catalog keys / 106 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 78,
+        "textHash": -1261799306,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 78,
+        "textHash": -1633015630,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 50,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "ブラウズ"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "ホーム"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "メディアの概要"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "ライブラリ"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "すべてのローカルメディア"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "ビデオ"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 78,
+        "textHash": 1816939305,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 50,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "浏览"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "首页"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "媒体概览"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "媒体库"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "全部本地媒体"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "视频"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 78,
+        "textHash": -1790874418,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 50,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "Разделы"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "Главная"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "Обзор вашей медиатеки"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "Медиатека"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "Все локальные медиа"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "Видео"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 50,
+    "baseRuns": 78,
+    "diffShare": 0.641
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

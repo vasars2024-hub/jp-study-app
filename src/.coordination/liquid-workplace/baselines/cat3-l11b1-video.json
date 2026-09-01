@@ -1,0 +1,41 @@
+{
+  "label": "l11b1-video",
+  "surface": "Video",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "already-on-top",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "1080x679",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 55,
+  "controlsSkipped": 48,
+  "byRole": {
+    "Work": 4,
+    "Liquid-eligible": 4,
+    "Anchor": 18,
+    "Anchor(holds work)": 11,
+    "Ambient": 18
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 4,
+  "sharedPrimitiveEligible": 4,
+  "eligibleTotal": 4,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

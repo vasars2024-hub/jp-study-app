@@ -1,0 +1,192 @@
+{
+  "label": "l11b1-settings",
+  "surface": "Settings",
+  "win": "(focused)",
+  "rootKind": "floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "960x680",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 4.8,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 26.1,
+      "dominantCanvasPct": 94.7,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 0.7,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 25.5,
+      "dominantCanvasPct": 78.8,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x765",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 7,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 22,
+      "dominantCanvasPct": 95.3,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "sizesExpected": 3,
+  "sizesRan": 3,
+  "sizesUnreachable": [],
+  "contentGrowsNotChromePair": "default -> maximized",
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "623x81 at grid 14,4",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 60px; top: 24px; width: 960px; height: 680px; z-index: 304;",
+      "restoredTo": "left: 60px; top: 24px; width: 960px; height: 680px; z-index: 304;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "90x78 at grid 26,17",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 60px; top: 24px; width: 960px; height: 680px; z-index: 304;",
+      "restoredTo": "left: 60px; top: 24px; width: 960px; height: 680px; z-index: 308;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "568x128 at grid 22,4",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notApplicableBars": [],
+  "deadRegionPctBySize": [
+    "default 4.8%",
+    "compact 0.7%",
+    "maximized 7%"
+  ],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ]
+}
