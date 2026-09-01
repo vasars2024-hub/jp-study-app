@@ -210,7 +210,9 @@ actionsEl.addEventListener('click', async (e) => {
       feedback(formatTranscribe(res), res?.ok ? 'ok' : 'err');
       // Not awaited: the job runs for minutes and the button must not stay
       // disabled for them. See followTranscription.
-      if (res?.state === 'queued' && res.videoId) void followTranscription(res.videoId);
+      if ((res?.state === 'queued' || res?.state === 'running') && res.videoId) {
+        void followTranscription(res.videoId, res.queuedAt);
+      }
     } else if (action === 'ocr') {
       const res = await send({ type: 'run-command', command: 'capture.ocr' });
       if (res?.ok) window.close();
@@ -279,13 +281,16 @@ const TRANSCRIBE_POLL_MS = 4000;
 /** 20 minutes at 4 s. Long enough for a first run that downloads a model. */
 const TRANSCRIBE_POLL_LIMIT = 300;
 
-async function followTranscription(videoId) {
-  const startedAt = Date.now();
-  const elapsed = () => `${Math.round((Date.now() - startedAt) / 1000)}s`;
+async function followTranscription(videoId, startedAt) {
+  // The JOB's clock when the app gave us one, not the poll's. Clicking a
+  // second time on a job eight minutes in used to restart the counter at 0s.
+  let clock = Number.isFinite(startedAt) ? startedAt : Date.now();
+  const elapsed = () => `${Math.round((Date.now() - clock) / 1000)}s`;
   for (let i = 0; i < TRANSCRIBE_POLL_LIMIT; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, TRANSCRIBE_POLL_MS));
     const res = await send({ type: 'transcribe-status', videoId });
     if (!res) continue;
+    if (Number.isFinite(res.queuedAt)) clock = res.queuedAt;
     if (res.state === 'transcribed') {
       feedback(`Transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`, 'ok');
       return;
@@ -309,6 +314,14 @@ function formatTranscribe(res) {
     return `Already transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`;
   }
   if (res.state === 'queued') return 'Transcribing in GrammarX — it will appear in the catalogue.';
+  // A second click on a job already running. Saying "queued" here would claim a
+  // new job was started; nothing was, and `enqueueTranscription` deduplicated.
+  if (res.state === 'running') {
+    const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
+    return secs === null
+      ? 'Already transcribing in GrammarX — nothing new was queued.'
+      : `Already transcribing in GrammarX for ${secs}s — nothing new was queued.`;
+  }
   if (res.state === 'refused') {
     return TRANSCRIBE_REFUSALS[res.reason] || res.reason || 'Transcription refused';
   }

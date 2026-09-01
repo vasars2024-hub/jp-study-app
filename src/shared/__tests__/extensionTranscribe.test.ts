@@ -36,6 +36,7 @@ const READY: ExtensionTranscribeFacts = {
   existingCueCount: null,
   mediaId: 'media-1',
   mediaFileExists: true,
+  alreadyQueued: false,
   transcriberReady: true,
 };
 
@@ -113,6 +114,50 @@ describe('gate 11 — the success paths', () => {
     // re-queue the same silent video forever and never say why.
     const plan = planExtensionTranscribe({ ...READY, existingCueCount: 0 });
     expect(plan).toEqual({ action: 'report', videoId: 'x9QKu3OLjaU', cueCount: 0 });
+  });
+
+  /*
+   * "Same episode twice", inherited from the qBittorrent contingency list.
+   * `enqueueTranscription` already deduplicates, so no second Whisper pass was
+   * ever run — but it answers `{ok:true}` either way, so the route said
+   * "queued" about a job eight minutes old and the popup restarted its elapsed
+   * counter at 0s. A wrong number about a real job is still a wrong number.
+   */
+  it('a second click on a running job follows it rather than queueing again', () => {
+    expect(planExtensionTranscribe({ ...READY, alreadyQueued: true })).toEqual({
+      action: 'follow',
+      videoId: 'x9QKu3OLjaU',
+      mediaId: 'media-1',
+    });
+  });
+
+  it('follow outranks transcriberOffline: a queued job runs when the host returns', () => {
+    // Telling someone their transcriber is down, about a job that is queued and
+    // will run, is a true statement about the wrong thing.
+    expect(planExtensionTranscribe({
+      ...READY,
+      alreadyQueued: true,
+      transcriberReady: false,
+    })).toMatchObject({ action: 'follow' });
+  });
+
+  it('control: a finished transcript still outranks follow', () => {
+    // Otherwise a stale queue entry would hide a cue count that already exists.
+    expect(planExtensionTranscribe({
+      ...READY,
+      alreadyQueued: true,
+      existingCueCount: 5,
+    })).toEqual({ action: 'report', videoId: 'x9QKu3OLjaU', cueCount: 5 });
+  });
+
+  it('control: follow never fires for a video with no media row', () => {
+    // `alreadyQueued` is about a media id; without one there is nothing to
+    // follow, and notDownloaded is the actionable answer.
+    expect(planExtensionTranscribe({
+      ...READY,
+      alreadyQueued: true,
+      mediaId: null,
+    })).toMatchObject({ action: 'refuse', reason: 'notDownloaded' });
   });
 });
 
@@ -246,6 +291,7 @@ describe('gate 11 — polling follows the queue sink', () => {
       existingCueCount: null,
       mediaId: null,
       mediaFileExists: false,
+      alreadyQueued: false,
       transcriberReady: true,
     };
     expect(planExtensionTranscribe(facts)).toMatchObject({
@@ -312,7 +358,7 @@ describe('gate 11 — the extension actually asks for the count', () => {
     // poller ends on the number — not a second copy of the popup's plumbing.
     const popup = readExtensionFile('popup.js');
     expect(popup).toContain("res?.state === 'queued'");
-    expect(popup).toContain('followTranscription(res.videoId)');
+    expect(popup).toContain('followTranscription(res.videoId, res.queuedAt)');
     expect(popup).toMatch(/type: 'transcribe-status', videoId/);
     expect(popup).toMatch(/Transcribed — \$\{res\.cueCount\} cues/);
     // And the four endings stay distinct: a shared sentence is the defect the
@@ -320,6 +366,17 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain('The transcription ended without a transcript.');
     expect(popup).toContain("res.state === 'notStarted'");
     expect(popup).toContain('Nothing has been downloaded for this video yet');
+  });
+
+  it('the popup follows a job that was ALREADY running, on the job\'s own clock', () => {
+    const popup = readExtensionFile('popup.js');
+    // Both entry states start the poller, or a second click on a running job
+    // ends on a one-line message and never reports the cue count.
+    expect(popup).toContain("res?.state === 'queued' || res?.state === 'running'");
+    expect(popup).toContain('followTranscription(res.videoId, res.queuedAt)');
+    // And the counter reads the queue's timestamp rather than the poll's.
+    expect(popup).toContain('Number.isFinite(res.queuedAt)');
+    expect(popup).toContain('Already transcribing in GrammarX');
   });
 
   it('control: notStarted and failed do not share a sentence in the popup', () => {

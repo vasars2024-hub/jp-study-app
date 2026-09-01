@@ -1447,15 +1447,33 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
             (entry) => youtubeIdFromFileName(entry.fileName || entry.path || '') === videoId,
           )
         : undefined;
-      const mediaCueCount = item ? transcriptionArtifactStatus(item.id).cueCount : null;
+      const artifact = item
+        ? transcriptionArtifactStatus(item.id)
+        : { cueCount: null, active: false, queuedAt: null };
       const plan = planExtensionTranscribe({
         pageKind: detectPageKind(pageUrl),
         videoId,
-        existingCueCount: mediaCueCount ?? (videoId ? readTranscriptCueCount(videoId) : null),
+        existingCueCount: artifact.cueCount ?? (videoId ? readTranscriptCueCount(videoId) : null),
         mediaId: item?.id ?? null,
         mediaFileExists: !!item?.path && fs.existsSync(item.path),
+        alreadyQueued: artifact.active,
         transcriberReady: transcriptionHostReady(),
       });
+
+      // A job that is already running is neither a new queue nor a refusal, and
+      // `enqueueTranscription`'s dedup answered `{ok:true}` for both — so the
+      // popup restarted its elapsed counter at zero for a job eight minutes in.
+      // `queuedAt` is the queue's own timestamp, never `Date.now()`.
+      if (plan.action === 'follow') {
+        json(res, 200, {
+          ok: true,
+          state: 'running',
+          videoId: plan.videoId,
+          mediaId: plan.mediaId,
+          queuedAt: artifact.queuedAt,
+        });
+        return;
+      }
 
       if (plan.action === 'report') {
         json(res, 200, {
@@ -1512,7 +1530,7 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       : undefined;
     const artifact = item
       ? transcriptionArtifactStatus(item.id)
-      : { cueCount: null, active: false };
+      : { cueCount: null, active: false, queuedAt: null };
     const status = resolveExtensionTranscribeStatus({
       playlistCueCount: videoId ? readTranscriptCueCount(videoId) : null,
       mediaCueCount: artifact.cueCount,
@@ -1530,6 +1548,11 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       // `notStarted` names the next step, exactly as the POST's `notDownloaded`
       // refusal does, so the popup does not have to infer it from the state.
       ...(status.state === 'notStarted' ? { canDownload: true } : {}),
+      // The queue's own timestamp, so a poller that attached late reports how
+      // long the JOB has run rather than how long it has been watching.
+      ...(status.state === 'pending' && artifact.queuedAt !== null
+        ? { queuedAt: artifact.queuedAt }
+        : {}),
       ...status,
     });
     return;

@@ -1033,22 +1033,32 @@ export function transcribableItems(): MediaItem[] {
 export function transcriptionArtifactStatus(mediaId: string): {
   cueCount: number | null;
   active: boolean;
+  /**
+   * When the queued job was accepted, so a caller can report a truthful
+   * elapsed time instead of restarting the clock at its own request. `null`
+   * whenever nothing is queued — never `Date.now()`, which would read as a
+   * job that just started.
+   */
+  queuedAt: number | null;
 } {
-  const active = queue.some(
-    (job) => job.mediaId === mediaId && (job.kind ?? 'transcribe') === 'transcribe',
+  const job = queue.find(
+    (entry) => entry.mediaId === mediaId && (entry.kind ?? 'transcribe') === 'transcribe',
   );
+  const active = !!job;
+  const queuedAt = job?.queuedAt ?? null;
   const item = host?.listItems().find((entry) => entry.id === mediaId);
   const record = [...(item?.subtitles ?? [])]
     .filter((entry) => entry.source === 'generated' && entry.derivation !== 'en-ja-fusion')
     .sort((a, b) => b.addedAt - a.addedAt)[0];
-  if (!record) return { cueCount: null, active };
+  if (!record) return { cueCount: null, active, queuedAt };
   try {
     return {
       cueCount: parseSubtitles(fs.readFileSync(subtitleFilePath(record), 'utf-8')).length,
       active,
+      queuedAt,
     };
   } catch {
-    return { cueCount: null, active };
+    return { cueCount: null, active, queuedAt };
   }
 }
 

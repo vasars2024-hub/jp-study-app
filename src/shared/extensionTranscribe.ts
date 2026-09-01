@@ -66,6 +66,17 @@ export interface ExtensionTranscribeFacts {
   mediaId: string | null;
   /** Whether that row's file is actually on disk. */
   mediaFileExists: boolean;
+  /**
+   * Whether the transcription queue ALREADY holds a job for this media row.
+   *
+   * `enqueueTranscription` deduplicates, so a second click costs no second
+   * Whisper pass — but it answers `{ok: true}` either way, which made "I queued
+   * it" and "it has been running for eight minutes" the same reply. The popup
+   * then restarted its elapsed counter from zero, which is a wrong number
+   * about a real job. This is the mining plan's inherited "same episode twice"
+   * contingency: a distinct situation gets a distinct, honest answer.
+   */
+  alreadyQueued: boolean;
   /** Whether `transcriptionJobs` has a host registered to run the queue. */
   transcriberReady: boolean;
 }
@@ -75,6 +86,11 @@ export type ExtensionTranscribePlan =
   | { action: 'report'; videoId: string; cueCount: number }
   /** Queue a Whisper run against an existing local file. */
   | { action: 'enqueue'; videoId: string; mediaId: string }
+  /**
+   * A job for this video is already in the queue. Nothing to enqueue and
+   * nothing to refuse — follow the one that is running.
+   */
+  | { action: 'follow'; videoId: string; mediaId: string }
   /** Named, actionable, and never a bare 'failed'. */
   | { action: 'refuse'; reason: ExtensionTranscribeRefusal; reasonKey: string; videoId: string | null };
 
@@ -108,6 +124,11 @@ export function planExtensionTranscribe(
   }
   if (!facts.mediaId) return refuse('notDownloaded', videoId);
   if (!facts.mediaFileExists) return refuse('audioMissing', videoId);
+  // Before `transcriberOffline` on purpose: a job already sitting in the queue
+  // will run when the host comes back, so telling its owner their transcriber
+  // is down is a true statement about the wrong thing — the same reason
+  // `transcriberOffline` is checked last in the first place.
+  if (facts.alreadyQueued) return { action: 'follow', videoId, mediaId: facts.mediaId };
   if (!facts.transcriberReady) return refuse('transcriberOffline', videoId);
   return { action: 'enqueue', videoId, mediaId: facts.mediaId };
 }
