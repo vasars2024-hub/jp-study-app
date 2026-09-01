@@ -105,6 +105,12 @@ const POPOUT_LABELS: Partial<Record<DesktopWinSection, string>> = {
   dictionary: 'Dictionary',
   grammar: 'Grammar',
   translate: 'Translate',
+  // Gate 8 deleted the Notebook section, and `notebook: 'Notebook'` went with it —
+  // but this object is also `popoutSection()`'s allow-list, so removing the key
+  // without adding its successor took the pop-out capability away rather than
+  // moving it. `ARGV_OPEN_SECTIONS` (main.ts) already lists 'files', so main would
+  // open `?popout=files` and the renderer would refuse to recognise it.
+  files: 'Files',
   player: 'Media Center',
   scraper: 'Scraper',
   video: 'Media Center · Video',
