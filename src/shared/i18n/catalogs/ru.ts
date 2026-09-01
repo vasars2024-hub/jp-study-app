@@ -1796,6 +1796,9 @@ export const ru: Catalog = {
   'settings.extension.running': 'Мост слушает 127.0.0.1:{port}',
   'settings.extension.version': 'Расширение v{version}',
   'settings.extension.stopped': 'Мост не запущен — перезапустите приложение.',
+  'settings.extension.stoppedPortInUse':
+    'Мост не запущен — порт {port} уже занят другой программой. Закройте её и перезапустите приложение.',
+  'settings.extension.stoppedError': 'Мост не запущен — не удалось запустить: {detail}',
   'settings.extension.token': 'Токен привязки',
   'settings.extension.copy': 'Копировать токен',
   'settings.extension.copied': 'Скопировано',

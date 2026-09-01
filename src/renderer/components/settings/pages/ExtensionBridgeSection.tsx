@@ -13,6 +13,8 @@ export default function ExtensionBridgeSection() {
     token: string;
     folderPath: string;
     extensionVersion: string;
+    stoppedReasonKey?: 'portInUse' | 'listenFailed';
+    stoppedDetail?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -49,7 +51,16 @@ export default function ExtensionBridgeSection() {
       <p className="muted os-set-hint">
         {status?.running
           ? t('settings.extension.running', { port: status.port })
-          : t('settings.extension.stopped')}
+          : /*
+             * "Stopped" alone left the one actionable failure invisible: the port
+             * was already taken, and the number shown next to it belonged to
+             * whoever took it. Name the reason instead.
+             */
+            status?.stoppedReasonKey === 'portInUse'
+            ? t('settings.extension.stoppedPortInUse', { port: status.port })
+            : status?.stoppedReasonKey === 'listenFailed'
+              ? t('settings.extension.stoppedError', { detail: status.stoppedDetail ?? '' })
+              : t('settings.extension.stopped')}
         {status?.extensionVersion
           ? ` · ${t('settings.extension.version', { version: status.extensionVersion })}`
           : ''}

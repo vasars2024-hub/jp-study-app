@@ -1626,6 +1626,9 @@ export const zh: Catalog = {
   'settings.extension.running': '桥接在 127.0.0.1:{port} 监听中',
   'settings.extension.version': '扩展 v{version}',
   'settings.extension.stopped': '桥接未运行 — 请重启应用。',
+  'settings.extension.stoppedPortInUse':
+    '桥接未运行 — 端口 {port} 已被其他程序占用。请关闭该程序后重启应用。',
+  'settings.extension.stoppedError': '桥接未运行 — 无法启动：{detail}',
   'settings.extension.token': '配对令牌',
   'settings.extension.copy': '复制令牌',
   'settings.extension.copied': '已复制',

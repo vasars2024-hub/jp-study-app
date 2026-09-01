@@ -350,10 +350,50 @@ export interface ExtensionBridgeStatus {
   folderPath: string;
   /** Manifest version in the load-unpacked folder (empty when unreadable). */
   extensionVersion: string;
+  /**
+   * Why the server is not listening, when it is not. `undefined` while running.
+   *
+   * A bind failure used to go to `console.error` alone, so the only thing a
+   * surface could say was "stopped" — with no reason, and next to a port number
+   * that another process owned. Named here so the settings card can say which.
+   */
+  stoppedReasonKey?: 'portInUse' | 'listenFailed';
+  /** Free-form detail for `listenFailed`; the port is already in `port`. */
+  stoppedDetail?: string;
 }
 
 let server: http.Server | null = null;
 let bridgeState: ExtensionBridgeState | null = null;
+/** Set by the listen error handler, cleared once a listen succeeds. */
+let listenFailure: Pick<ExtensionBridgeStatus, 'stoppedReasonKey' | 'stoppedDetail'> | null = null;
+
+/**
+ * A dev-only port override, so a second dev instance can run its own extension
+ * server instead of silently losing the bind to the first one.
+ *
+ * `JP_DEBUG_PORT` / `JP_USER_DATA_DIR` (64c22632) already give a worktree its own
+ * debug bridge and its own profile, but the extension server stayed on the shared
+ * 18765. Measured 2026-09-01: the second instance failed to bind, reported
+ * `running: false` with no reason, and STILL advertised 18765 — which is the
+ * FIRST app's server. Anything driving the extension against that status measures
+ * the wrong app on the wrong profile, which is precisely the class of false
+ * result this plan's gates exist to catch.
+ *
+ * Deliberately NOT persisted: the override belongs to the environment, not to the
+ * user's profile, so `saveState` must never write it into the state file.
+ * Guarded by `!app.isPackaged`, like the other two, so a shipped app cannot be
+ * moved off its port by a stray environment variable.
+ */
+function devPortOverride(): number | null {
+  if (app.isPackaged) return null;
+  const raw = Number.parseInt(process.env.JP_EXTENSION_PORT ?? '', 10);
+  return Number.isInteger(raw) && raw > 0 && raw < 65536 ? raw : null;
+}
+
+/** The port this process actually listens on — and therefore the one to report. */
+function effectivePort(state: ExtensionBridgeState): number {
+  return devPortOverride() ?? state.port;
+}
 
 function statePath(): string {
   return path.join(app.getPath('userData'), STATE_FILE);
@@ -426,12 +466,14 @@ function saveState(state: ExtensionBridgeState): void {
 
 export function getExtensionBridgeStatus(): ExtensionBridgeStatus {
   const state = bridgeState ?? loadOrCreateState();
+  const running = !!server?.listening;
   return {
-    running: !!server?.listening,
-    port: state.port,
+    running,
+    port: effectivePort(state),
     token: state.token,
     folderPath: getChromeExtensionFolder(),
     extensionVersion: readInstalledExtensionVersion() || '',
+    ...(running ? {} : (listenFailure ?? {})),
   };
 }
 
@@ -2119,11 +2161,21 @@ export function startExtensionServer(): void {
   server = http.createServer((req, res) => {
     void onRequest(req, res);
   });
+  const port = effectivePort(state);
   server.on('error', (err) => {
+    // Record WHICH failure, so `getExtensionBridgeStatus` can say more than
+    // "stopped". EADDRINUSE is the one a user (or a second dev instance) can act
+    // on, and it is the one that used to be invisible.
+    const code = (err as NodeJS.ErrnoException).code;
+    listenFailure =
+      code === 'EADDRINUSE'
+        ? { stoppedReasonKey: 'portInUse' }
+        : { stoppedReasonKey: 'listenFailed', stoppedDetail: err.message };
     console.error('[extensionServer]', err);
   });
-  server.listen(state.port, '127.0.0.1', () => {
-    console.log(`[extensionServer] listening on 127.0.0.1:${state.port}`);
+  server.listen(port, '127.0.0.1', () => {
+    listenFailure = null;
+    console.log(`[extensionServer] listening on 127.0.0.1:${port}`);
   });
 }
 

@@ -1769,6 +1769,9 @@ export const en: Catalog = {
   'settings.extension.running': 'Bridge listening on 127.0.0.1:{port}',
   'settings.extension.version': 'Extension v{version}',
   'settings.extension.stopped': 'Bridge is not running — restart the app.',
+  'settings.extension.stoppedPortInUse':
+    'Bridge is not running — port {port} is already in use by another program. Close it and restart the app.',
+  'settings.extension.stoppedError': 'Bridge is not running — it could not start: {detail}',
   'settings.extension.token': 'Pairing token',
   'settings.extension.copy': 'Copy token',
   'settings.extension.copied': 'Copied',

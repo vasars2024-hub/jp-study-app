@@ -1638,6 +1638,9 @@ export const ja: Catalog = {
   'settings.extension.running': 'ブリッジは 127.0.0.1:{port} で待機中',
   'settings.extension.version': '拡張機能 v{version}',
   'settings.extension.stopped': 'ブリッジが停止しています — アプリを再起動してください。',
+  'settings.extension.stoppedPortInUse':
+    'ブリッジが停止しています — ポート {port} は別のプログラムが使用中です。そちらを終了してからアプリを再起動してください。',
+  'settings.extension.stoppedError': 'ブリッジが停止しています — 起動できませんでした: {detail}',
   'settings.extension.token': 'ペアリングトークン',
   'settings.extension.copy': 'トークンをコピー',
   'settings.extension.copied': 'コピーしました',
