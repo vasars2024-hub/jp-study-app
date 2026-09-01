@@ -3,7 +3,7 @@
   "surface": "Video",
   "win": "(focused)",
   "depth": 12,
-  "raised": "already-on-top",
+  "raised": "raised",
   "presentationAsFound": "standard",
   "presentationDriven": true,
   "box": "1080x679",
@@ -31,11 +31,69 @@
   "theme": null,
   "materials": null,
   "viewport": "1264x821",
+  "untreatedEligible": [],
   "bars": {
     "denseWorkAnchored": true,
     "contextualTreated": true,
     "sharedPrimitives": true
   },
   "verdict": "PASS 10/10",
-  "failedBars": []
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.mc-tile-row.mc-tile-row-small",
+      "path": [
+        0,
+        1,
+        1,
+        0,
+        1,
+        0,
+        1,
+        4,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        4,
+        4,
+        4,
+        4
+      ],
+      "oneRegionGlass": [
+        1,
+        4,
+        4,
+        4,
+        4
+      ],
+      "allGlass": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "restored": [
+        0,
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
 }

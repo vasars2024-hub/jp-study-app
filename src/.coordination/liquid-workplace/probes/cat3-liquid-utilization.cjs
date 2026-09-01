@@ -59,6 +59,7 @@ const OUT = arg('out', '');
 const CONTROL = has('control');
 const DEPTH = Number(arg('depth', '12'));
 const PRESENTATION = arg('presentation', 'as-is');
+const DETAIL = has('detail');
 if (!['liquid', 'standard', 'as-is'].includes(PRESENTATION)) {
   console.error(`REFUSE - --presentation must be liquid, standard or as-is; got ${PRESENTATION}`);
   process.exit(2);
@@ -489,6 +490,21 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
       sharedPrimitives: base.eligibleTotal > 0 && base.sharedPrimitiveEligible === base.eligibleTotal,
     };
     const { detail: _runtimePaths, ...baseReport } = base;
+    // A FAIL that says "12 of 26" and nothing else cannot be acted on: the next worker has to
+    // re-derive the same walk by hand to learn WHICH regions. `--detail` names them, and only
+    // the ones the failed bars are about, so the flag stays a diagnostic rather than a second
+    // report. `path` is the runtime index path the control leg already uses to re-find a region,
+    // so a row here is enough to go straight to the element.
+    const untreated = DETAIL
+      ? base.detail
+        .filter((row) => row.role === 'Liquid-eligible' && !(row.translucentBacking || row.ownBackdrop || row.sharedPrimitive))
+        .map((row) => ({
+          sel: row.sel, box: row.box, areaPct: row.areaPct, path: row.path,
+          ownAlpha: row.ownAlpha, ownBackdrop: row.ownBackdrop,
+          translucentBacking: row.translucentBacking, backingReason: row.backingReason,
+          sharedPrimitive: row.sharedPrimitive, evidence: row.evidence,
+        }))
+      : null;
     out = {
       label: LABEL,
       surface: SURFACE,
@@ -498,6 +514,7 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
       presentationAsFound: foundMode,
       presentationDriven: restorePresentationTo !== null,
       ...baseReport,
+      ...(untreated ? { untreatedEligible: untreated } : {}),
       bars,
       verdict: Object.values(bars).every(Boolean) ? 'PASS 10/10' : 'FAIL',
       failedBars: Object.entries(bars).filter(([, value]) => !value).map(([name]) => name),

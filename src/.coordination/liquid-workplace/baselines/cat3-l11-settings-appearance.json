@@ -1,5 +1,5 @@
 {
-  "label": "l11b1-settings",
+  "label": "l11-settings-appearance",
   "surface": "Settings",
   "win": "(focused)",
   "depth": 12,
@@ -14,20 +14,20 @@
     "image": null,
     "opacity": 1
   },
-  "regions": 42,
-  "controlsSkipped": 45,
+  "regions": 177,
+  "controlsSkipped": 224,
   "byRole": {
-    "Work": 2,
-    "Liquid-eligible": 13,
-    "Anchor": 21,
-    "Anchor(holds work)": 6,
-    "Ambient": 0
+    "Work": 54,
+    "Liquid-eligible": 12,
+    "Anchor": 70,
+    "Anchor(holds work)": 37,
+    "Ambient": 4
   },
   "denseWorkOnTranslucent": 0,
   "denseWorkOnTranslucentList": [],
-  "liquidTreatedEligible": 13,
-  "sharedPrimitiveEligible": 13,
-  "eligibleTotal": 13,
+  "liquidTreatedEligible": 12,
+  "sharedPrimitiveEligible": 12,
+  "eligibleTotal": 12,
   "theme": null,
   "materials": null,
   "viewport": "1264x821",
@@ -51,31 +51,31 @@
     "counts": {
       "base": [
         0,
-        13,
-        13,
-        13,
-        2
+        12,
+        12,
+        12,
+        54
       ],
       "oneRegionGlass": [
         1,
-        13,
-        13,
-        13,
-        2
+        12,
+        12,
+        12,
+        54
       ],
       "allGlass": [
-        2,
-        13,
-        13,
-        13,
-        2
+        54,
+        12,
+        12,
+        12,
+        54
       ],
       "restored": [
         0,
-        13,
-        13,
-        13,
-        2
+        12,
+        12,
+        12,
+        54
       ]
     },
     "movedOne": true,

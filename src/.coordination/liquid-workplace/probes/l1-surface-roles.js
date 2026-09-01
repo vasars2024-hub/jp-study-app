@@ -133,6 +133,29 @@
     '.lq-reading-sheet',
   ].join(',');
 
+  // CORRECTION — a bare nested <header>/<footer> is a SECTION CAPTION, not app chrome.
+  // HTML's own scoping rule, not a heuristic: <header> maps to the `banner` landmark and
+  // <footer> to `contentinfo` ONLY when they are not descendants of article / aside / main /
+  // nav / section. Nested, the browser exposes them as generic — they caption their section.
+  // Measured 2026-09-01 on Settings > Appearance: 26 Liquid-eligible regions, 14 untreated,
+  // and ALL FOURTEEN were `header.os-set-card-head` — the <h3> + description strip inside
+  // `section.os-set-card`, a settings FORM card. Scoring those as untreated Liquid chrome asks
+  // for glass on fourteen work-card captions, which is precisely the "universal glass is a
+  // failure" outcome §2.3 forbids, so the FAIL was the instrument's, not the product's.
+  // The exemption is deliberately narrow and the product itself supplies the discriminator:
+  // a document-wide sweep found exactly FOUR distinct header shapes, and the three that are
+  // real chrome — `os-set-page-head`, `mc-topbar`, `medialib-browser__head` — all already
+  // carry `lq-contextual`. Only the card caption is bare. So an explicit `lq-` primitive or an
+  // explicit landmark ROLE still counts at any depth; only an unannotated nested header drops
+  // out. `nav`, `aside` and the role selectors are untouched — an <aside> is complementary at
+  // any depth, and a toolbar inside a dense editor pane is still contextual chrome.
+  const SECTIONING_SEL = 'article,aside,main,nav,section';
+  const EXPLICIT_LANDMARK_SEL = '[role="tablist"],[role="toolbar"],[role="navigation"],[role="banner"],[role="menubar"],[role="dialog"],[role="contentinfo"]';
+  const isSectionCaption = (el) => (el.tagName === 'HEADER' || el.tagName === 'FOOTER')
+    && !el.matches(SHARED_PRIMITIVE_SEL)
+    && !el.matches(EXPLICIT_LANDMARK_SEL)
+    && Boolean(el.parentElement && el.parentElement.closest(SECTIONING_SEL));
+
   const classify = (el) => {
     const text = (el.textContent || '').trim().length;
     const forms = el.querySelectorAll('input,textarea,select,[contenteditable="true"]').length;
@@ -147,7 +170,7 @@
     // `.dict-truncated` into the Liquid denominator and made an opaque Work notice look like
     // untreated navigation. Semantic landmarks and shared Liquid primitives are the runtime
     // evidence for navigation / transport / inspector / transition regions.
-    const isContextual = el.matches(CONTEXTUAL_SEL);
+    const isContextual = el.matches(CONTEXTUAL_SEL) && !isSectionCaption(el);
     const dense = !isContextual && (text >= 200 || forms >= 1 || rows >= 1 || items >= 3);
     const sharedPrimitive = isContextual && Boolean(el.closest(SHARED_PRIMITIVE_SEL));
     let role;

@@ -108,3 +108,40 @@ cat7 scores, and touches nothing in the Video window at all.
 `liquidTreatedEligible` — fourteen eligible regions untreated and on no shared primitive
 (`cat3-l10b4-settings-appearance.json`, control movedOne true / allWorkFailed true / returned
 true). Page-scoped, sampled out of L10 bullet 4, and still open.
+
+### Banked cat3 FAIL on Settings > Appearance — RESOLVED 2026-09-01, and the defect was the instrument's
+
+L10 bullet 4 banked `cat3-l10b4-settings-appearance.json` at **12 of 26 `liquidTreatedEligible`**
+— "fourteen eligible regions untreated and on no shared primitive" — and left it open. The
+`--detail` flag added to `cat3-liquid-utilization.cjs` this turn names them, which no prior run
+could: **all fourteen are `header.os-set-card-head`**, one per settings card, 644x42 each,
+`ownAlpha 0`, backing `opaque at section.os-set-card`.
+
+That is the `<h3>` + description strip inside `section.os-set-card` — a settings FORM card's own
+caption. Glassing fourteen of them is the "universal glass is a failure" outcome §2.3 forbids and
+CLAUDE.md restates ("keep reading, editing, forms, tables… on stable high-contrast anchor
+surfaces"). So the FAIL was the measurement's, and the correction goes in `l1-surface-roles.js`,
+not in the product.
+
+The rule is HTML's own scoping, not a heuristic: `<header>` maps to the `banner` landmark and
+`<footer>` to `contentinfo` **only** when they are not descendants of `article`/`aside`/`main`/
+`nav`/`section`; nested, the browser exposes them as generic and they caption their section. The
+exemption is narrow — an explicit `lq-` primitive class or an explicit landmark `role` still
+counts at any depth, and `nav`, `aside` and the role selectors are untouched, so a toolbar inside
+a dense editor pane stays contextual chrome.
+
+**The product supplied its own discriminator, which is why this is not a weakened bar.** A
+document-wide sweep found exactly FOUR distinct header shapes in the whole app, and the three
+that are real chrome already carry `lq-contextual` — `os-set-page-head`, `mc-topbar`,
+`medialib-browser__head`. Only the card caption is bare. The instrument was second-guessing an
+opt-in the product already makes explicitly.
+
+After, live: Settings > Appearance **PASS 10/10, 12 of 12 treated**, `Liquid-eligible` 26 → 12 and
+`Anchor` 56 → 70 (the fourteen move, none vanish), control `movedOne`/`allWorkFailed`/`returned`
+all true. Regression check on the two cells this could have emptied — a denominator of 0 caps the
+category at 0 — **Settings Home still 13 of 13 and Video still 4 of 4, both PASS 10/10 with their
+controls proven**; neither surface has a bare nested header, so neither moved.
+
+Trap: the first control run of the corrected probe VOIDed on `returned: false` with
+`denseWorkOnTranslucent` stuck at 1 while `oneMaterialReturned` was true — the liquid
+presentation's backdrop had not settled. Re-run clean. One gesture reading is noise here.
