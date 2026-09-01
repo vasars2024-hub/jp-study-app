@@ -159,7 +159,16 @@ const LOAD_ARM = (heavyJs, deadlineMs) => `(() => {
   const cycle = () => {
     // Generation AND deadline, both checked here rather than by whoever stops it. An aborted
     // run leaves no stopper behind; it must still stop.
-    if (window.__lqLoadGen !== gen || Date.now() > rec.until) { window.__lqLoad = null; return; }
+    //
+    // A SUPERSEDED TICK MUST TOUCH NOTHING. This first read `if (gen mismatch || past deadline)
+    // { window.__lqLoad = null }`, and that one line voided all four under-load legs of the
+    // first two runs with `0 cycles, 0 refusals, last: null`. Stopping bumps the generation, the
+    // previous generation's timer fires up to 2 s later, and it cleared the record the NEXT leg
+    // had just armed — across runs too, because the page had not reloaded between them. A dead
+    // generation may stop itself and nothing else; only the owner of the current record may
+    // clear it. Same family as `deleting-probe-state-is-not-a-stop`.
+    if (window.__lqLoadGen !== gen) return;
+    if (Date.now() > rec.until) { if (window.__lqLoad === rec) window.__lqLoad = null; return; }
     let r;
     try { r = String(run()); } catch (e) { r = 'REFUSE: ' + String(e); }
     rec.last = r.slice(0, 120);
@@ -1248,7 +1257,12 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
         over100: reading.frames_over_100,
         mainMax: reading.main_max_ms,
         sceneStable: reading.scene_stable,
-        load: { label: spec.heavy.label, cyclesDuring, refusals: after.refusals, last: after.last },
+        // `armed` and `after` raw, not only their difference: a leg that voids on
+        // `cyclesDuring` is otherwise indistinguishable between "the load stopped early" and
+        // "the record was never there", and that ambiguity cost a diagnosis once already.
+        load: {
+          label: spec.heavy.label, cyclesDuring, refusals: after.refusals, last: after.last, armed, after,
+        },
       };
     }
     // Restore whatever the load disturbed, through the load's own receipt, before the surface is
