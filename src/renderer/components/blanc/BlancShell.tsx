@@ -455,6 +455,12 @@ export default function BlancShell({
               key={id}
               type="button"
               className={`blanc-nav-btn${!book && tab === id ? ' active' : ''}`}
+              // Which section is current was stated only in paint (the `active` class), so a
+              // screen-reader user could reach all nine routes and never learn which one they
+              // were on. The Study OS taskbar had the same gap and closed it with the same
+              // shared declaration in a2e9c1ce; `aria-current="page"` is the standard spelling
+              // for a navigation landmark, which this <nav> is.
+              aria-current={!book && tab === id ? 'page' : undefined}
               onClick={() => chooseNavTab(id)}
               title={TAB_META[id].label}
             >
@@ -1819,6 +1825,7 @@ function BlancToolsPanel({
 }
 
 function ToolboxCoveragePanel() {
+  const { t } = useT();
   const modules = useMemo(() => listToolboxModules(), []);
   const ready = modules.filter((module) => module.status === 'ready').length;
   const experimental = modules.filter((module) => module.status === 'experimental').length;

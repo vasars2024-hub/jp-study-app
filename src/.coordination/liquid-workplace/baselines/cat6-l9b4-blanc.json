@@ -1,0 +1,223 @@
+{
+  "label": "l9b4-blanc",
+  "app": "blancShell",
+  "win": "blanc",
+  "raised": "n/a — the shell is the host, not a window",
+  "matchedBy": "shell-selector",
+  "host": "shell",
+  "presentationAsFound": "standard",
+  "box": "1264x761",
+  "driven": [
+    {
+      "step": "navClick",
+      "result": "{\"clicked\":\"Read\"}"
+    },
+    {
+      "step": "readNav",
+      "result": "{\"painted\":\"Read\",\"moved\":true}"
+    },
+    {
+      "step": "navRestore",
+      "result": "{\"restored\":\"Stats\"}"
+    },
+    {
+      "step": "hideChrome",
+      "result": "{\"clicked\":\"hide\",\"navBefore\":9}"
+    },
+    {
+      "step": "readChromeHidden",
+      "result": "{\"taskbarVisible\":false,\"revealControl\":true}"
+    },
+    {
+      "step": "revealChrome",
+      "result": "{\"clicked\":\"reveal\"}"
+    },
+    {
+      "step": "readChromeRevealed",
+      "result": "{\"taskbarVisible\":true,\"nav\":9}"
+    },
+    {
+      "step": "openSearch",
+      "result": "{\"clicked\":\"Search Blanc\"}"
+    },
+    {
+      "step": "readSearchOpen",
+      "result": "{\"opened\":1,\"results\":40}"
+    },
+    {
+      "step": "closeSearch",
+      "result": "{\"sent\":\"Escape\"}"
+    },
+    {
+      "step": "readSearchClosed",
+      "result": "{\"after\":0}"
+    },
+    {
+      "step": "openTools",
+      "result": "{\"clicked\":\"context tools\"}"
+    },
+    {
+      "step": "readToolsOpen",
+      "result": "{\"state\":\"true|open\"}"
+    },
+    {
+      "step": "closeTools",
+      "result": "{\"clicked\":\"context tools\"}"
+    },
+    {
+      "step": "readToolsClosed",
+      "result": "{\"state\":\"false|shut\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "8/8",
+    "liquid": "8/8",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1264x761"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "taskbarIdentity",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "title stripped",
+        "reachable": "7/8",
+        "fellRows": [
+          "taskbarIdentity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "clock",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "element detached",
+        "reachable": "7/8",
+        "fellRows": [
+          "clock"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "workspaceToggleHonest",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "title set to \"Exit fullscreen workspace\"",
+        "reachable": "7/8",
+        "fellRows": [
+          "workspaceToggleHonest"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "shellIdentity",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "2 identity region(s) unstamped",
+        "reachable": "7/8",
+        "fellRows": [
+          "shellIdentity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"data-lq-role\",\"data-lq-role\"]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "navRoutes",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "navMoved forced to false",
+        "reachable": "7/8",
+        "fellRows": [
+          "navRoutes"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "chromeRecoverable",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "navAfterReveal forced to 0",
+        "reachable": "7/8",
+        "fellRows": [
+          "chromeRecoverable"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "masterSearch",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "searchClosed forced to 1",
+        "reachable": "7/8",
+        "fellRows": [
+          "masterSearch"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "8/8",
+        "returned": true
+      },
+      {
+        "mutation": "contextTools",
+        "declaredCascade": [],
+        "preBaseline": "8/8",
+        "applied": "collapsed state forced to a lie",
+        "reachable": "7/8",
+        "fellRows": [
+          "contextTools"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[]",
+        "afterRestore": "8/8",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

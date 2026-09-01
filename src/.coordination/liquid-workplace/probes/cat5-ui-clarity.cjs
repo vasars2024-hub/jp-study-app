@@ -139,6 +139,68 @@ const ALLOW_SCROLL = has('allow-scroll');
  * in its baseline.
  */
 const SHELL_CHROME = arg('shell-chrome', '');
+/**
+ * `--hosted "<selector>"` — WHAT THIS SHELL HOSTS. Defaults to `.fwin`, so every one of the
+ * 20 banked baselines re-derives bit-identical and this is a no-op unless a run names it.
+ *
+ * CORRECTION 30, and it is one correction that answers three open terms at once.
+ *
+ * Shell detection was spelled "a root that is not a `.fwin` and CONTAINS one". That is not the
+ * definition of a shell, it is the definition of the TWO shells that had been scored when it
+ * was written. Blanc is a third: `.blanc-root` hosts one of 42 interchangeable tools inline in
+ * `.blanc-content` and never renders a floating window at all. So it read `hostClass:
+ * 'root-selector'`, and every consequence of being a shell was withheld from it:
+ *
+ *   Q4  the hosted surface's controls were charged to the shell — the same double-count the
+ *       `.fwin` scope exists to prevent, and the reason the shell's clutter number moved with
+ *       whichever tool happened to be open.
+ *   Q5  the text walk measured 118 runs, most of them the open tool's content, so "does the
+ *       SHELL hold contrast" was answered by a hosted surface.
+ *   Q6  `isShellRoot` false sent it down the floating-window branch, where it looked for
+ *       `.fwin-b-liquid` inside a shell that has no `.fwin`, found none, and refused
+ *       "surface has no Liquid presentation control" — on a shell whose chrome carries
+ *       `data-lq-role="liquid"` unconditionally (`BlancShell.tsx:435`), which is precisely
+ *       the case the shell branch above `isShellRoot` was written for.
+ *
+ * The structural test is kept and only its VOCABULARY is parameterised: a shell is a root that
+ * is not itself the hosted thing and contains one. It is still never named by title, a hosted
+ * root can never satisfy it, and a chromeless reader root contains nothing. A run that names a
+ * hosted selector says so in `hostedSelector` in its own baseline, so a reader can put the
+ * hosted surface back and disagree with the rule rather than with the verdict.
+ *
+ * What it must not become: a way to subtract a surface's OWN body. `.blanc-content` qualifies
+ * because the 42 tools inside it are separately-scored surfaces with their own identities,
+ * exactly as the Media Center's sections are; a plain app's content region does not.
+ */
+const HOSTED = arg('hosted', '.fwin');
+/**
+ * `--alt-class "<class>"` — the second Q5 cell driven by a class on the SURFACE ROOT.
+ * DEFAULT EMPTY, so every banked baseline re-derives unchanged. Mutually exclusive with
+ * `--alt-attr`, which drives an attribute on `documentElement`.
+ *
+ * Q5 asks whether contrast is STABLE, and the second cell is only evidence if it is a
+ * rendering the product actually ships. `--alt-attr` was added for the Wired shell because a
+ * foreign palette is not one; it puts the attribute on `documentElement`, which is where the
+ * theme and display-transparency axes live. A shell whose alternate rendering is a CLASS ON
+ * ITS OWN ROOT is out of that lever's reach as written: Blanc renders `.is-dark` on
+ * `.blanc-root` from `settings.darkMode` (`BlancShell.tsx:433`), and `data-theme` is null in
+ * the Blanc window entirely — so the theme axis moved nothing and the run VOIDed, correctly,
+ * on 118 measured runs that never changed.
+ *
+ * DRIVEN BY WRITING THE CLASS, NOT BY PRESSING THE CONTROL, and the distinction matters. The
+ * question here is about a RENDERING, not about an affordance — category 6 owns "can the user
+ * get back", and its decision 1 is the opposite for the opposite reason. Pressing Blanc's Dark
+ * checkbox would write `settings.darkMode` to a PERSISTED store, which is trap 4's territory
+ * and the one thing this harness has already damaged the app doing. The class is captured and
+ * restored, the restore is compared before any verdict, and the `q5Moved` / paintKey guard
+ * still decides whether the axis reached the paint — so naming a class that changes nothing
+ * VOIDs rather than passes.
+ */
+const ALT_CLASS = arg('alt-class', '');
+if (ALT_CLASS && ALT_ATTR) {
+  console.error('REFUSE - --alt-class and --alt-attr are two spellings of the same second cell; name one.');
+  process.exit(2);
+}
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own.');
   console.error('         A window title ("Library") or a root selector ("@.reader").');
@@ -402,16 +464,22 @@ const SNAP = `(function(){
    * windows happened to be open. Q5 was worse: its classic-light cell reported 79 failing
    * text runs, every one of them hosted-window content.
    *
-   * A SHELL IS DETECTED STRUCTURALLY, never named: a root that is not itself a \`.fwin\` and
-   * CONTAINS one. A .fwin root can never satisfy it, a chromeless reader root contains no
-   * .fwin, so \`rq\` is the identity function on every one of the 18 surfaces already banked
+   * A SHELL IS DETECTED STRUCTURALLY, never named: a root that is not itself the hosted thing
+   * and CONTAINS one. A hosted root can never satisfy it, a chromeless reader root contains
+   * none, so \`rq\` is the identity function on every one of the 18 surfaces already banked
    * and their baselines re-derive bit-identical. Same principle as category 6's shell
-   * decision 3 (\`shq\`), reached from the same evidence.
+   * decision 3 (\`shq\`), reached from the same evidence. The selector is \`--hosted\`,
+   * default \`.fwin\` — see correction 30 at its declaration.
    */
-  var isShell = !isFwin && !!root.querySelector('.fwin');
+  // root.matches(HOSTED_SEL) and not isFwin: identical for the .fwin default (isFwin IS that
+  // match), and correct for a named selector, where "am I the hosted thing" has to be asked
+  // about the hosted thing rather than about a floating window. (No backticks in this block:
+  // it lives inside a template literal and one backtick ends it.)
+  var HOSTED_SEL = ${A(HOSTED)};
+  var isShell = !root.matches(HOSTED_SEL) && !!root.querySelector(HOSTED_SEL);
   function rq(sel){
     var list = [].slice.call(root.querySelectorAll(sel));
-    return isShell ? list.filter(function(e){ return !e.closest('.fwin'); }) : list;
+    return isShell ? list.filter(function(e){ return !e.closest(HOSTED_SEL); }) : list;
   }
   function rq1(sel){ return rq(sel)[0] || null; }
   /**
@@ -440,13 +508,36 @@ const SNAP = `(function(){
   }
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
 
+  /*
+   * A SHELL'S OWN FURNITURE, read from the shared contract instead of from one shell's class
+   * names. Both shells in the tree mark their chrome the same way -- .os-taskbar carries
+   * data-lq-role="liquid" (DesktopShell.tsx:3081) and so do .blanc-taskbar and .blanc-top
+   * (BlancShell.tsx:436, :476) -- which is the same declaration LiquidAppScaffold marks its
+   * rail and dock with. rq() keeps it to the shell's own regions, never the hosted surface's.
+   */
+  var ownChrome = isShell ? rq('[data-lq-role="liquid"]') .filter(painted) : [];
+  function inOwnChrome(e){
+    for (var oc = 0; oc < ownChrome.length; oc++) if (ownChrome[oc].contains(e)) return true;
+    return false;
+  }
+
   // ---- Q1: one obvious way in. ------------------------------------------------------------
   function entryBand(e){
     var b = e.getBoundingClientRect();
-    // App reading order starts at the top. A desktop shell deliberately inverts
-    // that convention: its authored entry band is the taskbar at the bottom.
+    /*
+     * App reading order starts at the top. A desktop shell deliberately inverts that
+     * convention: its authored entry band is the taskbar at the bottom.
+     *
+     * CORRECTION 31 -- "the bottom third" is where the Study OS taskbar happens to be, not
+     * what an entry band IS. Blanc's taskbar is a full-height rail on the LEFT, so the
+     * bottom-third rule found entryPoints 0 on a shell whose entry band is its most
+     * prominent element, and Q1 Q3 both read NO for a reason that is a property of the
+     * probe. The band is now the bottom third OR the shell's own marked chrome -- a strict
+     * SUPERSET, so it can only add an entry point and never remove one, and the .os-taskbar
+     * sits inside the bottom third already, which is why Wired re-derives unchanged.
+     */
     return b.width > 0 && (isShell
-      ? b.bottom > B.bottom - B.height/3
+      ? (b.bottom > B.bottom - B.height/3 || inOwnChrome(e))
       : b.top < B.top + B.height/3);
   }
   /**
@@ -699,7 +790,7 @@ const SNAP = `(function(){
     // The walker takes a ROOT, not a selector, so shell scope is applied here instead of
     // through rq(). Without it the shell's classic-light cell reported 79 failing runs,
     // every one of them a hosted window's own text.
-    if (isShell && el.closest('.fwin')) continue;
+    if (isShell && el.closest(HOSTED_SEL)) continue;
     seen.push(el);
     var cs = getComputedStyle(el);
     var fg = parseRgb(cs.color);
@@ -830,14 +921,33 @@ const SNAP = `(function(){
         themeToken: themeToken,
         bespokeRegionPrefix: bespokePrefixes.length > 0,
         contentDominantRegion: contentFrac >= 0.25 }
-    // DELIBERATELY NOT rq(). For a .fwin root this asks "does this window have a title
-    // bar"; for a SHELL root the same query asks "does this shell host titled windows",
-    // which is a true and identity-bearing fact about a desktop shell rather than a
-    // neighbour's chrome borrowed. Every other marker here is already document-level.
-    : { floatingWindowChrome: !!root.querySelector('.fwin-bar'),
+    /*
+     * DELIBERATELY NOT rq(). For a .fwin root this asks "does this window have a title
+     * bar"; for a SHELL root the same query asks "does this shell host titled windows",
+     * which is a true and identity-bearing fact about a desktop shell rather than a
+     * neighbour's chrome borrowed. Every other marker here is already document-level.
+     *
+     * CORRECTION 32 -- three of these five were spelled in STUDY OS's class names, so they
+     * were markers of "is this Study OS", not of "does this surface look like itself".
+     * Blanc runs in its own window with no .os-desktop anywhere in the document and scored
+     * 2 of 5 for being a different shell: no .fwin-bar, no .os-task-win, no desktop layer.
+     * Each now has the shell's own equivalent OR-ed on, spelled through the shared
+     * data-lq-role contract and --hosted rather than through a second shell's class names.
+     *
+     * PROVABLY A NO-OP ON ALL 20 BANKED BASELINES, which is why the clauses are appended
+     * rather than replacing: an appended OR can only turn false into true, and the one
+     * banked shell (l9b4-wired) already records all three of these as TRUE. The keys are
+     * kept even though floatingWindowChrome now reads more broadly than its name -- 20
+     * committed baselines diff against these key names and the churn buys nothing.
+     */
+    : { floatingWindowChrome: !!root.querySelector('.fwin-bar')
+          || (isShell && !!root.querySelector(HOSTED_SEL)),
         surfaceChrome: surfaceChrome,
-        taskbar: !!document.querySelector('.os-task-win'),
-        desktopLayer: !!document.querySelector('.desktop-root,.os-desktop,.os-wall-layer'),
+        taskbar: !!document.querySelector('.os-task-win')
+          || (isShell && ownChrome.some(function(c){
+               return c.matches('nav,[role="navigation"]') || !!c.querySelector('nav,[role="navigation"]'); })),
+        desktopLayer: !!document.querySelector('.desktop-root,.os-desktop,.os-wall-layer')
+          || (isShell && fillsViewport),
         themeToken: themeToken };
   var identityCount = Object.keys(identityMarkers).filter(function(k){ return identityMarkers[k]; }).length;
   var cardUniformity = 0, cardHost = null, cardHostDetail = null, cardControlSignatures = 0;
@@ -854,7 +964,7 @@ const SNAP = `(function(){
       // A shell's hosted windows are bordered, painted boxes well over 120x60, so an
       // unscoped read counts four open windows as a uniform card grid and answers
       // "is this a generic card dashboard" with the user's window arrangement.
-      if (isShell && c.matches && (c.matches('.fwin') || c.closest('.fwin'))) return false;
+      if (isShell && c.matches && (c.matches(HOSTED_SEL) || c.closest(HOSTED_SEL))) return false;
       var b = c.getBoundingClientRect();
       if (b.width < 120 || b.height < 60) return false;
       var cs2 = getComputedStyle(c);
@@ -923,8 +1033,9 @@ const SNAP = `(function(){
     hostClass: isFwin ? 'fwin' : isShell ? 'shell' : 'root-selector',
     // Reported as a NUMBER, not as a flag alone: a reader can see how much of the surface
     // the scope removed and add it back to disagree.
+    hostedSelector: HOSTED_SEL,
     shellScope: isShell
-      ? { hostedWindows: root.querySelectorAll('.fwin').length,
+      ? { hostedWindows: root.querySelectorAll(HOSTED_SEL).length,
           controlsInHostedWindows: root.querySelectorAll(CTRL).length - rq(CTRL).length }
       : null,
     theme: document.documentElement.getAttribute('data-theme'),
@@ -981,11 +1092,13 @@ const PLANT_JS = `(function(){
   var isFwin = root.classList && root.classList.contains('fwin');
   // The plant hunts the same population the snapshot scores, shell scope included; see the
   // rq() note in SNAP. Without this the shell's Q2 plant blanked headings inside hosted
-  // windows and the term it was aiming at never moved.
-  var isShell = !isFwin && !!root.querySelector('.fwin');
+  // windows and the term it was aiming at never moved. Same --hosted vocabulary as SNAP:
+  // a control that attacks a different population than the one scored measures nothing.
+  var HOSTED_SEL = ${A(HOSTED)};
+  var isShell = !root.matches(HOSTED_SEL) && !!root.querySelector(HOSTED_SEL);
   function prq(sel){
     var list = [].slice.call(root.querySelectorAll(sel));
-    return isShell ? list.filter(function(e){ return !e.closest('.fwin'); }) : list;
+    return isShell ? list.filter(function(e){ return !e.closest(HOSTED_SEL); }) : list;
   }
 
   /*
@@ -1238,6 +1351,8 @@ function scoreSnapshot(s) {
   const found = await evj(SNAP);
   if (found.refuse) throw new Error(`REFUSE - ${found.refuse}`);
   out.hostClass = found.hostClass;
+  out.hostedSelector = found.hostedSelector;
+  out.shellScope = found.shellScope;
   out.box = found.box;
   out.bodyScrollTop = found.bodyScrollTop;
   out.presentationAsFound = found.presentation;
@@ -1269,18 +1384,35 @@ function scoreSnapshot(s) {
     else h.setAttribute(${A(ALT_ATTR_NAME)}, ${A(v)});
     return 'ok' })()`);
   const attrLabel = attrBefore === ABSENT ? '(absent)' : attrBefore;
+  /** The class the ROOT already carried, restored the same capture-patch-restore way. */
+  const classBefore = ALT_CLASS
+    ? await ev(`(function(){ var r = ${ROOT_EXPR}; return r && r.classList.contains(${A(ALT_CLASS)}) ? 'on' : 'off'; })()`)
+    : null;
+  const setClass = (on) => ev(`(function(){ var r = ${ROOT_EXPR};
+    if (!r) return 'no-root';
+    r.classList[${A(on)} === 'on' ? 'add' : 'remove'](${A(ALT_CLASS)});
+    return 'ok' })()`);
+  // The second cell is always the OTHER state, so a surface found already in its alternate
+  // rendering is swept the same way rather than measured twice in the same one.
+  const classAlt = classBefore === 'on' ? 'off' : 'on';
   /** Both cells as {label, apply}. Theme mode is byte-identical to what it replaced. */
   const cellPlan = ALT_ATTR
     ? [{ label: `${ALT_ATTR_NAME}=${attrLabel}`, apply: () => setAttr(attrBefore) },
        { label: `${ALT_ATTR_NAME}=${ALT_ATTR_VALUE}`, apply: () => setAttr(ALT_ATTR_VALUE) }]
-    : [BASE_THEME, SECOND_THEME].map((theme) => ({
-        label: `theme=${theme}`,
-        apply: () => ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(theme)}); return 'ok'; })()`),
-      }));
+    : ALT_CLASS
+      ? [{ label: `.${ALT_CLASS}=${classBefore}`, apply: () => setClass(classBefore) },
+         { label: `.${ALT_CLASS}=${classAlt}`, apply: () => setClass(classAlt) }]
+      : [BASE_THEME, SECOND_THEME].map((theme) => ({
+          label: `theme=${theme}`,
+          apply: () => ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(theme)}); return 'ok'; })()`),
+        }));
   out.axes = ALT_ATTR
     ? { attr: cellPlan.map((c) => c.label), theme: [BASE_THEME, BASE_THEME],
         why: 'the shell root exists only under its own theme family, so the second cell is its shipped degradation tier rather than a foreign palette' }
-    : { theme: [BASE_THEME, SECOND_THEME] };
+    : ALT_CLASS
+      ? { rootClass: cellPlan.map((c) => c.label), theme: [BASE_THEME, BASE_THEME],
+          why: 'the surface renders its alternate from a class on its own root, not from the document theme, so the second cell is that rendering rather than a palette the surface never sees' }
+      : { theme: [BASE_THEME, SECOND_THEME] };
   const storeKeys = ['jp-os-theme', 'jp-os-theme-engine-v'];
   const readStore = () => evj(`(function(){ var o = {}; ${A(storeKeys)}.forEach(function(k){ o[k] = localStorage.getItem(k); }); return JSON.stringify(o); })()`);
   out.storeBefore = await readStore();
@@ -1319,9 +1451,10 @@ function scoreSnapshot(s) {
   const OWN_LIQUID_BTN = `(function(){
     var r = ${ROOT_EXPR};
     if (!r) return null;
-    var isShell = !r.classList.contains('fwin') && !!r.querySelector('.fwin');
+    var H = ${A(HOSTED)};
+    var isShell = !r.matches(H) && !!r.querySelector(H);
     return [].slice.call(r.querySelectorAll(${A(Object.values(LIQUID_BTN).join(','))}))
-      .filter(function(b){ return !isShell || !b.closest('.fwin'); })[0] || null;
+      .filter(function(b){ return !isShell || !b.closest(H); })[0] || null;
   })()`;
   const presToggle = () => ev(`(function(){
     var b = ${OWN_LIQUID_BTN};
@@ -1404,7 +1537,22 @@ function scoreSnapshot(s) {
 
   // --- restore, and VERIFY it, before any verdict is computed -------------------------------
   step('restore');
-  await ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(BASE_THEME)}); return 'ok'; })()`);
+  /*
+   * CORRECTION 33 — `setAttribute('data-theme', null)` WRITES THE STRING "null".
+   *
+   * Every surface scored so far lived in the Study OS window, where `data-theme` is always
+   * set, so `BASE_THEME` was always a real id and this restore was a no-op assignment. The
+   * Blanc window has no `data-theme` at all: the restore therefore stamped `data-theme="null"`
+   * onto its documentElement, the read-back compared "null" against null, and the run VOIDed
+   * with the self-refuting `theme left as null, wanted null` — while leaving a bogus attribute
+   * behind for the next run to find. Absence is restored as absence, exactly as the attribute
+   * leg's ABSENT sentinel already does one function up.
+   */
+  if (BASE_THEME === null || BASE_THEME === undefined) {
+    await ev(`(function(){ document.documentElement.removeAttribute('data-theme'); return 'ok'; })()`);
+  } else {
+    await ev(`(function(){ document.documentElement.setAttribute('data-theme', ${A(BASE_THEME)}); return 'ok'; })()`);
+  }
   if (ALT_ATTR) await setAttr(attrBefore);
   if (CONTROL) out.unplanted = await evj(unplantJs(planted && planted.savedTitle));
   await sleep(400);
@@ -1421,6 +1569,14 @@ function scoreSnapshot(s) {
     const attrAfter = await ev(`(function(){ var v = document.documentElement.getAttribute(${A(ALT_ATTR_NAME)}); return v === null ? ${A(ABSENT)} : v; })()`);
     out.restored.attr = { name: ALT_ATTR_NAME, before: attrBefore, after: attrAfter, identical: attrAfter === attrBefore };
     if (attrAfter !== attrBefore) out.restoreWarning = `${ALT_ATTR_NAME} left as ${attrAfter}, found ${attrBefore}`;
+  }
+  if (ALT_CLASS) {
+    // Same standard as the attribute leg. A run that leaves Blanc in dark mode has changed a
+    // rendering the user chose, and the next run would record that damage as their setting.
+    await setClass(classBefore);
+    const classAfter = await ev(`(function(){ var r = ${ROOT_EXPR}; return r && r.classList.contains(${A(ALT_CLASS)}) ? 'on' : 'off'; })()`);
+    out.restored.rootClass = { name: ALT_CLASS, before: classBefore, after: classAfter, identical: classAfter === classBefore };
+    if (classAfter !== classBefore) out.restoreWarning = `.${ALT_CLASS} left ${classAfter}, found ${classBefore}`;
   }
 
   // --- assemble the ten -------------------------------------------------------------------
@@ -1514,7 +1670,7 @@ function scoreSnapshot(s) {
   const unscored = questions.filter((x) => x.verdict === 'MEASURE' || x.verdict === 'NO-SUBJECT');
   for (const u of unscored) voided.push(`Q${u.id} is ${u.verdict} — ${u.verdict === 'MEASURE' ? `no category-6 baseline at ${path.relative(process.cwd(), c6path)}` : 'the surface has no subject for this question'}`);
   if (!q5Moved && !CONTROL) {
-    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}); the swap never reached the paint, so contrast stability measured nothing`);
+    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : ALT_CLASS ? ('.' + ALT_CLASS) : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}); the swap never reached the paint, so contrast stability measured nothing`);
   }
   if (out.storeIdentical === false) voided.push('persisted theme state was NOT restored byte-identical');
   if (out.restoreWarning) voided.push(out.restoreWarning);
@@ -1524,7 +1680,7 @@ function scoreSnapshot(s) {
   // is scored from its own Liquid leg, so comparing the two cells' q6 compares two readings of
   // a question neither of them answers.
   const drift = Object.keys(live).filter((k) => k !== 'q6' && live[k] !== liveAlt[k]);
-  if (drift.length) voided.push(`verdicts drift across ${A_CELL.cell} -> ${B_CELL.cell} (${drift.join(', ')}); a §10.4 answer that depends on the ${ALT_ATTR ? 'degradation tier' : 'palette'} is not an answer`);
+  if (drift.length) voided.push(`verdicts drift across ${A_CELL.cell} -> ${B_CELL.cell} (${drift.join(', ')}); a §10.4 answer that depends on the ${ALT_ATTR ? 'degradation tier' : ALT_CLASS ? 'root class' : 'palette'} is not an answer`);
 
   if (CONTROL) {
     // The control must move all five. A control that does not fail voids the score rather

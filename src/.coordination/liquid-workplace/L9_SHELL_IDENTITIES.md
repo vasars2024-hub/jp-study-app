@@ -1938,3 +1938,156 @@ Controls: injected clip 0→1→0; art plate counted only as art; foreground pla
 and restored 0.
 
 **RULE C: 12 of 16 passing cells** — all eight Wired plus cat1–cat4 Blanc. Next: cat5 Blanc.
+
+## 2026-08-31 — primary — cat6 Blanc 10/10 on a sixth host, and the axis a shell owns itself
+
+**RECOVERY FIRST.** `codexA` ended at 20:15:30 on a usage limit; **nothing was stranded**. Its five
+commits `090d4549`..`6b488974` all landed (19:58–20:10), the index is empty, and no file under
+`src`/`docs`/`tools`/`debug` has an mtime after 20:10. Boss audit `audit-20260831-043527` is now
+CLOSED: finding 2 (`aero-safe-mode.css`) and finding 3 (four Scraper anchors) both pass at clean
+HEAD, and finding 1 went **15 unclassified identities → 3 → 0** (`23ecd75c`). The last three —
+`StudyBottomBar`, `StudyDocks`, `StudyWorkspaceCustomizer`, all from `9fa37b59` — are classified
+**pending, per file**, not accepted: their only consumer is `VideoCoreStudyOverlay.tsx`, which is
+mid-rewrite and uncommitted in the shared tree (936 insertions / 662 deletions) beside untracked
+`src/media/studyWorkspace.css`. Wiring them would have meant committing another track's work.
+Control: a fresh unimported module still exits 1, so the gate was not widened.
+
+**THE HANDOFF'S ORDER WAS WRONG, and this doc already said so at line 1636: for a shell cat6 runs
+BEFORE cat5.** `cat5-ui-clarity.cjs` reads Q7/Q8/Q9 from `baselines/cat6-<label>.json` and VOIDs
+without it, so "run cat5 on Blanc, then cat6–cat8" would have produced a VOID and a wasted arm.
+
+**Host `shell` cannot score Blanc.** All eight of its rows name a `.os-*` class and its axis flips
+a hosted `.fwin`; Blanc renders **0** `.fwin` and lives in its own BrowserWindow. Added
+**`blancShell`** (`shellSel: '.blanc-root'`) rather than widening `shell` with nine `||` fallbacks
+— a row that falls back cannot say which shell it scored.
+
+**The axis is `taskbarHidden`, and two plausible candidates were rejected on evidence.** NOT
+`workspaceFull`: its effect calls `window.api.blancSetFullScreen()` (`BlancShell.tsx:310`), so the
+trip would drive the real OS window — the same objection that ruled out the theme axis for Wired,
+through a different door. NOT dark mode: a palette swap leaves every capability in place, so
+parity would be equal by construction and the cell would pass without being asked. Chrome
+reduction removes nine routes and the exit from the screen while leaving `.blanc-content` alone,
+so the question is real and `.blanc-taskbar-reveal` is the answer under test. New engine seam:
+`presAxis` (read + flip), checked before the `.fwin`-proxy branch in `toggleLiquid` and in
+`snapshot`'s presentation; the flip presses the user's control, never a class write.
+
+**cat6 · Blanc = PASS 10/10** (`5d82ece6`). Parity **8/8 standard, 8/8 liquid**, `rowsAgree` true,
+`onlyInOne` empty, `na` 0. Round trip standard→liquid→standard: **0 diffs**, `fieldsHeld` and
+`shellHeld` true, 1264x761 either side. All **15** drive steps ran with **0 refusals**. Control:
+**8 of 8 mutations fell exactly their own row**, 8/8→7/8 each, every one restored to 8/8. Live
+state restored to as-found: taskbar visible, Stats route, 9 nav buttons, 2 identity regions,
+0 detached residue.
+
+**Disclosed weaker term, not banked silently:** `dirtiedField` is **null** — Blanc's shell chrome
+has no editable text field outside `.blanc-content`, so the trip carried field values, scroll
+offsets, geometry and node/char/control counts but no dirtied text. The harness reports this
+itself. If a later worker wants the stronger reading, dirty the `.blanc-lang` select.
+
+**RULE C: 13 of 16 passing cells** — all eight Wired plus Blanc cat1–cat4 and cat6. Next: **cat5
+Blanc**, which is now unblocked and will read Q7/Q8/Q9 from `cat6-l9b4-blanc.json`; then cat7, cat8.
+
+## 2026-08-31 — primary — cat5 Blanc measured: 7 of 10, VOID, and the three terms named
+
+Run with the cat6 baseline in place. **Q7/Q8/Q9 flipped VOID → YES** off `cat6-l9b4-blanc.json`
+exactly as the harness's "NO CATEGORY-6 BASELINE, NO SCORE" refusal intends — that refusal, not
+the plan's cat5→cat6 reading, is why cat6 had to run first. Q1 Q2 Q3 Q10 also YES.
+
+**cat5 · Blanc = VOID, 7 of 10.** Recorded as VOID rather than 7/10-and-moving-on because the
+rubric caps an uncontrolled or no-subject cell at VOID. `cat5-l9b4-blanc.json` is committed as the
+honest baseline. The three open terms, each with the analysis the next turn would otherwise redo:
+
+1. **Q4 NO — `scannedControls` 23 against a bar of 12, `shellChromeSelector` null.** The 23
+   include the Stats tool's own controls: `.blanc-content` hosts the 42 separately-scored Blanc
+   tools, so charging the shell for them makes Blanc's number a function of which tool is open —
+   the same defect the Wired cell hit at 47 controls, and the same principle as cat6 decision 3.
+   The lever already exists: `--shell-chrome "<selectors>"` (cat5 line 141). **The exclusion goes
+   on `.blanc-content`, NOT on `.blanc-taskbar, .blanc-top`** — those two ARE the chrome Blanc
+   authors and excluding them would be the escape hatch that option's own header forbids. Needs a
+   control proving Q4 can still fail once scoped.
+2. **Q5 NO plus `theme left as null, wanted null` VOID.** 118 runs measured in one cell and the
+   alt cell never applied: `--alt` defaults to `classic-light`, which is a Study OS theme, and
+   Blanc's alt is its OWN identity family — `settings.darkMode` renders `.is-dark` on
+   `.blanc-root` (`BlancShell.tsx:433`). The harness drives its alt cell by setting an ATTRIBUTE
+   on `documentElement` (`ALT_ATTR`), so a class on the Blanc root is out of its reach as written.
+   Either give the alt axis a root+class form, or have Blanc mirror dark mode onto an attribute.
+   Same shape as the Wired Q5 finding ("a shell's alt must come from its own identity family").
+3. **Q6 NO-SUBJECT — `refused: surface has no Liquid presentation control`.** cat5 detects the
+   toggle itself and does not know about the `presAxis` seam this turn added to `l6-parity.js`.
+   Blanc now demonstrably HAS a presentation trip (cat6 drove it, 0 diffs), so this is an
+   instrument gap, not a product gap. Teach cat5's q6 leg to ask `__LQP` for the axis.
+
+**RULE C: still 13 of 16.** Next turn OPENS on term 1, then 2, then 3, re-running cat5 after each.
+
+## 2026-08-31 — primary — CORRECTION: boss-audit finding 1 cannot be closed by classification
+
+The entry two sections above claimed finding 1 went **15 → 3 → 0** via `23ecd75c`. **That is
+retracted.** `23ecd75c` is reverted by `8d59b9de`, and the honest count is **3 open at clean HEAD,
+0 in the shared tree** — a difference that no baseline edit can remove.
+
+Why, and it is worth two lines because the next worker will otherwise repeat it:
+`architectureBaseline.test.ts` has **two** assertions, not one. `:49` fails on a finding with no
+baseline entry; **`:55` fails on a baseline entry with no finding**, and `pending` is not exempt
+(`tools/architecture-audit.cjs:481`). `StudyBottomBar` / `StudyDocks` / `StudyWorkspaceCustomizer`
+are orphans at clean HEAD and NOT orphans in the shared tree, because the dirty uncommitted
+`VideoCoreStudyOverlay.tsx` imports them. So the entries make clean HEAD exit 0 and the shared tree
+exit 1 — the gate is symmetric and cannot be satisfied in both states at once. Measured, not
+reasoned: full shared Vitest with the entries in place was **1 failed / 12,316 passed / 6 skipped**,
+the single failure being `:55` on exactly those three keys; after the revert that file is 6/6.
+
+**The right close is the media track committing its overlay rewrite**, at which point the three get
+a real consumer at HEAD too and the finding evaporates with no baseline entry ever written. Until
+then this is honest open debt attributable to `9fa37b59`, and a red SHARED suite for every worker
+is strictly worse than a red clean-HEAD gate for CI. Boss-audit findings **2 and 3 are genuinely
+closed** and were verified this turn at clean HEAD (`liquidTokens` and `settingsSearchReachability`
+both pass, 22/23 tests in that trio, the one failure being the above).
+
+## 2026-08-31 — primary — cat5 Blanc VOID → 9/10; term 1's lever measured and REFUTED
+
+**Term 1's stated cause was wrong and is retracted.** The last entry said the 23 scanned
+controls "include the Stats tool's own controls" and that `--shell-chrome ".blanc-content"`
+would fix Q4. Measured live before writing a line: **taskbar 11 + top 11 + content 1**. The
+lever moves 23 → 22 against a bar of 12. Blanc's clutter is its OWN chrome, not the hosted
+tool's, and no exclusion rescues it.
+
+**What actually blocked the cell was one instrument defect, and it caused all three terms.**
+`isShell` was spelled "a root that is not a `.fwin` and contains one" — the definition of the
+two shells scored so far, not of a shell. Blanc hosts one of 42 tools inline in
+`.blanc-content` and never renders a `.fwin`, so it read `hostClass: root-selector` and every
+consequence of being a shell was withheld: Q4 charged it for the hosted tool, Q5 measured 118
+text runs most of which were the tool's, Q6 hunted `.fwin-b-liquid` inside a shell that has
+none and refused. `--hosted "<selector>"`, default `.fwin`, parameterises the vocabulary and
+leaves the structural test alone.
+
+Four corrections and one product fix, each with its own control:
+
+- **30 `--hosted`.** Default `.fwin`; the default run re-derives `root-selector` and the same
+  Q4/Q5/Q6 outcomes as the committed baseline — that run IS the no-op control.
+- **31 the entry band.** "Bottom third" is where the Study OS taskbar happens to be. Blanc's
+  is a left rail, so Q1 read `entryPoints 0` and Q3 `primaryAction null` on a shell whose
+  entry band is its most prominent element. Band is now bottom-third OR the shell's own
+  `[data-lq-role="liquid"]` chrome — a strict SUPERSET, and `.os-taskbar` is in the bottom
+  third already, so Wired cannot move.
+- **32 Q10's markers.** Three of five were spelled in Study OS class names, so they measured
+  "is this Study OS". Blanc runs in its own window with no `.os-desktop` in the document and
+  scored 2/5 for being a different shell. Each gains an OR-ed shell equivalent; appended, not
+  replaced, and `l9b4-wired` records all three as already TRUE — provably unmovable.
+- **33 `setAttribute('data-theme', null)` writes the string "null".** Every surface until now
+  lived in the Study OS window where the attribute is always set. In the Blanc window the
+  restore stamped `data-theme="null"`, compared "null" against null, and VOIDed with the
+  self-refuting `theme left as null, wanted null` — while leaving the bogus attribute for the
+  next run. Absence is restored as absence.
+- **`--alt-class`, and Blanc's `aria-current`.** Q5's second cell is now `.is-dark` on the
+  shell's own root (`BlancShell.tsx:433`), not a Study OS palette the surface never renders:
+  5.27 → 5.74, both witnesses moved, restored off, store identical. Q2 needed the PRODUCT: the
+  nav stated the current route only in the `active` class, so a screen-reader user could reach
+  all nine routes and never learn which one they were on — the same gap Wired closed in
+  `a2e9c1ce`. `aria-current="page"` added; Q2 now reads `titleFrom: button.blanc-nav-btn`.
+
+**cat5 · Blanc = 9/10, controlled.** Control failed as required on Q2, Q3, Q4, Q5, Q10;
+restore verified (`rootClass` identical, theme null, storeIdentical, 0 plant residue).
+**Q4 stays NO and it is a real product finding, not an instrument one:** 22 controls scanned
+at rest — 11 taskbar (Hide, 9 sections, Exit) and 11 top (a full 6-control media transport
+plus search, fullscreen, language, Advanced, Dark). Blanc ships a `Context tools` disclosure
+that already tucks exactly these away, but `blanc-shell-liquid.css:87` only paints it under
+`max-width:780px and max-height:420px`, so the disclosure the shell authored is dead at every
+normal size. RULE C: **14 of 16.**
