@@ -488,6 +488,26 @@ export default function BlancShell({
             )}
             <span>{title}</span>
           </div>
+          {/* Out of the disclosure, because the disclosure now closes at every width and the
+              time is the one thing in the top bar that is read rather than operated. A <time>
+              is not a control, so keeping it visible costs the default view nothing. */}
+          <time className="blanc-clock">
+            {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </time>
+          {/* Blanc's one cross-tool capability (6b488974) and its dominant way in, so it stays
+              in the bar rather than one click inside the drawer: a Ctrl+F affordance that has
+              to be uncovered first is not an affordance. `primary` is the declaration the
+              shared vocabulary uses for "this is the way in" — the taskbar is the map, this is
+              the action. */}
+          <button
+            type="button"
+            className="blanc-icon-btn primary blanc-top-search"
+            title="Search Blanc (Ctrl+F)"
+            aria-label="Search Blanc"
+            onClick={() => setMasterSearchOpen(true)}
+          >
+            <Icon name="search" size={15} />
+          </button>
           <button
             type="button"
             className="blanc-compact-tools-toggle"
@@ -503,15 +523,6 @@ export default function BlancShell({
           >
             <FocusMusicBar />
             <div className="blanc-top-tools">
-            <button
-              type="button"
-              className="blanc-icon-btn"
-              title="Search Blanc (Ctrl+F)"
-              aria-label="Search Blanc"
-              onClick={() => setMasterSearchOpen(true)}
-            >
-              <Icon name="search" size={15} />
-            </button>
             {canExpandWorkspace && (
               <button
                 type="button"
@@ -539,9 +550,6 @@ export default function BlancShell({
               />
               <span>Dark</span>
             </label>
-            <time className="blanc-clock">
-              {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </time>
             </div>
           </div>
         </header>

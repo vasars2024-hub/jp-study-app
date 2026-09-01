@@ -2090,4 +2090,46 @@ at rest — 11 taskbar (Hide, 9 sections, Exit) and 11 top (a full 6-control med
 plus search, fullscreen, language, Advanced, Dark). Blanc ships a `Context tools` disclosure
 that already tucks exactly these away, but `blanc-shell-liquid.css:87` only paints it under
 `max-width:780px and max-height:420px`, so the disclosure the shell authored is dead at every
-normal size. RULE C: **14 of 16.**
+normal size. RULE C: still **13 of 16** — a 9/10 cell is not a closed cell.
+
+## 2026-08-31 — primary — cat5 Blanc CLOSES 10/10: the disclosure the shell already owned
+
+Q4 was the one real product finding left, and Blanc had shipped its own fix one media query
+away. `blanc-shell-liquid.css:87` painted the `Context tools` toggle only under
+`max-width:780px and max-height:420px`; everywhere else `.blanc-top-context` was
+`display: contents` and its eleven controls sat permanently in the chrome. Three changes, in
+the order they were forced:
+
+1. **The disclosure is unconditional.** Toggle always painted, region hidden unless `.is-open`,
+   the `.is-open` popover hoisted out of the media query. Driven live: closed 0 controls →
+   open 11 (Previous/Play/Next/Mix/Select a song/Volume/Search/Fullscreen/language/Advanced/
+   Dark, 1076x104) → reclosed 0, `aria-expanded` tracking each way. Nothing removed, nothing
+   unreachable. The clock moved OUT — it is read, not operated, and a `<time>` is not a control.
+2. **That broke Q1 and Q3, and the break was informative.** Blanc's two entry points had been
+   a volume slider and a language dropdown; with them behind the drawer `entryPoints` went to
+   0. Neither was ever an entry point — the old YES was weak. Master search is Blanc's dominant
+   cross-tool action (`6b488974`) and a Ctrl+F affordance behind a click is not an affordance,
+   so it is promoted into the bar and marked `primary`. `.blanc-top-search.primary` gets a real
+   accent fill in the same commit: a `primary` painting identically to every other icon button
+   is a claim nothing backs.
+3. **Correction 34 — a route map is one scan, not N.** Even at 13, the rail alone spent 9 of
+   Q4's 12-control budget, so no amount of tucking TOOLS away could pass. Q4 asks about
+   advanced tools; a navigation landmark's destinations are the surface's map. Three guards,
+   and the third is the one that matters: a real `nav`/`role=navigation`, at least 3, and
+   EXACTLY ONE control signature among them (Q10's gallery discriminator reused). Measured:
+   `.os-taskbar` also carries `role="navigation"` but holds THREE signatures
+   (`os-desktop-switch`, `os-task-win`, tray), so the Wired cell cannot collapse at all.
+
+**cat5 · Blanc = PASS 10/10, controlled.** Q1 `entryPoints 1`; Q3 `primaryAction
+button.blanc-icon-btn, explicitlyMarked true`; Q4 `13 → 5`, the one collapse published as
+`navRouteGroups: [{NAV.blanc-nav, BUTTON.blanc-nav-btn, routes 9, countedAs 1}]` beside
+`scannedBeforeNavCollapse: 13`; Q5 `.is-dark` 5.27 → 5.74. Control failed as required on Q2,
+Q3, Q4, Q5, Q10. Restore verified — rootClass identical, theme null, storeIdentical, 0 residue.
+
+**cat6 Blanc RE-RUN after the chrome change, not assumed:** still PASS 10/10, parity 8/8 both
+presentations, round trip 0 diffs, its own control failed as required. Banked.
+
+**RULE C: 14 of 16** — all eight Wired plus Blanc cat1–cat6, counted from this doc's own
+per-cell PASS lines. sampled-out, unchanged: City, Video, Library, Captures, Immersion,
+Manga, Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources,
+Scraper, Settings, YouTube. Next: **cat7 and cat8 on Blanc**, which close bullet 4.

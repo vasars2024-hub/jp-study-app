@@ -753,7 +753,49 @@ const SNAP = `(function(){
   }
   var summaryHeaders = chromeControls.filter(function(e){ return e.tagName === 'SUMMARY'; });
   var behindDisclosure = chromeControls.filter(inDisclosure);
-  var scanned = chromeControls.filter(function(e){ return !inDisclosure(e) && e.tagName !== 'SUMMARY'; });
+  var scannedRaw = chromeControls.filter(function(e){ return !inDisclosure(e) && e.tagName !== 'SUMMARY'; });
+  /*
+   * CORRECTION 34 -- A ROUTE MAP IS ONE SCAN, NOT N.
+   *
+   * Q4 asks whether ADVANCED TOOLS are tucked away and the default view is uncluttered. A
+   * navigation landmark's destinations are neither advanced nor tools: they are the surface's
+   * map, and a reader takes a map in as one object. The instrument already says this twice --
+   * repeatingRow drops a control inside a repeating li/-row/-card because repeated instances
+   * of one kind of thing are scanned as a group, and Q3 excludes NAV outright because
+   * navigation is not the surface's primary action. Blanc is where charging N bit: its shell
+   * is a nine-destination rail, so the rail alone spent 9 of the 12 budget and no amount of
+   * tucking the actual tools away could bring the number under the bar.
+   *
+   * THREE GUARDS KEEP THIS FROM BEING THE GENERAL ESCAPE HATCH --shell-chrome is documented
+   * not to be, and they are why the banked runs cannot move:
+   *   - a real landmark (nav / role=navigation), not any container a surface calls a rail;
+   *   - at least 3 of them, so a two-button group is still counted in full;
+   *   - EXACTLY ONE control signature among them, ignoring state classes. This is Q10's own
+   *     gallery discriminator reused rather than a new rule, and it is the guard that matters:
+   *     measured 2026-08-31, .os-taskbar carries role="navigation" and holds THREE signatures
+   *     (os-desktop-switch, os-task-win, tray), so the Wired cell does not collapse at all.
+   * The group counts once rather than zero, every collapsed group lands in navRouteGroups with
+   * its size, and scannedRaw is published beside it, so a reader can add them back and
+   * disagree with the rule instead of with the verdict. The bar stays at 12.
+   */
+  function ctlSignature(e){
+    return e.tagName + '.' + String(e.className || '').split(' ')
+      .filter(function(c){ return c && c !== 'active' && c !== 'is-active' && c !== 'selected' && c !== 'current'; })
+      .sort().join('.');
+  }
+  var navRouteGroups = [];
+  var navCollapsed = [];
+  rq('nav,[role="navigation"]').filter(painted).forEach(function(lm){
+    var inside = scannedRaw.filter(function(e){ return e !== lm && lm.contains(e) && navCollapsed.indexOf(e) < 0; });
+    if (inside.length < 3) return;
+    var sigs = [];
+    inside.forEach(function(e){ var s = ctlSignature(e); if (sigs.indexOf(s) < 0) sigs.push(s); });
+    if (sigs.length !== 1) return;
+    navRouteGroups.push({ landmark: lm.tagName + '.' + String(lm.className || ''),
+      signature: sigs[0], routes: inside.length, countedAs: 1 });
+    navCollapsed = navCollapsed.concat(inside.slice(1));
+  });
+  var scanned = scannedRaw.filter(function(e){ return navCollapsed.indexOf(e) < 0; });
   var allDetails = rq('details');
 
   // ---- Q5's population: every painted text run, and its worst ratio. ----------------------
@@ -1055,6 +1097,7 @@ const SNAP = `(function(){
           shellChromeSelector: SHELL_SEL || null, shellControls: shellControls.length,
           shellList: shellControls.slice(0,24).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.title || e.tagName).trim().slice(0,24); }),
+          scannedBeforeNavCollapse: scannedRaw.length, navRouteGroups: navRouteGroups,
           chromeControlsRaw: chromeControls.length, summaryHeaders: summaryHeaders.length,
           behindDisclosure: behindDisclosure.length,
           disclosures: { total: allDetails.length, open: allDetails.filter(function(d){ return d.open; }).length },
