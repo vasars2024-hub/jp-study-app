@@ -126,6 +126,18 @@
     "test-only-module:src/renderer/components/liquid/LiquidInspector.tsx": {
       "status": "pending",
       "note": "Same L2 boundary as LiquidAppScaffold.tsx. Fills the scaffold's inspector slot and carries the required close path (control, Escape, caller state) plus focus return. No app has migrated, so nothing imports it yet. Closes when L4 migrates the Video player."
+    },
+    "orphan-module:src/media/StudyBottomBar.tsx": {
+      "status": "pending",
+      "note": "Last residue of boss-audit finding 1 against 9fa37b59, the build closure that committed product modules ahead of their consumer. That audit reported 15 unclassified identities at HEAD; twelve were closed by wiring real consumers and these three could not be, because their only consumer is VideoCoreStudyOverlay.tsx and that file is mid-rewrite in the shared tree (936 insertions / 662 deletions, uncommitted, owned by the study-workspace track) alongside untracked src/media/studyWorkspace.css. Wiring it here would mean committing another track's in-flight refactor. Pending, not accepted: the bar IS the replacement for .study-control-dock and is meant to render. Remove all three entries when that overlay rewrite lands and the audit reports them reachable."
+    },
+    "orphan-module:src/media/StudyDocks.tsx": {
+      "status": "pending",
+      "note": "Same stranded slice as StudyBottomBar.tsx — the dock layout half. It takes a blockId -> element map from the overlay, so the overlay rewrite is the only thing that can import it. Closes with that commit."
+    },
+    "orphan-module:src/media/StudyWorkspaceCustomizer.tsx": {
+      "status": "pending",
+      "note": "Same stranded slice as StudyBottomBar.tsx — the Customize Workspace chrome. It renders null unless the overlay passes `customizing`, so it too has exactly one possible consumer. Closes with that commit."
     }
   }
 }
