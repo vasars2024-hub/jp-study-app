@@ -356,6 +356,30 @@ both read `failed`. Row 2 above is really the second. The user-facing next step 
 in both ("queue it from the Media library"), so this buys no behaviour — it is recorded here
 so the next worker does not read `failed` as proof a job ran.
 
+**`581a5b0b` — clicking Transcribe twice said "queued" and restarted the clock at zero.**
+The queue already deduplicates, so no second Whisper pass was ever run — but
+`enqueueTranscription` answers `{ok: true}` whether it queued something or found the job
+already there, so the route said `queued` about a job eight minutes old and the popup started
+`followTranscription` on its own clock: *"Transcribing in GrammarX… 4s"* over a run well into
+its second chunk. This is the same-episode-twice contingency the plan inherits from the
+qBittorrent list. New `follow` action behind an `alreadyQueued` fact, ordered **above**
+`transcriberOffline` (a queued job runs when the host returns) and **below** `report` (a
+finished transcript still beats a stale queue entry).
+
+LIVE on `OFDfLnG987E`, audio-only, one session — the POST route discriminating four ways:
+
+| request | answer |
+| --- | --- |
+| POST #1, nothing queued | `queued` |
+| POST #2, **6 s later** | `running`, `queuedAt 1788263532440` → the popup prints **7s**, not 0s |
+| GET while running | `pending` **with the same `queuedAt`**, so a late poller reads the job's clock |
+| POST on transcribed `GSx0rW2aHs8` | `transcribed`, **cueCount 8** — `report` still outranks `follow` |
+| POST on `dQw4w9WgXcQ` (no media row) | `refused / notDownloaded` — `follow` never fires without one |
+
+Then `cancelTranscription` on that job: status went `pending` → `failed`, and `queuedAt`
+vanished with it rather than going stale. 4 planner tests, 3 of them controls, plus one on the
+popup wiring; adverse control forcing the branch off turns exactly 2 red.
+
 ### 2026-09-01 — gate 11 polling follows the queue's real sink
 
 - `3ef98483` adds one shared status resolver and makes both POST deduplication and GET status
