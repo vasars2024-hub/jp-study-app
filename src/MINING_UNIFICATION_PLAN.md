@@ -157,4 +157,51 @@ An empty result is a FINDING: say so and stop.
 
 ## Progress
 
-_(none yet — opened 2026-08-16)_
+### 2026-09-01 — gate 5 CLOSES, measured on the real profile
+
+The catalogue half of this plan was absorbed by `FILES_APP_PLAN.md`, so gate 5 was not built
+here — it was **measured** here, against the shipped `buildFilesIndex`. The instrument is a
+`--mining` mode on the existing gate-1 census (`src/.coordination/files-app/census.ts`), not a
+new probe: it reuses the same one `buildFilesIndex` call and filters it with the PRODUCTION
+`mineabilityOf`, so a private copy of that predicate cannot make the census agree with itself
+and nothing else.
+
+```
+npx esbuild src/.coordination/files-app/census.ts --bundle --platform=node \
+  --format=cjs --external:better-sqlite3 --outfile=debug/filesapp-census.cjs
+node debug/filesapp-census.cjs --mining [--detail] [--dupes]
+```
+
+**ONE call, 1,985 rows, 93 mineable, 1,892 refused.** By media type: 20 book, 71 subtitle,
+2 transcript. By provenance: 20 `book-text`, 61 `human-subs`, 8 `whisper-transcript`,
+4 `unknown`. `auto-captions` is **STATED as empty**, not omitted — the gate asks for exactly
+that. Every refusal is NAMED: 1,666 `kindHasNoText`, 143 `notFileBacked`, 83 `mediaHasNoText`;
+zero unnamed.
+
+**The control walks the directories itself**, from the gate's own words rather than from the
+enumerators, because the index checking its own homework proves nothing — `dictionary` was once
+spelt `dictionaries` inside an enumerator and printed a confident, wrong zero. Distinct paths
+vs files on disk: yt-transcripts **2 / 2**, harvested anime subtitles **16 / 16**, epubs
+**20 / 20**, downloads sidecars **48 / 48**. No category is 0 while files exist for it.
+
+**The instrument was wrong twice before the product was, and both are worth carrying:**
+(a) `mineabilityOf` returns `{ mineable }`, not `{ ok }` — reading `.ok` scored **0 of 1,985**
+mineable and 93 refusals with `undefined` as their reason, which reads exactly like a dead
+feature; (b) matching `\downloads\` as a substring also matched `C:\Users\<user>\Downloads\`,
+so a file that exists was reported as a row pointing at a file that is gone. Anchor at the
+userData root. A third, smaller one: a `filter(a !== '--mining')` argv guard let `--detail`
+become the userData path, and the census walked a directory of that name and printed an
+empty report next to a summary claiming a finding.
+
+**KNOWN DEFECT, quantified and NOT fixed here — the next slice.** 54 index rows cover the 48
+downloads sidecars: **6 duplicate rows, every one of them the `download` + `media-subtitle`
+enumerator pair claiming the same file** (3 videos × `.ja.vtt` + `.en.vtt`, listed by
+`node debug/filesapp-census.cjs --dupes`). 6 of 1,985. The Files app therefore shows those six
+subtitles twice and any asset count overstates by six. Gate 5's own FAIL condition is "a
+category returning 0 while files exist", which does not occur, so it closes — but the count is
+recorded as 54/48 rather than rounded to 48.
+
+Gates 6, 7, 8 look substantially built by the same absorption (`shared/filesApp/mining.ts`
+carries `mineabilityOf`, `buildFilesMineDrafts`, `deckProvenanceFor` and
+`buildFilesMineNoteRequest`); they are NOT claimed here, because none has been measured
+against its own words yet. 1 of 12 closed.
