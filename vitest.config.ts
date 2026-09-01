@@ -1,9 +1,28 @@
 // Standalone Vitest config — pure logic in src/shared, plus main-process
 // modules that can run under a stubbed `electron` (see src/main/__tests__).
 // Deliberately separate from the forge/vite build configs, which are untouched.
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { searchForWorkspaceRoot } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+// Vite refuses to transform a file outside `server.fs.allow`, whose default is the
+// project root. In a git worktree `node_modules` is a SYMLINK to the main checkout's
+// copy, and Vite realpaths it — so every `?url` import resolves outside the root and
+// dies with `Denied ID …/pdfjs-dist/build/pdf.worker.min.mjs?url`. That took out
+// novelReaderCanvas.test.tsx (10) and novelReaderProgressGuard.test.ts (1) on
+// `wt/files-app` only, which reads exactly like a product regression and is not one:
+// the same two suites are green in the main checkout, same commit.
+//
+// Allow wherever `node_modules` actually lives. In the main checkout that realpaths
+// to the repo root, which is already allowed, so this is a no-op there.
+// `searchForWorkspaceRoot` is Vite's own default, kept verbatim so this ADDS a path
+// and never narrows one — a hand-written `[__dirname]` would silently drop whatever
+// the default resolved to.
+const REAL_MODULES = realpathSync(resolve(__dirname, 'node_modules'));
+
 export default defineConfig({
+  server: { fs: { allow: [searchForWorkspaceRoot(__dirname), REAL_MODULES] } },
   test: {
     include: [
       'src/shared/__tests__/**/*.test.ts',
