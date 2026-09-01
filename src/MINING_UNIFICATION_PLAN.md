@@ -125,13 +125,13 @@ An empty result is a FINDING: say so and stop.
 1. `YouTubeDownloadOptions` carries an audio-language field, it reaches the yt-dlp format
    string, and a video with two audio tracks downloads the Japanese one — proven by the
    selected track's language, not by the flag being set.
-   <!-- status: open; evidence: 2026-09-01 9d7c5f62 -- the field EXISTS and reaches the format string, proven live:
-        lSRBZNEjbpg -> `-f bv*[ext=mp4]+140/bv*+140`, format_id 140 chosen because the
-        MANIFEST tags it `ja`. What is NOT proven is the gate's third clause: 11 videos across
-        5 channels were probed (`--gateAudio`) and every one had 0 or 1 distinct audio
-        language, so "a video with TWO audio tracks downloads the Japanese one" has no live
-        subject. yt-dlp 2026.06.09's default player client does not surface YouTube's
-        multi-language audio here; the `web` client errors "The page needs to be reloaded". -->
+   <!-- status: closed; evidence: 2026-09-01 86014306 -- live on OFDfLnG987E, whose manifest
+        exposed 12 distinct languages after the production probe selected
+        `web_embedded,default`. Asking for `ja` selected exact format 251-3 because the MANIFEST
+        tags it `ja`; the app's audio-only args downloaded that exact track to a 1,177,311-byte,
+        32.879-second m4a (SHA-256 1D2B7CCD...9CB6B21). SAME-video negative control `zh`
+        refused `noSuchAudioLanguage`, named all 12 available languages, and downloaded nothing.
+        `original` retained both pre-feature format strings byte-for-byte. -->
 2. Negative control for gate 1: asking for a language the video does not have fails with a
    named message, not a silent fall back to the default track.
    <!-- status: closed; evidence: 2026-09-01 9d7c5f62 -- live, twice, on real videos and on the SAME video as gate 1's
@@ -225,7 +225,12 @@ An empty result is a FINDING: say so and stop.
         EXACT NEXT SLICE: make the status route answer from the sink the queue actually writes
         (count cues in the media row's generated track) while keeping the yt-transcripts read
         for the playlist path, and give a retired/failed job a state of its own so it stops
-        reading as pending. -->
+        reading as pending.
+        ADVANCED 2026-09-01 3ef98483: that product defect is fixed. The status route now
+        prioritises the generated subtitle track on the media row, retains the legacy playlist
+        fallback, reports zero cues honestly, and distinguishes an active queue job from a
+        retired job with no artifact. Forty focused tests pass. Gate remains OPEN until the
+        live POST/status pair returns the measured cue count and the catalogue sees the result. -->
    <!-- trap: the ONE reason this could not be measured before was never "an exclusive
         Electron". It was that a second dev instance had no extension server at all -- it lost
         the bind to 18765 and still advertised it. See 660f10c7; JP_EXTENSION_PORT fixes it. -->
@@ -235,6 +240,16 @@ An empty result is a FINDING: say so and stop.
    <!-- status: open; evidence: the four full gates run every turn, but `npx vitest run` is not clean on this tree -- see the turn logs for the named failures. -->
 
 ## Progress
+
+### 2026-09-01 — gate 11 polling follows the queue's real sink
+
+- `3ef98483` adds one shared status resolver and makes both POST deduplication and GET status
+  consult the generated subtitle artifact that `transcriptionJobs` actually records.
+- A live job remains `pending`; a retired job with no artifact is `failed` with
+  `job-ended-without-transcript`; a generated track returns its parsed cue count, including 0.
+- Focused evidence: 40/40 tests pass across `extensionTranscribe` and `transcriptionJobs`.
+- Gate 11 remains open pending one live POST/status/catalogue re-drive; this commit fixes the
+  exact defect found by the prior live run rather than converting source inspection into credit.
 
 ### 2026-09-01 — gates 3 and 11 driven live at last, and what actually blocked them
 
@@ -262,6 +277,17 @@ the same shape as `f104600b` — things a git worktree does not inherit:
 Measured outcomes are recorded in the gate 3 and gate 11 tags above, including the one number
 that must not be quoted as a pass: the transcript produced is **1 cue of degenerate
 repetition**, on `whisper-base`, which is NOT the tier `defaultWhisperTier('ja')` picks.
+### 2026-09-01 — gate 1 CLOSES on a real multi-dub download
+
+`86014306`. The blocker was the probe, not the absence of a subject: yt-dlp's logged-out
+default client exposes only the primary track on current multi-dub videos. The shared probe
+now asks `web_embedded,default`, keeping the fallback while exposing alternate dubs; production
+and `--gateAudio` import the same argument builder.
+
+Live on `OFDfLnG987E`: 12 distinct manifest languages; `ja` selected exact format `251-3`
+tagged `ja`, and the app's audio-only arguments produced a 1,177,311-byte, 32.879-second m4a.
+Same-video `zh` control refused `noSuchAudioLanguage` and downloaded nothing. The `original`
+control retained both legacy format strings byte-for-byte. Gate 1 is CLOSED; mining is 9/12.
 
 ### 2026-09-01 — gate 5 CLOSES, measured on the real profile
 

@@ -26,7 +26,10 @@ import {
   type ExtensionContentCategory,
   type ExtensionMineMode,
 } from '../shared/extensionCapture';
-import { planExtensionTranscribe } from '../shared/extensionTranscribe';
+import {
+  planExtensionTranscribe,
+  resolveExtensionTranscribeStatus,
+} from '../shared/extensionTranscribe';
 import { youtubeIdFromFileName } from '../shared/filesApp/catalog';
 import { extensionContractManifest } from '../shared/extensionContract';
 import { extractReadableFromHtml, htmlToText } from './readabilityExtract';
@@ -1409,12 +1412,13 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
    * MINING gate 11 — transcribe the page being watched.
    *
    * Composes what already exists rather than adding a second transcription
-   * path: `readTranscriptCueCount` answers immediately when the video is
-   * already transcribed, and otherwise the media row this app downloaded is
+   * path: the generated track on the media row (with the older playlist cue
+   * file as a fallback) answers immediately when the video is already
+   * transcribed, and otherwise the media row this app downloaded is
    * handed to the SAME Whisper queue `transcriptionJobs` runs for the Media
-   * library. The result therefore lands at `yt-transcripts/<id>.json`, which is
-   * where the Files-app transcripts enumerator reads — so it is mineable later
-   * without returning to the page, which is the second half of the gate.
+   * library. The result lands as a generated subtitle record on that media row,
+   * which the Files-app index reads — so it is mineable later without returning
+   * to the page, which is the second half of the gate.
    *
    * Every refusal is NAMED by `planExtensionTranscribe` and carries its own
    * i18n key. Nothing here returns a bare failure.
@@ -1426,7 +1430,12 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       const body = JSON.parse(raw || '{}') as { url?: string };
       const pageUrl = typeof body.url === 'string' ? body.url.trim() : '';
       const { readTranscriptCueCount } = await import('./ytPlaylists');
-      const { enqueueTranscription, transcribableItems, transcriptionHostReady } =
+      const {
+        enqueueTranscription,
+        transcribableItems,
+        transcriptionArtifactStatus,
+        transcriptionHostReady,
+      } =
         await import('./transcriptionJobs');
 
       const videoId = parseYoutubeVideoId(pageUrl);
@@ -1438,10 +1447,11 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
             (entry) => youtubeIdFromFileName(entry.fileName || entry.path || '') === videoId,
           )
         : undefined;
+      const mediaCueCount = item ? transcriptionArtifactStatus(item.id).cueCount : null;
       const plan = planExtensionTranscribe({
         pageKind: detectPageKind(pageUrl),
         videoId,
-        existingCueCount: videoId ? readTranscriptCueCount(videoId) : null,
+        existingCueCount: mediaCueCount ?? (videoId ? readTranscriptCueCount(videoId) : null),
         mediaId: item?.id ?? null,
         mediaFileExists: !!item?.path && fs.existsSync(item.path),
         transcriberReady: transcriptionHostReady(),
@@ -1494,14 +1504,24 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     if (!requireAuth(req, res)) return;
     const videoId = url.searchParams.get('videoId') ?? '';
     const { readTranscriptCueCount } = await import('./ytPlaylists');
-    const cueCount = videoId ? readTranscriptCueCount(videoId) : null;
+    const { transcribableItems, transcriptionArtifactStatus } = await import('./transcriptionJobs');
+    const item = videoId
+      ? transcribableItems().find(
+          (entry) => youtubeIdFromFileName(entry.fileName || entry.path || '') === videoId,
+        )
+      : undefined;
+    const artifact = item
+      ? transcriptionArtifactStatus(item.id)
+      : { cueCount: null, active: false };
+    const status = resolveExtensionTranscribeStatus({
+      playlistCueCount: videoId ? readTranscriptCueCount(videoId) : null,
+      mediaCueCount: artifact.cueCount,
+      active: artifact.active,
+    });
     json(res, 200, {
-      ok: true,
+      ok: status.state !== 'failed',
       videoId,
-      // `null` means "no transcript file", which is genuinely different from a
-      // transcript that produced 0 cues. Both are reported as themselves.
-      state: cueCount === null ? 'pending' : 'transcribed',
-      cueCount,
+      ...status,
     });
     return;
   }

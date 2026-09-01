@@ -1009,6 +1009,33 @@ export function transcribableItems(): MediaItem[] {
 }
 
 /**
+ * The artifact and activity state consumed by the extension status route.
+ * Reads the same generated subtitle record this queue writes; the old
+ * `yt-transcripts` playlist store is a separate fallback in the route.
+ */
+export function transcriptionArtifactStatus(mediaId: string): {
+  cueCount: number | null;
+  active: boolean;
+} {
+  const active = queue.some(
+    (job) => job.mediaId === mediaId && (job.kind ?? 'transcribe') === 'transcribe',
+  );
+  const item = host?.listItems().find((entry) => entry.id === mediaId);
+  const record = [...(item?.subtitles ?? [])]
+    .filter((entry) => entry.source === 'generated' && entry.derivation !== 'en-ja-fusion')
+    .sort((a, b) => b.addedAt - a.addedAt)[0];
+  if (!record) return { cueCount: null, active };
+  try {
+    return {
+      cueCount: parseSubtitles(fs.readFileSync(subtitleFilePath(record), 'utf-8')).length,
+      active,
+    };
+  } catch {
+    return { cueCount: null, active };
+  }
+}
+
+/**
  * The provenance sidecar for one fused track, or `null` when there is none.
  *
  * `null` is the honest answer for four different situations and the caller does

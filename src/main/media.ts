@@ -19,6 +19,7 @@ import {
   audioLangRefusalMessage,
   normalizeYouTubeAudioLang,
   planYoutubeAudioTrack,
+  youtubeAudioProbeArgs,
   youtubeFormatArgs,
   type YtDlpFormat,
 } from '../shared/ytAudioLang';
@@ -241,7 +242,7 @@ export interface DownloadYoutubeResult {
  */
 async function probeYoutubeAudioFormats(url: string, audioLang: unknown): Promise<YtDlpFormat[] | null> {
   if (normalizeYouTubeAudioLang(audioLang) === 'original') return [];
-  const res = await ytDlpJson(['-J', '--no-playlist', '--no-warnings', url]);
+  const res = await ytDlpJson(youtubeAudioProbeArgs(url));
   if (!res.ok) return null;
   const formats = (res.data as { formats?: unknown } | null)?.formats;
   return Array.isArray(formats) ? (formats as YtDlpFormat[]) : null;
