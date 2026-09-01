@@ -297,7 +297,38 @@ const CONDITION_SNAPSHOT = `JSON.stringify({
   fontLg: getComputedStyle(document.documentElement).getPropertyValue('--font-size-lg').trim()
 })`;
 
+/*
+ * CORRECTION 25b. A TOKEN THAT CHANGED IS NOT TEXT THAT GREW. Guard (a) first compared the
+ * `--font-size-*` custom properties, which the product's own interpreter had demonstrably
+ * rewritten (0.8125rem -> 14px) — so it passed while the measured surface was, for all this file
+ * could tell, ignoring those tokens entirely. That is the same false PASS as measuring an
+ * unzoomed window: the condition is "on" and the surface never received it.
+ * The real question is whether the SURFACE'S OWN rendered text changed size, so it is asked of
+ * the surface's visible text-bearing elements. Reported as the distinct sizes and their
+ * histogram, never a single number, because a surface where only some text scales is a finding
+ * rather than a pass or a fail.
+ */
+const TEXT_SAMPLE = (surface) => `JSON.stringify((function () {
+  var root = ${rootExpr(surface)};
+  if (!root) return null;
+  var hist = {};
+  var n = 0;
+  [].slice.call(root.querySelectorAll('*')).forEach(function (el) {
+    if (n >= 600) return;
+    if (!el.checkVisibility || !el.checkVisibility({ contentVisibilityAuto: true })) return;
+    var own = [].slice.call(el.childNodes).some(function (c) {
+      return c.nodeType === 3 && c.textContent.trim().length > 0;
+    });
+    if (!own) return;
+    n += 1;
+    var px = Math.round(parseFloat(getComputedStyle(el).fontSize) * 10) / 10;
+    hist[px] = (hist[px] || 0) + 1;
+  });
+  return { sampled: n, hist: hist };
+})())`;
+
 async function conditionSnapshot() { return JSON.parse(await ev(CONDITION_SNAPSHOT)); }
+async function textSample() { return JSON.parse(await ev(TEXT_SAMPLE(SURFACE))); }
 
 // The two halves of the round trip are separate so the sweep can sit between them and so the
 // "still applied afterwards" re-read (guard b) has something to compare against.
@@ -310,6 +341,7 @@ async function conditionApply() {
     await sleep(150);
   }
   const before = await conditionSnapshot();
+  const textBefore = UI_REQUEST ? await textSample() : null;
   /*
    * CORRECTION 25a. `setZoom`, NOT `applyZoom`, and it took a landed fix to notice.
    * `applyZoom` produces the same DOM as `setZoom` minus persistence — which reads like the
@@ -333,8 +365,9 @@ async function conditionApply() {
   }
   await sleep(SETTLE);
   const during = await conditionSnapshot();
+  const textDuring = UI_REQUEST ? await textSample() : null;
   const plan = UI_REQUEST ? JSON.parse(await ev('JSON.stringify(window.__cat4plan)')) : null;
-  return { before, during, plan };
+  return { before, during, plan, textBefore, textDuring };
 }
 
 // Restore uses the PRODUCT'S own no-argument calls: `applyZoom(loadZoom())` re-applies whatever is
@@ -353,7 +386,12 @@ async function conditionRestore(before) {
   await sleep(SETTLE);
   const after = await conditionSnapshot();
   const fields = ['appZoomVar', 'rootStyle', 'zoomPersisted', 'uiCss', 'uiPersisted', 'fontSm', 'fontMd', 'fontLg'];
-  const drifted = fields.filter((f) => String(before[f]) !== String(after[f]));
+  // `uiCss` is `null` when the product has not created its one `<style>` element yet and `''`
+  // once it has and there is nothing to write. Both mean "no customization CSS is applied", and
+  // the effective state is checked by the resolved font tokens below regardless — so treating
+  // the element's mere existence as drift VOIDs an otherwise clean round trip. It did, once.
+  const norm = (f, v) => (f === 'uiCss' ? String(v || '') : String(v));
+  const drifted = fields.filter((f) => norm(f, before[f]) !== norm(f, after[f]));
   return { after, drifted };
 }
 
@@ -1481,9 +1519,31 @@ const BARS_OF = (m) => ({
   if (cond) {
     const stillOn = await conditionSnapshot();
     const zoomChanged = ZOOM ? cond.during.zoomFactor !== cond.before.zoomFactor : null;
-    const fontChanged = UI_REQUEST
+    // CORRECTION 25b: the tokens moving is necessary but NOT sufficient. The surface's own
+    // rendered text has to move with them, or the condition never reached what is being scored.
+    const tokensChanged = UI_REQUEST
       ? ['fontSm', 'fontMd', 'fontLg'].some((f) => cond.during[f] !== cond.before[f])
       : null;
+    const renderedTextChanged = UI_REQUEST
+      ? Boolean(cond.textBefore && cond.textDuring
+        && JSON.stringify(cond.textBefore.hist) !== JSON.stringify(cond.textDuring.hist))
+      : null;
+    /*
+     * HOW MUCH of the surface the request actually reached, because "changed" is a bit and this
+     * bullet needs a number. One element out of seventy moving satisfies `renderedTextChanged`
+     * and is not a working text-scale feature — Settings measured exactly that.
+     * A LOWER BOUND by construction: the histogram counts sizes, not identities, so elements
+     * that move between two already-populated buckets are invisible to it. It is reported as a
+     * floor and never as the reach.
+     */
+    const reach = (() => {
+      if (!UI_REQUEST || !cond.textBefore || !cond.textDuring || !cond.textBefore.sampled) return null;
+      const keys = new Set([...Object.keys(cond.textBefore.hist), ...Object.keys(cond.textDuring.hist)]);
+      let delta = 0;
+      keys.forEach((k) => { delta += Math.abs((cond.textBefore.hist[k] || 0) - (cond.textDuring.hist[k] || 0)); });
+      return Math.round((delta / 2 / cond.textBefore.sampled) * 1000) / 10;
+    })();
+    const fontChanged = UI_REQUEST ? (tokensChanged && renderedTextChanged) : null;
     const zoomHeld = ZOOM ? stillOn.zoomFactor === cond.during.zoomFactor : null;
     const fontHeld = UI_REQUEST
       ? ['fontSm', 'fontMd', 'fontLg'].every((f) => stillOn[f] === cond.during[f])
@@ -1501,6 +1561,11 @@ const BARS_OF = (m) => ({
       zoomFactorDuring: cond.during.zoomFactor,
       fontTokensBefore: { sm: cond.before.fontSm, md: cond.before.fontMd, lg: cond.before.fontLg },
       fontTokensDuring: { sm: cond.during.fontSm, md: cond.during.fontMd, lg: cond.during.fontLg },
+      tokensChanged,
+      renderedTextChanged,
+      textReachLowerBoundPct: reach,
+      surfaceTextBefore: cond.textBefore,
+      surfaceTextDuring: cond.textDuring,
       applied: (zoomChanged !== false) && (fontChanged !== false),
       // (b) was it still on when the last number was taken?
       heldThroughSweep: (zoomHeld !== false) && (fontHeld !== false),
