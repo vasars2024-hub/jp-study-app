@@ -44,10 +44,16 @@
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface captures
  *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface captures --jank
+ *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface library --under-load
  *
  * --jank runs the drag leg a second time with the interaction probe's 120 ms renderer
  * blocks. It is the sensitivity control: if the distribution does NOT get worse, the
  * recorder is not seeing the frames it claims to and every number in the run is void.
+ *
+ * --under-load adds drag and resize legs measured WHILE the surface's own `heavy` work is
+ * running, which is L11 bullet 3's actual question and which no other leg here asks — the
+ * three gestures above run on an idle surface and `heavy` is measured beside them, not under
+ * them. It implies --jank. See the LOAD_ARM block for the three things it refuses without.
  */
 'use strict';
 const fs = require('node:fs');
@@ -115,6 +121,62 @@ const scrollProof = `(() => {
   if (!s.restored) return 'REFUSE: the scroll load did not restore its starting offset ' + s.start + ' on ' + s.sel;
   return 'scrolled ' + s.sel + ' to ' + Math.round(s.reached) + ' px over ' + s.ticks + ' ticks (overflow ' + s.over + '), restored to ' + s.start;
 })()`;
+
+/**
+ * `--under-load` — L11 bullet 3's own words, which no leg above answers.
+ *
+ * The bullet is "drag/resize at target frame rate WHILE media, dictionaries, and large lists are
+ * ACTIVE". This harness measured the three gestures on an otherwise idle surface, and measured
+ * each surface's heaviest real work SEPARATELY as main-process availability. Both are real
+ * numbers and neither is the question: a surface can drag at the ceiling when nothing else is
+ * happening and drop frames the moment its own list is scrolling.
+ *
+ * So the load is armed AROUND the gesture instead of beside it. Every `heavy.js` here is a
+ * one-shot expression that self-terminates (`scrollAll` runs 91 ticks of 20 ms, ~1.8 s) and a
+ * gesture outlives that, so the load re-arms on a timer for as long as the gesture runs.
+ *
+ * THREE THINGS IT REFUSES WITHOUT, each a shape this repo has already paid for:
+ *
+ *  1. A HARD DEADLINE IN THE RENDERER. `deleting-probe-state-is-not-a-stop` is banked here: a
+ *     run that dies mid-gesture must not leave a scroll loop driving the app into the NEXT
+ *     run's numbers. The renderer stops itself on wall-clock time even if nothing ever calls
+ *     the stop, and every tick re-checks its own generation id so a second arm cannot leave the
+ *     first one running.
+ *  2. CYCLES ACROSS THE GESTURE, not merely a load that once started. The counter is read
+ *     before and after the reading; fewer than two cycles in between means the load was over
+ *     (or throttled to nothing) while the frames were being recorded, and the leg is VOID
+ *     rather than a flattering PASS. This is the same false-pass shape as the `heavy` leg's
+ *     `proof`, one layer up.
+ *  3. THE SENSITIVITY CONTROL. A clean under-load reading only means something if the recorder
+ *     can see load at all, so `--under-load` turns `--jank` on and the existing control check
+ *     applies: if injected 120 ms blocks do NOT worsen the distribution, every number is void.
+ */
+const LOAD_ARM = (heavyJs, deadlineMs) => `(() => {
+  const gen = (window.__lqLoadGen = (window.__lqLoadGen || 0) + 1);
+  const run = function () { return ${heavyJs}; };
+  const rec = { gen, cycles: 0, refusals: 0, last: null, until: Date.now() + ${deadlineMs} };
+  window.__lqLoad = rec;
+  const cycle = () => {
+    // Generation AND deadline, both checked here rather than by whoever stops it. An aborted
+    // run leaves no stopper behind; it must still stop.
+    if (window.__lqLoadGen !== gen || Date.now() > rec.until) { window.__lqLoad = null; return; }
+    let r;
+    try { r = String(run()); } catch (e) { r = 'REFUSE: ' + String(e); }
+    rec.last = r.slice(0, 120);
+    if (/^REFUSE/.test(r)) rec.refusals += 1; else rec.cycles += 1;
+    setTimeout(cycle, ${Math.max(200, Math.min(deadlineMs, 2000))});
+  };
+  cycle();
+  return 'armed gen=' + gen + ' until=' + rec.until;
+})()`;
+
+const LOAD_READ = `JSON.stringify(window.__lqLoad
+  ? { gen: window.__lqLoad.gen, cycles: window.__lqLoad.cycles, refusals: window.__lqLoad.refusals, last: window.__lqLoad.last }
+  : { gen: null, cycles: 0, refusals: 0, last: null })`;
+
+// Bumping the generation is what stops it; the record is cleared by the loop's own next tick,
+// so nothing here depends on the stopper having run.
+const LOAD_STOP = `(window.__lqLoadGen = (window.__lqLoadGen || 0) + 1, window.__lqLoad = null, 'stopped')`;
 
 const SPECS = {
   captures: {
@@ -881,6 +943,7 @@ const arg = (n, d) => {
 };
 const has = (n) => process.argv.includes(`--${n}`);
 const SURFACE = arg('surface', '');
+const UNDER_LOAD = has('under-load');
 const spec = SPECS[SURFACE];
 if (!spec) {
   console.error(`REFUSE - --surface must be one of: ${Object.keys(SPECS).join(', ')}`);
@@ -1152,8 +1215,47 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   legs.idle = ps(PPROBE, ['-Samples', '40', '-DurationMs', String(spec.heavy.durationMs), '-Label', `${SURFACE}: idle`, '-AsJson']);
 
   // --- 6. the sensitivity control, when asked for -----------------------------------
-  if (has('jank')) step('drag CONTROL (-Jank)');
-  if (has('jank')) legs.dragJank = ps(IPROBE, ['-Interaction', 'drag', ...interactionScope, '-Jank', '-AsJson']);
+  // `--under-load` implies it: a clean reading taken under load is only readable next to a
+  // control that demonstrably makes the same recorder look worse.
+  const wantJank = has('jank') || UNDER_LOAD;
+  if (wantJank) step('drag CONTROL (-Jank)');
+  if (wantJank) legs.dragJank = ps(IPROBE, ['-Interaction', 'drag', ...interactionScope, '-Jank', '-AsJson']);
+
+  // --- 6b. THE BULLET'S OWN QUESTION: the gestures WHILE the surface's real work runs ------
+  // Extra legs, never a replacement for 2-4: the idle readings taken minutes ago in this same
+  // session, against this same ceiling, are the control this comparison needs.
+  if (UNDER_LOAD) {
+    legs.underLoad = {};
+    for (const g of ['drag', 'resize']) {
+      step(`${g} UNDER LOAD (${spec.heavy.label})`);
+      // The gesture's own duration is not exposed, so the deadline covers the slowest observed
+      // reading with room to spare; the loop stops itself either way.
+      await ev(LOAD_ARM(spec.heavy.js, 120000));
+      const armed = JSON.parse(await ev(LOAD_READ));
+      let reading;
+      let after;
+      try {
+        reading = ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']);
+      } finally {
+        after = JSON.parse(await ev(LOAD_READ));
+        await ev(LOAD_STOP);
+      }
+      const cyclesDuring = after.cycles - armed.cycles;
+      legs.underLoad[g] = {
+        p50: reading.frame_p50_ms,
+        p95: reading.frame_p95_ms,
+        max: reading.frame_max_ms,
+        over100: reading.frames_over_100,
+        mainMax: reading.main_max_ms,
+        sceneStable: reading.scene_stable,
+        load: { label: spec.heavy.label, cyclesDuring, refusals: after.refusals, last: after.last },
+      };
+    }
+    // Restore whatever the load disturbed, through the load's own receipt, before the surface is
+    // handed back. `scrollAll` returns its scroller to the offset it started on; anything that
+    // refused is reported rather than assumed harmless.
+    legs.underLoadProof = spec.heavy.proof ? await ev(spec.heavy.proof) : null;
+  }
 
   const memAfter = await get('/mem');
 
@@ -1188,7 +1290,31 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   if (legs.heavy.max_ms > L0.mainBlockBarMs) {
     findings.push(`heaviest real operation (${spec.heavy.label}): main blocked ${legs.heavy.max_ms} ms, over the ${L0.mainBlockBarMs} ms bar`);
   }
-  if (has('jank') && legs.dragJank && legs.dragJank.frames_over_100 <= (legs.drag.frames_over_100 || 0)) {
+  // The under-load legs are scored against the SAME session ceiling as their idle counterparts,
+  // so the only difference between the two readings is the load.
+  if (UNDER_LOAD && legs.underLoad) {
+    for (const g of ['drag', 'resize']) {
+      const r = legs.underLoad[g];
+      if (!r) continue;
+      const idle = legs[g];
+      r.idle = idle ? { p50: idle.frame_p50_ms, p95: idle.frame_p95_ms, over100: idle.frames_over_100 } : null;
+      if (!r.sceneStable) { voided.push(`${g} under load: the scene moved during the gesture`); continue; }
+      // Refusal 2 of this mode: a load that was over before the frames were recorded turns the
+      // whole leg back into the idle measurement it was supposed to differ from.
+      if (r.load.cyclesDuring < 2) {
+        voided.push(`${g} under load: the load completed only ${r.load.cyclesDuring} cycle(s) across the gesture (${r.load.refusals} refusals, last: ${JSON.stringify(r.load.last)}), so these frames were not recorded under load`);
+        continue;
+      }
+      if (r.p50 > ceilingP50 * 1.5) findings.push(`${g} under load (${r.load.label}): p50 ${r.p50} ms against a ${ceilingP50} ms control (idle was ${r.idle ? r.idle.p50 : '?'} ms)`);
+      if (r.p95 > ceilingP95 * 2) findings.push(`${g} under load (${r.load.label}): p95 ${r.p95} ms against a ${ceilingP95} ms control (idle was ${r.idle ? r.idle.p95 : '?'} ms)`);
+      if (r.over100 > ceilingOver100) findings.push(`${g} under load (${r.load.label}): ${r.over100} frames over 100 ms, against a control that produced ${ceilingOver100}`);
+      if (r.mainMax > L0.mainBlockBarMs) findings.push(`${g} under load (${r.load.label}): main blocked ${r.mainMax} ms, over the ${L0.mainBlockBarMs} ms bar`);
+    }
+    if (legs.underLoadProof && /^REFUSE/.test(String(legs.underLoadProof))) {
+      voided.push(`under-load legs left no valid receipt: ${legs.underLoadProof}`);
+    }
+  }
+  if (wantJank && legs.dragJank && legs.dragJank.frames_over_100 <= (legs.drag.frames_over_100 || 0)) {
     voided.push(`CONTROL DID NOT FAIL: -Jank produced ${legs.dragJank.frames_over_100} frames over 100 ms against the clean run's ${legs.drag.frames_over_100}. The recorder is not seeing the frames it claims to and every number here is void.`);
   }
 
