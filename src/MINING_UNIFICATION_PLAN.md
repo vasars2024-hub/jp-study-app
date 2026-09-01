@@ -283,3 +283,36 @@ asks whether a transcribed video is findable, not how many there are, but the sa
 only app running on this machine is the liquid track's instrument on `feat/nyaa-subtitles`,
 which does not contain the Files app at all, and starting a second app on the same userData
 would strand it. 3 of 12 closed.
+
+### 2026-09-01 — gate 7 CLOSES, end to end on real assets
+
+`--gate7`, a fourth mode on the same census. It takes the catalogue ROW — the same object the
+list renders — and walks the whole production chain off it and nothing else:
+`mineabilityOf` → `readFilesMineSource` → `buildFilesMineDrafts` → `buildFilesMineNoteRequest`.
+No video id, playlist, player or reader is consulted at any step; the row's `location.path` and
+`kind` are the entire input, which **is** the gate's "without opening its original context".
+Nothing is written — the chain stops at the built `MineNoteRequest`, the last step before
+AnkiConnect. Posting real cards into the user's deck is not something a census gets to do.
+
+**One asset of each of the three mineable categories, all three end to end:**
+
+| category | asset | passages read | cards | route / tags |
+| --- | --- | --- | --- | --- |
+| transcript | `T-5_dUq-oyo` | 86 | **86** | `subtitle/sentence/ja`, `provenance-transcript` |
+| subtitle | `[DBD-Raws][JOJO…][39].ass` | 36,427 | **200** (cap) | `subtitle/sentence/ja`, `provenance-human-subs` |
+| book | `DDD 1 (講談社BOX)` epub | 7,584 | **200** (cap) | `epub/sentence/ja`, `provenance-book-text` |
+
+Both caps are `FILES_MINE_MAX_CARDS` and both are REPORTED, not silent: the subtitle run says
+`478 over cap` and the book `7,347 over cap`, beside `34,684 not-Japanese` and `1,065 duplicate`
+for the subtitle. Three controls: **(a)** a video row from the same index refuses and names
+`mediaHasNoText`, which points at the transcript that works; **(b)** a row whose file is gone
+refuses `brokenLink` rather than mining zero cards, so an empty result and a failure stay
+distinguishable; **(c)** 0 of the 486 drafts lack Japanese, checked rather than trusted.
+
+**The subtitle number looked wrong and was checked independently.** 36,427 passages from one
+episode is implausible, so the file was counted from PowerShell, never touching the app's code:
+it is **5,044,076 bytes, 36,571 lines, 36,435 `Dialogue:` lines, of which 1,743 contain
+kana/kanji** — a heavily typeset ASS whose dialogue lines are mostly karaoke and signs. The
+census reports 36,427 read and 34,684 skipped as not-Japanese: **36,427 − 34,684 = 1,743**,
+matching the independent count exactly. The parser is right, and the 8-line gap to 36,435 is
+the blank cues `readFilesMineSource` documents dropping. 4 of 12 closed.

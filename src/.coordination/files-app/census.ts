@@ -27,7 +27,15 @@ import {
   smartFolderMembers,
   type FilesSmartCriteria,
 } from '../../shared/filesApp/smartFolders';
-import { mineabilityOf } from '../../shared/filesApp/mining';
+import {
+  buildFilesMineDrafts,
+  buildFilesMineNoteRequest,
+  mineabilityOf,
+} from '../../shared/filesApp/mining';
+// Reaches `main/mining.ts`, which imports `electron` at module scope — the
+// bundle aliases that to `./electron-stub`, exactly as the mineSource suite
+// stubs it with `vi.mock`. See this directory's README for the command.
+import { readFilesMineSource } from '../../main/filesApp/mineSource';
 
 // Filter EVERY flag, not a named list: `--detail` slipped through a
 // `!== '--mining'` filter and became the userData path, so the census walked a
@@ -476,4 +484,133 @@ if (process.argv.includes('--gate68')) {
   console.log('');
   console.log(`GATE 6: ${g6 ? 'PASS' : 'FAIL'}`);
   console.log(`GATE 8: ${handFiled.length === 0 ? 'PASS' : 'FAIL'}`);
+}
+
+/**
+ * `--gate7` — mining gate 7, end to end on the live profile.
+ *
+ * "Pick an asset in the catalogue and mine it end to end without opening its
+ * original context, for at least one asset of each category." So: take the
+ * catalogue ROW — the same object the list renders — and walk the whole
+ * production chain off it and nothing else.
+ *
+ *   mineabilityOf -> readFilesMineSource -> buildFilesMineDrafts
+ *                 -> buildFilesMineNoteRequest
+ *
+ * Not one of those is reimplemented here, and no video id, playlist, player or
+ * reader is consulted at any step: the row's own `location.path` and `kind`
+ * are the entire input, which IS the gate's "without opening its original
+ * context".
+ *
+ * Nothing is written. The chain stops at the built `MineNoteRequest`, which is
+ * the last step before AnkiConnect; posting real cards into the user's deck is
+ * not something a census gets to do.
+ *
+ * Controls, because a chain that always says yes proves nothing:
+ *  (a) a VIDEO row from the same index must refuse, and name
+ *      `mediaHasNoText` — the refusal points at the transcript that works;
+ *  (b) a row whose file is deleted must refuse `brokenLink` rather than mine
+ *      zero cards, so an empty result and a failure stay distinguishable;
+ *  (c) every draft's sentence must actually contain Japanese, checked here
+ *      rather than trusted, since a chain that emitted credits and blank lines
+ *      would still report a healthy card count.
+ */
+if (process.argv.includes('--gate7')) {
+  console.log('');
+  console.log('=== MINING gate 7 — one-click mine from the list, end to end ===');
+  console.log('');
+
+  const HAS_JA = /[぀-ゟ゠-ヿ一-鿿]/;
+  let failures = 0;
+
+  /** Run the whole chain off one catalogue row. */
+  const mineOne = (item: FilesItem, label: string): boolean => {
+    const mineability = mineabilityOf(item);
+    if (!mineability.mineable) {
+      console.log(`  ${label}: REFUSED at the catalogue — ${mineability.reasonKey}`);
+      return false;
+    }
+    const filePath = item.location.store === 'file' ? item.location.path : '';
+    const read = readFilesMineSource(filePath, item.kind as 'transcript' | 'subtitle' | 'book');
+    if (!read.ok) {
+      console.log(`  ${label}: REFUSED at the reader — ${read.reasonKey}${read.detail ? ` (${read.detail})` : ''}`);
+      return false;
+    }
+    const plan = buildFilesMineDrafts(item, read.passages);
+    const requests = plan.drafts.map(buildFilesMineNoteRequest);
+    const notJapanese = plan.drafts.filter((d) => !HAS_JA.test(d.sentence)).length;
+
+    console.log(`  ${label}`);
+    console.log(`    row:        ${item.kind} / ${item.provenance} / ${item.source}`);
+    console.log(`    name:       ${item.name.slice(0, 60)}`);
+    console.log(`    passages:   read ${read.readCount}, kept ${read.passages.length}`);
+    console.log(
+      `    drafts:     ${plan.drafts.length} cards  (skipped: ${plan.skippedNotJapanese} not-Japanese, ${plan.skippedDuplicate} duplicate, ${plan.skippedOverCap} over cap)`,
+    );
+    console.log(`    requests:   ${requests.length} MineNoteRequest built`);
+    if (requests[0]) {
+      const r = requests[0];
+      console.log(`    route:      ${r.route.source} / ${r.route.cardKind} / ${r.route.language}`);
+      console.log(`    tags:       ${(r.extraTags ?? []).join(', ')}`);
+      console.log(`    first card: ${String(r.sentence).slice(0, 60)}`);
+    }
+    console.log(`    control (c) drafts with no Japanese in them: ${notJapanese} (must be 0)`);
+    const ok = requests.length > 0 && requests.length === plan.drafts.length && notJapanese === 0;
+    if (!ok) failures += 1;
+    return ok;
+  };
+
+  // One asset of EACH mineable category, picked from the live index by kind —
+  // the largest of each, so the sample is not an empty file that mines nothing.
+  const pick = (kind: string): FilesItem | undefined =>
+    snapshot.items
+      .filter((i) => i.kind === kind && mineabilityOf(i).mineable)
+      .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
+
+  const kinds = ['transcript', 'subtitle', 'book'];
+  const mined: string[] = [];
+  for (const kind of kinds) {
+    const item = pick(kind);
+    if (!item) {
+      console.log(`  ${kind}: NO ASSET IN THE INDEX — cannot be claimed`);
+      failures += 1;
+      continue;
+    }
+    if (mineOne(item, kind)) mined.push(kind);
+    console.log('');
+  }
+
+  // (a) — a video row, from the same index, must refuse and say why.
+  const video = snapshot.items.find((i) => i.kind === 'video');
+  const videoRefusal = video ? mineabilityOf(video) : null;
+  console.log(
+    `  control (a) a video row: ${videoRefusal ? (videoRefusal.mineable ? 'MINEABLE — WRONG' : `refused ${videoRefusal.reasonKey}`) : 'no video in the index'}`,
+  );
+
+  // (b) — a row whose file is gone. Built by hand from a real row so nothing
+  // on disk is touched: the path is real, plus a suffix that is not.
+  const ghostSource = pick('subtitle');
+  const ghostRead = ghostSource
+    ? readFilesMineSource(
+        (ghostSource.location.store === 'file' ? ghostSource.location.path : '') + '.gone',
+        'subtitle',
+      )
+    : null;
+  console.log(
+    `  control (b) a row whose file is gone: ${ghostRead && !ghostRead.ok ? `refused ${ghostRead.reasonKey}` : 'DID NOT REFUSE — WRONG'}`,
+  );
+
+  const controlsOk =
+    videoRefusal !== null &&
+    !videoRefusal.mineable &&
+    videoRefusal.reasonKey === 'filesApp.mine.refuse.mediaHasNoText' &&
+    ghostRead !== null &&
+    !ghostRead.ok &&
+    ghostRead.reasonKey === 'filesApp.mine.refuse.brokenLink';
+
+  console.log('');
+  console.log(`mined end to end: ${mined.join(', ') || 'none'} (${mined.length} of ${kinds.length} categories)`);
+  console.log(
+    `GATE 7: ${failures === 0 && mined.length === kinds.length && controlsOk ? 'PASS' : 'FAIL'}`,
+  );
 }
