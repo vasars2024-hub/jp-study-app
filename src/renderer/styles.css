@@ -14477,7 +14477,7 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   cursor: grabbing;
 }
 .fwin-title {
-  font-size: 12.5px;
+  font-size: calc(var(--font-size-xs, 12px) + 0.5px);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -14979,7 +14979,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
   text-align: left;
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
@@ -15052,7 +15052,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--muted);
   padding: 8px 10px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--font-size-xs, 12px);
   font-weight: 650;
   letter-spacing: 0.02em;
   transition:
@@ -15581,7 +15581,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--panel);
-  font-size: 12px;
+  font-size: var(--font-size-xs, 12px);
 }
 .os-set-status-chip strong {
   font-size: var(--font-size-sm, 13px);
@@ -15611,7 +15611,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
   min-height: 96px;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
@@ -15643,7 +15643,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   border-radius: 8px;
   padding: 9px 11px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
 }
 .os-set-recent-item:hover {
   background: var(--panel-2);

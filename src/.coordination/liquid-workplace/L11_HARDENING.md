@@ -376,3 +376,76 @@ Exact next slice: read what `(max-width: 640px)` already does to `.mc-video-layo
 inspector the same treatment the drawer gets in `mediaLibrary.css` at 1240px — an overlay or a
 collapse, not a third fixed column — then re-run `cat4 --surface Video --zoom 2.0`, whose only
 remaining bar this is. Do NOT re-derive the container-query question; it is settled above.
+
+## L11 bullet 2 — the last two blockers close: Video's stage, and Settings text scaling (2026-09-01, primary)
+
+Opened by RECOVERING an interrupted turn. `mediaCenter.css` was ` M` with an mtime of
+08:30:00, six seconds before the worker died on a usage limit; the previous handoff said
+"UNCOMMITTED OF MINE: NONE", so an unmentioned dirty file would normally read as another
+track's. It was not — it was a half-landed slice, re-derived and finished here.
+
+**`4d6a7ce7` — Video's stage collapsed to 30px whenever the layout stacked.**
+`.mc-video-empty` was `position: absolute; inset: 0`, so it contributed no height and
+`.mc-video-stage` was sized by the only thing left in flow, the 30px status line, under
+`overflow: hidden`. Invisible in two columns (the outer row is sized by the 452px inspector
+beside it); fatal when `@container mc (max-width: 820px)` stacks, which is where 200% zoom puts
+an ordinary window. Stage becomes a one-cell grid stack.
+
+| Video fwin 560x400 (`.mc-root` 522, one 426px column) | stage | "Open in the media workspace" |
+| --- | --- | --- |
+| after | 426x271, rows `241px 28px` | 59px INSIDE the bottom edge |
+| mutation control | 426x**30**, `overflow: hidden` | **158px PAST** it |
+| control still applied, widened to 1080 | 426x452 | 135px inside |
+
+The third row is what makes it a control rather than a reproduction: same reverted CSS, two
+sizes, opposite outcomes.
+
+**It also closed the bar the last handoff named as the exact next slice**, and that slice's
+diagnosis was wrong. `contentGrowsNotChrome` at zoom 2 was attributed to `aside.mc-video-inspector`
+being a fixed 288x452 box. It was not the inspector: with the stage collapsed, chrome's AREA share
+was inflated at every size. Same probe, same route:
+
+| cat4 Video zoom 2.0 | default | maximized | verdict |
+| --- | --- | --- | --- |
+| before / mutation control | chrome 45.1% | chrome 49.9% | FAIL `contentGrowsNotChrome` |
+| after | chrome **30.4%** | chrome **27.2%** | **PASS 10/10** |
+
+Regression legs: Video zoom 1 PASS 10/10, Media zoom 2.0 PASS 10/10. Condition guards green.
+
+**`7e0d16be` + `ff977f9f` — Settings ignored "bigger text" on 69 of its 70 text elements.**
+The standing blocker was recorded as "Settings' own CSS hardcodes px — 2,408 font-size
+declarations, only 550 tokenised, a whole-surface typography pass, not this slice". The 2,408 is
+real; it is not this surface's lever, and the estimate it produced was ~180x too large.
+
+Measured from the CSSOM, not grepped: of 16,839 style rules, 2,374 set a font-size, and **13**
+of them govern all 70 Settings text elements — 7 matching the elements themselves, 6 more on the
+ancestors the remaining 49 inherit from (49 of 49 resolved, 0 unresolved). All 13 are in
+`styles.css`. Every replacement is default-identical at a 16px root and keeps its old value as
+the `var()` fallback; verified after HMR as 13/11/21.6/13/12/13/11 then 13/13/13/12/12/12.5px.
+
+| through `interpretUiRequest("bigger text")` -> `applyUiCustomization(doc, preview)` | reach |
+| --- | --- |
+| before | 1.4% — one element, and it was `.ui-btn`, the ONE token rule in the set |
+| after 7 rules (`7e0d16be`) | 30% element-wise / 21.4% harness floor |
+| after 13 rules (`ff977f9f`) | **100% element-wise (70/70) / 91.4% harness floor** |
+
+cat4 Settings PASS 10/10 **under** bigger text at 960x681, 260x170 and 1264x765 — clipped 0,
+overlaps 0, horizontal 0, dead 4.8 / 0.6 / 6.4 pct. So the larger text does not clip.
+
+**FOUND, NOT FIXED, and it is the exact next slice.** The product's OTHER text-scaling control is
+dead on this surface. Settings > Display base font moves `body` 14px -> 18px and the entire
+ancestor chain with it (`.fwin`, `.os-desktop`, `.desktop-root` all 14 -> 18) — and **0 of 70**
+text elements follow, before or after this change, because every one resolves through an authored
+rule instead of inheriting. `displayPrefs.ts:173` writes `--display-font-px` unconditionally, so
+`body`'s `var(--display-font-px, 14px)` fallback can never fire either. The two affordances need
+to compose; that is a precedence decision plus roughly one declaration, and it is NOT folded in
+here.
+
+**Instrument trap, which produced a false zero and then a false "no authoring rule".** Chrome
+supports CSS nesting, so **every** `CSSStyleRule` now has a truthy but EMPTY `.cssRules`. A walker
+shaped `if (r.cssRules) { recurse; return }` descends into nothing and reports **0 rules across 64
+readable stylesheets** — it looks exactly like a permissions failure. Count the rule first, then
+recurse only on `r.cssRules.length`. Second, self-inflicted, same turn: the collected rule objects
+stored the selector as `sel`, and the matcher called `el.matches(r.selectorText)` — `undefined`
+throws, the `catch` skipped every rule, and the ancestor walk reported that even `body` had no
+font-size rule. Both were caught by asking the instrument a question with a known answer.
