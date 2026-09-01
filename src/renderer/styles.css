@@ -1256,14 +1256,45 @@ html.os-interacting #root {
   filter: none !important;
 }
 
-/* Contrast modes */
+/* Contrast modes — the shift has to read a SEPARATE source token.
+
+   `--muted: color-mix(… var(--muted) …)` declared on the element that already
+   carries `--muted` is a cycle, and the spec's answer to a cycle is the
+   guaranteed-invalid value, not the previous value. All four declarations here
+   computed to nothing. Measured live on the desktop at
+   `data-display-contrast='high'`: `--muted` and `--border` both resolved empty,
+   so of 77 bordered elements and 314 muted-text elements the ones whose own
+   rule supplied no `var()` fallback dropped to `currentColor` and painted
+   `rgb(245,244,247)` where the mix asks for roughly `rgb(135,133,141)`.
+
+   That is worse than a no-op. The fallback fires only where an author left no
+   fallback, so a single token painted two different colours on one screen — a
+   hairline border next to a near-white one. A control the Display page offers
+   as an accessibility aid was making the surface less coherent, not more.
+
+   Both halves of the repair are load-bearing. A separate property name breaks
+   the self-reference; a separate ELEMENT is needed too, because capturing and
+   consuming under two names on the same element is still a cycle, only an
+   indirect one. So the base is captured on `html` and consumed on `body`.
+   Consequence worth knowing: under a non-default contrast these three tokens
+   now read their shifted value from `body` down, and `documentElement` keeps
+   the base — anything sampling the token off `:root` sees the unshifted colour,
+   where before it saw an empty string. */
 html[data-display-contrast='medium'] {
-  --text: color-mix(in srgb, var(--text) 92%, #fff 8%);
-  --muted: color-mix(in srgb, var(--muted) 70%, var(--text) 30%);
+  --contrast-src-text: var(--text);
+  --contrast-src-muted: var(--muted);
+}
+html[data-display-contrast='medium'] body {
+  --text: color-mix(in srgb, var(--contrast-src-text) 92%, #fff 8%);
+  --muted: color-mix(in srgb, var(--contrast-src-muted) 70%, var(--text) 30%);
 }
 html[data-display-contrast='high'] {
-  --muted: color-mix(in srgb, var(--muted) 45%, var(--text) 55%);
-  --border: color-mix(in srgb, var(--border) 55%, var(--text) 45%);
+  --contrast-src-muted: var(--muted);
+  --contrast-src-border: var(--border);
+}
+html[data-display-contrast='high'] body {
+  --muted: color-mix(in srgb, var(--contrast-src-muted) 45%, var(--text) 55%);
+  --border: color-mix(in srgb, var(--contrast-src-border) 55%, var(--text) 45%);
 }
 html[data-display-bold='1'] button,
 html[data-display-bold='1'] .os-set-card-title,
