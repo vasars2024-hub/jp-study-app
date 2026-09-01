@@ -43,6 +43,7 @@ import {
 } from '../readerSettings';
 import { addBookmark, loadBookmarks, removeBookmark, type Bookmark } from '../bookmarks';
 import { recordReading } from '../stats';
+import { scrollIntoViewReliably } from '../utils/reliableScroll';
 import { loadEpub, type LoadedEpub } from '../epubLoader';
 import { loadPdf } from '../pdfLoader';
 import {
@@ -1889,7 +1890,7 @@ export default function NovelReader({ item, onClose }: Props) {
         const scope = (e.currentTarget as HTMLElement) ?? contentRef.current;
         const target =
           scope?.querySelector?.(`[id="${CSS.escape(id)}"]`) ?? document.getElementById(id);
-        target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        scrollIntoViewReliably(target as HTMLElement | null, { block: 'start' });
         return;
       }
 
@@ -1925,7 +1926,7 @@ export default function NovelReader({ item, onClose }: Props) {
         const scope = (e.currentTarget as HTMLElement) ?? contentRef.current;
         const el = scope?.querySelector?.(`[id="${CSS.escape(hash)}"]`);
         if (el) {
-          el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          scrollIntoViewReliably(el as HTMLElement, { block: 'start' });
         }
       }
     },

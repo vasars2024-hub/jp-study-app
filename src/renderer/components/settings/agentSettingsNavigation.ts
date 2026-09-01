@@ -3,6 +3,7 @@ import {
   type AgentNavigationDestination,
 } from '../../../shared/agentNavigation';
 import type { AgentSettingsNavigationLink } from '../../../shared/agentNavigationBridge';
+import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 
 export function normalizeAgentSettingsNavigationLink(
   value: unknown,
@@ -50,7 +51,7 @@ export function agentSettingsRenderedTarget(
 }
 
 export function focusAgentSettingsRenderedTarget(target: AgentSettingsRenderedTarget): void {
-  target.scroll?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  scrollIntoViewReliably(target.scroll, { block: 'nearest' });
   if (target.focus.tabIndex < 0 && target.focus === target.scroll) target.focus.tabIndex = -1;
   target.focus.focus({ preventScroll: true });
 }

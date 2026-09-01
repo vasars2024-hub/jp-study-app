@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../Icons';
 import { Button, IconButton, Toggle } from '../../ui';
 import ScrCard from '../ScrCard';
+import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import Sparkline from '../Sparkline';
 import StatusDot from '../StatusDot';
 import { Pill } from '../result/Pill';
@@ -136,15 +137,17 @@ export default function SourceManagerPage() {
 
   useEffect(() => {
     if (!handoffSourceId) return;
+    let cancelScroll: (() => void) | null = null;
     const frame = window.requestAnimationFrame(() => {
       const row = sourceRefs.current.get(handoffSourceId);
-      row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      cancelScroll = scrollIntoViewReliably(row, { block: 'center' });
       row?.focus({ preventScroll: true });
     });
     const timer = window.setTimeout(() => setHandoffSourceId(null), 2_200);
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
+      cancelScroll?.();
     };
   }, [handoffSourceId]);
 

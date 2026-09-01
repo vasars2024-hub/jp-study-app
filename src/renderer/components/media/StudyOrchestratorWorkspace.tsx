@@ -93,6 +93,7 @@ import {
   type StudyMediaSurface,
 } from '../../../shared/studyMediaSurface';
 import Icon from '../Icons';
+import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 import MediaArtwork from './library/MediaArtwork';
 import {
   collectStudyOpportunities,
@@ -441,32 +442,44 @@ export default function StudyOrchestratorWorkspace({ surface }: StudyOrchestrato
 
   useEffect(() => {
     if (!speechRatePreview) return;
+    let cancelScroll: (() => void) | null = null;
     const frame = window.requestAnimationFrame(() => {
       const panel = speechRateRef.current;
-      panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      cancelScroll = scrollIntoViewReliably(panel, { block: 'nearest' });
       panel?.focus({ preventScroll: true });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      cancelScroll?.();
+    };
   }, [speechRatePreview]);
 
   useEffect(() => {
     if (!ankiLeechReviewId) return;
+    let cancelScroll: (() => void) | null = null;
     const frame = window.requestAnimationFrame(() => {
       const panel = ankiLeechRef.current;
-      panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      cancelScroll = scrollIntoViewReliably(panel, { block: 'nearest', inline: 'nearest' });
       panel?.focus({ preventScroll: true });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      cancelScroll?.();
+    };
   }, [ankiLeechReviewId]);
 
   useEffect(() => {
     if (!seriesRecurrenceId) return;
+    let cancelScroll: (() => void) | null = null;
     const frame = window.requestAnimationFrame(() => {
       const panel = seriesRecurrenceRef.current;
-      panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      cancelScroll = scrollIntoViewReliably(panel, { block: 'nearest', inline: 'nearest' });
       panel?.focus({ preventScroll: true });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      cancelScroll?.();
+    };
   }, [seriesRecurrenceId]);
 
   useEffect(() => {

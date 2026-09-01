@@ -15,6 +15,7 @@ import { useScraperPort } from '../data/scraperPort';
 import { formatAgeMinutes, formatEtaClock } from '../data/charts';
 import { formatBytes } from '../../../../shared/assetRegistry';
 import { formatDuration } from '../../../stats';
+import { scrollIntoViewReliably } from '../../../utils/reliableScroll';
 import { sx, sxn, sxs } from '../strings';
 import { SERIES, episodes, type FixtureSeries } from '../data/fixtures';
 import { scraperArtwork } from '../artwork';
@@ -156,11 +157,15 @@ export function ResultsPage() {
 
   useEffect(() => {
     if (!selectedId) return;
+    let cancelScroll: (() => void) | null = null;
     const frame = window.requestAnimationFrame(() => {
-      inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      cancelScroll = scrollIntoViewReliably(inspectorRef.current, { block: 'start' });
       inspectorRef.current?.focus({ preventScroll: true });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      cancelScroll?.();
+    };
   }, [selectedId]);
 
   const resumeSeries = (title: string) => {

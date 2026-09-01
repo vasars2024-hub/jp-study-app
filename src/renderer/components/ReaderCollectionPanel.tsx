@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { LANG_TAGS } from '../../shared/i18n/core';
+import { scrollToReliably } from '../utils/reliableScroll';
 import {
   addDeckCards,
   loadDeck,
@@ -413,7 +414,7 @@ export default function ReaderCollectionPanel({
         const cardId = card.id;
         setFlashId(cardId);
         window.setTimeout(() => setFlashId((id) => (id === cardId ? null : id)), 1600);
-        listRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollToReliably(listRef.current, { top: 0 });
       }
     })();
   }, [pendingAdd, onPendingConsumed, bookId, bookTitle, runTranslate, sendToAnki]);
