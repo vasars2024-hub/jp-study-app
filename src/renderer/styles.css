@@ -1230,7 +1230,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: var(--display-font-px, 14px);
+  /* The ladder, not the raw preference. --font-size-md IS the base step
+     (calc(0.875rem * var(--display-font-scale, 1))), so this is numerically
+     identical whenever only Display > base font is set -- but it also follows
+     "bigger text", which scales the ladder and which --display-font-px, an
+     absolute px written straight from the preference, could never see. */
+  font-size: var(--font-size-md, 14px);
   font-weight: var(--display-font-weight, 400);
   letter-spacing: var(--display-letter-spacing, 0);
 }
