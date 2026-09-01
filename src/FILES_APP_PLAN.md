@@ -625,6 +625,19 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 30. **Referenced items behave.** Removing a referenced item from the library leaves the user's
    original file on disk; moving the original produces a reported broken link rather than a
    crash or a silent disappearance.
+   <!-- status: closed; evidence: 2026-08-31 -- main/__tests__/filesAppReferenced.test.ts, 5
+        tests on real files in a real temp tree whose media rows point OUTSIDE userData, which
+        is what "referenced in place" means. Removing: the production deleteFilesItemInMain
+        refuses with filesApp.delete.refuseNotTrashable, the user's bytes are still on disk and
+        unchanged, and `trashItem` is a spy that THROWS if reached -- it is not reached, so the
+        claim is "never called", not "called harmlessly". Moving: the row survives the rebuild,
+        keeps its name and gains brokenLink:true, while the untouched neighbour does not gain
+        it; putting the file back clears the flag, so it is derived per build and not stored.
+        Two adverse controls: dropping the referenced->soft branch turns 2 of 5 red, and making
+        brokenLink unconditional turns the other 2 red. -->
+   <!-- note: `referenced` is what makes a row file-backed for Open and Reveal but index-backed
+        for Delete. A generic `location.store === 'file'` branch in a future delete path would
+        trash the user's own bytes; that is the single line this gate protects. -->
 31. **The stability window is honoured and adjustable.** Setting it higher delays ingest of a
    file still growing by that amount; setting it lower does not bypass the completeness check
    entirely. Proven against a file arriving mid-write at two different settings.
