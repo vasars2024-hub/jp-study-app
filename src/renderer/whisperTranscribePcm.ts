@@ -12,6 +12,12 @@ export interface PcmTranscription {
   text?: string;
   cues?: Array<{ start: number; end: number; text: string }>;
   error?: string;
+  /**
+   * Set when the worker ran a DIFFERENT model than the tier asked for — see
+   * `TranscriptionChunkResult.modelSubstitution`, whose shape this is, because
+   * App.tsx forwards this object to the main process with `{ id, ...result }`.
+   */
+  modelSubstitution?: { requested: string; used: string };
 }
 
 /** Decodes the base64 the main process sends over the bridge. */
@@ -52,19 +58,35 @@ export async function transcribePcm(audio: Float32Array, lang?: string): Promise
     const chunks: string[] = [];
     const cues: Array<{ start: number; end: number; text: string }> = [];
     let settled = false;
+    // Set only by the worker's own `model-fallback` status. Carried onto BOTH
+    // endings: a substituted model that then errors is exactly the case where
+    // knowing which graph ran matters most.
+    let modelSubstitution: PcmTranscription['modelSubstitution'];
     const finish = (result: PcmTranscription): void => {
       if (settled) return;
       settled = true;
       worker.terminate();
-      resolve(result);
+      resolve(modelSubstitution ? { ...result, modelSubstitution } : result);
     };
 
     worker.onmessage = (event: MessageEvent) => {
       const message = event.data as {
         type?: string;
+        status?: string;
+        model?: string;
+        requestedModel?: string;
         cues?: Array<{ start?: number; end?: number; text?: string }>;
         message?: string;
       };
+      if (
+        message.type === 'status'
+        && message.status === 'model-fallback'
+        && typeof message.requestedModel === 'string'
+        && typeof message.model === 'string'
+      ) {
+        modelSubstitution = { requested: message.requestedModel, used: message.model };
+        return;
+      }
       if (message.type === 'partial' && Array.isArray(message.cues)) {
         for (const cue of message.cues) {
           const text = cue?.text?.trim();

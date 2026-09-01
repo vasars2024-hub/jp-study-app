@@ -169,6 +169,44 @@ export interface TranscriptionChunkResult {
   text?: string;
   cues?: TranscriptionCue[];
   error?: string;
+  /**
+   * The model that actually ran, when it is NOT the one that was asked for.
+   *
+   * `whisperModelForCpu` substitutes `Xenova/whisper-base` for kotoba-whisper
+   * and whisper-large-v3-turbo on the WASM path, because their fp32 encoders
+   * carry external ONNX data the browser runtime cannot mount. That is the
+   * right call — the alternative is a completed download that then fails to
+   * transcribe — but it was SILENT: the worker posts a `model-fallback` status
+   * and nothing listened to it, so a machine with no usable WebGPU adapter
+   * produced whisper-base output while Settings still said kotoba-whisper.
+   *
+   * Absent means no substitution happened. It is never a guess: only the worker
+   * knows which graph it actually loaded.
+   */
+  modelSubstitution?: { requested: string; used: string };
+}
+
+/**
+ * The subtitle-track name a Whisper run writes onto the media row.
+ *
+ * When no substitution happened this is the label it has always been, so
+ * existing rows and tests are unaffected. When one did, the name carries the
+ * model that ACTUALLY produced the text — a track named only "Whisper (ja)" is
+ * indistinguishable between a kotoba-whisper transcript and the markedly worse
+ * whisper-base one the WASM path silently falls back to, and the user has no
+ * other place to learn which they are reading.
+ *
+ * The bare HF repo name, not the tier id: the tier is what was *asked for*, and
+ * printing it here would restate the lie. Model ids are not translated.
+ */
+export function whisperTrackLabel(
+  lang: string,
+  substitution?: { requested: string; used: string },
+): string {
+  const base = `Whisper (${lang})`;
+  if (!substitution || substitution.used === substitution.requested) return base;
+  const shortName = substitution.used.split('/').pop() || substitution.used;
+  return `${base} · ${shortName}`;
 }
 
 /** A job is abandoned after this many failed attempts. */

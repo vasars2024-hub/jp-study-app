@@ -34,6 +34,7 @@ import {
   type TranscriptionProgress,
   type TranscriptionRequest,
   type TranscriptionResult,
+  whisperTrackLabel,
 } from '../shared/transcriptionIpc';
 import type { SubtitleRecord } from '../shared/subtitleRecord';
 import {
@@ -312,6 +313,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
 
     const texts: string[] = [];
     const timedCues: TranscriptionCue[] = [];
+    let modelSubstitution: TranscriptionChunkResult['modelSubstitution'];
     for (let i = 0; i < total; i += 1) {
       if (cancelled.has(job.mediaId)) {
         emit('cancelled', i);
@@ -332,6 +334,9 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         texts.push('');
         continue;
       }
+      // The worker only announces a substitution on the load that performed it,
+      // so the first chunk carries it and later ones do not. Keep the first.
+      if (reply.modelSubstitution && !modelSubstitution) modelSubstitution = reply.modelSubstitution;
       texts.push(reply.text ?? '');
       for (const cue of reply.cues ?? []) {
         if (!cue.text.trim() || cue.end <= cue.start) continue;
@@ -358,7 +363,9 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       source: 'generated',
       format: 'srt',
       path: relative,
-      label: `Whisper (${job.lang})`,
+      // Names the model that ACTUALLY ran when the WASM path substituted one.
+      // The track name is the only place this survives the session.
+      label: whisperTrackLabel(job.lang, modelSubstitution),
       machineGenerated: true,
       derivation: 'whisper',
       addedAt: Date.now(),
