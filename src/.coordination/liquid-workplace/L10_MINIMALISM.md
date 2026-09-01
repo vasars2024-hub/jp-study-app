@@ -245,3 +245,75 @@ undeclared churn. And `--both-presentations --control` are not implied — witho
 `MediaCenterView.tsx:1994-2012`. The bar is 100 ms and the measured first keystroke is 130-146.
 Re-measure with the same task and require three consecutive runs under the bar, not one. Then
 cat7 on both surfaces closes bullet 2 at 16/16.
+
+---
+
+## 2026-09-01 — bullet 2 CLOSES 16/16. The overnight FAIL was desk load; the cost under it was real
+
+**The FAIL did not reproduce, and that is the first thing to record.** Same HEAD, same task, same
+surface, same clean resting state (`base` 79 textRuns / 32 controls, box 1080x679 — byte-identical
+to the FAIL's own base), next session: **93.2, 102.5, 84.7, 84.9, 98.4, 85.1** worst-keystroke
+against last night's **129.9 / 145.9 / 134.8**. Bullet 1 had read 99.4 an hour before the FAIL.
+Two unrelated surfaces had risen together that night — Settings 43.7 → 59.9 (+37%) on its own
+unchanged task, Media 99.4 → 129.9 (+31%) — which is the desk-load signature `cat7-perf.cjs`'s
+header already warns about in its refusal #1. cat2 records the SURFACE's box but no desk-wide
+window or element count, so it cannot see that confound; cat7 can. **A cat2 latency FAIL should be
+repeated in a fresh session before it is filed against a surface, not merely repeated in the same
+one** — three consecutive runs an hour apart proved only that the desk was still loaded.
+
+**The cost under it was real anyway and is now fixed** (`326d1cc7`). `query` lives in `useMedia`,
+so committing every keystroke re-rendered the whole Media Center synchronously.
+`useDebouncedValue(query, 80)` at `MediaContent.tsx:575` protected the FILTER; the JSX was
+unprotected. `/type` sends its characters in a tight `for` loop with no pacing
+(`debugBridge.ts:471-479`), so the ~33 ms gaps between the four `input` events were not driver
+delay — they were the renderer's own synchronous work, and the four rAF callbacks all landed in
+ONE frame. That is the descending `inputRecv` shape (129.9 / 99.2 / 64.5 / 26.2 share a `paintAt`);
+read it as "no frame painted for 130 ms", never as "the first keystroke cost 130 ms".
+
+`GlobalSearchField` is memoized and holds its own in-flight text, committing on a 70 ms timer —
+under the 80 ms the filter already waits, so results cost nothing. Discover opts out
+(`deferMs=0`): `submitQuery` is a `useCallback` over the hook's own `query`
+(`DiscoverContent.tsx:324`), so an Enter arriving before a deferred commit would submit the
+previous character. Music opts out too — its cost was never measured.
+
+| leg | before | after (3 consecutive) |
+| --- | --- | --- |
+| inputRecv | 85.1 / 58.9 / 39.3 / 19.3 | 8.9/5.3/3.3/1.5 · 8.4/6.8/4.8/2.0 · 8.3/6.7/3.5/1.7 |
+| per keystroke | ~20-26 ms | ~2-4 ms |
+| overBar100 | 0 (1 of 6 readings over) | 0, 0, 0 |
+
+`worstRecv` is now the Video→Library click (61.6 / 60.5 / 57.1), not the typing.
+
+**Live functional check, driven through `/type`, with its negative control:** 11 cards → `jojo`
+2 cards → `zzzzqq` **0 cards and the honest empty state** → cleared, 11 back. Typing from the Video
+tab still lands on Library and filters to 2, so the line-2007 navigation branch survives deferral.
+
+### The 16 cells
+
+| cat | Settings | Media Center (Video) |
+| --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 |
+| 2 clunkiness | 10/10 | **10/10** (was FAIL — `cat2-l10b2-media-fixed.json`) |
+| 3 Liquid utilization | 10/10 | 10/10 |
+| 4 use of space | 10/10 | 10/10 |
+| 5 UI clarity | 10/10 | 10/10 |
+| 6 feature parity | 10/10 | 10/10 |
+| 7 performance | **10/10** | **10/10** |
+| 8 honest states | 10/10 | 10/10 |
+
+cat2 re-score carries its own control (dead-end + modal-trap + scroll-trap 0 → 1 → 0) and
+`costParity` liquid 5 ≤ standard 5, presentation and geometry restored. cat7 both surfaces:
+findings `[]`, voided `[]`, scene 3 fwins / 991 fwin elements / 1116 document elements /
+1264x821 / dpr 1, **session ceiling p50 16.7 ms** — this display is 60 Hz and L0's 10.0 ms is
+recorded as provenance only, never as the bar. Heavy legs proved themselves: video cycled 40
+disclosures over 7 tiles and 639 px and restored; settings ran 24 pages ×2 = 48 navigations at
+87 ms and restored to Home, which is correction 39's budget-derived tick holding at the real
+rail size. `sampled-out:` Music, Discover, Study Mode, Readiness, Review, Home, Library — RULE C
+scores two representative surfaces, and these were not measured for this bullet.
+
+**Instrument note, and it exonerates the harness.** Three of my own runs scored the opening
+`click:.mc-nav > button:nth-of-type(2)` as a dead end. That was correct and the fault was mine:
+a run leaves `jojo` in the field, and with `media.query` non-empty the product's own line-2007
+branch keeps the surface on Library, so clicking Library really did move nothing. **A cat2 run on
+this surface must start from an EMPTY search field, not merely the right tab** — `base` reads
+79/32 when it is clean and 100/41 when it is not, which is the cheapest way to spot it.
