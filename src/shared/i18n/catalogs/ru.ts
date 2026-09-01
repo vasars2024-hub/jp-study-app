@@ -11730,7 +11730,13 @@ export const ru: Catalog = {
   'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
   'filesApp.review.scan': 'Сканировать',
   'filesApp.review.scanning': 'Сканирование…',
+  'filesApp.review.paste': 'Вставить папку',
+  'filesApp.review.pasteHint': 'Просканировать папку, которая сейчас в буфере обмена.',
   'filesApp.review.error.noRoot': 'Сначала укажите папку, которую нужно просканировать.',
+  'filesApp.review.error.clipboardNoFolder':
+    'В буфере обмена нет папки, существующей на этом компьютере.',
+  'filesApp.review.error.clipboardManyFolders':
+    'Вставлено несколько папок. Первая уже в поле — просканируйте её или сначала измените.',
   'filesApp.review.error.unreadableRoot':
     'Эту папку не удалось прочитать, поэтому ничего не просканировано.',
   'filesApp.review.error.scanFailed': 'Сканирование не удалось завершить.',

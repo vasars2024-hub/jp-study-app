@@ -16,10 +16,11 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { BrowserWindow, app, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, clipboard, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
 import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
+import { folderCandidatesFrom, resolveFolders } from '../../shared/filesApp/clipboardPaths';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReportWithArchives } from '../../shared/filesApp/archive';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
@@ -193,6 +194,54 @@ export function registerFilesAppIpc(): void {
     // scan: see `FilesScanOptions`. Without it this handler passed no stability
     // judgement at all and the setting would have been decorative.
     return scanRoots(list, { stabilityMs, stabilityFromMtime: true });
+  });
+
+  /**
+   * Gate 28's first three words — the folder currently on the clipboard.
+   *
+   * Read-only in both directions: the clipboard is read and never written, and
+   * the candidates are `stat`ed and never opened. Parsing lives in
+   * `shared/filesApp/clipboardPaths.ts` so it is testable without Electron;
+   * this handler exists for the two things that genuinely need the main
+   * process — the `FileNameW` format, which the renderer's own paste event
+   * cannot see, and the existence check.
+   *
+   * A file is answered with its PARENT rather than refused. A user who copied
+   * `ep01.mkv` and pasted it into a folder scanner means the folder it is in,
+   * and refusing would be technically correct and useless.
+   */
+  ipcMain.handle('filesapp:clipboard-folders', (): string[] => {
+    let fileNameW: Uint8Array | null = null;
+    let text = '';
+    try {
+      // `readBuffer` throws on some platforms for an absent format rather than
+      // returning empty, so the availability check comes first.
+      if (clipboard.availableFormats().includes('FileNameW')) {
+        fileNameW = clipboard.readBuffer('FileNameW');
+      }
+    } catch {
+      fileNameW = null;
+    }
+    try {
+      text = clipboard.readText() ?? '';
+    } catch {
+      text = '';
+    }
+
+    return resolveFolders(folderCandidatesFrom({ fileNameW, text }), {
+      kindOf: (candidate) => {
+        try {
+          const stat = fs.statSync(candidate);
+          if (stat.isDirectory()) return 'directory';
+          if (stat.isFile()) return 'file';
+          return null;
+        } catch {
+          // Not on this machine, or not readable. Dropped, not offered.
+          return null;
+        }
+      },
+      parentOf: (candidate) => path.dirname(candidate),
+    });
   });
 
   /**

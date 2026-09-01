@@ -72,6 +72,7 @@ const dictImportYomitan = vi.fn();
 const setWallpaperFromPath = vi.fn();
 const getWallpaper = vi.fn();
 const removeMedia = vi.fn();
+const filesClipboardFolders = vi.fn<() => Promise<string[]>>();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -92,9 +93,11 @@ beforeEach(() => {
     setWallpaperFromPath,
     getWallpaper,
     removeMedia,
+    filesClipboardFolders,
   ]) {
     fn.mockReset();
   }
+  filesClipboardFolders.mockImplementation(async () => []);
   filesScan.mockImplementation(async () => report());
   fileDropClassify.mockImplementation(async (paths: string[]) =>
     paths.map((path) => ({
@@ -123,6 +126,7 @@ beforeEach(() => {
       removeMedia,
       removeItem: vi.fn(),
       fileDropFolderFiles: vi.fn(),
+      filesClipboardFolders,
     },
   });
 });
@@ -417,7 +421,11 @@ describe('gate 24 — the import half, and its reversal', () => {
  * importer spies stay untouched after a scan that found five members.
  */
 describe('gate 28 — the surface reports what is inside an archive', () => {
-  const ZIP = 'C:\dl\subs-pack.zip';
+  // Escaped, and it matters: `'C:\dl\...'` is the string `C:dlsubs-pack.zip` —
+  // `\d` and `\s` are not escapes — so the archive under test was not in the
+  // same folder as every other fixture here. Consistent, and therefore green,
+  // but not the path it claimed to be.
+  const ZIP = 'C:\\dl\\subs-pack.zip';
 
   /** The router's real answer for an unsniffable `.zip`: two ambiguous homes. */
   const ZIP_CANDIDATES: DropCandidate[] = [
@@ -517,5 +525,109 @@ describe('gate 28 — the surface reports what is inside an archive', () => {
     await mount();
     await scan();
     expect(host?.querySelector('.fa-review-archives')).toBeNull();
+  });
+});
+
+/**
+ * Gate 28's first three words — "**Paste a folder** sorts all of it".
+ *
+ * The scored claim is that the pasted folder is what gets SCANNED, so every
+ * assertion here is about `filesScan`'s argument, not about the field's text. A
+ * field that fills correctly and then scans the previous root would pass a
+ * DOM-only assertion and fail the gate — and that is the exact failure this
+ * component's `explicitRoot` parameter exists to prevent, since `setRoot(x)`
+ * followed by `onScan()` reads the value from before the paste.
+ */
+describe('gate 28 — a pasted folder is the folder that gets scanned', () => {
+  async function clickPaste(): Promise<void> {
+    await act(async () => {
+      q('.fa-review-paste').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  it('scans the pasted folder — not the one left in the field', async () => {
+    // The control is the stale root: the field is deliberately loaded with a
+    // DIFFERENT folder first, so "scanned the pasted one" cannot be satisfied
+    // by scanning whatever was already there.
+    localStorage.setItem('jp-filesapp-scan-root-v1', 'C:\\stale');
+    filesClipboardFolders.mockImplementation(async () => ['C:\\dl\\anime']);
+    await mount();
+    expect(q<HTMLInputElement>('.fa-review-root-input').value).toBe('C:\\stale');
+    await clickPaste();
+    expect(filesScan).toHaveBeenCalledTimes(1);
+    expect(filesScan.mock.calls[0][0]).toEqual(['C:\\dl\\anime']);
+    expect(q<HTMLInputElement>('.fa-review-root-input').value).toBe('C:\\dl\\anime');
+  });
+
+  it('the pasted folder is walked and sorted, not merely accepted', async () => {
+    // "sorts all of it" — the report the paste produced is the one on screen,
+    // in the same three piles a typed scan produces.
+    filesClipboardFolders.mockImplementation(async () => ['C:\\dl']);
+    await mount();
+    await clickPaste();
+    expect(rowNames('.fa-review-auto')).toEqual(['ep01.srt', 'ep01.mkv']);
+    expect(rowNames('.fa-review-queue')).toEqual(['vocab.csv', 'page001.png']);
+    expect(rowNames('.fa-review-refused')).toEqual(['notes.xyz']);
+    expect(rowNames('.fa-review-skips')).toEqual(['ep02.mkv.crdownload']);
+  });
+
+  it('an empty clipboard says so and scans NOTHING', async () => {
+    filesClipboardFolders.mockImplementation(async () => []);
+    await mount();
+    await clickPaste();
+    expect(filesScan).not.toHaveBeenCalled();
+    expect(q('.fa-review-error').textContent).toContain('clipboard');
+  });
+
+  it('several pasted folders offer the first and refuse to choose', async () => {
+    filesClipboardFolders.mockImplementation(async () => ['C:\\dl\\a', 'C:\\dl\\b']);
+    await mount();
+    await clickPaste();
+    // Stated, not scanned: picking one silently is exactly the quiet decision
+    // the review sheet exists to avoid.
+    expect(filesScan).not.toHaveBeenCalled();
+    expect(q<HTMLInputElement>('.fa-review-root-input').value).toBe('C:\\dl\\a');
+    expect(q('.fa-review-error').textContent).toContain('Several folders');
+  });
+
+  it('a preload without the binding degrades to "nothing on the clipboard"', async () => {
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      writable: true,
+      value: { ...window.api, filesClipboardFolders: undefined },
+    });
+    await mount();
+    await clickPaste();
+    expect(filesScan).not.toHaveBeenCalled();
+    expect(q('.fa-review-error')).toBeTruthy();
+  });
+
+  it('Ctrl+V in the sheet pastes the folder; Ctrl+V in the FIELD does not', async () => {
+    filesClipboardFolders.mockImplementation(async () => ['C:\\dl\\anime']);
+    await mount();
+    const paste = (target: Element) =>
+      act(async () => {
+        target.dispatchEvent(
+          new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent,
+        );
+        await Promise.resolve();
+      });
+
+    // In the field, a paste is ordinary text editing and must be left alone,
+    // or the field becomes impossible to correct by pasting a fragment.
+    await paste(q('.fa-review-root-input'));
+    expect(filesClipboardFolders).not.toHaveBeenCalled();
+
+    // Anywhere else there is nothing to paste INTO, so it can only mean the
+    // folder.
+    await paste(q('.fa-review-title'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(filesScan.mock.calls.map((c) => c[0])).toEqual([['C:\\dl\\anime']]);
   });
 });

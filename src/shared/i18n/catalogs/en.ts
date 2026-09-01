@@ -11307,7 +11307,13 @@ export const en: Catalog = {
   'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
   'filesApp.review.scan': 'Scan',
   'filesApp.review.scanning': 'Scanning…',
+  'filesApp.review.paste': 'Paste folder',
+  'filesApp.review.pasteHint': 'Scan the folder currently on the clipboard.',
   'filesApp.review.error.noRoot': 'Type the folder you want scanned first.',
+  'filesApp.review.error.clipboardNoFolder':
+    'The clipboard does not hold a folder that exists on this computer.',
+  'filesApp.review.error.clipboardManyFolders':
+    'Several folders were pasted. The first is in the field — scan it, or edit it first.',
   'filesApp.review.error.unreadableRoot':
     'That folder could not be read, so nothing was scanned.',
   'filesApp.review.error.scanFailed': 'The scan could not finish.',

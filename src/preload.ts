@@ -1037,6 +1037,17 @@ const api = {
     options?: { stabilityMs?: number },
   ): Promise<FilesScanReportWithArchives> => ipcRenderer.invoke('filesapp:scan', roots, options),
   /**
+   * Gate 28: folders currently on the clipboard, confirmed to exist.
+   *
+   * Main-side because the renderer's own `paste` event cannot see Windows'
+   * `FileNameW` format — a folder copied in Explorer arrives with an EMPTY
+   * `clipboardData` as far as the DOM is concerned, so a renderer-only paste
+   * handler would read nothing and the feature would look broken rather than
+   * absent. Reads the clipboard; never writes it.
+   */
+  filesClipboardFolders: (): Promise<string[]> =>
+    ipcRenderer.invoke('filesapp:clipboard-folders'),
+  /**
    * Gate 25: watch these folders and tell me when something lands. Replaces the
    * previous set wholesale and re-baselines, so nothing already present is
    * announced as an arrival.

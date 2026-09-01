@@ -141,8 +141,15 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
     return planIngest(state.report, effectiveSettings, state.candidates, ledger);
   }, [state, effectiveSettings, ledger]);
 
-  const onScan = useCallback(async () => {
-    const target = root.trim();
+  /*
+   * `explicitRoot` exists because of a trap this repo has been bitten by more
+   * than once: `setRoot(folder)` followed by `onScan()` reads the PREVIOUS
+   * `root`, since a state update is not visible until the next render. The
+   * paste path therefore hands the folder straight in rather than routing it
+   * through state and hoping.
+   */
+  const onScan = useCallback(async (explicitRoot?: string) => {
+    const target = (explicitRoot ?? root).trim();
     if (!target) {
       setState({ status: 'error', reasonKey: 'filesApp.review.error.noRoot' });
       return;
@@ -193,6 +200,40 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
       setState({ status: 'error', reasonKey: 'filesApp.review.error.scanFailed' });
     }
   }, [root, effectiveSettings]);
+
+  /**
+   * Gate 28 — "paste a folder".
+   *
+   * The clipboard is read in MAIN: a folder copied in Explorer arrives as
+   * Windows' `FileNameW` format, which the DOM's own paste event cannot see at
+   * all, so a renderer-only handler would find an empty `clipboardData` and the
+   * feature would look broken rather than absent.
+   *
+   * One folder is scanned immediately, because that is the whole gesture. More
+   * than one fills the field with the first and says so rather than silently
+   * picking — the scan takes one root at a time and choosing for the user would
+   * be the kind of quiet decision the report exists to avoid.
+   */
+  const onPasteFolder = useCallback(async () => {
+    let folders: string[] = [];
+    try {
+      folders = (await window.api.filesClipboardFolders?.()) ?? [];
+    } catch {
+      folders = [];
+    }
+    if (!folders.length) {
+      setState({ status: 'error', reasonKey: 'filesApp.review.error.clipboardNoFolder' });
+      return;
+    }
+    const first = folders[0];
+    setRoot(first);
+    if (folders.length > 1) {
+      // Stated, not scanned. The user pasted several and gets to say which.
+      setState({ status: 'error', reasonKey: 'filesApp.review.error.clipboardManyFolders' });
+      return;
+    }
+    await onScan(first);
+  }, [onScan]);
 
   const onConfirm = useCallback(async () => {
     if (!plan || state.status !== 'report') return;
@@ -484,6 +525,20 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
         role="dialog"
         aria-modal="true"
         aria-label={t('filesApp.review.title')}
+        /*
+         * Ctrl+V anywhere in the sheet EXCEPT the root field. Inside the field
+         * a paste is ordinary text editing and is left alone — intercepting it
+         * would make the field impossible to correct by pasting a fragment.
+         * Everywhere else there is nothing to paste INTO, so the gesture can
+         * only mean the folder, and it is routed to main because the event's
+         * own `clipboardData` is empty for a folder copied in Explorer.
+         */
+        onPaste={(e) => {
+          if ((e.target as HTMLElement | null)?.id === 'fa-review-root-input') return;
+          if (state.status === 'scanning' || state.status === 'importing') return;
+          e.preventDefault();
+          void onPasteFolder();
+        }}
       >
         <h2 className="fa-review-title">{t('filesApp.review.title')}</h2>
         <p className="fa-review-sub">{t('filesApp.review.subtitle')}</p>
@@ -501,6 +556,20 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
             placeholder={t('filesApp.review.rootPlaceholder')}
             onChange={(e) => setRoot(e.target.value)}
           />
+          {/*
+            * Gate 28's first three words. Ctrl+V anywhere in the sheet does the
+            * same thing; this button exists because a paste target with no
+            * visible affordance is a feature nobody finds.
+            */}
+          <button
+            type="button"
+            className="fa-action fa-review-paste"
+            disabled={state.status === 'scanning' || state.status === 'importing'}
+            onClick={() => void onPasteFolder()}
+            title={t('filesApp.review.pasteHint')}
+          >
+            {t('filesApp.review.paste')}
+          </button>
           <button
             type="button"
             className="fa-action fa-review-scan"

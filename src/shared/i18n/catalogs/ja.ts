@@ -10836,7 +10836,13 @@ export const ja: Catalog = {
   'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
   'filesApp.review.scan': 'スキャン',
   'filesApp.review.scanning': 'スキャン中…',
+  'filesApp.review.paste': 'フォルダーを貼り付け',
+  'filesApp.review.pasteHint': 'クリップボードにあるフォルダーをスキャンします。',
   'filesApp.review.error.noRoot': 'まずスキャンするフォルダーを入力してください。',
+  'filesApp.review.error.clipboardNoFolder':
+    'クリップボードに、このコンピューター上に存在するフォルダーが入っていません。',
+  'filesApp.review.error.clipboardManyFolders':
+    '複数のフォルダーが貼り付けられました。最初のものが入力欄にあります。そのままスキャンするか、先に編集してください。',
   'filesApp.review.error.unreadableRoot':
     'そのフォルダーを読み取れなかったため、何もスキャンしていません。',
   'filesApp.review.error.scanFailed': 'スキャンを完了できませんでした。',

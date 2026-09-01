@@ -648,6 +648,13 @@ declare global {
         path: string;
       }): Promise<import('../main/filesApp/cleanupIpc').FilesRelocateResult>;
       filesCleanupUndo(undoToken: string): Promise<{ ok: boolean }>;
+      /**
+       * Gate 28. Folders on the clipboard, confirmed to exist. Main-side
+       * because Windows' `FileNameW` format is invisible to the renderer's own
+       * paste event. Optional: a renderer running against an older preload
+       * must degrade to "nothing on the clipboard", not throw.
+       */
+      filesClipboardFolders?(): Promise<string[]>;
 
       popOut(section: string): Promise<void>;
       popoutListOpen(): Promise<string[]>;

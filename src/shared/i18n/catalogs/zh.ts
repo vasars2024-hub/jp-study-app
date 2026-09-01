@@ -10736,7 +10736,12 @@ export const zh: Catalog = {
   'filesApp.review.rootPlaceholder': 'C:\\Users\\you\\Downloads',
   'filesApp.review.scan': '扫描',
   'filesApp.review.scanning': '正在扫描…',
+  'filesApp.review.paste': '粘贴文件夹',
+  'filesApp.review.pasteHint': '扫描当前剪贴板中的文件夹。',
   'filesApp.review.error.noRoot': '请先输入要扫描的文件夹。',
+  'filesApp.review.error.clipboardNoFolder': '剪贴板中没有本机上存在的文件夹。',
+  'filesApp.review.error.clipboardManyFolders':
+    '粘贴了多个文件夹。第一个已填入输入框——可直接扫描，或先行修改。',
   'filesApp.review.error.unreadableRoot': '无法读取该文件夹，因此什么也没有扫描。',
   'filesApp.review.error.scanFailed': '扫描未能完成。',
   'filesApp.review.importing': '正在导入第 {done} 项，共 {total} 项…',
