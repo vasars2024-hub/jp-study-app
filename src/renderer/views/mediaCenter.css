@@ -3155,16 +3155,46 @@
     padding-inline: 0;
   }
 
+  /* Decoration, and only decoration. The brand wordmark and the "Browse" /
+     "Library status" section captions name no control, and `.mc-nav button em`
+     is a count badge whose number the destination itself repeats. */
   .mc-brand > span:last-child,
   .mc-nav-label,
+  .mc-nav button em {
+    display: none;
+  }
+
+  /*
+   * A CONTROL'S NAME IS NOT DECORATION — measured 2026-09-01, L10 bullet 2.
+   *
+   * These four selectors used to sit in the `display: none` list above, and that
+   * deleted the accessible name of every destination in the collapsed rail. Of the
+   * 11 controls here at 800px: 6 fell back to `title` and announced their
+   * DESCRIPTION instead of their name ("Your media at a glance", never "Home"),
+   * and `Media workspace` and `Media Settings` carry no title at all, so they
+   * announced NOTHING. Only 3 of 11 survived. The rail looks identical either way,
+   * which is exactly why it went unnoticed: the defect is invisible by construction.
+   *
+   * Clipped instead of removed. `position: absolute` takes the wrapper out of flow,
+   * so the button still centres its icon at 58px and no rect moves — the same
+   * treatment `.medialib-view__head > span` already uses one container query away.
+   * The chevron on the group heading stays visible; only its wordmark is clipped,
+   * or the collapsed rail has no way to open the group and three destinations
+   * become unreachable by pointer.
+   */
   .mc-nav button > span,
-  .mc-nav button em,
   .mc-settings-link > span,
   .mc-seanime-link > span,
-  /* The wordmark only. The chevron stays, or the collapsed rail has no way to open
-     the group and three destinations become unreachable by pointer. */
   .mc-nav-group__heading > span {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
   }
 
   .mc-nav-group__heading {

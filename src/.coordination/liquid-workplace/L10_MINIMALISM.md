@@ -156,8 +156,39 @@ Dictionary, Grammar, Notebook, Translate, Anki, Flashcards, Game Arena, Statisti
 Sticky Note, Visualizer, Music widget, City, Immersion, Calendar, YouTube, Scraper, Aero shell,
 Wired shell, Blanc shell. Media, Video and Music share the one Media Center root that was scored.
 
-### Exact next: bullet 2 — labels, icons, spacing, motion, empty states, breakpoints
+### Bullet 2 — IN PROGRESS. First repair: the collapsed Media rail had no names.
 
-Same two surfaces, same 16 cells, order cat1 → cat5 → cat8 first per the table above. Bullet 1's
-runs are NOT reusable for it: they scored redundant chrome, and bullet 2 asks a different
-question of the same pixels.
+Bullet 2's own words send you at labels and icon semantics, and no rubric category asks that
+question directly — so it was asked of the source and then of the running app. The Media Center
+sidebar collapses to a 58px icon rail under `@container mc (max-width: 820px)`, and that rule
+carried `display: none` on the wrapper holding every destination's `<strong>` name.
+
+Measured live at an 800px `.mc-root` (container width driven 1042 → 800 → 1042, restored):
+**11 controls, 8 of them lost their own name.** Six fell back to `title` and announced their
+DESCRIPTION — `Home` announced as "Your media at a glance (Ctrl+1)", `Library` as "All local
+media (Ctrl+2)", and so on through `Video`, `Music`, `Study Mode`, `Discover`. Two — `Media
+workspace` and `Media Settings` — carry no `title` at all and announced **nothing**. Only 3 of
+11 survived. None of these buttons has an `aria-label`, so the wrapper was the only name.
+
+Fixed by clipping rather than removing, the treatment `.medialib-view__head > span` already uses
+one container query away. Re-measured in the same session: **unnamed 2 → 0, name-lost 8 → 0.**
+The rail is pixel-identical — sidebar 58 px, all 11 buttons 43 px wide, icon offset 14 px (16 px
+for the group chevron), 0 painted text runs, 0 horizontal overflow on any button, the rail or
+the root. Wide stays 206 px with 11 painted labels.
+
+Negative control, injected and withdrawn in the same run: a stylesheet forcing `display: none`
+back onto the three wrappers moved the reading 0 → 8 name-lost / 2 unnamed and naming exactly
+the same eight rows; removing it returned 0 / 0. Guard: `mediaVideoMinimalism.test.ts`, 3 tests,
+proven discriminating by a byte-restored source mutation (dropping `.mc-nav button > span` from
+the clip rule fails it; the file restored `-ceq` identical).
+
+The decoration that names no control — the brand wordmark, the `Browse` / `Library status`
+captions, the `em` count badge — still uses `display: none` and is asserted to keep doing so, so
+this is not a licence to un-hide the rail.
+
+### Exact next: bullet 2's remaining work
+
+Ask the same compact-width naming question of **Settings** — it is the other representative
+surface and RULE C will not close the bullet on one. Then run the 16 cells, order cat1 → cat5 →
+cat8 first per the table above; those three are the ones bullet 2's words actually bite on, and
+they must be re-run *after* the repairs above, not reused from bullet 1.
