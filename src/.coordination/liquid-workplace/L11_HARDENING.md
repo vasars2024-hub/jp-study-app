@@ -770,3 +770,72 @@ the merge), a startup block that is not this bullet's question; (2) the `video` 
 a load that exists post-`4d6a7ce7`; (3) every non-scroll, non-dictionary, non-music spec still
 lacks a `progress` receipt and will VOID under load exactly as flashcards and music did first —
 the fix is one line per spec, naming the load's own tick counter.
+
+## 2026-09-01 (night) — L11 bullet 4, clauses 1-2: blur fallback and GPU-loss recovery
+
+Bullet 4 is `Blur fallback, GPU-loss recovery, multi-monitor, restart persistence, and
+long-session memory checks` — five clauses. Two are closed here with live evidence and
+controls; three are untouched and the bullet stays **open**. Saying which is the point.
+
+**Clause 1, blur fallback — `24f7dfc4`.** Two defects, one root. (a) The OS preference
+`prefers-reduced-transparency` (Windows' Colors > "Transparency effects") had exactly ONE
+reader in the app, `views/mediaCenter.css:6792`. Measured through the bridge's `/emulate`
+(CDP `Emulation.setEmulatedMedia`, so `matchMedia` genuinely flips): turning it on took
+Media Center's blurs 24/18/22px → `none` — the positive control that the query re-evaluates
+at all — while `--lq-liquid-blur` 8px, `--lq-ambient-blur` 6px, `--glass-blur` 8px,
+`--blur-md` 6px, `--lq-liquid-saturate` 1.25 and the painted `.os-taskbar`
+`blur(8px) saturate(1.25)` over `color(srgb … / 0.72)` were byte-identical. This is the
+transparency half of the pair `liquid-tokens.css:215` already fixed for MOTION.
+(b) The in-app `off` removed only the BLUR — `styles.css:1321` drops it with `!important`
+while `--glass-tint` stayed at 72%, i.e. a *sharply* see-through taskbar, which
+`mediaCenter.css:6812` calls the worst of both. AFTER: 0px/0px/0px/0px, saturate 1, tint
+`#1a1823`, taskbar `blur(0px) saturate(1)` over opaque `rgb(26, 24, 35)`; clearing the
+emulation returns every value.
+**SPECIFICITY WAS LOAD-BEARING and the first version was wrong**: a bare `:root` is (0,1,0)
+and loses to `[data-perf='performance']` (0,2,0), which sets this very ladder — `--glass-blur`
+stayed 8px. Qualified on `[data-display-transparency='full']` it is (0,2,0) and last.
+MUTATION CONTROL, in the live renderer via CSSOM: deleting exactly the 2 rules (scoped by
+token name so Media Center's is not taken) returns 8px/6px/72%/1.25/8px/6px; re-inserting
+restores them identically.
+
+**Clause 2, GPU-loss recovery — `df9d9a71`.** `theme/perf.ts` is a saved user preference with
+NO hardware detection (default `performance`), so a machine on a software rasteriser still
+asked for 8px of blur everywhere and a GPU-process death changed nothing. The only
+GPU-adjacent code in main was `main.ts:708`'s `render-process-gone` log — a different process.
+`theme/gpuFallback.ts` writes `data-gpu` = `software` (SwiftShader / WARP / Basic Render
+Driver, matched on the unmasked renderer string) or `lost` (`webglcontextlost`); perf.css and
+liquid-tokens.css flatten the same tokens with the same opaque values — the 4th and 5th
+triggers to reuse them. LIVE, on the real `WEBGL_lose_context` against the real shipped
+detector, on a machine reporting a healthy `ANGLE (AMD, AMD Radeon 780M …, D3D11)`:
+HEALTHY `data-gpu` null / 8px / 6px / 8px / 72% tint → LOST (`isContextLost()` true) all three
+blurs **0px**, tints `#1a1823`, taskbar painted opaque `rgb(26, 24, 35)` → RECOVERED
+(`restoreContext()`) every value back, `roundTripClean: true`. Reversibility only works
+because the handler `preventDefault()`s the loss event; without it `webglcontextrestored`
+never fires and the app degrades permanently on the first blip.
+
+**THE INSTRUMENT WAS BLIND, which is why both went unnoticed.** `liquidTokens.test.ts` derives
+degradation triggers from `[attr]`/`.class` qualifiers on the ROOT, so a trigger the PLATFORM
+owns has no qualifier and cannot be seen. The new block parses `@media` conditions by brace
+matching. TEST CONTROL: rewriting only the condition to a name nothing answers fails 3 of the
+new cases; both sheets restored sha256-identical.
+
+**A NUMBER THAT GOES AGAINST THE FIX, measured not estimated.** Every trigger in this app —
+all five now — grades TOKENS. Across all 15 CSS files that paint glass: **66 backdrop-filter
+declarations are token-driven and therefore reached; 88 are hardcoded pixels and are reached
+by NOTHING** (31 more are an explicit `none`). So 57% of the app's painted glass still ignores
+transparency-off, battery, high-contrast, Aero safe mode, the OS preference and GPU loss alike.
+By file: `styles.css` 38, `aero-shell.css` 14, `readingGarden.css` 6, `aero-apps.css` 5,
+`mediaWorkspace.css` 4, `mediaCenter.css` 4, `readingLens.css` 3, `scraper.css` 3,
+`wired-shell.css` 3, `shell.css` 2, `multiMonitor.css` 2, and 1 each in
+`lensClipboardPassage.css`, `mediaLibrary.css`, `blanc.css`, `readingGardenPhaseGallery.css`.
+perf.css's own comment called this "a known remainder, not a claim"; this is the count it never had.
+**Deliberately NOT fixed with a `:root[state] * { backdrop-filter: none !important }` catch-all**,
+even though `perf.css` battery already uses that shape for animations: those 88 surfaces carry
+hardcoded `rgba()` backgrounds too, so removing only their blur would manufacture the exact
+"unblurred but see-through" state clause 1 exists to prevent, on 88 surfaces at once. It needs
+the tint converted per surface, which is a slice of its own, not a tail-of-turn edit.
+
+**NOT DONE, and bullet 4 stays open on them:** multi-monitor (needs a second display this
+machine does not have; `f5b664ff` and L4's 2026-08-22 detach/reopen run are prior art to
+re-derive against, not inherit), restart persistence, long-session memory. RULE C: 0 of 16
+cells banked for this bullet — no rubric surface was scored, and none is claimed.
