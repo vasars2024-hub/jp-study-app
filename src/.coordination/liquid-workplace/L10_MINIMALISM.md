@@ -317,3 +317,75 @@ a run leaves `jojo` in the field, and with `media.query` non-empty the product's
 branch keeps the surface on Library, so clicking Library really did move nothing. **A cat2 run on
 this surface must start from an EMPTY search field, not merely the right tab** — `base` reads
 79/32 when it is clean and 100/41 when it is not, which is the cheapest way to spot it.
+
+## L10 bullet 4 — no feature duplicated into competing control systems (2026-09-01)
+
+**Instrument: `cat6-feature-parity.cjs --mode duplication`, not a new probe.** `--mode parity`
+asks whether a feature is REACHABLE in both presentations; it cannot tell one route from
+three. Scope is a product fact rather than a DOM heuristic: a control counts only when its
+primary label appears verbatim in the EN catalogs (8,379 values, 9 files), so a shelf of
+media tiles carrying the user's filenames drops out with no "is this a list" rule to go
+stale. Primary label = first text segment, then `aria-label`, then `title` — that order is
+what dissolved reconnaissance's one false positive, where Video's Subtitles and Generate
+share a single disabled-reason tooltip and title-first collapsed them into a duplicate.
+
+**Two real defects, both live, both fixed in `34324fb3`.**
+
+| surface | before | after |
+| --- | --- | --- |
+| Video | "Media workspace" in nav-rail@157,635 **and** app-toolbar@811,204 | crossSystem `[]` |
+| Settings | "Memory & storage" in nav-rail@79,1124 **and** content-body@305,734 | crossSystem `[]` |
+
+Video's toolbar copy shared the stage CTA's handler byte-for-byte and was enabled on exactly
+the condition that RENDERS that CTA, so it was never the only route — one feature, three
+control systems. Settings' Home tile was a byte-for-byte copy of `settings.nav.memory` while
+going somewhere else (it deep-links `backup`); nine of the ten quick actions name the ACTION
+against the rail's DESTINATION, and this was the exception. It now uses `search.backup`.
+
+**Control, both runs:** a duplicate is planted by overwriting one control's first text node
+with another system's label; crossSystem must rise by exactly 1, name that pair, and return.
+Both ends must be SINGLETONS — the first run planted onto the control that was already half
+of the real duplicate, destroyed one group while creating another, read delta 0, and scored
+VOID on a sweep that had in fact seen the plant.
+
+**`topbarActions` was re-derived, and this is the uncomfortable half.** Deleting the
+duplicate dropped cat6 Video to 9/10: the row read `acts.length === 3 && on >= 1`, and BOTH
+terms were satisfied only by the control being deleted. The instrument had banked the defect
+as the contract. The replacement is strictly stronger — the count is keyed to
+`mc-button-primary` identity instead of a literal, exactly one of {topbar entry action, stage
+entry actions} must exist, and a NEW `liveSomewhere` clause requires the page to offer at
+least one enabled entry point. All ten mutations still flip exactly their own row.
+
+### The 16 cells
+
+| cat | Settings | Media Center (Video) | derived |
+| --- | --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 | this turn |
+| 2 clunkiness | 10/10 | 10/10 | carried from bullet 2 (`b95b7d95`) |
+| 3 Liquid utilization | 10/10 | 10/10 | this turn, `--presentation liquid` |
+| 4 use of space | 10/10 | 10/10 | this turn |
+| 5 UI clarity | 10/10 | 10/10 | this turn, control run banked separately |
+| 6 feature parity | 10/10 | 10/10 | this turn, 10/10 rows both presentations |
+| 7 performance | 10/10 | 10/10 | carried from bullet 2 (`b95b7d95`) |
+| 8 honest states | 10/10 | 10/10 | this turn, `--langs` |
+
+Twelve of sixteen re-derived at this HEAD; cat2 and cat7 are carried because removing a
+control and renaming a tile can neither create a dead end in the scored tasks (Library nav +
+global search; the Settings rail walk) nor raise a cost. Said plainly so it is not read as
+sixteen fresh runs. `sampled-out:` Music, Discover, Study Mode, Readiness, Review, Home,
+Library.
+
+**A number that moved against me, banked rather than dropped.** cat3 on Settings first read
+FAIL — because I had left the window on **Appearance** for cat8's language leg, not because
+of anything this bullet touched. On Home it is `liquidTreatedEligible 13/13`,
+`sharedPrimitiveEligible 13/13`. On Appearance it is **12/26 and 12/26**: fourteen
+Liquid-eligible regions with no treatment and no shared primitive
+(`cat3-l10b4-settings-appearance.json`, `contextualTreated` and `sharedPrimitives` both
+false, control `movedOne` true / `allWorkFailed` true / `returned` true). That page is
+sampled out of this bullet, so it is not scored here — it is an open finding for a later
+turn, and the instrument note it carries is that **cat3's Settings score is page-scoped, so
+a cell must name the page it was taken on.**
+
+**Trap paid for again:** editing `MediaCenterView.tsx` HMR-reset BOTH Media Center windows to
+the Library tab, and the next `--app video` run correctly refused with "the video surface is
+not open". Click the Video nav entry back before scoring, and re-read `videoPage` to confirm.

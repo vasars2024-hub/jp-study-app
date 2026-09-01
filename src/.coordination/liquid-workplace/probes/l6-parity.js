@@ -3169,6 +3169,24 @@
           // deliberately omits its duplicate Open video action; with a source, that action
           // returns because the stage entry is gone. Presence is therefore cross-checked
           // against the stage, while disabled/reason agreement remains exact.
+          //
+          // RE-DERIVED at L10 bullet 4, and the reason matters more than the edit. This row
+          // used to read `acts.length === 3 && on >= 1` with no source. BOTH terms were
+          // satisfied only by a control that did not belong in this bar: the workspace
+          // launcher, which acts on no source at all, wore the nav rail's own name, and was
+          // enabled whenever the stage CTA beside it was rendered. Deleting the duplicate
+          // dropped this row to 9/10 — the instrument had banked the defect as the contract.
+          //
+          // What replaces it is STRICTLY STRONGER, not a lowered bar:
+          //   - the count is DERIVED from the source state, not a literal 3 (which is what
+          //     let a stale layout keep passing);
+          //   - exactly one of {topbar Open video, stage entry actions} exists — never both,
+          //     never neither, which the old row only half-checked;
+          //   - `liveSomewhere` is NEW: the page must always offer at least one enabled
+          //     entry point. That is the real thing `on >= 1` was reaching for, and it is
+          //     the clause that stops "the topbar may be entirely inert" from being a hole.
+          //     A topbar of explained mute pairs is honest; a page with nothing to click is
+          //     not, and only this version can tell the two apart.
           id: 'topbarActions',
           f: (w) => {
             const acts = qa(w, '.mc-video-actions button');
@@ -3177,10 +3195,20 @@
             const on = acts.length - off.length;
             const hasSource = !!q(w, '.mc-video-stage video');
             const entry = qa(w, '.mc-video-empty').find((e) => qa(e, ':scope > div > button').length >= 2);
-            const countAgrees = hasSource ? acts.length >= 4 && !entry : acts.length === 3 && !!entry;
+            const entryLive = entry ? qa(entry, ':scope > div > button').filter((b) => !b.disabled).length : 0;
+            // The action the topbar GAINS with a source is the primary one — that is the
+            // surface's own convention (`mc-button-primary` is used for exactly the entry
+            // action, in the topbar and in the stage alike). Keying on it makes the check an
+            // identity rather than an arithmetic literal, so a layout change cannot quietly
+            // keep passing the way `acts.length === 3` did.
+            const primary = qa(w, '.mc-video-actions .mc-button-primary').length;
+            const countAgrees = acts.length >= 2
+              && (hasSource ? primary === 1 && !entry : primary === 0 && !!entry);
+            const liveSomewhere = on + entryLive >= 1;
             return {
-              ok: countAgrees && on >= 1 && explained === off.length,
-              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained} source=${hasSource} stageEntry=${!!entry}`,
+              ok: countAgrees && liveSomewhere && explained === off.length,
+              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained}`
+                + ` primary=${primary} source=${hasSource} stageEntry=${!!entry} stageLive=${entryLive}`,
             };
           },
         },
