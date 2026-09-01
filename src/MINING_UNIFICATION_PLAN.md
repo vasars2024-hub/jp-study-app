@@ -316,3 +316,54 @@ kana/kanji** — a heavily typeset ASS whose dialogue lines are mostly karaoke a
 census reports 36,427 read and 34,684 skipped as not-Japanese: **36,427 − 34,684 = 1,743**,
 matching the independent count exactly. The parser is right, and the 8-line gap to 36,435 is
 the blank cues `readFilesMineSource` documents dropping. 4 of 12 closed.
+
+### 2026-09-01 — gate 9 CLOSES, both outlets on one book
+
+`--gate9`, a fifth mode on the same census. It is the first mode that calls a **main-process
+IPC handler**: `registerMiningIpc()` runs and `mining:analyzeEpub` / `mining:getConfig` are
+taken out of the stub's `capturedIpcHandlers`, so the batch export is measured through the
+channel the renderer invokes. `analyzeBook` is not exported and a private re-implementation of
+it would have proven nothing.
+
+One book — the largest mineable epub in the live index, `library:b41ef962…/original.epub`,
+4,324,227 bytes — through **both** outlets:
+
+| outlet | entry | product | count |
+| --- | --- | --- | --- |
+| A, the new one | catalogue row → `readFilesMineSource` → `buildFilesMineDrafts` → `buildFilesMineNoteRequest` | `MineNoteRequest`, route `epub/sentence/ja`, tag `provenance-book-text` | **200** (capped; 7,347 over cap) |
+| B, the pre-existing one | `mining:analyzeEpub` → `buildEpubDeckExport` | 5,937 deck rows + 491,223 bytes of CSV | **5,937** |
+
+Outlet B calls the same `buildEpubDeckExport` `EpubMiningSimplePanel.downloadDeck` calls, with
+the default filter — which is exactly that panel's `filterEpubCandidates(analysis.candidates,
+config)` followed by `skipFilter: true`, the identical set from the identical function.
+8,362 candidates before the filter, 5,937 after, kuromoji, 14.1 s.
+
+Four controls. **(a)** the two outlets read the same bytes: same `itemId`, and character counts
+**197,301 = 197,301**, both from `extractEpubSections` on one file. **(b)** re-rendering outlet B
+from an analysis with its candidates emptied gives **0 cards / 0 bytes**, so the count tracks its
+input rather than being a constant. **(c)** the products are different shapes — A is an object
+`{route,term,sentence,surface,extraTags}` bound for AnkiConnect with no `profileId` (the mining
+rules route it), B is 3-column text whose rows are `{expression,reading,sentence,front,back}`.
+**(d)** the whole table family still renders, not just CSV: `csv` 491,223 b, `anki` 491,223 b,
+`txt` 51,509 b, `txt-rep` 782,787 b, `yomitan` 1,067,766 b — every format non-empty.
+
+**The scope difference is the point, not a defect.** A is capped at `FILES_MINE_MAX_CARDS` so a
+click in a list cannot dump a whole novel into a deck; B is the whole book. That is what "the
+batch path is not removed, it gains a second outlet" means, and both numbers are reported.
+
+**NOT run, and stated rather than hidden:** `mining:renderEpubDeck`'s Qwen/API enrichment pass,
+which fills translation fields. It can load a local LLM and a census does not get to spend that;
+the configured engine (`qwen`) is printed so the reader can see what was skipped. Analysis-time
+enrichment — offline dictionary glosses, `glossOnly` — DOES run, because `analyzeBook` does it.
+
+**A control failed first, and it was the control that was wrong.** Comparing the two titles
+FAILED the gate on a run where every byte matched: the catalogue row's name is `library.json`'s
+`title` (an Anna's Archive filename), while `analysis.title` is the EPUB's own OPF metadata
+(`ＤＤＤ（１）`). Two authorities for one book, both legitimate. The title comparison was
+replaced with the character-count equality, which is what "same bytes" actually means.
+
+**Trap for the next worker:** the stub's `app.getPath('userData')` answered the `appData` ROOT
+until this slice. Every main-process reader that resolves the profile through it — 
+`resolveItemEpubPath`, `readMiningConfig`, the frequency-dictionary root — was looking one
+directory too high and would have fallen back to defaults *silently*. `--gate7` was re-run
+after the fix and is byte-identical, so gates 5–8 are unaffected. 5 of 12 closed.

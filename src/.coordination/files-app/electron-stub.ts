@@ -13,11 +13,45 @@
  * them, and a stub that silently *did* something would let the census pass on
  * behaviour the real app does not have.
  */
+import path from 'node:path';
+
+/**
+ * Electron resolves `userData` as `appData/<name>`, and `--gate9` reaches main
+ * code that reads the profile through it (`resolveItemEpubPath`,
+ * `readMiningConfig`, the frequency-dictionary root). The first version of this
+ * stub answered the `appData` ROOT for every name, so those readers looked one
+ * directory too high, found nothing and fell back to defaults — a silent wrong
+ * answer, which is worse than a throw. `JP_CENSUS_USERDATA` lets the census
+ * point main at the same profile it passed to `buildFilesIndex`, so one run
+ * cannot measure two different profiles.
+ */
 export const app = {
-  getPath: () => process.env.APPDATA ?? '',
+  getPath: (name?: string) => {
+    const appData = process.env.APPDATA ?? '';
+    if (name === 'userData') {
+      return process.env.JP_CENSUS_USERDATA || path.join(appData, 'jp-study-app');
+    }
+    return appData;
+  },
   getName: () => 'jp-study-app',
 };
-export const ipcMain = { handle: () => undefined, removeHandler: () => undefined };
+
+/**
+ * Handlers registered by `registerMiningIpc()` land here so `--gate9` can call
+ * the PRODUCTION entry point (`mining:analyzeEpub`, `mining:getConfig`) rather
+ * than a private copy of it. Recording is what real `ipcMain.handle` does, so
+ * this makes the stub more faithful, not less: nothing is invoked unless the
+ * census asks for a named channel by hand.
+ */
+export const capturedIpcHandlers = new Map<string, (...args: unknown[]) => unknown>();
+export const ipcMain = {
+  handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+    capturedIpcHandlers.set(channel, handler);
+  },
+  removeHandler: (channel: string) => {
+    capturedIpcHandlers.delete(channel);
+  },
+};
 export const dialog = {};
 export const shell = {};
 export const BrowserWindow = { getAllWindows: () => [] };

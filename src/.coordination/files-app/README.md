@@ -14,7 +14,7 @@ npx esbuild src/.coordination/files-app/census.ts --bundle --platform=node \
   --format=cjs --external:better-sqlite3 --external:node-llama-cpp \
   --alias:electron=./src/.coordination/files-app/electron-stub.ts \
   --outfile=debug/filesapp-census.cjs
-node debug/filesapp-census.cjs [userDataPath] [--mining] [--detail] [--dupes] [--gate68] [--gate7]
+node debug/filesapp-census.cjs [userDataPath] [--mining] [--detail] [--dupes] [--gate68] [--gate7] [--gate9]
 ```
 
 `userDataPath` defaults to `%APPDATA%\jp-study-app`. `debug/` is gitignored, so
@@ -39,6 +39,24 @@ The modes:
 | `--dupes` | one file / one row, with a no-dedupe CONTROL pass beside it |
 | `--gate68` | MINING gates 6 & 8 — transcribed assets found through the presets |
 | `--gate7` | MINING gate 7 — the whole mine chain, end to end, per category |
+| `--gate9` | MINING gate 9 — both epub outlets on ONE book, counts side by side |
+
+`--gate9` is the only mode that calls a **main-process IPC handler**. It runs
+`registerMiningIpc()` and takes `mining:analyzeEpub` / `mining:getConfig` out of
+`electron-stub.ts`'s `capturedIpcHandlers`, so the batch export is measured
+through the channel the renderer actually invokes rather than a private copy of
+`analyzeBook` (which is not exported, and re-implementing it would prove
+nothing). Two consequences to know about:
+
+- The stub's `app.getPath('userData')` now answers `appData/<name>`, not the
+  `appData` ROOT, and honours `JP_CENSUS_USERDATA`. Main-process readers
+  (`resolveItemEpubPath`, `readMiningConfig`, the frequency-dictionary root) go
+  through it; the old answer was one directory too high and would have silently
+  fallen back to defaults. `--gate7` was re-run after the change and is
+  byte-identical, so the earlier modes are unaffected.
+- It takes ~15 s on a 4.3 MB novel: kuromoji over the whole book plus offline
+  gloss enrichment. Qwen/API enrichment is deliberately NOT run — it can load a
+  local LLM, and the run prints the configured engine so that is visible.
 
 It prints items, per-enumerator counts and timings, every category including the
 empty ones, total bytes, broken links, orphans, the provenance split, and every

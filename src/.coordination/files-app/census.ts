@@ -36,6 +36,14 @@ import {
 // bundle aliases that to `./electron-stub`, exactly as the mineSource suite
 // stubs it with `vi.mock`. See this directory's README for the command.
 import { readFilesMineSource } from '../../main/filesApp/mineSource';
+// `--gate9` only. `registerMiningIpc` is the production registration the app
+// itself calls; `capturedIpcHandlers` is where the aliased stub records what it
+// bound, so the census can call `mining:analyzeEpub` — the same channel the
+// renderer invokes — instead of a private re-implementation of `analyzeBook`.
+import { registerMiningIpc } from '../../main/mining';
+import { buildEpubDeckExport, exportDeckFileContent } from '../../shared/epubDeck';
+import type { EpubMiningAnalysis, TraditionalMiningConfig } from '../../shared/miningTypes';
+import { capturedIpcHandlers } from './electron-stub';
 
 // Filter EVERY flag, not a named list: `--detail` slipped through a
 // `!== '--mining'` filter and became the userData path, so the census walked a
@@ -44,6 +52,20 @@ import { readFilesMineSource } from '../../main/filesApp/mineSource';
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const miningMode = process.argv.includes('--mining');
 const userDataPath = args[0] || path.join(process.env.APPDATA || '', 'jp-study-app');
+// `--gate9` reaches main-process readers that resolve the profile through
+// `app.getPath('userData')`. Point the stub at the SAME profile this run is
+// measuring, so one census cannot read the index from one place and the library
+// from another. Set before any handler is called; main code that resolves a
+// root at module-eval time would already have used the stub's default, which is
+// this same path unless a non-default `userDataPath` argument was given — in
+// which case export `JP_CENSUS_USERDATA` in the shell as well.
+process.env.JP_CENSUS_USERDATA = userDataPath;
+
+// Declared once, at module scope, deliberately: a `\s` written inside a shell
+// heredoc has already shipped in this repo as the literal letter `s`, so the
+// two regexes the gate modes need live here where they are read back as source.
+const WHITESPACE = /\s+/g;
+const NEWLINE = /\r?\n/;
 
 const ctx = {
   userDataPath,
@@ -613,4 +635,217 @@ if (process.argv.includes('--gate7')) {
   console.log(
     `GATE 7: ${failures === 0 && mined.length === kinds.length && controlsOk ? 'PASS' : 'FAIL'}`,
   );
+}
+
+/**
+ * `--gate9` — mining gate 9, both outlets, on the SAME book.
+ *
+ * "Epub mining produces a `MineNoteRequest` through the shared contract, with
+ * the existing CSV/table export still working — the batch path is not removed,
+ * it gains a second outlet."
+ *
+ * Two claims, so two runs against one epub and both counts reported:
+ *
+ *   OUTLET A (the new one)  catalogue row -> mineabilityOf -> readFilesMineSource
+ *                           -> buildFilesMineDrafts -> buildFilesMineNoteRequest
+ *   OUTLET B (the old one)  library itemId -> `mining:analyzeEpub` (the real IPC
+ *                           handler, registered by `registerMiningIpc`)
+ *                           -> buildEpubDeckExport -> csv / rows
+ *
+ * Neither is reimplemented. Outlet B calls the same `buildEpubDeckExport` that
+ * `EpubMiningSimplePanel.downloadDeck` calls, with the default filter — which is
+ * exactly the panel's own `filterEpubCandidates(analysis.candidates, config)`
+ * followed by `skipFilter: true`, i.e. the identical set from the identical
+ * function.
+ *
+ * NOT exercised, and stated rather than hidden: `mining:renderEpubDeck`'s Qwen /
+ * API enrichment pass, which fills translation fields. It can load a local LLM,
+ * and a census does not get to spend that. Analysis-time enrichment (offline
+ * dictionary glosses, `glossOnly`) DOES run, because `analyzeBook` does it. The
+ * run prints the configured translation engine so the reader can see which.
+ *
+ * Nothing is written: no CSV is saved, no card is posted.
+ *
+ * Controls:
+ *  (a) SAME BOOK — the two outlets must be reading the same bytes. The row's
+ *      `library:<id>` maps to outlet B's `analysis.itemId`, the titles must
+ *      agree, and both character counts come from `extractEpubSections` on one
+ *      file, so they are printed side by side.
+ *  (b) NOT A CONSTANT — re-render outlet B from an analysis with its candidates
+ *      emptied. `cardCount` must go to 0. A deck builder that returned a fixed
+ *      number, or read something other than what it was handed, would not move.
+ *  (c) DIFFERENT SHAPES — outlet A's product is a `MineNoteRequest` bound for
+ *      AnkiConnect, outlet B's is text. Both are printed, so "a second outlet"
+ *      is visible rather than asserted.
+ *  (d) THE WHOLE TABLE FAMILY — every `exportDeckFileContent` format must return
+ *      non-empty content, not just `csv`; "the table export still works" covers
+ *      the formats the panel offers, not one of them.
+ */
+if (process.argv.includes('--gate9')) {
+  void (async () => {
+    console.log('');
+    console.log('=== MINING gate 9 — epub keeps its CSV/table outlet AND gains the shared one ===');
+    console.log('');
+
+    let failures = 0;
+    const fail = (why: string): void => {
+      failures += 1;
+      console.log(`  FAILURE: ${why}`);
+    };
+
+    // The same pick as gate 7: the largest mineable book in the live index.
+    const book = snapshot.items
+      .filter((i) => i.kind === 'book' && mineabilityOf(i).mineable)
+      .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
+    if (!book) {
+      console.log('  NO MINEABLE BOOK IN THE INDEX — gate 9 cannot be claimed');
+      console.log('GATE 9: FAIL');
+      return;
+    }
+    const bookPath = book.location.store === 'file' ? book.location.path : '';
+    console.log(`book: ${book.name}`);
+    console.log(`  row id:   ${book.id}`);
+    console.log(`  path:     ${bookPath}`);
+    console.log(`  size:     ${book.sizeBytes ?? 0} bytes`);
+    console.log('');
+
+    /* ---- OUTLET A — the shared MineNoteRequest contract ---- */
+    const read = readFilesMineSource(bookPath, 'book');
+    if (!read.ok) {
+      fail(`outlet A refused at the reader — ${read.reasonKey}`);
+      console.log('GATE 9: FAIL');
+      return;
+    }
+    const plan = buildFilesMineDrafts(book, read.passages);
+    const requests = plan.drafts.map(buildFilesMineNoteRequest);
+    const outletAChars = read.passages.reduce(
+      (n, passage) => n + passage.text.replace(WHITESPACE, '').length,
+      0,
+    );
+    console.log('OUTLET A — shared contract (MineNoteRequest -> AnkiConnect)');
+    console.log(`  passages read:  ${read.readCount}, kept ${read.passages.length}`);
+    console.log(
+      `  drafts:         ${plan.drafts.length}  (skipped: ${plan.skippedNotJapanese} not-Japanese, ${plan.skippedDuplicate} duplicate, ${plan.skippedOverCap} over cap)`,
+    );
+    console.log(`  requests:       ${requests.length} MineNoteRequest`);
+    if (requests[0]) {
+      console.log(
+        `  route:          ${requests[0].route.source} / ${requests[0].route.cardKind} / ${requests[0].route.language}`,
+      );
+      console.log(`  tags:           ${(requests[0].extraTags ?? []).join(', ')}`);
+      console.log(`  first card:     ${String(requests[0].sentence).slice(0, 60)}`);
+    }
+    if (requests.length === 0) fail('outlet A produced 0 MineNoteRequests');
+    if (requests[0] && requests[0].route.source !== 'epub') {
+      fail(`outlet A route.source is ${requests[0].route.source}, not epub`);
+    }
+    console.log('');
+
+    /* ---- OUTLET B — the pre-existing CSV/table export ---- */
+    registerMiningIpc();
+    const getConfig = capturedIpcHandlers.get('mining:getConfig');
+    const analyzeEpub = capturedIpcHandlers.get('mining:analyzeEpub');
+    if (!getConfig || !analyzeEpub) {
+      const bound = [...capturedIpcHandlers.keys()].filter((k) => k.startsWith('mining:'));
+      fail(`the batch path's IPC channels are not registered (have: ${bound.join(', ') || 'none'})`);
+      console.log('GATE 9: FAIL');
+      return;
+    }
+    const traditional = getConfig() as TraditionalMiningConfig;
+    const itemId = book.id.startsWith('library:') ? book.id.slice('library:'.length) : book.id;
+    const started = Date.now();
+    let analysis: EpubMiningAnalysis;
+    try {
+      analysis = (await analyzeEpub(null, itemId)) as EpubMiningAnalysis;
+    } catch (error) {
+      fail(`mining:analyzeEpub threw — ${error instanceof Error ? error.message : String(error)}`);
+      console.log('GATE 9: FAIL');
+      return;
+    }
+    const deck = buildEpubDeckExport(analysis, traditional);
+    const csvBytes = Buffer.byteLength(deck.csv, 'utf-8');
+    console.log('OUTLET B — the pre-existing batch export (CSV / table rows)');
+    console.log("  entry point:    ipcMain 'mining:analyzeEpub' -> buildEpubDeckExport");
+    console.log(`  analyzer:       ${analysis.analyzer}, ${Date.now() - started}ms`);
+    console.log(`  candidates:     ${analysis.candidates.length} (before the export filter)`);
+    console.log(`  cardCount:      ${deck.cardCount}`);
+    console.log(`  rows:           ${deck.rows.length}`);
+    console.log(`  csv:            ${csvBytes} bytes`);
+    console.log(
+      `  translation:    engine=${traditional.export?.translationEngine ?? 'default'} (enrichment beyond offline glosses NOT run here)`,
+    );
+    const csvLines = deck.csv.split(NEWLINE);
+    console.log(`  csv line 1:     ${(csvLines[0] ?? '').slice(0, 80)}`);
+    console.log(`  csv line 2:     ${(csvLines[1] ?? '').slice(0, 80)}`);
+    if (deck.cardCount === 0) fail('outlet B produced 0 cards — the batch export is not working');
+    if (deck.rows.length !== deck.cardCount) {
+      fail(`outlet B cardCount ${deck.cardCount} disagrees with rows ${deck.rows.length}`);
+    }
+    console.log('');
+
+    /* ---- controls ---- */
+    console.log('controls');
+    const sameId = analysis.itemId === itemId;
+    const sameChars = outletAChars === analysis.totalCharacters;
+    console.log(`  (a) same book:  itemId ${analysis.itemId} vs ${itemId} -> ${sameId ? 'match' : 'MISMATCH'}`);
+    console.log(
+      `      characters: outlet A ${outletAChars} vs outlet B totalCharacters ${analysis.totalCharacters} -> ${sameChars ? 'EQUAL' : 'DIFFER'}`,
+    );
+    if (!sameId) fail('control (a): the two outlets did not read the same library item');
+    if (!sameChars) fail('control (a): the two outlets read different amounts of text');
+    // Titles are NOT compared, and the reason is worth carrying: the catalogue
+    // row's name comes from `library.json`'s `title` (what the Library UI shows,
+    // here an Anna's Archive filename), while `analysis.title` comes from the
+    // EPUB's own OPF metadata. Two authorities for one book, both legitimate —
+    // asserting equality made this control FAIL on a run where every byte
+    // matched, which is a control measuring the wrong thing.
+    console.log(`      titles differ by design: row "${book.name.slice(0, 40)}…" / opf "${analysis.title}"`);
+
+    const emptied = buildEpubDeckExport({ ...analysis, candidates: [] }, traditional);
+    console.log(
+      `  (b) not a constant: candidates emptied -> cardCount ${emptied.cardCount}, csv ${Buffer.byteLength(emptied.csv, 'utf-8')} bytes (must be 0 cards)`,
+    );
+    if (emptied.cardCount !== 0) {
+      fail('control (b): the deck builder returned cards for no candidates');
+    }
+
+    console.log(
+      `  (c) different shapes: A = MineNoteRequest object, fields {${Object.keys(requests[0] ?? {}).join(',')}}, profileId ${requests[0]?.profileId ?? '(routed by mining rules)'}`,
+    );
+    console.log(
+      `      B = ${csvBytes} bytes of text, columns ${(csvLines[0] ?? '').split(',').length}, row fields {${Object.keys(deck.rows[0] ?? {}).join(',')}}`,
+    );
+    // Not a failure — the honest headline. The two outlets are scoped
+    // differently on purpose: the one-click shared route caps at
+    // FILES_MINE_MAX_CARDS so a list click cannot dump a whole novel into a
+    // deck, while the batch export is the whole book. That difference IS what
+    // "the batch path is not removed, it gains a second outlet" means.
+    console.log(
+      `      scope:  A ${requests.length} (capped, ${plan.skippedOverCap} over cap) vs B ${deck.cardCount} (whole book)`,
+    );
+
+    const formats: TraditionalMiningConfig['export']['format'][] = [
+      'csv',
+      'anki',
+      'txt',
+      'txt-rep',
+      'yomitan',
+    ];
+    const formatSizes = formats.map((format) => {
+      const out = exportDeckFileContent(deck, format);
+      return `${format}=${Buffer.byteLength(out.content, 'utf-8')}b/.${out.ext}`;
+    });
+    console.log(`  (d) table family: ${formatSizes.join('  ')}`);
+    for (const format of formats) {
+      if (!exportDeckFileContent(deck, format).content.length) {
+        fail(`control (d): format ${format} produced empty content`);
+      }
+    }
+
+    console.log('');
+    console.log(
+      `both outlets from one book: A ${requests.length} MineNoteRequest, B ${deck.cardCount} deck rows`,
+    );
+    console.log(`GATE 9: ${failures === 0 ? 'PASS' : 'FAIL'}`);
+  })();
 }
