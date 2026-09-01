@@ -5917,6 +5917,23 @@ export const en: Catalog = {
   'flash.mining.simpleLead':
     'English meaning + Japanese sentence & definition — two frequency filters only.',
   'flash.mining.advancedLead': 'Full control: all languages, export formats, translation engines.',
+  // MINING gate 10 — the catalogue tab. The other three tabs are EPUB tools.
+  'flash.tab.catalogue': 'Catalogue',
+  'flash.mining.catalogueLead':
+    'Every mineable asset the app holds — transcripts, subtitles and books — grouped by where the text came from.',
+  'mining.catalogue.searchPlaceholder': 'Search assets',
+  'mining.catalogue.refresh': 'Refresh',
+  'mining.catalogue.refreshing': 'Refreshing…',
+  'mining.catalogue.openFiles': 'Open in Files',
+  'mining.catalogue.provenanceLabel': 'Text came from',
+  'mining.catalogue.mediaLabel': 'Kind',
+  'mining.catalogue.media.all': 'All kinds',
+  'mining.catalogue.filter.all': {
+    one: 'All ({count})',
+    other: 'All ({count})',
+  },
+  'mining.catalogue.empty':
+    'Nothing here holds minable text yet. Download a video with subtitles, transcribe one, or import an EPUB.',
   'flash.csv.intro':
     'Paste CSV/TSV, edit in a spreadsheet grid, or import TXT lists — auto-syncs to flashcards.',
   'flash.epubMining': 'EPUB mining',

@@ -1,0 +1,167 @@
+/*
+ * The Mining catalogue (gate 10) — presentation.
+ *
+ * Every colour, radius and spacing is an `--lq-*` token; not one literal hex.
+ * The list is a table that gets read and scanned, so it sits on the ANCHOR
+ * surface — stable and opaque — rather than glass. The plan's rule is that
+ * Liquid is selective and universal glass is a failure, not a maximum, and a
+ * list of file names behind a blur is precisely the case it names.
+ *
+ * The filter chips are chrome and take the WORK weight, which is what the
+ * surrounding Flashcards panel already sits on.
+ */
+
+.mining-catalogue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-3);
+  min-height: 0;
+  color: var(--lq-work-text);
+}
+
+.mining-catalogue-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex-wrap: wrap;
+}
+
+.mining-catalogue-search {
+  flex: 1 1 220px;
+  min-width: 0;
+  height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+  background: var(--lq-work-bg-raised);
+  color: var(--lq-work-text);
+}
+
+.mining-catalogue-refresh,
+.mining-catalogue-mine,
+.mining-catalogue-chip {
+  min-height: var(--lq-hit-target);
+  padding: 0 var(--lq-space-3);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+  background: var(--lq-work-bg-raised);
+  color: var(--lq-work-text);
+  cursor: pointer;
+  transition: background var(--lq-motion-move) var(--lq-ease-move);
+}
+
+.mining-catalogue-refresh:disabled,
+.mining-catalogue-mine:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mining-catalogue-chip.active {
+  background: var(--lq-liquid-bg-raised);
+  border-color: var(--lq-liquid-border);
+  color: var(--lq-liquid-text);
+}
+
+/* An empty category is SHOWN, dimmed — never omitted. Gate 5's rule is that a
+   category legitimately empty must say so, and a hidden chip cannot say it. */
+.mining-catalogue-chip[data-empty='true'] {
+  opacity: 0.6;
+}
+
+.mining-catalogue-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2);
+  flex-wrap: wrap;
+}
+
+.mining-catalogue-filter-label {
+  color: var(--lq-work-text-muted);
+  font-size: 0.85em;
+}
+
+.mining-catalogue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--lq-anchor-radius);
+  background: var(--lq-anchor-bg);
+  color: var(--lq-anchor-text);
+}
+
+.mining-catalogue-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-3);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border-bottom: 1px solid var(--lq-anchor-border);
+}
+
+.mining-catalogue-row:last-child {
+  border-bottom: none;
+}
+
+.mining-catalogue-row[data-active='true'] {
+  background: var(--lq-anchor-bg-raised);
+}
+
+.mining-catalogue-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mining-catalogue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mining-catalogue-meta {
+  display: flex;
+  gap: var(--lq-space-2);
+  font-size: 0.85em;
+  color: var(--lq-anchor-text-muted);
+}
+
+/* The machine-origin mark. `MINING_UNIFICATION_PLAN.md` allows this to be made
+   more prominent and never less: a transcript-derived card that reads like a
+   human-subtitle one is the fusion track's defect repeated. */
+.mining-catalogue-provenance[data-machine='true']::before {
+  content: '⚙ ';
+}
+
+.mining-catalogue-provenance[data-machine='true'] {
+  color: var(--lq-work-text);
+}
+
+.mining-catalogue-receipt {
+  margin: 0;
+  padding: var(--lq-space-3);
+  border: 1px solid var(--lq-work-border);
+  border-radius: var(--lq-work-radius);
+  background: var(--lq-work-bg-raised);
+}
+
+.mining-catalogue-receipt.refused {
+  border-color: var(--lq-liquid-border);
+}
+
+.mining-catalogue-machine {
+  color: var(--lq-work-text);
+}
+
+.mining-catalogue-state {
+  margin: 0;
+  padding: var(--lq-space-4) 0;
+}
+
+.mining-catalogue-error {
+  margin: 0 0 var(--lq-space-2);
+  color: var(--lq-work-text);
+}

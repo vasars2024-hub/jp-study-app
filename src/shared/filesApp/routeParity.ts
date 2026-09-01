@@ -394,7 +394,10 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
     section: 'flashcards',
     module: 'src/renderer/components/flashcards/FlashcardsContent.tsx',
     symbol: 'EpubMiningSimplePanel',
-    note: 'Epub mining is unchanged in Flashcards, and in Blanc via BlancShell.',
+    note:
+      'Epub mining is unchanged in Flashcards, and in Blanc via BlancShell. MINING gate 10 '
+      + 'added a fourth Mining tab (the catalogue) BESIDE Simple/Advanced/Jiten rather than in '
+      + 'place of any of them, which is why this row still re-derives from the same symbol.',
   },
   {
     capability: 'action:mine.subtitle',
@@ -410,7 +413,12 @@ export const FILES_ROUTE_PARITY: readonly FilesParityRow[] = [
     section: null,
     module: '',
     symbol: '',
-    note: 'Same as the transcripts row: no reader existed once the session that made it ended.',
+    note:
+      'Same as the transcripts row: no reader existed once the session that made it ended. Still '
+      + 'scored `new` after MINING gate 10 — the gate gave it a SECOND route (Flashcards -> '
+      + 'Mining -> Catalogue, which imports the same filesMineChain), so it is no longer '
+      + 'Files-app-only, but it did not exist before the Files app and calling it `preserved` '
+      + 'would claim a history it does not have.',
   },
   {
     capability: 'action:undoMine',

@@ -54,12 +54,10 @@ import {
   type FilesItem,
   type FilesSortColumn,
 } from '../../../shared/filesApp/catalog';
-import {
-  FILES_MINE_MAX_CARDS,
-  buildFilesMineDrafts,
-  existingDeckKeys,
-  mineabilityOf,
-} from '../../../shared/filesApp/mining';
+import { FILES_MINE_MAX_CARDS, mineabilityOf } from '../../../shared/filesApp/mining';
+// The mine chain moved out of this file for gate 10: the Flashcards Mining
+// surface hosts the same catalogue, and two copies of the walk would drift.
+import { mineFilesItem, type MineState, type SettledMineState } from './filesMineChain';
 import {
   filesOpenDecision,
   isRoutableLocation,
@@ -133,7 +131,7 @@ import {
 } from '../../filesViewStateStore';
 import { targetLabelKey, type DropCandidate } from '../../../shared/fileRouting';
 import { openSectionSurface } from '../../sectionSurface';
-import { addDeckCardsTracked, loadDeck, removeDeckCards } from '../../flashcardDeck';
+import { removeDeckCards } from '../../flashcardDeck';
 import {
   FILES_SCOPE_EVENT,
   clearPendingFilesScope,
@@ -223,31 +221,6 @@ interface FolderNotice {
   values?: Record<string, string | number>;
   tone: 'ok' | 'error';
 }
-
-/**
- * The one-click mine's outcome, as a state rather than a string.
- *
- * A refusal and a zero-card success are DIFFERENT states and the plan calls
- * conflating them a finding, so `refused` carries a reason key while `done`
- * carries the four counts. Both render; neither is silent.
- */
-type MineState =
-  | { status: 'idle' }
-  | { status: 'reading' }
-  | { status: 'refused'; reasonKey: string; detail?: string; values?: Record<string, number> }
-  | {
-      status: 'done';
-      added: number;
-      passagesRead: number;
-      skippedNotJapanese: number;
-      skippedDuplicate: number;
-      skippedOverCap: number;
-      machineDerived: boolean;
-      addedIds: string[];
-    }
-  | { status: 'undone'; count: number };
-
-type SettledMineState = Extract<MineState, { status: 'done' | 'refused' }>;
 
 interface BulkMineResult {
   itemId: string;
@@ -637,68 +610,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   );
 
   /**
-   * Gate 3, the whole round trip: main reads the file into passages, `shared/`
-   * turns passages into drafts, and the renderer — the only owner of the deck —
-   * writes them. No card is invented here that the source did not carry.
+   * Gate 3, the whole round trip — now in `./filesMineChain`, because gate 10
+   * gives the Flashcards Mining surface the same catalogue and the two must
+   * mine identically.
    */
-  const mineOne = useCallback(async (item: FilesItem): Promise<SettledMineState> => {
-    const mineable = mineabilityOf(item);
-    if (!mineable.mineable) {
-      return { status: 'refused', reasonKey: mineable.reasonKey };
-    }
-    const kind = item.kind as 'transcript' | 'subtitle' | 'book';
-    let read;
-    try {
-      read = await window.api?.filesMineSource?.(item.location, kind);
-    } catch (error) {
-      return {
-        status: 'refused',
-        reasonKey: 'filesApp.mine.refuse.unreadable',
-        detail: error instanceof Error ? error.message : String(error),
-      };
-    }
-    if (!read) {
-      return { status: 'refused', reasonKey: 'filesApp.mine.refuse.unreadable' };
-    }
-    if (!read.ok) {
-      return { status: 'refused', reasonKey: read.reasonKey, detail: read.detail };
-    }
-    const plan = buildFilesMineDrafts(item, read.passages, {
-      existingWords: existingDeckKeys(loadDeck().map((card) => card.sentence || card.word)),
-    });
-    if (plan.drafts.length === 0) {
-      // Two different empty results, told apart rather than merged: nothing was
-      // Japanese, or everything was already mined. They need opposite actions.
-      return {
-        status: 'refused',
-        reasonKey:
-          plan.skippedDuplicate > 0
-            ? 'filesApp.mine.refuse.allDuplicates'
-            : 'filesApp.mine.refuse.noJapanese',
-        values: { read: plan.passagesRead },
-      };
-    }
-    let created;
-    try {
-      created = addDeckCardsTracked(plan.drafts);
-    } catch (error) {
-      return {
-        status: 'refused',
-        reasonKey: 'filesApp.mine.refuse.writeFailed',
-        detail: error instanceof Error ? error.message : String(error),
-      };
-    }
-    return {
-      status: 'done',
-      added: created.length,
-      passagesRead: plan.passagesRead,
-      skippedNotJapanese: plan.skippedNotJapanese,
-      skippedDuplicate: plan.skippedDuplicate,
-      skippedOverCap: plan.skippedOverCap,
-      machineDerived: isMachineDerived(item.provenance),
-      addedIds: created.map((card) => card.id),
-    };
-  }, []);
+  const mineOne = useCallback(
+    (item: FilesItem): Promise<SettledMineState> => mineFilesItem(item),
+    [],
+  );
 
   const onMine = useCallback(async () => {
     if (!selected) return;

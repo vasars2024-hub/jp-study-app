@@ -41,6 +41,7 @@ import VirtualList from '../VirtualList';
 import EpubMiningPanel from '../EpubMiningPanel';
 import EpubMiningSimplePanel from '../EpubMiningSimplePanel';
 import JitenMiningPanel from '../JitenMiningPanel';
+import MiningCataloguePanel from '../MiningCataloguePanel';
 import DeckActionMenu from '../DeckActionMenu';
 import AiCardStudio from '../AiCardStudio';
 import CsvEditorPanel from '../CsvEditorPanel';
@@ -125,7 +126,13 @@ import { takeHandoffJson } from '../../pendingHandoff';
 
 export type Mode = 'overview' | 'review' | 'epub-mining' | 'ai-studio' | 'csv-tool';
 export type OverviewTab = 'dictionary' | 'epub';
-export type EpubMiningUi = 'simple' | 'advanced' | 'jiten';
+/**
+ * MINING gate 10 added `catalogue`. The other three are all EPUB tools, which
+ * is what made this surface epub-only; the catalogue lists every mineable asset
+ * across every store. None of the three was removed — a capability that becomes
+ * catalogue-only would be the regression the plan forbids.
+ */
+export type EpubMiningUi = 'simple' | 'advanced' | 'jiten' | 'catalogue';
 
 export interface ReviewCard {
   id: string;
@@ -1471,6 +1478,16 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
         >
           Jiten
         </button>
+        {/* MINING gate 10. The other three tabs are EPUB tools; this one lists
+            every mineable asset in the index, which is what stops this surface
+            being epub-only. It is added beside them, never in place of one. */}
+        <button
+          type="button"
+          className={`flash-tab${epubMiningUi === 'catalogue' ? ' active' : ''}`}
+          onClick={() => state.setEpubMiningUi('catalogue')}
+        >
+          {t('flash.tab.catalogue')}
+        </button>
       </ContextualSurface>
 
       <p className="epub-mining-mode-lead muted">
@@ -1478,7 +1495,9 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
           ? t('flash.mining.simpleLead')
           : epubMiningUi === 'advanced'
             ? t('flash.mining.advancedLead')
-            : 'Download a Jiten vocabulary deck for a planned title and save it into your local deck library.'}
+            : epubMiningUi === 'catalogue'
+              ? t('flash.mining.catalogueLead')
+              : 'Download a Jiten vocabulary deck for a planned title and save it into your local deck library.'}
       </p>
 
       {epubMiningUi === 'simple' ? (
@@ -1497,6 +1516,11 @@ export function FlashcardMiningMode({ state }: { state: FlashcardsState }) {
             state.setOverviewTab('epub');
           }}
         />
+      ) : epubMiningUi === 'catalogue' ? (
+        // Stays on the Mining surface after a mine, deliberately: the whole
+        // point of a catalogue is mining several assets in one sitting, and
+        // bouncing to the deck overview after each one would undo that.
+        <MiningCataloguePanel onMined={() => state.setDeck(loadDeck())} />
       ) : (
         <JitenMiningPanel
           initialDeckId={state.initialJitenDeckId}

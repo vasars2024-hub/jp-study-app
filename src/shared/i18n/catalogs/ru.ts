@@ -6163,6 +6163,24 @@ export const ru: Catalog = {
   'flash.mining.simpleLead':
     'Значение на английском + японское предложение и определение — только два фильтра частоты.',
   'flash.mining.advancedLead': 'Полный контроль: все языки, форматы экспорта, движки перевода.',
+  'flash.tab.catalogue': 'Каталог',
+  'flash.mining.catalogueLead':
+    'Все материалы, из которых можно добывать карточки, — расшифровки, субтитры и книги — сгруппированы по происхождению текста.',
+  'mining.catalogue.searchPlaceholder': 'Поиск материалов',
+  'mining.catalogue.refresh': 'Обновить',
+  'mining.catalogue.refreshing': 'Обновление…',
+  'mining.catalogue.openFiles': 'Открыть в «Файлах»',
+  'mining.catalogue.provenanceLabel': 'Источник текста',
+  'mining.catalogue.mediaLabel': 'Тип',
+  'mining.catalogue.media.all': 'Все типы',
+  'mining.catalogue.filter.all': {
+    one: 'Все ({count})',
+    few: 'Все ({count})',
+    many: 'Все ({count})',
+    other: 'Все ({count})',
+  },
+  'mining.catalogue.empty':
+    'Пока нет материалов с текстом для добычи. Скачайте видео с субтитрами, сделайте расшифровку или импортируйте EPUB.',
   'flash.csv.intro':
     'Вставьте CSV/TSV, редактируйте в табличной сетке или импортируйте списки TXT — автосинхронизация с карточками.',
   'flash.epubMining': 'Добыча из EPUB',

@@ -5591,6 +5591,21 @@ export const zh: Catalog = {
   'flash.tab.advanced': '高级',
   'flash.mining.simpleLead': '英文释义＋日文例句与释义 — 仅两个频率过滤器。',
   'flash.mining.advancedLead': '完全控制：所有语言、导出格式、翻译引擎。',
+  'flash.tab.catalogue': '目录',
+  'flash.mining.catalogueLead':
+    '应用中所有可挖掘的素材 — 转写、字幕与书籍 — 按文本来源分组。',
+  'mining.catalogue.searchPlaceholder': '搜索素材',
+  'mining.catalogue.refresh': '刷新',
+  'mining.catalogue.refreshing': '正在刷新…',
+  'mining.catalogue.openFiles': '在文件中打开',
+  'mining.catalogue.provenanceLabel': '文本来源',
+  'mining.catalogue.mediaLabel': '类型',
+  'mining.catalogue.media.all': '所有类型',
+  'mining.catalogue.filter.all': {
+    other: '全部（{count}）',
+  },
+  'mining.catalogue.empty':
+    '目前没有可挖掘的文本。请下载带字幕的视频、进行转写，或导入 EPUB。',
   'flash.csv.intro': '粘贴 CSV/TSV、在表格中编辑，或导入 TXT 列表 — 自动同步到抽认卡。',
   'flash.epubMining': 'EPUB 挖掘',
   'flash.aiStudio.intro': '先在上方配置预设和字段映射，然后从已保存的词典单词生成卡片。',

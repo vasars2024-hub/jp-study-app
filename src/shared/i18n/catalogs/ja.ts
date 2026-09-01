@@ -5616,6 +5616,21 @@ export const ja: Catalog = {
   'flash.tab.advanced': '詳細',
   'flash.mining.simpleLead': '英語の意味＋日本語の例文と定義 — 頻度フィルター2つのみ。',
   'flash.mining.advancedLead': '完全な制御：全言語、エクスポート形式、翻訳エンジン。',
+  'flash.tab.catalogue': 'カタログ',
+  'flash.mining.catalogueLead':
+    'アプリが保持する採集可能な素材すべて — 文字起こし、字幕、書籍 — をテキストの出所ごとに分類。',
+  'mining.catalogue.searchPlaceholder': '素材を検索',
+  'mining.catalogue.refresh': '再読み込み',
+  'mining.catalogue.refreshing': '再読み込み中…',
+  'mining.catalogue.openFiles': 'ファイルで開く',
+  'mining.catalogue.provenanceLabel': 'テキストの出所',
+  'mining.catalogue.mediaLabel': '種類',
+  'mining.catalogue.media.all': 'すべての種類',
+  'mining.catalogue.filter.all': {
+    other: 'すべて（{count}）',
+  },
+  'mining.catalogue.empty':
+    '採集できるテキストはまだありません。字幕付きの動画をダウンロードするか、文字起こしするか、EPUBをインポートしてください。',
   'flash.csv.intro': 'CSV/TSVを貼り付け、表形式で編集、またはTXTリストをインポート — フラッシュカードに自動同期されます。',
   'flash.epubMining': 'EPUBマイニング',
   'flash.aiStudio.intro': '上でプリセットとフィールドマッピングを設定してから、保存した辞書の単語からカードを生成します。',
