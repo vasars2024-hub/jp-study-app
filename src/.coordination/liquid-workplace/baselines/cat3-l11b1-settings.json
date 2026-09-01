@@ -1,0 +1,93 @@
+{
+  "label": "l11b1-settings",
+  "surface": "Settings",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "already-on-top",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "960x680",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 42,
+  "controlsSkipped": 45,
+  "byRole": {
+    "Work": 2,
+    "Liquid-eligible": 13,
+    "Anchor": 21,
+    "Anchor(holds work)": 6,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 13,
+  "sharedPrimitiveEligible": 13,
+  "eligibleTotal": 13,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "untreatedEligible": [],
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.os-set-search",
+      "path": [
+        0,
+        0,
+        0
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        13,
+        13,
+        13,
+        2
+      ],
+      "oneRegionGlass": [
+        1,
+        13,
+        13,
+        13,
+        2
+      ],
+      "allGlass": [
+        2,
+        13,
+        13,
+        13,
+        2
+      ],
+      "restored": [
+        0,
+        13,
+        13,
+        13,
+        2
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

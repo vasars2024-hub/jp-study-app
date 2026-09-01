@@ -385,6 +385,44 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     }
     if (plateOnly) { decorativeClips.push({ sel: name(el), unreachablePx: Math.round(over), why: 'out-of-flow plates, no control past the fold' }); continue; }
 
+    // SIXTH EXCLUSION - a line-clamped LABEL whose full string is exposed anyway. Measured on the
+    // Media Library: span.medialib-card__title is -webkit-line-clamp 2 over a three-line
+    // title, so it reports 17px unreachable on every long card and scored the Video surface as
+    // two scroll traps. The clamp is an ellipsised truncation, not a hidden region - and the
+    // exclusion is deliberately NOT "it is clamped, so it is fine", because that would pass a
+    // card whose full title exists nowhere. The bar is the rubric's own words: content with NO
+    // WAY TO REACH IT. So the full string must be RECOVERABLE, proven from the DOM: an ancestor
+    // (or the element itself) carries title or aria-label that CONTAINS this element's own
+    // textContent - the hover tooltip and the screen-reader name are two real routes to it.
+    // The existing fourth exclusion (clamped && disclosure) already covers the expander case
+    // and is left alone; it looks for a sibling BUTTON, which a card whose only button is the
+    // overflow menu two levels up does not have. Excluded rows are reported, never dropped.
+    // NOTE FOR ANY LATER EDIT OF THIS FILE: this block lives inside a template literal, so a
+    // BACKTICK in a comment ends the string and the whole probe stops parsing. Cost one run.
+    var clampRaw = cs.webkitLineClamp || cs.lineClamp || 'none';
+    var truncates = (clampRaw && clampRaw !== 'none') || cs.textOverflow === 'ellipsis';
+    if (truncates) {
+      var norm = function (s) { return (s || '').replace(/\\s+/g, ' ').trim(); };
+      var own = norm(el.textContent);
+      var exposedOn = null;
+      for (var a2 = el; a2 && own; a2 = a2.parentElement) {
+        var lbl = norm(a2.getAttribute('title')) || norm(a2.getAttribute('aria-label'));
+        if (lbl && lbl.indexOf(own) >= 0) { exposedOn = name(a2) + (a2.getAttribute('title') ? '[title]' : '[aria-label]'); break; }
+        if (a2 === root) break;
+      }
+      // Same question the plate branch asks, for the same reason: a clamp that strands a CONTROL
+      // past the fold is a trap however well the text is labelled.
+      var stranded = false;
+      var acts2 = el.querySelectorAll('button,a[href],input,select,textarea,[tabindex],[role="button"]');
+      for (var q3 = 0; q3 < acts2.length; q3++) {
+        if (acts2[q3].getBoundingClientRect().top >= clipBottom - 1) { stranded = true; break; }
+      }
+      if (exposedOn && !stranded) {
+        decorativeClips.push({ sel: name(el), unreachablePx: Math.round(over), why: 'line-clamped label, full string exposed on ' + exposedOn });
+        continue;
+      }
+    }
+
     scrollTraps.push({ sel: name(el), overflowY: cs.overflowY, unreachablePx: Math.round(over) });
   }
 

@@ -1,0 +1,259 @@
+{
+  "label": "l11b1-settings",
+  "surface": "@.fwin:has(.os-settings-v2)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": null,
+  "rect": "960x680",
+  "textRuns": 267,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 226,
+  "textHash": 631323752,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 8,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9784,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9784 catalog keys / 106 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 267,
+        "textHash": 631323752,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 267,
+        "textHash": -2002040423,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 166,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "エージェントに聞く"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "ホーム"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "個人設定"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "外観"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "壁紙"
+          },
+          {
+            "i": 11,
+            "was": "Atmosphere",
+            "now": "雰囲気"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 267,
+        "textHash": 1326693898,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 166,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "询问助手"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "主页"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "个性化"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "外观"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "壁纸"
+          },
+          {
+            "i": 11,
+            "was": "Atmosphere",
+            "now": "氛围"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 267,
+        "textHash": -1234052740,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 166,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Ask the Agent",
+            "now": "Спросить агента"
+          },
+          {
+            "i": 7,
+            "was": "Home",
+            "now": "Главная"
+          },
+          {
+            "i": 8,
+            "was": "Personalization",
+            "now": "Персонализация"
+          },
+          {
+            "i": 9,
+            "was": "Appearance",
+            "now": "Внешний вид"
+          },
+          {
+            "i": 10,
+            "was": "Wallpaper",
+            "now": "Обои"
+          },
+          {
+            "i": 11,
+            "was": "Atmosphere",
+            "now": "Атмосфера"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 166,
+    "baseRuns": 267,
+    "diffShare": 0.6217
+  },
+  "drive": {
+    "input": ".os-set-search-input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "openedBy": null,
+    "restoredAfterEscape": true,
+    "restoredAfterUndo": null,
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 268,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "No matching settings"
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}
