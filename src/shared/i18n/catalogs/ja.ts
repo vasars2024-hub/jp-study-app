@@ -1626,6 +1626,15 @@ export const ja: Catalog = {
   'settings.study.setup.working': 'ダウンロード開始中…',
   'settings.extension.title': 'Chrome 拡張機能',
   'settings.extension.desc': 'Chrome 拡張機能ブリッジをインストールし、このアプリとペアリングします。',
+  'extension.transcribe.refuse.notAVideoPage':
+    'まず動画ページを開いてください — このページには音声がありません。',
+  'extension.transcribe.refuse.noVideoId': 'この YouTube の URL には動画が含まれていません。',
+  'extension.transcribe.refuse.notDownloaded':
+    'まずこの動画をダウンロードしてください — Whisper はページではなくファイルを読みます。',
+  'extension.transcribe.refuse.audioMissing':
+    'この動画の記録はありますが、ファイルが見つかりません。',
+  'extension.transcribe.refuse.transcriberOffline':
+    'アプリは起動していますが、文字起こし機能がまだ準備できていません。',
   'settings.extension.running': 'ブリッジは 127.0.0.1:{port} で待機中',
   'settings.extension.version': '拡張機能 v{version}',
   'settings.extension.stopped': 'ブリッジが停止しています — アプリを再起動してください。',

@@ -152,6 +152,10 @@ function renderActions() {
     items = [
       { id: 'capture-page', label: kind === 'youtube-playlist' ? 'Save playlist' : 'Save video', primary: true },
       { id: 'download', label: 'Download video' },
+      // MINING gate 11. Only on a single video: a playlist has no one audio
+      // track to transcribe, and offering it there would be a button that can
+      // only refuse.
+      ...(kind === 'youtube-video' ? [{ id: 'transcribe', label: 'Transcribe audio' }] : []),
       { id: 'lookup', label: 'Look up selection' },
       { id: 'save-selection', label: 'Save selection' },
     ];
@@ -200,6 +204,10 @@ actionsEl.addEventListener('click', async (e) => {
       feedback('Queueing download…', 'pending');
       const res = await send({ type: 'run-command', command: 'media.download' });
       feedback(res?.ok ? 'Download queued in GrammarX.' : res?.error || 'Download failed', res?.ok ? 'ok' : 'err');
+    } else if (action === 'transcribe') {
+      feedback('Asking GrammarX to transcribe…', 'pending');
+      const res = await send({ type: 'run-command', command: 'media.transcribe' });
+      feedback(formatTranscribe(res), res?.ok ? 'ok' : 'err');
     } else if (action === 'ocr') {
       const res = await send({ type: 'run-command', command: 'capture.ocr' });
       if (res?.ok) window.close();
@@ -224,6 +232,33 @@ actionsEl.addEventListener('click', async (e) => {
     void refreshRecent();
   }
 });
+
+/**
+ * MINING gate 11's user-facing text. Every refusal gets its OWN sentence with
+ * the next step in it — a shared "Transcription failed" is what makes a feature
+ * that is working correctly look broken.
+ */
+const TRANSCRIBE_REFUSALS = {
+  notAVideoPage: 'Open a video page first — there is no audio on this one.',
+  noVideoId: 'This YouTube URL has no video in it.',
+  notDownloaded: 'Download this video first — Whisper reads the file, not the page.',
+  audioMissing: 'GrammarX has a record of this video but its file is gone.',
+  transcriberOffline: 'GrammarX is running but its transcriber is not ready yet.',
+  'host-not-registered': 'GrammarX is running but its transcriber is not ready yet.',
+  'item-not-found': 'GrammarX no longer has this video in its media library.',
+};
+
+function formatTranscribe(res) {
+  if (!res) return 'Transcription failed';
+  if (res.state === 'transcribed') {
+    return `Already transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`;
+  }
+  if (res.state === 'queued') return 'Transcribing in GrammarX — it will appear in the catalogue.';
+  if (res.state === 'refused') {
+    return TRANSCRIBE_REFUSALS[res.reason] || res.reason || 'Transcription refused';
+  }
+  return res.error || 'Transcription failed';
+}
 
 function formatSave(res) {
   if (!res) return 'Save failed';

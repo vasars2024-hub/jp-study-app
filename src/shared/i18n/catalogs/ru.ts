@@ -1785,6 +1785,14 @@ export const ru: Catalog = {
   'settings.study.setup.working': 'Запуск загрузки…',
   'settings.extension.title': 'Расширение Chrome',
   'settings.extension.desc': 'Установите и привяжите мост расширения Chrome к этому приложению.',
+  'extension.transcribe.refuse.notAVideoPage':
+    'Сначала откройте страницу с видео — на этой нет звука.',
+  'extension.transcribe.refuse.noVideoId': 'В этой ссылке YouTube нет видео.',
+  'extension.transcribe.refuse.notDownloaded':
+    'Сначала скачайте это видео — Whisper читает файл, а не страницу.',
+  'extension.transcribe.refuse.audioMissing': 'Запись об этом видео есть, но его файл пропал.',
+  'extension.transcribe.refuse.transcriberOffline':
+    'Приложение работает, но расшифровщик ещё не готов.',
   'settings.extension.running': 'Мост слушает 127.0.0.1:{port}',
   'settings.extension.version': 'Расширение v{version}',
   'settings.extension.stopped': 'Мост не запущен — перезапустите приложение.',

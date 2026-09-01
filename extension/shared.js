@@ -371,6 +371,19 @@ const COMMANDS = [
     contextMenu: true,
   },
   {
+    // MINING gate 11. Distinct from media.download on purpose: downloading
+    // gets the file, this gets the TEXT out of it, and a video with no
+    // subtitles needs the second step as well as the first.
+    id: 'media.transcribe',
+    label: 'Transcribe audio',
+    shortLabel: 'Transcribe',
+    description: 'Transcribe the current video’s audio with Whisper and add it to the catalogue.',
+    category: 'capture',
+    contexts: ['page:youtube'],
+    wheel: true,
+    contextMenu: false,
+  },
+  {
     id: 'clipboard.send',
     label: 'Send to clipboard history',
     shortLabel: 'Clip',
@@ -483,6 +496,7 @@ const COMMAND_ALIASES = {
   epub: 'capture.page',
   capture: 'capture.page',
   download: 'media.download',
+  transcribe: 'media.transcribe',
   clipboard: 'clipboard.send',
   ocr: 'capture.ocr',
   'bulk-tabs': 'tabs.picker',

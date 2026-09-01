@@ -80,6 +80,7 @@ export const EXTENSION_COMMAND_IDS = [
   'capture.audio.save',
   'capture.manga',
   'media.download',
+  'media.transcribe',
   'clipboard.send',
   'translate.selection',
   'grammar.match',
@@ -121,6 +122,7 @@ export const EXTENSION_COMMANDS: readonly ExtensionCommandContract[] = [
   { id: 'capture.audio.save', category: 'capture', contexts: ['page'], pageSide: false },
   { id: 'capture.manga', category: 'capture', contexts: ['page:manga'], pageSide: false },
   { id: 'media.download', category: 'capture', contexts: ['page:youtube'], pageSide: false },
+  { id: 'media.transcribe', category: 'capture', contexts: ['page:youtube'], pageSide: false },
   { id: 'clipboard.send', category: 'save', contexts: ['selection'], pageSide: false },
   { id: 'translate.selection', category: 'read', contexts: ['selection'], pageSide: true },
   { id: 'grammar.match', category: 'read', contexts: ['selection'], pageSide: true },
@@ -192,6 +194,11 @@ export const EXTENSION_BRIDGE_ROUTES = [
   '/v1/mine-info',
   '/v1/download',
   '/v1/download/status',
+  // MINING gate 11. Two routes because a Whisper pass is minutes long: the POST
+  // answers with a named refusal or `queued`, and the GET is where the cue
+  // count the gate asks for actually arrives.
+  '/v1/transcribe',
+  '/v1/transcribe/status',
   '/v1/inbox',
   '/v1/mine',
   '/v1/capture',

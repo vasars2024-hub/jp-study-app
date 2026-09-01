@@ -1754,6 +1754,18 @@ export const en: Catalog = {
   'settings.study.setup.working': 'Starting download…',
   'settings.extension.title': 'Chrome extension',
   'settings.extension.desc': 'Install and pair the Chrome extension bridge with this app.',
+  // MINING gate 11 — one key per refusal, each naming its own next step. The
+  // extension renders its own copy of these (it cannot import this catalogue),
+  // so any in-app surface reporting a transcribe refusal reads the same words.
+  'extension.transcribe.refuse.notAVideoPage':
+    'Open a video page first — there is no audio on this one.',
+  'extension.transcribe.refuse.noVideoId': 'This YouTube URL has no video in it.',
+  'extension.transcribe.refuse.notDownloaded':
+    'Download this video first — Whisper reads the file, not the page.',
+  'extension.transcribe.refuse.audioMissing':
+    'There is a record of this video but its file is gone.',
+  'extension.transcribe.refuse.transcriberOffline':
+    'The app is running but its transcriber is not ready yet.',
   'settings.extension.running': 'Bridge listening on 127.0.0.1:{port}',
   'settings.extension.version': 'Extension v{version}',
   'settings.extension.stopped': 'Bridge is not running — restart the app.',

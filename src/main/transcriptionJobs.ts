@@ -992,6 +992,23 @@ export function transcriptionQueue(): TranscriptionJob[] {
 }
 
 /**
+ * Whether a host is registered, i.e. whether anything could actually run.
+ *
+ * MINING gate 11 needs this as its OWN answer rather than inferring it from an
+ * `enqueueTranscription` that returned `host-not-registered`: the extension has
+ * to refuse before it downloads a video, and a refusal discovered only after
+ * the download is a refusal that already cost the user a file.
+ */
+export function transcriptionHostReady(): boolean {
+  return host !== null;
+}
+
+/** The media rows the queue can act on, or an empty list when there is no host. */
+export function transcribableItems(): MediaItem[] {
+  return host ? host.listItems() : [];
+}
+
+/**
  * The provenance sidecar for one fused track, or `null` when there is none.
  *
  * `null` is the honest answer for four different situations and the caller does

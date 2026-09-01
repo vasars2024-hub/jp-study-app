@@ -365,6 +365,31 @@ async function downloadCurrent(tab) {
   }
 }
 
+/**
+ * MINING gate 11 — transcribe the audio of the page being watched.
+ *
+ * Not queued for retry when it refuses. `enqueueIfRetryable` exists for a
+ * request the app was simply not running to receive; a refusal here is an
+ * ANSWER — "you have not downloaded this video", "the transcriber is not
+ * running" — and replaying it later would produce the same answer while making
+ * it look like the click was lost.
+ */
+async function transcribeCurrent(tab) {
+  if (!tab?.url) throw new Error('No active tab');
+  const kind = S.detectPageKind(tab.url);
+  if (kind !== 'youtube-video') {
+    throw new Error('Open a YouTube video tab first');
+  }
+  const out = await apiFetch('/v1/transcribe', {
+    method: 'POST',
+    body: JSON.stringify({ url: tab.url }),
+  });
+  if (out?.ok) {
+    await recordActivity({ kind: 'transcribe', label: tab.title || tab.url });
+  }
+  return { ...out, kind, openTarget: 'youtube' };
+}
+
 async function saveCurrent(tab) {
   if (!tab?.url) throw new Error('No active tab');
   const kind = S.detectPageKind(tab.url);
@@ -1053,6 +1078,8 @@ async function runCommand(commandId, tab, opts = {}) {
       return scanLongStrip(tab);
     case 'media.download':
       return downloadCurrent(tab);
+    case 'media.transcribe':
+      return transcribeCurrent(tab);
     case 'capture.audio.save':
       return saveAudioClipboard(tab);
     case 'clipboard.send': {

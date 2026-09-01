@@ -342,9 +342,15 @@ describe('background service worker — every command still routes', () => {
   it('actually completes every command that does not need a real page', async () => {
     // Without this the test above would still pass if each command failed for
     // some other reason. Two commands read the live DOM through an injected
-    // function (no fake page installed in this describe block) and one needs a
-    // YouTube tab; the rest must come back ok.
-    const needsRealPage = new Set(['capture.page', 'capture.manga', 'media.download']);
+    // function (no fake page installed in this describe block) and two need a
+    // YouTube tab — `media.download` and, since MINING gate 11,
+    // `media.transcribe`; the rest must come back ok.
+    const needsRealPage = new Set([
+      'capture.page',
+      'capture.manga',
+      'media.download',
+      'media.transcribe',
+    ]);
     const failures: Array<{ id: string; error?: string }> = [];
     for (const cmd of h.shared.COMMANDS) {
       if (needsRealPage.has(cmd.id)) continue;

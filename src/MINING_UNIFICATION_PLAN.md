@@ -423,3 +423,53 @@ genuinely empty index says what to do, and a missing desktop binding is its own 
 only app on this machine is the liquid track's instrument on `feat/nyaa-subtitles`, which does
 not contain the Files app, and a second app on the same 8.6 GB userData would strand it. 6 of
 12 closed.
+
+### 2026-09-01 — gate 11 BUILT and half measured; it does NOT close yet
+
+The gap this plan opened with — *"zero occurrences of `transcri` anywhere in
+`src/main/chrome-extension/`"* — is closed as a gap: the extension now has a **Transcribe
+audio** command (`media.transcribe`), on the YouTube page context, beside Download rather than
+instead of it. Downloading gets the file; this gets the TEXT out of it, and a video with no
+subtitles needs both.
+
+**The decision is a pure module, `shared/extensionTranscribe.ts`,** not logic spread through an
+HTTP handler — for the reason the qBittorrent contingencies gave: each distinct failure needs
+its own honest state. Five named refusals, each with its own i18n key in all four languages:
+`notAVideoPage`, `noVideoId`, `notDownloaded`, `audioMissing`, `transcriberOffline`. Order is
+load-bearing and tested: `transcriberOffline` is checked LAST, because telling a user their
+transcriber is down while they look at a news article is a true statement about the wrong
+thing, and `report` precedes every refusal, so an already-transcribed video answers with its
+cue count even when nothing on the machine could run a new job.
+
+Two routes, because a Whisper pass is minutes long: `POST /v1/transcribe` answers with a named
+refusal, a cue count (already transcribed), or `queued`; `GET /v1/transcribe/status` is where
+the number arrives. Both declared in `EXTENSION_BRIDGE_ROUTES` — the contract suite caught the
+omission before the commit, which is the check working.
+
+**No second transcription path.** The route hands the media row this app downloaded to the same
+`transcriptionJobs` queue the Media library uses, so the result lands at
+`yt-transcripts/<id>.json` — which is exactly the directory gate 6 measured the transcripts
+enumerator reading, 2 rows / 2 files on disk, both `mineable=true` and both reachable through
+the preset folder alone. That is the gate's "mineable later without returning to the page",
+inherited rather than rebuilt.
+
+**14 tests.** Every one of the five refusals is proven REACHABLE (a planner that can only say
+one thing would pass a suite that only checked one thing), the five English sentences are
+proven to be five DIFFERENT sentences, and `0` cues is proven to report as `0` rather than as
+"no transcript" — an empty result is a finding, and merging it with absence would re-queue the
+same silent video forever. `countTranscriptCues` reads a corrupt file as absent, never as a
+confident 0. The extension mirror stayed byte-identical (13 files, hash for hash).
+
+**IT IS NOT CLOSED, and the missing half is a NUMBER.** The gate says the button "returns a cue
+count" and no cue count has been produced through this path on a real video. That needs the
+running app, a paired extension and a real Whisper pass. Refusals are proven; the success path
+is built and unproven, which is precisely the shape this plan was written to stop claiming.
+6 of 12 closed; gate 11 stays OPEN.
+
+**The exact remaining leg, for the next turn:** with an Electron instance available, pair the
+extension (or POST `/v1/transcribe` directly with the bearer token from
+`extension-bridge.json`), on a YouTube video that is downloaded and NOT yet transcribed. Report
+the cue count from `GET /v1/transcribe/status`, then re-run
+`node debug/filesapp-census.cjs --gate68` and show the transcript count moving by exactly one.
+The control is already written: a video that is not downloaded must return `notDownloaded`
+before any of this, and that refusal is checkable without Whisper.

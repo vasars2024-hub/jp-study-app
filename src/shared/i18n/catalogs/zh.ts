@@ -1617,6 +1617,12 @@ export const zh: Catalog = {
   'settings.study.setup.working': '正在开始下载…',
   'settings.extension.title': 'Chrome 扩展',
   'settings.extension.desc': '安装并将 Chrome 扩展桥与本应用配对。',
+  'extension.transcribe.refuse.notAVideoPage': '请先打开视频页面 — 此页面没有音频。',
+  'extension.transcribe.refuse.noVideoId': '该 YouTube 网址中没有视频。',
+  'extension.transcribe.refuse.notDownloaded':
+    '请先下载此视频 — Whisper 读取的是文件，而不是网页。',
+  'extension.transcribe.refuse.audioMissing': '已有此视频的记录，但文件已丢失。',
+  'extension.transcribe.refuse.transcriberOffline': '应用正在运行，但转写功能尚未就绪。',
   'settings.extension.running': '桥接在 127.0.0.1:{port} 监听中',
   'settings.extension.version': '扩展 v{version}',
   'settings.extension.stopped': '桥接未运行 — 请重启应用。',

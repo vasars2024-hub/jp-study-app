@@ -21,10 +21,13 @@ import {
   detectContentCategory,
   detectPageKind,
   extractMineTerm,
+  parseYoutubeVideoId,
   primaryCaptureAction,
   type ExtensionContentCategory,
   type ExtensionMineMode,
 } from '../shared/extensionCapture';
+import { planExtensionTranscribe } from '../shared/extensionTranscribe';
+import { youtubeIdFromFileName } from '../shared/filesApp/catalog';
 import { extensionContractManifest } from '../shared/extensionContract';
 import { extractReadableFromHtml, htmlToText } from './readabilityExtract';
 import { importGeneratedArticle, importMangaFromImageUrls } from './library';
@@ -1357,6 +1360,107 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
     } catch (err) {
       json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
     }
+    return;
+  }
+
+  /**
+   * MINING gate 11 — transcribe the page being watched.
+   *
+   * Composes what already exists rather than adding a second transcription
+   * path: `readTranscriptCueCount` answers immediately when the video is
+   * already transcribed, and otherwise the media row this app downloaded is
+   * handed to the SAME Whisper queue `transcriptionJobs` runs for the Media
+   * library. The result therefore lands at `yt-transcripts/<id>.json`, which is
+   * where the Files-app transcripts enumerator reads — so it is mineable later
+   * without returning to the page, which is the second half of the gate.
+   *
+   * Every refusal is NAMED by `planExtensionTranscribe` and carries its own
+   * i18n key. Nothing here returns a bare failure.
+   */
+  if (req.method === 'POST' && pathname === '/v1/transcribe') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}') as { url?: string };
+      const pageUrl = typeof body.url === 'string' ? body.url.trim() : '';
+      const { readTranscriptCueCount } = await import('./ytPlaylists');
+      const { enqueueTranscription, transcribableItems, transcriptionHostReady } =
+        await import('./transcriptionJobs');
+
+      const videoId = parseYoutubeVideoId(pageUrl);
+      // The library row for this video, found by the id yt-dlp wrote into the
+      // filename — the same parser the Files app index uses, so the extension
+      // and the catalogue agree about which file belongs to which video.
+      const item = videoId
+        ? transcribableItems().find(
+            (entry) => youtubeIdFromFileName(entry.fileName || entry.path || '') === videoId,
+          )
+        : undefined;
+      const plan = planExtensionTranscribe({
+        pageKind: detectPageKind(pageUrl),
+        videoId,
+        existingCueCount: videoId ? readTranscriptCueCount(videoId) : null,
+        mediaId: item?.id ?? null,
+        mediaFileExists: !!item?.path && fs.existsSync(item.path),
+        transcriberReady: transcriptionHostReady(),
+      });
+
+      if (plan.action === 'report') {
+        json(res, 200, {
+          ok: true,
+          state: 'transcribed',
+          videoId: plan.videoId,
+          cueCount: plan.cueCount,
+        });
+        return;
+      }
+      if (plan.action === 'refuse') {
+        // 200, not 400: this is an answer, not a malformed request, and the
+        // extension renders the named reason rather than "request failed".
+        json(res, 200, {
+          ok: false,
+          state: 'refused',
+          reason: plan.reason,
+          reasonKey: plan.reasonKey,
+          videoId: plan.videoId,
+          // `notDownloaded` is the one refusal with an obvious next step, and
+          // saying so is what keeps the button from looking broken.
+          ...(plan.reason === 'notDownloaded' ? { canDownload: true } : {}),
+        });
+        return;
+      }
+      const queued = enqueueTranscription({ mediaId: plan.mediaId, lang: 'ja' });
+      json(res, 200, {
+        ok: queued.ok,
+        state: queued.ok ? 'queued' : 'refused',
+        videoId: plan.videoId,
+        mediaId: plan.mediaId,
+        ...(queued.ok ? {} : { reason: queued.error, reasonKey: queued.error }),
+      });
+    } catch (err) {
+      json(res, 400, { ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+    return;
+  }
+
+  /**
+   * The cue count, once the queued run has landed. Gate 11 asks for a NUMBER,
+   * and a Whisper pass is minutes long, so the POST above returns `queued` and
+   * the extension polls here.
+   */
+  if (req.method === 'GET' && pathname === '/v1/transcribe/status') {
+    if (!requireAuth(req, res)) return;
+    const videoId = url.searchParams.get('videoId') ?? '';
+    const { readTranscriptCueCount } = await import('./ytPlaylists');
+    const cueCount = videoId ? readTranscriptCueCount(videoId) : null;
+    json(res, 200, {
+      ok: true,
+      videoId,
+      // `null` means "no transcript file", which is genuinely different from a
+      // transcript that produced 0 cues. Both are reported as themselves.
+      state: cueCount === null ? 'pending' : 'transcribed',
+      cueCount,
+    });
     return;
   }
 

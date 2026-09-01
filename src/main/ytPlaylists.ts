@@ -31,6 +31,7 @@ import {
   type YtVideo,
 } from '../shared/ytPlaylists';
 import type { YouTubeDownloadOptions, YouTubeSubtitleLang } from '../shared/types';
+import { countTranscriptCues } from '../shared/extensionTranscribe';
 import {
   YOUTUBE_PLAYLIST_STORE_FILE,
   YOUTUBE_PLAYLIST_SUBTITLE_DIRECTORY,
@@ -75,6 +76,24 @@ function readStore(): YtPlaylistsStore {
 /** Read-only snapshot for the Chrome extension HTTP bridge. */
 export function readStoreForExtension(): YtPlaylistsStore {
   return readStore();
+}
+
+/**
+ * Cues already on disk for one video, or `null` when there is no transcript.
+ *
+ * MINING gate 11's cue count comes from here rather than from the store's
+ * `transcribed` boolean: the flag says a run happened, the file says how much
+ * text it produced, and only the second is a number the gate can report. `0`
+ * and `null` stay distinct — an empty transcript is a finding, a missing one is
+ * a job to queue.
+ */
+export function readTranscriptCueCount(youtubeId: string): number | null {
+  if (!youtubeId) return null;
+  try {
+    return countTranscriptCues(fs.readFileSync(transcriptPath(youtubeId), 'utf-8'));
+  } catch {
+    return null;
+  }
 }
 
 /** Status of a YouTube playlist by list= id — used by the extension badge. */
