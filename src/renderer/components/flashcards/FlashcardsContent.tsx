@@ -113,6 +113,7 @@ import type { LibraryItem } from '../../../shared/types';
 import type { BookLevelEstimate } from '../../../shared/bookLevelEstimate';
 import type { JitenStore } from '../../../shared/jiten';
 import { coverStyleFor } from '../../utils/coverArt';
+import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 import {
   deckContentFingerprint,
   deckGroupKey,
@@ -954,9 +955,11 @@ export function useFlashcards(hideAiStudio = false): FlashcardsState {
   }
 
   useEffect(() => {
-    if (mode !== 'review') return;
+    if (mode !== 'review') return undefined;
     const el = stripRef.current?.querySelector<HTMLElement>('[data-review-active="true"]');
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    // The strip scrolls HORIZONTALLY, which is why `reliableScroll` looks for a
+    // scroller in either axis: an overflow-Y-only search walks past this one.
+    return scrollIntoViewReliably(el, { inline: 'center', block: 'nearest' });
   }, [mode, reviewIndex, sessionCards.length]);
 
   // Review shortcuts — central manager (Settings → Shortcuts rebindable).

@@ -6,6 +6,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import StatusDot from './StatusDot';
 import { useScraperFocusId } from './ScraperContext';
+import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 
 export default function ScrCard({
   id,
@@ -38,8 +39,8 @@ export default function ScrCard({
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!focused) return;
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!focused) return undefined;
+    return scrollIntoViewReliably(ref.current, { block: 'nearest' });
   }, [focused]);
 
   return (

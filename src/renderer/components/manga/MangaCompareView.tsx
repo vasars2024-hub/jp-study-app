@@ -3,6 +3,7 @@ import type { MokuroPage } from '../../../shared/mokuroTypes';
 import { blockContext } from '../../../shared/mokuroTypes';
 import { lookupWordFromMouseUp, isLookupClick, noteLookupPointerDown } from '../../wordLookup';
 import { useT } from '../../i18n';
+import { scrollIntoViewReliably } from '../../utils/reliableScroll';
 
 interface Props {
   jaPage: MokuroPage;
@@ -48,7 +49,7 @@ export default function MangaCompareView({
     .filter((r) => r.jaBlock.kind !== 'ignore' && (showSfx || r.jaBlock.kind !== 'sfx'));
 
   function scrollTo(refs: React.MutableRefObject<Record<string, HTMLElement | null>>, key: string) {
-    refs.current[key]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    scrollIntoViewReliably(refs.current[key], { block: 'center' });
   }
 
   return (

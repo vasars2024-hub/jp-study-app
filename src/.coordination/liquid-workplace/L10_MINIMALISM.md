@@ -81,6 +81,19 @@ withheld entry as a miss — that was this sweep's single "disagreement" and the
 settling and moved the card 19 px by itself, so a first fix gated on `rect.top === before`
 never fired and measured as no fix at all. Compare the SCROLLER's `scrollTop`.
 
+### Refused-scroll recovery — CHECKPOINTED 2026-09-01, `8d0e2b13`
+
+The interrupted follow-up is recovered rather than left as loose shared-tree edits. One
+axis-aware helper now owns smooth-request measurement, an outright fallback, and cancellation;
+all **12 direct smooth calls across 10 committed product files became 0**, while working-smooth,
+already-visible, horizontal and cancelled negative controls remain single/no-op calls as
+appropriate. Exact-commit validation: **5 files / 40 tests pass** in a detached worktree;
+touched-path ESLint **0 errors** (9 pre-existing `NovelReader` warnings).
+
+The shared working tree still has one direct call inside an older uncommitted transcript-panel
+rewrite. It was deliberately not absorbed: that call does not exist in `HEAD`, so committing
+its integration alone would either reference dead code or steal the foreign rewrite.
+
 `sampled-out:` **Media Center** — it owns no settings registry, so bullet 3's claim has nothing
 to bite on there. **Wired shell** — its command entry point is already certified by L9 bullet 1
 at RULE C 16/16 (`b1e35170`), and the palette's data is theme-independent. **Blanc** — it is a
