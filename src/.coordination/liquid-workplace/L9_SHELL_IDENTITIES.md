@@ -2017,3 +2017,26 @@ honest baseline. The three open terms, each with the analysis the next turn woul
    instrument gap, not a product gap. Teach cat5's q6 leg to ask `__LQP` for the axis.
 
 **RULE C: still 13 of 16.** Next turn OPENS on term 1, then 2, then 3, re-running cat5 after each.
+
+## 2026-08-31 — primary — CORRECTION: boss-audit finding 1 cannot be closed by classification
+
+The entry two sections above claimed finding 1 went **15 → 3 → 0** via `23ecd75c`. **That is
+retracted.** `23ecd75c` is reverted by `8d59b9de`, and the honest count is **3 open at clean HEAD,
+0 in the shared tree** — a difference that no baseline edit can remove.
+
+Why, and it is worth two lines because the next worker will otherwise repeat it:
+`architectureBaseline.test.ts` has **two** assertions, not one. `:49` fails on a finding with no
+baseline entry; **`:55` fails on a baseline entry with no finding**, and `pending` is not exempt
+(`tools/architecture-audit.cjs:481`). `StudyBottomBar` / `StudyDocks` / `StudyWorkspaceCustomizer`
+are orphans at clean HEAD and NOT orphans in the shared tree, because the dirty uncommitted
+`VideoCoreStudyOverlay.tsx` imports them. So the entries make clean HEAD exit 0 and the shared tree
+exit 1 — the gate is symmetric and cannot be satisfied in both states at once. Measured, not
+reasoned: full shared Vitest with the entries in place was **1 failed / 12,316 passed / 6 skipped**,
+the single failure being `:55` on exactly those three keys; after the revert that file is 6/6.
+
+**The right close is the media track committing its overlay rewrite**, at which point the three get
+a real consumer at HEAD too and the finding evaporates with no baseline entry ever written. Until
+then this is honest open debt attributable to `9fa37b59`, and a red SHARED suite for every worker
+is strictly worse than a red clean-HEAD gate for CI. Boss-audit findings **2 and 3 are genuinely
+closed** and were verified this turn at clean HEAD (`liquidTokens` and `settingsSearchReachability`
+both pass, 22/23 tests in that trio, the one failure being the above).
