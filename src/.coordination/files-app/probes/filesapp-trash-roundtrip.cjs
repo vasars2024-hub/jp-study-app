@@ -135,7 +135,140 @@ function record(label, value) {
   console.log(`  ${label}: ${value}`);
 }
 
+/* ------------------------------------------------------------------ *
+ * Gate 32/35 — the same round trip, driven by the CLEANUP path.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Gates 32 and 35's live half, in this file rather than a second probe.
+ *
+ * The two gates ask the same physical question gate 21 does — did the bytes
+ * land in the Windows Recycle Bin, and can the user get them back — so they
+ * reuse the bin helpers above instead of restating them. What differs is the
+ * production function under test: `runCleanupInMain` with a REAL
+ * `shell.trashItem`, planning against a real temp userData that contains the
+ * shape gate 33 is about (an unclaimed video in `downloads/`, which the
+ * downloads enumerator stamps `orphan`).
+ */
+async function gate35(recordFn) {
+  const { runCleanupInMain, planCleanupInMain, collectCleanupInputs } = bundle(
+    path.join(ROOT, 'src', 'main', 'filesApp', 'cleanupIpc.ts'),
+  );
+  const { buildFilesIndex } = bundle(path.join(ROOT, 'src', 'main', 'filesApp', 'enumerators.ts'));
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-files-gate35-'));
+  const downloads = path.join(root, 'downloads');
+  fs.mkdirSync(downloads, { recursive: true });
+
+  const videoBytes = Buffer.alloc(8192, 3);
+  const fragmentBytes = Buffer.alloc(4096, 9);
+  const video = path.join(downloads, 'gate35 irreplaceable [x9QKu3OLjaU].mp4');
+  const fragment = path.join(downloads, 'gate35 unfinished.mp4.part');
+  const empty = path.join(downloads, 'gate35 nothing.ja.vtt');
+  fs.writeFileSync(video, videoBytes);
+  fs.writeFileSync(fragment, fragmentBytes);
+  fs.writeFileSync(empty, '');
+  fs.writeFileSync(path.join(root, 'media.json'), JSON.stringify({ items: [] }));
+
+  const settings = {
+    enabledClasses: ['broken-links', 'partial-downloads', 'empty-files', 'orphan-files'],
+    brokenLinkPolicy: 'mark',
+  };
+  const log = [];
+  const deps = {
+    getItems: () => buildFilesIndex({ userDataPath: root }).items,
+    userDataPath: () => root,
+    trashItem: (p) => shell.trashItem(p), // the real Windows shell
+    softDeleteRow: async () => {
+      throw new Error('no soft-delete adapter in this probe');
+    },
+    readSettings: () => settings,
+    invalidate: () => {},
+    appendLog: (entries) => log.push(...entries),
+    now: () => Date.now(),
+  };
+
+  console.log('\n=== Gates 32/35 — cleanup to the Recycle Bin (real Electron, real shell) ===\n');
+  recordFn('userData fixture', root);
+
+  const report = planCleanupInMain(deps);
+  const names = report.candidates.map((c) => c.name).sort();
+  recordFn('dry run candidates', JSON.stringify(names));
+  recordFn('dry run reclaimable bytes', report.classes.reduce((s, r) => s + r.reclaimableBytes, 0));
+  recordFn('video still on disk after DRY RUN', fs.existsSync(video));
+  recordFn(
+    'video is in the report as PROTECTED',
+    report.protectedItems.some((r) => r.name.includes('irreplaceable')),
+  );
+  recordFn(
+    'video protection reason',
+    report.protectedItems.find((r) => r.name.includes('irreplaceable'))?.reasonKey,
+  );
+
+  /* --- control: confirm EVERYTHING the app knows about, including the video --- */
+  const everything = collectCleanupInputs(deps).map((i) => i.id);
+  recordFn('CONTROL confirming ids', everything.length);
+  const run = await runCleanupInMain(
+    { confirmedItemIds: everything, reportBuiltAt: report.builtAt, settings },
+    deps,
+  );
+  recordFn('CONTROL video survived a confirm-everything run', fs.existsSync(video));
+  recordFn('CONTROL video bytes unchanged', fs.readFileSync(video).equals(videoBytes));
+
+  recordFn('removed', JSON.stringify(run.log.map((e) => e.name).sort()));
+  recordFn('log matches the report item for item', JSON.stringify(names) === JSON.stringify(run.log.map((e) => e.name).sort()));
+  recordFn('fragment gone from disk', !fs.existsSync(fragment));
+  recordFn('every log destination', JSON.stringify([...new Set(run.log.map((e) => e.destination))]));
+
+  /* --- gate 35: the binned item is really restorable --- */
+  const entry = recycleBinEntryFor(fragment);
+  recordFn('fragment in Recycle Bin', entry ? 'yes' : 'NO');
+  const restore = restoreFromRecycleBin(fragment);
+  recordFn('restore verb', restore);
+  recordFn('fragment back on disk', fs.existsSync(fragment));
+  const restored = fs.existsSync(fragment) ? fs.readFileSync(fragment) : Buffer.alloc(0);
+  recordFn('fragment bytes identical', restored.equals(fragmentBytes));
+
+  /* --- the empty file too, so "each removed item" is more than one --- */
+  const emptyEntry = recycleBinEntryFor(empty);
+  recordFn('empty file in Recycle Bin', emptyEntry ? 'yes' : 'NO');
+  const emptyRestore = restoreFromRecycleBin(empty);
+  recordFn('empty file restore verb', emptyRestore);
+
+  const pass =
+    fs.existsSync(video) &&
+    fs.readFileSync(video).equals(videoBytes) &&
+    report.protectedItems.some((r) => r.name.includes('irreplaceable')) &&
+    run.log.length === 2 &&
+    run.log.every((e) => e.destination === 'recycle-bin' && e.path) &&
+    JSON.stringify(names) === JSON.stringify(run.log.map((e) => e.name).sort()) &&
+    Boolean(entry) &&
+    restore === 'RESTORED' &&
+    restored.equals(fragmentBytes) &&
+    Boolean(emptyEntry) &&
+    emptyRestore === 'RESTORED';
+
+  console.log(`\nGATES 32/35 LIVE: ${pass ? 'PASS' : 'FAIL'}\n`);
+  try {
+    fs.rmSync(root, { recursive: true, force: true });
+  } catch {
+    /* temp cleanup is best-effort */
+  }
+  return pass;
+}
+
 async function main() {
+  // `--gate 35` runs the cleanup round trip instead; both share every helper
+  // above, so there is one probe for "did it reach the Recycle Bin", not two.
+  const gateArg = process.argv.includes('--gate')
+    ? process.argv[process.argv.indexOf('--gate') + 1]
+    : '21';
+  if (gateArg === '35' || gateArg === '32') {
+    const ok = await gate35(record);
+    app.exit(ok ? 0 : 1);
+    return;
+  }
+
   const { deleteFilesItemInMain } = bundle(
     path.join(ROOT, 'src', 'main', 'filesApp', 'deletionIpc.ts'),
   );
