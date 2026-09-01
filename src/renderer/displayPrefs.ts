@@ -171,6 +171,16 @@ function applyDisplayPrefsInternal(s: DisplayPrefs, persistMotionMirror: boolean
   const n = normalize(s);
 
   st.setProperty('--display-font-px', `${n.baseFontPx}px`);
+  /*
+   * `--display-font-px` has exactly one consumer, `body`, so this preference used to reach only
+   * the text that INHERITS its size. Settings resolves all 70 of its text elements through
+   * authored `--font-size-*` rules instead, and measured 0 of 70 following the base font.
+   * The scale is the same preference expressed as a ratio of the ladder's own base step
+   * (`--font-size-md`, 14px), so `theme/tokens.css` can move the whole ladder with it and the
+   * two text-size affordances drive one lever. A unitless ratio cannot be derived from a px
+   * value in CSS (`calc()` refuses length/length), which is why it is computed here.
+   */
+  st.setProperty('--display-font-scale', String(Math.round((n.baseFontPx / 14) * 10000) / 10000));
   st.setProperty('--display-letter-spacing', letterSpacingCss(n.letterSpacing));
   st.setProperty('--display-font-weight', n.boldText ? '600' : '400');
   st.setProperty('--display-night-light', String(n.nightLight));

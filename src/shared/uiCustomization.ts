@@ -529,7 +529,7 @@ export function profileToCss(profile: UiThemeProfile): string {
   const declarations = Object.entries(profile.tokens)
     .filter(([token]) => TOKEN_BY_NAME.has(token))
     .sort(([left], [right]) => left.localeCompare(right))
-    .map(([token, value]) => `  --${token}: ${value} !important;`);
+    .map(([token, value]) => `  --${token}: ${emittedTokenValue(token, value)} !important;`);
 
   for (const spec of COMPONENT_SETTING_SPECS) {
     const value = profile.componentSettings[spec.component]?.[spec.key];
@@ -545,6 +545,26 @@ export function profileToCss(profile: UiThemeProfile): string {
     if (review.safe) lines.push('', profile.customCss.trim());
   }
   return lines.join('\n');
+}
+
+/**
+ * A pinned font-size still rides the display base font.
+ *
+ * `theme/tokens.css` writes the whole `--font-size-*` ladder as
+ * `calc(<step> * var(--display-font-scale, 1))`, which is how Settings > Display > base font
+ * reaches the surfaces (they resolve through the ladder, not through inheritance from `body`).
+ * The declarations here are `!important` and therefore replace that whole value — so a profile
+ * that pins one step would silently make the base font stop working for it. Re-applying the
+ * scale here keeps the two text-size affordances composing instead of cancelling: `bigger text`
+ * against an 18px base gives 13 * 1.15 * (18/14).
+ *
+ * Only `font-size-*` is scaled. `line-height-normal` is unitless, and `space-*`/`radius-*` are
+ * not typography — scaling those would turn a base-font preference into a whole-layout zoom,
+ * which the app already has as a separate control.
+ */
+function emittedTokenValue(token: string, value: string): string {
+  if (!token.startsWith('font-size-')) return value;
+  return `calc(${value} * var(--display-font-scale, 1))`;
 }
 
 function kebab(value: string): string {
