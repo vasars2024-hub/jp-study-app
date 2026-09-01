@@ -257,12 +257,152 @@ async function gate35(recordFn) {
   return pass;
 }
 
+/* ------------------------------------------------------------------ *
+ * Gate 28 — "PASTE a folder sorts all of it", on the real clipboard.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Gate 28's first three words, live.
+ *
+ * Here for the same reason gates 32/35 are: this needs a real Electron main
+ * process and a real Windows API — `clipboard.availableFormats()` and
+ * `clipboard.readBuffer('FileNameW')`, neither of which vitest can run and
+ * neither of which a mock can say anything true about. The PRODUCTION
+ * `folderCandidatesFrom` and `resolveFolders` are bundled out of
+ * `shared/filesApp/clipboardPaths.ts` and driven with the real `fs.statSync`,
+ * so what is scored is the shipped code against real bytes and real folders.
+ *
+ * THE CLIPBOARD IS THE USER'S. Two protections, both load-bearing:
+ *
+ * - if a file selection (`FileNameW`) is already on it, the write half is
+ *   REFUSED outright rather than destroying something restorable only by the
+ *   user going back to Explorer and copying again;
+ * - otherwise the text is captured, written, and restored byte-identical, and
+ *   the comparison is reported rather than assumed.
+ */
+async function gate28(recordFn) {
+  const { clipboard } = require('electron');
+  const { folderCandidatesFrom, resolveFolders } = bundle(
+    path.join(ROOT, 'src', 'shared', 'filesApp', 'clipboardPaths.ts'),
+  );
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-files-gate28-'));
+  const folder = path.join(root, 'anime pack');
+  const nested = path.join(folder, 'season 1');
+  fs.mkdirSync(nested, { recursive: true });
+  const episode = path.join(nested, 'ep01.mkv');
+  fs.writeFileSync(episode, Buffer.alloc(2048, 3));
+  const absent = path.join(root, 'never-existed');
+
+  console.log('\n=== Gate 28 — paste a folder (real Electron, real clipboard) ===\n');
+  recordFn('fixture folder', folder);
+  recordFn('fixture file', episode);
+
+  const probe = {
+    kindOf: (p) => {
+      try {
+        const st = fs.statSync(p);
+        return st.isDirectory() ? 'directory' : st.isFile() ? 'file' : null;
+      } catch {
+        return null;
+      }
+    },
+    parentOf: (p) => path.dirname(p),
+  };
+
+  /* --- what is on the user's clipboard right now, read-only --- */
+  const formatsBefore = clipboard.availableFormats();
+  const hadFileSelection = formatsBefore.includes('FileNameW');
+  const textBefore = clipboard.readText() ?? '';
+  recordFn('formats before', JSON.stringify(formatsBefore));
+  recordFn('held a file selection', hadFileSelection ? 'YES — write half refused' : 'no');
+  recordFn('text before (chars)', textBefore.length);
+
+  let wroteText = false;
+  let textRestored = null;
+  let liveTextFolders = null;
+  if (!hadFileSelection) {
+    // Explorer's "Copy as path" shape, quoted, which is what a user actually
+    // has after the context-menu command.
+    clipboard.writeText(`"${folder}"`);
+    wroteText = true;
+    const reading = { fileNameW: null, text: clipboard.readText() ?? '' };
+    liveTextFolders = resolveFolders(folderCandidatesFrom(reading), probe);
+    recordFn('live text clipboard -> folders', JSON.stringify(liveTextFolders));
+  }
+
+  /* --- the FileNameW half, on bytes shaped exactly as Explorer sets them --- */
+  const wide = Buffer.alloc((folder.length + 1) * 2 + 40, 0);
+  wide.write(folder, 0, 'ucs2');
+  const wideFolders = resolveFolders(
+    folderCandidatesFrom({ fileNameW: new Uint8Array(wide), text: '' }),
+    probe,
+  );
+  recordFn('padded FileNameW -> folders', JSON.stringify(wideFolders));
+
+  /* --- a FILE resolves to the folder it sits in --- */
+  const fromFile = resolveFolders(folderCandidatesFrom({ text: episode }), probe);
+  recordFn('pasted FILE -> folders', JSON.stringify(fromFile));
+
+  /* --- CONTROL 1: a path from another machine is DROPPED, not offered --- */
+  const control1 = resolveFolders(folderCandidatesFrom({ text: absent }), probe);
+  recordFn('CONTROL absent path -> folders', JSON.stringify(control1));
+
+  /* --- CONTROL 2: pasted prose produces no filesystem candidates at all --- */
+  const prose = 'Here are the episodes I downloaded.\nThey are in the usual place.';
+  const control2 = folderCandidatesFrom({ text: prose });
+  recordFn('CONTROL prose -> candidates', JSON.stringify(control2));
+
+  /* --- CONTROL 3: the padding really is there, and really is stripped --- */
+  const naive = Buffer.from(wide).toString('ucs2');
+  recordFn('CONTROL naive decode length', `${naive.length} vs path ${folder.length}`);
+  recordFn('CONTROL naive decode is a real folder', probe.kindOf(naive) === 'directory');
+
+  /* --- restore the user's clipboard, and say whether it matched --- */
+  if (wroteText) {
+    clipboard.writeText(textBefore);
+    const after = clipboard.readText() ?? '';
+    textRestored = after === textBefore;
+    recordFn('clipboard text restored byte-identical', textRestored);
+  }
+
+  const pass =
+    wideFolders.length === 1 &&
+    wideFolders[0].toLowerCase() === folder.toLowerCase() &&
+    fromFile.length === 1 &&
+    fromFile[0].toLowerCase() === nested.toLowerCase() &&
+    control1.length === 0 &&
+    control2.length === 0 &&
+    probe.kindOf(naive) !== 'directory' &&
+    (hadFileSelection || (liveTextFolders.length === 1 && textRestored === true));
+
+  console.log(`\nGATE 28 LIVE: ${pass ? 'PASS' : 'FAIL'}\n`);
+  if (hadFileSelection) {
+    console.log(
+      '  NOTE: the live-clipboard write half was refused because the user had a\n' +
+        '  file selection copied. Re-run with an empty or text clipboard for it.\n',
+    );
+  }
+  try {
+    fs.rmSync(root, { recursive: true, force: true });
+  } catch {
+    /* temp cleanup is best-effort */
+  }
+  return pass;
+}
+
 async function main() {
-  // `--gate 35` runs the cleanup round trip instead; both share every helper
-  // above, so there is one probe for "did it reach the Recycle Bin", not two.
+  // `--gate 35` runs the cleanup round trip instead; `--gate 28` the clipboard
+  // one. All three share every helper above, so there is one probe for "what
+  // does the real Windows shell do", not three.
   const gateArg = process.argv.includes('--gate')
     ? process.argv[process.argv.indexOf('--gate') + 1]
     : '21';
+  if (gateArg === '28') {
+    const ok = await gate28(record);
+    app.exit(ok ? 0 : 1);
+    return;
+  }
   if (gateArg === '35' || gateArg === '32') {
     const ok = await gate35(record);
     app.exit(ok ? 0 : 1);

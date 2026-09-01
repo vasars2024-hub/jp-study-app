@@ -603,6 +603,42 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 28. **Paste a folder sorts all of it.** A pasted folder is walked recursively, archives are
    expanded far enough to classify their contents, and the report names placed / skipped /
    ambiguous with reasons.
+   <!-- status: closed; evidence: 80034ac4 + 06087c12 + afeab217. Four claims, four
+        measurements. PASTE (afeab217): live on real Windows with the real clipboard --
+        `npx electron .../filesapp-trash-roundtrip.cjs --gate 28` prints GATE 28 LIVE: PASS.
+        The user's own text clipboard was Explorer's "Copy as path" shape and resolved to the
+        one real folder; a 90-wide padded FileNameW buffer resolved to the same 69-char path;
+        a pasted FILE resolved to `season 1`, the folder it sits in. THREE CONTROLS, all
+        firing: a path not on this machine -> 0 folders (not offered as an unreadable root);
+        two lines of prose -> 0 candidates (no filesystem call per line); and the naive decode
+        of the padded buffer is 90 chars against a 69-char path and `statSync` says it is NOT
+        a directory -- so the NUL-strip is load-bearing, not decoration. The user's clipboard
+        was captured and restored byte-identical (112 chars, compared, not assumed), and the
+        write half REFUSES outright if a file selection is already held.
+        RECURSIVE (main/filesApp/scan.ts:121,167): filesAppScan.test.ts:161 walks a real
+        fixture -- 8 found recursively, 4 with `recursive: false`, difference exactly the 3
+        subtitles and 1 video in `season 1`. The shallow scan IS the control.
+        ARCHIVES (shared/filesApp/archive.ts): 50 tests across filesAppArchive.test.ts,
+        filesAppArchiveScan.test.ts and filesAppScan.test.ts, on real .zip bytes.
+        REPORT (06087c12): the production component renders the four piles from a paste --
+        auto [ep01.srt, ep01.mkv], review [vocab.csv, page001.png], refused [notes.xyz],
+        skipped [ep02.mkv.crdownload], each with its reason key; asserted in
+        filesAppScanReview.test.tsx's gate 28 block, which scores `filesScan`'s ARGUMENT
+        against a deliberately stale root in the field so "scanned the pasted one" cannot
+        pass by scanning what was already there. 38 tests total on the paste half. -->
+   <!-- decision: the clipboard is read in MAIN, not in the renderer's paste event. A folder
+        copied in Explorer arrives as `FileNameW`, which the DOM cannot see at all, so a
+        renderer-only handler finds an empty `clipboardData` and the feature looks BROKEN
+        rather than absent. Parsing stays in shared/filesApp/clipboardPaths.ts so it is
+        testable without Electron; main supplies only `statSync` and `dirname`. -->
+   <!-- decision: a pasted FILE is answered with its parent rather than refused, and several
+        pasted folders fill the field with the first and SAY SO rather than choosing. The scan
+        takes one root; picking one silently is the quiet decision the review sheet exists to
+        avoid. Ctrl+V inside the root field is left to ordinary text editing, or the field
+        becomes impossible to correct by pasting a fragment. -->
+   <!-- decision: this is a THIRD way in, not a reversal of gate 27's "the root is typed".
+        A native directory dialog is still not something this side can drive; paste needs no
+        dialog, which is exactly why it can carry live evidence. -->
 29. **Re-scan is idempotent.** Running the same scan twice imports nothing the second time and
    says so — a duplicate library entry is a FAIL.
    <!-- status: closed; evidence: 2026-08-31 -- shared/filesApp/importLedger.ts + renderer/filesImportLedgerStore.ts + a fourth `known` pile in planIngest; 19 tests. "Says so": the production component scans, imports, scans again, and reports the 3 that landed under Already brought in with auto empty, while the refused .csv stays offerable; the second confirm calls NO importer and reports 0 of 1. "Imports nothing": the real media:addPaths and library:importPaths handlers, called twice with the same paths, return the same row counts and exactly one row per source. Undo forgets, so the files are offered again. -->
