@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Liquid rubric category 7 instrument #2: frame stability during a real interaction.
 
@@ -90,6 +90,14 @@ param(
   [string]$ThemeId = 'oled-black',
   [string]$Title = '',
   [string]$Root = '',
+  # CORRECTION 30, 2026-08-31. Every bridge route here resolved the FOCUSED OS window, which is
+  # the main desktop unless something else asked for the foreground. A shell that runs in its own
+  # BrowserWindow -- Blanc, the Agent pop-out, a Focus host -- therefore could not be measured at
+  # all: /focus raised the desktop, the -Root gesture ran in the desktop's document, `.blanc-root`
+  # was absent there, and the run refused. Passing -Win pins /focus, /eval and /bounds to ONE
+  # window id and asserts that id actually took the foreground, so a run can never silently
+  # measure a different window's frames. Unset, behaviour is byte-identical to before.
+  [string]$Win = '',
   [switch]$AsJson,
   [string]$OutFile = ''
 )
@@ -104,20 +112,36 @@ $b = Get-Content $bridgePath -Raw | ConvertFrom-Json
 $headers = @{ Authorization = "Bearer $($b.token)" }
 $base = "http://127.0.0.1:$($b.port)"
 
+function New-BridgeBody([hashtable]$fields) {
+  $h = @{}
+  if ($fields) { foreach ($k in $fields.Keys) { $h[$k] = $fields[$k] } }
+  if ($Win) { $h['window'] = $Win }
+  return ($h | ConvertTo-Json -Compress)
+}
+
 function Invoke-Eval([string]$js) {
-  $body = @{ js = $js } | ConvertTo-Json -Compress
+  $body = New-BridgeBody @{ js = $js }
   $r = Invoke-RestMethod -Uri "$base/eval" -Method Post -Headers $headers -Body $body -ContentType 'application/json' -TimeoutSec 60
   if (-not $r.ok) { Write-Error "eval failed: $($r.error)" }
   return $r.result
 }
 
 # rAF is throttled in a background window. Focus, then verify -- do not assume.
-$null = Invoke-RestMethod -Uri "$base/focus" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json'
+$null = Invoke-RestMethod -Uri "$base/focus" -Method Post -Headers $headers -Body (New-BridgeBody @{}) -ContentType 'application/json'
 Start-Sleep -Milliseconds 300
 $h = Invoke-RestMethod -Uri "$base/health" -Headers $headers
-$win = $h.windows | Where-Object { $_.focused } | Select-Object -First 1
-if (-not $win) { Write-Error "No focused window after /focus -- rAF would be throttled and every frame number void." }
-if ($win.minimized) { Write-Error "Focused window is minimized -- refusing to record zeros." }
+# NOT `$win`: PowerShell variable names are CASE-INSENSITIVE, so `$win = ...` silently overwrote
+# the `-Win` PARAMETER, and the correction-30 assertion below then compared the window id against
+# a stringified window OBJECT and VOIDed every run. The instrument refused three times in a row on
+# a window /focus had correctly raised, and the refusal named the right symptom for the wrong
+# reason -- which is the expensive kind.
+$focusedWin = $h.windows | Where-Object { $_.focused } | Select-Object -First 1
+if (-not $focusedWin) { Write-Error "No focused window after /focus -- rAF would be throttled and every frame number void." }
+if ($focusedWin.minimized) { Write-Error "Focused window is minimized -- refusing to record zeros." }
+# Correction 30: asked for a specific window, PROVE it is the one producing the frames.
+if ($Win -and "$($focusedWin.id)" -ne "$Win") {
+  Write-Error "VOID: asked for window $Win but window $($focusedWin.id) took the foreground. Every frame from the requested window would be a throttle artifact."
+}
 
 # --- the gesture, self-driving over rAF so /eval returns immediately -----------------
 $gestureJs = switch ($Interaction) {
@@ -378,7 +402,7 @@ Add-Type -AssemblyName System.Net.Http
 $client = [System.Net.Http.HttpClient]::new()
 $client.Timeout = [TimeSpan]::FromSeconds(60)
 $client.DefaultRequestHeaders.Add('Authorization', "Bearer $($b.token)")
-$json = @{ js = $gestureJs } | ConvertTo-Json -Compress
+$json = New-BridgeBody @{ js = $gestureJs }
 $content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, 'application/json')
 $task = $client.PostAsync("$base/eval", $content)
 
@@ -389,7 +413,7 @@ $rootResizeBefore = $null
 $rootResizeRestored = $false
 $rootResizeSteps = 0
 if ($Root -and $Interaction -eq 'resize') {
-  $rootResizeBefore = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json' -TimeoutSec 60
+  $rootResizeBefore = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body (New-BridgeBody @{}) -ContentType 'application/json' -TimeoutSec 60
   if (-not ($rootResizeBefore.ok -and $rootResizeBefore.contentSize)) {
     Write-Error "Root resize cannot read /bounds -- refusing a gesture that cannot be restored."
   }
@@ -411,11 +435,11 @@ try {
       $d = [Math]::Round(140 * [Math]::Sin($progress * [Math]::PI))
       $rw = [int]$rootResizeBefore.contentSize.width + [int]$d
       $rh = [int]$rootResizeBefore.contentSize.height + [int][Math]::Round($d * 0.5)
-      $rb = @{ width = $rw; height = $rh } | ConvertTo-Json -Compress
+      $rb = New-BridgeBody @{ width = $rw; height = $rh }
       $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $rb -ContentType 'application/json' -TimeoutSec 60
       $rootResizeSteps += 1
       if ($progress -ge 1) {
-        $restore = @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height } | ConvertTo-Json -Compress
+        $restore = New-BridgeBody @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height }
         $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $restore -ContentType 'application/json' -TimeoutSec 60
         $rootResizeRestored = $true
       }
@@ -428,7 +452,7 @@ try {
   }
 } finally {
   if ($rootResizeBefore -and -not $rootResizeRestored) {
-    $restore = @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height } | ConvertTo-Json -Compress
+    $restore = New-BridgeBody @{ width = [int]$rootResizeBefore.contentSize.width; height = [int]$rootResizeBefore.contentSize.height }
     $null = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body $restore -ContentType 'application/json' -TimeoutSec 60
     $rootResizeRestored = $true
   }
@@ -438,7 +462,7 @@ if (-not $rootResizeBefore) { try { $null = $task.GetAwaiter().GetResult() } cat
 $client.Dispose()
 
 if ($rootResizeBefore) {
-  $rootResizeAfter = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body '{}' -ContentType 'application/json' -TimeoutSec 60
+  $rootResizeAfter = Invoke-RestMethod -Uri "$base/bounds" -Method Post -Headers $headers -Body (New-BridgeBody @{}) -ContentType 'application/json' -TimeoutSec 60
   $bw = [int]$rootResizeBefore.contentSize.width
   $bh = [int]$rootResizeBefore.contentSize.height
   $aw = [int]$rootResizeAfter.contentSize.width
@@ -469,6 +493,12 @@ $after = Invoke-RestMethod -Uri "$base/health" -Headers $headers
 $afterWin = $after.windows | Where-Object { $_.focused } | Select-Object -First 1
 if (-not $afterWin) {
   Write-Error "VOID: the window lost focus during the gesture. Chromium throttles rAF in a background window, so every frame number from this run is a throttle artifact, not renderer cost. Re-run with nothing else taking the foreground."
+}
+# Correction 30: with -Win, "some window is focused" is not enough -- ANOTHER window of this same
+# app taking the foreground mid-gesture backgrounds the one being recorded, and that is precisely
+# the throttle gap the check above exists to refuse.
+if ($Win -and "$($afterWin.id)" -ne "$Win") {
+  Write-Error "VOID: window $Win lost the foreground to window $($afterWin.id) during the gesture. Its frames are a throttle artifact, not renderer cost."
 }
 
 $frames = Invoke-Eval @"

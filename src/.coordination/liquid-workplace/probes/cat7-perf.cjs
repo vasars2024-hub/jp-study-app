@@ -782,6 +782,73 @@ const SPECS = {
       })()`,
     },
   },
+  blanc: {
+    // Blanc is a whole second BrowserWindow, not a `.fwin`, so the interaction probe drives its
+    // Root branch and every bridge call is pinned to that window (correction 30). `.blanc-root`
+    // is the shell's own element; the `blanc-shell` class lives on <html>, which is not a
+    // resizable root and would make the drag gesture meaningless.
+    title: 'Blanc shell',
+    root: '.blanc-root',
+    // Resolved from /health at run time, never hardcoded: BrowserWindow ids are assigned in
+    // creation order and change on every restart, so a literal `2` scores whatever happened to
+    // open second. Ambiguity refuses rather than picking the first match.
+    winMatch: 'blanc.html',
+    heavy: {
+      // Blanc's Start-equivalent: the master search is the one control that builds a
+      // cross-tool index over tools, study material and the library in a single synchronous
+      // mount, and it is fully reversible from the keyboard. Measured 2026-08-31 on this
+      // scene: `.blanc-root` 307 elements at rest -> 477 open -> 487 with a query -> 307 on
+      // Escape. Route switching is heavier but persists which tool the user is on; a perf leg
+      // must not leave the shell somewhere the user did not put it.
+      label: 'open and close the master search index 20 times',
+      durationMs: 6000,
+      js: `(() => {
+        delete window.__lqBlancLoad;
+        const root = document.querySelector('.blanc-root');
+        const open = root && root.querySelector('.blanc-top-search');
+        if (!open) return 'REFUSE: no Blanc master search control';
+        const openAtStart = !!root.querySelector('.blanc-master-search-input-row');
+        const rec = {
+          openAtStart, ticks: 0, opened: 0, closed: 0,
+          minNodes: root.querySelectorAll('*').length,
+          maxNodes: root.querySelectorAll('*').length,
+          restored: false,
+        };
+        window.__lqBlancLoad = rec;
+        const esc = (el) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+        const timer = setInterval(() => {
+          const field = root.querySelector('.blanc-master-search-input-row input');
+          if (field) { esc(field); rec.closed += 1; } else { open.click(); rec.opened += 1; }
+          rec.ticks += 1;
+          const nodes = root.querySelectorAll('*').length;
+          rec.minNodes = Math.min(rec.minNodes, nodes);
+          rec.maxNodes = Math.max(rec.maxNodes, nodes);
+          if (rec.ticks >= 20) {
+            clearInterval(timer);
+            setTimeout(() => {
+              const f = root.querySelector('.blanc-master-search-input-row input');
+              if (!!f !== openAtStart) { if (f) esc(f); else open.click(); }
+              setTimeout(() => {
+                rec.restored = !!root.querySelector('.blanc-master-search-input-row') === openAtStart;
+              }, 160);
+            }, 200);
+          }
+        }, 200);
+        return 'cycling master search over ' + rec.minNodes + ' initial nodes';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqBlancLoad;
+        if (!r) return 'REFUSE: Blanc load never armed';
+        if (r.ticks < 20 || r.opened < 8 || r.closed < 8) return 'REFUSE: incomplete search cycle ' + JSON.stringify(r);
+        // 170 nodes measured; the bar is the smaller 120 so a scene with fewer library rows
+        // still counts, and anything an order of magnitude smaller is not this mount at all.
+        if (r.maxNodes - r.minNodes < 120) return 'REFUSE: the search mounted only ' + (r.maxNodes - r.minNodes) + ' nodes';
+        if (!r.restored) return 'REFUSE: master search did not restore open=' + r.openAtStart;
+        return 'cycled the master search ' + r.ticks + ' times (' + r.opened + ' open / ' + r.closed + ' closed), mounted '
+          + (r.maxNodes - r.minNodes) + ' nodes and restored open=' + r.openAtStart;
+      })()`,
+    },
+  },
 };
 
 // L0-baseline-1, recorded 2026-08-16 in PERF_BASELINE_RESTART.md. PROVENANCE, NOT THE BAR —
@@ -806,6 +873,22 @@ if (!spec) {
   console.error(`REFUSE - --surface must be one of: ${Object.keys(SPECS).join(', ')}`);
   process.exit(2);
 }
+/**
+ * CORRECTION 30 — `--win`, and it is the same gap categories 5 and 8 already closed.
+ *
+ * Every bridge route here resolved the FOCUSED OS window. That is correct for the eighteen
+ * surfaces above, which are all `.fwin` windows or full-window readers inside the desktop; it is
+ * wrong for a shell that IS its own BrowserWindow. Measured 2026-08-31: with Blanc open in window
+ * 2 and the desktop focused, `document.querySelector('.blanc-root')` in the desktop's document is
+ * null, so the structural-root refusal fired and the surface simply could not be scored. The two
+ * PowerShell instruments carry the same pin (`-Win`), and the interaction probe additionally
+ * ASSERTS the requested window took the foreground both before and after the gesture — with two
+ * windows of one app, "something is focused" no longer rules out the rAF throttle.
+ *
+ * A spec declares its window as a URL/title substring in `winMatch`, resolved from /health at run
+ * time; `--win <id>` overrides it. Both unset is the old, focused-window behaviour.
+ */
+let WIN = arg('win', '');
 
 const cfg = JSON.parse(fs.readFileSync('debug/bridge.json', 'utf8'));
 const H = { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json', Connection: 'close' };
@@ -828,14 +911,20 @@ async function http(route, init, tries = 4) {
 }
 const get = (route) => http(route, {});
 async function ev(js) {
-  const r = await http('/eval', { method: 'POST', body: JSON.stringify({ js: js.replace(/\s*;\s*$/, '').trimEnd() }) });
+  const r = await http('/eval', {
+    method: 'POST',
+    body: JSON.stringify({ ...(WIN ? { window: WIN } : {}), js: js.replace(/\s*;\s*$/, '').trimEnd() }),
+  });
   if (!r.ok) throw new Error(`eval failed: ${JSON.stringify(r).slice(0, 300)}`);
   return r.result;
 }
 
 // The instruments are PowerShell. Scalars only across that boundary: `pwsh -File` binds
 // "8,16,24" as the single number 81624, which is a banked trap in this repo.
-function ps(script, args) {
+function ps(script, argv) {
+  // Correction 30: the pin travels with every instrument call, never only with the runner's own
+  // reads -- a gesture recorded in the wrong window is exactly the artifact this scores against.
+  const args = WIN ? [...argv, '-Win', String(WIN)] : argv;
   const r = spawnSync('pwsh', ['-NoProfile', '-File', script, ...args], {
     encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true,
   });
@@ -851,6 +940,17 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
 
 (async () => {
   // --- refusals, before a single number is taken -----------------------------------
+  // Correction 30: resolve the spec's own window FIRST, so every read below — including the
+  // structural-root refusal — already looks at the surface it claims to be scoring.
+  if (!WIN && spec.winMatch) {
+    const h = await get('/health');
+    const hit = (h.windows || []).filter((w) => !w.destroyed && w.visible
+      && (String(w.url || '').includes(spec.winMatch) || String(w.title || '').includes(spec.winMatch)));
+    if (hit.length !== 1) {
+      throw new Error(`REFUSE - ${hit.length} visible windows match "${spec.winMatch}"; a perf run must name exactly one. Open the surface, or pass --win <id>. Saw: ${JSON.stringify((h.windows || []).map((w) => ({ id: w.id, title: w.title, url: w.url })))}`);
+    }
+    WIN = String(hit[0].id);
+  }
   const mem = await get('/mem');
   if (!mem.ok) throw new Error('REFUSE - /mem did not answer; main memory is part of this score');
   if (mem.uptimeSec < 120) {
