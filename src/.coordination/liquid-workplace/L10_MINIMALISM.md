@@ -91,7 +91,7 @@ separate window that does not mount `CommandPalette` at all; that is pre-existin
 Blanc's own track, where L9 established that the shell owns its own controls. Named here rather
 than passed over in silence.
 
-### Bullet 1 — IN PROGRESS, 4/16 cells, `2ae5fa57`
+### Bullet 1 — first 4 of 16 cells, `2ae5fa57` (superseded by the closure below)
 
 Samples: **Settings**, the 1,307-control census maximum; **Media Center**, the structurally
 different shared `player`/`video`/`music` root. Settings cat3 remains 10/10 (0 dense regions on
@@ -110,7 +110,138 @@ Anki, Flashcards, Game Arena, Statistics, Resources, Sticky Note, Visualizer, Mu
 City, Immersion, Calendar, YouTube, Scraper, Aero shell, Wired shell, and Blanc shell. Media,
 Video and Music are represented by their one shared Media Center root.
 
-### Exact next: finish bullet 1's 16 cells
+### Bullet 1 — CLOSED 2026-09-01. RULE C 16 of 16. `2ae5fa57`, `12c2b10a`, `4ece2839`, `<this>`.
 
-Run cat1, cat2, cat5, cat6, cat7 and cat8 on Settings and Media Center. Any failed category
-expands across the sampled-out list; only 16/16 with required expansions may close the bullet.
+The remaining twelve cells, each with its own control firing in its own run. No category failed
+at this point, so no expansion across the sampled-out list was owed.
+
+| cat | Settings | Media Center (Video) | control that discriminated |
+| --- | --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 | 5 injected defects moved 0→2 contrast / 5→7 sub-32 / 0→2 WCAG 2.5.8 / 0→1 unreachable, all restored, rect drift 0 |
+| 2 clunkiness | 10/10 | 10/10 | dead end + modal trap + scroll trap injected 0→1 each, restored 0 |
+| 5 UI clarity | 10/10 | 10/10 | separate `-control` run FAILED as required on Q2, Q3, Q4, Q5, Q10 |
+| 6 feature parity | 10/10 | 10/10 | per-row mutations: each fell **exactly its own row** (+ its declared cascade), 0 unexpected, all returned |
+| 7 performance | 10/10 | 10/10 | `--jank` 120 ms blocks: p95 17.6→100.4 ms, over-100 frames 0→12 (Settings); 16.9→100.3 and 0→12 (Video) |
+| 8 honest states | 10/10 | 10/10 | raw key + placeholder + mute-pair injected 0→1 each against a 9,784-key / 106-namespace catalog, restored 0 |
+
+Numbers behind the two that are only ever quoted as ratios. **cat1:** Settings 70 text runs, min
+contrast 6.18:1, 51 controls, 0 keyboard-unreachable, 0 WCAG-2.5.8 failures, 5 sub-32px by rect
+and **0 by hit box** (`.fwin-b` carries `lq-hit`); Media 79 runs, min 4.76:1, 33 controls, same
+zeros. Reduced-motion emulation took and released on both: 46→0→46 over-threshold animations on
+Settings, 40→0→40 on Media. **cat8:** 0 raw keys, 0 placeholders, 0 mute pairs on either; all
+four languages differ from English by 166 of 267 runs on Settings, so the surface is really
+translated rather than falling back. Media declares 2 empty-state hosts and names both.
+
+**cat7 scene and ceiling, without which the ms mean nothing.** 3 `.fwin`s / 991 window elements
+/ 1,116 document elements, viewport 1264×821, dpr 1; process uptime 14,786 s, so the restart bar
+is met. This session's ceiling is **16.7 ms p50** (60 Hz), not L0's 10.0 — the L0 rows are kept
+as provenance only. Settings drag p50 16.7 / p95 17.6 / 0 over 100; resize 16.7 / 16.9 / 0;
+theme swap painted in 48.1 ms and restored in 97.2. Video drag 16.7 / 16.9 / 0; resize 16.7 /
+16.9 / 0; theme painted 44.2 ms. Main-process block under each surface's heaviest real work:
+**23.6 ms** (Settings, 24 pages × 2 = 48 navigations) and **8.8 ms** (Video, 40 disclosure
+cycles over 7 tiles / 639 px), both far under the 500 ms bar, both restored to their start page.
+
+**Instrument correction 39, and the run it VOIDed first.** cat7 Settings scored **VOID** on its
+first pass: `heavy` answered `REFUSE: only 38 of 48 navigations ran`. Nothing was wrong with the
+app — the load reached all 48 ticks and restored the rail. The leg was written at a fixed 110 ms
+tick against a **19-page** rail (38 ticks, 4.2 s, inside the 5 s window); the rail is **24 pages**
+today, so 48 fixed ticks need 5.28 s and the sampling window shut first. Every gesture in that
+run was already paid for when the arithmetic voided it. The tick interval is now DERIVED from a
+declared 4,200 ms budget (`min(110, budget/ticks)`, floor 45 ms, REFUSE above it) and the run
+records what it used — 87 ms here. A fixed interval rots on the one thing a settings rail
+reliably does, which is grow a page.
+
+`sampled-out:` unchanged from the four cells above — Agent, Library, Novels, Reading Finder,
+Dictionary, Grammar, Notebook, Translate, Anki, Flashcards, Game Arena, Statistics, Resources,
+Sticky Note, Visualizer, Music widget, City, Immersion, Calendar, YouTube, Scraper, Aero shell,
+Wired shell, Blanc shell. Media, Video and Music share the one Media Center root that was scored.
+
+### Bullet 2 — IN PROGRESS. First repair: the collapsed Media rail had no names.
+
+Bullet 2's own words send you at labels and icon semantics, and no rubric category asks that
+question directly — so it was asked of the source and then of the running app. The Media Center
+sidebar collapses to a 58px icon rail under `@container mc (max-width: 820px)`, and that rule
+carried `display: none` on the wrapper holding every destination's `<strong>` name.
+
+Measured live at an 800px `.mc-root` (container width driven 1042 → 800 → 1042, restored):
+**11 controls, 8 of them lost their own name.** Six fell back to `title` and announced their
+DESCRIPTION — `Home` announced as "Your media at a glance (Ctrl+1)", `Library` as "All local
+media (Ctrl+2)", and so on through `Video`, `Music`, `Study Mode`, `Discover`. Two — `Media
+workspace` and `Media Settings` — carry no `title` at all and announced **nothing**. Only 3 of
+11 survived. None of these buttons has an `aria-label`, so the wrapper was the only name.
+
+Fixed by clipping rather than removing, the treatment `.medialib-view__head > span` already uses
+one container query away. Re-measured in the same session: **unnamed 2 → 0, name-lost 8 → 0.**
+The rail is pixel-identical — sidebar 58 px, all 11 buttons 43 px wide, icon offset 14 px (16 px
+for the group chevron), 0 painted text runs, 0 horizontal overflow on any button, the rail or
+the root. Wide stays 206 px with 11 painted labels.
+
+Negative control, injected and withdrawn in the same run: a stylesheet forcing `display: none`
+back onto the three wrappers moved the reading 0 → 8 name-lost / 2 unnamed and naming exactly
+the same eight rows; removing it returned 0 / 0. Guard: `mediaVideoMinimalism.test.ts`, 3 tests,
+proven discriminating by a byte-restored source mutation (dropping `.mc-nav button > span` from
+the clip rule fails it; the file restored `-ceq` identical).
+
+The decoration that names no control — the brand wordmark, the `Browse` / `Library status`
+captions, the `em` count badge — still uses `display: none` and is asserted to keep doing so, so
+this is not a licence to un-hide the rail.
+
+### Bullet 2 — 13 of 16 cells PASS, 1 FAILS, 2 unrun. NOT closed.
+
+Settings was asked the same compact-width question and **already answers it**: at a 400px
+`.os-set-body` the rail collapses 204 → 52 px, and all 25 items keep their own name, 0 unnamed,
+0 falling back to `title`, names byte-identical to the wide reading, rail restored to 204. Its
+own CSS comment (`styles.css:27081`) says `display: none` "is WRONG here" for exactly the reason
+Media Center was failing — so the correct treatment was already written down in this repo, one
+surface away, and Media Center had the defect anyway. Six controls still paint at 52px; all six
+are empty-text dots/glyphs (`.os-set-adv-dot`, `.os-set-advanced-glyph`), fully inside their
+host, rail overflow 0 — the earlier "painted" count was my reader appending a separator for
+empty text, not a leak.
+
+| cat | Settings | Media Center (Video) |
+| --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 |
+| 2 clunkiness | 10/10 | **FAIL — latency** |
+| 3 Liquid utilization | 10/10 | 10/10 |
+| 4 use of space | 10/10 | 10/10 |
+| 5 UI clarity | 10/10 | 10/10 |
+| 6 feature parity | 10/10 | 10/10 |
+| 7 performance | not run | not run |
+| 8 honest states | 10/10 | 10/10 |
+
+Controls that discriminated: cat1 5 injected defects moved and restored, rect drift 0; cat2
+Settings dead-end + modal-trap + scroll-trap 0 → 1 → 0; cat5 a separate `-control` run failed as
+required on Q2/Q3/Q4/Q5/Q10 on both; cat6 every mutation felled exactly its own row and returned;
+cat8 raw-key + placeholder + mute-pair 0 → 1 → 0 on both. cat2 presentation parity: Settings
+liquid 7 ≤ standard 7, Media liquid 5 ≤ standard 5, geometry and presentation restored.
+
+**THE FAILURE, and it repeated three times.** Media Center's global search is over the 100 ms
+input-response bar on its first keystrokes. Typing `jojo` into `.mc-global-search input` with
+Library already open: **129.9 / 145.9 / 134.8 ms** for the first keystroke across three
+consecutive runs, and 99.2 / 112.3 / 101.4 for the second — 1, 2 and 2 samples over the bar. The
+tab switch is not the cause; the task navigates to Library first, so `setTab` never fires. Bullet
+1 measured 99.4 ms on the same task an hour earlier — under the bar by 0.6 ms — so this is a
+marginal cost that has been sitting on the line, not a regression from this turn's CSS. Per the
+banked one-reading rule it was repeated before being filed, and it repeated.
+`MediaCenterView.tsx:1999` calls `media.setQuery` synchronously on every `onChange`, and the
+library filter runs in the same commit.
+
+**Instrument correction 40 — clicking into a text field is not a dead end.** cat2 Settings first
+scored FAIL/`deadEnds` on step 1: the click moved no text, controls, scroll or focus, because the
+field already held focus from an earlier leg. Correction 11 had already masked the focus channel
+for a self-focusing click, so nothing could rescue the step. Checked against the product before
+touching the instrument: with Settings raised a real OS click at the field centre focuses it, and
+focusing an empty box changes nothing else — 45 controls / 903 characters before and after. The
+verdict now exempts a click that leaves a TEXT-ENTRY element holding the caret, and nothing else;
+proven not to blunt the bar because the same run's injected dead end still moved 0 → 1 → 0.
+
+Two run-shape notes the next turn needs. The cat2 Settings task needs a trailing `wait:2800`:
+bullet 3's landing scroll is still moving when the idle window opens and the run VOIDs on
+undeclared churn. And `--both-presentations --control` are not implied — without them
+`costParity` reads UNMEASURED and no control runs at all.
+
+### Exact next: fix the Media global-search keystroke cost, then cat7 ×2
+
+`MediaCenterView.tsx:1994-2012`. The bar is 100 ms and the measured first keystroke is 130-146.
+Re-measure with the same task and require three consecutive runs under the bar, not one. Then
+cat7 on both surfaces closes bullet 2 at 16/16.

@@ -1,0 +1,221 @@
+{
+  "label": "l10b2-settings",
+  "surface": "Settings",
+  "win": "(focused)",
+  "theme": null,
+  "presentation": "standard",
+  "box": "960x680",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 70,
+    "unmeasurable": 0,
+    "minRatio": 6.18,
+    "minOwner": "span.muted \"Language\" 12px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 0,
+    "decorativeSkipped": 0,
+    "decorativeWorst": [],
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 51,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 5,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 51,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 1,
+    "focusHosts": [
+      {
+        "el": "div.os-set-pane-v2",
+        "why": "tabindex=-1"
+      }
+    ],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "raised",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 46,
+    "beforeLongest": {
+      "el": "span.os-set-advanced-glyph",
+      "dur": 1.6
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 46,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": "Settings",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": null,
+    "box": "960x680",
+    "deferredVisibilityOwners": 0,
+    "controls": 50,
+    "measured": 50,
+    "belowFloorByRect": 5,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-bar",
+        "button.fwin-b.lq-hit.fwin-b-liquid",
+        "section.fwin.focused",
+        "div.fwin-bar"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 0,
+    "disabled": [],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "div.lq-contextual.os-set-nav-scroll 0,0 -> 596,0",
+      "div.os-set-pane-v2.os-set-pane-anim 0,0 -> 523,0"
+    ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

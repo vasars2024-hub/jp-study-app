@@ -1,0 +1,204 @@
+{
+  "label": "l10b2-media",
+  "app": "video",
+  "win": "(focused)",
+  "raised": "raised",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "1080x679",
+  "driven": [
+    {
+      "step": "toggle",
+      "result": "{\"was\":false,\"now\":true}"
+    },
+    {
+      "step": "youtube",
+      "result": "{\"drafted\":true}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "parity": {
+    "standard": "10/10",
+    "liquid": "10/10",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "INPUT",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1080x679"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "stageHonesty",
+        "declaredCascade": [
+          "topbarActions"
+        ],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "8/10",
+        "fellRows": [
+          "stageHonesty",
+          "topbarActions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "topbarActions",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "title stripped",
+        "reachable": "9/10",
+        "fellRows": [
+          "topbarActions"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "learningToggles",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "learningToggles"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "transcriptionModel",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "active removed from 1 of 1",
+        "reachable": "9/10",
+        "fellRows": [
+          "transcriptionModel"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "watchFolder",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "watchFolder"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "youtubeDraft",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "youtubeDraft"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "upNextShelf",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "element detached",
+        "reachable": "9/10",
+        "fellRows": [
+          "upNextShelf"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "inspectorHonesty",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "mc-muted removed from 1 of 1",
+        "reachable": "9/10",
+        "fellRows": [
+          "inspectorHonesty"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "navReach",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "is-active removed from 1 of 1",
+        "reachable": "9/10",
+        "fellRows": [
+          "navReach"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "applied": "aria-pressed stripped",
+        "reachable": "9/10",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"video:toggle0+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      }
+    ],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

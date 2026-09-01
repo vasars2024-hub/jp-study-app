@@ -447,10 +447,21 @@ const POINT = (surface, sel) => `(function(){
  */
 const FOCUS_IS = (surface, sel) => `(function(){
   var root = ${rootExpr(surface)};
-  if (!root) return JSON.stringify({ self: false });
+  if (!root) return JSON.stringify({ self: false, caret: false });
   var el = root.querySelector(${JSON.stringify(sel)});
   var ae = document.activeElement;
-  return JSON.stringify({ self: !!el && !!ae && (ae === el || el.contains(ae)) })
+  var self = !!el && !!ae && (ae === el || el.contains(ae));
+  // Correction 40: is the thing now holding focus a TEXT ENTRY field? Only then does a
+  // click with no other observable effect still have an outcome — the caret.
+  var entry = false;
+  if (self && ae) {
+    var tag = ae.tagName;
+    var type = (ae.getAttribute('type') || 'text').toLowerCase();
+    entry = tag === 'TEXTAREA'
+      || ae.isContentEditable === true
+      || (tag === 'INPUT' && ['text','search','url','email','tel','number','password',''].indexOf(type) >= 0);
+  }
+  return JSON.stringify({ self: self, caret: entry })
 })()`;
 
 /** Correction 6: focus() first — a synthetic click does not focus, and /type follows focus. */
@@ -700,9 +711,12 @@ async function driveStep(surface, step, before) {
     await sleep(SETTLE);
     out.after = await snapOf(surface);
     // Correction 11: mask the focus channel when focus merely landed on the control just pressed.
-    const selfFocus = JSON.parse(await ev(FOCUS_IS(surface, rem))).self === true;
+    const focusState = JSON.parse(await ev(FOCUS_IS(surface, rem)));
+    const selfFocus = focusState.self === true;
     out.moved = movedBetween(before, out.after, { maskFocus: selfFocus });
     out.selfFocus = selfFocus;
+    // Correction 40 — see `caretOnly` at the dead-end verdict.
+    out.caretOnly = focusState.caret === true;
     out.counted = true;
     return out;
   }
@@ -779,8 +793,26 @@ async function runTask(surface, spec) {
       target: r.target || null,
       counted: r.counted,
       moved: r.moved,
-      // Correction 3: this is the dead-end verdict, and it is driven, not read.
-      deadEnd: r.counted === true && r.moved.any === false,
+      caretOnly: r.caretOnly === true,
+      /*
+       * Correction 3: this is the dead-end verdict, and it is driven, not read.
+       *
+       * Correction 40 (2026-09-01) — CLICKING INTO A TEXT FIELD IS NOT A DEAD END. Measured
+       * on the Settings search box: the click moved no text, no controls, no scroll and no
+       * focus (the field already held it from a previous leg), so the step scored `deadEnd`
+       * and the whole surface FAILED — while the identical run an hour earlier passed only
+       * because the pane happened to still be settling and the text hash moved on its own.
+       * The bar is meant to catch a control that answers nothing; a text field's answer IS
+       * the caret, and correction 11 has already masked the focus channel for exactly this
+       * gesture, so it can never be the thing that saves the step.
+       *
+       * Deliberately narrow: `caret` is true only when the element now holding focus is a
+       * text-entry field. A click on a button that does nothing still scores a dead end.
+       * Verified against the product before changing the instrument: with Settings raised, a
+       * real OS click at the field's centre focuses it, and focusing an empty box changes
+       * nothing else on the pane — 45 controls and 903 characters before and after.
+       */
+      deadEnd: r.counted === true && r.moved.any === false && r.caretOnly !== true,
     });
     if (r.moved.rootGone) { before = r.after; break; }
     before = r.after;
