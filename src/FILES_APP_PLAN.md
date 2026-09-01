@@ -781,12 +781,16 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 66b9c9da -- all four run, three clean, one not.
+    <!-- status: open; evidence: 2026-09-01 f17b25d8 -- all four run, three clean, one not.
          i18n exit 0 at 12,085 keys in all four languages. architecture exit 0, "Nothing new",
-         9 known findings still pending. eslint on the 7 touched paths: 0 errors (it also
-         caught a REAL defect in a committed suite -- 'C:\dl\subs-pack.zip' is the string
-         C:dlsubs-pack.zip, since \d and \s are not escapes; fixed in afeab217).
-         vitest: 981 files passed / 4 failed, 12,718 tests passed / 13 failed. IDENTICAL to
+         9 known findings still pending. eslint on the 5 touched lintable paths: 0 errors.
+         vitest: 982 files passed / 4 failed, 12,737 tests passed / 13 failed, and this time
+         the four are NAMED so the set-difference is checkable rather than asserted:
+         scraperSources.test.ts, novelReaderCanvas.test.tsx, novelReaderProgressGuard.test.ts,
+         i18n.test.ts. Not one is a path this turn touched. scraperSources is a temp-dir
+         cleanup race (ENOTEMPTY rmdir .../scraper/logs), i.e. a flake -- a first run the
+         same night reported 3 failed / 12, so the count varies by one and 4 is the stable
+         reading. IDENTICAL to
          the count this worktree inherited, so files-app added zero failures -- but the gate
          says green, and it is not, so it stays OPEN. The 4: novelReaderCanvas.test.tsx and
          novelReaderProgressGuard.test.ts fail on `Denied ID .../pdfjs-dist/build/
