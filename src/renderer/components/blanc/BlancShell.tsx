@@ -1819,6 +1819,7 @@ function BlancToolsPanel({
 }
 
 function ToolboxCoveragePanel() {
+  const { t } = useT();
   const modules = useMemo(() => listToolboxModules(), []);
   const ready = modules.filter((module) => module.status === 'ready').length;
   const experimental = modules.filter((module) => module.status === 'experimental').length;
