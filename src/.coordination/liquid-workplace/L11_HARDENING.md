@@ -312,14 +312,28 @@ and lands just inside the band instead of just under it.
 Condition guards all green on both graded runs: `applied` `heldThroughSweep` `restored`
 `persistedUnchanged` true, `driftedFields` [].
 
-**MEASURED TRAP for anyone writing a responsive rule that must hold under app zoom: a
-`@container` length is compared against the container's PAINTED size, while `clientWidth` reports
-the zoom-adjusted one.** At zoom 2 a rail whose `clientWidth` reads 131 satisfies
-`(max-width: 240px)` and fails `(max-width: 120px)` — every px breakpoint in the app fires at half
-its visual width at 200%. `em` does track it (`9.2em` matched at both zooms, because the query
-resolves the container's font-size in the same painted space), but it is not a fix on its own — the
-breakpoint here was never the bug. Probed with four parallel `--cq*` custom properties on one
-element; both zooms in one artifact.
+**WITHDRAWN — this entry first published the opposite, and a discriminating re-test one slice
+later falsified it.** The claim was that a `@container` length is compared against the container's
+PAINTED size, so every px breakpoint would fire at half its visual width at 200%. It is not: the
+comparison uses the ZOOM-ADJUSTED size, the same number `clientWidth` reports, and it is
+self-consistent. Two measurements, either one sufficient:
+
+- the rail at zoom 2 is 123 adjusted / 246 painted, and `(max-width: 240px)` MATCHED — which
+  painted semantics forbids, since 246 > 240. The original entry had this datum and read it
+  backwards;
+- `.mc-root` at zoom 2 is 502 adjusted / 1004 painted, and `@container mc (max-width: 820px)`
+  MATCHED and did its job: the Media Center sidebar collapsed 206 -> 58 CSS px on cue.
+
+`em` agrees with `px` at both zooms rather than correcting it, because the container's font-size
+is zoom-adjusted too — so converting breakpoints to `em` buys nothing, and a slice was nearly
+spent doing it to nine `@container mc` at-rules.
+
+**The trap that IS real and worth keeping: a `scrollbar-width: thin` scrollbar is painted in
+DEVICE pixels and does not scale with app zoom.** So the same window has MORE CSS content width at
+200% than at 100% — the rail measures 118 at zoom 1 and 123 at zoom 2 — and a breakpoint at 120
+lands on opposite sides of it. That is the whole of why the clip below showed up at 200% first,
+and it is why a knife-edge responsive threshold is not safe under zoom even though the query
+itself is correct.
 
 ## L11 bullet 2 — Video's zoom cell is no longer an empty harness, and it found two bars (2026-09-01, primary)
 
@@ -349,12 +363,16 @@ plus the wrapper's `min-width: 0` -> `main.mc-content` 197 > 154 becomes 154 = 1
 past the edge. The before rows above are the control: same harness, same content, same probe,
 at this HEAD minus the two declarations.
 
-**`contentGrowsNotChrome` at zoom 2 stays open, and it is the container-query/zoom class again.**
-Chrome is fixed in CSS px — sidebar 206, inspector 288 — and the queries that would collapse them
-(`@container mc (max-width: 1040px)` -> 174px, `(max-width: 820px)` -> 58px) compare against the
-PAINTED size, which at zoom 2 is double. So a window that is visually 540 CSS px wide reports
-2084 to the query and keeps its widest three-column chrome: 494 of 540 px of width is chrome, and
-the share grows 45.1% -> 49.9% as the box grows because the clipped inspector's height grows with
-it. 9 `@container mc (...)` at-rules are affected. Converting them to `em` is the candidate fix
-and is measured to track zoom correctly (see the previous entry); it is a whole-shell change, not
-this slice, and it is the exact next slice.
+**`contentGrowsNotChrome` at zoom 2 stays open, and it is NOT the breakpoints.** That was this
+turn's first hypothesis and it is disproved above: `@container mc (max-width: 820px)` fires
+correctly at zoom 2 and the sidebar does collapse 206 -> 58 CSS px. What remains is the
+INSPECTOR: `aside.mc-video-inspector` is a fixed 288 CSS px wide and 452 CSS px tall at every
+size, so across the pair the probe compares (default 540x315 CSS, chrome 45.1%) against
+(maximized 632x355 CSS, chrome 49.9%) — its width share falls 53% -> 46% as the box grows, but
+its CLIPPED HEIGHT grows with the box faster, and chrome's AREA share is what the bar measures.
+Both boxes are under `@container mc (max-width: 640px)`, which does not touch the inspector.
+
+Exact next slice: read what `(max-width: 640px)` already does to `.mc-video-layout`, and give the
+inspector the same treatment the drawer gets in `mediaLibrary.css` at 1240px — an overlay or a
+collapse, not a third fixed column — then re-run `cat4 --surface Video --zoom 2.0`, whose only
+remaining bar this is. Do NOT re-derive the container-query question; it is settled above.
