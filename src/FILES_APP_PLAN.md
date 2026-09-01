@@ -816,9 +816,17 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 f8a19c4e -- ONE failure left, down from four, and it
-         is named and diagnosed. vitest: **994 files passed / 1 failed / 1 skipped, 12,841
-         tests passed / 1 failed / 6 skipped**. i18n exit 0 at 12,113 keys. architecture exit 0,
+    <!-- status: open; evidence: 2026-09-01 81004907 -- still ONE failure, the SAME one, and it
+         is still not ours. vitest: **995 files passed / 1 failed / 1 skipped, 12,862 tests
+         passed / 1 failed / 6 skipped** (up 21 tests: this turn added 5 extension-dispatch and
+         9 model-substitution tests). i18n exit 0 at 12,113 keys. architecture exit 0,
+         "Nothing new", 9 pending. eslint 0 errors on every touched .ts/.tsx.
+         Re-checked the blocker at the top of this turn rather than inheriting it: the 27
+         components are STILL dirty-and-mid-conversion in the main tree, so the finding below
+         holds unchanged.
+         (superseded numbers from 2026-09-01 f8a19c4e: 994 files / 12,841 tests) -- ONE failure
+         left, down from four, and it
+         is named and diagnosed. i18n exit 0 at 12,113 keys. architecture exit 0,
          "Nothing new", 9 pending. eslint 0 errors on the touched .ts/.tsx.
          Three of the four previous failures are GONE, each for a checkable reason:
            novelReaderCanvas.test.tsx (10) + novelReaderProgressGuard.test.ts (1) -- fixed by

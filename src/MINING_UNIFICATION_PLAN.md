@@ -298,7 +298,14 @@ An empty result is a FINDING: say so and stop.
 12. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
    `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
    gate here — 327 pre-existing errors on a clean tree; prove "no new" by set-difference.
-   <!-- status: open; evidence: the four full gates run every turn, but `npx vitest run` is not clean on this tree -- see the turn logs for the named failures. -->
+   <!-- status: open; evidence: 2026-09-01 81004907 -- run this turn, after the last slice.
+        vitest **995 files passed / 1 FAILED / 1 skipped; 12,862 tests passed / 1 failed / 6
+        skipped**. i18n-check exit 0, 12,113 English keys all translated. architecture-audit
+        exit 0, "Nothing new", 9 known pending. eslint 0 errors on every touched .ts/.tsx.
+        The single failure is i18n.test.ts's hardcoded-string ratchet (27 components, 763
+        strings) and it is ANOTHER TRACK'S in-flight uncommitted conversion in the main tree --
+        re-verified this turn, not inherited. This gate and FILES_APP_PLAN gate 37 are the same
+        blocker and will close in the same merge. -->
 
 ## Progress
 
