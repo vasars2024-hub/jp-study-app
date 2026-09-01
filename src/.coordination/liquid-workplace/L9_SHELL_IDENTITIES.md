@@ -2171,3 +2171,54 @@ document elements (exactly at rest), drawer closed, search closed, 0 plants, no 
 Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources, Scraper,
 Settings, YouTube. Only **cat7 · Blanc** is left, and it needs an instrument that can measure a
 surface living in a second OS window at all.
+
+## 2026-08-31 — primary — cat7 Blanc CLOSES the bullet: /focus could not focus any window but the first
+
+**The blocker was a product defect in the debug bridge, not a probe gap.** `/focus` ran
+`win.focus()` and THEN `app.focus({ steal: true })`; on Windows that call focuses the
+application's FIRST window, so it took the foreground straight back off every other one.
+Measured against the old binary: /focus on the Blanc window returned `focused: false` on three
+consecutive attempts while window 1 stayed focused. Since Chromium throttles rAF in an occluded
+window, that made every frame number anyone could record for a second-window shell a THROTTLE
+ARTIFACT rather than renderer cost — a category-7 score for Blanc was not merely unmeasured, it
+was unmeasurABLE, and any number taken anyway would have been a fabricated finding. Stealing for
+the app first, then focusing the requested window, lands: the same request against the restarted
+main returns `focused: true` with window 1 unfocused. That IS the control — same call, same
+window, opposite answer, and only main changed.
+
+**Correction 30 — one pin, carried end to end.** `-Win` on both PowerShell instruments and
+`--win` on the runner, so /focus, /eval, /bounds and `-DuringJs` all address ONE window. A spec
+names its window as a URL/title substring resolved from /health (`winMatch: 'blanc.html'`), never
+a literal id: BrowserWindow ids are creation order and change on every restart, so a hardcoded
+`2` scores whatever happened to open second. The interaction probe asserts the requested window
+holds the foreground BEFORE and AFTER the gesture — with two windows of one app, "something is
+focused" no longer rules out the throttle.
+
+**The trap, banked, because it cost three runs:** PowerShell variable names are CASE-INSENSITIVE.
+`$win = <focused window>` silently overwrote the `-Win` PARAMETER, so the new assertion compared
+a window id against a stringified window OBJECT and VOIDed every run — naming the right symptom
+for the wrong reason, which is the expensive kind.
+
+**cat7 · Blanc = PASS 10/10, no findings, no voids.** Scene: **0** floating windows,
+`.blanc-root` **308** elements, **346** document elements at 1264×761; PID 46072 uptime 247 s.
+Session ceiling p50/p95 **16.7/16.8 ms** across three readings, 0 frames over 100. Drag
+16.7/16.8/max **17.3**, resize 16.7/16.8/**17.6**, theme 16.7/16.8/**31.2** against a
+hidden-root theme control of 16.7/16.8; every scene stable, every gesture a closed loop (drag
+1264×761 → 1264×761, resize the same through /bounds), all main maxima **≤ 11.7 ms** against the
+500 ms bar. Heavy leg — the master search is Blanc's Start-equivalent, the one control that
+builds a cross-tool index in a single reversible synchronous mount: **20** ticks (10 open / 10
+closed), **170** nodes mounted, restored `open=false`; main p50/p95/max **2.0/3.0/49.4 ms** over
+a 6,019 ms span, against an idle control of 2.1/4.4/9.9. Sensitivity control (`--jank`): 12
+injected 120 ms blocks produced **12** frames over 100 ms and p95 **100.3**, where the clean drag
+had **0** and 16.8 — the recorder demonstrably sees the frames it reports. Residue: 307/346
+elements, theme null, search closed, route Stats, both window bounds byte-identical.
+
+**RULE C: 16 of 16 — L9 bullet 4 CLOSES.** Every cell is 10/10 across the two representative
+shells, so no category failed and no expansion was forced. Counted from this doc's own per-cell
+lines: Wired cat1 (`bc7816d6`, re-scored after the tree changed), cat2–cat8; Blanc cat1–cat8.
+Surfaces were chosen as the densest (Wired: taskbar, tray, launcher, hosted windows) and the most
+different (Blanc: its own BrowserWindow, no `.fwin` at all, a left rail instead of a taskbar) —
+and that second choice is what paid: five of the seven corrections banked in this bullet exist
+only because Blanc is not Study OS. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+Video, Library, Captures, Immersion, Manga, Novels, VN, Calendar, Flashcards, Games, Notebook,
+Statistics, Music, Resources, Scraper, Settings, YouTube, notifications, onboarding, help.
