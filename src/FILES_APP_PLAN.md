@@ -523,6 +523,18 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    reference in place, checked rather than assumed.
 25. **Watch picks up a live download.** A file appearing in a watched folder is recognised
    without a manual refresh, and the elapsed time is reported.
+   <!-- status: closed; evidence: 2026-08-31 8c0796df (main) + 59e72c27 (renderer) -- main/filesApp/watch.ts over real chunked writes: a file appears, is refused while growing, and is announced at 4,096 bytes with elapsedMs 4,000 measured from firstSeenAt; a 60 s stall reports 63,000, not the 3,000 window. "Without a manual refresh" is driven with NO sweep call -- one fs.watch event, then the session's own re-check timer -- and on the renderer side by pushing main's broadcast into the production FilesApp, which forces an index rebuild nothing asked for and renders "ep99.mkv arrived after 4.2 s". Adverse controls: disarming the re-check turns 2 of 8 red, a non-silent baseline 1 of 8. -->
+   <!-- decision: an event is a hint to look, never an answer. The LAST fs.watch event for a
+        file arrives while it is still unstable and nothing further ever fires, so a sweep
+        arms its own re-check while anything is pending -- and nothing at all when idle, so a
+        permanently watched Downloads costs nothing at rest. -->
+   <!-- finding, fixed: the baseline was silent only in intention. Every pre-existing file is
+        a first sighting, so it was skipped and then announced as an "arrival" one sweep
+        later -- adding Downloads would have reported nine hundred of them. The mtime rule
+        (gate 31's slice) is what makes the baseline silent in fact; a file genuinely
+        mid-write at baseline still has a fresh mtime and is announced for real when it
+        finishes. -->
+   **CLOSED 2026-08-31.** See the 2026-08-31 (twenty-first) Progress entry.
 26. **A partial download is never ingested.** A `.crdownload`/`.part`/`.!qB` file, and a file
    still growing, are both ignored until complete — proven by watching one arrive mid-write,
    not by asserting the extension list exists.
@@ -1762,3 +1774,57 @@ window to a literal turns **4 of 9** red; dropping `byTarget` turns **3 of 9** r
 
 Focused gates: **37** store/model tests + **9** component + **8** handler; i18n exit 0 at
 **11,942 keys**; ESLint exit 0 on all nine touched TS/TSX paths.
+
+
+### 2026-08-31 (twenty-first) — gate 25 CLOSES: watched folders, and what they say
+
+Commits `8c0796df` (main), `59e72c27` (renderer).
+
+**Recognition is `scanRoots` with a ledger carried across sweeps** — the same walk and the
+same classifier as gate 23. A watcher with its own opinion about what a file is would be the
+second classifier gate 23 spent itself avoiding, one route later.
+
+Three things the tests forced rather than the design predicting:
+
+1. **An event is a hint to look, never an answer.** The last `fs.watch` event for a file
+   arrives while it is still unstable, and nothing further ever fires — so a watcher that
+   only re-checked on events would miss precisely the moment it exists to catch. A sweep arms
+   its own re-check while anything is pending, and **nothing at all when idle**, which is what
+   makes a permanently watched Downloads affordable.
+2. **The baseline was silent only in intention.** Every pre-existing file is a first sighting,
+   so it was skipped and then announced as an "arrival" one sweep later — adding Downloads
+   would have reported nine hundred arrivals, none of which arrived. Gate 31's mtime rule is
+   what makes it silent in fact. A file genuinely mid-write at baseline still has a fresh
+   mtime and is announced for real when it finishes, which is the case worth keeping.
+3. **Elapsed is measured from `firstSeenAt`, which never moves.** From `changedAt` a download
+   that stalled a minute would report the 3 s window as its duration; pinned as its own test
+   at **63,000 ms** against a 60 s stall.
+
+Numbers: 4,096 bytes announced at **elapsedMs 4,000** after being refused twice while growing;
+a `.crdownload` never announced even after settling for a minute, with its finished twin in
+the same folder announced in the same sweep as the control; a file announced **exactly once**
+across six further sweeps.
+
+**"Without a manual refresh" is measured where it cannot be faked.** Calling `sweep()` IS the
+manual refresh, so main's half is driven through the session's own scheduler with no sweep
+call, and the renderer's half by pushing main's broadcast into the production `FilesApp` —
+which then forces an index rebuild nothing asked for and renders **"ep99.mkv arrived after
+4.2 s"**. The hook reports what MAIN says it is watching, not what was asked: a root main
+refused must not appear as covered.
+
+The list is edited in the scan sheet from the folder already typed there. A duplicate is
+refused by name rather than deduplicated, and `C:\dl\` and `c:\dl` are one folder — without
+the fold the same directory could be watched twice and every arrival announced twice.
+
+Traps: (1) a bash heredoc **collapses a doubled backslash into a single one**, which silently
+halved every escaped path in two appended test blocks — a Windows path meant as two
+characters arrived as one, so a string comparison that looked right compared the wrong thing
+— and turned a `[backslash-or-slash]` regex class into one matching only the forward slash.
+ESLint's `no-useless-escape` caught the tests; **nothing would have caught the regex**, and
+this very paragraph was eaten by the same trap on its first write. Use the Edit tool for any
+line carrying a backslash. (2) `refresh` is held in a ref, not a dependency: a subscription rebuilt on every
+render drops the arrival that lands between the two.
+
+Focused gates: **8** main + **7** hook + **3** on the production FilesApp + **4** on the
+sheet's list = 22 new; 57/57 and 47/47 across the touched renderer suites; i18n exit 0 at
+**11,952 keys**; ESLint exit 0 on all touched TS/TSX.

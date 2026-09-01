@@ -1102,7 +1102,10 @@
 
 .fa-review-categories {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  /* `min(260px, 100%)`, never a bare 260px: a bare floor is a HARD minimum, so
+     in the 260x170 window the shell allows the track keeps its width and the
+     right-hand column leaves the frame with no scrollbar to reach it. */
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 0 var(--lq-space-3);
   margin: 0;
   padding: var(--lq-space-2);
