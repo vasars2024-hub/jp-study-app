@@ -186,9 +186,62 @@ The decoration that names no control — the brand wordmark, the `Browse` / `Lib
 captions, the `em` count badge — still uses `display: none` and is asserted to keep doing so, so
 this is not a licence to un-hide the rail.
 
-### Exact next: bullet 2's remaining work
+### Bullet 2 — 13 of 16 cells PASS, 1 FAILS, 2 unrun. NOT closed.
 
-Ask the same compact-width naming question of **Settings** — it is the other representative
-surface and RULE C will not close the bullet on one. Then run the 16 cells, order cat1 → cat5 →
-cat8 first per the table above; those three are the ones bullet 2's words actually bite on, and
-they must be re-run *after* the repairs above, not reused from bullet 1.
+Settings was asked the same compact-width question and **already answers it**: at a 400px
+`.os-set-body` the rail collapses 204 → 52 px, and all 25 items keep their own name, 0 unnamed,
+0 falling back to `title`, names byte-identical to the wide reading, rail restored to 204. Its
+own CSS comment (`styles.css:27081`) says `display: none` "is WRONG here" for exactly the reason
+Media Center was failing — so the correct treatment was already written down in this repo, one
+surface away, and Media Center had the defect anyway. Six controls still paint at 52px; all six
+are empty-text dots/glyphs (`.os-set-adv-dot`, `.os-set-advanced-glyph`), fully inside their
+host, rail overflow 0 — the earlier "painted" count was my reader appending a separator for
+empty text, not a leak.
+
+| cat | Settings | Media Center (Video) |
+| --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 |
+| 2 clunkiness | 10/10 | **FAIL — latency** |
+| 3 Liquid utilization | 10/10 | 10/10 |
+| 4 use of space | 10/10 | 10/10 |
+| 5 UI clarity | 10/10 | 10/10 |
+| 6 feature parity | 10/10 | 10/10 |
+| 7 performance | not run | not run |
+| 8 honest states | 10/10 | 10/10 |
+
+Controls that discriminated: cat1 5 injected defects moved and restored, rect drift 0; cat2
+Settings dead-end + modal-trap + scroll-trap 0 → 1 → 0; cat5 a separate `-control` run failed as
+required on Q2/Q3/Q4/Q5/Q10 on both; cat6 every mutation felled exactly its own row and returned;
+cat8 raw-key + placeholder + mute-pair 0 → 1 → 0 on both. cat2 presentation parity: Settings
+liquid 7 ≤ standard 7, Media liquid 5 ≤ standard 5, geometry and presentation restored.
+
+**THE FAILURE, and it repeated three times.** Media Center's global search is over the 100 ms
+input-response bar on its first keystrokes. Typing `jojo` into `.mc-global-search input` with
+Library already open: **129.9 / 145.9 / 134.8 ms** for the first keystroke across three
+consecutive runs, and 99.2 / 112.3 / 101.4 for the second — 1, 2 and 2 samples over the bar. The
+tab switch is not the cause; the task navigates to Library first, so `setTab` never fires. Bullet
+1 measured 99.4 ms on the same task an hour earlier — under the bar by 0.6 ms — so this is a
+marginal cost that has been sitting on the line, not a regression from this turn's CSS. Per the
+banked one-reading rule it was repeated before being filed, and it repeated.
+`MediaCenterView.tsx:1999` calls `media.setQuery` synchronously on every `onChange`, and the
+library filter runs in the same commit.
+
+**Instrument correction 40 — clicking into a text field is not a dead end.** cat2 Settings first
+scored FAIL/`deadEnds` on step 1: the click moved no text, controls, scroll or focus, because the
+field already held focus from an earlier leg. Correction 11 had already masked the focus channel
+for a self-focusing click, so nothing could rescue the step. Checked against the product before
+touching the instrument: with Settings raised a real OS click at the field centre focuses it, and
+focusing an empty box changes nothing else — 45 controls / 903 characters before and after. The
+verdict now exempts a click that leaves a TEXT-ENTRY element holding the caret, and nothing else;
+proven not to blunt the bar because the same run's injected dead end still moved 0 → 1 → 0.
+
+Two run-shape notes the next turn needs. The cat2 Settings task needs a trailing `wait:2800`:
+bullet 3's landing scroll is still moving when the idle window opens and the run VOIDs on
+undeclared churn. And `--both-presentations --control` are not implied — without them
+`costParity` reads UNMEASURED and no control runs at all.
+
+### Exact next: fix the Media global-search keystroke cost, then cat7 ×2
+
+`MediaCenterView.tsx:1994-2012`. The bar is 100 ms and the measured first keystroke is 130-146.
+Re-measure with the same task and require three consecutive runs under the bar, not one. Then
+cat7 on both surfaces closes bullet 2 at 16/16.

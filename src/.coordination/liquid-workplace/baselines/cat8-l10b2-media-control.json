@@ -1,0 +1,101 @@
+{
+  "label": "l10b2-media",
+  "surface": "@.fwin:has(.mc-video-page)",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": null,
+  "rect": "1080x679",
+  "textRuns": 79,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 73,
+  "textHash": 1688077469,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 4,
+  "states": {
+    "empty": {
+      "hosts": 2,
+      "messages": [
+        "Video plays in the media workspaceOpen the workspace to watch with subtitles, transcript and mining. It reports the media server state itself. Open in the media workspace",
+        "Choose what to watchOpen a local video, browse a folder, or choose a title from your library. Select a video Browse folderLibrary queueUp next37 videosE38JoJo no Kimyou na Bouken - Ougon no Kaze 38 RAWJoJo's Bizarre Adventure: Golden Wind · 2018Emotion 感情表現 ｜ Japanese Podcast with Hana #13Video「パラッ」と「パラリ」はどう違う？オノマトペを部品で分析する【オノマトペ1】#284VideoHabits 習慣🏃‍♀️📚 ｜ Japanese Podcast with Hana #12VideoJoJo no Kimyou na Bouken - Ougon no Kaze 39-END RAWJoJo's Bizarre Adventure: Golden Wind · 2018E01The Big O - 01The Big O · 1999E02The Big O - 02The Big O · 1999"
+      ]
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9784,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9784 catalog keys / 106 namespaces",
+  "raised": "root surface - no taskbar button",
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "languagesDiffer"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "hostedIsolation": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "label": "l10b2-media",
+  "surface": "Media",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "raised",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "1080x700",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 52,
+  "controlsSkipped": 36,
+  "byRole": {
+    "Work": 3,
+    "Liquid-eligible": 7,
+    "Anchor": 31,
+    "Anchor(holds work)": 11,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 7,
+  "sharedPrimitiveEligible": 7,
+  "eligibleTotal": 7,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
