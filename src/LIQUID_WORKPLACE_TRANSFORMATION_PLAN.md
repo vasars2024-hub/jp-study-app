@@ -1241,7 +1241,7 @@ Gate: all theme/mode combinations in §8 pass without identity leakage.
 
 - Remove redundant chrome and card nesting identified by the visual census.  <!-- status: open; evidence:  -->
 - Reconcile toolbar labels, icon semantics, spacing, motion, empty states, and responsive breakpoints.  <!-- status: open; evidence:  -->
-- Ensure the command palette and search expose moved secondary/expert actions.  <!-- status: open; evidence:  -->
+- Ensure the command palette and search expose moved secondary/expert actions.  <!-- status: closed; evidence: 9c117226 + 74628bbc; receipt in L10_MINIMALISM.md. Palette exposed 0 of 160 registry entries despite its own header claiming otherwise; now cat6 10/10 with a live sweep of 129 of 129 entries agreeing with the gate the registry declares (124 present, 5 withheld), controls discriminating on the discovery AND theme axes plus a commands-mode control. cat5 FAILED first at 10/10 only after the fix: results landed 7,438 px below the fold because this renderer refuses behavior:'smooth' (0 px vs 7,233 px for auto, OS reduced-motion off) -->
 - Confirm no feature is duplicated into competing control systems.  <!-- status: open; evidence:  -->
 
 Gate: one coherent workplace language with individual app character preserved.
