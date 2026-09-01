@@ -2040,3 +2040,54 @@ then this is honest open debt attributable to `9fa37b59`, and a red SHARED suite
 is strictly worse than a red clean-HEAD gate for CI. Boss-audit findings **2 and 3 are genuinely
 closed** and were verified this turn at clean HEAD (`liquidTokens` and `settingsSearchReachability`
 both pass, 22/23 tests in that trio, the one failure being the above).
+
+## 2026-08-31 — primary — cat5 Blanc VOID → 9/10; term 1's lever measured and REFUTED
+
+**Term 1's stated cause was wrong and is retracted.** The last entry said the 23 scanned
+controls "include the Stats tool's own controls" and that `--shell-chrome ".blanc-content"`
+would fix Q4. Measured live before writing a line: **taskbar 11 + top 11 + content 1**. The
+lever moves 23 → 22 against a bar of 12. Blanc's clutter is its OWN chrome, not the hosted
+tool's, and no exclusion rescues it.
+
+**What actually blocked the cell was one instrument defect, and it caused all three terms.**
+`isShell` was spelled "a root that is not a `.fwin` and contains one" — the definition of the
+two shells scored so far, not of a shell. Blanc hosts one of 42 tools inline in
+`.blanc-content` and never renders a `.fwin`, so it read `hostClass: root-selector` and every
+consequence of being a shell was withheld: Q4 charged it for the hosted tool, Q5 measured 118
+text runs most of which were the tool's, Q6 hunted `.fwin-b-liquid` inside a shell that has
+none and refused. `--hosted "<selector>"`, default `.fwin`, parameterises the vocabulary and
+leaves the structural test alone.
+
+Four corrections and one product fix, each with its own control:
+
+- **30 `--hosted`.** Default `.fwin`; the default run re-derives `root-selector` and the same
+  Q4/Q5/Q6 outcomes as the committed baseline — that run IS the no-op control.
+- **31 the entry band.** "Bottom third" is where the Study OS taskbar happens to be. Blanc's
+  is a left rail, so Q1 read `entryPoints 0` and Q3 `primaryAction null` on a shell whose
+  entry band is its most prominent element. Band is now bottom-third OR the shell's own
+  `[data-lq-role="liquid"]` chrome — a strict SUPERSET, and `.os-taskbar` is in the bottom
+  third already, so Wired cannot move.
+- **32 Q10's markers.** Three of five were spelled in Study OS class names, so they measured
+  "is this Study OS". Blanc runs in its own window with no `.os-desktop` in the document and
+  scored 2/5 for being a different shell. Each gains an OR-ed shell equivalent; appended, not
+  replaced, and `l9b4-wired` records all three as already TRUE — provably unmovable.
+- **33 `setAttribute('data-theme', null)` writes the string "null".** Every surface until now
+  lived in the Study OS window where the attribute is always set. In the Blanc window the
+  restore stamped `data-theme="null"`, compared "null" against null, and VOIDed with the
+  self-refuting `theme left as null, wanted null` — while leaving the bogus attribute for the
+  next run. Absence is restored as absence.
+- **`--alt-class`, and Blanc's `aria-current`.** Q5's second cell is now `.is-dark` on the
+  shell's own root (`BlancShell.tsx:433`), not a Study OS palette the surface never renders:
+  5.27 → 5.74, both witnesses moved, restored off, store identical. Q2 needed the PRODUCT: the
+  nav stated the current route only in the `active` class, so a screen-reader user could reach
+  all nine routes and never learn which one they were on — the same gap Wired closed in
+  `a2e9c1ce`. `aria-current="page"` added; Q2 now reads `titleFrom: button.blanc-nav-btn`.
+
+**cat5 · Blanc = 9/10, controlled.** Control failed as required on Q2, Q3, Q4, Q5, Q10;
+restore verified (`rootClass` identical, theme null, storeIdentical, 0 plant residue).
+**Q4 stays NO and it is a real product finding, not an instrument one:** 22 controls scanned
+at rest — 11 taskbar (Hide, 9 sections, Exit) and 11 top (a full 6-control media transport
+plus search, fullscreen, language, Advanced, Dark). Blanc ships a `Context tools` disclosure
+that already tucks exactly these away, but `blanc-shell-liquid.css:87` only paints it under
+`max-width:780px and max-height:420px`, so the disclosure the shell authored is dead at every
+normal size. RULE C: **14 of 16.**

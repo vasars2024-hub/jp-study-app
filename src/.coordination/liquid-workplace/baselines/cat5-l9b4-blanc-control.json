@@ -1,8 +1,8 @@
 {
   "surface": "@.blanc-root",
   "label": "l9b4-blanc",
-  "control": false,
-  "at": "2026-09-01T00:52:53.626Z",
+  "control": true,
+  "at": "2026-09-01T00:53:10.549Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "shell",
@@ -45,10 +45,41 @@
     "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
+  "planted": {
+    "savedTitle": "Stats",
+    "savedTransform": "",
+    "clutterPlanted": 17,
+    "clutterSelfGuard": "cat5-ctl-self declares itself its own disclosure; the guard must refuse it",
+    "primaryFound": "input.",
+    "primaryFromPin": true,
+    "primariesMoved": 2,
+    "primariesFromPin": 2,
+    "primaryList": [
+      "input.",
+      "select."
+    ],
+    "titlesBlanked": 1,
+    "titleList": [
+      "button.blanc-nav-btn"
+    ],
+    "dashboardCards": 6,
+    "expect": {
+      "Q2": "NO",
+      "Q3": "NO",
+      "Q4": "NO",
+      "Q5": "NO",
+      "Q10": "NO"
+    }
+  },
   "q6leg": {
     "presentationAsFound": "null",
     "basis": "shell: one presentation — its chrome material is unconditional, so Q6 is measured where the shell is found; no hosted window was touched",
     "measuredIn": null
+  },
+  "unplanted": {
+    "restoredMoved": 2,
+    "restoredTitles": 1,
+    "residue": 0
   },
   "storeAfter": {
     "jp-os-theme": "study-os",
@@ -87,11 +118,11 @@
     {
       "id": 2,
       "q": "current location and way back obvious",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "a non-empty location label AND at least one way back",
       "numbers": {
-        "titleText": "Stats",
-        "titleFrom": "button.blanc-nav-btn",
+        "titleText": "",
+        "titleFrom": null,
         "backAffordances": 1,
         "backList": [
           "Exit Blanc"
@@ -101,11 +132,11 @@
     {
       "id": 3,
       "q": "primary actions visible without hunting",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "input.",
-        "insideBodyViewport": true,
+        "primaryAction": null,
+        "insideBodyViewport": false,
         "explicitlyMarked": false
       }
     },
@@ -116,12 +147,12 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 1,
-        "scannedControls": 22,
+        "scannedControls": 44,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 22,
-        "summaryHeaders": 0,
+        "chromeControlsRaw": 45,
+        "summaryHeaders": 1,
         "behindDisclosure": 0,
         "disclosures": {
           "total": 0,
@@ -135,7 +166,7 @@
           "Deck",
           "Cards",
           "Media",
-          "Stats",
+          "BUTTON",
           "Toolbox",
           "Blocks",
           "Settings",
@@ -155,46 +186,61 @@
     {
       "id": 5,
       "q": "every readable surface has stable contrast",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
       "numbers": {
-        "verdict": "YES",
+        "verdict": "NO",
         "cells": [
           {
             "cell": ".is-dark=off",
             "theme": null,
-            "measured": 20,
+            "measured": 43,
             "unmeasurable": 0,
-            "minRatio": 5.27,
-            "failingCount": 0,
+            "minRatio": 1.14,
+            "failingCount": 1,
             "worst": {
-              "el": "span.focus-music-vol-value",
-              "ratio": 5.27,
+              "el": "span.",
+              "ratio": 1.14,
               "bar": 4.5,
-              "bg": "div.focus-music-bar@100%",
-              "text": "100"
+              "bg": "span.@100%",
+              "text": "cat5 contrast plant"
             }
           },
           {
             "cell": ".is-dark=on",
             "theme": null,
-            "measured": 20,
+            "measured": 43,
             "unmeasurable": 0,
-            "minRatio": 5.74,
-            "failingCount": 0,
+            "minRatio": 1.14,
+            "failingCount": 1,
             "worst": {
-              "el": "span.focus-music-vol-value",
-              "ratio": 5.74,
+              "el": "span.",
+              "ratio": 1.14,
               "bar": 4.5,
-              "bg": "div.focus-music-bar@100%",
-              "text": "100"
+              "bg": "span.@100%",
+              "text": "cat5 contrast plant"
             }
           }
         ],
-        "failing": [],
+        "failing": [
+          {
+            "el": "span.",
+            "ratio": 1.14,
+            "bar": 4.5,
+            "bg": "span.@100%",
+            "text": "cat5 contrast plant"
+          },
+          {
+            "el": "span.",
+            "ratio": 1.14,
+            "bar": 4.5,
+            "bg": "span.@100%",
+            "text": "cat5 contrast plant"
+          }
+        ],
         "themeAxisMoved": true,
         "axisWitness": {
-          "minRatioMoved": true,
+          "minRatioMoved": false,
           "paintDigestMoved": true
         }
       }
@@ -275,7 +321,7 @@
     {
       "id": 10,
       "q": "still feels like itself, not a generic card dashboard",
-      "verdict": "YES",
+      "verdict": "NO",
       "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
       "numbers": {
         "identityMarkers": {
@@ -289,30 +335,37 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": true,
         "bespokePrefixes": [
-          "blanc:5"
+          "blanc:3"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
-        "cardUniformity": 0,
-        "cardControlSignatures": 0,
-        "cardHost": null,
-        "cardHostDetail": null,
-        "cardHosts": [],
-        "dashboardHosts": 0
+        "cardUniformity": 1,
+        "cardControlSignatures": 6,
+        "cardHost": "div. cards=6",
+        "cardHostDetail": "34% of body",
+        "cardHosts": [
+          {
+            "host": "div. cards=6",
+            "uniformity": 1,
+            "signatures": 6,
+            "detail": "34% of body"
+          }
+        ],
+        "dashboardHosts": 1
       }
     }
   ],
   "altThemeVerdicts": {
     "q1": "YES",
-    "q2": "YES",
-    "q3": "YES",
+    "q2": "NO",
+    "q3": "NO",
     "q4": "NO",
     "q6": "YES",
-    "q10": "YES"
+    "q10": "NO"
   },
   "altThemeNumbers": {
     "theme": null,
-    "controlsPainted": 22,
+    "controlsPainted": 45,
     "q1": {
       "entryPoints": 2,
       "primaryInputs": 2,
@@ -325,12 +378,12 @@
     },
     "q4": {
       "collapsedDisclosures": 1,
-      "scannedControls": 22,
+      "scannedControls": 44,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 22,
-      "summaryHeaders": 0,
+      "chromeControlsRaw": 45,
+      "summaryHeaders": 1,
       "behindDisclosure": 0,
       "disclosures": {
         "total": 0,
@@ -344,7 +397,7 @@
         "Deck",
         "Cards",
         "Media",
-        "Stats",
+        "BUTTON",
         "Toolbox",
         "Blocks",
         "Settings",
@@ -386,23 +439,39 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": true,
       "bespokePrefixes": [
-        "blanc:5"
+        "blanc:3"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
-      "cardUniformity": 0,
-      "cardControlSignatures": 0,
-      "cardHost": null,
-      "cardHostDetail": null,
-      "cardHosts": [],
-      "dashboardHosts": 0
+      "cardUniformity": 1,
+      "cardControlSignatures": 6,
+      "cardHost": "div. cards=6",
+      "cardHostDetail": "34% of body",
+      "cardHosts": [
+        {
+          "host": "div. cards=6",
+          "uniformity": 1,
+          "signatures": 6,
+          "detail": "34% of body"
+        }
+      ],
+      "dashboardHosts": 1
     }
   },
-  "controlsPaintedA": 22,
-  "findings": [
-    "Q4 advanced tools discoverable without cluttering"
-  ],
-  "voided": [],
-  "score": 9,
-  "verdict": "9/10 — 1 question(s) answer NO"
+  "controlsPaintedA": 45,
+  "controlResult": {
+    "Q2": true,
+    "Q3": true,
+    "Q4": true,
+    "Q5": true,
+    "Q10": true
+  },
+  "controlQ4": {
+    "scannedControls": 44,
+    "bar": 12,
+    "behindDisclosure": 0,
+    "ariaDisclosures": []
+  },
+  "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10",
+  "score": "CONTROL-OK"
 }
