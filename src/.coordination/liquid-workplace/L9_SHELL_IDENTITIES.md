@@ -2133,3 +2133,41 @@ presentations, round trip 0 diffs, its own control failed as required. Banked.
 per-cell PASS lines. sampled-out, unchanged: City, Video, Library, Captures, Immersion,
 Manga, Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources,
 Scraper, Settings, YouTube. Next: **cat7 and cat8 on Blanc**, which close bullet 4.
+
+## 2026-08-31 — primary — cat8 Blanc PASS 10/10: the shell owns its own language control
+
+Two harness corrections, both the shape category 5 paid for two turns ago — the category-8
+vocabulary was Study OS's, so a shell that is not Study OS could not answer.
+
+- **35 the language control.** `[data-setting-id="ui-language"]` is a Settings CARD. Blanc runs
+  in its own BrowserWindow, renders no Settings page at all, and owns the control outright
+  (`BlancShell.tsx:700`, a `<select>` whose options already carry the same four `lang` tags).
+  `--langs` refused on every tag, `languagesDiffer` came back UNMEASURED, and the cell could not
+  score better than UNMEASURED — an instrument verdict wearing a product one. The fallback is
+  deliberately narrow, because the reason the card scoping exists still holds: the select must
+  carry an option for ALL FOUR tags or it is not a language chooser. Two things the button path
+  never needed — React's value tracker dedupes a plain `.value` assignment, so the native
+  prototype setter is what makes the dispatched `change` real; and the control lives inside the
+  `Context tools` drawer, so the leg opens the `aria-controls` disclosure and CLOSES IT AGAIN,
+  since every `run()` must see the resting chrome the baseline was measured on.
+- **36 a filter behind a disclosure is still this surface's filter.** Corrections 9 and 10 made
+  `--drive-click` and `--drive-input` alternatives, which is right for a chip set and wrong for a
+  shell: a shell's one authored adverse state lives behind its master search. Blanc at rest
+  paints a volume range and two checkboxes and NO text field; `.blanc-top-search` mounts one
+  (307 → 477 elements on `.blanc-root`). A click-only leg measures the search open and EMPTY,
+  which names no state. Given both, the click is the opener and the typing leg runs inside it;
+  `restored` is still asserted against the RESTING hash, so a drawer left open fails exactly as
+  a stranded query does. Neither flag alone changes behaviour.
+
+**cat8 · Blanc = PASS 10/10, controlled.** At 1264×761: **116** text runs (105 carrying words),
+**0** raw keys against a 9,782-key catalogue, **0** placeholders, **0** mute pairs of **0**
+disabled controls, and the one observable state named — `Nothing in Blanc matched.` Four
+languages produced **4** distinct hashes with **40 of 116 = 34.48%** of runs moving and 0 raw
+keys in any of them; en/en restored. Control planted a key, a placeholder and an unexplained
+disabled button: **0/0/0 → 1/1/1 → 0/0/0**, back to baseline. Residue after both runs: 346
+document elements (exactly at rest), drawer closed, search closed, 0 plants, no error boundary.
+
+**RULE C: 15 of 16.** sampled-out, unchanged: City, Video, Library, Captures, Immersion, Manga,
+Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources, Scraper,
+Settings, YouTube. Only **cat7 · Blanc** is left, and it needs an instrument that can measure a
+surface living in a second OS window at all.
