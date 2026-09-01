@@ -449,3 +449,46 @@ recurse only on `r.cssRules.length`. Second, self-inflicted, same turn: the coll
 stored the selector as `sel`, and the matcher called `el.matches(r.selectorText)` — `undefined`
 throws, the `catch` skipped every rule, and the ancestor walk reported that even `body` had no
 font-size rule. Both were caught by asking the instrument a question with a known answer.
+
+## 2026-09-01 (primary, later) — the second text-scaling affordance, and cat7 gets the bullet's own question
+
+**`69026f5d` — Settings > Display base font reached 0 of 70 text elements.** This is the defect
+L11 bullet 2's own tag named as the exact next slice while closing. Re-derived on my own
+instrument before touching code, both readings on the same 70 elements of the same window:
+
+| condition, through the product's own non-persisting route | moved | reach |
+| --- | --- | --- |
+| Settings > Display base font 14 -> 18 (a sibling-window `storage` event) | 0 of 70 | 0.0% |
+| UI customization "bigger text" (`interpretUiRequest` -> preview) | 70 of 70 | 100% |
+
+The second row is the INSTRUMENT'S POSITIVE CONTROL. It can see movement, so the first row is a
+product defect and not a dead sampler — the shape that has produced three false passes here.
+
+Cause: `--display-font-px` has exactly one consumer, `body`. After `ff977f9f` all 70 elements
+resolve through authored `--font-size-*` rules, so none of them inherit and none of them moved.
+Fix: the preference also lands as `--display-font-scale` = `baseFontPx / 14` and `tokens.css`
+writes all 11 ladder steps as `calc(<step> * var(--display-font-scale, 1))`. Computed in JS
+because `calc()` refuses length/length, so a unitless ratio cannot be derived from a px value.
+`profileToCss` emits `font-size-*` as `calc(<value> * var(...))` too: its declarations are
+`!important` and replace the whole ladder value, so without that a profile pinning one step would
+silently switch the base font off for exactly that step.
+
+| after, Settings 960x681 | moved | note |
+| --- | --- | --- |
+| default (scale 1) | — | 70 elements, sizes 11/12/12.5/13/21.6, byte-identical to before |
+| base font 18 alone | **70 of 70** | 13px -> 16.71px |
+| bigger text ON TOP of it | 70 of 70 | 13px -> **19.29px** = 13 * 1.15 * (18/14) |
+| MUTATION CONTROL — ladder reverted to the pre-fix literals, base font still 18 | **0 of 70** | the exact before-number |
+| control removed | 70 of 70 | same code, control on and off, opposite outcomes |
+| round trip | 0 moved | scale 1, body 14px, `jp-os-display-prefs-v1` unchanged, no style left |
+
+The composition row is what proves the `profileToCss` half: 19.29 is only reachable if the pinned
+15px still rides the scale. Pinned, it would have read 15. `.fwin-title` reads 15.93 not 16.07
+because it is `calc(var(--font-size-xs) + 0.5px)` and the 0.5px offset correctly does not scale.
+
+**FOUND, NOT FIXED — the mirror of the same defect.** `body { font-size: var(--display-font-px,
+14px) }` does not read the ladder, so under "bigger text" ALONE `--font-size-md` moves 14 -> 16
+while `body` stays 14px. Measured this turn. Invisible on Settings (0 of its 70 inherit from
+body) so it does not touch the numbers above; closing it means changing which property `body`
+reads, and `aeroDisplayModeSync.test.ts` — which asserts `--display-font-px` literally — is an
+UNTRACKED file belonging to another track, so it is theirs to move, not mine.
