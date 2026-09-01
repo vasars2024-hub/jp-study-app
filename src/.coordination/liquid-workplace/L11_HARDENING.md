@@ -603,3 +603,52 @@ is silently clamped, the pipeline is killed mid-run at ten minutes, and because 
 in `| tail`, the output file is left **completely empty** and the exit status reads 0. Nothing is
 written to `baselines/`, so the only symptom is a run that appears never to have happened. Launch
 it detached (`Start-Process`) and poll the baseline file's mtime.
+
+## 2026-09-01 — L11 bullet 3: the under-load instrument finally scores, the bullet does NOT close
+
+`bc88587a`. **Correction 33.** The `--under-load` mode has never produced a scoreable number.
+It did not parse (fixed `e9710c83`), then it measured L0's sensitivity control instead of a real
+load (fixed `583c7815`), and it still returned VOID three ways. **All three had one cause:**
+`LOAD_ARM` re-armed a load that was still running.
+
+- The re-arm interval was `Math.min(deadlineMs, 2000)` = **2000 ms** for every surface, against a
+  gesture of **~1800 ms**. "At least 2 cycles across the gesture" was **unsatisfiable by
+  construction** — no surface could ever have passed it. Same shape as the SENSITIVITY CONTROL
+  trap the previous turn found, one layer up.
+- A `heavy.js` is not a pulse. The dictionary's schedules 28 searches over 20 s and returns at
+  once, so re-arming **stacked** a second interval on the first and, because it opens with
+  `delete window.__lqDictLoad`, **wiped its own receipt**. That is the whole of
+  `REFUSE: only 2 searches ran` — the counter had been reset 2 s earlier. The load never failed.
+- Scene stability used the **idle** test. Under load the surface must change; the dictionary
+  rewrites its results list on every search. Unsatisfiable by construction again.
+
+Repairs, all in the direction of a HARDER test: interval = the load's own `durationMs`; the
+dictionary stores its interval handle so a re-arm clears the previous one (**leg 2 was measuring
+twice the load leg 1 did**); the receipt counts REAL WORK via a new `progress` expression rather
+than arms; under-load scene stability keeps only what makes frames incomparable (window count,
+gesture closed-loop) and records content drift as data; `loadProof` re-scales the DURATION
+threshold and keeps every correctness check verbatim, the mojibake guard included.
+
+**THE NUMBER, first ever produced for this bullet.** Session ceiling p50 16.7 / p95 16.8.
+drag under load p50 **16.7** / p95 **33.4** / max 50.1 / over100 **0** / mainMax 186.5;
+resize p50 **16.7** / p95 **33.4** / max 50.2 / over100 **0** / mainMax 234.5. Idle counterparts
+16.7/16.8 and 16.7/17.0. **Zero findings from either under-load leg** — drag and resize hold the
+ceiling while the dictionary is actively searching. Receipt: `4 searches this leg, 4 distinct,
+entries 6-8`. Scene fwins 4 -> 4, closedLoop true, elements 1032 -> 1283.
+**The diagnosis is settled by the run itself: `workDuring` 4 on both legs where `cyclesDuring`
+is 0** — the old counter would still have voided a load that demonstrably ran.
+
+**MUTATION CONTROL** (`progress` frozen to `0`, everything else identical): both legs VOID,
+`the load completed only 0 unit(s) of real work across the gesture`, while `last` still reads
+`"searching 28 words"` — i.e. the load armed and the OLD arm counter would have been satisfied.
+The new receipt catches what the old one could not. Probe restored sha256-identical
+(`e2ec30ca…`), clean against HEAD. `node --check` over all 52 probes: 0 failures.
+
+**BULLET 3 STAYS OPEN, said plainly.** The cell is still **VOID** on two things that are not the
+under-load legs: the **idle** `resize` leg came back UNSTABLE (2 of 5 repeats breached, idle max
+343.3 ms this session against 11.4 ms in the 15:41 run — the machine is noisier, so re-run before
+treating it as a surface defect), and the heavy leg reports **main blocked 1182 ms**, over the
+500 ms bar. That 1182 ms is the real remaining product question and the next turn's opening slice:
+the earlier 5114.8 ms reading was inflated by the stacked intervals this commit removed, so the
+honest figure is 1182 ms — still 2.4x the bar, on a surface whose search is supposed to be off
+the main event loop (CLAUDE.md, Performance).
