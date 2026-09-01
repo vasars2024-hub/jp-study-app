@@ -781,6 +781,26 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
+    <!-- status: open; evidence: 2026-09-01 66b9c9da -- all four run, three clean, one not.
+         i18n exit 0 at 12,085 keys in all four languages. architecture exit 0, "Nothing new",
+         9 known findings still pending. eslint on the 7 touched paths: 0 errors (it also
+         caught a REAL defect in a committed suite -- 'C:\dl\subs-pack.zip' is the string
+         C:dlsubs-pack.zip, since \d and \s are not escapes; fixed in afeab217).
+         vitest: 981 files passed / 4 failed, 12,718 tests passed / 13 failed. IDENTICAL to
+         the count this worktree inherited, so files-app added zero failures -- but the gate
+         says green, and it is not, so it stays OPEN. The 4: novelReaderCanvas.test.tsx and
+         novelReaderProgressGuard.test.ts fail on `Denied ID .../pdfjs-dist/build/
+         pdf.worker.min.mjs?url` -- Vite server.fs.allow, because this WORKTREE resolves
+         node_modules to ../jp-study-app/node_modules; they are green in the main tree, so
+         this is environment, not code. Plus i18n.test.ts's hardcoded-strings baseline, whose
+         27 named files are all other tracks' (ScraperPage 184 strings, ArcadeGames 71, ...);
+         no files-app module appears in it. This gate cannot close from the files-app side
+         alone: two of the four are a worktree artifact that a .gitattributes-style
+         environment fix clears, and one is shared debt with the liquid track. -->
+    <!-- trap: run the suite from THIS worktree and the two novelReader suites will always be
+         red. Do not "fix" them here -- they are a node_modules resolution artifact and the
+         edit would be a no-op against the real defect, which is that the worktree has no
+         node_modules of its own. -->
 
 ## Decisions (user, 2026-08-16)
 
