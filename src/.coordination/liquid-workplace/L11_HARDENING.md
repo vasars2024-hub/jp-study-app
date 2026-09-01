@@ -492,3 +492,42 @@ while `body` stays 14px. Measured this turn. Invisible on Settings (0 of its 70 
 body) so it does not touch the numbers above; closing it means changing which property `body`
 reads, and `aeroDisplayModeSync.test.ts` — which asserts `--display-font-px` literally — is an
 UNTRACKED file belonging to another track, so it is theirs to move, not mine.
+
+**`aac9a9c1` — cat7 gains `--under-load`, which is L11 bullet 3's actual question.** The bullet
+is "drag/resize at target frame rate WHILE media, dictionaries, and large lists are ACTIVE", and
+no leg asked that: gestures 2-4 run on an IDLE surface and `heavy` is measured BESIDE them as
+main availability, never under them. A surface can drag at the ceiling with nothing happening and
+drop frames the moment its own list scrolls. A MODE on the existing runner (RULE 1), same shape
+as cat4's `--zoom` / `--ui-request`; it adds two legs and leaves 2-4 as the in-session control.
+
+Three refusals, and **two of them fired on the first two runs, which is the point of having them**:
+
+| run | outcome | why |
+| --- | --- | --- |
+| `--surface video --under-load` | VOID | refusal 2: `0 cycles, 2 refusals, "REFUSE: the Up Next shelf has no scrollable overflow to sweep"`. Environmental and MINE — an HMR reload earlier in the turn reset Media Center to its empty state (0 tiles, both `.mc-video-empty` at overflow 0), the `hmr-resets-media-center-tab` trap. The surface's PRE-EXISTING `heavy` leg refuses identically, so nothing here is caused by the new code. |
+| `--surface dictionary --under-load` | VOID | both legs `0 cycles, 0 refusals, last: null`. This one was an instrument bug of my own, below. |
+
+**`FINDING, pre-existing and NOT this turn's` — dictionary `heavy` blocked main 9,093.3 ms against
+a 500 ms bar.** Not new and not a regression: `L7_PERF_DICTIONARY.md:49` already banks this exact
+load at **8,081.5 ms**, recorded 2026-08-26 and used there deliberately AS a sensitivity control.
+Line 1453 of the same file records a repaired path at **6.0 ms** for "126 cold headword lookups"
+with `keys=126, withGloss=126`, so the two routes differ and reconciling them is its own slice.
+Reported as a number with its nearest banked comparator, and claimed as neither a regression nor
+a pass.
+
+**`<next commit>` — the instrument bug the VOIDs exposed, and it was mine.** `cycle()` read
+`if (generation mismatch || past deadline) { window.__lqLoad = null; }`. Stopping bumps the
+generation; the previous generation's timer then fires up to 2 s later and cleared the record the
+NEXT leg had just armed — across runs too, since the page had not reloaded between them. That is
+why all four legs read `0 cycles, 0 refusals, last: null` rather than a real number. A dead
+generation may stop itself and nothing else. Proven live, same sequence, one line different:
+
+| arm, stop, arm again, then let the superseded tick fire | record afterwards |
+| --- | --- |
+| old line | **null** — exactly the four voided legs |
+| fixed line | `{ gen 15, cycles 1 }` — survives |
+
+The legs now also record `armed` and `after` raw, because a `cyclesDuring` void could not
+distinguish "the load stopped early" from "the record was never there". Same family as the banked
+`deleting-probe-state-is-not-a-stop`. **The guards did their job: four legs VOIDed rather than
+reporting frame numbers taken under no load at all.**
