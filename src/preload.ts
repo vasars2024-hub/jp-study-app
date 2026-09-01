@@ -1030,6 +1030,29 @@ const api = {
     /** Gate 31: the ingest settings document's stability window, in ms. */
     options?: { stabilityMs?: number },
   ): Promise<FilesScanReport> => ipcRenderer.invoke('filesapp:scan', roots, options),
+  /**
+   * Gate 25: watch these folders and tell me when something lands. Replaces the
+   * previous set wholesale and re-baselines, so nothing already present is
+   * announced as an arrival.
+   */
+  filesWatchSet: (
+    roots: string[],
+    options?: { stabilityMs?: number },
+  ): Promise<import('./main/filesApp/ipc').FilesWatchStatus> =>
+    ipcRenderer.invoke('filesapp:watch-set', roots, options),
+  filesWatchStatus: (): Promise<import('./main/filesApp/ipc').FilesWatchStatus> =>
+    ipcRenderer.invoke('filesapp:watch-status'),
+  /** Fires per batch of files that finished arriving. Push, not poll. */
+  onFilesWatchArrival: (
+    cb: (arrivals: import('./main/filesApp/watch').FilesWatchArrival[]) => void,
+  ): (() => void) => {
+    const handler = (
+      _e: unknown,
+      arrivals: import('./main/filesApp/watch').FilesWatchArrival[],
+    ): void => cb(arrivals);
+    ipcRenderer.on('filesapp:watch-arrival', handler);
+    return () => ipcRenderer.removeListener('filesapp:watch-arrival', handler);
+  },
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

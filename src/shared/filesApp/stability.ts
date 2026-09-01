@@ -79,6 +79,13 @@ export interface StabilityObservation {
   changedAt: number;
   /** How many readings this file has had. A first sighting is never stable. */
   readings: number;
+  /**
+   * The first time this watcher saw the path at all. Gate 25 asks for "the
+   * elapsed time", and that is measured from here — not from `changedAt`,
+   * which restarts on every chunk and would report a long download as having
+   * taken the length of its last pause.
+   */
+  firstSeenAt: number;
 }
 
 export interface StabilityVerdict {
@@ -117,6 +124,7 @@ export function observeSize(
       observedAt: reading.at,
       changedAt: usable ? (hint as number) : reading.at,
       readings: 1,
+      firstSeenAt: reading.at,
     };
   }
   const changed = previous.sizeBytes !== reading.sizeBytes;
@@ -127,6 +135,8 @@ export function observeSize(
     // Any change restarts the clock — growing and shrinking alike.
     changedAt: changed ? reading.at : previous.changedAt,
     readings: previous.readings + 1,
+    // Never moves: this is when the file was first seen, not when it last moved.
+    firstSeenAt: previous.firstSeenAt,
   };
 }
 
@@ -201,6 +211,11 @@ export class StabilityLedger {
 
   verdict(path: string, at: number, stabilityMs?: number): StabilityVerdict {
     return stabilityVerdict(this.seen.get(path), at, stabilityMs);
+  }
+
+  /** What is known about a path, or undefined if it has never been seen. */
+  peek(path: string): StabilityObservation | undefined {
+    return this.seen.get(path);
   }
 
   /** Drop a file the watcher no longer cares about, so the map stays bounded. */

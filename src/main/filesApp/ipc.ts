@@ -15,7 +15,7 @@
  * hands it.
  */
 import fs from 'node:fs';
-import { app, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
 import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
@@ -24,11 +24,38 @@ import type { FilesScanReport } from '../../shared/filesApp/scan';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
 import { readFilesMineSource } from './mineSource';
 import { scanRoots } from './scan';
+import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
 
 /** How long a built index is served before the next request rebuilds it. */
 const INDEX_TTL_MS = 15_000;
 
 let cached: FilesIndexSnapshot | null = null;
+
+/** Gate 25's session. One at a time; see the `watch-set` handler for why. */
+let watchSession: FilesWatchSession | null = null;
+let watchRootsInUse: string[] = [];
+
+export interface FilesWatchStatus {
+  roots: string[];
+  /** Files seen but not yet accepted. A count, never "some". */
+  pending: number;
+}
+
+export const FILES_WATCH_ARRIVAL_CHANNEL = 'filesapp:watch-arrival';
+
+/**
+ * Gate 25's "without a manual refresh": the renderer is told, it does not ask.
+ *
+ * Every window is told rather than the one that set the watch — a second Files
+ * window showing the same tree would otherwise go stale the moment another one
+ * started watching.
+ */
+function broadcastArrivals(arrivals: FilesWatchArrival[]): void {
+  if (!arrivals.length) return;
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(FILES_WATCH_ARRIVAL_CHANNEL, arrivals);
+  }
+}
 
 export function defaultFilesContext(): FilesEnumeratorContext {
   return {
@@ -162,5 +189,40 @@ export function registerFilesAppIpc(): void {
     // scan: see `FilesScanOptions`. Without it this handler passed no stability
     // judgement at all and the setting would have been decorative.
     return scanRoots(list, { stabilityMs, stabilityFromMtime: true });
+  });
+
+  /**
+   * Gate 25 — watched folders.
+   *
+   * One session at a time, replaced wholesale: the roots are a small list the
+   * user edits, and reconciling an old set against a new one would buy nothing
+   * except a way for a removed root to keep firing. Replacing re-baselines, so
+   * a re-add announces nothing that was already there.
+   *
+   * The renderer owns the list (it is part of the same settings document as
+   * gate 31's window) and re-sends it on load; main holds no preference of its
+   * own, which keeps one writer for it.
+   */
+  ipcMain.handle('filesapp:watch-set', (_e, roots: unknown, options: unknown): FilesWatchStatus => {
+    const list = Array.isArray(roots)
+      ? roots.filter((r): r is string => typeof r === 'string' && r.length > 0).slice(0, 8)
+      : [];
+    watchSession?.stop();
+    watchSession = null;
+    watchRootsInUse = [];
+    if (!list.length) return { roots: [], pending: 0 };
+
+    const stabilityMs = normalizeIngestSettings(options).stabilityMs;
+    const session = watchRoots(list, broadcastArrivals, { stabilityMs });
+    // The baseline sweep, whose whole job is to announce nothing.
+    session.sweep();
+    watchSession = session;
+    watchRootsInUse = list;
+    return { roots: list, pending: session.pendingCount() };
+  });
+
+  /** What is being watched, and how many files are still arriving. */
+  ipcMain.handle('filesapp:watch-status', (): FilesWatchStatus => {
+    return { roots: [...watchRootsInUse], pending: watchSession?.pendingCount() ?? 0 };
   });
 }
