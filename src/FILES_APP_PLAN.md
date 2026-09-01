@@ -646,14 +646,93 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 32. **Cleanup dry-runs before it acts.** Every cleanup class reports its count and reclaimable
    size first, and the report matches exactly what is removed when confirmed — item for item,
    not just in total.
+   <!-- status: closed; evidence: 2026-08-31 ec0a57f9 (model) + b2d8ff95 (executor) + 4081c05b
+        (surface) + b8052e6a (live) -- LIVE, real Electron + real shell.trashItem over a real
+        temp userData: the dry run named exactly ["gate35 nothing.ja.vtt","gate35
+        unfinished.mp4.part"] / 4,096 reclaimable bytes and removed nothing; the run's log was
+        that same pair, item for item, every destination "recycle-bin". "Matches exactly" is
+        enforced by planning TWICE and intersecting -- the user confirms ids from report A,
+        main rebuilds report B from the live stores, and drift is NAMED in `skipped` (gone /
+        protectedNow / notConfirmed) rather than acted on. 42 tests (23 shared + 19 main on
+        real files). Adverse control: ignoring the confirmed set turns 1 main test red;
+        dropping the unconfirmed-candidate accounting turns 3 shared red. -->
 33. **Cleanup never touches irreplaceable material.** Point it at a library containing a
    downloaded video and every junk class; the video survives every class, including a scheduled
    run. A cleanup that can reach it is a FAIL regardless of settings.
+   <!-- status: closed; evidence: 2026-08-31 ec0a57f9 + b8052e6a (live) -- LIVE: an 8,192-byte
+        video in `downloads/` (which the downloads enumerator stamps `orphan: true` by
+        construction, so this is the reachable mistake, not a hypothetical), every class
+        enabled, and a run confirming ALL 3 ids the app knows about. Video still on disk, bytes
+        byte-identical, listed in the report as protected with reason
+        `filesApp.cleanup.protect.irreplaceableMedia`. In vitest the same holds under all three
+        broken-link policies and under trigger 'scheduled' -- which is not a second code path:
+        the trigger is a label on the result and both go through `planFilesCleanup`.
+        LIVE ADVERSE CONTROL, the strongest available: with the single guard line disabled the
+        probe prints "video survived: false" and then THROWS ENOENT reading its bytes. The
+        video really does reach the Recycle Bin. In vitest the same edit turns 5 main tests red
+        with the trash spy raising "GATE 33 VIOLATION" on the video's own path, and 5 shared. -->
+   <!-- decision: the guard reuses `deletionRiskForKind` from the DELETE path rather than
+        re-deriving risk, so cleanup and Delete cannot come to disagree about what is
+        irreplaceable. It is keyed on the authoritative `kind`, never on a caller field: a
+        `.part` row that CLAIMS kind 'video' is protected too (tested), and the main-side
+        sweep gives fragments kind 'other' because `extOf('x.mp4.part')` is `.part`, which is
+        in no media set. Calling a fragment a video would put the entire partial-downloads
+        class permanently behind this guard. -->
+   <!-- decision: `orphan-files` is OFF in DEFAULT_CLEANUP_SETTINGS. It is the 5.14 GB class
+        (96 files in `downloads/`, 4 of them claimed by media.json, measured 2026-08-30); the
+        user opts into it after reading a report, never by installing the app. -->
 34. **Orphan detection is real.** Delete a video's file behind the app's back; the broken-link
    class finds exactly that record, names it, and the chosen policy (mark / prompt / relocate)
    does what it says.
+   <!-- status: closed; evidence: 2026-08-31 b2d8ff95 + 4081c05b -- main/__tests__/
+        filesAppCleanup.test.ts, real files in a real temp tree, media rows pointing OUTSIDE
+        userData. Before the deletion the report has 0 candidates; `fs.rmSync` behind the app's
+        back and it has exactly 1, named "Episode 01", class broken-links, mode soft (the bytes
+        are gone; only the record remains), and the untouched neighbour media:v2 is not in it.
+        Each policy does its own thing: `mark` -> 0 candidates, protected with reason
+        brokenLinkMarked, the record survives still flagged; `prompt` -> removable but
+        requiresConfirmation, and confirming calls the soft-delete adapter and returns an undo
+        token; `relocate` -> `relocateBrokenLinkInMain` rewrites the media.json row and the
+        row is HEALTHY on the next real `buildFilesIndex` (brokenLink undefined, location.path
+        equal to the new file) with the next plan reporting 0 protected. Three refusals, each
+        naming its own cause rather than failing vaguely: missingTarget (repointing at another
+        missing path would move the break, not fix it), notBroken (a healthy row must not be
+        silently repointed), unsupported (a scraper job, whose broken link is regenerable
+        derived output). -->
+   <!-- CORRECTION worth keeping: the first cut of this made a broken media row
+        `location.store === 'json'` with a `/items/v1` pointer. It is not. `mediaEnumerator`
+        builds media rows through `fileItem`, so they are store 'file' + `referenced: true`,
+        and `fileItem` adds `brokenLink` when the stat fails. Relocate therefore keys off the
+        row id (`media:<id>`), not a JSON pointer, and `RELOCATABLE_SOURCES` is the single list
+        the UI offer and the executor both consult -- so the surface cannot offer a Relocate
+        that must refuse. -->
 35. **Cleanup is logged.** After a run, a log names each removed item and its destination, and
    Recycle-Bin-destined items are actually restorable from there.
+   <!-- status: closed; evidence: 2026-08-31 4081c05b (the log file) + b8052e6a (live) --
+        LIVE, through the real Windows shell: both removed files were found in the Recycle Bin
+        BY THEIR ORIGINAL PATH and both came back on the bin's own Restore verb, the fragment
+        byte-identical to what was written. The log names, per entry, the item, its class, its
+        destination and the exact path the OS was asked to trash. A destination is one of
+        recycle-bin / index-undo / failed, and a failure is logged as `failed` and contributes
+        0 to removedBytes -- proven in vitest with a trashItem that throws: 2 calls, 2 failed
+        entries, removedBytes 0. The log is a FILE under userData (files-cleanup-log.json,
+        capped at 2,000 entries), not a toast: the gate asks that a binned item be restorable,
+        and a user who closed the window still needs to know which file to restore. -->
+   <!-- trap, already cost three runs on gate 21 and still true: `Get-ChildItem` cannot see
+        into the Recycle Bin (use Shell.Application `Namespace(10)`), `GetDetailsOf(item, 0)`
+        honours "hide extensions" so the extension must come from the $R stub's own `.Path`,
+        and `JSON.stringify` is the WRONG quoter for a Windows path -- PowerShell's escape
+        character is the backtick. All three are handled in the shared probe helpers; do not
+        write a fourth copy. -->
+   <!-- decision: gates 21, 32 and 35 all ask "did the bytes reach the Recycle Bin and can the
+        user get them back", so the live evidence is a SECOND `--gate` mode on
+        `probes/filesapp-trash-roundtrip.cjs`, sharing every helper, rather than a second
+        probe. RULE 1: a new single-use probe is a defect. -->
+   <!-- OPEN, deliberately: no SCHEDULED trigger fires today. `runCleanupInMain` takes
+        trigger: 'manual' | 'scheduled' and gate 33 is proven for both, but nothing calls it
+        with 'scheduled' yet -- there is no timer. That is a separate slice (a settings-owned
+        interval plus a main-side timer), and gate 33's wording is satisfied because the
+        scheduled path is the same function; gate 35 does not require a schedule at all. -->
 36. **Per-category ingest overrides work.** With subtitles set to auto-import and video set to
    review, a folder containing both routes each one differently in a single scan.
    <!-- status: closed; evidence: 2026-08-31 30b13bfb (routing) + 41a678c0 (document) + 8ef06751 (controls) -- the production ScanReviewSheet's own per-destination selects: the SAME folder puts ep01.srt and ep01.mkv in one pile before the overrides and in two after; the video moved to review and skipped never reaches addMediaPaths, which it did on the identical run before; `auto` on deck-csv still cannot promote a guessed .csv past gate 27; both overrides survive an unmount + memory-reset restart and still route the scan. Adverse control dropping byTarget turns 3 of 9 red. -->
