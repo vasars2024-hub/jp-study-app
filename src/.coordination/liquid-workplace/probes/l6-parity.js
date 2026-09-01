@@ -115,6 +115,7 @@
    */
   const shq = (root, sel) => qa(root, sel).filter((e) => !e.closest('.fwin'));
   const shellState = specState('__LQP_SHELL_ORIG');
+  const blancState = specState('__LQP_BLANC_ORIG');
   const libState = specState('__LQP_LIB_ORIG');
   const immState = specState('__LQP_IMM_ORIG');
   const capState = specState('__LQP_CAP_ORIG');
@@ -4874,6 +4875,355 @@
         },
       },
     },
+
+    /**
+     * THE BLANC SHELL — a sixth host, added 2026-08-31 for L9 bullet 4's Blanc column.
+     *
+     * `shell` above is `.os-desktop` from end to end: `.os-task-win`, `.os-desktop-switch`,
+     * `.os-tray-btn`, `.os-clock`, and a presentation axis that flips a hosted `.fwin`.
+     * Blanc renders NONE of those. It is a second, separate shell in its own BrowserWindow
+     * (`blanc.html?blanc=1`) with **0** `.fwin`, so pointing `shell` at it refuses every row
+     * and the cell would have been recorded as unreachable rather than measured. cat1-cat4
+     * Blanc all score `@.blanc-root`; this is the same subject, given the category-6 rows it
+     * actually has.
+     *
+     * WHY A NEW HOST RATHER THAN WIDENING `shell`: every one of `shell`'s eight rows names a
+     * `.os-*` class. Generalising them would mean nine `||` fallbacks, and a row that falls
+     * back is a row that cannot say WHICH shell it scored — the exact shape RULE 1 is against.
+     *
+     * DECISION 1 — THE PRESENTATION AXIS IS `taskbarHidden`, and the two rejected candidates
+     * are recorded because both looked reasonable:
+     *   · NOT `workspaceFull`. Its effect handler calls `window.api.blancSetFullScreen()`
+     *     (`BlancShell.tsx:310`), so a round trip through it drives the real OS window's
+     *     fullscreen state — a persisted, native, out-of-renderer mutation for a reading the
+     *     category never asked for. That is the same objection that ruled out the theme axis
+     *     for the Wired shell, arriving through a different door.
+     *   · NOT dark mode. A palette swap leaves every capability where it was, so parity would
+     *     be equal by construction and the cell would pass without ever being asked. The
+     *     rubric names that failure by name: "a surface that answered yes ten times on the
+     *     first pass was not really asked."
+     *   `taskbarHidden` is the honest one: it REMOVES the shell's own chrome — nine routes and
+     *   the exit — from the screen while leaving `.blanc-content` untouched, so "is any
+     *   capability lost when the chrome is reduced?" is a real question with a real reveal
+     *   affordance (`.blanc-taskbar-reveal`) as the answer, and the round-trip snapshot
+     *   compares work-surface state rather than a re-laid-out content tree.
+     *
+     * DECISION 2 — `shq` STILL APPLIES even though Blanc hosts no `.fwin`. It is a no-op here
+     * today and is kept so that the day Blanc gains a floating surface this spec does not
+     * silently start counting it. Blanc's own containment is different in kind: the shell owns
+     * `.blanc-taskbar` and `.blanc-top`, and the 42 tools render inside `.blanc-content`. Rows
+     * that would otherwise fold a tool's controls into the shell's are scoped to the chrome.
+     *
+     * DECISION 3 — THE DRIVEN ROWS SPLIT ACT FROM READ, trap 1, inherited rather than
+     * rediscovered: `/eval` is synchronous, so a step that clicks and counts in one expression
+     * reads the DOM React has not re-rendered yet. That cost the `shell` spec three rows on
+     * its first run.
+     */
+    blancShell: {
+      shellSel: '.blanc-root',
+      titleRe: /$^/,
+      /**
+       * Decision 1, as the engine sees it. `read` names the presentation the shell is in;
+       * `flip` presses the control the USER would press, never a class write — a spec that
+       * sets `.is-taskbar-hidden` itself would prove the CSS works and nothing about whether
+       * the shell has a reversible affordance at all.
+       */
+      presAxis: {
+        read: (w) => (w.classList.contains('is-taskbar-hidden') ? 'liquid' : 'standard'),
+        flip: (w) => {
+          const hidden = w.classList.contains('is-taskbar-hidden');
+          const btn = q(w, hidden ? '.blanc-taskbar-reveal' : '.blanc-taskbar-toggle');
+          if (!btn) {
+            return { refused: hidden ? 'chrome is hidden and no reveal control is rendered' : 'no chrome-reduction control' };
+          }
+          btn.click();
+          return { before: hidden ? 'liquid' : 'standard', via: (btn.getAttribute('title') || btn.className).trim() };
+        },
+      },
+      features: [
+        {
+          id: 'taskbarIdentity',
+          f: (w) => {
+            // The rubric's own named term, in Blanc's vocabulary: one titled route per
+            // section, exactly one of them current, and the current one AGREEING with the
+            // title the shell painted. Agreement is the side effect — a nav that highlights
+            // one route while the top bar names another is the regression, and a count alone
+            // cannot see it.
+            const nav = shq(w, '.blanc-nav .blanc-nav-btn');
+            const titles = nav.map((b) => (b.getAttribute('title') || '').trim()).filter(Boolean);
+            const active = nav.filter((b) => b.classList.contains('active'));
+            const painted = txt(q(w, '.blanc-title'));
+            const agree = active.length === 1
+              && painted.indexOf((active[0].getAttribute('title') || '').trim()) >= 0;
+            return {
+              ok: nav.length > 0 && titles.length === nav.length && agree,
+              ev: `routes=${nav.length} titled=${titles.length} active=${active.length} painted=${JSON.stringify(painted)} [${titles.join(' | ')}]`,
+            };
+          },
+        },
+        {
+          id: 'navRoutes',
+          f: () => {
+            // Side effect, not presence: `navClick` recorded whether the surface the shell
+            // painted actually became the route it was asked for, and `navRestore` put the
+            // user's own route back.
+            const s = blancState();
+            return {
+              ok: s.navMoved === true,
+              ev: `from=${JSON.stringify(s.navFrom)} clicked=${JSON.stringify(s.navTo)} painted=${JSON.stringify(s.navPainted)} restored=${JSON.stringify(s.navBack)}`,
+            };
+          },
+        },
+        {
+          id: 'chromeRecoverable',
+          f: () => {
+            // The presentation axis's own "enable has a disable" requirement, driven end to
+            // end BEFORE the driver takes its trip, and ending where it started. It overlaps
+            // the round trip deliberately and is not redundant with it: the trip compares a
+            // whole snapshot, while this row isolates the one claim that the reveal control
+            // brings back the SAME nine routes rather than a shell that merely re-renders.
+            const s = blancState();
+            return {
+              ok: s.chromeHidden === true && s.chromeRevealNav > 0 && s.chromeRevealNav === s.chromeNavBefore,
+              ev: `navBefore=${s.chromeNavBefore} hiddenWhileReduced=${s.chromeHidden} revealControl=${s.chromeRevealSeen} navAfterReveal=${s.chromeRevealNav}`,
+            };
+          },
+        },
+        {
+          id: 'clock',
+          f: (w) => {
+            const c = q(w, '.blanc-clock');
+            const t = txt(c);
+            return { ok: !!c && /\d{1,2}:\d{2}/.test(t), ev: `clock=${JSON.stringify(t)}` };
+          },
+        },
+        {
+          id: 'masterSearch',
+          f: () => {
+            // Blanc's one cross-tool capability (`6b488974`). Opened by its own control and
+            // dismissed by Escape, both read on a later POST.
+            const s = blancState();
+            return {
+              ok: s.searchOpened === 1 && s.searchClosed === 0,
+              ev: `dialogsWhileOpen=${s.searchOpened} results=${s.searchResults} dialogsAfterEscape=${s.searchClosed}`,
+            };
+          },
+        },
+        {
+          id: 'contextTools',
+          f: () => {
+            // The compact disclosure cat4 added. The claim is that its DECLARED state and its
+            // rendered state move together — an `aria-expanded` that lies is a capability a
+            // screen-reader user is told about and cannot reach.
+            const s = blancState();
+            return {
+              ok: s.toolsOpen === 'true|open' && s.toolsShut === 'false|shut',
+              ev: `opened=${s.toolsOpen} closed=${s.toolsShut}`,
+            };
+          },
+        },
+        {
+          id: 'workspaceToggleHonest',
+          f: (w) => {
+            // `presentationHonest`'s analogue for the one presentation control this spec
+            // deliberately does NOT drive (decision 1). Its label must describe the state it
+            // would move to, or the user cannot tell which way it goes.
+            const full = w.classList.contains('is-workspace-full');
+            const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
+            const label = btn ? (btn.getAttribute('title') || '').trim() : null;
+            const exit = !!q(w, '.blanc-fullscreen-exit');
+            return {
+              ok: !!btn && /^exit /i.test(label) === full && exit === full,
+              ev: `workspaceFull=${full} control=${JSON.stringify(label)} exitAffordance=${exit}`,
+            };
+          },
+        },
+        {
+          id: 'shellIdentity',
+          f: (w) => {
+            // Blanc's material stamp read from the document, not from a class this file
+            // invented: cat3 mapped the taskbar and top bar onto the shared `lq-liquid`
+            // vocabulary with `data-lq-role="liquid"`, and those two regions ARE the shell's
+            // own furniture. The Study OS desktop must be absent — two shells painting at
+            // once is the defect this row would catch.
+            const owned = shq(w, '[data-lq-role="liquid"]');
+            const roles = owned.map((n) => (n.className || '').split(' ')[0]);
+            return {
+              ok: owned.length > 0 && !document.querySelector('.os-desktop'),
+              ev: `identityRegions=${owned.length} [${roles.join(' | ')}] osDesktopPresent=${!!document.querySelector('.os-desktop')}`,
+            };
+          },
+        },
+      ],
+      drive: [
+        'navClick', 'readNav', 'navRestore',
+        'hideChrome', 'readChromeHidden', 'revealChrome', 'readChromeRevealed',
+        'openSearch', 'readSearchOpen', 'closeSearch', 'readSearchClosed',
+        'openTools', 'readToolsOpen', 'closeTools', 'readToolsClosed',
+      ],
+      steps: {
+        navClick: (w) => {
+          const s = blancState();
+          const nav = shq(w, '.blanc-nav .blanc-nav-btn');
+          const current = nav.find((b) => b.classList.contains('active'));
+          // Never the active one: clicking the route already on screen proves nothing, and
+          // Settings is avoided because its panel is the shell's largest synchronous mount
+          // (cat2 measured 462 ms) and would make every later step race it.
+          const target = nav.find((b) => b !== current && !/settings/i.test(b.getAttribute('title') || ''));
+          if (!target) return { refused: 'no second route to visit' };
+          s.navFrom = current ? (current.getAttribute('title') || '').trim() : null;
+          s.navTo = (target.getAttribute('title') || '').trim();
+          s.navFromEl = current || null;
+          target.click();
+          return { clicked: s.navTo };
+        },
+        readNav: (w) => {
+          const s = blancState();
+          s.navPainted = txt(q(w, '.blanc-title'));
+          s.navMoved = !!s.navTo && s.navPainted.indexOf(s.navTo) >= 0 && s.navTo !== s.navFrom;
+          return { painted: s.navPainted, moved: s.navMoved };
+        },
+        navRestore: (w) => {
+          // PRESENTED STATE IS THE USER'S. Whatever route was open when this ran goes back.
+          const s = blancState();
+          if (!s.navFromEl) return { skipped: 'shell had no active route to restore' };
+          s.navFromEl.click();
+          s.navBack = s.navFrom;
+          return { restored: s.navFrom };
+        },
+        hideChrome: (w) => {
+          const s = blancState();
+          s.chromeNavBefore = shq(w, '.blanc-nav .blanc-nav-btn').length;
+          const b = q(w, '.blanc-taskbar-toggle');
+          if (!b) return { refused: 'no chrome-reduction control' };
+          if (!w.classList.contains('is-taskbar-hidden')) b.click();
+          return { clicked: 'hide', navBefore: s.chromeNavBefore };
+        },
+        readChromeHidden: (w) => {
+          const s = blancState();
+          const bar = q(w, '.blanc-taskbar');
+          // Trap: a hidden bar is still in the DOM at `display: none`, so presence is the
+          // wrong reading. `checkVisibility` is the true one.
+          s.chromeHidden = !!bar && !bar.checkVisibility();
+          s.chromeRevealSeen = !!q(w, '.blanc-taskbar-reveal');
+          return { taskbarVisible: !!bar && bar.checkVisibility(), revealControl: s.chromeRevealSeen };
+        },
+        revealChrome: (w) => {
+          const b = q(w, '.blanc-taskbar-reveal');
+          if (!b) return { refused: 'chrome hidden with no reveal control — the disable path is missing' };
+          b.click();
+          return { clicked: 'reveal' };
+        },
+        readChromeRevealed: (w) => {
+          const s = blancState();
+          const bar = q(w, '.blanc-taskbar');
+          s.chromeRevealNav = bar && bar.checkVisibility()
+            ? shq(w, '.blanc-nav .blanc-nav-btn').length
+            : 0;
+          return { taskbarVisible: !!bar && bar.checkVisibility(), nav: s.chromeRevealNav };
+        },
+        openSearch: (w) => {
+          const s = blancState();
+          const b = shq(w, '.blanc-icon-btn').find((x) => /search/i.test(x.getAttribute('aria-label') || x.getAttribute('title') || ''));
+          if (!b) return { refused: 'no master-search control' };
+          s.searchVia = (b.getAttribute('aria-label') || '').trim();
+          if (!document.querySelector('.blanc-master-search')) b.click();
+          return { clicked: s.searchVia };
+        },
+        readSearchOpen: () => {
+          const s = blancState();
+          // The dialog is a sibling of `.blanc-root`'s chrome, not inside it, so this one
+          // query is deliberately document-scoped.
+          s.searchOpened = document.querySelectorAll('.blanc-master-search').length;
+          s.searchResults = document.querySelectorAll('#blanc-master-search-results [role="option"]').length;
+          return { opened: s.searchOpened, results: s.searchResults };
+        },
+        closeSearch: () => {
+          const el = document.querySelector('.blanc-master-search input');
+          (el || document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          return { sent: 'Escape' };
+        },
+        readSearchClosed: () => {
+          const s = blancState();
+          s.searchClosed = document.querySelectorAll('.blanc-master-search').length;
+          return { after: s.searchClosed };
+        },
+        openTools: (w) => {
+          const b = q(w, '.blanc-compact-tools-toggle');
+          if (!b) return { refused: 'no context-tools disclosure' };
+          if (b.getAttribute('aria-expanded') !== 'true') b.click();
+          return { clicked: 'context tools' };
+        },
+        readToolsOpen: (w) => {
+          const s = blancState();
+          const b = q(w, '.blanc-compact-tools-toggle');
+          const panel = q(w, '#blanc-top-context');
+          s.toolsOpen = `${b && b.getAttribute('aria-expanded')}|${panel && panel.classList.contains('is-open') ? 'open' : 'shut'}`;
+          return { state: s.toolsOpen };
+        },
+        closeTools: (w) => {
+          const b = q(w, '.blanc-compact-tools-toggle');
+          if (b && b.getAttribute('aria-expanded') === 'true') b.click();
+          return { clicked: 'context tools' };
+        },
+        readToolsClosed: (w) => {
+          const s = blancState();
+          const b = q(w, '.blanc-compact-tools-toggle');
+          const panel = q(w, '#blanc-top-context');
+          s.toolsShut = `${b && b.getAttribute('aria-expanded')}|${panel && panel.classList.contains('is-open') ? 'open' : 'shut'}`;
+          return { state: s.toolsShut };
+        },
+      },
+      mutations: {
+        // Detach ONE route, not the nav: `titled === nav.length` and the agreement term both
+        // still hold on eight buttons, so this falls the row only through the count the row
+        // actually claims — and it is undone by `restore()`'s placeholder sweep.
+        taskbarIdentity: (w) => {
+          const nav = shq(w, '.blanc-nav .blanc-nav-btn');
+          const inactive = nav.find((b) => !b.classList.contains('active'));
+          if (!inactive) return { refused: 'no inactive route to remove' };
+          return stripAttr(inactive, 'title', 'no route to strip');
+        },
+        clock: (w) => detach(q(w, '.blanc-clock'), 'no clock'),
+        // LIE rather than delete for the declared-state rows: a control that exists and
+        // misdescribes itself is precisely the defect each of those rows is for.
+        workspaceToggleHonest: (w) => {
+          const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
+          if (!btn) return { refused: 'no workspace control' };
+          return setAttr(btn, 'title', 'Exit fullscreen workspace');
+        },
+        shellIdentity: (w) => {
+          const owned = shq(w, '[data-lq-role="liquid"]');
+          if (!owned.length) return { refused: 'shell renders no identity furniture' };
+          // EVERY element the row reads. The `shell` spec's control proved nothing by
+          // detaching one of two; that correction is inherited here rather than repeated.
+          owned.forEach((n) => stripAttr(n, 'data-lq-role', ''));
+          return { mutated: `${owned.length} identity region(s) unstamped` };
+        },
+        // The driven rows are falsified through the side effect they recorded, never through
+        // the control — a control that removes the button proves the button exists.
+        navRoutes: () => {
+          const s = blancState();
+          s.navMoved = false;
+          return { mutated: 'navMoved forced to false' };
+        },
+        chromeRecoverable: () => {
+          const s = blancState();
+          s.chromeRevealNav = 0;
+          return { mutated: 'navAfterReveal forced to 0' };
+        },
+        masterSearch: () => {
+          const s = blancState();
+          s.searchClosed = s.searchClosed + 1;
+          return { mutated: `searchClosed forced to ${s.searchClosed}` };
+        },
+        contextTools: () => {
+          const s = blancState();
+          s.toolsShut = 'true|open';
+          return { mutated: 'collapsed state forced to a lie' };
+        },
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -5138,7 +5488,8 @@
     scope('input,textarea,select').forEach((el, i) => {
       fields[`${el.tagName.toLowerCase()}${i}:${(el.className || '').split(' ')[0]}`] = el.value;
     });
-    const proxy = host === 'shell' ? shellProxy() : null;
+    const axis = SPECS[app] && SPECS[app].presAxis;
+    const proxy = host === 'shell' && !axis ? shellProxy() : null;
     return {
       app,
       matchedBy,
@@ -5146,12 +5497,18 @@
       // The shell has no `data-presentation` of its own. It reports the presentation of the
       // window it is hosting, because that is the axis it is scored across, and it names the
       // proxy beside it so this can never be mistaken for a shell-level attribute.
-      presentation: host === 'shell'
-        ? (proxy && proxy.getAttribute('data-presentation'))
-        : win.getAttribute('data-presentation'),
-      ...(host === 'shell'
+      // A shell that declares its OWN axis (`presAxis`, Blanc) reads its own presentation and
+      // names no proxy: there is no hosted window in the trip, so reporting one would be a
+      // second lie on top of a missing measurement.
+      presentation: axis
+        ? axis.read(win)
+        : (host === 'shell'
+          ? (proxy && proxy.getAttribute('data-presentation'))
+          : win.getAttribute('data-presentation')),
+      ...(host === 'shell' && !axis
         ? { presentationProxy: proxy ? (txt(q(proxy, '.fwin-title-text')) || '(frameless)') : null }
         : {}),
+      ...(axis ? { presentationAxis: 'shell-owned' } : {}),
       liquidClass: win.classList.contains('fwin-liquid') || win.classList.contains('popout-liquid'),
       rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
       maximized: win.classList.contains('fwin-max'),
@@ -5221,6 +5578,11 @@
   const toggleLiquid = (app, pres) => {
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
+    // A spec that declares its own axis owns the flip. Checked BEFORE the `.fwin`-proxy
+    // branch: Blanc hosts no `.fwin` at all, so falling through would refuse a trip the shell
+    // can genuinely take. The control pressed is the user's, never a class write.
+    const axis = spec(app).presAxis;
+    if (axis) return axis.flip(win);
     // Decision 1/2: the shell's axis is a HOSTED window's flip, driven through that window's
     // own control. Refuses rather than falling back when nothing on screen can take the trip.
     if (host === 'shell') {

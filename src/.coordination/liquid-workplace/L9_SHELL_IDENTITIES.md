@@ -1938,3 +1938,50 @@ Controls: injected clip 0→1→0; art plate counted only as art; foreground pla
 and restored 0.
 
 **RULE C: 12 of 16 passing cells** — all eight Wired plus cat1–cat4 Blanc. Next: cat5 Blanc.
+
+## 2026-08-31 — primary — cat6 Blanc 10/10 on a sixth host, and the axis a shell owns itself
+
+**RECOVERY FIRST.** `codexA` ended at 20:15:30 on a usage limit; **nothing was stranded**. Its five
+commits `090d4549`..`6b488974` all landed (19:58–20:10), the index is empty, and no file under
+`src`/`docs`/`tools`/`debug` has an mtime after 20:10. Boss audit `audit-20260831-043527` is now
+CLOSED: finding 2 (`aero-safe-mode.css`) and finding 3 (four Scraper anchors) both pass at clean
+HEAD, and finding 1 went **15 unclassified identities → 3 → 0** (`23ecd75c`). The last three —
+`StudyBottomBar`, `StudyDocks`, `StudyWorkspaceCustomizer`, all from `9fa37b59` — are classified
+**pending, per file**, not accepted: their only consumer is `VideoCoreStudyOverlay.tsx`, which is
+mid-rewrite and uncommitted in the shared tree (936 insertions / 662 deletions) beside untracked
+`src/media/studyWorkspace.css`. Wiring them would have meant committing another track's work.
+Control: a fresh unimported module still exits 1, so the gate was not widened.
+
+**THE HANDOFF'S ORDER WAS WRONG, and this doc already said so at line 1636: for a shell cat6 runs
+BEFORE cat5.** `cat5-ui-clarity.cjs` reads Q7/Q8/Q9 from `baselines/cat6-<label>.json` and VOIDs
+without it, so "run cat5 on Blanc, then cat6–cat8" would have produced a VOID and a wasted arm.
+
+**Host `shell` cannot score Blanc.** All eight of its rows name a `.os-*` class and its axis flips
+a hosted `.fwin`; Blanc renders **0** `.fwin` and lives in its own BrowserWindow. Added
+**`blancShell`** (`shellSel: '.blanc-root'`) rather than widening `shell` with nine `||` fallbacks
+— a row that falls back cannot say which shell it scored.
+
+**The axis is `taskbarHidden`, and two plausible candidates were rejected on evidence.** NOT
+`workspaceFull`: its effect calls `window.api.blancSetFullScreen()` (`BlancShell.tsx:310`), so the
+trip would drive the real OS window — the same objection that ruled out the theme axis for Wired,
+through a different door. NOT dark mode: a palette swap leaves every capability in place, so
+parity would be equal by construction and the cell would pass without being asked. Chrome
+reduction removes nine routes and the exit from the screen while leaving `.blanc-content` alone,
+so the question is real and `.blanc-taskbar-reveal` is the answer under test. New engine seam:
+`presAxis` (read + flip), checked before the `.fwin`-proxy branch in `toggleLiquid` and in
+`snapshot`'s presentation; the flip presses the user's control, never a class write.
+
+**cat6 · Blanc = PASS 10/10** (`ce4e3c76`). Parity **8/8 standard, 8/8 liquid**, `rowsAgree` true,
+`onlyInOne` empty, `na` 0. Round trip standard→liquid→standard: **0 diffs**, `fieldsHeld` and
+`shellHeld` true, 1264x761 either side. All **15** drive steps ran with **0 refusals**. Control:
+**8 of 8 mutations fell exactly their own row**, 8/8→7/8 each, every one restored to 8/8. Live
+state restored to as-found: taskbar visible, Stats route, 9 nav buttons, 2 identity regions,
+0 detached residue.
+
+**Disclosed weaker term, not banked silently:** `dirtiedField` is **null** — Blanc's shell chrome
+has no editable text field outside `.blanc-content`, so the trip carried field values, scroll
+offsets, geometry and node/char/control counts but no dirtied text. The harness reports this
+itself. If a later worker wants the stronger reading, dirty the `.blanc-lang` select.
+
+**RULE C: 13 of 16 passing cells** — all eight Wired plus Blanc cat1–cat4 and cat6. Next: **cat5
+Blanc**, which is now unblocked and will read Q7/Q8/Q9 from `cat6-l9b4-blanc.json`; then cat7, cat8.
