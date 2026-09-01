@@ -129,6 +129,53 @@ async function refreshPage() {
   pageCardEl.classList.remove('empty');
   pageMetaEl.innerHTML = pills.join('');
   renderActions();
+  // Not awaited: one status call must never delay the buttons.
+  void showTranscriptionPill();
+}
+
+/**
+ * What GrammarX already knows about THIS video's audio, before anything is
+ * clicked.
+ *
+ * `/v1/transcribe/status` knew all of this already and nothing asked it except
+ * a poller started by a click — so a video transcribed yesterday looked
+ * identical to one never touched, and the only way to learn the cue count was
+ * to press Transcribe again.
+ *
+ * `notStarted` is deliberately SILENT. It is the ordinary state of every video
+ * on the internet, and a pill for it would be noise on every page; it exists so
+ * that the `failed` pill, which IS actionable, is not printed over videos this
+ * machine has never downloaded. That was the actual defect: before `notStarted`
+ * this branch would have said "transcription failed" on every YouTube page.
+ */
+async function showTranscriptionPill() {
+  if (detect?.kind !== 'youtube-video') return;
+  // `detect` reports the page KIND, not the id — parsed here rather than
+  // widening that message, which four other callers already depend on.
+  const videoId = parseVideoId(detect.url || '');
+  if (!videoId) return;
+  const res = await send({ type: 'transcribe-status', videoId });
+  if (!res || res.state === 'notStarted') return;
+  let pill = null;
+  if (res.state === 'transcribed') {
+    pill = `<span class="pill" title="Already in the GrammarX catalogue — mine it without returning here">Transcribed · ${escapeHtml(String(res.cueCount))} cues</span>`;
+  } else if (res.state === 'pending') {
+    const secs = Number.isFinite(res.queuedAt) ? Math.round((Date.now() - res.queuedAt) / 1000) : null;
+    pill = `<span class="pill">Transcribing${secs === null ? '' : ` · ${secs}s`}</span>`;
+  } else if (res.state === 'failed') {
+    pill = '<span class="pill" title="Retry from the Media library">Transcription left no text</span>';
+  }
+  if (!pill) return;
+  pageMetaEl.insertAdjacentHTML('beforeend', pill);
+  // A job still running is worth following from here too — the popup is open,
+  // and the count is the thing the gate asks for.
+  if (res.state === 'pending') void followTranscription(videoId, res.queuedAt);
+}
+
+/** The 11-character id in a watch/shorts/youtu.be URL, or ''. */
+function parseVideoId(url) {
+  const m = String(url || '').match(/(?:v=|\/shorts\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : '';
 }
 
 function escapeHtml(s) {

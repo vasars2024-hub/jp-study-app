@@ -389,6 +389,39 @@ describe('gate 11 — the extension actually asks for the count', () => {
     for (const sentence of sentences) expect(popup).toContain(sentence);
   });
 
+  /*
+   * The trap the previous turn filed: a route can be correct and still close
+   * nothing, because nobody calls it. `notStarted` was reachable only from a
+   * poller a click had already started — so its whole point (a poll that runs
+   * BEFORE any click) had no consumer. This is that consumer.
+   */
+  it('the popup asks what the app already knows, before anything is clicked', () => {
+    const popup = readExtensionFile('popup.js');
+    expect(popup).toContain('showTranscriptionPill');
+    // Wired into the page refresh, not only into the button handler.
+    expect(popup).toMatch(/renderActions\(\);\s*\n\s*\/\/[^\n]*\n\s*void showTranscriptionPill\(\);/);
+    expect(popup).toMatch(/Transcribed · \$\{escapeHtml\(String\(res\.cueCount\)\)\} cues/);
+  });
+
+  it('notStarted is SILENT on page load — that is what it is for', () => {
+    // Without it this branch printed "transcription failed" over every YouTube
+    // video this machine has never downloaded, which is every one of them.
+    const popup = readExtensionFile('popup.js');
+    expect(popup).toContain("if (!res || res.state === 'notStarted') return;");
+    // And the failed pill still exists, or the silence would be a deletion.
+    expect(popup).toContain('Transcription left no text');
+  });
+
+  it('the id comes from the URL, since detect does not carry one', () => {
+    const popup = readExtensionFile('popup.js');
+    const background = readExtensionFile('background.js');
+    // If `detect` ever grows a videoId this test is the place to notice; today
+    // reading `detect.videoId` would be undefined and the pill would never show.
+    expect(background).not.toMatch(/kind,\n\s*category,\n[\s\S]{0,200}videoId/);
+    expect(popup).toContain('parseVideoId(detect.url');
+    expect(popup).toMatch(/v=\|\\\/shorts\\\/\|youtu\\\.be\\\//);
+  });
+
   it('notStarted is passed through the background verbatim, not rounded to failed', async () => {
     const harness = bootBackground({
       responder: () => ({
