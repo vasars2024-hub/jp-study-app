@@ -1999,13 +1999,16 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
                 onChange={(event) => {
                   if (tab === 'music') music.setQuery(event.target.value);
                   else if (tab === 'discover') discovery.setQuery(event.target.value);
-                  else media.setQuery(event.target.value);
+                  else {
+                    media.setQuery(event.target.value);
+                    // Focusing a global control must not change context (keyboard users
+                    // encounter it while tabbing). The first actual library query owns the
+                    // navigation instead, so search remains immediate without a focus trap.
+                    if (tab !== 'library') setTab('library');
+                  }
                 }}
                 onKeyDown={(event) => {
                   if (tab === 'discover' && event.key === 'Enter') discovery.submitQuery();
-                }}
-                onFocus={() => {
-                  if (!['music', 'discover', 'library'].includes(tab)) setTab('library');
                 }}
                 placeholder={searchPlaceholder}
                 aria-label={searchPlaceholder}
