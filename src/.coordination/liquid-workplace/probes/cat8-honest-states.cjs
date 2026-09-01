@@ -16,7 +16,10 @@
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat8-honest-states.cjs \
  *     --surface "Dictionary" [--win main] [--label dictionary] [--langs] [--control] [--out <file>] \
- *     [--drive-input "<css>" | --drive-click "<css>" [--drive-undo "<css>"]] [--drive-value "<text>"]
+ *     [--drive-input "<css>"] [--drive-click "<css>" [--drive-undo "<css>"]] [--drive-value "<text>"]
+ *
+ * --drive-click and --drive-input may be given TOGETHER (correction 36): the click is then the
+ * OPENER for a filter that is not mounted at rest, and the typing leg runs inside it.
  *
  * --surface takes the same two forms as the category-1 and category-4 harnesses, deliberately, so
  * a surface is named identically in all three: a leading `@` is a CSS SELECTOR (a section of the
@@ -453,14 +456,66 @@ const CONTROL_REMOVE_HOSTED = `(function(){
  * If the card is absent the leg refuses and names the page to open, rather than falling
  * back to whatever else on screen happens to carry the class.
  */
+/**
+ * CORRECTION 35, measured 2026-08-31 on the Blanc shell — THE SETTINGS CARD IS ONE SHELL'S
+ * VOCABULARY, NOT THE CONTRACT. `[data-setting-id="ui-language"]` is a Study OS Settings card.
+ * Blanc runs in its own BrowserWindow, renders no Settings page at all, and owns its language
+ * control outright (`BlancShell.tsx:700`, a `<select>` whose options already carry the same
+ * `lang` tags). With only the card path, `--langs` refused on every tag, `languagesDiffer` came
+ * back UNMEASURED, and the cell could never score better than UNMEASURED — an instrument
+ * verdict wearing a product one, which is exactly the shape corrections 30-33 removed from
+ * category 5.
+ *
+ * The fallback is deliberately narrow, because the reason the card scoping exists is still
+ * true: a bare `.sp-seg-btn` also matches the subtitle segment, and a bare `<select>` matches
+ * every dropdown on screen. So the select must carry an option for ALL FOUR tags — that is a
+ * language chooser and nothing else is.
+ *
+ * Two things the select path must do that the button path does not:
+ *  - REACT'S VALUE TRACKER. Assigning `.value` updates the tracker, so React's change handler
+ *    dedupes the event away and the language silently does not move. The native prototype
+ *    setter is what makes the dispatched `change` real.
+ *  - THE DISCLOSURE. Blanc's control lives inside the `Context tools` drawer, so at rest it is
+ *    `display:none` and not a user path. The leg opens the disclosure that `aria-controls` an
+ *    ancestor of the control, and CLOSES IT AGAIN before returning — every `run()` in the leg
+ *    must see the same resting chrome the baseline was measured on.
+ */
 const clickLang = (tag) => `(function(){
+  var TAG = ${JSON.stringify(tag)};
   var card = document.querySelector('[data-setting-id="ui-language"]');
-  if (!card) return JSON.stringify({ refuse: 'no ui-language card on screen - open Settings > Appearance; refusing to click a bare .sp-seg-btn, which also matches the Subtitle & transcription segment' });
-  var b = [].slice.call(card.querySelectorAll('.sp-seg-btn')).filter(function(x){
-    return x.getAttribute('lang') === ${JSON.stringify('TAG')}.replace('TAG', ${JSON.stringify(tag)}); })[0];
-  if (!b) return JSON.stringify({ refuse: 'no .sp-seg-btn for that lang tag inside #ui-language' });
-  b.click();
-  return JSON.stringify({ clicked: ${JSON.stringify(tag)} });
+  if (card) {
+    var b = [].slice.call(card.querySelectorAll('.sp-seg-btn')).filter(function(x){
+      return x.getAttribute('lang') === TAG; })[0];
+    if (!b) return JSON.stringify({ refuse: 'no .sp-seg-btn for that lang tag inside #ui-language' });
+    b.click();
+    return JSON.stringify({ clicked: TAG, via: 'settings-card' });
+  }
+  var WANT = ['en', 'ja', 'zh-Hans', 'ru'];
+  var sel = [].slice.call(document.querySelectorAll('select')).filter(function(s){
+    var tags = [].slice.call(s.options).map(function(o){ return o.getAttribute('lang'); });
+    return WANT.every(function(w){ return tags.indexOf(w) >= 0; });
+  })[0];
+  if (!sel) return JSON.stringify({ refuse: 'no ui-language card on screen and no select carrying all four lang tags - open Settings > Appearance, or give this surface a language control; refusing to click a bare .sp-seg-btn, which also matches the Subtitle & transcription segment' });
+  var opt = [].slice.call(sel.options).filter(function(o){ return o.getAttribute('lang') === TAG; })[0];
+  if (!opt) return JSON.stringify({ refuse: 'the language select has no option for ' + TAG });
+  var opened = null;
+  var visible = typeof sel.checkVisibility === 'function'
+    ? sel.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : true;
+  if (!visible) {
+    opened = [].slice.call(document.querySelectorAll('[aria-expanded="false"][aria-controls]')).filter(function(t){
+      var region = document.getElementById(t.getAttribute('aria-controls'));
+      return !!region && region.contains(sel);
+    })[0] || null;
+    if (!opened) return JSON.stringify({ refuse: 'the language select is not painted and no aria-controls disclosure owns it' });
+    opened.click();
+  }
+  var setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+  setter.call(sel, opt.value);
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  var took = sel.value === opt.value;
+  if (opened) opened.click();
+  if (!took) return JSON.stringify({ refuse: 'the select did not accept ' + TAG + ' (value is ' + sel.value + ')' });
+  return JSON.stringify({ clicked: TAG, via: 'surface-select', reopened: !!opened });
 })()`;
 
 /**
@@ -601,8 +656,37 @@ const clickEl = (sel, which) => `(function(){
   return JSON.stringify({ clicked: ${JSON.stringify(sel)}, label: (el.textContent || '').trim().slice(0, 40) });
 })()`;
 
+/**
+ * CORRECTION 36, measured 2026-08-31 on the Blanc shell — A FILTER BEHIND A DISCLOSURE IS
+ * STILL THIS SURFACE'S FILTER.
+ *
+ * Corrections 9 and 10 gave this harness a typing leg and a clicking leg, and treated them as
+ * alternatives: `--drive-click` short-circuits before `--drive-input` is ever read. That is
+ * right for a chip set and wrong for a SHELL, whose one authored adverse state usually lives
+ * behind its master search. Blanc at rest paints three inputs — a volume range and two
+ * checkboxes — and no text field at all; `.blanc-top-search` mounts one (346 -> 516 elements),
+ * and typing nonsense into it renders `Nothing in Blanc matched.` A click-only leg measures the
+ * search OPEN AND EMPTY, which names no state, so the cell reads UNMEASURED on a surface whose
+ * empty state is real and correct.
+ *
+ * Given BOTH, the click is treated as the opener and the input leg runs inside it. The undo is
+ * `--drive-undo` if given and otherwise the input leg's own Escape, and `restored` is still
+ * asserted against the RESTING text hash — so a disclosure left open fails the restore exactly
+ * as a stranded query does. Neither leg alone changes behaviour.
+ */
 async function driveLeg(base) {
-  if (DRIVE_CLICK) {
+  let opener = null;
+  if (DRIVE_CLICK && DRIVE_INPUT) {
+    const hit = JSON.parse(await ev(clickEl(DRIVE_CLICK, 'click')));
+    if (hit.refuse) return { refuse: `opener: ${hit.refuse}` };
+    await sleep(600);
+    const mounted = JSON.parse(await ev(
+      `(function(){ var e = document.querySelector(${JSON.stringify(DRIVE_INPUT)});`
+      + ' return JSON.stringify({ present: !!e }) })()',
+    ));
+    if (!mounted.present) return { refuse: `opener ${DRIVE_CLICK} did not mount ${DRIVE_INPUT}` };
+    opener = { click: DRIVE_CLICK, clickedLabel: hit.label };
+  } else if (DRIVE_CLICK) {
     const hit = JSON.parse(await ev(clickEl(DRIVE_CLICK, 'click')));
     if (hit.refuse) return { refuse: hit.refuse };
     await sleep(600);
@@ -665,11 +749,23 @@ async function driveLeg(base) {
     restoredAfterEscape = second.textHash === base.textHash;
     if (restoredAfterEscape) restored = second;
   }
+  // Correction 36: an explicit way back, for an opener whose disclosure does not honour Escape.
+  // Only pressed when the surface is still not back, so no run that already restored changes.
+  let restoredAfterUndo = null;
+  if (DRIVE_UNDO && restored.textHash !== base.textHash) {
+    await ev(clickEl(DRIVE_UNDO, 'undo'));
+    await sleep(600);
+    const third = await run();
+    restoredAfterUndo = third.textHash === base.textHash;
+    if (restoredAfterUndo) restored = third;
+  }
   return {
     input: DRIVE_INPUT,
     value: DRIVE_VALUE,
     originalValue: set.was,
+    openedBy: opener,
     restoredAfterEscape,
+    restoredAfterUndo,
     // A drive that changed nothing has not driven anything; scoring its states would be fabrication.
     surfaceChanged: driven.textHash !== base.textHash,
     restored: restored.textHash === base.textHash && back.now === set.was,
