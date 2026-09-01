@@ -125,35 +125,68 @@ An empty result is a FINDING: say so and stop.
 1. `YouTubeDownloadOptions` carries an audio-language field, it reaches the yt-dlp format
    string, and a video with two audio tracks downloads the Japanese one — proven by the
    selected track's language, not by the flag being set.
+   <!-- status: open; evidence: 2026-09-01 9d7c5f62 -- the field EXISTS and reaches the format string, proven live:
+        lSRBZNEjbpg -> `-f bv*[ext=mp4]+140/bv*+140`, format_id 140 chosen because the
+        MANIFEST tags it `ja`. What is NOT proven is the gate's third clause: 11 videos across
+        5 channels were probed (`--gateAudio`) and every one had 0 or 1 distinct audio
+        language, so "a video with TWO audio tracks downloads the Japanese one" has no live
+        subject. yt-dlp 2026.06.09's default player client does not surface YouTube's
+        multi-language audio here; the `web` client errors "The page needs to be reloaded". -->
 2. Negative control for gate 1: asking for a language the video does not have fails with a
    named message, not a silent fall back to the default track.
+   <!-- status: closed; evidence: 2026-09-01 9d7c5f62 -- live, twice, on real videos and on the SAME video as gate 1's
+        selection. lSRBZNEjbpg ships only `ja`: asking `ru` refused `noSuchAudioLanguage` and
+        the message NAMED what it does ship. jNQXAC9IVRw has 0 tagged tracks: refused
+        `noTaggedAudioTracks`, a different reason with a different fix. No silent fallback is
+        possible -- `youtubeFormatArgs` emits the chosen format id with NO `/ba/b` tail, and
+        that absence is asserted in `ytAudioLang.test.ts`. -->
 3. An audio-only download of a video with no subtitles produces a transcript with a stated
    cue count, through the existing transcription queue.
+   <!-- status: open; evidence: blocked on an exclusive Electron + a Whisper run. The transcription queue exists
+        (`transcription:enqueue`, `ytMarkTranscribed`); what is missing is a live run with a
+        stated cue count. -->
 4. A card mined from that transcript reaches its destination AND renders as
    transcript-derived; a card from human subtitles on the same surface does not carry that mark.
+   <!-- status: closed; evidence: 2026-09-01 93237b79 -- live via `--gate4` on the real profile, both halves. Transcript
+        `T-5_dUq-oyo`: 86 cards, `textProvenance: transcript`, extraTags `files-app,
+        files-media, provenance-transcript`, routable. Human subs (JOJO ep 39): 200 cards,
+        `provenance-human-subs`, and carries `provenance-transcript` = FALSE -- control (a),
+        the mark is not universal. Control (c): `unknown` maps to no mark at all, so a row
+        whose origin was never established is not given a false one. The review screen renders
+        it at FlashcardsContent.tsx:1322 via `flash.provenance.transcript`, present in all
+        four catalogues. The transcript used is a pre-existing one on the profile, NOT one
+        produced by gate 3 -- said out loud because gate 3 is still open. -->
 5. **The index enumerates real assets, with numbers.** One call returns every mineable asset
    across the stores — YouTube transcripts from `yt-transcripts/`, subtitle sidecars, harvested
    anime subtitles, epubs — each carrying its provenance and media type. Report the count per
    category against what is actually on disk. A category returning 0 while files exist for it
    is a FINDING; a category legitimately empty must say so rather than be omitted.
+   <!-- status: closed; evidence: 2026-09-01 -- `--mining` on the real profile, with a disk control per category. -->
 6. **Nothing already transcribed is invisible.** Take a video transcribed earlier, whose
    transcript file exists, and find it in the catalogue **without navigating to that video**.
    This is the whole point of the feature: `ytPlaylists.ts:254` already knows the answer and
    only tells the video row.
+   <!-- status: closed; evidence: 2026-09-01 -- `--gate68`, transcribed assets found through the presets without navigating. -->
 7. **One-click mine from the list.** Pick an asset in the catalogue and mine it end to end
    without opening its original context, for at least one asset of each category.
+   <!-- status: closed; evidence: 2026-09-01 -- `--gate7`, one asset of each category mined end to end, three controls. -->
 8. **Sorting is derived, not hand-maintained.** The categories come from the asset's own
    provenance, so a newly transcribed video appears in the right group with no extra step.
+   <!-- status: closed; evidence: 2026-09-01 -- `--gate68`, categories derived from provenance; 0-of-1979 defect fixed first. -->
 9. Epub mining produces a `MineNoteRequest` through the shared contract, with the existing
    CSV/table export still working — the batch path is not removed, it gains a second outlet.
+   <!-- status: closed; evidence: 2026-09-01 2ae91e5d -- both epub outlets on ONE book: A 200 MineNoteRequest, B 5,937 deck rows / 491,223 b CSV. -->
 10. One Mining surface hosts the catalogue, replacing the epub-only "simple mining" entry
    point without losing any capability it had.
+   <!-- status: closed; evidence: 2026-09-01 827931ba + d0637e03 -- a fourth Mining tab; 1979 rows -> 87 listed, provenance 55/0/8/20/4. -->
 11. The extension button transcribes the audio of the page being watched and returns a cue
    count, with a named refusal when no audio is resolvable. The result lands in the catalogue
    (gate 5), so it is mineable later without returning to the page.
+   <!-- status: open; evidence: 3a0199fe -- BUILT (media.transcribe, POST /v1/transcribe, five named refusals, 14 tests) but the CUE COUNT was never measured. Needs an exclusive Electron. -->
 12. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
    `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
    gate here — 327 pre-existing errors on a clean tree; prove "no new" by set-difference.
+   <!-- status: open; evidence: the four full gates run every turn, but `npx vitest run` is not clean on this tree -- see the turn logs for the named failures. -->
 
 ## Progress
 
@@ -473,3 +506,74 @@ the cue count from `GET /v1/transcribe/status`, then re-run
 `node debug/filesapp-census.cjs --gate68` and show the transcript count moving by exactly one.
 The control is already written: a video that is not downloaded must return `notDownloaded`
 before any of this, and that refusal is checkable without Whisper.
+
+### 2026-09-01 — gates 1, 2 and 4; two CLOSE, one does not and says why
+
+**Gate 2 CLOSES. Gate 4 CLOSES. Gate 1 does NOT** — the honest split is the point of this
+entry, because the code for all three landed together and it would have been easy to report
+three.
+
+`YouTubeDownloadOptions` had no audio-language field and `main/media.ts:236` hardcoded
+`-f ba[ext=m4a]/ba/b`, so yt-dlp always took the default track. `shared/ytAudioLang.ts`
+(`9d7c5f62`) decides which dub, purely, and two of its choices are load-bearing:
+
+- **An exact format id from a `yt-dlp -J` probe, not a `ba[language^=ja]` filter.** The gate
+  wants the track's language proven "not by the flag being set", and a filter expression IS
+  the flag again — nothing in the output says which track it matched. Probing means the
+  language is read off the video's own manifest.
+- **No `/ba/b` tail once a language is asked for.** `-f 'ba[language^=ja]/ba/b'` downloads the
+  English track and reports success. That silent wrong-track success is precisely what gate 2
+  is the control against, so a stale format id must fail loudly instead.
+
+Three named refusals with their own i18n keys in all four catalogues:
+`noSuchAudioLanguage` (and it names what the video DOES ship), `noTaggedAudioTracks` (one
+untagged track is not "no Japanese" — different situation, different fix), `audioProbeFailed`.
+`MediaOpen` errors gained optional `errorKey`/`errorParams` so the renderer localises these
+while `media.ts`'s older raw-English failures stay untouched.
+
+Live, through `--gateAudio` on the census (the PRODUCTION planner, not a replica):
+
+```
+lSRBZNEjbpg  27 formats, 4 tagged audio tracks, languages ["ja"]
+  gate 1  asked "ja" -> format_id 140, manifest language "ja", -f bv*[ext=mp4]+140/bv*+140
+  gate 2  asked "ru" -> REFUSED noSuchAudioLanguage: "This video has no RU audio track.
+                        It ships: ja."
+jNQXAC9IVRw  11 formats, 0 tagged audio tracks
+  gate 2  asked "ja" -> REFUSED noTaggedAudioTracks
+control (c)  "original" -> -f bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b   (byte-identical to
+             the pre-feature string, so an ordinary download cannot have changed)
+```
+
+**Why gate 1 stays open, with the number.** Its third clause is "a video with two audio tracks
+downloads the Japanese one". **11 videos across 5 channels** (MrBeast recent and 2024-era,
+Netflix, Crunchyroll, Veritasium, TED) were probed and **every one had 0 or 1 distinct audio
+language**. yt-dlp 2026.06.09's default player client does not surface YouTube's multi-language
+audio on this machine; `--extractor-args youtube:player_client=web` fails with *"The page needs
+to be reloaded"*. So the gate has no live subject, not a failing one.
+
+**A harness bug found and fixed in the same slice, worth keeping.** `--gateAudio` first counted
+FORMATS and read PASS on `lSRBZNEjbpg` — which ships **four** `ja` audio formats (139/249/140/
+251) that are bitrates and codecs of ONE dub. Counting distinct *languages* makes it correctly
+FAIL. An instrument that answers the question you typed instead of the one the gate asks is
+the recurring failure here.
+
+**Gate 4** (`93237b79`, `--gate4`) is the mark, and it is scored against its opposite because a
+build that tagged every card `provenance-transcript` would satisfy the gate's first clause and
+be worthless:
+
+```
+transcript  T-5_dUq-oyo         86 cards  textProvenance=transcript
+                                extraTags: files-app, files-media, provenance-transcript
+human-subs  JOJO ep 39         200 cards  textProvenance=human-subs
+                                extraTags: files-app, files-media, provenance-human-subs
+control (a) human-subs card carries provenance-transcript = false
+control (c) unknown -> (unmarked)   — a row whose origin was never established gets no mark
+```
+
+It renders: `FlashcardsContent.tsx:1322` shows `flash.provenance.transcript` ("From a machine
+transcript"), present in all four catalogues. **Said out loud: the transcript is a
+pre-existing one on the profile, not one produced by gate 3**, which is still open.
+
+Gate status after this turn, tagged inline on the gate list so the count is mechanical:
+**8 closed / 4 open of 12** — open are 1 (no two-dub video), 3 (needs Electron + Whisper),
+11 (built, cue count unmeasured), 12 (full gates; vitest is not clean on this tree).
