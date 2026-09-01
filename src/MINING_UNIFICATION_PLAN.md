@@ -125,13 +125,13 @@ An empty result is a FINDING: say so and stop.
 1. `YouTubeDownloadOptions` carries an audio-language field, it reaches the yt-dlp format
    string, and a video with two audio tracks downloads the Japanese one — proven by the
    selected track's language, not by the flag being set.
-   <!-- status: open; evidence: 2026-09-01 9d7c5f62 -- the field EXISTS and reaches the format string, proven live:
-        lSRBZNEjbpg -> `-f bv*[ext=mp4]+140/bv*+140`, format_id 140 chosen because the
-        MANIFEST tags it `ja`. What is NOT proven is the gate's third clause: 11 videos across
-        5 channels were probed (`--gateAudio`) and every one had 0 or 1 distinct audio
-        language, so "a video with TWO audio tracks downloads the Japanese one" has no live
-        subject. yt-dlp 2026.06.09's default player client does not surface YouTube's
-        multi-language audio here; the `web` client errors "The page needs to be reloaded". -->
+   <!-- status: closed; evidence: 2026-09-01 86014306 -- live on OFDfLnG987E, whose manifest
+        exposed 12 distinct languages after the production probe selected
+        `web_embedded,default`. Asking for `ja` selected exact format 251-3 because the MANIFEST
+        tags it `ja`; the app's audio-only args downloaded that exact track to a 1,177,311-byte,
+        32.879-second m4a (SHA-256 1D2B7CCD...9CB6B21). SAME-video negative control `zh`
+        refused `noSuchAudioLanguage`, named all 12 available languages, and downloaded nothing.
+        `original` retained both pre-feature format strings byte-for-byte. -->
 2. Negative control for gate 1: asking for a language the video does not have fails with a
    named message, not a silent fall back to the default track.
    <!-- status: closed; evidence: 2026-09-01 9d7c5f62 -- live, twice, on real videos and on the SAME video as gate 1's
@@ -262,6 +262,17 @@ the same shape as `f104600b` — things a git worktree does not inherit:
 Measured outcomes are recorded in the gate 3 and gate 11 tags above, including the one number
 that must not be quoted as a pass: the transcript produced is **1 cue of degenerate
 repetition**, on `whisper-base`, which is NOT the tier `defaultWhisperTier('ja')` picks.
+### 2026-09-01 — gate 1 CLOSES on a real multi-dub download
+
+`86014306`. The blocker was the probe, not the absence of a subject: yt-dlp's logged-out
+default client exposes only the primary track on current multi-dub videos. The shared probe
+now asks `web_embedded,default`, keeping the fallback while exposing alternate dubs; production
+and `--gateAudio` import the same argument builder.
+
+Live on `OFDfLnG987E`: 12 distinct manifest languages; `ja` selected exact format `251-3`
+tagged `ja`, and the app's audio-only arguments produced a 1,177,311-byte, 32.879-second m4a.
+Same-video `zh` control refused `noSuchAudioLanguage` and downloaded nothing. The `original`
+control retained both legacy format strings byte-for-byte. Gate 1 is CLOSED; mining is 9/12.
 
 ### 2026-09-01 — gate 5 CLOSES, measured on the real profile
 

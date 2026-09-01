@@ -19,6 +19,7 @@ import {
   normalizeYouTubeAudioLang,
   pickAudioTrack,
   planYoutubeAudioTrack,
+  youtubeAudioProbeArgs,
   youtubeFormatArgs,
   type YtDlpFormat,
 } from '../ytAudioLang';
@@ -55,6 +56,20 @@ describe('YouTubeAudioLang normalisation', () => {
   it('isYouTubeAudioLang rejects the subtitle list\'s "none"', () => {
     expect(isYouTubeAudioLang('none')).toBe(false);
     expect(isYouTubeAudioLang('original')).toBe(true);
+  });
+});
+
+describe('youtubeAudioProbeArgs', () => {
+  it('asks the client that exposes alternate dubs and retains the default fallback', () => {
+    const url = 'https://www.youtube.com/watch?v=multi-dub';
+    expect(youtubeAudioProbeArgs(url)).toEqual([
+      '--extractor-args',
+      'youtube:player_client=web_embedded,default',
+      '-J',
+      '--no-playlist',
+      '--no-warnings',
+      url,
+    ]);
   });
 });
 

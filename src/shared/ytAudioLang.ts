@@ -67,6 +67,26 @@ export interface YtDlpFormat {
   format_note?: string | null;
 }
 
+/**
+ * Arguments for the manifest probe used before selecting a requested dub.
+ *
+ * yt-dlp's logged-out default YouTube client currently exposes only the
+ * primary audio language on multi-dub videos. `web_embedded` exposes the
+ * alternate tracks where YouTube permits it; `default` remains as a fallback
+ * for videos the embedded client cannot inspect. Keep this in the shared
+ * module so the production caller and the live gate census cannot drift.
+ */
+export function youtubeAudioProbeArgs(url: string): string[] {
+  return [
+    '--extractor-args',
+    'youtube:player_client=web_embedded,default',
+    '-J',
+    '--no-playlist',
+    '--no-warnings',
+    url,
+  ];
+}
+
 /** An audio track this module is willing to name. */
 export interface YtAudioTrack {
   formatId: string;
