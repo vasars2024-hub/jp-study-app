@@ -160,13 +160,20 @@ const LOAD_ARM = (heavyJs, deadlineMs) => `(() => {
     // Generation AND deadline, both checked here rather than by whoever stops it. An aborted
     // run leaves no stopper behind; it must still stop.
     //
-    // A SUPERSEDED TICK MUST TOUCH NOTHING. This first read `if (gen mismatch || past deadline)
-    // { window.__lqLoad = null }`, and that one line voided all four under-load legs of the
-    // first two runs with `0 cycles, 0 refusals, last: null`. Stopping bumps the generation, the
+    // A SUPERSEDED TICK MUST TOUCH NOTHING. This first read 'if (gen mismatch || past deadline)
+    // { window.__lqLoad = null }', and that one line voided all four under-load legs of the
+    // first two runs with '0 cycles, 0 refusals, last: null'. Stopping bumps the generation, the
     // previous generation's timer fires up to 2 s later, and it cleared the record the NEXT leg
     // had just armed — across runs too, because the page had not reloaded between them. A dead
     // generation may stop itself and nothing else; only the owner of the current record may
-    // clear it. Same family as `deleting-probe-state-is-not-a-stop`.
+    // clear it. Same family as 'deleting-probe-state-is-not-a-stop'.
+    //
+    // TRAP, and it is why this comment uses quotes: these lines live INSIDE the LOAD_ARM
+    // template literal opened on line 154. A backtick here does not comment -- it CLOSES the
+    // template, and the next word parses as real JS. 98c78aa5 added this note with backticks
+    // and shipped a probe that 'node --check' rejects outright, which is what actually voided the
+    // two under-load runs the note claims to have fixed. Never put a backtick in a comment
+    // inside a template literal.
     if (window.__lqLoadGen !== gen) return;
     if (Date.now() > rec.until) { if (window.__lqLoad === rec) window.__lqLoad = null; return; }
     let r;
