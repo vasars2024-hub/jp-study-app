@@ -142,9 +142,28 @@ An empty result is a FINDING: say so and stop.
         that absence is asserted in `ytAudioLang.test.ts`. -->
 3. An audio-only download of a video with no subtitles produces a transcript with a stated
    cue count, through the existing transcription queue.
-   <!-- status: open; evidence: blocked on an exclusive Electron + a Whisper run. The transcription queue exists
-        (`transcription:enqueue`, `ytMarkTranscribed`); what is missing is a live run with a
-        stated cue count. -->
+   <!-- status: open; evidence: 2026-09-01 660f10c7 -- the run HAPPENED this time, end to end, and
+        the gate still does not close. No longer "blocked on an exclusive Electron": this
+        worktree drives its own app (vite 5273 / bridge 39274 / userData %TEMP%\jp-filesapp-
+        scratch, 0 media rows at the start).
+          audio-only download  GSx0rW2aHs8, 54 s, yt-dlp's own words "has no subtitles"
+                               (automatic captions only). Landed as kind:"audio", one .m4a of
+                               850.9 KB, and ZERO .srt/.vtt/.ass anywhere in the profile --
+                               media.ts:285 makes that structural, `audioOnly` sends no
+                               subtitle langs at all. So "a video with no subtitles" is true
+                               twice: at the source and on disk.
+          queue                preparing -> extracting-audio -> transcribing x2 -> aligning
+                               -> done. No error phase.
+          transcript           subtitles/<mediaId>/generated-ja.srt, 2,919 bytes.
+        And that is where it stops being a pass. The file holds **1 cue** spanning
+        00:00:00-00:00:30 whose text is degenerate repetition -- `カカカカ…` then `いい いい …`,
+        1,110 chars of it. That is a number, but it is not a transcript, and reporting "1 cue"
+        as a PASS is exactly the false success this plan's gates exist to catch.
+        DO NOT score this against the app yet: **I forced the tier to `whisper-base` (75 MB) to
+        keep the download short, and `defaultWhisperTier('ja')` is `kotoba-whisper` (320 MB).**
+        A real user gets kotoba; I measured a model I downgraded, so the degenerate output is
+        as likely to be my instrument as the product. The next turn re-runs on the DEFAULT
+        tier and only then decides whether this is a product defect. -->
 4. A card mined from that transcript reaches its destination AND renders as
    transcript-derived; a card from human subtitles on the same surface does not carry that mark.
    <!-- status: closed; evidence: 2026-09-01 93237b79 -- live via `--gate4` on the real profile, both halves. Transcript
@@ -182,13 +201,67 @@ An empty result is a FINDING: say so and stop.
 11. The extension button transcribes the audio of the page being watched and returns a cue
    count, with a named refusal when no audio is resolvable. The result lands in the catalogue
    (gate 5), so it is mineable later without returning to the page.
-   <!-- status: open; evidence: 3a0199fe -- BUILT (media.transcribe, POST /v1/transcribe, five named refusals, 14 tests) but the CUE COUNT was never measured. Needs an exclusive Electron. -->
+   <!-- status: open; evidence: 2026-09-01 660f10c7 -- driven LIVE for the first time, against this
+        worktree's own extension server (18865, owned by MY pid; 18765 is the other app's). The
+        refusal half CLOSES; the cue-count half found a real defect and stays open.
+          refusals, live, on one URL, distinct reasons:
+            before download   notDownloaded  + canDownload:true
+            non-video page    notAVideoPage
+            no Bearer token   401 Unauthorized
+            after download    state:"queued"  <- the control pair: only the download changed
+          cue count         STILL "pending", cueCount:null -- for a job that reached
+                            phase:"done" and wrote a real 2,919-byte file.
+        THE DEFECT: the route's own comment claims "the result therefore lands at
+        `yt-transcripts/<id>.json`, which is where the Files-app transcripts enumerator reads".
+        Measured, that is FALSE. `transcriptionJobs` writes
+        `subtitles/<mediaId>/generated-ja.srt`; `yt-transcripts/` does not exist in the profile
+        at all. So POST enqueues through one sink and GET /v1/transcribe/status polls another
+        (`readTranscriptCueCount`, ytPlaylists.ts), and a SUCCESSFUL transcription is reported
+        as `pending` forever. Two producers, two sinks, one poller looking at the wrong one.
+        This is also an honest-states failure in the gate's own reporting path: "pending" is
+        indistinguishable from "ran and finished", and from "ran and failed" -- the FIRST run
+        this turn ended `phase:"error" err:"empty"` and the status route said "pending" for
+        that too, then the job vanished from transcription-jobs.json (2 bytes, `[]`).
+        EXACT NEXT SLICE: make the status route answer from the sink the queue actually writes
+        (count cues in the media row's generated track) while keeping the yt-transcripts read
+        for the playlist path, and give a retired/failed job a state of its own so it stops
+        reading as pending. -->
+   <!-- trap: the ONE reason this could not be measured before was never "an exclusive
+        Electron". It was that a second dev instance had no extension server at all -- it lost
+        the bind to 18765 and still advertised it. See 660f10c7; JP_EXTENSION_PORT fixes it. -->
 12. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
    `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
    gate here — 327 pre-existing errors on a clean tree; prove "no new" by set-difference.
    <!-- status: open; evidence: the four full gates run every turn, but `npx vitest run` is not clean on this tree -- see the turn logs for the named failures. -->
 
 ## Progress
+
+### 2026-09-01 — gates 3 and 11 driven live at last, and what actually blocked them
+
+Neither was ever blocked on "an exclusive Electron". Two environment gaps were, and both are
+the same shape as `f104600b` — things a git worktree does not inherit:
+
+1. **No extension server.** The second dev instance lost the bind to 18765 and still reported
+   `port: 18765` — the FIRST app's. Fixed in `660f10c7` (`JP_EXTENSION_PORT`, dev-only, plus a
+   named `stoppedReasonKey` so a bind failure stops reading as a bare "stopped").
+2. **`public/ort/` is GITIGNORED** (`.gitignore:104`, 73.7 MB, 8 files, hand-populated — no
+   script generates it). A worktree has no `public/` beyond `sounds` + `tray-icon.png`, so
+   every ONNX backend fails and Whisper cannot run at all. The failure does NOT look like a
+   missing file: Vite's SPA fallback answers `/ort/ort-wasm-simd-threaded.asyncify.mjs` with
+   **HTTP 200 and `Content-Type: text/html`**, so a status-code check reads healthy on both
+   ports. Only the response BODY tells them apart (`<!doctype html>` here, real WASM glue on
+   5173). The renderer's own message — `no available backend found. ERR: [webgpu] Failed to
+   fetch dynamically imported module` — names webgpu and hides the 404-shaped cause.
+   Fix applied locally: copy `public/ort/` from the main checkout, then RESTART (Vite does not
+   pick up a public dir created under a running server). Gitignored, so nothing to commit.
+   Also missing in a worktree, not needed for Whisper but worth knowing: `public/models`
+   (1.28 GB), `cedict` (9.4 MB), `kuromoji` (17 MB), `tesseract` (10.4 MB).
+   **A durable fix — a `tools/` copy step wired into `postinstall`, next to the three that
+   already run there — is NOT yet written. It is the cheapest way to stop this recurring.**
+
+Measured outcomes are recorded in the gate 3 and gate 11 tags above, including the one number
+that must not be quoted as a pass: the transcript produced is **1 cue of degenerate
+repetition**, on `whisper-base`, which is NOT the tier `defaultWhisperTier('ja')` picks.
 
 ### 2026-09-01 — gate 5 CLOSES, measured on the real profile
 
