@@ -21,7 +21,11 @@
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat4-use-of-space.cjs \
  *     --surface "Library" [--win main] [--label l6-library] [--out <file>] [--control] \
- *     [--compact 260x170] [--settle 500]
+ *     [--compact 260x170] [--settle 500] [--zoom 2.0] [--ui-request "bigger text"]
+ *
+ * `--zoom` and `--ui-request` are L11 bullet 2's zoom and text-scaling clauses: a global CONDITION
+ * the whole existing sweep runs under, applied and restored through the product's own code. See
+ * correction 25.
  *
  * --surface takes the same two forms as the category-1, -2 and -8 harnesses, deliberately, so a
  * surface is named identically in all four: a leading `@` is a CSS SELECTOR (a section of the main
@@ -187,6 +191,41 @@ const SETTLE = Number(arg('settle', '500')) || 500;
 const COMPACT = arg('compact', '260x170');
 const SUBMIN = arg('submin', '200x140');
 
+/**
+ * CORRECTION 25. ZOOM AND TEXT SCALING ARE A CONDITION TO RUN THE EXISTING SWEEP UNDER, NOT A
+ * NEW PROBE. L11 bullet 2 names both by name, and neither is browser zoom or OS DPI:
+ *   --zoom <factor>        `src/renderer/appZoom.ts`. Scales `#root` with CSS `zoom` and re-sizes
+ *                          it to (100/z)vw x (100/z)vh so the painted box stays exactly one
+ *                          viewport. ZOOM_MIN 0.8, ZOOM_MAX 2.0, snapped to 0.05.
+ *   --ui-request "<words>" `src/shared/uiCustomization.ts`. The product's own natural-language
+ *                          interpreter: "bigger text" -> the `bigger-text` intent -> a token patch
+ *                          on font-size-sm/md/lg. There is NO `data-display-*` hook for text
+ *                          scale; looking for one is the wrong search.
+ * Both drive the PRODUCT'S OWN code through a Vite dev module URL rather than a reimplementation.
+ * That is faithful here specifically because neither entry point carries module-level state:
+ * `applyZoom` writes `--app-zoom` and `#root`, and `getZoomFactor()` READS `--app-zoom` back from
+ * the DOM, so the app's own copy of the module agrees with a second instance. `applyUiCustomization`
+ * looks its one `<style>` element up by id. A duplicate instance of a module that DID hold state
+ * would measure the duplicate.
+ * Four guards, because a condition that silently fails to apply scores a perfect unzoomed run —
+ * correction 4's failure mode wearing a different hat:
+ *   a. the condition must demonstrably CHANGE something, or the run VOIDs;
+ *   b. it must still be applied AFTER the sweep. `installZoomResizeHook` re-applies the PERSISTED
+ *      zoom on every window `resize`, so the `/bounds` lever on a root surface silently undoes it;
+ *   c. restore is byte-compared on `#root`'s cssText, the custom-CSS element and the resolved font
+ *      tokens, not eyeballed;
+ *   d. neither entry point may persist. `applyZoom` does not (only `setZoom` writes
+ *      `jp-app-zoom`), and `applyUiCustomization` does not (only `saveUiCustomizationDocument`
+ *      writes `jp-ui-customization-v1`). Both storage keys are compared before and after anyway.
+ */
+const ZOOM = arg('zoom', '');
+const UI_REQUEST = arg('ui-request', '');
+const HAS_CONDITION = Boolean(ZOOM || UI_REQUEST);
+if (ZOOM && !(Number(ZOOM) >= 0.8 && Number(ZOOM) <= 2.0)) {
+  console.error(`REFUSE - --zoom must be within the product's own ZOOM_MIN 0.8 .. ZOOM_MAX 2.0, got ${ZOOM}`);
+  process.exit(2);
+}
+
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
   process.exit(2);
@@ -232,6 +271,91 @@ async function ev(js) {
   return t.result;
 }
 const sleep = (ms) => new Promise((s) => { setTimeout(s, ms); });
+
+// --- CORRECTION 25's condition mode -------------------------------------------------------
+// One expression per /eval, and a dynamic import returns a promise, which serializes to `{}`.
+// So the modules are stashed on globals and the status is polled.
+const CONDITION_BOOT = `(window.__cat4cond = { s: 'pending' }, Promise.all([
+  import('/src/renderer/appZoom.ts'),
+  import('/src/shared/uiCustomization.ts'),
+  import('/src/renderer/uiCustomizationStore.ts')
+]).then(function (m) {
+  window.__cat4zoom = m[0]; window.__cat4uic = m[1]; window.__cat4uis = m[2];
+  window.__cat4cond = { s: 'ok' };
+}).catch(function (e) { window.__cat4cond = { s: 'err', e: String(e) }; }), 'kicked')`;
+
+const CONDITION_SNAPSHOT = `JSON.stringify({
+  appZoomVar: document.documentElement.style.getPropertyValue('--app-zoom'),
+  rootStyle: (document.getElementById('root') || { style: {} }).style.cssText,
+  zoomFactor: window.__cat4zoom.getZoomFactor(),
+  zoomPersisted: localStorage.getItem('jp-app-zoom'),
+  uiCss: document.getElementById('jp-ui-customization')
+    ? document.getElementById('jp-ui-customization').textContent : null,
+  uiPersisted: localStorage.getItem('jp-ui-customization-v1'),
+  fontSm: getComputedStyle(document.documentElement).getPropertyValue('--font-size-sm').trim(),
+  fontMd: getComputedStyle(document.documentElement).getPropertyValue('--font-size-md').trim(),
+  fontLg: getComputedStyle(document.documentElement).getPropertyValue('--font-size-lg').trim()
+})`;
+
+async function conditionSnapshot() { return JSON.parse(await ev(CONDITION_SNAPSHOT)); }
+
+// The two halves of the round trip are separate so the sweep can sit between them and so the
+// "still applied afterwards" re-read (guard b) has something to compare against.
+async function conditionApply() {
+  await ev(CONDITION_BOOT);
+  for (let i = 0; i < 40; i += 1) {
+    const st = JSON.parse(await ev('JSON.stringify(window.__cat4cond)'));
+    if (st.s === 'ok') break;
+    if (st.s === 'err') { console.error(`REFUSE - condition modules failed to import: ${st.e}`); process.exit(2); }
+    await sleep(150);
+  }
+  const before = await conditionSnapshot();
+  /*
+   * CORRECTION 25a. `setZoom`, NOT `applyZoom`, and it took a landed fix to notice.
+   * `applyZoom` produces the same DOM as `setZoom` minus persistence — which reads like the
+   * strictly safer probe entry point, and this file used it first for exactly that reason. But
+   * only `setZoom` dispatches `app-zoom-changed`, and that event is the product's cross-surface
+   * zoom contract: the Settings slider syncs off it, and so does the desktop shell's re-fit of
+   * window geometry into the new layout viewport. A probe on `applyZoom` therefore measures a
+   * state the product never reaches through its own control, and would have scored the shell's
+   * zoom handling as broken after it was fixed.
+   * The persistence that comes with it is handled the way this repo handles any persisted
+   * setting: captured, patched, restored, and byte-compared — including the ABSENT case, where
+   * the key must end up removed rather than written back as the default.
+   */
+  if (ZOOM) await ev(`(window.__cat4zoom.setZoom(${Number(ZOOM)}), 'applied')`);
+  if (UI_REQUEST) {
+    const q = JSON.stringify(UI_REQUEST);
+    await ev(`(window.__cat4plan = window.__cat4uic.interpretUiRequest(${q}), window.__cat4uis.applyUiCustomization(
+      window.__cat4uis.loadUiCustomizationDocument(),
+      { tokens: window.__cat4plan.tokens, componentSettings: window.__cat4plan.componentSettings }
+    ), 'applied')`);
+  }
+  await sleep(SETTLE);
+  const during = await conditionSnapshot();
+  const plan = UI_REQUEST ? JSON.parse(await ev('JSON.stringify(window.__cat4plan)')) : null;
+  return { before, during, plan };
+}
+
+// Restore uses the PRODUCT'S own no-argument calls: `applyZoom(loadZoom())` re-applies whatever is
+// persisted (the app's real state), and `applyUiCustomization()` with no preview re-renders the
+// active profile. Neither is this file writing values back by hand.
+async function conditionRestore(before) {
+  if (ZOOM) {
+    // Back through the same product route, so the shell gets its `app-zoom-changed` on the way
+    // out too — then the storage key is put back exactly as found. `setZoom` always writes, so
+    // an originally-absent key has to be removed, not written back as "1".
+    const original = before.zoomPersisted;
+    await ev(`(window.__cat4zoom.setZoom(${Number(original == null ? 1 : original)}), 'restored')`);
+    if (original == null) await ev("(localStorage.removeItem('jp-app-zoom'), 'unset')");
+  }
+  if (UI_REQUEST) await ev('(window.__cat4uis.applyUiCustomization(window.__cat4uis.loadUiCustomizationDocument()), \'restored\')');
+  await sleep(SETTLE);
+  const after = await conditionSnapshot();
+  const fields = ['appZoomVar', 'rootStyle', 'zoomPersisted', 'uiCss', 'uiPersisted', 'fontSm', 'fontMd', 'fontLg'];
+  const drifted = fields.filter((f) => String(before[f]) !== String(after[f]));
+  return { after, drifted };
+}
 
 const rootExpr = (surface) => (surface.startsWith('@')
   ? `document.querySelector(${JSON.stringify(surface.slice(1))})`
@@ -1254,8 +1378,16 @@ const BARS_OF = (m) => ({
 });
 
 (async () => {
+  // CORRECTION 25 guard (a): the condition goes on FIRST, so every size leg below — including the
+  // `default` leg, which is read as-found — is measured under it rather than beside it.
+  const cond = HAS_CONDITION ? await conditionApply() : null;
+
   const base = await read();
-  if (base.refuse) { console.error(`REFUSE - ${base.refuse}`); process.exit(2); }
+  if (base.refuse) {
+    if (cond) await conditionRestore(cond.before);
+    console.error(`REFUSE - ${base.refuse}`);
+    process.exit(2);
+  }
 
   // CORRECTION 14. Which lever this surface needs is a DOM fact, not a fact about the argument's
   // first character. A `@`-rooted section that lives inside a `.fwin` gets the frame's levers;
@@ -1341,6 +1473,47 @@ const BARS_OF = (m) => ({
   // never 10". NOT-APPLICABLE means the number exists, is recorded at every size, and the bar is
   // not a question this shape of surface can answer. Folding the first into the second would let
   // a broken run score; folding the second into the first makes a desktop unscoreable forever.
+  /*
+   * CORRECTION 25, the four guards. The sweep is over, so this is the last moment the condition
+   * can still be checked against the same window the numbers came from.
+   */
+  let conditionReport = null;
+  if (cond) {
+    const stillOn = await conditionSnapshot();
+    const zoomChanged = ZOOM ? cond.during.zoomFactor !== cond.before.zoomFactor : null;
+    const fontChanged = UI_REQUEST
+      ? ['fontSm', 'fontMd', 'fontLg'].some((f) => cond.during[f] !== cond.before[f])
+      : null;
+    const zoomHeld = ZOOM ? stillOn.zoomFactor === cond.during.zoomFactor : null;
+    const fontHeld = UI_REQUEST
+      ? ['fontSm', 'fontMd', 'fontLg'].every((f) => stillOn[f] === cond.during[f])
+      : null;
+    conditionReport = {
+      zoom: ZOOM ? Number(ZOOM) : null,
+      uiRequest: UI_REQUEST || null,
+      uiPlan: cond.plan ? { intents: cond.plan.intents, tokens: cond.plan.tokens, unmatched: cond.plan.unmatched } : null,
+      productRoute: [
+        ZOOM ? "src/renderer/appZoom.ts applyZoom() - applies without persisting; setZoom is the one that writes jp-app-zoom" : null,
+        UI_REQUEST ? 'src/shared/uiCustomization.ts interpretUiRequest() -> uiCustomizationStore.applyUiCustomization(doc, preview) - the preview argument is the product\'s own non-persisting path' : null,
+      ].filter(Boolean),
+      // (a) did it actually take?
+      zoomFactorBefore: cond.before.zoomFactor,
+      zoomFactorDuring: cond.during.zoomFactor,
+      fontTokensBefore: { sm: cond.before.fontSm, md: cond.before.fontMd, lg: cond.before.fontLg },
+      fontTokensDuring: { sm: cond.during.fontSm, md: cond.during.fontMd, lg: cond.during.fontLg },
+      applied: (zoomChanged !== false) && (fontChanged !== false),
+      // (b) was it still on when the last number was taken?
+      heldThroughSweep: (zoomHeld !== false) && (fontHeld !== false),
+      zoomFactorAfterSweep: stillOn.zoomFactor,
+      // (c) and (d) are filled in after the negative-control legs below — the control has to run
+      // under the SAME condition as the measurement it must falsify, or its injected clip is
+      // compared against a baseline taken in a different state.
+      restored: null,
+      driftedFields: null,
+      persistedUnchanged: null,
+    };
+  }
+
   const notApplicable = Object.entries(bars).filter(([, v]) => v === 'NOT-APPLICABLE').map(([k]) => k);
   const unmeasured = Object.entries(bars).filter(([, v]) => typeof v === 'string' && v !== 'NOT-APPLICABLE').map(([k]) => k);
   const failed = Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k);
@@ -1354,6 +1527,7 @@ const BARS_OF = (m) => ({
       ? 'desktop-window surface (no .fwin above it)'
       : (SURFACE.startsWith('@') ? 'section inside a floating window' : 'floating window'),
     viewport: base.viewport,
+    globalCondition: conditionReport,
     sizes: perSize,
     refusedLegs: refused.map((l) => ({
       kind: l.kind,
@@ -1546,6 +1720,31 @@ const BARS_OF = (m) => ({
     }
     if (!submin.refuse && submin.restored !== true) {
       out.verdict = 'VOID - the sub-minimum leg did not restore the surface';
+    }
+  }
+
+  // CORRECTION 25. The condition comes OFF here, after the control legs, so everything this run
+  // measured — sweep and control alike — was measured in one state.
+  if (conditionReport) {
+    const { after, drifted } = await conditionRestore(cond.before);
+    conditionReport.restored = drifted.length === 0;
+    conditionReport.driftedFields = drifted;
+    conditionReport.persistedUnchanged = String(cond.before.zoomPersisted) === String(after.zoomPersisted)
+      && String(cond.before.uiPersisted) === String(after.uiPersisted);
+  }
+
+  // These VOID rather than fail, and they are checked LAST so a condition run that never actually
+  // got its condition on can never be read as a clean sweep. An unzoomed window measures
+  // perfectly at 0.8 and at 2.0 alike.
+  if (conditionReport) {
+    if (!conditionReport.applied) {
+      out.verdict = 'VOID - the requested global condition did not change the app; an unapplied condition scores the default state';
+    } else if (!conditionReport.heldThroughSweep) {
+      out.verdict = 'VOID - the global condition was undone during the sweep (installZoomResizeHook re-applies the persisted zoom on any OS-window resize)';
+    } else if (!conditionReport.restored) {
+      out.verdict = `VOID - the global condition did not restore: ${conditionReport.driftedFields.join(',')}`;
+    } else if (!conditionReport.persistedUnchanged) {
+      out.verdict = 'VOID - the global condition wrote to persisted storage; this run changed the user profile';
     }
   }
 
