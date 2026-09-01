@@ -445,7 +445,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    start without evicting another track's instrument; same entry says why and what clears it.
 9. Deleting a derived item removes exactly it; the guard for irreplaceable media refuses without
    an explicit confirmation, proven by a refusal that actually fires.
-   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 8bb2fd8b (live) -- "exactly it":
+   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 341b94e4 (live) -- "exactly it":
         the live probe deletes one of two real 4 KB files through the PRODUCTION
         deleteFilesItemInMain and the bystander is still on disk after; the soft-delete half is
         asserted on the production FilesApp, where one row leaves the list AND the item count
@@ -507,7 +507,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    Bin (`shell.trashItem`) and it is restorable from there — verified by actually restoring one.
    An index-only row is soft-deleted with a working undo. Where neither applies, the confirm
    says so in different words from a recoverable delete.
-   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 8bb2fd8b (live) --
+   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 341b94e4 (live) --
         debug/filesapp-trash-roundtrip.cjs, a real Electron main process calling the production
         deleteFilesItemInMain with the real shell.trashItem: a self-created 4 KB file leaves the
         disk, is FOUND IN THE BIN by its original path, is put back by the bin's own Restore
