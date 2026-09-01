@@ -588,6 +588,17 @@ export interface PopupOptions {
   tabs?: unknown[];
   /** Seed for `chrome.storage.local`, which settings.js reads on load. */
   seed?: Record<string, unknown>;
+  /**
+   * Collapse the window's `setTimeout` delays to 0.
+   *
+   * `followTranscription` sleeps `TRANSCRIBE_POLL_MS` (4 s) up to
+   * `TRANSCRIBE_POLL_LIMIT` (300) times, so its loop is unreachable in a test at
+   * real speed. Delays are collapsed rather than faked with a virtual clock
+   * because popup.js reads `Date.now()` for the elapsed counter, and a virtual
+   * clock that moved one but not the other would report times that cannot occur.
+   * Ordering is preserved; only the waiting is removed.
+   */
+  fastPoll?: boolean;
 }
 
 export interface JpMessage {
@@ -607,6 +618,8 @@ export interface PopupHarness {
   text(selector: string): string;
   /** The rendered `.pill` chips, in DOM order — what the popup actually shows. */
   pills(): string[];
+  /** Click a rendered `button[data-action="…"]`; throws if it is not on screen. */
+  clickAction(action: string): void;
   /** Close the window so `followTranscription`'s poll timer cannot outlive the test. */
   dispose(): void;
 }
@@ -642,6 +655,11 @@ export function loadPopupSandbox(options: PopupOptions = {}): PopupHarness {
     Promise.resolve(options.tabRespond?.(msg))) as never;
 
   (win as unknown as Record<string, unknown>).chrome = chromeStub;
+  if (options.fastPoll) {
+    const real = win.setTimeout.bind(win);
+    (win as unknown as Record<string, unknown>).setTimeout = (fn: () => void, _ms?: number, ...rest: unknown[]) =>
+      real(fn as never, 0, ...(rest as never[]));
+  }
   for (const file of ['shared.js', 'settings.js', 'popup.js']) {
     win.eval(readExtensionFile(file));
   }
@@ -658,6 +676,18 @@ export function loadPopupSandbox(options: PopupOptions = {}): PopupHarness {
     text: (selector) => win.document.querySelector(selector)?.textContent?.trim() ?? '',
     pills: () =>
       Array.from(win.document.querySelectorAll('.pill')).map((el) => (el.textContent ?? '').trim()),
+    clickAction: (action) => {
+      const btn = win.document.querySelector(`button[data-action="${action}"]`);
+      if (!btn) {
+        const offered = Array.from(win.document.querySelectorAll('button[data-action]'))
+          .map((b) => (b as HTMLElement).dataset.action)
+          .join(', ');
+        // Naming what IS offered turns "the click did nothing" into a diagnosis:
+        // renderActions is page-kind dependent and the fixture is usually why.
+        throw new Error(`popup offers no "${action}" action. Rendered: [${offered || 'none'}]`);
+      }
+      (btn as HTMLElement).click();
+    },
     dispose: () => win.close(),
   };
 }

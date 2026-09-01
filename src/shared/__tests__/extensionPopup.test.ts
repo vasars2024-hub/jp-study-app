@@ -149,6 +149,115 @@ describe('extension popup — transcription pill', () => {
   });
 });
 
+describe('extension popup — the Transcribe button', () => {
+  /**
+   * The gate in the plan's own words is "the button transcribes the audio of the
+   * page being watched and RETURNS A CUE COUNT". `/v1/transcribe` can only answer
+   * `queued`, so the count arrives later from the status poller — which means the
+   * only honest check drives the click and then reads the feedback line the user
+   * ends up looking at. Six tests used to assert this by grepping popup.js for
+   * `followTranscription(res.videoId, res.queuedAt)`; that string can be present
+   * in a build where the button is never rendered at all.
+   */
+  function transcribeRun(statuses: unknown[]) {
+    const queue = [...statuses];
+    return loadPopupSandbox({
+      fastPoll: true,
+      respond: (msg: JpMessage) => {
+        switch (msg.type) {
+          case 'status-summary':
+            return { ok: true, app: true, paired: true, pending: 0 };
+          case 'detect':
+            return youtubeDetect;
+          case 'transcribe-status':
+            // The page-load pill takes the first entry; the poller takes the rest.
+            return queue.length > 1 ? queue.shift() : queue[0];
+          case 'run-command':
+            return msg.command === 'media.transcribe'
+              ? { ok: true, state: 'queued', videoId: 'GSx0rW2aHs8', queuedAt: Date.now() }
+              : { ok: false };
+          default:
+            return undefined;
+        }
+      },
+      tabRespond: () => undefined,
+    });
+  }
+
+  it('ends on the cue count after following a job it queued', async () => {
+    harness = transcribeRun([
+      { ok: true, state: 'notStarted' },
+      { ok: true, state: 'pending', queuedAt: Date.now() },
+      { ok: true, state: 'transcribed', cueCount: 8 },
+    ]);
+    await harness.settle();
+
+    harness.clickAction('transcribe');
+    await harness.settle(40);
+
+    expect(harness.text('#feedback')).toBe('Transcribed — 8 cues. Mine it from Files or Mining.');
+    expect(harness.document.getElementById('feedback')?.className).toBe('ok');
+  });
+
+  it('says a job left no text rather than reporting a count it does not have', async () => {
+    harness = transcribeRun([
+      { ok: true, state: 'notStarted' },
+      { ok: true, state: 'failed', reason: 'job-ended-without-transcript' },
+    ]);
+    await harness.settle();
+
+    harness.clickAction('transcribe');
+    await harness.settle(40);
+
+    expect(harness.text('#feedback')).toBe(
+      'The transcription ended without a transcript. Retry from the Media library.',
+    );
+    expect(harness.document.getElementById('feedback')?.className).toBe('err');
+  });
+
+  it('keeps notStarted and failed on separate sentences all the way to the DOM', async () => {
+    harness = transcribeRun([
+      { ok: true, state: 'notStarted' },
+      { ok: true, state: 'notStarted' },
+    ]);
+    await harness.settle();
+
+    harness.clickAction('transcribe');
+    await harness.settle(40);
+
+    // The control for the one above: same click, same button, a DIFFERENT
+    // sentence. A shared "transcription failed" for both is the defect the
+    // named-refusal table exists to prevent, and only a live read can tell.
+    expect(harness.text('#feedback')).toBe(
+      'Nothing has been downloaded for this video yet, so no transcription has run.',
+    );
+  });
+
+  it('offers no Transcribe button on a page with no audio to transcribe', async () => {
+    const popup = loadPopupSandbox({
+      respond: (msg: JpMessage) => {
+        if (msg.type === 'status-summary') return { ok: true, app: true, paired: true, pending: 0 };
+        if (msg.type === 'detect') {
+          return {
+            ok: true,
+            scriptable: true,
+            kind: 'article',
+            url: 'https://example.com/a',
+            title: 'A',
+            categoryLabel: 'News',
+          };
+        }
+        return undefined;
+      },
+      tabRespond: () => undefined,
+    });
+    harness = popup;
+    await popup.settle();
+
+    expect(() => popup.clickAction('transcribe')).toThrow(/offers no "transcribe" action/);
+  });
+});
+
 describe('extension popup — status header', () => {
   it('reports the app as not running when the background worker says so', async () => {
     harness = loadPopupSandbox({
