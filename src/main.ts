@@ -120,6 +120,30 @@ if (started) {
   app.quit();
 }
 
+// A dev-only, opt-in userData redirect, so a second instance can be driven while
+// another one holds the machine.
+//
+// This MUST run before requestSingleInstanceLock() below: Electron keys that lock on
+// the userData path, so without the redirect a second copy loses the lock, calls
+// app.quit(), and routes its argv into the FIRST app — which reads as "my instance
+// never started" and is not that at all.
+//
+// It is deliberately an env var rather than the `--user-data-dir` Chromium switch.
+// Position-dependent switch parsing through `electron-forge start -- …` is not
+// something to be uncertain about here: the failure mode is two live instances on ONE
+// profile, and %APPDATA%\jp-study-app is 8.6 GB of leveldb/SQLite with no restore
+// point. An env var either took effect or it did not, and the value is echoed to the
+// log below so a driver can confirm which before any data is touched.
+//
+// Never in a packaged build, so a shipped app cannot be pointed at a scratch profile
+// by a stray environment variable.
+const altUserData = !app.isPackaged ? (process.env.JP_USER_DATA_DIR ?? '').trim() : '';
+if (altUserData) {
+  app.setPath('userData', path.resolve(altUserData));
+  app.setPath('sessionData', path.resolve(altUserData));
+  console.log(`[main] JP_USER_DATA_DIR -> userData = ${app.getPath('userData')}`);
+}
+
 // Single instance so a Startup hotkey can launch with `--toggle` / `--open=` /
 // `--restart` and route into the already-running copy.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();

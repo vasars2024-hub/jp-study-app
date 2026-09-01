@@ -21,7 +21,22 @@ import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
 import { llamaHostStats } from './llamaHost';
 
-const DEBUG_PORT = 39273;
+/**
+ * The bridge port. 39273 unless `JP_DEBUG_PORT` says otherwise.
+ *
+ * Why the override exists: this repo is worked from git worktrees, and a second
+ * dev instance is the ONLY way to drive a surface while another track's app holds
+ * the machine. The renderer half of that was already solved — `vite.renderer.config.ts`
+ * honours `PORT` for exactly this reason ("dev harnesses run alongside the Electron
+ * dev server, which owns the default") — but the bridge stayed hardcoded, so the
+ * second instance came up with `[debugBridge] disabled: EADDRINUSE` and no way to be
+ * driven. `debugRoot()` is already `cwd/debug`, so each worktree writes its own
+ * `bridge.json` and a client that reads it finds the right port with no extra wiring.
+ *
+ * An unset or unparseable value keeps 39273, so the normal `npm start` flow is
+ * byte-identical.
+ */
+const DEBUG_PORT = Number.parseInt(process.env.JP_DEBUG_PORT ?? '', 10) || 39273;
 const LOG_RING_LIMIT = 2000;
 const LOG_FILE_MAX_BYTES = 5 * 1024 * 1024;
 
