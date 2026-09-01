@@ -367,3 +367,59 @@ until this slice. Every main-process reader that resolves the profile through it
 `resolveItemEpubPath`, `readMiningConfig`, the frequency-dictionary root — was looking one
 directory too high and would have fallen back to defaults *silently*. `--gate7` was re-run
 after the fix and is byte-identical, so gates 5–8 are unaffected. 5 of 12 closed.
+
+### 2026-09-01 — gate 10 CLOSES, the Mining surface stops being epub-only
+
+`827931ba`. Flashcards → Mining had three tabs — Simple, Advanced, Jiten — and **all three are
+EPUB tools**. That is what "the epub-only simple mining entry point" means in practice: a
+Whisper transcript this app wrote itself could be mined only from the Files app. A fourth tab,
+**Catalogue**, lists every mineable asset in the index.
+
+**Categorised on TEXT PROVENANCE, not on media type**, per this plan's binding constraint. The
+primary filter is human subs / auto captions / whisper transcript / book text / unknown; kind is
+the secondary filter. `unknown` is offered rather than dropped — a sidecar no record claims
+still mines fine, and hiding it would hide working assets.
+
+**Nothing was replaced.** All three EPUB panels still render; `filesAppRouteParity.test.ts`
+re-derives `action:mine.book` from the `EpubMiningSimplePanel` symbol in the same file, so a
+future removal fails that suite rather than passing quietly. `action:mine.transcript` stays
+scored `new`, with its note updated: gate 10 gave it a second route, so it is no longer
+Files-app-only, but it did not exist before the Files app and `preserved` would claim a history
+it does not have.
+
+**Unify the surface, not the extractors.** The mine walk moved out of `FilesApp.tsx` into
+`renderer/components/filesapp/filesMineChain.ts`; both surfaces import it. A second copy is
+exactly how the two would come to mine one file to two different results, and the suite asserts
+neither file calls `buildFilesMineDrafts` or `addDeckCardsTracked` directly any more.
+
+**Live, `--gate10` on the real profile** — a tenth mode on the same census, re-deriving the
+panel's own partition from the production predicates:
+
+```
+index rows:      1979        catalogue lists: 87
+by kind:         book 20   subtitle 65   transcript 2
+by provenance:   human-subs 55   auto-captions 0   whisper-transcript 8
+                 book-text 20    unknown 4
+```
+
+Three controls, all firing: **(a)** the provenance buckets sum to **87 = 87**, so no asset sits
+under no filter; **(b)** **83** video/audio rows are in the index and **0** are listed, which is
+what proves `mineabilityOf` is being applied rather than the whole index being dumped;
+**(c)** **67 of 87** listed assets are NOT books — the gate's actual claim, since a catalogue of
+books alone would have changed nothing about a surface whose other three tabs are EPUB tools.
+
+**14 tests** in `renderer/__tests__/miningCataloguePanel.test.tsx`, on the real component. The
+controls are the content: a video row is in the fixture index and must be ABSENT; a filter that
+does not narrow fails; the machine-derived mark must be absent on the human-subtitle mine and
+present on the transcript one; the media filter must MOVE the provenance counts, since a count
+that stands still is describing a different set than the list beneath it; and the source scan
+strips comments and proves it does, because this file's own prose names every symbol it looks
+for.
+
+Honest states, all three distinct: an index that failed to read prints its error and no list, a
+genuinely empty index says what to do, and a missing desktop binding is its own message.
+
+**NOT claimed: the click.** The panel was mounted and driven under jsdom, not in Electron. The
+only app on this machine is the liquid track's instrument on `feat/nyaa-subtitles`, which does
+not contain the Files app, and a second app on the same 8.6 GB userData would strand it. 6 of
+12 closed.

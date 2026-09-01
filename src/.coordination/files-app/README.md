@@ -14,7 +14,7 @@ npx esbuild src/.coordination/files-app/census.ts --bundle --platform=node \
   --format=cjs --external:better-sqlite3 --external:node-llama-cpp \
   --alias:electron=./src/.coordination/files-app/electron-stub.ts \
   --outfile=debug/filesapp-census.cjs
-node debug/filesapp-census.cjs [userDataPath] [--mining] [--detail] [--dupes] [--gate68] [--gate7] [--gate9]
+node debug/filesapp-census.cjs [userDataPath] [--mining] [--detail] [--dupes] [--gate68] [--gate7] [--gate9] [--gate10]
 ```
 
 `userDataPath` defaults to `%APPDATA%\jp-study-app`. `debug/` is gitignored, so
@@ -40,6 +40,7 @@ The modes:
 | `--gate68` | MINING gates 6 & 8 — transcribed assets found through the presets |
 | `--gate7` | MINING gate 7 — the whole mine chain, end to end, per category |
 | `--gate9` | MINING gate 9 — both epub outlets on ONE book, counts side by side |
+| `--gate10` | MINING gate 10 — what the catalogue tab lists, by kind and provenance |
 
 `--gate9` is the only mode that calls a **main-process IPC handler**. It runs
 `registerMiningIpc()` and takes `mining:analyzeEpub` / `mining:getConfig` out of

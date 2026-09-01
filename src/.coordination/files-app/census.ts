@@ -849,3 +849,84 @@ if (process.argv.includes('--gate9')) {
     console.log(`GATE 9: ${failures === 0 ? 'PASS' : 'FAIL'}`);
   })();
 }
+
+/**
+ * `--gate10` — what the Mining catalogue lists, on the live profile.
+ *
+ * "One Mining surface hosts the catalogue, replacing the epub-only 'simple
+ * mining' entry point without losing any capability it had."
+ *
+ * `miningCataloguePanel.test.tsx` proves the panel's behaviour on a four-row
+ * fixture: the filters narrow, the empty categories say so, the machine mark
+ * appears only where it should. What a fixture cannot say is how many real
+ * assets the tab opens onto, or that the provenance axis is *discriminating* on
+ * this profile rather than every row landing in one bucket. That is this mode.
+ *
+ * It re-derives the panel's own partition — `mineabilityOf` -> media kind ->
+ * provenance — from the production predicates, over the same one
+ * `buildFilesIndex` call every other mode uses.
+ *
+ * Controls:
+ *  (a) THE PARTITION IS COMPLETE — the per-provenance counts must sum to the
+ *      mineable total. A bucket silently dropped would leave assets that appear
+ *      under no filter, which is the same defect as omitting an empty category.
+ *  (b) THE PANEL REFUSES SOMETHING — every `video` and `audio` row in the index
+ *      must be absent from the listed set. A catalogue that lists the whole
+ *      index is not applying `mineabilityOf` at all, and would read as a
+ *      healthy count.
+ *  (c) IT IS NOT EPUB-ONLY, which is the gate's actual claim: at least one
+ *      NON-book asset must be listed. The three tabs it sits beside are all
+ *      EPUB tools, so a catalogue of books alone would change nothing.
+ */
+if (process.argv.includes('--gate10')) {
+  console.log('');
+  console.log('=== MINING gate 10 — what the catalogue tab lists, live ===');
+  console.log('');
+
+  let failures = 0;
+  const listed = snapshot.items.filter((item) => mineabilityOf(item).mineable);
+  const byKind = new Map<string, number>();
+  const byProvenance = new Map<string, number>();
+  // Every provenance the panel offers, seeded at 0 so an empty one PRINTS.
+  for (const key of ['human-subs', 'auto-captions', 'whisper-transcript', 'book-text', 'unknown']) {
+    byProvenance.set(key, 0);
+  }
+  for (const item of listed) {
+    byKind.set(item.kind, (byKind.get(item.kind) ?? 0) + 1);
+    byProvenance.set(item.provenance, (byProvenance.get(item.provenance) ?? 0) + 1);
+  }
+
+  console.log(`index rows:        ${snapshot.items.length}`);
+  console.log(`catalogue lists:   ${listed.length}`);
+  console.log('');
+  console.log('by kind (the secondary filter):');
+  for (const [kind, count] of [...byKind].sort()) console.log(`  ${kind.padEnd(12)} ${count}`);
+  console.log('');
+  console.log('by provenance (the PRIMARY axis — every value printed, including 0):');
+  for (const [key, count] of byProvenance) console.log(`  ${key.padEnd(20)} ${count}`);
+
+  const provenanceTotal = [...byProvenance.values()].reduce((a, b) => a + b, 0);
+  console.log('');
+  console.log(
+    `  control (a) partition complete: ${provenanceTotal} across the buckets vs ${listed.length} listed -> ${provenanceTotal === listed.length ? 'EQUAL' : 'LOSES ROWS'}`,
+  );
+  if (provenanceTotal !== listed.length) {
+    failures += 1;
+  }
+
+  const mediaRows = snapshot.items.filter((i) => i.kind === 'video' || i.kind === 'audio');
+  const mediaListed = listed.filter((i) => i.kind === 'video' || i.kind === 'audio').length;
+  console.log(
+    `  control (b) media refused: ${mediaRows.length} video/audio rows in the index, ${mediaListed} listed (must be 0)`,
+  );
+  if (mediaListed !== 0 || mediaRows.length === 0) failures += 1;
+
+  const nonBook = listed.filter((i) => i.kind !== 'book').length;
+  console.log(
+    `  control (c) not epub-only: ${nonBook} of ${listed.length} listed assets are NOT books`,
+  );
+  if (nonBook === 0) failures += 1;
+
+  console.log('');
+  console.log(`GATE 10 (catalogue contents): ${failures === 0 ? 'PASS' : 'FAIL'}`);
+}
