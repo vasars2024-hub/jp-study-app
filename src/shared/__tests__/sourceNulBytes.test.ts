@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -46,22 +46,40 @@ const SCANNED = new Set(['.ts', '.tsx', '.js', '.jsx', '.cjs', '.mjs', '.css']);
  */
 const skipDirectory = (name: string): boolean => name.startsWith('.') || name === 'node_modules';
 
+/*
+ * `withFileTypes` rather than a `statSync` per entry, and the result is memoised.
+ *
+ * Both cases below walked the whole tree independently, and the walk paid one
+ * extra `statSync` syscall for every entry it saw. On Windows that stat is the
+ * expensive part. Under a full `vitest run` — eight workers contending for the
+ * same disk — the byte-scanning case blew vitest's 20s per-test timeout and was
+ * reported as a product regression three audits running. It is not one: re-run
+ * alone, or with a raised timeout, it passes. Walking once without the stats
+ * removes the cause instead of hiding it behind a bigger number.
+ */
+let cache: string[] | null = null;
+
 function collect(directory: string, found: string[]): string[] {
-  for (const entry of readdirSync(directory)) {
-    const full = join(directory, entry);
-    if (statSync(full).isDirectory()) {
-      if (!skipDirectory(entry)) collect(full, found);
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!skipDirectory(entry.name)) collect(full, found);
       continue;
     }
-    const dot = entry.lastIndexOf('.');
-    if (dot > 0 && SCANNED.has(entry.slice(dot))) found.push(full);
+    const dot = entry.name.lastIndexOf('.');
+    if (dot > 0 && SCANNED.has(entry.name.slice(dot))) found.push(full);
   }
   return found;
 }
 
+function scannedFiles(): string[] {
+  if (!cache) cache = collect(SRC, []);
+  return cache;
+}
+
 describe('source files carry no raw NUL byte', () => {
   it('finds none anywhere under src/', () => {
-    const files = collect(SRC, []);
+    const files = scannedFiles();
 
     /*
      * Read as bytes and search for the byte. Spelling the character out in
@@ -78,6 +96,6 @@ describe('source files carry no raw NUL byte', () => {
 
   it('scans a meaningful number of files, so a broken walk cannot pass empty', () => {
     // A walk that silently returns nothing would satisfy the assertion above.
-    expect(collect(SRC, []).length).toBeGreaterThan(500);
+    expect(scannedFiles().length).toBeGreaterThan(500);
   });
 });

@@ -87,8 +87,23 @@ function code(text: string): string {
     .join('\n');
 }
 
-function sweep(needle: RegExp): string[] {
-  const hits: string[] = [];
+/**
+ * Every `.ts`/`.tsx` under `src/`, read once and comment-stripped once.
+ *
+ * `sweep()` used to walk the tree, re-read every file and re-run `code()` on each
+ * one *per call*. With two call sites that is two full passes over ~1,900 files,
+ * and `code()` is itself three passes (regex, split/filter, join) over each. The
+ * suite measured **30.97s of test time for 17 cases** that way, so under a full
+ * `vitest run` — where eight workers contend for the same disk — both sweep cases
+ * blew the 20s per-test timeout and were reported as product regressions. They are
+ * not: re-run alone with a raised timeout they pass. Reading the tree once removes
+ * the cause rather than hiding it.
+ */
+let sourceCache: Array<{ rel: string; text: string }> | null = null;
+
+function allStrippedSource(): Array<{ rel: string; text: string }> {
+  if (sourceCache) return sourceCache;
+  const files: Array<{ rel: string; text: string }> = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = resolve(dir, entry.name);
@@ -96,12 +111,30 @@ function sweep(needle: RegExp): string[] {
         if (entry.name !== 'node_modules') walk(full);
       } else if (/\.tsx?$/.test(entry.name)) {
         const rel = relative(SRC, full).replace(/\\/g, '/');
-        if (rel !== SELF && needle.test(code(readFileSync(full, 'utf8')))) hits.push(rel);
+        if (rel !== SELF) files.push({ rel, text: code(readFileSync(full, 'utf8')) });
       }
     }
   };
   walk(SRC);
-  return hits;
+  /*
+   * Both callers assert `toEqual([])`, so a walk that silently returned nothing
+   * would make every sweep pass. Fail loudly instead of passing emptily — this is
+   * the same control `sourceNulBytes.test.ts` spends a whole case on, bought here
+   * for free because every sweep goes through this one function.
+   */
+  if (files.length < 500) {
+    throw new Error(`the src/ walk found only ${files.length} files — the sweep is broken, not clean`);
+  }
+  sourceCache = files;
+  return files;
+}
+
+function sweep(needle: RegExp): string[] {
+  // A fresh `lastIndex` per file: a caller could hand us a /g regex, and `test()`
+  // on a shared global regex returns alternating results. Cheaper to be immune.
+  return allStrippedSource()
+    .filter(({ text }) => new RegExp(needle.source, needle.flags.replace('g', '')).test(text))
+    .map(({ rel }) => rel);
 }
 
 /** `KeyboardEvent.code` → the `key` a US layout produces, for comparing the two maps. */
@@ -271,6 +304,30 @@ describe("Media Center's Study tab hands the episode to the adopted player", () 
     // The sessionStorage key had exactly one reader in the whole app — this file, in the
     // branch that only ran when an inline player was mounted. It is gone from src/.
     expect(sweep(/jp-pending-study-media-seek/)).toEqual([]);
+  });
+
+  /*
+   * The positive control for both sweeps above. They assert `toEqual([])`, and a
+   * walk that read nothing — or a cache that came back empty — satisfies that just
+   * as well as a genuinely clean tree does. This case makes the empty answers mean
+   * something by proving the same walk still reaches files and still finds needles.
+   */
+  it('the sweep still finds things, so its empty answers are answers', () => {
+    const scanned = allStrippedSource();
+    expect(scanned.length).toBeGreaterThan(500);
+
+    // A needle that IS in shipped code, through the identical walk and cache.
+    expect(sweep(/\bregisterCommandHandler\b/).length).toBeGreaterThan(0);
+
+    /*
+     * And the specific reason `ref={videoRef}` comes back empty is comment
+     * stripping, not a file the walk missed: `keyboardShortcuts.ts` still spells
+     * the pattern out in prose, is in the scanned set, and is still excluded.
+     */
+    const shortcuts = 'renderer/keyboardShortcuts.ts';
+    expect(readFileSync(resolve(SRC, shortcuts), 'utf8')).toMatch(/ref=\{videoRef\}/);
+    expect(scanned.some((entry) => entry.rel === shortcuts)).toBe(true);
+    expect(sweep(/ref=\{(state\.)?videoRef\}/)).not.toContain(shortcuts);
   });
 });
 
