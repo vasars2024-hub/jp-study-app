@@ -41,6 +41,8 @@ import {
   commitIngestCategoryPolicy,
   commitIngestConfidence,
   commitIngestStabilityMs,
+  commitIngestWatchRootAdded,
+  commitIngestWatchRootRemoved,
   loadIngestSettings,
   onIngestSettingsChanged,
 } from '../../filesIngestSettingsStore';
@@ -382,6 +384,41 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
               </select>
             </label>
           ))}
+        </fieldset>
+
+        <fieldset className="fa-review-watched">
+          <legend>{t('filesApp.watch.title')}</legend>
+          {effectiveSettings.watchRoots.length === 0 ? (
+            <p className="fa-review-note">{t('filesApp.watch.none')}</p>
+          ) : (
+            <ul className="fa-watch-list">
+              {effectiveSettings.watchRoots.map((watched) => (
+                <li className="fa-watch-row" key={watched}>
+                  <span className="fa-watch-path" title={watched}>
+                    {watched}
+                  </span>
+                  <button
+                    type="button"
+                    className="fa-action fa-watch-remove"
+                    data-root={watched}
+                    onClick={() => applyCommit(commitIngestWatchRootRemoved(watched))}
+                  >
+                    {t('filesApp.watch.remove')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* The folder being scanned is the one a user wants watched, so the
+              button takes the path already typed above rather than asking for
+              it twice. */}
+          <button
+            type="button"
+            className="fa-action fa-watch-add"
+            onClick={() => applyCommit(commitIngestWatchRootAdded(root))}
+          >
+            {t('filesApp.watch.addRoot')}
+          </button>
         </fieldset>
 
         {settingsError ? (

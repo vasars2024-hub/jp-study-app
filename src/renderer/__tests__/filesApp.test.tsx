@@ -248,6 +248,13 @@ function recordOpen(ev: Event) {
   opened.push(String((ev as CustomEvent).detail));
 }
 
+/* Gate 25: main's side of the watcher, stood in for. `pushArrival` is the
+   callback main's broadcast reaches, so a test can deliver an arrival the way
+   the real IPC does — without the renderer asking for anything. */
+const filesWatchSet = vi.fn();
+const onFilesWatchArrival = vi.fn();
+let pushArrival: ((arrivals: unknown[]) => void) | null = null;
+
 beforeEach(() => {
   filesIndex.mockReset();
   filesReveal.mockReset();
@@ -265,10 +272,25 @@ beforeEach(() => {
       candidates: [{ target: 'media', confidence: 'exact', reasonKey: 'fileDrop.reason.media' }],
     },
   ]);
+  filesWatchSet.mockReset();
+  onFilesWatchArrival.mockReset();
+  pushArrival = null;
+  filesWatchSet.mockImplementation(async (roots: string[]) => ({ roots, pending: 0 }));
+  onFilesWatchArrival.mockImplementation((cb: (a: unknown[]) => void) => {
+    pushArrival = cb;
+    return () => undefined;
+  });
   Object.defineProperty(window, 'api', {
     configurable: true,
     writable: true,
-    value: { filesIndex, filesReveal, filesMineSource, fileDropClassify },
+    value: {
+      filesIndex,
+      filesReveal,
+      filesMineSource,
+      fileDropClassify,
+      filesWatchSet,
+      onFilesWatchArrival,
+    },
   });
 });
 
@@ -1034,5 +1056,70 @@ describe('Files app — context entry from another page (gate 5)', () => {
     // wearing a success's clothes.
     expect(openFilesAppScoped({ categoryId: 'sources/nope' as never })).toBe(false);
     expect(peekPendingFilesScope()).toBeNull();
+  });
+});
+
+describe('Files app — a watched folder announces what lands (gate 25)', () => {
+  /** Exactly the shape `main/filesApp/watch.ts` broadcasts. */
+  function arrival(name: string, elapsedMs: number) {
+    return {
+      entry: {
+        path: `C:\\dl\\${name}`,
+        name,
+        sizeBytes: 4096,
+        target: 'media',
+        confidence: 'exact',
+        reasonKey: 'fileDrop.reason.media',
+        candidateCount: 1,
+        settlement: 'placed',
+      },
+      root: 'C:\\dl',
+      elapsedMs,
+      at: 1_000,
+    };
+  }
+
+  it('the list refreshes and the app SAYS what arrived, with the elapsed time', async () => {
+    await mount(<FilesApp />);
+    await settle();
+    // The first, unforced index build. Nothing has been asked for since.
+    expect(filesIndex).toHaveBeenCalledTimes(1);
+    expect(hasText('arrived after')).toBe(false);
+
+    // Delivered the way main delivers it. Nothing in this test clicks Refresh.
+    await act(async () => {
+      pushArrival?.([arrival('ep99.mkv', 4_200)]);
+      await Promise.resolve();
+    });
+    await settle();
+
+    // "Without a manual refresh": a forced rebuild that no control triggered.
+    expect(filesIndex).toHaveBeenCalledWith(true);
+    // And it says so, with the number rather than "a file arrived".
+    expect(hasText('ep99.mkv arrived after 4.2 s')).toBe(true);
+  });
+
+  it('names the watched count from what main confirmed', async () => {
+    filesWatchSet.mockImplementation(async () => ({
+      roots: ['C:\\dl', 'C:\\downloads'],
+      pending: 0,
+    }));
+    await mount(<FilesApp />);
+    await settle();
+    expect(hasText('Watching 2 folders')).toBe(true);
+  });
+
+  it('a build with no watcher renders the app unchanged', async () => {
+    // The preload is versioned separately from the renderer; a missing watcher
+    // must cost the notice, never the app.
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      writable: true,
+      value: { filesIndex, filesReveal, filesMineSource, fileDropClassify },
+    });
+    await mount(<FilesApp />);
+    await settle();
+    expect(railButton(/^Video$/)).toBeTruthy();
+    expect(hasText('Watching')).toBe(false);
   });
 });

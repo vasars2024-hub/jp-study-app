@@ -10664,6 +10664,20 @@ export const zh: Catalog = {
   'filesApp.settings.policy.inherit': '沿用上面的设置',
   'filesApp.settings.policy.auto': '无需确认直接导入',
   'filesApp.settings.policy.review': '每次都询问我',
+  'filesApp.watch.title': '监视的文件夹',
+  'filesApp.watch.none': '尚未监视任何文件夹。',
+  'filesApp.watch.addRoot': '监视上面的文件夹',
+  'filesApp.watch.remove': '停止监视',
+  'filesApp.watch.watching': {
+    other: '正在监视 {count} 个文件夹',
+  },
+  'filesApp.watch.arrived': {
+    other: '已到达 {count} 个文件，最后一个用时 {seconds} 秒',
+  },
+  'filesApp.watch.dismiss': '关闭',
+  'filesApp.settings.error.emptyRoot': '请先在上面输入要监视的文件夹。',
+  'filesApp.settings.error.duplicateRoot': '该文件夹已在监视中。',
+  'filesApp.settings.error.tooManyRoots': '最多可同时监视 8 个文件夹。',
   'filesApp.settings.error.stabilityRange': '请输入 0 到 600000 毫秒之间的等待时间。',
   'filesApp.settings.error.unknownValue': '此设置无法接受该值。',
   'filesApp.settings.error.saveFailed':

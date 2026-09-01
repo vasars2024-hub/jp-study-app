@@ -95,13 +95,36 @@ export interface IngestSettings {
   byTarget: Partial<Record<DropTargetId, IngestCategoryPolicy>>;
   /** Gate 31's adjustable half: how long a size must hold before ingest. */
   stabilityMs: number;
+  /**
+   * Gate 25's watched folders. In the same document as the window on purpose:
+   * a watched folder without the window that governs it is two settings that
+   * have to agree, stored in two places that can disagree.
+   */
+  watchRoots: string[];
 }
 
 export const DEFAULT_INGEST_SETTINGS: IngestSettings = {
   confidence: 'high-confidence',
   byTarget: {},
   stabilityMs: DEFAULT_STABILITY_MS,
+  // Nothing is watched until the user says so. Guessing at Downloads would
+  // start a filesystem watcher nobody asked for, on the folder most likely to
+  // be enormous.
+  watchRoots: [],
 };
+
+/**
+ * How many folders may be watched at once.
+ *
+ * Each root is a recursive `fs.watch` plus a tree walk per sweep, and the IPC
+ * handler caps at the same number — a cap the renderer alone enforced would be
+ * a cap in name only.
+ */
+export const MAX_WATCH_ROOTS = 8;
+
+export const INGEST_SETTINGS_ERROR_EMPTY_ROOT = 'filesApp.settings.error.emptyRoot';
+export const INGEST_SETTINGS_ERROR_DUPLICATE_ROOT = 'filesApp.settings.error.duplicateRoot';
+export const INGEST_SETTINGS_ERROR_TOO_MANY_ROOTS = 'filesApp.settings.error.tooManyRoots';
 
 /**
  * Gate 29's fourth answer. `known` is kept out of the other three rather than
@@ -388,6 +411,44 @@ export function setIngestStabilityMs(doc: IngestSettings, raw: number): IngestSe
 }
 
 /**
+ * Gate 25's writers.
+ *
+ * A duplicate is refused by name rather than deduplicated silently: a user who
+ * adds the same folder twice and sees one row has been told nothing about why,
+ * and the second add would look like a control that did not work.
+ */
+export function addIngestWatchRoot(doc: IngestSettings, root: string): IngestSettingsResult {
+  const value = typeof root === 'string' ? root.trim() : '';
+  if (!value) return { doc, errorKey: INGEST_SETTINGS_ERROR_EMPTY_ROOT };
+  if (doc.watchRoots.some((existing) => sameRoot(existing, value))) {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_DUPLICATE_ROOT };
+  }
+  if (doc.watchRoots.length >= MAX_WATCH_ROOTS) {
+    return { doc, errorKey: INGEST_SETTINGS_ERROR_TOO_MANY_ROOTS };
+  }
+  return { doc: { ...doc, watchRoots: [...doc.watchRoots, value] } };
+}
+
+export function removeIngestWatchRoot(doc: IngestSettings, root: string): IngestSettingsResult {
+  const next = doc.watchRoots.filter((existing) => !sameRoot(existing, root));
+  if (next.length === doc.watchRoots.length) return { doc };
+  return { doc: { ...doc, watchRoots: next } };
+}
+
+/**
+ * Windows paths are case-insensitive and a trailing separator means the same
+ * folder, so `C:\dl` and `c:\dl\` are one root. Comparing raw strings would
+ * let the same folder be watched twice and announce every arrival twice.
+ */
+function sameRoot(a: string, b: string): boolean {
+  // Both separators, and note the class must carry a real backslash: a `\/`
+  // that lost its escape matches only the forward one, and `C:\dl\` would then
+  // count as a different folder from `C:\dl`.
+  const fold = (v: string) => v.trim().replace(/[\\/]+$/, '').toLowerCase();
+  return fold(a) === fold(b);
+}
+
+/**
  * Settings normalisation, shared by the store and by anything reading a value
  * out of a settings file. Kept here rather than in the renderer store so the
  * clamp is one implementation and gate 31's "does not bypass the completeness
@@ -419,5 +480,16 @@ export function normalizeIngestSettings(raw: unknown): IngestSettings {
       ? Math.min(MAX_STABILITY_MS, Math.max(0, Math.round(rawMs)))
       : DEFAULT_INGEST_SETTINGS.stabilityMs;
 
-  return { confidence, byTarget, stabilityMs };
+  const watchRoots: string[] = [];
+  if (Array.isArray(source.watchRoots)) {
+    for (const raw of source.watchRoots) {
+      if (typeof raw !== 'string') continue;
+      const value = raw.trim();
+      if (!value || watchRoots.some((existing) => sameRoot(existing, value))) continue;
+      if (watchRoots.length >= MAX_WATCH_ROOTS) break;
+      watchRoots.push(value);
+    }
+  }
+
+  return { confidence, byTarget, stabilityMs, watchRoots };
 }

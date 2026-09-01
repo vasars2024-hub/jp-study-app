@@ -141,6 +141,7 @@ import {
 } from './filesAppScope';
 import { useFilesIndex } from './useFilesIndex';
 import { ScanReviewSheet } from './ScanReviewSheet';
+import { useFilesWatch } from './useFilesWatch';
 import './filesApp.css';
 
 /**
@@ -294,6 +295,14 @@ export interface FilesAppProps {
 export function FilesApp({ initialScope = null, initialFocusItemId = null }: FilesAppProps) {
   const { t, lang } = useT();
   const { state, refresh, refreshing } = useFilesIndex();
+  /*
+   * Gate 25. The watcher runs in main whether or not this window is open; what
+   * lives here is the half the gate scores — the list refreshing on its own,
+   * and a line saying what landed. It sits in the app rather than in the scan
+   * sheet because the sheet is modal, and a folder that only reports arrivals
+   * while a dialog happens to be open is not being watched.
+   */
+  const watch = useFilesWatch(refresh);
 
   /**
    * Gate 5's entry. An explicit prop wins — a caller that mounted this
@@ -2110,6 +2119,31 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
 
   const onPanel = scope !== null && isFilesPanelCategory(scope);
 
+  /**
+   * Gate 25's statement. The list has already refreshed by the time this
+   * renders — this says WHY it changed, with the number the gate asks for.
+   * Seconds are passed as a number so `t()` can format them for the locale; a
+   * `toFixed` string here would opt the value out of i18n entirely.
+   */
+  const watchNotice = watch.arrivals.length ? (
+    <span className="fa-watch-arrived">
+      {t('filesApp.watch.arrived', {
+        count: watch.arrivals.length,
+        name: watch.arrivals[watch.arrivals.length - 1].entry.name,
+        seconds:
+          Math.round(watch.arrivals[watch.arrivals.length - 1].elapsedMs / 100) / 10,
+      })}
+      <button
+        type="button"
+        className="fa-watch-dismiss"
+        onClick={watch.clearArrivals}
+        title={t('filesApp.watch.dismiss')}
+      >
+        {t('filesApp.watch.dismiss')}
+      </button>
+    </span>
+  ) : null;
+
   const dock = (
     <div className="fa-status" role="status">
       {onPanel ? (
@@ -2121,6 +2155,12 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <span>{t('filesApp.status.items', { count: visible.length })}</span>
           <span>{t('filesApp.status.size', { size: formatSize(totalSize, t, lang) })}</span>
           {selected ? <span>{t('filesApp.status.selected', { name: selected.name })}</span> : null}
+          {watch.roots.length ? (
+            <span className="fa-watch-count">
+              {t('filesApp.watch.watching', { count: watch.roots.length })}
+            </span>
+          ) : null}
+          {watchNotice}
         </>
       )}
     </div>

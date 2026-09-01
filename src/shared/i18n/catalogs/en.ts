@@ -11231,6 +11231,22 @@ export const en: Catalog = {
   'filesApp.settings.policy.inherit': 'Use the setting above',
   'filesApp.settings.policy.auto': 'Bring in without asking',
   'filesApp.settings.policy.review': 'Always ask me',
+  'filesApp.watch.title': 'Watched folders',
+  'filesApp.watch.none': 'No folders are being watched yet.',
+  'filesApp.watch.addRoot': 'Watch the folder above',
+  'filesApp.watch.remove': 'Stop watching',
+  'filesApp.watch.watching': {
+    one: 'Watching {count} folder',
+    other: 'Watching {count} folders',
+  },
+  'filesApp.watch.arrived': {
+    one: '{name} arrived after {seconds} s',
+    other: '{count} files arrived, the last after {seconds} s',
+  },
+  'filesApp.watch.dismiss': 'Dismiss',
+  'filesApp.settings.error.emptyRoot': 'Type a folder above before watching it.',
+  'filesApp.settings.error.duplicateRoot': 'That folder is already being watched.',
+  'filesApp.settings.error.tooManyRoots': 'Up to 8 folders can be watched at once.',
   'filesApp.settings.error.stabilityRange': 'Enter a wait between 0 and 600000 milliseconds.',
   'filesApp.settings.error.unknownValue': 'That is not a setting this can hold.',
   'filesApp.settings.error.saveFailed':

@@ -19,7 +19,9 @@
  */
 import {
   DEFAULT_INGEST_SETTINGS,
+  addIngestWatchRoot,
   normalizeIngestSettings,
+  removeIngestWatchRoot,
   setIngestCategoryPolicy,
   setIngestConfidence,
   setIngestStabilityMs,
@@ -67,6 +69,14 @@ export function commitIngestCategoryPolicy(
 
 export function commitIngestStabilityMs(value: number): IngestSettingsCommit {
   return commit((doc) => setIngestStabilityMs(doc, value));
+}
+
+export function commitIngestWatchRootAdded(root: string): IngestSettingsCommit {
+  return commit((doc) => addIngestWatchRoot(doc, root));
+}
+
+export function commitIngestWatchRootRemoved(root: string): IngestSettingsCommit {
+  return commit((doc) => removeIngestWatchRoot(doc, root));
 }
 
 export function onIngestSettingsChanged(listener: () => void): () => void {

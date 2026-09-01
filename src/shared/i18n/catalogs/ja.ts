@@ -10763,6 +10763,20 @@ export const ja: Catalog = {
   'filesApp.settings.policy.inherit': '上の設定に従う',
   'filesApp.settings.policy.auto': '確認せずに取り込む',
   'filesApp.settings.policy.review': '必ず確認する',
+  'filesApp.watch.title': '監視するフォルダー',
+  'filesApp.watch.none': 'まだ監視しているフォルダーはありません。',
+  'filesApp.watch.addRoot': '上のフォルダーを監視する',
+  'filesApp.watch.remove': '監視をやめる',
+  'filesApp.watch.watching': {
+    other: '{count} 個のフォルダーを監視中',
+  },
+  'filesApp.watch.arrived': {
+    other: '{count} 件が届きました（最後の 1 件は {seconds} 秒後）',
+  },
+  'filesApp.watch.dismiss': '閉じる',
+  'filesApp.settings.error.emptyRoot': '監視する前に、上にフォルダーを入力してください。',
+  'filesApp.settings.error.duplicateRoot': 'そのフォルダーはすでに監視中です。',
+  'filesApp.settings.error.tooManyRoots': '同時に監視できるフォルダーは 8 個までです。',
   'filesApp.settings.error.stabilityRange': '待ち時間は 0〜600000 ミリ秒で入力してください。',
   'filesApp.settings.error.unknownValue': 'この設定では扱えない値です。',
   'filesApp.settings.error.saveFailed':

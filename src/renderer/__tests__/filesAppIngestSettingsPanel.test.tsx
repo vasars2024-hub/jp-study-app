@@ -295,3 +295,63 @@ describe('gate 31 — the window the user typed is the window the scan uses', ()
     expect(filesScan).toHaveBeenLastCalledWith(['C:\\dl'], { stabilityMs: 45000 });
   });
 });
+
+describe('gate 25 — the watched-folder list is a control, not a config file', () => {
+  async function addWatched(path: string): Promise<void> {
+    await setValue(q<HTMLInputElement>('.fa-review-root-input'), path, 'input');
+    await act(async () => {
+      q('.fa-watch-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+  }
+
+  function watchedPaths(): string[] {
+    return Array.from(host?.querySelectorAll('.fa-watch-path') ?? []).map(
+      (n) => n.textContent ?? '',
+    );
+  }
+
+  it('the typed folder becomes a watched one, and survives a restart', async () => {
+    await mount();
+    await addWatched('C:\\dl');
+    expect(watchedPaths()).toEqual(['C:\\dl']);
+    await restart();
+    expect(watchedPaths()).toEqual(['C:\\dl']);
+  });
+
+  it('the same folder twice is REFUSED by name rather than silently deduped', async () => {
+    await mount();
+    await addWatched('C:\\dl');
+    // A trailing separator and a different case are the SAME folder on Windows.
+    await addWatched('c:\\dl\\');
+    expect(q('.fa-review-settings .fa-review-error').textContent).toContain(
+      'already being watched',
+    );
+    expect(watchedPaths()).toEqual(['C:\\dl']);
+  });
+
+  it('an empty folder field is refused, so nothing starts watching by accident', async () => {
+    await mount();
+    await act(async () => {
+      q('.fa-watch-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(q('.fa-review-settings .fa-review-error').textContent).toContain('Type a folder');
+    expect(watchedPaths()).toEqual([]);
+  });
+
+  it('removing one leaves the others, and the removal survives a restart', async () => {
+    await mount();
+    await addWatched('C:\\dl');
+    await addWatched('C:\\downloads');
+    expect(watchedPaths()).toHaveLength(2);
+
+    const remove = Array.from(host?.querySelectorAll('.fa-watch-remove') ?? []).find(
+      (b) => b.getAttribute('data-root') === 'C:\\dl',
+    );
+    expect(remove).toBeTruthy();
+    await act(async () => {
+      remove?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await restart();
+    expect(watchedPaths()).toEqual(['C:\\downloads']);
+  });
+});
