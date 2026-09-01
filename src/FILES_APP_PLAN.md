@@ -816,12 +816,30 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 6c140279 -- still ONE failure, the SAME one, and it
-         is still not ours. vitest: **995 files passed / 1 failed / 1 skipped, 12,883 tests
-         passed / 1 failed / 6 skipped** (up 21 again: 11 planner/status tests, 7 on the live
-         model substitution, 3 on the popup's pre-click status call). i18n exit 0 at 12,115
-         keys. architecture exit 0, "Nothing new", 9 pending. eslint 0 on all 13 touched
-         .ts/.tsx paths.
+    <!-- status: open; evidence: 2026-09-01 b8db81bd -- ONE failure, unchanged, and this turn
+         finally names its MECHANISM instead of re-observing it. vitest: **996 files passed /
+         1 failed / 1 skipped, 12,897 tests passed / 1 failed / 6 skipped** (+14: the popup
+         DOM suite). i18n exit 0 at 12,115 keys. architecture exit 0, "Nothing new", 9 pending.
+         eslint 0 on both touched paths. Set difference vs the inherited baseline: zero new.
+         WHY IT CANNOT CLOSE FROM HERE, and it is not a flake: `tools/i18n-hardcoded-baseline.json`
+         was created on 2026-08-11 by `478566fa` with SIX entries, generated from a working tree
+         in which 27 components had already been converted -- but those conversions were never
+         committed. So the ratchet on disk asserts a tree that HEAD has never contained, and
+         committed HEAD has been red for three weeks. The main tree passes only because it still
+         holds those 27 conversions uncommitted; `git status` on the baseline file itself is
+         clean there, which is what makes this invisible from a status line.
+         CONTROL, run this turn in a detached probe worktree: `node tools/i18n-hardcoded-check.cjs`
+         at `feat/nyaa-subtitles` committed HEAD (2ee7c924) reports **27** offending files, exit 1.
+         The same command in this worktree reports **27**, exit 1, and `diff` of the two sorted
+         file lists is EMPTY -- the identical set. files-app contributes ZERO offenders, so no
+         action on this branch can move this gate. It closes when the i18n track commits its 27
+         files, or when someone re-baselines from a committed tree and says why.
+         Baselining them from here would be WRONG: the tool also fails on `fixed` entries, so the
+         moment that track lands, a baseline containing them goes red again.
+         (superseded numbers from 2026-09-01 6c140279: 995 files / 12,883 tests passed / 1
+         failed / 6 skipped -- up 21: 11 planner/status tests, 7 on the live model
+         substitution, 3 on the popup's pre-click status call. i18n exit 0 at 12,115 keys.
+         architecture exit 0, "Nothing new", 9 pending. eslint 0 on all 13 touched .ts/.tsx.)
          This run took TWO passes and the first one is the honest part of the record: the
          first full run showed **2** failed, and the new one was mine --
          mediaLibraryListRow.test.ts scans mediaLibrary.css as raw text from the
@@ -2136,3 +2154,46 @@ render drops the arrival that lands between the two.
 Focused gates: **8** main + **7** hook + **3** on the production FilesApp + **4** on the
 sheet's list = 22 new; 57/57 and 47/47 across the touched renderer suites; i18n exit 0 at
 **11,952 keys**; ESLint exit 0 on all touched TS/TSX.
+
+## 2026-09-01 (twenty-second) — The forward merge is ONE conflict hunk, not a structural wall
+
+`wt/files-app` is 150 commits ahead of `feat/nyaa-subtitles` and **still not on the branch**.
+Say that plainly in every handoff until it is. But the reason it has not landed was recorded
+as "STRUCTURAL ... it will not clear on its own", and that reading was too pessimistic. It was
+never measured; this turn measured it.
+
+`relay-mergeback.ps1` refuses because 12 incoming paths are uncommitted in the main tree, and
+a fast-forward checkout cannot overwrite a locally modified file. **That refusal is correct and
+must stay.** What is new is the size of what it is refusing.
+
+Method — no writes to the shared tree at all. `git diff HEAD -- <the 12 paths>` in the main
+tree captures the other tracks' uncommitted work; a throwaway `git worktree add --detach` at
+this branch's HEAD receives it via `git apply --3way --cached`.
+
+    11 of 12 apply CLEANLY. Three conflict hunks total, and two were mine.
+
+- `preload.ts` x2, both avoidable from this side and both removed by `66849d0a`. The Files-app
+  type imports shared an anchor line with another track's in-flight `SubtitleSyncEstimate`
+  import; moved below `FILES_DELETE_CHANNEL`, which already exists on the base. And the base
+  ends the file with a stray lone-CR line (`^M$`) that this branch normalised to an empty line
+  while the other track deleted it — two sides editing one byte. Deleted here too, matching them.
+- `src/renderer/App.tsx` x1, GENUINE and it stays. This branch's entire App.tsx change is
+  deleting `notebook: 'Notebook',`; the other track is rewriting that whole object into
+  `POPOUT_LABEL_KEYS` holding `palette.section.*` keys. Resolve by taking THEIRS and dropping
+  its `notebook` line — required, not cosmetic: `desktop.ts` removed `notebook` from
+  `DESKTOP_WIN_SECTIONS` and made it a legacy alias (`notebook: 'files'`), so the key no longer
+  type-checks in a `Partial<Record<DesktopWinSection, string>>`.
+
+Re-probed after `66849d0a`: 11/12 clean, `App.tsx` the only unmerged path.
+
+`~\.claude-runs\land-files-app.ps1` performs the whole thing, guarded — refuses unless the main
+tree is quiet, re-verifies the fast-forward (and syncs the worktree down first, since the liquid
+worker commits continuously and this branch falls behind between turns), copies the 12 files
+plus a patch to a timestamped backup, lands, re-applies, unstages, and then verifies that every
+OTHER dirty path is still dirty. Its dry run is read-only and works while the tree is busy.
+`relay-mergeback.ps1`'s refusal text now carries this forecast instead of the old wording.
+
+**Not landed this turn, and the reason is scheduling, not merge difficulty.** `primary` and
+`primary2` are dispatched concurrently and each runs ~70 minutes, so the main tree was busy for
+every minute of this turn; one dispatch ended at 10:55 and the next began the same minute. The
+window is real but brief. Whoever holds one runs the script.
