@@ -729,7 +729,9 @@
 }
 
 .mc-button {
-  min-height: 30px;
+  /* The shared accessibility walk measured three Video actions at a 30.5px pointer
+     envelope. Two pixels keeps the compact geometry while meeting the 32px Liquid floor. */
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

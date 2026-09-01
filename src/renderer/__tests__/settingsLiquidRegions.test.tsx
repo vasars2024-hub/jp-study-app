@@ -168,6 +168,15 @@ describe('Settings — Liquid region roles', () => {
       .toMatch(/\.os-set-nav-scroll\.lq-contextual,/);
   });
 
+  it('uses dark ink on the active Advanced control in classic-light', () => {
+    const sheet = read('components', 'settings', 'SettingsNav.css');
+    const block = sheet.match(
+      /:root\[data-theme='classic-light'\] \.os-set-advanced-btn\.on \{([^}]*)\}/,
+    );
+    expect(block, 'classic-light has a scoped active-control foreground').not.toBeNull();
+    expect(block?.[1]).toMatch(/color:\s*#312e81/);
+  });
+
   it('keeps the Advanced footer outside the rail scroller', async () => {
     // Category 4 read the whole 179x88 footer overlapping a nav group at maximized, and two
     // more pairs at 960x680, because the footer stayed visible by being `position: sticky`

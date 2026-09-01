@@ -122,6 +122,41 @@ function rowHeights(el: HTMLElement): string[] {
 }
 
 describe('list view rows', () => {
+  it('keeps the persistent browser header in the shared contextual role', async () => {
+    const el = await render([entry('a')], 'list');
+    const header = el.querySelector('.medialib-browser__head');
+    expect(header).not.toBeNull();
+    expect(header?.tagName).toBe('HEADER');
+    expect(header?.classList.contains('lq-contextual')).toBe(true);
+    expect(header?.getAttribute('data-lq-role')).toBe('contextual');
+  });
+
+  it('compacts redundant toolbar labels without removing their accessible text', async () => {
+    const el = await render([entry('a')], 'list');
+    const labels = [...el.querySelectorAll('.medialib-view__head > span')]
+      .map((node) => node.textContent);
+    expect(labels).toEqual(['View']);
+
+    const source = readFileSync(
+      join(__dirname, '..', 'components', 'media', 'library', 'MediaLibraryBrowser.tsx'),
+      'utf8',
+    );
+    // The kind disclosure is data-dependent and this fixture has no kind chips,
+    // so guard its accessible label at the source seam as well as the mounted View label.
+    expect(source).toContain("<span>{t('media.browser.filter')}</span>");
+    expect(source).toContain("<span>{t('media.browser.view')}</span>");
+
+    const css = readFileSync(
+      join(__dirname, '..', 'components', 'media', 'library', 'mediaLibrary.css'),
+      'utf8',
+    ).replace(/\r/g, '');
+    const compact = css.slice(css.indexOf('@container medialib (max-width: 420px)'));
+    expect(compact).toMatch(/\.medialib-view__head > span \{[\s\S]*?position: absolute;[\s\S]*?clip-path: inset\(50%\)/);
+    expect(compact).toMatch(/\.medialib-view__head small \{ max-width: 5ch; \}/);
+    expect(compact).toMatch(/\.medialib-browser__title \{[\s\S]*?white-space: normal;/);
+    expect(compact).not.toMatch(/\.medialib-view__head > span \{[\s\S]*?display: none/);
+  });
+
   it('lays its cards out as rows, and grid view keeps the stacked card', async () => {
     const list = await render([entry('a'), entry('b')], 'list');
     expect([...list.querySelectorAll('.medialib-card')].map((c) => c.getAttribute('data-layout')))

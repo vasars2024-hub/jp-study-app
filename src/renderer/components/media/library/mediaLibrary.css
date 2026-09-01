@@ -1379,6 +1379,36 @@
     padding-right: var(--space-sm);
   }
 
+  /* At the one-pane floor the visible "Filter by type" / "View" labels repeat
+     the current value immediately beside them and make each disclosure wider
+     than the entire 110px toolbar. Keep those labels in the accessibility tree,
+     while the icon, current value and chevron provide the compact visual form. */
+  .medialib-browser__title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .medialib-view,
+  .medialib-kind,
+  .medialib-view__head {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .medialib-view__head > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .medialib-view__head small { max-width: 5ch; }
+
   /* `flex-shrink: 0` is right while the toolbar has a row to itself; here it was
      the pane's whole minimum width (194px in 126px). Wrapping keeps every tool. */
   .medialib-browser__tools {

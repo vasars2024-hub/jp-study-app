@@ -1,0 +1,371 @@
+{
+  "surface": "Settings",
+  "label": "l10-settings",
+  "control": false,
+  "at": "2026-09-01T05:14:45.450Z",
+  "category": 5,
+  "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
+  "hostClass": "fwin",
+  "hostedSelector": ".fwin",
+  "shellScope": null,
+  "box": "960x680",
+  "bodyScrollTop": 0,
+  "presentationAsFound": "standard",
+  "cat6": {
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l10-settings.json",
+    "verdict": "PASS 10/10",
+    "parity": {
+      "standard": "7/7",
+      "liquid": "7/7",
+      "na": 0,
+      "equal": true,
+      "rowsAgree": true,
+      "failing": [],
+      "onlyInOne": []
+    },
+    "roundTrip": {
+      "diffs": []
+    }
+  },
+  "axes": {
+    "theme": [
+      null,
+      "classic-light"
+    ]
+  },
+  "storeBefore": {
+    "jp-os-theme": "study-os",
+    "jp-os-theme-engine-v": "1"
+  },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
+  },
+  "storeAfter": {
+    "jp-os-theme": "study-os",
+    "jp-os-theme-engine-v": "1"
+  },
+  "storeIdentical": true,
+  "restored": {
+    "theme": null,
+    "presentation": "standard",
+    "box": "960x680",
+    "plantResidue": 0
+  },
+  "questions": [
+    {
+      "id": 1,
+      "q": "dominant task immediately obvious",
+      "verdict": "YES",
+      "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
+      "numbers": {
+        "entryPoints": 1,
+        "primaryInputs": 1,
+        "accentButtons": 0,
+        "accentList": [],
+        "inputList": [
+          "input.os-set-search-input"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "q": "current location and way back obvious",
+      "verdict": "YES",
+      "bar": "a non-empty location label AND at least one way back",
+      "numbers": {
+        "titleText": "Settings",
+        "titleFrom": "span.fwin-title",
+        "backAffordances": 1,
+        "backList": [
+          "×"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "q": "primary actions visible without hunting",
+      "verdict": "YES",
+      "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
+      "numbers": {
+        "primaryAction": "input.os-set-search-input",
+        "insideBodyViewport": true,
+        "explicitlyMarked": false
+      }
+    },
+    {
+      "id": 4,
+      "q": "advanced tools discoverable without cluttering",
+      "verdict": "YES",
+      "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
+      "numbers": {
+        "collapsedDisclosures": 1,
+        "scannedControls": 3,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "scannedBeforeNavCollapse": 3,
+        "navRouteGroups": [],
+        "chromeControlsRaw": 3,
+        "summaryHeaders": 0,
+        "behindDisclosure": 0,
+        "disclosures": {
+          "total": 0,
+          "open": 0
+        },
+        "ariaDisclosures": [],
+        "scannedList": [
+          "Search settings",
+          "Ask the Agent",
+          "Advanced"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "q": "every readable surface has stable contrast",
+      "verdict": "YES",
+      "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
+      "numbers": {
+        "verdict": "YES",
+        "cells": [
+          {
+            "cell": "theme=null",
+            "theme": "null",
+            "measured": 70,
+            "unmeasurable": 0,
+            "minRatio": 5.6,
+            "failingCount": 0,
+            "worst": {
+              "el": "div.os-set-nav-group-label",
+              "ratio": 5.6,
+              "bar": 4.5,
+              "bg": "gradient layer 1 of 1 on div.os-settings",
+              "text": "Personalization"
+            }
+          },
+          {
+            "cell": "theme=classic-light",
+            "theme": "classic-light",
+            "measured": 70,
+            "unmeasurable": 0,
+            "minRatio": 5.69,
+            "failingCount": 0,
+            "worst": {
+              "el": "div.os-set-nav-group-label",
+              "ratio": 5.69,
+              "bar": 4.5,
+              "bg": "gradient layer 1 of 1 on div.os-settings",
+              "text": "Personalization"
+            }
+          }
+        ],
+        "failing": [],
+        "themeAxisMoved": true,
+        "axisWitness": {
+          "minRatioMoved": true,
+          "paintDigestMoved": true
+        }
+      }
+    },
+    {
+      "id": 6,
+      "q": "Liquid motion explains a real relationship",
+      "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "YES",
+      "numbers": {
+        "measuredIn": "liquid",
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
+        },
+        "liquidRegions": 2,
+        "byBackdropFilter": 0,
+        "byContextualPaint": 2,
+        "carryingATransition": 2,
+        "infiniteAnimationsOnLiquid": 0,
+        "liquidMaterialTotal": 2,
+        "decoratedLeaves": [],
+        "regionList": [
+          "nav.lq-contextual",
+          "header.lq-contextual"
+        ],
+        "withoutTransition": [],
+        "inStandardPresentation": 0
+      }
+    },
+    {
+      "id": 7,
+      "q": "standard mode remains fully normal",
+      "bar": "category 6's parity: the same features reachable in standard as in Liquid",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "parity": {
+          "standard": "7/7",
+          "liquid": "7/7",
+          "na": 0,
+          "equal": true,
+          "rowsAgree": true,
+          "failing": [],
+          "onlyInOne": []
+        }
+      }
+    },
+    {
+      "id": 8,
+      "q": "Liquid can be turned off without losing state",
+      "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
+        "roundTrip": {
+          "diffs": []
+        }
+      }
+    },
+    {
+      "id": 9,
+      "q": "all pre-migration features reachable and functional",
+      "bar": "category 6's row agreement: no row reachable in only one presentation",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "rowsAgree": true,
+        "onlyInOne": []
+      }
+    },
+    {
+      "id": 10,
+      "q": "still feels like itself, not a generic card dashboard",
+      "verdict": "YES",
+      "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
+      "numbers": {
+        "identityMarkers": {
+          "floatingWindowChrome": true,
+          "surfaceChrome": true,
+          "taskbar": true,
+          "desktopLayer": true,
+          "themeToken": true
+        },
+        "identityCount": 5,
+        "markerSet": "chromed (5 markers, bar 3 = 60%)",
+        "fillsViewport": false,
+        "bespokePrefixes": [],
+        "contentDominant": "svg.[object media",
+        "contentFrac": 0,
+        "cardUniformity": 1,
+        "cardControlSignatures": 1,
+        "cardHost": "div.os-set-quick-grid cards=10",
+        "cardHostDetail": "46% of body",
+        "cardHosts": [
+          {
+            "host": "div.os-set-quick-grid cards=10",
+            "uniformity": 1,
+            "signatures": 1,
+            "detail": "46% of body"
+          }
+        ],
+        "dashboardHosts": 0
+      }
+    }
+  ],
+  "altThemeVerdicts": {
+    "q1": "YES",
+    "q2": "YES",
+    "q3": "YES",
+    "q4": "YES",
+    "q6": "NO-SUBJECT",
+    "q10": "YES"
+  },
+  "altThemeNumbers": {
+    "theme": "classic-light",
+    "controlsPainted": 50,
+    "q1": {
+      "entryPoints": 1,
+      "primaryInputs": 1,
+      "accentButtons": 0,
+      "accentList": [],
+      "inputList": [
+        "input.os-set-search-input"
+      ]
+    },
+    "q4": {
+      "collapsedDisclosures": 1,
+      "scannedControls": 3,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "scannedBeforeNavCollapse": 3,
+      "navRouteGroups": [],
+      "chromeControlsRaw": 3,
+      "summaryHeaders": 0,
+      "behindDisclosure": 0,
+      "disclosures": {
+        "total": 0,
+        "open": 0
+      },
+      "ariaDisclosures": [],
+      "scannedList": [
+        "Search settings",
+        "Ask the Agent",
+        "Advanced"
+      ]
+    },
+    "q6": {
+      "liquidRegions": 0,
+      "byBackdropFilter": 0,
+      "byContextualPaint": 0,
+      "carryingATransition": 0,
+      "infiniteAnimationsOnLiquid": 0,
+      "liquidMaterialTotal": 0,
+      "decoratedLeaves": [],
+      "regionList": [],
+      "withoutTransition": []
+    },
+    "q10": {
+      "identityMarkers": {
+        "floatingWindowChrome": true,
+        "surfaceChrome": true,
+        "taskbar": true,
+        "desktopLayer": true,
+        "themeToken": true
+      },
+      "identityCount": 5,
+      "markerSet": "chromed (5 markers, bar 3 = 60%)",
+      "fillsViewport": false,
+      "bespokePrefixes": [],
+      "contentDominant": "svg.[object media",
+      "contentFrac": 0,
+      "cardUniformity": 1,
+      "cardControlSignatures": 1,
+      "cardHost": "div.os-set-quick-grid cards=10",
+      "cardHostDetail": "46% of body",
+      "cardHosts": [
+        {
+          "host": "div.os-set-quick-grid cards=10",
+          "uniformity": 1,
+          "signatures": 1,
+          "detail": "46% of body"
+        }
+      ],
+      "dashboardHosts": 0
+    }
+  },
+  "controlsPaintedA": 50,
+  "findings": [],
+  "voided": [],
+  "score": 10,
+  "verdict": "PASS 10/10"
+}

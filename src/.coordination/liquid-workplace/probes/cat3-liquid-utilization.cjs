@@ -391,8 +391,16 @@ async function injectAllGlass() {
   })()`));
 }
 
+/**
+ * Undo control B, then let product transitions settle before the caller re-reads the metric.
+ * Settings exposed the missing wait in L10: removing the all-glass stylesheet restored the
+ * attribute and stylesheet immediately, but its Work regions transition `background-color`.
+ * The next synchronous read therefore still saw both regions as translucent (2 instead of 0)
+ * and VOIDed a control that had already restored. Control A has always carried the same 450ms
+ * settle for this reason; control B now observes the same contract.
+ */
 async function restoreAllGlass(before) {
-  return JSON.parse(await ev(`(function(){
+  const restored = JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     var style = document.querySelector('style[data-lq-cat3-control-style]');
     if (style) style.remove();
@@ -404,6 +412,9 @@ async function restoreAllGlass(before) {
       styleStillMounted: !!document.querySelector('style[data-lq-cat3-control-style]')
     });
   })()`));
+  if (restored.refuse) return restored;
+  await new Promise((resolve) => { setTimeout(resolve, 450); });
+  return restored;
 }
 
 const metricTuple = (row) => [

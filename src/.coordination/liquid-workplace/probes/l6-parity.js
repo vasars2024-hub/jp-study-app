@@ -3165,17 +3165,22 @@
         },
         {
           // The mute-pair contract the topbar's own source argues for: a greyed action
-          // must carry its reason. Presence is not what is scored — the agreement between
-          // `disabled` and a non-empty `title` is, in both directions.
+          // must carry its reason. With no source, the stage owns file entry and the topbar
+          // deliberately omits its duplicate Open video action; with a source, that action
+          // returns because the stage entry is gone. Presence is therefore cross-checked
+          // against the stage, while disabled/reason agreement remains exact.
           id: 'topbarActions',
           f: (w) => {
             const acts = qa(w, '.mc-video-actions button');
             const off = acts.filter((b) => b.disabled);
             const explained = off.filter((b) => (b.title || '').trim().length > 0).length;
             const on = acts.length - off.length;
+            const hasSource = !!q(w, '.mc-video-stage video');
+            const entry = qa(w, '.mc-video-empty').find((e) => qa(e, ':scope > div > button').length >= 2);
+            const countAgrees = hasSource ? acts.length >= 4 && !entry : acts.length === 3 && !!entry;
             return {
-              ok: acts.length >= 4 && on >= 2 && explained === off.length,
-              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained}`,
+              ok: countAgrees && on >= 1 && explained === off.length,
+              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained} source=${hasSource} stageEntry=${!!entry}`,
             };
           },
         },
@@ -3335,6 +3340,9 @@
         },
       },
       drive: ['toggle', 'youtube'],
+      // topbarActions deliberately cross-checks whether the empty stage owns file entry.
+      // Detaching that entry must therefore falsify both its own row and this agreement row.
+      cascades: { stageHonesty: ['topbarActions'] },
       undo: {
         video: (w) => {
           const g = window.__LQP_VIDEO_ORIG;
