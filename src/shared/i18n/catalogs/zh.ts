@@ -2312,6 +2312,8 @@ export const zh: Catalog = {
   'palette.continueWatchingAt': '从 {time} 继续',
   'palette.group.flashcards': '闪卡',
   'palette.group.grammar': '语法',
+  'palette.group.settings': '设置',
+  'palette.settingIn': '设置 · {page}',
   'palette.section.player': '媒体',
   'palette.section.video': '视频',
   'palette.section.music': '音乐',

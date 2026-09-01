@@ -2474,6 +2474,8 @@ export const en: Catalog = {
   'palette.continueWatchingAt': 'Resume at {time}',
   'palette.group.flashcards': 'Flashcards',
   'palette.group.grammar': 'Grammar',
+  'palette.group.settings': 'Settings',
+  'palette.settingIn': 'Setting · {page}',
   'palette.section.player': 'Media',
   'palette.section.video': 'Video',
   'palette.section.music': 'Music',

@@ -2322,6 +2322,8 @@ export const ja: Catalog = {
   'palette.continueWatchingAt': '{time}から再開',
   'palette.group.flashcards': 'フラッシュカード',
   'palette.group.grammar': '文法',
+  'palette.group.settings': '設定',
+  'palette.settingIn': '設定 · {page}',
   'palette.section.player': 'メディア',
   'palette.section.video': '動画',
   'palette.section.music': '音楽',

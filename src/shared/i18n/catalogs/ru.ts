@@ -2495,6 +2495,8 @@ export const ru: Catalog = {
   'palette.continueWatchingAt': 'Продолжить с {time}',
   'palette.group.flashcards': 'Карточки',
   'palette.group.grammar': 'Грамматика',
+  'palette.group.settings': 'Настройки',
+  'palette.settingIn': 'Настройка · {page}',
   'palette.section.player': 'Медиа',
   'palette.section.video': 'Видео',
   'palette.section.music': 'Музыка',

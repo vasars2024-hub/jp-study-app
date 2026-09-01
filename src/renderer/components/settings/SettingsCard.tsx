@@ -2,6 +2,17 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useSettings } from './SettingsContext';
 import { useT } from '../../i18n';
 
+/** The ancestor that would actually move if this card were scrolled to. */
+function nearestScroller(el: HTMLElement): HTMLElement | null {
+  for (let n = el.parentElement; n; n = n.parentElement) {
+    const overflowY = getComputedStyle(n).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') && n.scrollHeight > n.clientHeight + 1) {
+      return n;
+    }
+  }
+  return null;
+}
+
 export default function SettingsCard({
   id,
   title,
@@ -45,8 +56,34 @@ export default function SettingsCard({
   }, [advancedMode]);
 
   useEffect(() => {
-    if (!focused || !ref.current) return;
-    ref.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!focused || !ref.current) return undefined;
+    const el = ref.current;
+    const scroller = nearestScroller(el);
+    const before = scroller ? scroller.scrollTop : window.scrollY;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // A smooth scroll is a REQUEST, not a guarantee, and here it is refused.
+    // Measured live 2026-08-31 in this Electron renderer with OS reduced-motion
+    // off: `behavior: 'smooth'` moved this pane 0 px while the identical `auto`
+    // call moved it 7,233 px, and a freshly created plain scroller in the same
+    // document ignored smooth too — so it is the environment, not this pane.
+    // The cost was invisible and total: a card reached from settings search or
+    // the command palette stayed ~7,400 px below the fold for the whole 2.2 s
+    // its highlight lasts, which is indistinguishable from the search having
+    // dumped you at the top of the page.
+    //
+    // So: ask for smooth, then check. Only if the SCROLLER has not moved at all
+    // AND the card is still entirely out of view does this land it outright — a
+    // smooth scroll that is working has always moved by now and is left alone
+    // to finish. The scroller is what gets compared, not the card's own rect:
+    // the first attempt tested `rect.top` and never fired, because the page was
+    // still settling and shifted the card 19 px on its own.
+    const settle = window.setTimeout(() => {
+      const now = scroller ? scroller.scrollTop : window.scrollY;
+      const r = el.getBoundingClientRect();
+      const offscreen = r.bottom <= 0 || r.top >= window.innerHeight;
+      if (offscreen && now === before) el.scrollIntoView({ block: 'nearest' });
+    }, 300);
+    return () => window.clearTimeout(settle);
   }, [focused]);
 
   if (advancedOnly && !advancedMode) return null;

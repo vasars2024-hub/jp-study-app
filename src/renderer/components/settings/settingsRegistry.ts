@@ -1655,6 +1655,13 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
   },
 ];
 
+/** The window state that decides which registry entries actually render. */
+export interface SettingsVisibility {
+  advanced?: boolean;
+  themeId?: string;
+  discovered?: { aero?: boolean; wired?: boolean };
+}
+
 /**
  * `themeId` is the theme the searching window is actually running and
  * `discovered` is which secret shells this profile has found; together they gate
@@ -1665,29 +1672,36 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
  * page and highlights nothing.
  *
  * Declared gates are OR-ed, because the guards they model are.
+ *
+ * Exported because the command palette offers the same entries. A second copy
+ * of this rule would drift, and the failure it drifts into is the silent one:
+ * an entry admitted by one surface but not rendered by the page it routes to.
  */
+export function settingsEntryRenders(e: SettingsRegistryEntry, opts?: SettingsVisibility): boolean {
+  const advanced = opts?.advanced ?? false;
+  if (e.advanced && !advanced) return false;
+  if (e.themes || e.discovered) {
+    const renders =
+      (e.themes ? !!opts?.themeId && e.themes.includes(opts.themeId) : false) ||
+      (e.discovered ? !!opts?.discovered?.[e.discovered] : false);
+    if (!renders) return false;
+  }
+  const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
+  if (page?.advanced && !advanced) return false;
+  return true;
+}
+
 export function searchSettings(
   query: string,
   t: (key: string) => string,
-  opts?: { advanced?: boolean; themeId?: string; discovered?: { aero?: boolean; wired?: boolean } },
+  opts?: SettingsVisibility,
 ): SettingsRegistryEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const advanced = opts?.advanced ?? false;
-  const themeId = opts?.themeId;
-  const discovered = opts?.discovered;
   const words = q.split(/\s+/).filter(Boolean);
   const scored: { e: SettingsRegistryEntry; score: number; title: string }[] = [];
   for (const e of SETTINGS_REGISTRY) {
-    if (e.advanced && !advanced) continue;
-    if (e.themes || e.discovered) {
-      const renders =
-        (e.themes ? !!themeId && e.themes.includes(themeId) : false) ||
-        (e.discovered ? !!discovered?.[e.discovered] : false);
-      if (!renders) continue;
-    }
-    const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
-    if (page?.advanced && !advanced) continue;
+    if (!settingsEntryRenders(e, opts)) continue;
     const title = e.titleKey ? t(e.titleKey) : '';
     const desc = e.descKey ? t(e.descKey) : '';
     const hay = [title, desc, e.group, e.pageId, ...e.keywords].join(' ').toLowerCase();

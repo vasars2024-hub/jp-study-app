@@ -26,6 +26,10 @@ import {
 import { MEDIA_WORKSPACE_OPEN_EVENT } from '../../shared/mediaWorkspace';
 import { loadSaved } from '../savedWords';
 import { loadDeck } from '../flashcardDeck';
+import { loadSettingsAdvanced } from '../settingsAdvanced';
+import { loadThemeId } from '../theme/engine';
+import { hasDiscoveredAero } from '../aeroDiscovery';
+import { hasDiscoveredWired } from '../wiredDiscovery';
 import { useT } from '../i18n';
 import { commandCategory, commandLabel } from '../commandI18n';
 import { fuzzyScore as fuzzy } from '../fuzzySearch';
@@ -39,6 +43,13 @@ interface Item {
   group: string;
   glyph: IconName;
   keys?: string;
+  /**
+   * Extra match text that is scored but never shown. Settings entries carry
+   * English keyword lists so a JA/ZH/RU user can still find a setting by its
+   * English feature name — the same reason `SettingsRegistryEntry.keywords`
+   * exists — and printing them in the row would be noise.
+   */
+  terms?: string;
   run: () => void;
 }
 
@@ -46,6 +57,22 @@ interface Item {
  * `items` memo below. Kept apart from `Item` so a language switch retranslates
  * the group even though grammar data (loaded once, lazily) never reloads. */
 type UngroupedItem = Omit<Item, 'group'>;
+
+/**
+ * One settings card the palette can route to, kept as catalog KEYS rather than
+ * as a built `Item`. The registry table is imported once and never re-imported,
+ * but its titles are chrome and must retranslate on a language switch, so the
+ * t() calls happen in the `items` memo (which depends on `lang`) instead of
+ * here. `terms` is the entry's English keyword list, matched but not shown.
+ */
+interface SettingsRow {
+  id: string;
+  titleKey: string;
+  descKey?: string;
+  pageId: string;
+  pageLabelKey: string;
+  terms: string;
+}
 
 /** Section id → glyph and i18n key. Built once; labels resolve through t() at
  * render/merge time so a language switch relabels without reloading data. */
@@ -77,6 +104,22 @@ function openSection(id: string): void {
   window.dispatchEvent(new CustomEvent('os:open', { detail: id }));
 }
 
+/**
+ * Open Settings *at* a card rather than at the front of the app. `SettingsApp`
+ * already listens for `settings:navigate` (the companion menu, the extension
+ * bridge and Media Center all route this way); the short delay is what those
+ * callers use too, so the listener exists by the time the event fires.
+ *
+ * A `page-*` entry IS the page, so it carries no highlight target — the same
+ * distinction `SettingsSearch.pick` makes.
+ */
+function openSettingsAt(page: string, settingId?: string): void {
+  openSection('settings');
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('settings:navigate', { detail: { page, settingId } }));
+  }, 80);
+}
+
 export default function CommandPalette() {
   // `t`'s identity never changes across renders (see renderer/i18n.ts), so a
   // memo that wants to retranslate on a language switch must depend on `lang`,
@@ -88,6 +131,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState(0);
   const [grammarItems, setGrammarItems] = useState<UngroupedItem[]>([]);
+  const [settingsRows, setSettingsRows] = useState<SettingsRow[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -148,6 +192,53 @@ export default function CommandPalette() {
       dead = true;
     };
   }, [open, mode, grammarItems.length]);
+
+  // Settings cards. Same lazy treatment as grammar and for the same reason —
+  // `settingsRegistry` is a 1,700-line data table and the palette is mounted on
+  // every surface, so pulling it in eagerly would put it on the boot path.
+  //
+  // The visibility gates are read here, at open time, from the same sources
+  // `SettingsSearch` subscribes to. The palette is transient (open, type, pick,
+  // gone), so a subscription would only cover a theme change made while it is
+  // open; a stale read is re-taken the next time it opens.
+  useEffect(() => {
+    if (!open || mode !== 'search' || settingsRows.length) return undefined;
+    let dead = false;
+    const visibility = {
+      advanced:
+        typeof document !== 'undefined'
+        && document.documentElement.classList.contains('settings-advanced')
+          ? true
+          : loadSettingsAdvanced(),
+      themeId: loadThemeId(),
+      discovered: { aero: hasDiscoveredAero(), wired: hasDiscoveredWired() },
+    };
+    import('./settings/settingsRegistry')
+      .then(({ SETTINGS_REGISTRY, SETTINGS_NAV, settingsEntryRenders }) => {
+        if (dead) return;
+        const rows: SettingsRow[] = [];
+        for (const e of SETTINGS_REGISTRY) {
+          if (!settingsEntryRenders(e, visibility)) continue;
+          const page = SETTINGS_NAV.find((p) => p.id === e.pageId);
+          if (!page) continue;
+          rows.push({
+            id: e.id,
+            titleKey: e.titleKey,
+            descKey: e.descKey,
+            pageId: e.pageId,
+            pageLabelKey: page.labelKey,
+            terms: e.keywords.join(' '),
+          });
+        }
+        setSettingsRows(rows);
+      })
+      .catch(() => {
+        /* registry failed to load — search just omits that group */
+      });
+    return () => {
+      dead = true;
+    };
+  }, [open, mode, settingsRows.length]);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -241,17 +332,35 @@ export default function CommandPalette() {
       }
       const grammarGroup = t('palette.group.grammar');
       out.push(...grammarItems.map((gi) => ({ ...gi, group: grammarGroup })));
+      // L10 bullet 3. A secondary or expert action that L8 moved behind a
+      // disclosure is reachable from Settings' own search box and, before this,
+      // from nowhere else — so the one surface a keyboard user reaches first
+      // could not offer it. Each row lands on the card, not on the front of
+      // Settings; the gates above keep out entries whose card does not render,
+      // which is the misroute the registry exists to prevent.
+      const settingsGroup = t('palette.group.settings');
+      for (const s of settingsRows) {
+        out.push({
+          key: `set-${s.id}`,
+          label: t(s.titleKey),
+          sub: t('palette.settingIn', { page: t(s.pageLabelKey) }),
+          group: settingsGroup,
+          glyph: 'settings',
+          terms: `${s.terms} ${s.descKey ? t(s.descKey) : ''}`,
+          run: () => openSettingsAt(s.pageId, s.id.startsWith('page-') ? undefined : s.id),
+        });
+      }
     }
     return out;
     // `t` is intentionally left out of the deps: its identity is stable (see
     // the comment above), `lang` is what actually needs to trigger a redo.
-  }, [open, mode, grammarItems, lang]);
+  }, [open, mode, grammarItems, settingsRows, lang]);
 
   const results = useMemo(() => {
     const q = query.trim();
     const scored: { item: Item; score: number }[] = [];
     for (const item of items) {
-      const s = fuzzy(q, `${item.label} ${item.sub ?? ''}`);
+      const s = fuzzy(q, `${item.label} ${item.sub ?? ''} ${item.terms ?? ''}`);
       if (s != null) scored.push({ item, score: s });
     }
     scored.sort((a, b) => b.score - a.score);
