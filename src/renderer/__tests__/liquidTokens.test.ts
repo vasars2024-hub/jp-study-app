@@ -242,3 +242,111 @@ describe('liquid semantic tokens — every shell degradation trigger reaches the
     ).toEqual([]);
   });
 });
+
+/**
+ * The same §8 rows again, along the axis the block above is structurally blind to.
+ *
+ * `rootQualifiers()` up there reads `[attr]` and `.class` qualifiers, so every
+ * trigger it can see is one the app writes onto the root element itself. A
+ * trigger the PLATFORM owns is an `@media` condition and has no qualifier at
+ * all — it is invisible to that check, and it went unanswered for exactly that
+ * reason. Measured live 2026-09-01 through the debug bridge's `/emulate`
+ * (CDP `Emulation.setEmulatedMedia`, so `matchMedia` really flips rather than a
+ * class being toggled): under `prefers-reduced-transparency: reduce`,
+ * `views/mediaCenter.css:6792` took its three blurs 24/18/22px -> `none` while
+ * `--lq-liquid-blur` (8px), `--lq-ambient-blur` (6px), `--glass-blur` (8px) and
+ * the painted `.os-taskbar` — `blur(8px) saturate(1.25)` over an 0.72 tint —
+ * were byte-identical. One sheet in the app read the preference.
+ *
+ * This is the transparency half of the pair `liquid-tokens.css` already fixed for
+ * MOTION, where the OS query and the in-app class are both honoured because on
+ * Windows the OS-level preference is commonly the only one a user ever sets.
+ */
+describe('liquid semantic tokens — the OS transparency preference, not only the in-app control', () => {
+  const FEATURE = 'prefers-reduced-transparency';
+
+  /** `@media (...) { ... }` bodies, by brace matching — nested rules survive. */
+  function mediaBlocks(source: string): { cond: string; body: string }[] {
+    const out: { cond: string; body: string }[] = [];
+    const re = /@media([^{]+)\{/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(source))) {
+      let depth = 1;
+      let i = re.lastIndex;
+      for (; i < source.length && depth > 0; i += 1) {
+        if (source[i] === '{') depth += 1;
+        else if (source[i] === '}') depth -= 1;
+      }
+      out.push({ cond: m[1].trim(), body: source.slice(re.lastIndex, i - 1) });
+    }
+    return out;
+  }
+
+  const sheet = (rel: string) =>
+    readFileSync(resolve(THEME_DIR, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /** The sheets that own translucent material: the shell, the tiers, the apps. */
+  const SHARED = ['../styles.css', 'a11y.css', 'perf.css', 'aero-safe-mode.css', '../views/mediaCenter.css'];
+  const readers = SHARED.filter((rel) => mediaBlocks(sheet(rel)).some((b) => b.cond.includes(FEATURE)));
+
+  const liquidQueries = mediaBlocks(BODY).filter((b) => b.cond.includes(FEATURE));
+
+  it('reads sheets in which the query is actually used', () => {
+    // Vacuity guard: if the parser stopped matching, every assertion below would
+    // pass on an empty list. Media Center is the sheet that always had it.
+    expect(readers, `no sheet in ${SHARED.join(', ')} uses ${FEATURE}`).toContain('../views/mediaCenter.css');
+    expect(mediaBlocks(BODY).length).toBeGreaterThanOrEqual(2); // reduced-motion + this one
+  });
+
+  it('answers the OS preference in the liquid role', () => {
+    expect(
+      liquidQueries.length,
+      `plan §8 forbids a blur/transparency dependency. A user who turned transparency off at ` +
+        `the OS level must reach the same flattened liquid role the in-app control reaches; ` +
+        `add an @media (${FEATURE}: reduce) block to liquid-tokens.css.`,
+    ).toBeGreaterThanOrEqual(1);
+    const body = liquidQueries.map((b) => b.body).join('');
+    expect(body).toMatch(/--lq-liquid-blur\s*:\s*0px/);
+    expect(body).toMatch(/--lq-ambient-blur\s*:\s*0px/);
+    // Opaque, not merely unblurred — the same invariant the in-app block carries.
+    expect(body, 'a zero blur over an unchanged translucent tint is the worst of both').toMatch(
+      /--lq-liquid-bg\s*:/,
+    );
+  });
+
+  it('answers it in the shared blur ladder too, or the liquid fix is the only surface that moved', () => {
+    // `.os-taskbar`, `.os-start`, `.fwin`, the palette, widgets and 52 other CSS
+    // call sites read `--glass-tint*`/`--blur-*` rather than the `--lq-*` roles.
+    const perf = mediaBlocks(sheet('perf.css')).filter((b) => b.cond.includes(FEATURE));
+    expect(perf.length, `perf.css owns the shared blur ladder and must read ${FEATURE}`).toBe(1);
+    expect(perf[0].body).toMatch(/--glass-blur\s*:\s*0px/);
+    expect(perf[0].body, 'the tint has to go opaque too').toMatch(/--glass-tint\s*:/);
+  });
+
+  it('qualifies the OS block so a perf tier cannot outrank it', () => {
+    // Load-bearing, and measured: a bare `:root` is (0,1,0) and LOSES to
+    // `:root[data-perf='performance']` (0,2,0), which sets this very ladder. The
+    // first version of this fix left `--glass-blur` at 8px live for that reason.
+    for (const [rel, qs] of [
+      ['liquid-tokens.css', liquidQueries],
+      ['perf.css', mediaBlocks(sheet('perf.css')).filter((b) => b.cond.includes(FEATURE))],
+    ] as const) {
+      for (const q of qs) {
+        expect(
+          q.body,
+          `${rel}: the ${FEATURE} block must be qualified on the root attribute, or the ` +
+            `[data-perf] tiers outrank it at (0,2,0)`,
+        ).toMatch(/:root\[data-display-transparency='full'\]/);
+      }
+    }
+  });
+
+  it('rejects a query nothing answers', () => {
+    // The control for the assertions above: they must be capable of failing.
+    const invented = mediaBlocks(BODY).filter((b) => b.cond.includes('prefers-nobody-answers-this'));
+    expect(invented).toHaveLength(0);
+    // ...and the brace matcher must return a real body, not an empty string that
+    // would make every `toMatch` above fail open on a passing `length` check.
+    expect(liquidQueries.every((b) => b.body.trim().length > 20)).toBe(true);
+  });
+});

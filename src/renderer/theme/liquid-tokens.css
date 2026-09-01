@@ -286,6 +286,46 @@
   --lq-ambient-blur: 0px;
 }
 
+/* ---------- Transparency's OTHER trigger — the OS one -------------------
+   The block above is the in-app control. The platform preference
+   (`prefers-reduced-transparency`, which is Windows' Settings > Personalization
+   > Colors > "Transparency effects") had exactly one reader in the whole app,
+   `views/mediaCenter.css:6792`, and none of the Liquid tokens were it.
+
+   This is the same omission, and the same argument, as the reduced-MOTION pair
+   at the top of this section: that block honours the OS query alongside
+   `:root.reduce-motion` precisely because `matchMedia` false is the common case
+   on Windows and an in-app-only trigger reaches nobody who set the preference
+   where the platform puts it. Transparency shipped the mirror image — the in-app
+   half only.
+
+   Measured live 2026-09-01 through the bridge's `/emulate`, with Media Center's
+   tokens as the positive control that the query re-evaluates at all: under the
+   emulated feature its three blurs went 24/18/22px -> none while
+   --lq-liquid-blur (8px), --lq-ambient-blur (6px), --lq-liquid-bg (72% tint) and
+   --lq-liquid-saturate (1.25) were byte-identical.
+
+   `off`'s values verbatim rather than a third ladder, for the reason that block
+   states about high contrast. Qualified on `='full'` so it is (0,2,0) like every
+   other block here: a bare `:root` is (0,1,0) and would lose to
+   `[data-perf='battery']` above, which sets --lq-liquid-bg to a 92% tint — an OS
+   accessibility request must not be overruled by the tier the machine picked.
+   `displayPrefs.ts:130` normalises the attribute to full/reduced/off and `:217`
+   writes it unconditionally, so `='full'` is every default install. `reduced` and
+   `off` are deliberately not matched, matching `mediaCenter.css`'s shipped policy
+   for this pair: the OS preference is the floor, an explicit in-app choice may
+   still differ, and `full` does not un-reduce it. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-display-transparency='full'] {
+    --lq-liquid-bg: var(--panel);
+    --lq-liquid-bg-raised: var(--panel-2);
+    --lq-liquid-blur: 0px;
+    --lq-liquid-saturate: 1;
+    --lq-ambient-bg: var(--bg);
+    --lq-ambient-blur: 0px;
+  }
+}
+
 /* ---------- Aero safe mode — the fourth trigger, same omission -----------
    §8 lists Aero safe mode among the protected systems and its own row asks for
    "replace blur/refraction with stable tint; no feature or layout loss".

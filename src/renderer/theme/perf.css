@@ -91,4 +91,59 @@
   --blur-lg: 0px;
   --blur-xl: 0px;
   --blur-max: 0px;
+  /* The tint has to go opaque too, or `off` lands on the worst of both. The blur
+     ladder above (and `styles.css:1321`, which drops the blur with `!important`
+     on .os-start/.os-taskbar/.fwin) only ever removed the BLUR, leaving
+     --glass-tint at tokens.css's 72% — measured live 2026-09-01, the taskbar
+     under `off` still painted `color(srgb … / 0.72)`. An unblurred 72% surface
+     shows the desktop through it *sharply*, which is strictly less legible than
+     either endpoint; `views/mediaCenter.css:6812` reached this same conclusion
+     for its own tokens and says so. Opaque values are `var(--panel)` verbatim
+     from `a11y.css:66`'s high-contrast block, so the two ways a user can ask for
+     the same thing cannot disagree — the rule liquid-tokens.css:266 states. */
+  --glass-tint: var(--panel);
+  --glass-tint-strong: var(--panel);
+}
+
+/* ---------- The OS preference, which had no reader outside Media Center ----
+   Windows' Settings > Personalization > Colors > "Transparency effects" reaches
+   Chromium as `prefers-reduced-transparency`, and `views/mediaCenter.css:6792`
+   is the ONLY rule in the app that ever read it. Measured live 2026-09-01
+   through the debug bridge's `/emulate` (CDP `Emulation.setEmulatedMedia`):
+   turning the feature on flips `matchMedia(...).matches` false -> true and takes
+   Media Center's three blurs 24/18/22px -> none, while --glass-blur, every
+   --blur-* step and the painted .os-taskbar `blur(8px) saturate(1.25)` over an
+   0.72 tint are byte-identical before and after. So a user who turned the effect
+   off system-wide got the full glass shell anyway.
+
+   This is exactly the omission liquid-tokens.css:215 already fixed for MOTION —
+   that sheet honours the OS query AND the in-app class, because on Windows the
+   OS-level preference is commonly the only one a user ever sets. Transparency
+   had the in-app half and was missing the platform half.
+
+   Qualified on `='full'` rather than a bare `:root`, and it is load-bearing, not
+   style. A bare `:root` is (0,1,0) and LOSES to the `[data-perf]` tiers above,
+   which are (0,2,0) and set this very ladder — measured: the first version of
+   this rule left --glass-blur at 8px on this machine because it sits on
+   `data-perf='performance'`. Matching the in-app blocks' (0,2,0) and coming last
+   is what this file's own header rule ("an explicit accessibility request
+   outranks whichever perf tier the machine picked") asks for.
+   `displayPrefs.ts:130` normalises the attribute to exactly full/reduced/off and
+   `:217` writes it unconditionally, so `='full'` is every default install; the
+   only uncovered moment is before the first apply, when nothing is painted yet.
+   `reduced` and `off` are deliberately NOT matched — they are explicit in-app
+   requests and keep their own values, which is `mediaCenter.css`'s shipped policy
+   for this pair: the OS preference is the floor, an explicit in-app choice may
+   still differ, and `full` does not un-reduce what the OS asked for. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-display-transparency='full'] {
+    --glass-blur: 0px;
+    --blur-sm: 0px;
+    --blur-md: 0px;
+    --blur-lg: 0px;
+    --blur-xl: 0px;
+    --blur-max: 0px;
+    --glass-tint: var(--panel);
+    --glass-tint-strong: var(--panel);
+  }
 }
