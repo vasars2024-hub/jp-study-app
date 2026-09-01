@@ -232,13 +232,24 @@ export interface FilesCleanupReport {
 }
 
 /**
- * Only a JSON-document store can have its path rewritten from this side; a
- * SQLite row, a localStorage pointer or a derived reading has no path field to
- * repoint. Saying so here keeps the surface from offering Relocate on a row no
- * adapter could ever satisfy.
+ * Which enumerators own a store whose row carries a rewritable path.
+ *
+ * `media` is the one adapter that exists (`relocateMediaRow` rewrites the
+ * `path` field of a `media.json` row). A scraper job's broken link points at
+ * derived output the app can regenerate, a dictionary row is SQLite with no
+ * path column this side may rewrite, and a derived reading has no target at
+ * all. Keeping the list here rather than in main means the surface offers
+ * Relocate on exactly the rows an adapter can satisfy — gate 34 asks that the
+ * chosen policy *does what it says*, and an offer that always refuses does not.
  */
+export const RELOCATABLE_SOURCES: ReadonlySet<string> = new Set(['media']);
+
 export function isRelocatable(item: FilesCleanupInput): boolean {
-  return item.flags?.brokenLink === true && item.location.store === 'json';
+  return (
+    item.flags?.brokenLink === true &&
+    item.location.store === 'file' &&
+    RELOCATABLE_SOURCES.has(item.source)
+  );
 }
 
 export function planFilesCleanup(

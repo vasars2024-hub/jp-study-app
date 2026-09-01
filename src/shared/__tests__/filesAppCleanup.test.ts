@@ -78,23 +78,30 @@ const ORPHAN_SCRAPE = fileRow({
   flags: { orphan: true },
 });
 
+/**
+ * The exact shape `mediaEnumerator` produces for a moved original: `fileItem`
+ * gives it `location.store === 'file'` and adds `brokenLink` when the stat
+ * fails, on top of the enumerator's own `referenced: true`. Writing this as a
+ * `json` row would have tested a shape the app never emits.
+ */
 const BROKEN_MEDIA_ROW: FilesCleanupInput = {
   id: 'media:v1',
   name: 'A video whose file was moved',
   kind: 'video',
   sizeBytes: null,
   source: 'media',
-  location: { store: 'json', file: 'media.json', pointer: '/items/v1' },
+  location: { store: 'file', path: 'C:/users/me/videos/Episode 01.mkv' },
   flags: { brokenLink: true, referenced: true },
 };
 
-const BROKEN_SQLITE_ROW: FilesCleanupInput = {
-  id: 'dict:5',
-  name: 'A dictionary whose file was moved',
-  kind: 'dictionary',
+/** A broken link whose owning store has no relocate adapter — scraper output. */
+const BROKEN_JOB_ROW: FilesCleanupInput = {
+  id: 'scraper-job:j1',
+  name: 'A job whose result file is gone',
+  kind: 'job',
   sizeBytes: null,
-  source: 'dictionaries',
-  location: { store: 'sqlite', database: 'dict.db', table: 'sources', rowId: '5' },
+  source: 'scraper-jobs',
+  location: { store: 'json', file: 'scraper/index.json', pointer: '/jobs/j1' },
   flags: { brokenLink: true },
 };
 
@@ -114,7 +121,7 @@ const LIBRARY: readonly FilesCleanupInput[] = [
   EMPTY_SUBTITLE,
   ORPHAN_SCRAPE,
   BROKEN_MEDIA_ROW,
-  BROKEN_SQLITE_ROW,
+  BROKEN_JOB_ROW,
   DERIVED_ROW,
 ];
 
@@ -251,15 +258,15 @@ describe('broken-link policy (gate 34)', () => {
 
   it('relocate: the record stays, and only a repointable store is offered it', () => {
     const report = planFilesCleanup(
-      [BROKEN_MEDIA_ROW, BROKEN_SQLITE_ROW],
+      [BROKEN_MEDIA_ROW, BROKEN_JOB_ROW],
       settings({ brokenLinkPolicy: 'relocate' }),
       1_000,
     );
     expect(report.candidates).toHaveLength(0);
     const byId = new Map(report.protectedItems.map((row) => [row.itemId, row]));
     expect(byId.get('media:v1')?.relocatable).toBe(true);
-    expect(byId.get('dict:5')?.relocatable).toBe(false);
-    expect(isRelocatable(BROKEN_SQLITE_ROW)).toBe(false);
+    expect(byId.get('scraper-job:j1')?.relocatable).toBe(false);
+    expect(isRelocatable(BROKEN_JOB_ROW)).toBe(false);
   });
 
   it('finds exactly the broken record and no neighbour', () => {
