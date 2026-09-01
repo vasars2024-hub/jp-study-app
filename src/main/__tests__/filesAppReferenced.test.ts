@@ -132,15 +132,20 @@ describe('gate 30 — referenced items behave', () => {
       referenced: false,
     };
 
-    const trashItem = vi.fn(async () => {});
+    // Resolves rather than throwing: this control's point is that the call
+    // HAPPENS, so the OS primitive is allowed to succeed here.
+    const trashItem = vi.fn(async () => Promise.resolve());
+    const invalidate = vi.fn();
     const result = await deleteFilesItemInMain(
       { itemId: 'subtitle:loose', confirmedItemId: 'subtitle:loose' },
-      { lookupItem: () => target, trashItem, onTrashed: () => {} },
+      { lookupItem: () => target, trashItem, onTrashed: invalidate },
     );
 
     expect(result.ok).toBe(true);
     expect(trashItem).toHaveBeenCalledTimes(1);
     expect(trashItem).toHaveBeenCalledWith(loose);
+    // And the index cache is dropped only on the branch that changed the disk.
+    expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
   it('MOVING the original reports a broken link — the row stays and says so', () => {
