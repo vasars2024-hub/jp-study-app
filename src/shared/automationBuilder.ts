@@ -4,15 +4,27 @@ export const AUTOMATION_BUILDER_CONFIG_DIR = 'automation-configs';
 export const AUTOMATION_BUILDER_COMMAND =
   'powershell -ExecutionPolicy Bypass -File ".\\automation-builder.ps1"';
 
-export const AUTOMATION_BUILDER_DIRECT_COMMAND =
-  'powershell -ExecutionPolicy Bypass -File "C:\\Users\\Arseniy\\Projects\\jp-study-app\\automation-builder.ps1"';
+/**
+ * The absolute-path launch command, built from a path resolved at runtime.
+ *
+ * This used to be a module constant holding a developer's own home directory —
+ * `C:\Users\Arseniy\Projects\jp-study-app\...` — baked into shipped source,
+ * rendered into a visible input and copied to the clipboard on request. It was
+ * inert for every other user, and it is one of the reasons `RULINGS_2026-08-04`
+ * §R2 judged the git history unpublishable. Audit F9.
+ *
+ * The main process already resolves the real script location (`app.getAppPath()`
+ * then `process.cwd()`), so there was never a need to guess it here.
+ */
+export function automationBuilderDirectCommand(scriptPath: string): string {
+  return `powershell -ExecutionPolicy Bypass -File "${scriptPath}"`;
+}
 
 export interface AutomationBuilderDescriptor {
   name: string;
   script: string;
   configDir: string;
   launchCommand: string;
-  directLaunchCommand: string;
   stopKey: string;
   capabilities: string[];
   safetyNotes: string[];
@@ -31,7 +43,6 @@ export const AUTOMATION_BUILDER: AutomationBuilderDescriptor = {
   script: AUTOMATION_BUILDER_SCRIPT,
   configDir: AUTOMATION_BUILDER_CONFIG_DIR,
   launchCommand: AUTOMATION_BUILDER_COMMAND,
-  directLaunchCommand: AUTOMATION_BUILDER_DIRECT_COMMAND,
   stopKey: 'F9',
   capabilities: [
     'cursor movement',

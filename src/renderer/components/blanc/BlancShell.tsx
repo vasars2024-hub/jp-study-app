@@ -2667,9 +2667,25 @@ function ImageConverterPanel() {
 function AutomationBuilderPanel() {
   const [copied, setCopied] = useState(false);
   const [launchMsg, setLaunchMsg] = useState('');
+  // Resolved from this install rather than a baked-in constant. That constant
+  // held a developer's own home directory, so the command shown here — and
+  // copied to the clipboard — was wrong on every machine but one (audit F9).
+  const [command, setCommand] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void window.api.automationBuilderCommand().then((resolved) => {
+      if (alive) setCommand(resolved);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const copyCommand = async (): Promise<void> => {
+    if (!command) return;
     try {
-      await navigator.clipboard.writeText(AUTOMATION_BUILDER.directLaunchCommand);
+      await navigator.clipboard.writeText(command);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
