@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { MediaItem } from '../../shared/types';
 import { MEDIA_STUDY_EVENT } from '../../shared/mediaStudyIntegration';
 import Icon, { type IconName } from '../components/Icons';
@@ -660,6 +660,109 @@ function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...a
   });
   return useCallback((...args: A) => ref.current(...args), []);
 }
+
+/**
+ * How long the top bar's search field holds a keystroke before committing it upward.
+ *
+ * Paired with, not a replacement for, `useDebouncedValue(query, 80)` at `MediaContent.tsx:575`:
+ * that one protects the FILTER, this one protects the JSX. 70 ms is under the 80 ms the filter
+ * already waits, so committing on this schedule costs the results nothing — the filter's own
+ * timer is what the user waits for either way.
+ */
+const GLOBAL_SEARCH_COMMIT_MS = 70;
+
+/**
+ * The top bar's search field, memoized, holding its own in-flight text.
+ *
+ * `query` lives in `useMedia`, so committing every keystroke to it re-rendered the whole Media
+ * Center synchronously. Measured on the Video window with the library populated: ~20-26 ms per
+ * keystroke, and `/type`'s four characters are dispatched in a tight loop with no pacing, so the
+ * renderer painted NO frame for the length of a burst — cat2 read a worst keystroke of 85-102 ms
+ * against a 100 ms bar, and 130-146 ms on a loaded desk. The card memo (`LibraryEntryCard`) had
+ * already taken out the grid's share; what was left is the shell itself.
+ *
+ * Local text keeps typing at the cost of this one node. The shell reconciles once per burst
+ * rather than once per character, and `state.debouncedQuery` still owns what the grid filters on.
+ *
+ * `deferMs = 0` opts a caller out, and Discover uses it deliberately: `submitQuery` is a
+ * `useCallback` over the hook's own `query` (`DiscoverContent.tsx:324`), so an Enter arriving
+ * before a deferred commit had landed would submit the previous character. Music is left
+ * immediate too — its cost was never measured, and a number is the only thing that earns a change.
+ *
+ * An external change to `value` — a clear, a tab switch — wins over in-flight text and cancels a
+ * pending commit, so the field stays drivable from outside.
+ */
+const GlobalSearchField = memo(function GlobalSearchField({
+  value,
+  placeholder,
+  deferMs,
+  onCommit,
+  onEnter,
+}: {
+  value: string;
+  placeholder: string;
+  deferMs: number;
+  onCommit: (next: string) => void;
+  onEnter?: () => void;
+}) {
+  const [text, setText] = useState(value);
+  const seen = useRef(value);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancel = useCallback(() => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (value === seen.current) return;
+    seen.current = value;
+    cancel();
+    setText(value);
+  }, [value, cancel]);
+
+  useEffect(() => cancel, [cancel]);
+
+  const commit = useStableCallback((next: string) => {
+    seen.current = next;
+    onCommit(next);
+  });
+
+  return (
+    <label className="mc-global-search">
+      <Icon name="search" size={13} />
+      <input
+        type="search"
+        value={text}
+        onChange={(event) => {
+          const next = event.target.value;
+          setText(next);
+          cancel();
+          if (deferMs <= 0) {
+            commit(next);
+            return;
+          }
+          timer.current = setTimeout(() => {
+            timer.current = null;
+            commit(next);
+          }, deferMs);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || !onEnter) return;
+          // Flush before submitting: a deferred commit still in flight would otherwise hand
+          // `submitQuery` the text as it stood one character ago.
+          cancel();
+          commit(text);
+          onEnter();
+        }}
+        placeholder={placeholder}
+        aria-label={placeholder}
+      />
+    </label>
+  );
+});
 
 function LibraryPanel({
   state,
@@ -1782,6 +1885,23 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
       ? t('mediaCenter.search.discover')
       : t('mediaCenter.search.library');
 
+  /*
+   * Stable by construction, or `GlobalSearchField`'s memo is decorative: the whole point is that
+   * the field survives the renders its own commits cause. The closure genuinely reads `tab`, so
+   * `useCallback` is not an option here — the same reason `LibraryPanel`'s `onPlay` uses a ref.
+   */
+  const commitSearch = useStableCallback((next: string) => {
+    if (tab === 'music') music.setQuery(next);
+    else if (tab === 'discover') discovery.setQuery(next);
+    else {
+      media.setQuery(next);
+      // Focusing a global control must not change context (keyboard users encounter it while
+      // tabbing). The first actual library query owns the navigation instead, so search remains
+      // immediate without a focus trap.
+      if (tab !== 'library') setTab('library');
+    }
+  });
+
   const mediaMenus: MenuBarMenu[] = [
     {
       id: 'file',
@@ -1991,29 +2111,13 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             <div className="mc-breadcrumb">
               <span>Media Center</span><Icon name="chevron" size={9} /><strong>{nav.find((item) => item.id === tab)?.label}</strong>
             </div>
-            <label className="mc-global-search">
-              <Icon name="search" size={13} />
-              <input
-                type="search"
-                value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
-                onChange={(event) => {
-                  if (tab === 'music') music.setQuery(event.target.value);
-                  else if (tab === 'discover') discovery.setQuery(event.target.value);
-                  else {
-                    media.setQuery(event.target.value);
-                    // Focusing a global control must not change context (keyboard users
-                    // encounter it while tabbing). The first actual library query owns the
-                    // navigation instead, so search remains immediate without a focus trap.
-                    if (tab !== 'library') setTab('library');
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (tab === 'discover' && event.key === 'Enter') discovery.submitQuery();
-                }}
-                placeholder={searchPlaceholder}
-                aria-label={searchPlaceholder}
-              />
-            </label>
+            <GlobalSearchField
+              value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
+              placeholder={searchPlaceholder}
+              deferMs={tab === 'music' || tab === 'discover' ? 0 : GLOBAL_SEARCH_COMMIT_MS}
+              onCommit={commitSearch}
+              onEnter={tab === 'discover' ? discovery.submitQuery : undefined}
+            />
             {/*
               `Open media` keeps its topbar slot because it is the only visible way to add a
               file from Home, Music, Study, Readiness, Review and Discover — the library
