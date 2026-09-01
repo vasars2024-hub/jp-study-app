@@ -31,7 +31,14 @@ const QUICK: {
   },
   { page: 'shortcuts', labelKey: 'settings.home.quick.shortcuts', icon: 'command' },
   { page: 'lockscreen', labelKey: 'settings.home.quick.lockscreen', icon: 'lock', settingId: 'lockscreen-enable' },
-  { page: 'memory', labelKey: 'settings.home.quick.memory', icon: 'folder', settingId: 'backup' },
+  // Nine of these ten name the ACTION and the rail names the DESTINATION — "Change
+  // wallpaper" beside Wallpaper, "Manage shortcuts" beside Shortcuts. This one was the
+  // exception: `settings.home.quick.memory` is byte-for-byte `settings.nav.memory`, so the
+  // Home tile and the rail entry read as the same control in two competing systems while
+  // going to different places (the rail opens the page, this deep-links `backup` on it).
+  // `search.backup` is that setting's own title in all four catalogs, so the tile, the
+  // settings-search result and the destination now agree instead of colliding.
+  { page: 'memory', labelKey: 'search.backup', icon: 'folder', settingId: 'backup' },
 ];
 
 export default function SettingsHome() {

@@ -66,4 +66,29 @@ describe('Media Center video progressive disclosure', () => {
     expect(empty).toContain("t('mediaCenter.video.selectFile')");
     expect(empty).toContain("t('mediaCenter.video.browseFolder')");
   });
+
+  /**
+   * L10 bullet 4. The workspace launcher was rendered THREE times at once: the rail entry
+   * (`.mc-seanime-link`), this topbar button and the stage CTA — and the topbar copy shared
+   * the rail's name `mediaWorkspace.launcher` while sharing the stage CTA's handler, so the
+   * live sweep read one label in two control systems. The topbar copy is the one that goes:
+   * it was enabled exactly when `stage === 'workspace'`, which is the same condition that
+   * renders the stage CTA, so it was never the only route to the workspace.
+   */
+  it('does not repeat the workspace launcher in the topbar', () => {
+    const topbar = SOURCE.match(/<div className="mc-video-actions">([\s\S]*?)\n\s{6}<\/div>/)?.[1] ?? '';
+    expect(topbar.length).toBeGreaterThan(0);
+    expect(topbar).not.toMatch(/\{t\('mediaWorkspace\.launcher'\)\}/);
+
+    // Both surviving routes must still exist, or this stopped being a de-duplication and
+    // became a deletion. The rail keeps the destination's name; the stage keeps the action.
+    expect(SOURCE).toContain("className=\"mc-seanime-link\"");
+    expect(SOURCE.match(/t\('mediaWorkspace\.launcher'\)/g)).toHaveLength(1);
+    expect(SOURCE).toContain("t('mediaCenter.video.openInWorkspace')");
+    // Comments stripped, for the same reason the CSS guard above strips them: the note left
+    // where the button stood quotes the handler verbatim, and counting raw text read two.
+    const code = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(code.match(/onOpenSeanime\(current \? \{ localFilePath: current\.path \} : undefined\)/g))
+      .toHaveLength(1);
+  });
 });
