@@ -8,10 +8,14 @@ import {
   type SeanimeStatus,
 } from './shared/seanime';
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
+import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
+// Kept below FILES_DELETE_CHANNEL, not above it, so the whole Files-app block sits
+// behind a line that already exists on feat/nyaa-subtitles. Another track inserts
+// its own import directly under `SeanimeLibraryFile`; sharing that anchor made the
+// forward merge conflict for no reason.
 import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
 import type { FilesMineSourceResult } from './shared/filesApp/mining';
 import type { FilesScanReportWithArchives } from './shared/filesApp/archive';
-import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
 import {
   FILES_CLEANUP_PLAN_CHANNEL,
   FILES_CLEANUP_RELOCATE_CHANNEL,
@@ -3214,4 +3218,3 @@ const api = {
 contextBridge.exposeInMainWorld('api', api);
 
 export type Api = typeof api;
-
