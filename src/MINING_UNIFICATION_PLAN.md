@@ -225,7 +225,12 @@ An empty result is a FINDING: say so and stop.
         EXACT NEXT SLICE: make the status route answer from the sink the queue actually writes
         (count cues in the media row's generated track) while keeping the yt-transcripts read
         for the playlist path, and give a retired/failed job a state of its own so it stops
-        reading as pending. -->
+        reading as pending.
+        ADVANCED 2026-09-01 3ef98483: that product defect is fixed. The status route now
+        prioritises the generated subtitle track on the media row, retains the legacy playlist
+        fallback, reports zero cues honestly, and distinguishes an active queue job from a
+        retired job with no artifact. Forty focused tests pass. Gate remains OPEN until the
+        live POST/status pair returns the measured cue count and the catalogue sees the result. -->
    <!-- trap: the ONE reason this could not be measured before was never "an exclusive
         Electron". It was that a second dev instance had no extension server at all -- it lost
         the bind to 18765 and still advertised it. See 660f10c7; JP_EXTENSION_PORT fixes it. -->
@@ -235,6 +240,16 @@ An empty result is a FINDING: say so and stop.
    <!-- status: open; evidence: the four full gates run every turn, but `npx vitest run` is not clean on this tree -- see the turn logs for the named failures. -->
 
 ## Progress
+
+### 2026-09-01 — gate 11 polling follows the queue's real sink
+
+- `3ef98483` adds one shared status resolver and makes both POST deduplication and GET status
+  consult the generated subtitle artifact that `transcriptionJobs` actually records.
+- A live job remains `pending`; a retired job with no artifact is `failed` with
+  `job-ended-without-transcript`; a generated track returns its parsed cue count, including 0.
+- Focused evidence: 40/40 tests pass across `extensionTranscribe` and `transcriptionJobs`.
+- Gate 11 remains open pending one live POST/status/catalogue re-drive; this commit fixes the
+  exact defect found by the prior live run rather than converting source inspection into credit.
 
 ### 2026-09-01 — gates 3 and 11 driven live at last, and what actually blocked them
 
