@@ -11860,6 +11860,7 @@ export const ru: Catalog = {
   'filesApp.delete.confirmAction': 'Подтвердить удаление',
   'filesApp.delete.cancel': 'Отмена',
   'filesApp.delete.undo': 'Отменить',
+  'filesApp.delete.dismiss': 'Закрыть',
   'filesApp.delete.confirmTrash':
     'Переместить «{name}» в Корзину? Файл можно будет восстановить оттуда.',
   'filesApp.delete.confirmMediaTrash':

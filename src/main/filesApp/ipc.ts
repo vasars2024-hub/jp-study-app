@@ -22,6 +22,7 @@ import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReport } from '../../shared/filesApp/scan';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
+import { createFilesDeletionMainDependencies, registerFilesDeletionIpc } from './deletionIpc';
 import { readFilesMineSource } from './mineSource';
 import { scanRoots } from './scan';
 import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
@@ -225,4 +226,25 @@ export function registerFilesAppIpc(): void {
   ipcMain.handle('filesapp:watch-status', (): FilesWatchStatus => {
     return { roots: [...watchRootsInUse], pending: watchSession?.pendingCount() ?? 0 };
   });
+
+  /*
+   * Gates 9 and 21 — the privileged half of Delete.
+   *
+   * The renderer sends an id and nothing else; the path, kind and `referenced`
+   * flag that decide whether this is a Recycle Bin operation are re-read HERE
+   * from the same index every other handler serves. `force: true` is deliberate
+   * and is the whole point of registering it this way: the 15-second cache
+   * could otherwise hand `shell.trashItem` a row whose file has already moved,
+   * and a stale path is exactly the input that turns a delete into the wrong
+   * file. Paying one rebuild per delete is the correct trade — a delete is a
+   * rare, destructive, user-initiated act, not a render-path call.
+   */
+  registerFilesDeletionIpc(
+    ipcMain,
+    createFilesDeletionMainDependencies({
+      getItems: () => getFilesIndex(true).items,
+      invalidate: invalidateFilesIndex,
+      trashItem: (target) => shell.trashItem(target),
+    }),
+  );
 }

@@ -17,6 +17,18 @@ export interface FilesDeletionControlsProps {
   t: Translate;
   /** Refreshes the derived index after delete and after a successful Undo. */
   onChanged(): void | Promise<void>;
+  /**
+   * Hand the receipt to an owner that outlives the selection.
+   *
+   * A successful delete removes the row, which clears the selection, which
+   * unmounts this inspector — taking the receipt and its Undo button with it.
+   * Rendered inline the Undo was therefore unreachable for exactly the deletes
+   * that succeeded, which is the only case it exists for. Standalone mounts
+   * (and this component's own suite) keep the inline rendering by omitting
+   * this prop; `FilesApp` supplies it and renders `FilesDeletionReceipt` in
+   * the status dock, which never unmounts.
+   */
+  onNotice?(notice: FilesDeletionNotice | null): void;
 }
 
 /**
@@ -32,20 +44,32 @@ export function FilesDeletionControls({
   session,
   t,
   onChanged,
+  onNotice,
 }: FilesDeletionControlsProps) {
   const plan = useMemo(() => session.plan(item), [item, session]);
   const [pending, setPending] = useState<FilesDeletionPlan | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<FilesDeletionNotice | null>(null);
+  const [inlineNotice, setInlineNotice] = useState<FilesDeletionNotice | null>(null);
   const operationGeneration = useRef(0);
+  // The owner is told regardless; only the RENDERING moves. Kept in a ref so
+  // the publish helper is not re-created on every parent render.
+  const noticeSink = useRef(onNotice);
+  noticeSink.current = onNotice;
+
+  const publishNotice = (next: FilesDeletionNotice | null): void => {
+    if (noticeSink.current) noticeSink.current(next);
+    else setInlineNotice(next);
+  };
 
   // Selection can change while the inspector remains mounted. Never carry a
   // confirmation or an Undo receipt onto the newly selected row.
   useEffect(() => {
     operationGeneration.current += 1;
     setPending(null);
-    setNotice(null);
+    setInlineNotice(null);
     setBusy(false);
+    // Deliberately does NOT clear a hoisted notice: the receipt for the row
+    // that just left the list must outlive the selection change it caused.
   }, [item.id]);
 
   const confirmDelete = async () => {
@@ -53,27 +77,30 @@ export function FilesDeletionControls({
     const generation = operationGeneration.current;
     setBusy(true);
     const result = await session.delete(item, { confirmedItemId: pending.itemId });
+    // The receipt is published either way: a delayed reply must not be attached
+    // to a row selected since, but a hoisted owner still needs to hear about it.
     if (generation !== operationGeneration.current) {
+      if (noticeSink.current) noticeSink.current(deletionNoticeForResult(result, item.name));
       if (result.ok) await onChanged();
       return;
     }
     setBusy(false);
     setPending(null);
-    setNotice(deletionNoticeForResult(result, item.name));
+    publishNotice(deletionNoticeForResult(result, item.name));
     if (result.ok) await onChanged();
   };
 
   const undo = async () => {
-    if (!notice?.undoToken || busy) return;
+    if (!inlineNotice?.undoToken || busy) return;
     const generation = operationGeneration.current;
     setBusy(true);
-    const result = session.undo(notice.undoToken);
+    const result = session.undo(inlineNotice.undoToken);
     if (generation !== operationGeneration.current) {
       if (result.ok) await onChanged();
       return;
     }
     setBusy(false);
-    setNotice(deletionNoticeForUndo(result));
+    setInlineNotice(deletionNoticeForUndo(result));
     if (result.ok) await onChanged();
   };
 
@@ -123,13 +150,13 @@ export function FilesDeletionControls({
           {t('filesApp.delete.action')}
         </button>
       )}
-      {notice ? (
+      {inlineNotice ? (
         <div
-          className={`fa-details-note fa-delete-notice is-${notice.tone}`}
+          className={`fa-details-note fa-delete-notice is-${inlineNotice.tone}`}
           role="status"
         >
-          <span>{t(notice.key, notice.values)}</span>
-          {notice.undoToken ? (
+          <span>{t(inlineNotice.key, inlineNotice.values)}</span>
+          {inlineNotice.undoToken ? (
             <button type="button" className="fa-action fa-delete-undo" onClick={undo} disabled={busy}>
               {t('filesApp.delete.undo')}
             </button>
@@ -137,5 +164,61 @@ export function FilesDeletionControls({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export interface FilesDeletionReceiptProps {
+  notice: FilesDeletionNotice | null;
+  session: FilesDeletionSession;
+  t: Translate;
+  onChanged(): void | Promise<void>;
+  onNotice(notice: FilesDeletionNotice | null): void;
+}
+
+/**
+ * The delete receipt, rendered somewhere that outlives the deleted row.
+ *
+ * Undo is the reason this is a separate component rather than a line of text.
+ * The row it would restore is by definition no longer in the list, so the
+ * inspector that offered Delete is gone; the receipt has to live in a region
+ * that does not depend on a selection. Dismiss is explicit — an Undo that
+ * disappears on its own is one the user can miss entirely.
+ */
+export function FilesDeletionReceipt({
+  notice,
+  session,
+  t,
+  onChanged,
+  onNotice,
+}: FilesDeletionReceiptProps) {
+  const [busy, setBusy] = useState(false);
+  if (!notice) return null;
+
+  const undo = async (): Promise<void> => {
+    if (!notice.undoToken || busy) return;
+    setBusy(true);
+    const result = session.undo(notice.undoToken);
+    setBusy(false);
+    onNotice(deletionNoticeForUndo(result));
+    if (result.ok) await onChanged();
+  };
+
+  return (
+    <span className={`fa-delete-notice is-${notice.tone}`} role="status">
+      <span>{t(notice.key, notice.values)}</span>
+      {notice.undoToken ? (
+        <button type="button" className="fa-action fa-delete-undo" onClick={undo} disabled={busy}>
+          {t('filesApp.delete.undo')}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="fa-action fa-delete-dismiss"
+        onClick={() => onNotice(null)}
+        aria-label={t('filesApp.delete.dismiss')}
+      >
+        {t('filesApp.delete.dismiss')}
+      </button>
+    </span>
   );
 }

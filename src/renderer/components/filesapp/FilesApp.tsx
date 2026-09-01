@@ -142,6 +142,12 @@ import {
 import { useFilesIndex } from './useFilesIndex';
 import { ScanReviewSheet } from './ScanReviewSheet';
 import { useFilesWatch } from './useFilesWatch';
+import { FilesDeletionControls, FilesDeletionReceipt } from './FilesDeletionControls';
+import {
+  FILES_SOFT_DELETE_EVENT,
+  createWindowFilesDeletionSession,
+  type FilesDeletionNotice,
+} from './filesDeletionSession';
 import './filesApp.css';
 
 /**
@@ -466,7 +472,51 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
   useEffect(() => onSmartFoldersChanged(() => setSmartDoc(loadSmartFoldersDoc())), []);
   useEffect(() => onViewStateChanged(() => setViewStateDoc(loadViewStateDoc())), []);
 
-  const allItems = state.snapshot?.items ?? [];
+  /*
+   * Gates 9 and 21. One session for the whole app, not one per selected row:
+   * the tombstone overlay is shared state, and a session rebuilt on selection
+   * would hand each row its own view of what is deleted.
+   *
+   * `createWindowFilesDeletionSession` reads `window`, so it is called in a
+   * lazy initialiser rather than at module scope — the same reason the panels
+   * below are `lazy`. `filesApp.test.tsx` mounts with no preload bridge, and
+   * the session's own adapter answers `filesApp.delete.failed` for that case
+   * instead of throwing.
+   */
+  const [deletionSession] = useState(createWindowFilesDeletionSession);
+  /*
+   * The receipt lives HERE, not in the inspector that produced it. Deleting a
+   * row clears the selection and unmounts that inspector, so an inline Undo
+   * was unreachable in exactly the case it exists for — the successful delete.
+   * The status dock below renders it and never unmounts.
+   */
+  const [deleteNotice, setDeleteNotice] = useState<FilesDeletionNotice | null>(null);
+  /*
+   * A soft delete writes localStorage from inside the control, so nothing in
+   * React's tree knows the row vanished. This is the same subscribe-and-re-read
+   * shape the four documents above use; the counter exists only to force the
+   * re-filter, since the tombstones live in the session rather than in state.
+   */
+  const [softDeleteGeneration, setSoftDeleteGeneration] = useState(0);
+  useEffect(() => {
+    const bump = (): void => setSoftDeleteGeneration((n) => n + 1);
+    window.addEventListener(FILES_SOFT_DELETE_EVENT, bump);
+    return () => window.removeEventListener(FILES_SOFT_DELETE_EVENT, bump);
+  }, []);
+
+  /*
+   * The single funnel. Filtering HERE rather than in the list means a
+   * soft-deleted row also leaves the tree counts, the search results and the
+   * bulk selection — a row hidden from the list but still counted in the
+   * sidebar is the "quietly shrank" state the collection resolver above is
+   * careful to avoid.
+   */
+  const allItems = useMemo(
+    () => deletionSession.visibleItems(state.snapshot?.items ?? []),
+    // `softDeleteGeneration` is the dependency that matters: the tombstone set
+    // is read inside `visibleItems`, so nothing else here changes when it does.
+    [state.snapshot, deletionSession, softDeleteGeneration],
+  );
 
   /**
    * Counts come from the snapshot when nothing is filtered, and are recomputed
@@ -2102,9 +2152,23 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           {t('filesApp.collections.removeFrom')}
         </button>
       ) : null}
+      {/* Gates 9 and 21. The mode line stays: it says what Delete WILL do
+          before the button is pressed, and the three modes read differently on
+          purpose — a Recycle Bin delete and an index-only one are not the same
+          promise. The control below is the act; this is the label. */}
       <p className="fa-details-note">
         {t(`filesApp.delete.mode.${deleteModeFor(selected.location)}`)}
       </p>
+      <FilesDeletionControls
+        item={selected}
+        session={deletionSession}
+        t={t}
+        /* A trashed file is gone from disk, so the index must be rebuilt rather
+           than filtered; `refresh` forces that. A soft delete also lands here,
+           where the rebuild is harmless and keeps one path for both. */
+        onChanged={refresh}
+        onNotice={setDeleteNotice}
+      />
       {revealNote ? (
         <p className="fa-details-note" role="status">
           {revealNote}
@@ -2163,6 +2227,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           {watchNotice}
         </>
       )}
+      {/* Outside the panel branch on purpose: a delete receipt is about an item,
+          and the panels have no items — but it must still be here rather than
+          in the inspector, which the delete itself unmounts. */}
+      <FilesDeletionReceipt
+        notice={deleteNotice}
+        session={deletionSession}
+        t={t}
+        onChanged={refresh}
+        onNotice={setDeleteNotice}
+      />
     </div>
   );
 

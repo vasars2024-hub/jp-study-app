@@ -10951,6 +10951,7 @@ export const ja: Catalog = {
   'filesApp.delete.confirmAction': '削除を確定',
   'filesApp.delete.cancel': 'キャンセル',
   'filesApp.delete.undo': '元に戻す',
+  'filesApp.delete.dismiss': '閉じる',
   'filesApp.delete.confirmTrash':
     '「{name}」をごみ箱に移動しますか？ファイルはごみ箱から復元できます。',
   'filesApp.delete.confirmMediaTrash':

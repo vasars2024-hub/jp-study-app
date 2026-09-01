@@ -11435,6 +11435,7 @@ export const en: Catalog = {
   'filesApp.delete.confirmAction': 'Confirm delete',
   'filesApp.delete.cancel': 'Cancel',
   'filesApp.delete.undo': 'Undo',
+  'filesApp.delete.dismiss': 'Dismiss',
   'filesApp.delete.confirmTrash':
     'Send “{name}” to the Recycle Bin? You can restore the file from there.',
   'filesApp.delete.confirmMediaTrash':

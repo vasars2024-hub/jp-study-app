@@ -10842,6 +10842,7 @@ export const zh: Catalog = {
   'filesApp.delete.confirmAction': '确认删除',
   'filesApp.delete.cancel': '取消',
   'filesApp.delete.undo': '撤销',
+  'filesApp.delete.dismiss': '关闭',
   'filesApp.delete.confirmTrash':
     '要将“{name}”移到回收站吗？之后可以从回收站恢复该文件。',
   'filesApp.delete.confirmMediaTrash':
