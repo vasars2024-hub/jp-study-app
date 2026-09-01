@@ -14504,7 +14504,7 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
      computes to nothing while reading exactly like a fix — the fourth instance of that shape in
      this file (see the --accent-2, --control-edge and --focus-ring-color notes). */
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
   cursor: pointer;
 }
 .fwin-b:hover {
@@ -15102,7 +15102,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .os-set-advanced-hint {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--font-size-2xs, 11px);
   line-height: 1.35;
   padding: 0 4px;
 }
@@ -15172,7 +15172,7 @@ html[data-taskbar-size='large'] .os-tray-btn {
   margin-top: 10px;
 }
 .os-set-nav-group-label {
-  font-size: 11px;
+  font-size: var(--font-size-2xs, 11px);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -15295,14 +15295,14 @@ html[data-taskbar-size='large'] .os-tray-btn {
 }
 .os-set-page-title {
   margin: 0 0 4px;
-  font-size: 1.35rem;
+  font-size: calc(var(--font-size-lg, 1rem) * 1.35);
   font-weight: 650;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 .os-set-page-intro {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
   line-height: 1.4;
   max-width: 42em;
 }
@@ -15584,12 +15584,12 @@ html[data-taskbar-size='large'] .os-tray-btn {
   font-size: 12px;
 }
 .os-set-status-chip strong {
-  font-size: 13px;
+  font-size: var(--font-size-sm, 13px);
   font-weight: 600;
 }
 .os-set-home-section-title {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: var(--font-size-xs, 12px);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
