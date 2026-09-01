@@ -1,0 +1,43 @@
+{
+  "label": "l10b4-settings-fixed",
+  "mode": "duplication",
+  "app": "settings",
+  "catalogFiles": 9,
+  "catalogLabels": 8379,
+  "baseline": {
+    "controlsVisible": 49,
+    "controlsProductLabelled": 36,
+    "controlsEnabled": 36,
+    "bySystem": [
+      "content-body=11",
+      "nav-rail=25"
+    ],
+    "withinSystem": [],
+    "crossSystem": [],
+    "containmentAdvisory": [
+      "\"Change wallpaper\" contains \"Wallpaper\"",
+      "\"Particles & atmosphere\" contains \"Atmosphere\"",
+      "\"Manage shortcuts\" contains \"Shortcuts\"",
+      "\"Lockscreen & PIN\" contains \"Lockscreen\""
+    ],
+    "duplicatesIncludingDisabled": [],
+    "droppedAsUserData": 13
+  },
+  "control": {
+    "plantedLabel": "Ask the Agent",
+    "from": "content-body -> nav-rail",
+    "applied": "Ask the Agent",
+    "restored": "Home",
+    "crossSystemDelta": 1,
+    "namedThePlantedPair": true,
+    "returnedToBaseline": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - the sweep sees a planted duplicate and loses it again"
+  },
+  "bars": {
+    "noWithinSystemDuplicates": true,
+    "noCrossSystemDuplicates": true,
+    "scopeNonEmpty": true
+  },
+  "failedBars": [],
+  "verdict": "PASS 10/10"
+}

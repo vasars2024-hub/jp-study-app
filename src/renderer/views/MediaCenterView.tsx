@@ -863,13 +863,11 @@ function VideoPanel({
   onStudy,
   onOpenSeanime,
   workspace,
-  seanimeActionTitle,
 }: {
   state: MediaState;
   onStudy: () => void;
   onOpenSeanime: OpenSeanimeWorkspace;
   workspace: MediaWorkspaceAvailability;
-  seanimeActionTitle?: string;
 }) {
   const { t } = useT();
   const videos = useMemo(() => orderUpNext(state.items), [state.items]);
@@ -913,7 +911,6 @@ function VideoPanel({
       )}
     </section>
   );
-  const seanimeAvailable = stage === 'workspace';
   const subtitlesReason = videoSubtitlesDisabledReason({ hasSource: !!state.src });
   const generateReason = videoGenerateDisabledReason({
     hasSource: !!state.src,
@@ -936,19 +933,17 @@ function VideoPanel({
               <Icon name="folder-open" size={13} /> {t('mediaCenter.action.openVideo')}
             </button>
           )}
-          <button
-            type="button"
-            className="mc-button"
-            disabled={!seanimeAvailable}
-            title={seanimeActionTitle}
-            onClick={() => onOpenSeanime(current ? { localFilePath: current.path } : undefined)}
-          >
-            <Icon name="globe" size={13} /> {t('mediaWorkspace.launcher')}
-          </button>
+          {/* A workspace launcher used to sit here too, and it was the same feature in a
+              third control system. Its handler was byte-for-byte the stage CTA's
+              (`onOpenSeanime(current ? { localFilePath: current.path } : undefined)`), it
+              was enabled on exactly the condition that renders that CTA — `stage ===
+              'workspace'` — so it was never the only route, and it wore the rail entry's
+              own name: L10 bullet 4's sweep read "Media workspace" in nav-rail and
+              app-toolbar at once. The rail names the destination, the stage acts on the
+              current item; a third copy in the toolbar only made the two disagree. */}
           {/* Both were greyed out with a caption and no reason — two of Video's three
               mute pairs. `disabled` derives from the reason rather than repeating the
-              condition, so the grey and the explanation cannot disagree. The neighbour
-              above already carries `seanimeActionTitle` on the same principle. */}
+              condition, so the grey and the explanation cannot disagree. */}
           <button
             type="button"
             className="mc-button"
@@ -1961,7 +1956,6 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
         onStudy={() => setTab('study')}
         onOpenSeanime={openSeanime}
         workspace={workspace}
-        seanimeActionTitle={seanimeActionTitle}
       />
     );
     if (tab === 'music') return <MusicPanel state={music} />;
@@ -1982,7 +1976,7 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
     if (tab === 'discover') return <DiscoverPanel state={discovery} />;
     return <SettingsPanel state={media} provenance={discovery.provenance} />;
   }, [
-    tab, media, music, discovery, readiness, openSeanime, seanimeActionTitle, seanimeAvailable,
+    tab, media, music, discovery, readiness, openSeanime, seanimeAvailable,
     // `seanimeAvailable` collapses three availability states into two, so on its own it
     // holds a stale panel across `pending` → `unavailable`.
     workspace,

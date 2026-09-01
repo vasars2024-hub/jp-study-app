@@ -1,0 +1,42 @@
+{
+  "label": "l10b4-video-fixed",
+  "mode": "duplication",
+  "app": "video",
+  "catalogFiles": 9,
+  "catalogLabels": 8379,
+  "baseline": {
+    "controlsVisible": 32,
+    "controlsProductLabelled": 20,
+    "controlsEnabled": 17,
+    "bySystem": [
+      "app-toolbar=2",
+      "content-body=3",
+      "inspector=1",
+      "nav-rail=11"
+    ],
+    "withinSystem": [],
+    "crossSystem": [],
+    "containmentAdvisory": [
+      "\"Open in the media workspace\" contains \"Media workspace\""
+    ],
+    "duplicatesIncludingDisabled": [],
+    "droppedAsUserData": 12
+  },
+  "control": {
+    "plantedLabel": "Home",
+    "from": "nav-rail -> content-body",
+    "applied": "Home",
+    "restored": "Open in the media workspace",
+    "crossSystemDelta": 1,
+    "namedThePlantedPair": true,
+    "returnedToBaseline": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - the sweep sees a planted duplicate and loses it again"
+  },
+  "bars": {
+    "noWithinSystemDuplicates": true,
+    "noCrossSystemDuplicates": true,
+    "scopeNonEmpty": true
+  },
+  "failedBars": [],
+  "verdict": "PASS 10/10"
+}
