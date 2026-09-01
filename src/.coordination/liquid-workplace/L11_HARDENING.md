@@ -277,3 +277,46 @@ for one is the wrong search. The display-preference vocabulary is only `anim`, `
 on Settings, and zoom leaves Media (`horizontal`) and Video (empty harness) open. The exact next
 slice is Media's `horizontal` failure at zoom 2 — it is the only one of the three that is a
 concrete named bar on a non-empty surface.
+
+## L11 bullet 2 — Media's `horizontal` FAIL is closed, and it was never a zoom bug (2026-09-01, primary)
+
+`b0` — `.medialib-rail__group` stays a COLUMN in the one-pane strip mode.
+
+The previous turn left this as "a scroller or a hidden overflow-x that only appears at 200%".
+It is neither, and it is not about zoom. `@container medialib (max-width: 420px)` turned the rail
+into a wrapping strip and applied `flex-direction: row; flex-wrap: wrap` to **two** selectors —
+the strip (`.medialib-rail .ui-sidebar`, correct) and the `<details>` group around it (wrong). A
+`<details>` laid out as a row puts its heading beside its own content box, and that content box is
+then a shrink-to-fit flex item sized to max-content, so `min-width: 0` on the nav resolves against
+the nav's own 161px rather than against the rail. The shell's `overflow: hidden auto` then clips it.
+
+**It reproduces at 100% zoom.** Live sweep of the Media window, 250..340px every 2px:
+
+| | clipped widths | worst |
+| --- | --- | --- |
+| before | **18 of 46** — a continuous 264..298px band | `medialib-shell` 165 > 130, 35px of nav unreachable |
+| after | **0 of 46** | — |
+
+Why 200% found it first: the `120px` icon-only container query hides the labels below the band and
+so hides the defect, and a `scrollbar-width: thin` scrollbar is painted in DEVICE px and does not
+scale — so at zoom 2 the same 260x170 compact window has ~5 more CSS px of content box (131 vs 126)
+and lands just inside the band instead of just under it.
+
+| cat4 Media | verdict |
+| --- | --- |
+| zoom 2.0, before | FAIL `horizontal`, compact `div.medialib-shell 165>131` |
+| zoom 2.0, after | **PASS 10/10** (`cat4-l11b2-media-zoom2-fixed.json`) |
+| zoom 2.0, mutation control (that one declaration re-added live) | **FAIL `horizontal`**, same `165>131` (`...-control.json`) |
+| zoom 1, after | PASS 10/10, no regression (`cat4-l11b3-media-nozoom.json`) |
+
+Condition guards all green on both graded runs: `applied` `heldThroughSweep` `restored`
+`persistedUnchanged` true, `driftedFields` [].
+
+**MEASURED TRAP for anyone writing a responsive rule that must hold under app zoom: a
+`@container` length is compared against the container's PAINTED size, while `clientWidth` reports
+the zoom-adjusted one.** At zoom 2 a rail whose `clientWidth` reads 131 satisfies
+`(max-width: 240px)` and fails `(max-width: 120px)` — every px breakpoint in the app fires at half
+its visual width at 200%. `em` does track it (`9.2em` matched at both zooms, because the query
+resolves the container's font-size in the same painted space), but it is not a fix on its own — the
+breakpoint here was never the bug. Probed with four parallel `--cq*` custom properties on one
+element; both zooms in one artifact.
