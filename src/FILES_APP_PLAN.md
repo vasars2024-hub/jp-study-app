@@ -468,6 +468,21 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    **CLOSED 2026-09-01.** All four clauses hold. The before-capture exists
    (`gate8-before.json`), the after-comparison is a test that imports it rather than retyping
    it, and the routing clause is now a live reading with two controls.
+   <!-- follow-up 2026-09-01 90502392, found while landing the branch and NOT caught by any of
+        the 12 assertions above, because it is outside this gate's own words: deleting the
+        Notebook section also deleted `notebook: 'Notebook'` from App.tsx's POPOUT_LABELS, and
+        that object is `popoutSection()`'s allow-list, not just a label map. `files` was added
+        to main.ts's ARGV_OPEN_SECTIONS but never here, so main would open `?popout=files` and
+        the renderer answered null -- a capability Notebook HAD (verified at 733fa357^) and
+        Files did not inherit. The gate stays closed; the lesson is that "absorbed its features"
+        has to be checked against every list the deleted section was a member of, not only the
+        ones the gate names. popoutSectionParity.test.ts now compares the two halves as sets. -->
+   <!-- follow-up 2026-09-01 084dcfea -- boss audit finding 4, the three whole-src sweeps that
+        timed out at 20s under full-suite load and read as product regressions. Cause was the
+        walk (re-read + re-strip per call), not the assertions: 30.97s -> 3.38s, 17 -> 18 tests,
+        with a hard floor and a positive control so an empty walk can no longer pass. -->
+   <!-- follow-up 2026-09-01: boss audit finding 3 (cherry-pick f104600b) is ALREADY CLOSED --
+        `git merge-base --is-ancestor f104600b feat/nyaa-subtitles` returns true. Do not redo it. -->
    The routing lives in `SettingsApp.tsx:159` `navigate()`, NOT in the search box — four callers
    reach it (search, nav rail, agent guided-navigation, recent pages) and a redirect in one
    would leave the other three dead-ending. So `movedTo` is registry METADATA that no component
