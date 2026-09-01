@@ -5617,6 +5617,9 @@ export const ru: Catalog = {
   'media.jobs.finished': 'Готово',
   'media.jobs.cancelAll': 'Отменить все',
   'media.jobs.eta': 'осталось {time}',
+  'media.jobs.modelSubstituted': 'работает {model}',
+  'media.jobs.modelSubstituted.detail':
+    'На этой машине {requested} не запускается в браузерной среде, поэтому расшифровку создаёт {used}. Её качество заметно ниже.',
   'media.jobs.phase.queued': 'В очереди',
   'media.jobs.phase.searching': 'Поиск',
   'media.jobs.phase.matching': 'Сопоставление',

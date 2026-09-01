@@ -1684,6 +1684,29 @@
   font-size: var(--font-size-2xs);
 }
 
+/*
+ * A model the machine substituted for the one that was asked for. Warning-toned
+ * rather than neutral: the substituted tier is measurably weaker, so this is a
+ * caveat about the output, not a second progress detail. Never `display: none`
+ * at any width — a disclosure that a narrow window hides is not a disclosure.
+ */
+.medialib-jobs__substitution {
+  flex-shrink: 0;
+  padding: 0 6px;
+  /*
+   * `--warning-text`, not `--warning`: the base token measures 2.0-2.5:1 as
+   * glyph colour on the six light palettes, which is the exact defect the
+   * `-text` family was added for. The border may use the base colour — it is a
+   * fill, not text.
+   */
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: 999px;
+  color: var(--warning-text);
+  font-size: var(--font-size-2xs);
+  white-space: nowrap;
+  cursor: help;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .medialib-jobs__bar i { transition: none; }
 }

@@ -5076,6 +5076,9 @@ export const zh: Catalog = {
   'media.jobs.finished': '已完成',
   'media.jobs.cancelAll': '全部取消',
   'media.jobs.eta': '剩余 {time}',
+  'media.jobs.modelSubstituted': '正在使用 {model}',
+  'media.jobs.modelSubstituted.detail':
+    '本机的浏览器运行时无法运行 {requested}，因此这份转写由 {used} 生成，质量明显更弱。',
   'media.jobs.phase.queued': '排队中',
   'media.jobs.phase.searching': '搜索中',
   'media.jobs.phase.matching': '匹配中',

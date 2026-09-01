@@ -22,6 +22,15 @@ function percent(job: MediaJob): number | null {
   return Math.min(100, Math.max(0, Math.round((job.done / job.total) * 100)));
 }
 
+/**
+ * The bare model name, matching `whisperTrackLabel`'s choice on the finished
+ * track. Repo ids are not translated, and printing the tier that was *asked
+ * for* would restate the substitution rather than disclose it.
+ */
+function shortModel(id: string): string {
+  return id.split('/').pop() || id;
+}
+
 function eta(ms: number | undefined): string | null {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return null;
   const total = Math.round(ms / 1000);
@@ -74,6 +83,25 @@ export default function MediaJobStrip() {
               )}
               {remaining && !job.finished && (
                 <span className="medialib-jobs__eta">{t('media.jobs.eta', { time: remaining })}</span>
+              )}
+              {/*
+                Shown while the job runs, not only on the finished track: the
+                substituted model is markedly worse (measured: 1 degenerate cue
+                against 8 coherent ones on the same audio), and a run that
+                errors never writes a track to read the label off at all.
+              */}
+              {job.modelSubstitution && (
+                <span
+                  className="medialib-jobs__substitution"
+                  title={t('media.jobs.modelSubstituted.detail', {
+                    requested: shortModel(job.modelSubstitution.requested),
+                    used: shortModel(job.modelSubstitution.used),
+                  })}
+                >
+                  {t('media.jobs.modelSubstituted', {
+                    model: shortModel(job.modelSubstitution.used),
+                  })}
+                </span>
               )}
             </li>
           );

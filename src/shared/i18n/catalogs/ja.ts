@@ -5101,6 +5101,9 @@ export const ja: Catalog = {
   'media.jobs.finished': '完了',
   'media.jobs.cancelAll': 'すべてキャンセル',
   'media.jobs.eta': '残り {time}',
+  'media.jobs.modelSubstituted': '{model} で実行中',
+  'media.jobs.modelSubstituted.detail':
+    'このPCではブラウザランタイムで {requested} を実行できないため、{used} がこの文字起こしを生成しています。品質は明らかに低下します。',
   'media.jobs.phase.queued': '待機中',
   'media.jobs.phase.searching': '検索中',
   'media.jobs.phase.matching': '照合中',

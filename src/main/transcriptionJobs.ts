@@ -285,6 +285,11 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
   const startedAt = Date.now();
   const cardOptions = normalizeTranscriptionCardOptions(job.cardOptions);
   let total = 0;
+  // Hoisted above `emit` on purpose: every progress event from the first chunk
+  // onward carries the substitution, so the strip can say which model is
+  // actually running while it runs. Declared here it would only reach the
+  // finished track — which an errored run never writes.
+  let modelSubstitution: TranscriptionChunkResult['modelSubstitution'];
   const emit = (phase: TranscriptionPhase, done: number, extra: Partial<TranscriptionProgress> = {}): void =>
     broadcast({
       mediaId: job.mediaId,
@@ -295,6 +300,7 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
       startedAt,
       etaMs: estimateEtaMs(done, total, Date.now() - startedAt),
       cardOptions,
+      ...(modelSubstitution ? { modelSubstitution } : {}),
       ...extra,
     });
 
@@ -313,7 +319,6 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
 
     const texts: string[] = [];
     const timedCues: TranscriptionCue[] = [];
-    let modelSubstitution: TranscriptionChunkResult['modelSubstitution'];
     for (let i = 0; i < total; i += 1) {
       if (cancelled.has(job.mediaId)) {
         emit('cancelled', i);
@@ -335,8 +340,13 @@ async function runJob(job: TranscriptionJob): Promise<TranscriptionResult> {
         continue;
       }
       // The worker only announces a substitution on the load that performed it,
-      // so the first chunk carries it and later ones do not. Keep the first.
-      if (reply.modelSubstitution && !modelSubstitution) modelSubstitution = reply.modelSubstitution;
+      // so the first chunk carries it and later ones do not. Keep the first, and
+      // re-emit at once: the next scheduled emit is a whole chunk away, and on a
+      // single-chunk job there is no next `transcribing` emit at all.
+      if (reply.modelSubstitution && !modelSubstitution) {
+        modelSubstitution = reply.modelSubstitution;
+        emit('transcribing', i);
+      }
       texts.push(reply.text ?? '');
       for (const cue of reply.cues ?? []) {
         if (!cue.text.trim() || cue.end <= cue.start) continue;

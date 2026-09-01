@@ -100,3 +100,51 @@ describe('the worker announcement now has a listener', () => {
     expect(source).not.toContain('label: `Whisper (${job.lang})`');
   });
 });
+
+/**
+ * The artifact label is the record; it is not the disclosure.
+ *
+ * A track name only exists once the run ENDS, which is minutes later and never
+ * at all when the run errors — and a user watching a job they started under one
+ * model has no reason to go re-read a subtitle track afterwards. So the
+ * substitution rides the progress broadcast too.
+ */
+describe('the live progress strip discloses it while the job is still running', () => {
+  const read = (rel: string): string =>
+    readFileSync(path.join(__dirname, '..', '..', rel), 'utf8');
+
+  it('the queue broadcasts it on every emit once it is known', () => {
+    const source = read('main/transcriptionJobs.ts');
+    expect(source).toContain('...(modelSubstitution ? { modelSubstitution } : {})');
+    // Declared above `emit` or the closure cannot see it — the whole point.
+    const declared = source.indexOf('let modelSubstitution');
+    const emitDefined = source.indexOf('const emit = (phase: TranscriptionPhase');
+    expect(declared).toBeGreaterThan(-1);
+    expect(declared).toBeLessThan(emitDefined);
+  });
+
+  it('it does not wait a whole chunk to appear', () => {
+    // A single-chunk job has no later `transcribing` emit at all, so without
+    // this the strip would never show the substitution for short audio.
+    const source = read('main/transcriptionJobs.ts');
+    expect(source).toMatch(
+      /modelSubstitution = reply\.modelSubstitution;\s*\n\s*emit\('transcribing', i\);/,
+    );
+  });
+
+  it('the strip renders it, with the model that ran', () => {
+    const source = read('renderer/components/media/library/MediaJobStrip.tsx');
+    expect(source).toContain('job.modelSubstitution');
+    expect(source).toContain("t('media.jobs.modelSubstituted'");
+    expect(source).toContain('shortModel(job.modelSubstitution.used)');
+  });
+
+  it('control: the strip never prints the requested model as the running one', () => {
+    // Printing the tier that was asked for is restating the lie, exactly as
+    // `whisperTrackLabel` refuses to.
+    const source = read('renderer/components/media/library/MediaJobStrip.tsx');
+    expect(source).not.toMatch(
+      /modelSubstituted'[^)]*model: shortModel\(job\.modelSubstitution\.requested\)/,
+    );
+  });
+});

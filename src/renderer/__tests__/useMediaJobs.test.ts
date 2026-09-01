@@ -80,3 +80,69 @@ describe('media jobs store', () => {
     expect(read().jobs).toHaveLength(3);
   });
 });
+
+/**
+ * The WASM path substitutes `whisper-base` for kotoba-whisper, and until this
+ * the only place that survived was the FINISHED track's label — minutes later,
+ * and never at all for a run that errors. These drive the real `wire()`, so the
+ * payload-to-`MediaJob` mapping is under test rather than assumed: a field
+ * added to `TranscriptionProgress` and not carried across is invisible to any
+ * test that calls `upsert` directly.
+ */
+describe('media jobs store — the substituted model reaches the live strip', () => {
+  const drive = (
+    payload: Record<string, unknown>,
+  ): ReturnType<typeof read> => {
+    let emit: ((p: unknown) => void) | undefined;
+    vi.stubGlobal('window', {
+      api: { onTranscriptionProgress: (cb: (p: unknown) => void) => { emit = cb; } },
+      setInterval: () => 0,
+      clearInterval: () => undefined,
+    });
+    __mediaJobsTestables.wire();
+    emit?.(payload);
+    return read();
+  };
+
+  const RUNNING = {
+    mediaId: 'm1',
+    title: 'Ep 1',
+    phase: 'transcribing',
+    done: 0,
+    total: 4,
+    startedAt: Date.now(),
+  };
+
+  beforeEach(() => reset());
+
+  it('carries the substitution from the IPC payload onto the job', () => {
+    const snap = drive({
+      ...RUNNING,
+      modelSubstitution: { requested: 'kotoba-tech/kotoba-whisper-v2.0', used: 'Xenova/whisper-base' },
+    });
+    expect(snap.jobs[0].modelSubstitution).toEqual({
+      requested: 'kotoba-tech/kotoba-whisper-v2.0',
+      used: 'Xenova/whisper-base',
+    });
+  });
+
+  it('control: no substitution leaves the field absent rather than guessing one', () => {
+    // A default here would be a fabricated claim about which graph ran, which
+    // only the worker knows.
+    expect(drive(RUNNING).jobs[0].modelSubstitution).toBeUndefined();
+  });
+
+  it('control: the other job kinds never grow the field', () => {
+    // `modelSubstitution` is transcription-only; a download reporting one would
+    // mean the mapping is copying blindly.
+    let emit: ((p: unknown) => void) | undefined;
+    vi.stubGlobal('window', {
+      api: { onYtDownloadProgress: (cb: (p: unknown) => void) => { emit = cb; } },
+      setInterval: () => 0,
+      clearInterval: () => undefined,
+    });
+    __mediaJobsTestables.wire();
+    emit?.({ videoId: 'v1', stage: 'downloading', percent: 10, modelSubstitution: { requested: 'a', used: 'b' } });
+    expect(read().jobs[0].modelSubstitution).toBeUndefined();
+  });
+});

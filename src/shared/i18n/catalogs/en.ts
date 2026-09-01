@@ -5393,6 +5393,9 @@ export const en: Catalog = {
   'media.jobs.finished': 'Finished',
   'media.jobs.cancelAll': 'Cancel all',
   'media.jobs.eta': '{time} left',
+  'media.jobs.modelSubstituted': 'running {model}',
+  'media.jobs.modelSubstituted.detail':
+    'This machine cannot run {requested} in the browser runtime, so {used} is producing this transcript. Its output is noticeably weaker.',
   'media.jobs.phase.queued': 'Queued',
   'media.jobs.phase.searching': 'Searching',
   'media.jobs.phase.matching': 'Matching',

@@ -35,6 +35,16 @@ export interface TranscriptionProgress {
   error?: string;
   /** The card work this transcription will perform after the subtitle is written. */
   cardOptions?: TranscriptionCardOptions;
+  /**
+   * Set from the first chunk onward when the WASM path substituted a model.
+   *
+   * `whisperTrackLabel` already records it on the finished track, but that
+   * artifact only exists once the run ends — minutes later, and only if it ends
+   * at all. A user watching a job they started under one model deserves to know
+   * a different one is producing it WHILE it produces it, not afterwards, and
+   * an errored run never writes a track to read at all.
+   */
+  modelSubstitution?: { requested: string; used: string };
 }
 
 export interface TranscriptionCardOptions {

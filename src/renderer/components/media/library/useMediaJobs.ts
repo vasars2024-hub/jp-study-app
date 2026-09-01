@@ -34,6 +34,11 @@ export interface MediaJob {
   total: number;
   etaMs?: number;
   error?: string;
+  /**
+   * Transcription only: the model that is actually running, when it is not the
+   * one the settings asked for. Absent means no substitution — never a guess.
+   */
+  modelSubstitution?: { requested: string; used: string };
   /** True once the job reached a terminal phase. */
   finished: boolean;
   updatedAt: number;
@@ -144,6 +149,7 @@ function wire(): void {
       total: p.total,
       etaMs: p.etaMs,
       error: p.error,
+      modelSubstitution: p.modelSubstitution,
       finished: TERMINAL.has(p.phase),
       updatedAt: Date.now(),
     });
@@ -206,4 +212,14 @@ export const __mediaJobsTestables = {
   },
   upsert,
   read,
+  /**
+   * Runs the real `wire()` against whatever `window.api` currently is, so a
+   * test can drive the ACTUAL translation from an IPC payload to a `MediaJob`.
+   * `upsert` alone cannot see that mapping — which is exactly where a field
+   * added to the payload and never carried across goes quietly missing.
+   */
+  wire(): void {
+    wired = false;
+    wire();
+  },
 };
