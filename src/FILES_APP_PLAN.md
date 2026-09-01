@@ -816,7 +816,30 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 f17b25d8 -- all four run, three clean, one not.
+    <!-- status: open; evidence: 2026-09-01 f8a19c4e -- ONE failure left, down from four, and it
+         is named and diagnosed. vitest: **994 files passed / 1 failed / 1 skipped, 12,841
+         tests passed / 1 failed / 6 skipped**. i18n exit 0 at 12,113 keys. architecture exit 0,
+         "Nothing new", 9 pending. eslint 0 errors on the touched .ts/.tsx.
+         Three of the four previous failures are GONE, each for a checkable reason:
+           novelReaderCanvas.test.tsx (10) + novelReaderProgressGuard.test.ts (1) -- fixed by
+             f104600b, which added the worktree's realpath'd node_modules to Vite's
+             server.fs.allow. Green here now, so the trap note below is SUPERSEDED.
+           scraperSources.test.ts -- passed this run and the previous one; the ENOTEMPTY
+             temp-dir race is confirmed a flake, not a regression.
+         THE ONE THAT REMAINS is i18n.test.ts's hardcoded-string ratchet: 27 files with zero
+         i18n adoption, 763 strings. It is NOT unowned debt and MUST NOT be picked up here --
+         **another track is already converting those exact files in the main tree,
+         uncommitted.** Verified before writing a line: all 27 are dirty in
+         C:\Users\Arseniy\Projects\jp-study-app, and the diffs are the conversion itself
+         (PerfOverlay.tsx already renders `t('perf.title')`; ScraperPage.tsx is -744 lines).
+         Doing it here would duplicate that work and guarantee a merge conflict on 27 files.
+         So this gate closes when that work lands in a merge, not by any files-app action.
+         The scanner is coarse in a way worth knowing: it flags a file only when it has ZERO
+         `t(`/`useT(`/`sx(` adoption, so ONE converted string clears a file from the list --
+         the count measures "never joined the system", not coverage. -->
+    <!-- superseded 2026-09-01: the trap below described the novelReader failures as permanent
+         in this worktree. f104600b fixed them; both suites are green here. Kept as the record
+         of why they were once red. -->
          i18n exit 0 at 12,085 keys in all four languages. architecture exit 0, "Nothing new",
          9 known findings still pending. eslint on the 5 touched lintable paths: 0 errors.
          vitest: 982 files passed / 4 failed, 12,737 tests passed / 13 failed, and this time
