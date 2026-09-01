@@ -208,6 +208,9 @@ actionsEl.addEventListener('click', async (e) => {
       feedback('Asking GrammarX to transcribe…', 'pending');
       const res = await send({ type: 'run-command', command: 'media.transcribe' });
       feedback(formatTranscribe(res), res?.ok ? 'ok' : 'err');
+      // Not awaited: the job runs for minutes and the button must not stay
+      // disabled for them. See followTranscription.
+      if (res?.state === 'queued' && res.videoId) void followTranscription(res.videoId);
     } else if (action === 'ocr') {
       const res = await send({ type: 'run-command', command: 'capture.ocr' });
       if (res?.ok) window.close();
@@ -247,6 +250,48 @@ const TRANSCRIBE_REFUSALS = {
   'host-not-registered': 'GrammarX is running but its transcriber is not ready yet.',
   'item-not-found': 'GrammarX no longer has this video in its media library.',
 };
+
+/**
+ * MINING gate 11 — carry a queued job through to its cue count.
+ *
+ * The gate is "the button transcribes the audio of the page being watched and
+ * RETURNS A CUE COUNT". `/v1/transcribe` can only answer `queued`, so the count
+ * has to be collected afterwards from `/v1/transcribe/status`, which is the one
+ * place that knows both transcript sinks.
+ *
+ * Three honest endings, never a shared "failed":
+ *   transcribed -> the number
+ *   failed      -> the job ended and left no transcript, with the next step
+ *   neither     -> still running, with the elapsed time so it is visibly alive
+ *
+ * A closed popup ends the poll — MV3 gives it no life of its own. That is not a
+ * lost result: the transcript still lands in the catalogue, and pressing the
+ * button again reports the finished count through `formatTranscribe`'s
+ * already-transcribed branch. The initial `queued` line says exactly that.
+ */
+const TRANSCRIBE_POLL_MS = 4000;
+/** 20 minutes at 4 s. Long enough for a first run that downloads a model. */
+const TRANSCRIBE_POLL_LIMIT = 300;
+
+async function followTranscription(videoId) {
+  const startedAt = Date.now();
+  const elapsed = () => `${Math.round((Date.now() - startedAt) / 1000)}s`;
+  for (let i = 0; i < TRANSCRIBE_POLL_LIMIT; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, TRANSCRIBE_POLL_MS));
+    const res = await send({ type: 'transcribe-status', videoId });
+    if (!res) continue;
+    if (res.state === 'transcribed') {
+      feedback(`Transcribed — ${res.cueCount} cues. Mine it from Files or Mining.`, 'ok');
+      return;
+    }
+    if (res.state === 'failed') {
+      feedback('The transcription ended without a transcript. Retry from the Media library.', 'err');
+      return;
+    }
+    feedback(`Transcribing in GrammarX… ${elapsed()}`, 'pending');
+  }
+  feedback('Still transcribing in GrammarX — it will appear in the catalogue.', 'pending');
+}
 
 function formatTranscribe(res) {
   if (!res) return 'Transcription failed';

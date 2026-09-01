@@ -1315,6 +1315,33 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
       return;
     }
+    /**
+     * MINING gate 11's second half — the cue count.
+     *
+     * A queued job is not the answer the gate asks for; "returns a cue count"
+     * is. `/v1/transcribe` can only ever reply `queued`, so without this the
+     * button ends at "it will appear in the catalogue" and the user has no way
+     * to learn whether it did. The popup polls this while it is open.
+     *
+     * Deliberately a thin pass-through: the app's status route already merges
+     * both transcript sinks and separates `pending` from `failed`, and a second
+     * copy of that judgement here is how the two drift apart.
+     */
+    if (msg?.type === 'transcribe-status') {
+      const videoId = String(msg.videoId || '').trim();
+      if (!videoId) {
+        sendResponse({ ok: false, state: 'failed', error: 'No video id' });
+        return;
+      }
+      try {
+        sendResponse(
+          await apiFetch(`/v1/transcribe/status?videoId=${encodeURIComponent(videoId)}`),
+        );
+      } catch (err) {
+        sendResponse({ ok: false, error: String(err.message || err), offline: !!err.offline });
+      }
+      return;
+    }
     if (msg?.type === 'save-selection') {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       try {

@@ -15,6 +15,7 @@
  *   machine could run a new job.
  */
 import { describe, expect, it } from 'vitest';
+import { bootBackground, readExtensionFile } from './extensionHarness';
 import {
   EXTENSION_TRANSCRIBE_REFUSALS,
   countTranscriptCues,
@@ -186,5 +187,65 @@ describe('gate 11 — polling follows the queue sink', () => {
       cueCount: null,
       reason: 'job-ended-without-transcript',
     });
+  });
+});
+
+/**
+ * The gate says the BUTTON returns a cue count. Until the extension polls, the
+ * status route is a correct answer nobody asks for: `/v1/transcribe` can only
+ * ever reply `queued`, and the click ended there. These drive the real
+ * `background.js` through the same `chrome.runtime.onMessage` a popup uses.
+ */
+describe('gate 11 — the extension actually asks for the count', () => {
+  const statusUrl = 'http://127.0.0.1:18765/v1/transcribe/status?videoId=GSx0rW2aHs8';
+
+  it('transcribe-status reaches the app route and passes its answer through', async () => {
+    const harness = bootBackground({
+      responder: (url) =>
+        url.includes('/v1/transcribe/status')
+          ? { status: 200, json: { ok: true, videoId: 'GSx0rW2aHs8', state: 'transcribed', cueCount: 41 } }
+          : { status: 200, json: { ok: true } },
+    });
+    const res = await harness.send({ type: 'transcribe-status', videoId: 'GSx0rW2aHs8' });
+    expect(res).toMatchObject({ state: 'transcribed', cueCount: 41 });
+    expect(harness.fetches.map((f) => f.url)).toContain(statusUrl);
+    // The token has to travel or the route answers 401 and the popup would
+    // report "not paired" for a job that is running fine.
+    expect(harness.fetches.at(-1)?.headers?.Authorization).toBe('Bearer tok');
+  });
+
+  it('a pending job is passed through as pending, not rounded to a failure', async () => {
+    const harness = bootBackground({
+      responder: () => ({ status: 200, json: { ok: true, state: 'pending', cueCount: null } }),
+    });
+    const res = await harness.send({ type: 'transcribe-status', videoId: 'GSx0rW2aHs8' });
+    expect(res).toMatchObject({ state: 'pending', cueCount: null });
+  });
+
+  it('an app that is not running answers offline instead of throwing', async () => {
+    const harness = bootBackground({ responder: () => 'network-error' });
+    const res = await harness.send({ type: 'transcribe-status', videoId: 'GSx0rW2aHs8' });
+    expect(res).toMatchObject({ ok: false, offline: true });
+  });
+
+  it('control: a missing videoId never reaches the network', async () => {
+    const harness = bootBackground();
+    const res = await harness.send({ type: 'transcribe-status', videoId: '  ' });
+    expect(res).toMatchObject({ ok: false, state: 'failed' });
+    expect(harness.fetches.filter((f) => f.url.includes('/v1/transcribe'))).toEqual([]);
+  });
+
+  it('the popup follows a queued job and ends on the cue count', () => {
+    // popup.js is a classic script wired to a DOM this suite does not build, so
+    // the honest check is that the queued branch is wired to the poller and the
+    // poller ends on the number — not a second copy of the popup's plumbing.
+    const popup = readExtensionFile('popup.js');
+    expect(popup).toContain("res?.state === 'queued'");
+    expect(popup).toContain('followTranscription(res.videoId)');
+    expect(popup).toMatch(/type: 'transcribe-status', videoId/);
+    expect(popup).toMatch(/Transcribed — \$\{res\.cueCount\} cues/);
+    // And the three endings stay distinct: a shared sentence is the defect the
+    // named-refusal table exists to prevent.
+    expect(popup).toContain('The transcription ended without a transcript.');
   });
 });
