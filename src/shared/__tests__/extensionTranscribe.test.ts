@@ -158,6 +158,7 @@ describe('gate 11 — polling follows the queue sink', () => {
       mediaCueCount: 37,
       playlistCueCount: 12,
       active: false,
+      mediaKnown: true,
     })).toEqual({ state: 'transcribed', cueCount: 37 });
   });
 
@@ -166,6 +167,7 @@ describe('gate 11 — polling follows the queue sink', () => {
       mediaCueCount: 0,
       playlistCueCount: null,
       active: false,
+      mediaKnown: true,
     })).toEqual({ state: 'transcribed', cueCount: 0 });
   });
 
@@ -174,6 +176,7 @@ describe('gate 11 — polling follows the queue sink', () => {
       mediaCueCount: null,
       playlistCueCount: null,
       active: true,
+      mediaKnown: true,
     })).toEqual({ state: 'pending', cueCount: null });
   });
 
@@ -182,11 +185,79 @@ describe('gate 11 — polling follows the queue sink', () => {
       mediaCueCount: null,
       playlistCueCount: null,
       active: false,
+      mediaKnown: true,
     })).toEqual({
       state: 'failed',
       cueCount: null,
       reason: 'job-ended-without-transcript',
     });
+  });
+
+  /*
+   * The defect this branch fixes: with no media row there is nothing
+   * `enqueueTranscription` could ever have been handed, so "the job ended
+   * without a transcript" is a statement about a job that does not exist.
+   * Anything polling on page load rather than only after its own POST — which
+   * is the obvious next feature for this route — hits this case first.
+   */
+  it('a video that was never downloaded says notStarted, not failed', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: null,
+      active: false,
+      mediaKnown: false,
+    })).toEqual({
+      state: 'notStarted',
+      cueCount: null,
+      reason: 'no-local-media',
+    });
+  });
+
+  it('control: the same absent media row still reports a transcript that exists', () => {
+    // Otherwise `notStarted` would swallow the legacy playlist sink, whose cue
+    // file outlives the media row it came from — a real regression shaped
+    // exactly like a fix.
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: 8,
+      active: false,
+      mediaKnown: false,
+    })).toEqual({ state: 'transcribed', cueCount: 8 });
+  });
+
+  it('control: notStarted never outranks a job that is actually running', () => {
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: null,
+      active: true,
+      mediaKnown: false,
+    })).toEqual({ state: 'pending', cueCount: null });
+  });
+
+  /*
+   * The two routes answer about the same machine and must not contradict each
+   * other: it would be incoherent for the POST to say "download it first"
+   * while the GET says the transcription failed.
+   */
+  it('agrees with the POST: notDownloaded on one route is notStarted on the other', () => {
+    const facts = {
+      pageKind: 'youtube-video',
+      videoId: 'GSx0rW2aHs8',
+      existingCueCount: null,
+      mediaId: null,
+      mediaFileExists: false,
+      transcriberReady: true,
+    };
+    expect(planExtensionTranscribe(facts)).toMatchObject({
+      action: 'refuse',
+      reason: 'notDownloaded',
+    });
+    expect(resolveExtensionTranscribeStatus({
+      mediaCueCount: null,
+      playlistCueCount: facts.existingCueCount,
+      active: false,
+      mediaKnown: Boolean(facts.mediaId),
+    })).toMatchObject({ state: 'notStarted' });
   });
 });
 
@@ -244,8 +315,31 @@ describe('gate 11 — the extension actually asks for the count', () => {
     expect(popup).toContain('followTranscription(res.videoId)');
     expect(popup).toMatch(/type: 'transcribe-status', videoId/);
     expect(popup).toMatch(/Transcribed — \$\{res\.cueCount\} cues/);
-    // And the three endings stay distinct: a shared sentence is the defect the
+    // And the four endings stay distinct: a shared sentence is the defect the
     // named-refusal table exists to prevent.
     expect(popup).toContain('The transcription ended without a transcript.');
+    expect(popup).toContain("res.state === 'notStarted'");
+    expect(popup).toContain('Nothing has been downloaded for this video yet');
+  });
+
+  it('control: notStarted and failed do not share a sentence in the popup', () => {
+    const popup = readExtensionFile('popup.js');
+    const sentences = [
+      'The transcription ended without a transcript. Retry from the Media library.',
+      'Nothing has been downloaded for this video yet, so no transcription has run.',
+    ];
+    expect(new Set(sentences).size).toBe(2);
+    for (const sentence of sentences) expect(popup).toContain(sentence);
+  });
+
+  it('notStarted is passed through the background verbatim, not rounded to failed', async () => {
+    const harness = bootBackground({
+      responder: () => ({
+        status: 200,
+        json: { ok: false, state: 'notStarted', cueCount: null, reason: 'no-local-media', canDownload: true },
+      }),
+    });
+    const res = await harness.send({ type: 'transcribe-status', videoId: 'GSx0rW2aHs8' });
+    expect(res).toMatchObject({ state: 'notStarted', reason: 'no-local-media', canDownload: true });
   });
 });

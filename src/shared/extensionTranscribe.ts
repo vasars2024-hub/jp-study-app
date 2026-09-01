@@ -136,11 +136,26 @@ export interface ExtensionTranscribeStatusFacts {
   mediaCueCount: number | null;
   /** Whether the shared queue still contains this video's media row. */
   active: boolean;
+  /**
+   * Whether a media-library row for this video exists on this machine at all.
+   *
+   * Without one there is nothing `enqueueTranscription` could ever have been
+   * handed, so no job can have run — let alone ended badly. This is the same
+   * fact `planExtensionTranscribe` turns into the `notDownloaded` refusal, and
+   * the two routes must agree: it would be incoherent for the POST to say
+   * "download it first" while the GET says the transcription failed.
+   */
+  mediaKnown: boolean;
 }
 
 export type ExtensionTranscribeStatus =
   | { state: 'transcribed'; cueCount: number }
   | { state: 'pending'; cueCount: null }
+  /**
+   * No media row, so nothing was ever queued. Distinct from `failed`, whose
+   * next step is "retry"; this one's next step is "download it".
+   */
+  | { state: 'notStarted'; cueCount: null; reason: 'no-local-media' }
   | { state: 'failed'; cueCount: null; reason: 'job-ended-without-transcript' };
 
 /**
@@ -150,6 +165,12 @@ export type ExtensionTranscribeStatus =
  * retained for backward compatibility. Once neither sink has cues, only an
  * actually active queue entry may say `pending`. A retired or failed job must
  * stop polling instead of claiming it is still running forever.
+ *
+ * The `mediaKnown` branch exists because the honest-state discipline cuts both
+ * ways: `failed` asserts that a job ran and produced nothing, and asserting it
+ * about a video this machine has never downloaded is exactly the generic-error
+ * lie the refusal list was written to avoid. Anything polling this route on
+ * page load — rather than only after its own POST — hits that case first.
  */
 export function resolveExtensionTranscribeStatus(
   facts: ExtensionTranscribeStatusFacts,
@@ -157,5 +178,6 @@ export function resolveExtensionTranscribeStatus(
   const cueCount = facts.mediaCueCount ?? facts.playlistCueCount;
   if (cueCount !== null) return { state: 'transcribed', cueCount };
   if (facts.active) return { state: 'pending', cueCount: null };
+  if (!facts.mediaKnown) return { state: 'notStarted', cueCount: null, reason: 'no-local-media' };
   return { state: 'failed', cueCount: null, reason: 'job-ended-without-transcript' };
 }

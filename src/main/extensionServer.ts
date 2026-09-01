@@ -1517,10 +1517,19 @@ async function onRequest(req: http.IncomingMessage, res: http.ServerResponse): P
       playlistCueCount: videoId ? readTranscriptCueCount(videoId) : null,
       mediaCueCount: artifact.cueCount,
       active: artifact.active,
+      // `item` is the media row `enqueueTranscription` would have been given.
+      // Absent, nothing was ever queued, and the honest answer is "not started"
+      // rather than a failure the user would go looking for in a log.
+      mediaKnown: Boolean(item),
     });
     json(res, 200, {
-      ok: status.state !== 'failed',
+      // "a transcript exists or is on its way". `notStarted` and `failed` are
+      // both true answers, and neither yields a cue count without a new action.
+      ok: status.state === 'transcribed' || status.state === 'pending',
       videoId,
+      // `notStarted` names the next step, exactly as the POST's `notDownloaded`
+      // refusal does, so the popup does not have to infer it from the state.
+      ...(status.state === 'notStarted' ? { canDownload: true } : {}),
       ...status,
     });
     return;

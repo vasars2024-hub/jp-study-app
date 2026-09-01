@@ -259,10 +259,16 @@ const TRANSCRIBE_REFUSALS = {
  * has to be collected afterwards from `/v1/transcribe/status`, which is the one
  * place that knows both transcript sinks.
  *
- * Three honest endings, never a shared "failed":
+ * Four honest endings, never a shared "failed":
  *   transcribed -> the number
  *   failed      -> the job ended and left no transcript, with the next step
+ *   notStarted  -> nothing was ever queued, because the video is not downloaded
  *   neither     -> still running, with the elapsed time so it is visibly alive
+ *
+ * `notStarted` cannot happen after our own POST returned `queued` — the queue
+ * only accepts a media row. It is here because this route is polled, and a poll
+ * that begins before or without a download must not report a failure that never
+ * happened.
  *
  * A closed popup ends the poll — MV3 gives it no life of its own. That is not a
  * lost result: the transcript still lands in the catalogue, and pressing the
@@ -286,6 +292,10 @@ async function followTranscription(videoId) {
     }
     if (res.state === 'failed') {
       feedback('The transcription ended without a transcript. Retry from the Media library.', 'err');
+      return;
+    }
+    if (res.state === 'notStarted') {
+      feedback('Nothing has been downloaded for this video yet, so no transcription has run.', 'err');
       return;
     }
     feedback(`Transcribing in GrammarX… ${elapsed()}`, 'pending');
