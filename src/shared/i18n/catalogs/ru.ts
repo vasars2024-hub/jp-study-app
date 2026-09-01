@@ -11743,7 +11743,7 @@ export const ru: Catalog = {
   'filesApp.review.skippedHeading': 'Не рассмотрено ({count})',
   'filesApp.review.archivesHeading': 'Внутри архивов ({count})',
   'filesApp.review.archiveSummary':
-    'Внутри {found}; {placed} определено, {ambiguous} требует выбора, {skipped} пропущено.',
+    'Внутри {found}; {placed} определено, {ambiguous} требует выбора, {unplaced} некуда положить, {skipped} пропущено.',
   'filesApp.review.archiveDominant': 'В основном — {target}.',
   'filesApp.review.archiveTruncated':
     'Перечислена только первая часть этого архива.',

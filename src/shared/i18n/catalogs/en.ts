@@ -11319,7 +11319,7 @@ export const en: Catalog = {
   'filesApp.review.skippedHeading': 'Not looked at ({count})',
   'filesApp.review.archivesHeading': 'Inside archives ({count})',
   'filesApp.review.archiveSummary':
-    '{found} inside; {placed} placed, {ambiguous} need a choice, {skipped} skipped.',
+    '{found} inside; {placed} placed, {ambiguous} need a choice, {unplaced} have no home, {skipped} skipped.',
   'filesApp.review.archiveDominant': 'Mostly {target}.',
   'filesApp.review.archiveTruncated': 'Only the first part of this archive was listed.',
   'filesApp.review.knownHeading': 'Already brought in ({count})',

@@ -10747,7 +10747,7 @@ export const zh: Catalog = {
   'filesApp.review.skippedHeading': '未查看（{count}）',
   'filesApp.review.archivesHeading': '压缩包内容（{count}）',
   'filesApp.review.archiveSummary':
-    '内含 {found} 项；{placed} 项已归位，{ambiguous} 项需要选择，{skipped} 项已跳过。',
+    '内含 {found} 项；{placed} 项已归位，{ambiguous} 项需要选择，{unplaced} 项无处可放，{skipped} 项已跳过。',
   'filesApp.review.archiveDominant': '大多为{target}。',
   'filesApp.review.archiveTruncated': '仅列出了此压缩包的前一部分。',
   'filesApp.review.knownHeading': '已经导入（{count}）',

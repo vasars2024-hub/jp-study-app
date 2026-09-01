@@ -643,6 +643,11 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
                             found: finding.report.found,
                             placed: finding.report.placed,
                             ambiguous: finding.report.ambiguous,
+                            // Named, not dropped: `found` counts these too, so
+                            // omitting them makes the sentence's own arithmetic
+                            // fail to add up in exactly the archives where
+                            // something had nowhere to go.
+                            unplaced: finding.report.unplaced,
                             skipped: finding.report.skipped,
                           })}
                         </p>

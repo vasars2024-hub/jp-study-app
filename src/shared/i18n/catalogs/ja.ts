@@ -10848,7 +10848,7 @@ export const ja: Catalog = {
   'filesApp.review.skippedHeading': '未確認 ({count})',
   'filesApp.review.archivesHeading': 'アーカイブの中身 ({count})',
   'filesApp.review.archiveSummary':
-    '中に {found} 件。{placed} 件を振り分け、{ambiguous} 件は選択が必要、{skipped} 件をスキップしました。',
+    '中に {found} 件。{placed} 件を振り分け、{ambiguous} 件は選択が必要、{unplaced} 件は行き先なし、{skipped} 件をスキップしました。',
   'filesApp.review.archiveDominant': 'ほとんどが{target}です。',
   'filesApp.review.archiveTruncated':
     'このアーカイブは先頭部分のみを一覧にしました。',

@@ -20,6 +20,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScanReviewSheet } from '../components/filesapp/ScanReviewSheet';
 import { buildScanReport, scanEntryFor, type FilesScanReport } from '../../shared/filesApp/scan';
+import {
+  classifyArchiveMembers,
+  type FilesScanReportWithArchives,
+} from '../../shared/filesApp/archive';
 import type { DropCandidate } from '../../shared/fileRouting';
 import { clearImportLedger } from '../filesImportLedgerStore';
 
@@ -396,5 +400,122 @@ describe('gate 24 — the import half, and its reversal', () => {
     expect(outcomes[1]?.textContent).toContain('Could not import ep01.mkv');
     // The wallpaper, which is scheduled after the failing video, still landed.
     expect(setWallpaperFromPath).toHaveBeenCalledWith(PNG);
+  });
+});
+
+/**
+ * Gate 28's surface half.
+ *
+ * The archives section is deliberately CONTROL-FREE: a member's path is
+ * `pack.zip!/ep01.srt`, which no importer can open, so offering a destination
+ * picker there would be a control that cannot act. What the section owes the
+ * user is the three words the gate names — placed, ambiguous, skipped — with a
+ * reason on every skip, so a decision about the archive ITSELF is informed.
+ *
+ * The scored claim is therefore "the contents are reported and nothing is
+ * importable", and both halves are asserted: the counts render, AND the
+ * importer spies stay untouched after a scan that found five members.
+ */
+describe('gate 28 — the surface reports what is inside an archive', () => {
+  const ZIP = 'C:\dl\subs-pack.zip';
+
+  /** The router's real answer for an unsniffable `.zip`: two ambiguous homes. */
+  const ZIP_CANDIDATES: DropCandidate[] = [
+    { target: 'dictionary-yomitan', confidence: 'ambiguous', reasonKey: 'fileDrop.reason.zipDict' },
+    { target: 'library-manga', confidence: 'ambiguous', reasonKey: 'fileDrop.reason.zipManga' },
+  ];
+
+  function reportWithArchive(): FilesScanReportWithArchives {
+    const base = report();
+    return {
+      ...base,
+      entries: [
+        ...base.entries,
+        scanEntryFor({ path: ZIP, name: 'subs-pack.zip', sizeBytes: 4096 }, ZIP_CANDIDATES),
+      ],
+      archives: [
+        {
+          path: ZIP,
+          // The real model, on the same index the main-process test writes to
+          // disk — so the numbers the surface prints are the model's, not a
+          // hand-typed set that could drift away from it.
+          report: classifyArchiveMembers(ZIP, [
+            { entryName: 'ep01.srt', sizeBytes: 40, isDirectory: false },
+            { entryName: 'ep02.srt', sizeBytes: 40, isDirectory: false },
+            { entryName: 'ep03.ass', sizeBytes: 14, isDirectory: false },
+            { entryName: 'notes.xyz', sizeBytes: 18, isDirectory: false },
+            { entryName: 'inner.zip', sizeBytes: 300, isDirectory: false },
+          ]),
+        },
+      ],
+    };
+  }
+
+  beforeEach(() => {
+    filesScan.mockImplementation(async () => reportWithArchive());
+  });
+
+  it('renders the archive with its placed / ambiguous / skipped counts', async () => {
+    await mount();
+    await scan();
+    const section = q('.fa-review-archives');
+    expect(section.textContent).toContain('subs-pack.zip');
+    /*
+     * 4 classified — two .srt and one .ass placed, notes.xyz with no home —
+     * and inner.zip skipped. The sentence names all four numbers on purpose:
+     * `found` counts the unplaced one, so a summary that omitted it would
+     * print "4 inside; 3 placed, 0 need a choice, 1 skipped" and quietly lose
+     * a file in its own arithmetic.
+     */
+    expect(section.textContent).toContain(
+      '4 inside; 3 placed, 0 need a choice, 1 have no home, 1 skipped',
+    );
+  });
+
+  it('names the nested archive it refused to open, with its reason', async () => {
+    await mount();
+    await scan();
+    const section = q('.fa-review-archives');
+    expect(section.textContent).toContain('inner.zip');
+    expect(section.textContent).toContain('An archive inside an archive');
+  });
+
+  it('says what the archive is mostly made of', async () => {
+    await mount();
+    await scan();
+    expect(q('.fa-review-archives').textContent).toContain('Mostly Subtitles');
+  });
+
+  it('offers NO control over a member — the section is a report', async () => {
+    await mount();
+    await scan();
+    const section = q('.fa-review-archives');
+    expect(section.querySelectorAll('select')).toHaveLength(0);
+    expect(section.querySelectorAll('button')).toHaveLength(0);
+    expect(section.querySelectorAll('input')).toHaveLength(0);
+  });
+
+  it('no member path reaches an importer, even after Import is pressed', async () => {
+    await mount();
+    await scan();
+    await act(async () => {
+      q('.fa-review-confirm').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const everyArg = [importPaths, addMediaPaths, dictImportYomitan, setWallpaperFromPath]
+      .flatMap((spy) => spy.mock.calls.flat(2))
+      .filter((arg): arg is string => typeof arg === 'string');
+    expect(everyArg.length).toBeGreaterThan(0);
+    for (const arg of everyArg) expect(arg).not.toContain('!/');
+  });
+
+  it('a report with no archives renders no archives section at all', async () => {
+    filesScan.mockImplementation(async () => report());
+    await mount();
+    await scan();
+    expect(host?.querySelector('.fa-review-archives')).toBeNull();
   });
 });
