@@ -1687,8 +1687,14 @@
 /*
  * A model the machine substituted for the one that was asked for. Warning-toned
  * rather than neutral: the substituted tier is measurably weaker, so this is a
- * caveat about the output, not a second progress detail. Never `display: none`
- * at any width — a disclosure that a narrow window hides is not a disclosure.
+ * caveat about the output, not a second progress detail. Never hidden at any
+ * width — a disclosure a narrow window suppresses is not a disclosure.
+ *
+ * Do not write the two-word CSS declaration for that here, even in prose:
+ * `mediaLibraryListRow.test.ts` scans this file as RAW TEXT from the
+ * `@container medialib (max-width: 420px)` block to EOF, so a comment
+ * hundreds of lines below satisfies its `[\s\S]*?` and fails the guard. It
+ * cost one red suite on the run that added this rule.
  */
 .medialib-jobs__substitution {
   flex-shrink: 0;
