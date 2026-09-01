@@ -662,6 +662,154 @@ describe('files app index — the transcription queue (workspaces/queue)', () =>
 });
 
 /**
+ * The duplicate-row defect the gate 5 census found on the live profile
+ * 2026-09-01: **54 index rows for 48 files under `downloads/`.** Every one of
+ * the six extras was the same pair — `media.json` holds a subtitle RECORD
+ * whose path is a sidecar sitting inside `downloads/`, and the downloads
+ * walker meets that same file on disk. Their ids are namespaced per store
+ * (`media-subtitle:…` vs `download:…`), so the id `Set` never saw it.
+ */
+describe('files app index — one file, one row, across enumerators', () => {
+  /**
+   * Three videos in `downloads/`, each with a `.ja.vtt` and a `.en.vtt`
+   * sidecar that `media.json` records — the live shape, at live scale.
+   */
+  function seedDownloadedSidecars(): void {
+    const rows = [1, 2, 3].map((n) => {
+      write(`downloads/ep-${n}.mp4`, 'video bytes');
+      write(`downloads/ep-${n}.ja.vtt`, 'WEBVTT');
+      write(`downloads/ep-${n}.en.vtt`, 'WEBVTT');
+      return {
+        id: `ep-${n}`,
+        title: `Episode ${n}`,
+        subtitles: [
+          {
+            id: 'ja',
+            lang: 'ja',
+            source: 'generated',
+            format: 'vtt',
+            path: `downloads/ep-${n}.ja.vtt`,
+            machineGenerated: true,
+            addedAt: 10,
+          },
+          {
+            id: 'en',
+            lang: 'en',
+            source: 'sidecar',
+            format: 'vtt',
+            path: `downloads/ep-${n}.en.vtt`,
+            addedAt: 20,
+          },
+        ],
+      };
+    });
+    write('media.json', JSON.stringify({ items: rows }));
+  }
+
+  it('lists a recorded sidecar under downloads exactly once', () => {
+    seedDownloadedSidecars();
+
+    const snapshot = buildFilesIndex(ctx());
+    const subtitleRows = snapshot.items.filter((item) => item.kind === 'subtitle');
+
+    // 6 sidecars on disk, 6 records naming them, 6 rows — not 12.
+    expect(subtitleRows.length).toBe(6);
+    const paths = subtitleRows.map((item) =>
+      item.location.store === 'file' ? item.location.path.toLowerCase() : '',
+    );
+    expect(new Set(paths).size).toBe(6);
+
+    // Control: the walker DID reach every one of them. Drop the record store
+    // and the same six files still arrive, from `downloads` instead — so the
+    // six above are a deduplication, not a reader that quietly failed.
+    fs.rmSync(path.join(root, 'media.json'));
+    const walkerOnly = buildFilesIndex(ctx()).items.filter((i) => i.kind === 'subtitle');
+    expect(walkerOnly.length).toBe(6);
+    expect(walkerOnly.every((i) => i.source === 'downloads')).toBe(true);
+  });
+
+  it('the RECORD wins, so provenance survives and the false orphan flag does not', () => {
+    seedDownloadedSidecars();
+
+    const snapshot = buildFilesIndex(ctx());
+    const ja = snapshot.items.find((item) => item.name.includes('ja') || item.id.endsWith(':ja'));
+
+    // The record knows `machineGenerated`; the filename does not. Had the
+    // downloads walker won, this row would read `human-subs` (nothing in
+    // `ep-1.ja.vtt` says otherwise) and carry `orphan: true` for a file the
+    // media library demonstrably claims.
+    expect(ja?.source).toBe('subtitles');
+    expect(ja?.provenance).toBe('whisper-transcript');
+    expect(ja?.flags?.orphan).toBeUndefined();
+  });
+
+  it('reports every dropped duplicate instead of swallowing it', () => {
+    seedDownloadedSidecars();
+
+    const snapshot = buildFilesIndex(ctx());
+    const downloads = snapshot.enumerators.find((r) => r.source === 'downloads');
+    const subtitles = snapshot.enumerators.find((r) => r.source === 'subtitles');
+
+    // The three .mp4 files are the walker's own; the six sidecars are refused
+    // and NAMED as refused. A drop nobody counts looks like a reader that
+    // never found the file.
+    expect(downloads?.itemCount).toBe(3);
+    expect(downloads?.duplicatePathCount).toBe(6);
+    // The enumerator that won reports no duplicates at all, rather than the
+    // field being absent because nothing tracks it.
+    expect(subtitles?.itemCount).toBe(6);
+    expect(subtitles?.duplicatePathCount).toBeUndefined();
+  });
+
+  it('matches the two spellings of one path the way Windows resolves it', () => {
+    write('downloads/Show.JA.vtt', 'WEBVTT');
+    write(
+      'media.json',
+      JSON.stringify({
+        items: [
+          {
+            id: 'ep',
+            title: 'Show',
+            subtitles: [
+              { id: 'ja', lang: 'ja', source: 'sidecar', format: 'vtt', path: 'downloads/show.ja.vtt' },
+            ],
+          },
+        ],
+      }),
+    );
+
+    // A case-sensitive or separator-sensitive key would let this pair through
+    // and put the file in the tree twice.
+    expect(buildFilesIndex(ctx()).items.filter((i) => i.kind === 'subtitle').length).toBe(1);
+  });
+
+  it('leaves rows that are not file-backed alone', () => {
+    // Two derived rows have no path to collide on. Coercing them into the
+    // path space would make unrelated rows look like one item.
+    const derived = (id: string) => ({
+      id,
+      name: id,
+      kind: 'note' as const,
+      categoryId: 'outputs/notes' as const,
+      provenance: 'app-generated' as const,
+      sizeBytes: null,
+      createdAt: null,
+      modifiedAt: null,
+      lastUsedAt: null,
+      location: { store: 'derived' as const, describes: 'x' },
+      flags: {},
+      source: 'fake',
+    });
+
+    const snapshot = buildFilesIndex(ctx(), [
+      { source: 'fake', run: () => [derived('a'), derived('b')] },
+    ]);
+    expect(snapshot.items.length).toBe(2);
+    expect(snapshot.enumerators[0].duplicatePathCount).toBeUndefined();
+  });
+});
+
+/**
  * Gate 4 — categorisation is derived. Nothing is filed by hand, and the proof
  * is a BEFORE and an AFTER around a single file appearing on disk: no code
  * runs between them, nothing is refreshed by hand, and the index simply says

@@ -20,6 +20,7 @@
 import {
   categoryForKind,
   countByCategory,
+  filesItemPathKey,
   type FilesIndexSnapshot,
   type FilesItem,
   type FilesItemKind,
@@ -525,23 +526,44 @@ export const RENDERER_FILES_ENUMERATORS: readonly {
  * sides cannot produce two rows for one item. Each renderer enumerator reports
  * itself alongside the main ones for the same reason they do: a category at 0
  * has to be distinguishable from a reader that failed.
+ *
+ * File-backed rows additionally dedupe on `filesItemPathKey`, the same rule
+ * `buildFilesIndex` applies, because namespaced ids do not collide when two
+ * stores describe one file. Every renderer enumerator is localStorage-backed
+ * today, so this drops nothing now — it is here so that the first one which
+ * ever points at a real path cannot silently double a row main already has.
  */
 export function withRendererItems(snapshot: FilesIndexSnapshot): FilesIndexSnapshot {
   const items = [...snapshot.items];
   const seen = new Set(items.map((item) => item.id));
+  const seenPaths = new Set(
+    items.map((item) => filesItemPathKey(item)).filter((key): key is string => key !== null),
+  );
   const reports = [...snapshot.enumerators];
 
   for (const enumerator of RENDERER_FILES_ENUMERATORS) {
     const started = Date.now();
     try {
       let kept = 0;
+      let duplicatePaths = 0;
       for (const item of enumerator.run()) {
         if (seen.has(item.id)) continue;
+        const pathKey = filesItemPathKey(item);
+        if (pathKey !== null && seenPaths.has(pathKey)) {
+          duplicatePaths += 1;
+          continue;
+        }
         seen.add(item.id);
+        if (pathKey !== null) seenPaths.add(pathKey);
         items.push(item);
         kept += 1;
       }
-      reports.push({ source: enumerator.source, itemCount: kept, elapsedMs: Date.now() - started });
+      reports.push({
+        source: enumerator.source,
+        itemCount: kept,
+        elapsedMs: Date.now() - started,
+        ...(duplicatePaths ? { duplicatePathCount: duplicatePaths } : {}),
+      });
     } catch (err) {
       reports.push({
         source: enumerator.source,

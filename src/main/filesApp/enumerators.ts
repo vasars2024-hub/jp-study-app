@@ -26,6 +26,7 @@ import {
   categoryForKind,
   countByCategory,
   deriveCrossStoreFlags,
+  filesItemPathKey,
   type FilesEnumeratorReport,
   type FilesIndexSnapshot,
   type FilesItem,
@@ -1042,6 +1043,14 @@ export const readingLensEnumerator: FilesEnumerator = {
  * reader; nothing else in the app changes, which is what "the tree is derived,
  * so adding a category later is additive" has to mean in practice.
  */
+/**
+ * The registry, and **its order is load-bearing** — see `buildFilesIndex`.
+ * Two enumerators can meet the same file, and the first one to claim its path
+ * keeps it. So every reader backed by a persisted RECORD (which knows a
+ * track's real provenance) comes before every walker that only sees a
+ * filename (which has to guess from it). `mediaSubtitleEnumerator` ahead of
+ * `downloadsEnumerator` is the measured case; do not reorder these two.
+ */
 export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
   libraryEnumerator,
   mediaEnumerator,
@@ -1069,6 +1078,20 @@ export const FILES_ENUMERATORS: readonly FilesEnumerator[] = [
  * enumerators claiming one id would otherwise make the same item appear twice
  * in a list and once in a count — the two would disagree and only one of them
  * would be visible.
+ *
+ * **Ids are not enough.** Each enumerator namespaces its own ids, so two
+ * enumerators describing the SAME FILE from two different stores collide on
+ * disk and not in the `Set` — measured on the live profile 2026-09-01, the
+ * `subtitles` and `downloads` pair produced 54 rows for 48 sidecars, six of
+ * them doubled. File-backed rows therefore also dedupe on
+ * `filesItemPathKey`, and the FIRST enumerator to claim a path wins.
+ *
+ * First-wins is only correct because `FILES_ENUMERATORS` puts the readers
+ * that carry a persisted RECORD ahead of the walkers that only meet a
+ * filename — that ordering is load-bearing and is commented as such. For the
+ * measured case it is the difference between a sidecar keeping the record's
+ * real `whisper-transcript` provenance and inheriting a guess made from its
+ * name plus a false `orphan` flag.
  */
 export function buildFilesIndex(
   ctx: FilesEnumeratorContext,
@@ -1076,6 +1099,7 @@ export function buildFilesIndex(
 ): FilesIndexSnapshot {
   const items: FilesItem[] = [];
   const seen = new Set<string>();
+  const seenPaths = new Set<string>();
   const reports: FilesEnumeratorReport[] = [];
 
   for (const enumerator of enumerators) {
@@ -1083,9 +1107,16 @@ export function buildFilesIndex(
     try {
       const produced = enumerator.run(ctx);
       let kept = 0;
+      let duplicatePaths = 0;
       for (const item of produced) {
         if (seen.has(item.id)) continue;
+        const pathKey = filesItemPathKey(item);
+        if (pathKey !== null && seenPaths.has(pathKey)) {
+          duplicatePaths += 1;
+          continue;
+        }
         seen.add(item.id);
+        if (pathKey !== null) seenPaths.add(pathKey);
         items.push(item);
         kept += 1;
       }
@@ -1093,6 +1124,7 @@ export function buildFilesIndex(
         source: enumerator.source,
         itemCount: kept,
         elapsedMs: Date.now() - started,
+        ...(duplicatePaths ? { duplicatePathCount: duplicatePaths } : {}),
       });
     } catch (err) {
       reports.push({

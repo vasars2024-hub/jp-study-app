@@ -26,7 +26,7 @@ const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const miningMode = process.argv.includes('--mining');
 const userDataPath = args[0] || path.join(process.env.APPDATA || '', 'jp-study-app');
 
-const snapshot = buildFilesIndex({
+const ctx = {
   userDataPath,
   openDictionary: () => {
     try {
@@ -41,7 +41,9 @@ const snapshot = buildFilesIndex({
       return null;
     }
   },
-});
+};
+
+const snapshot = buildFilesIndex(ctx);
 
 console.log(`userData: ${userDataPath}`);
 console.log(`items: ${snapshot.items.length}`);
@@ -297,28 +299,70 @@ if (miningMode && process.argv.includes('--detail')) {
  * Gate 5 reports a COUNT of assets, so a file listed twice overstates what the
  * user has. This says whether that is happening and which enumerators disagree
  * about who owns the row.
+ *
+ * It prints TWO passes over the same profile in one run. The CONTROL flattens
+ * every enumerator's own output with no deduplication at all, which is what
+ * `buildFilesIndex` did before 2026-09-01; the PRODUCTION pass is the shipped
+ * snapshot. A fix that had merely stopped one enumerator from looking would
+ * move both numbers together — only a deduplication moves the second while the
+ * first stands still.
  */
 if (process.argv.includes('--dupes')) {
+  const groupByPath = (items: readonly FilesItem[]): Map<string, FilesItem[]> => {
+    const byPath = new Map<string, FilesItem[]>();
+    for (const item of items) {
+      if (item.location.store !== 'file' || !item.location.path) continue;
+      const key = item.location.path.toLowerCase();
+      byPath.set(key, [...(byPath.get(key) ?? []), item]);
+    }
+    return byPath;
+  };
+
+  const report = (label: string, items: readonly FilesItem[], show: boolean): number => {
+    const byPath = groupByPath(items);
+    let dupes = 0;
+    const pairs: Record<string, number> = {};
+    for (const [key, group] of byPath) {
+      if (group.length < 2) continue;
+      dupes += group.length - 1;
+      const sources = group.map((i) => i.id.split(':')[0]).sort().join(' + ');
+      pairs[sources] = (pairs[sources] ?? 0) + 1;
+      if (show && dupes <= 8) console.log(`  ${sources.padEnd(28)} ${key}`);
+    }
+    console.log(
+      `${label}: ${items.length} rows, ${byPath.size} distinct files, ${dupes} duplicate rows`,
+    );
+    for (const [sources, n] of Object.entries(pairs).sort((a, b) => b[1] - a[1])) {
+      console.log(`    ${sources.padEnd(34)} ${n}`);
+    }
+    return dupes;
+  };
+
   console.log('');
   console.log('files claimed by more than one row:');
-  const byPath = new Map<string, FilesItem[]>();
-  for (const item of snapshot.items) {
-    if (item.location.store !== 'file' || !item.location.path) continue;
-    const key = item.location.path.toLowerCase();
-    byPath.set(key, [...(byPath.get(key) ?? []), item]);
+
+  // CONTROL — every enumerator's raw output, concatenated, nothing dropped.
+  const raw: FilesItem[] = [];
+  for (const enumerator of FILES_ENUMERATORS) {
+    try {
+      raw.push(...enumerator.run(ctx));
+    } catch {
+      /* an unreadable store is already reported by the production pass */
+    }
   }
-  let dupes = 0;
-  const pairs: Record<string, number> = {};
-  for (const [key, items] of byPath) {
-    if (items.length < 2) continue;
-    dupes += items.length - 1;
-    const sources = items.map((i) => i.id.split(':')[0]).sort().join(' + ');
-    pairs[sources] = (pairs[sources] ?? 0) + 1;
-    if (dupes <= 8) console.log(`  ${sources.padEnd(28)} ${key}`);
-  }
+  const rawDupes = report('  CONTROL (no dedupe)', raw, true);
+  const liveDupes = report('  PRODUCTION (buildFilesIndex)', snapshot.items, false);
+
   console.log('');
-  console.log(`duplicate rows total: ${dupes}`);
-  for (const [sources, n] of Object.entries(pairs).sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${sources.padEnd(34)} ${n}`);
+  const dropped = snapshot.enumerators.reduce((n, r) => n + (r.duplicatePathCount ?? 0), 0);
+  console.log('reported as dropped by their own enumerator:');
+  for (const r of snapshot.enumerators) {
+    if (r.duplicatePathCount) console.log(`    ${r.source.padEnd(14)} ${r.duplicatePathCount}`);
   }
+  console.log(`    total ${dropped}`);
+  console.log('');
+  console.log(
+    `GATE (dupes): ${rawDupes > 0 && liveDupes === 0 && dropped === rawDupes ? 'PASS' : 'FAIL'}` +
+      `  control ${rawDupes} > 0, production ${liveDupes} === 0, reported ${dropped} === control`,
+  );
 }

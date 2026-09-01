@@ -614,6 +614,38 @@ export interface FilesEnumeratorReport {
   itemCount: number;
   elapsedMs: number;
   error?: string;
+  /**
+   * Rows this enumerator produced for a file an EARLIER enumerator had already
+   * claimed. Reported rather than silently swallowed: a drop that nobody counts
+   * is indistinguishable from a reader that never found the file at all.
+   */
+  duplicatePathCount?: number;
+}
+
+/**
+ * The identity of the file a row points at, for cross-enumerator deduplication.
+ *
+ * Two enumerators owning two different stores can legitimately describe the
+ * same bytes — `media.json` holds a subtitle RECORD whose `path` happens to sit
+ * inside `downloads/`, which the downloads walker also meets on disk. Their ids
+ * are namespaced per store, so an id-keyed `Set` cannot see the collision, and
+ * the file lands in the tree twice. Measured on the live profile 2026-09-01:
+ * 54 rows for 48 files.
+ *
+ * Pure string work, no `node:path`, because the renderer merges its own
+ * enumerators into the same snapshot and cannot import it. Separators are
+ * folded and case is dropped the way Windows resolves a path, matching
+ * `storageReaders.pathKey` and the downloads walker's `claimed` set.
+ *
+ * Returns `null` for a row that is not file-backed: a SQLite row and a
+ * localStorage key have no path to collide on, and coercing them into this
+ * space would make two unrelated rows look like one item.
+ */
+export function filesItemPathKey(item: FilesItem): string | null {
+  if (item.location.store !== 'file') return null;
+  const raw = item.location.path.trim();
+  if (!raw) return null;
+  return raw.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 }
 
 export interface FilesIndexSnapshot {
