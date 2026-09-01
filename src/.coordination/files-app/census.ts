@@ -15,7 +15,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { buildFilesIndex, FILES_ENUMERATORS, type FilesSqliteLike } from '../../main/filesApp/enumerators';
-import { FILES_TREE, type FilesItem } from '../../shared/filesApp/catalog';
+import {
+  FILES_TREE,
+  categoryForKind,
+  deriveCrossStoreFlags,
+  revealTargetFor,
+  type FilesItem,
+} from '../../shared/filesApp/catalog';
+import {
+  FILES_SMART_FOLDER_PRESETS,
+  smartFolderMembers,
+  type FilesSmartCriteria,
+} from '../../shared/filesApp/smartFolders';
 import { mineabilityOf } from '../../shared/filesApp/mining';
 
 // Filter EVERY flag, not a named list: `--detail` slipped through a
@@ -365,4 +376,104 @@ if (process.argv.includes('--dupes')) {
     `GATE (dupes): ${rawDupes > 0 && liveDupes === 0 && dropped === rawDupes ? 'PASS' : 'FAIL'}` +
       `  control ${rawDupes} > 0, production ${liveDupes} === 0, reported ${dropped} === control`,
   );
+}
+
+/**
+ * `--gate68` — mining gates 6 and 8, on the live profile, read-only.
+ *
+ * Gate 6: "take a video transcribed earlier, whose transcript file exists, and
+ * find it in the catalogue WITHOUT navigating to that video." So the video is
+ * reached only through `smartFolderMembers` and the shipped preset criteria —
+ * the same predicate the Files app runs — and never by looking up a video page.
+ * Gate 8: "the categories come from the asset's own provenance", i.e. no
+ * enumerator hand-files a row.
+ *
+ * Three controls, because a flag that is always true proves nothing:
+ *  (a) the two presets must PARTITION the videos — no row in both, none in
+ *      neither, so `transcribed` is discriminating and not decorative;
+ *  (b) re-deriving with the transcript rows withheld must take the marked
+ *      count to 0, which is what ties the flag to the transcripts;
+ *  (c) every transcript row's file must be on disk, checked with `statSync`,
+ *      because a row pointing at nothing would satisfy the count and not the
+ *      gate.
+ */
+if (process.argv.includes('--gate68')) {
+  console.log('');
+  console.log('=== MINING gates 6 & 8 — transcribed assets are findable in the catalogue ===');
+  console.log('');
+
+  const preset = (id: string): FilesSmartCriteria => {
+    const found = FILES_SMART_FOLDER_PRESETS.find((f) => f.id === id);
+    if (!found) throw new Error(`no such preset: ${id}`);
+    return found.criteria;
+  };
+
+  const videos = snapshot.items.filter((i) => i.kind === 'video');
+  const transcribed = smartFolderMembers(snapshot.items, preset('preset:transcribed-video'));
+  const untranscribed = smartFolderMembers(snapshot.items, preset('preset:untranscribed-video'));
+  const transcriptRows = snapshot.items.filter((i) => i.kind === 'transcript');
+
+  console.log(`videos in the index:            ${videos.length}`);
+  console.log(`transcript rows in the index:   ${transcriptRows.length}`);
+  console.log(`"Transcribed video" folder:     ${transcribed.length}`);
+  console.log(`"Untranscribed video" folder:   ${untranscribed.length}`);
+  console.log('');
+  console.log('reached through the folder alone, never through a video page:');
+  for (const item of transcribed) {
+    const target = revealTargetFor(item.location);
+    console.log(`  ${item.name}`);
+    console.log(`    reveal: ${target ?? 'NONE'}`);
+  }
+
+  // (c) — the transcript each one refers to is a real file, not just a row.
+  let transcriptsOnDisk = 0;
+  for (const t of transcriptRows) {
+    const p = t.location.store === 'file' ? t.location.path : '';
+    try {
+      if (p && fs.statSync(p).isFile()) transcriptsOnDisk += 1;
+    } catch {
+      /* counted as absent */
+    }
+    const mine = mineabilityOf(t);
+    console.log(
+      `  transcript ${t.name.slice(0, 40).padEnd(42)} mineable=${mine.mineable}${mine.mineable ? '' : ` (${mine.reasonKey})`}`,
+    );
+  }
+
+  // (a) — partition.
+  const inBoth = transcribed.filter((i) => untranscribed.some((j) => j.id === i.id)).length;
+  const inNeither = videos.filter(
+    (i) => !transcribed.some((j) => j.id === i.id) && !untranscribed.some((j) => j.id === i.id),
+  ).length;
+
+  // (b) — widen: withhold the transcript rows and re-derive from the same input.
+  const withheld = deriveCrossStoreFlags(
+    snapshot.items.filter((i) => i.kind !== 'transcript').map((i) => ({
+      ...i,
+      flags: { ...i.flags, transcribed: undefined },
+    })),
+  ).filter((i) => i.kind === 'video' && i.flags.transcribed).length;
+
+  // Gate 8 — every row's category is reproducible from the row itself.
+  const handFiled = snapshot.items.filter((i) => i.categoryId !== categoryForKind(i.kind));
+
+  console.log('');
+  console.log(`control (a) partition:      in both ${inBoth}, in neither ${inNeither} (both must be 0)`);
+  console.log(`control (b) transcripts withheld: ${withheld} videos still marked (must be 0)`);
+  console.log(`control (c) transcript files on disk: ${transcriptsOnDisk} of ${transcriptRows.length}`);
+  console.log(`gate 8 — rows whose category is not derived from their kind: ${handFiled.length} of ${snapshot.items.length}`);
+  for (const i of handFiled.slice(0, 5)) console.log(`    ${i.source} ${i.id} ${i.categoryId}`);
+
+  const g6 =
+    transcribed.length > 0 &&
+    transcribed.every((i) => revealTargetFor(i.location) !== null) &&
+    transcriptsOnDisk === transcriptRows.length &&
+    transcriptRows.length > 0 &&
+    transcriptRows.every((t) => mineabilityOf(t).mineable) &&
+    inBoth === 0 &&
+    inNeither === 0 &&
+    withheld === 0;
+  console.log('');
+  console.log(`GATE 6: ${g6 ? 'PASS' : 'FAIL'}`);
+  console.log(`GATE 8: ${handFiled.length === 0 ? 'PASS' : 'FAIL'}`);
 }

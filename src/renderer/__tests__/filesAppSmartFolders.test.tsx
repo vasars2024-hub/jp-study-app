@@ -248,6 +248,43 @@ describe('gate 19 — smart folders stay live', () => {
     expect(smartCount('Broken links')).toBe(before);
   });
 
+  /**
+   * MINING_UNIFICATION_PLAN gate 6 — "take a video transcribed earlier, whose
+   * transcript file exists, and find it in the catalogue WITHOUT navigating to
+   * that video." The count moving (above) is not that gate; arriving at the
+   * row from the rail, and at the transcript from the search box, is.
+   */
+  it('gate 6 — the transcribed video is reached from the rail, not from its video page', async () => {
+    filesIndex.mockImplementation(async () => snapshot([...VIDEOS, TRANSCRIPT]));
+    await mount(<FilesApp />);
+
+    // Two clicks, neither of them on a video: the rail, then nothing else.
+    await click(smartNode('Transcribed videos'));
+    expect(bodyRowNames()).toEqual(['lecture [dQw4w9WgXcQ].mkv']);
+
+    // CONTROL: the other video is real, is in the index, and is deliberately
+    // NOT here — so the folder is discriminating rather than listing videos.
+    expect(bodyRowNames()).not.toContain('talk [abc12345678].mkv');
+    await click(smartNode('Untranscribed videos'));
+    expect(bodyRowNames()).toEqual(['talk [abc12345678].mkv']);
+  });
+
+  it('gate 6 — the transcript is its own row, findable without knowing the video', async () => {
+    filesIndex.mockImplementation(async () => snapshot([...VIDEOS, TRANSCRIPT]));
+    await mount(<FilesApp />);
+
+    // The transcript file is an asset in its own right. Searching for it never
+    // touches the video row, which is the point: `ytPlaylists.ts:254` already
+    // knew the answer and only ever told that one video.
+    await typeSearch('dQw4w9WgXcQ');
+    expect(bodyRowNames()).toContain('dQw4w9WgXcQ');
+
+    // CONTROL: a string in nothing returns nothing, so the hit above is a
+    // match and not a search box that ignores its input.
+    await typeSearch('zzzz-no-such-asset');
+    expect(bodyRowNames()).toEqual([]);
+  });
+
   it('saves the current search, and it survives a restart', async () => {
     await mount(<FilesApp />);
     await typeSearch('talk');

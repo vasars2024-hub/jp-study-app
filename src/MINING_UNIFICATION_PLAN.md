@@ -237,3 +237,49 @@ Gates 6, 7, 8 look substantially built by the same absorption (`shared/filesApp/
 carries `mineabilityOf`, `buildFilesMineDrafts`, `deckProvenanceFor` and
 `buildFilesMineNoteRequest`); they are NOT claimed here, because none has been measured
 against its own words yet. 1 of 12 closed.
+
+### 2026-09-01 — gates 6 and 8 CLOSE, on the live profile
+
+`--gate68`, a third mode on the same census, reusing the same one `buildFilesIndex` call and
+the PRODUCTION `smartFolderMembers` with the shipped `FILES_SMART_FOLDER_PRESETS` criteria —
+the identical predicate the sidebar runs. Read-only.
+
+**Gate 6** — "find it in the catalogue WITHOUT navigating to that video". Live:
+
+```
+videos in the index:            81
+transcript rows in the index:    2
+"Transcribed video" folder:      2      "Untranscribed video" folder:  79
+```
+
+Both transcribed videos are reached through the preset folder alone and each carries its own
+`revealTargetFor` path, so nothing about a video page is required to get to either. Both
+transcript rows are independently `mineable=true`. Three controls, all firing:
+**(a)** the two presets PARTITION the 81 videos — 0 in both, 0 in neither, so `transcribed` is
+discriminating and not decorative; **(b)** re-deriving with the transcript rows withheld takes
+the marked count to **0**, which is what ties the flag to the transcripts rather than to
+anything else on the row; **(c)** both transcript files are confirmed on disk with `statSync`,
+because a row pointing at nothing would satisfy the count and not the gate.
+
+**Gate 8** — "the categories come from the asset's own provenance". **0 of 1,979** rows carry a
+category that is not reproducible from the row's own kind by the production `categoryForKind`.
+No enumerator hand-files anything; the field could hold any value and none of the 17 sets one.
+The BEFORE/AFTER half — a newly transcribed video landing in the right group with no extra
+step — is the committed fixture pair in `filesAppEnumerators.test.ts` (gate 4), where the only
+event between the two builds is a `yt-transcripts/<id>.json` appearing on disk.
+
+Two UI tests added to `filesAppSmartFolders.test.tsx` for gate 6's other half, which a count
+moving does not prove: opening **Transcribed videos** lists exactly the transcribed one (the
+control being that the other real video is deliberately absent, and appears in the
+untranscribed folder instead), and the transcript is its own row, found by searching its id
+with no video involved (control: a string in nothing returns nothing).
+
+**Honestly stated, and it is small:** 2 of 81 videos in this profile are transcribed. The gate
+asks whether a transcribed video is findable, not how many there are, but the sample is two.
+
+**NOT claimed: the renderer click.** The census runs the production index against the real
+8.6 GB profile outside Electron; the sidebar wiring (`allSmartFolders` prepends the presets,
+`FilesApp.tsx:1253` renders each with a live `smartFolderCount`) was read, not clicked. The
+only app running on this machine is the liquid track's instrument on `feat/nyaa-subtitles`,
+which does not contain the Files app at all, and starting a second app on the same userData
+would strand it. 3 of 12 closed.
