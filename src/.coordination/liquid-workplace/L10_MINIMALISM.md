@@ -38,10 +38,57 @@ shell-level, so it also scores the Wired shell, already instrumented in `L9_SHEL
 
 ## Progress
 
-Nothing measured yet. **Exact next: bullet 3**, because it is the only one with a committed
-non-rubric instrument already green (`settingsSearchReachability.test.ts` asserts
-`unanchored === []` for both the settings and the Scraper registries) — so its baseline is a
-re-derivation rather than a first build, and the open half is whether the PALETTE, not just
-search, exposes the actions L8 moved behind disclosures.
+### Bullet 3 — CLOSED 2026-08-31. `9c117226` (palette), `74628bbc` (landing).
 
-`sampled-out:` every surface not named above, listed per bullet as it is scored.
+The open half was real and worse than "not yet widened": the palette exposed **0 of 160**
+registry entries. Its own header comment had claimed since it was written that it searches
+"…and settings"; the `items` memo had no settings source at all. So every action L8 moved
+behind a disclosure was reachable from the Settings search box and from nowhere else.
+
+**cat6 — feature parity. 10/10.** Live sweep of every registry entry whose English title can
+be typed as a query (129 of 160; the 31 excluded are the generated `page-*` rows and titles
+carrying `{}` placeholders). For each, the gate the registry declares was compared against
+what the palette actually offered in the running app: **129 of 129 agree** — 124 present as
+expected, 5 withheld as expected. Live gate state read from the app, not assumed:
+advanced=true, aeroDiscovered=true, wiredDiscovered=false, theme=study-os.
+Negative control, two independent axes discriminating in the same run: `Aero gadget lab` and
+`Aero games` PRESENT (discovery true) while `NAVI terminal` and `WIRED games` are ABSENT
+(discovery false) and `Pillarbox style` / `Leave secret OS` ABSENT (theme-gated). Each absent
+run still returned 7–13 other settings rows, so no refusal is vacuous. Mode control: the same
+query in `commands` mode returns 0 settings rows while still returning 19 command rows.
+Gatekeeper check (the plan's own constraint): every route the palette offers already existed
+inside Settings, so nothing became palette-only.
+
+**cat5 — UI clarity. 10/10, and it FAILED first.** Picking a result named the action and did
+not deliver it: the card highlighted **7,438 px below the fold**, pane `scrollTop` stayed 0 for
+the whole 2.2 s the highlight lasts, and the highlight then expired offscreen — identical, from
+the user's seat, to being dumped at the top of the page. This hit the Settings search box
+equally; it is not a palette defect. Fixed in `74628bbc` and re-measured in that commit: pane
+scrollTop 0 → 7233, card top 7462 → **183**, in view at ~2.5 s **while the highlight is still
+lit**.
+
+**The cause, because 11 other call sites share it.** `scrollIntoView({behavior:'smooth'})` is a
+request and this renderer refuses it. Measured with OS `prefers-reduced-motion` reporting
+**no-preference**: the settings pane moved 0 px on smooth and 7,233 px on the identical `auto`
+call, `pane.scrollTo({behavior:'smooth'})` also moved 0, and a freshly created plain scroller in
+the same document ignored smooth too. `grep` finds 16 `behavior: 'smooth'` sites, 11 of them
+product. Only `SettingsCard` is fixed here — the rest are named, not silently absorbed.
+
+Two instrument corrections banked. (37) A `themes:` gate may be written as a CONSTANT
+(`themes: SECRET_SHELL_THEMES`), so a `/themes: \[/` expectation parser scores a correctly
+withheld entry as a miss — that was this sweep's single "disagreement" and the app was right.
+(38) The card's own `rect.top` cannot decide whether a scroll happened: the page was still
+settling and moved the card 19 px by itself, so a first fix gated on `rect.top === before`
+never fired and measured as no fix at all. Compare the SCROLLER's `scrollTop`.
+
+`sampled-out:` **Media Center** — it owns no settings registry, so bullet 3's claim has nothing
+to bite on there. **Wired shell** — its command entry point is already certified by L9 bullet 1
+at RULE C 16/16 (`b1e35170`), and the palette's data is theme-independent. **Blanc** — it is a
+separate window that does not mount `CommandPalette` at all; that is pre-existing and belongs to
+Blanc's own track, where L9 established that the shell owns its own controls. Named here rather
+than passed over in silence.
+
+### Exact next: bullet 1
+
+Redundant chrome and card nesting, scored cat3 + cat4 on Settings and Media Center per the
+table above.
