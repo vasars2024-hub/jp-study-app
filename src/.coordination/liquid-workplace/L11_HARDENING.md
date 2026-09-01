@@ -145,3 +145,51 @@ controls proven**; neither surface has a bare nested header, so neither moved.
 Trap: the first control run of the corrected probe VOIDed on `returned: false` with
 `denseWorkOnTranslucent` stuck at 1 while `oneMaterialReturned` was true — the liquid
 presentation's backdrop had not settled. Re-run clean. One gesture reading is noise here.
+
+### Bullet 2 — high contrast, zoom, text scaling, compact widths, reduced/disabled motion. **OPEN, 3 of 5 clauses measured.**
+
+This bullet names five specific user requests, so it is scored against those words first and the
+RULE C grid second — a 16/16 built only from the default display preferences would not have
+touched the bullet at all. Measured live this turn on Settings and Media Center / Video, driving
+the product's own `data-display-*` hooks on `<html>` (attribute-level, never the persisted store —
+captured, patched and restored; `contrast normal / bold 0 / transparency full` verified back).
+
+**High contrast — PASSES on both surfaces.** With `data-display-contrast='high'` **and**
+`data-display-bold='1'` set together, `cat1-accessibility.cjs` scores **Settings PASS 10/10** and
+**Video PASS 10/10**: 0 failing text runs, 0 targets below the 32 px hit floor, 0 stolen, 0
+WCAG 2.5.8 failures, 0 keyboard-unreachable, motion `during 0` against `before 46` / `before 40`
+(a non-empty baseline, so the motion leg is not scored on an empty harness).
+`cat1-l11b2-settings-hc.json`, `cat1-l11b2-video-hc.json`.
+
+**No-blur / no-transparency dependency — PASSES, and the Liquid presentation honours it.** This
+is the clause most likely to have rotted, because `styles.css:1285`'s selector list predates
+Liquid and only strips `backdrop-filter`. Measured on the Settings window driven into Liquid
+presentation, one preference at a time:
+
+| `data-display-transparency` | `.fwin` background | `backdrop-filter` | `--lq-liquid-bg` | `--lq-liquid-blur` |
+| --- | --- | --- | --- | --- |
+| `full` | `srgb 0.102 0.094 0.137 / **0.72**` | `blur(8px) saturate(1.25)` | `color-mix(… 72%, transparent)` | `8px` |
+| `reduced` | `… / **0.88**` | `blur(6px)` | `color-mix(… 88%, transparent)` | `6px` |
+| `off` | `rgb(26, 24, 35)` — **fully opaque** | `none` | `#1a1823` | `0px` |
+
+So the token layer described in `liquid-tokens.css:244` is reaching the live window, not just the
+stylesheet. Independently on the Media Center: `aside.lq-contextual.mc-sidebar` goes
+`blur(24px)`/alpha 0.94 → `none`/alpha **1**, and `header.lq-contextual.mc-topbar`
+`blur(18px)`/0.72 → `none`/**1**. Settings' own 13 eligible regions read alpha 0 with no backdrop
+in both states — they have no background of their own and inherit the window's, so there is
+nothing there to opacify; that is a correct reading, not a silent pass.
+
+**Compact widths — PASSES** on both surfaces via cat4's `allThreeSizes` + `restored` bars
+(`cat4-l11b1-settings.json`, `cat4-l11b1-video.json`, both PASS 10/10).
+
+**Reduced/disabled motion — PARTIAL.** cat1's motion leg drives the OS-level
+`prefers-reduced-motion` through `/emulate` and both surfaces pass (`duringOverThreshold 0`,
+emulation demonstrably taken and released). The product's OWN switch, `data-display-anim='none'`,
+is a second and independent trigger and has **not** been measured live.
+
+**Zoom and text scaling — NOT MEASURED, and no instrument covers them.** There is no
+`data-display-text-scale` hook in the sheet; the display-preference vocabulary is `anim`, `bold`,
+`contrast`, `flashes`, `focus`, `links`, `pointer`, `scroll`, `transparency`. Whether zoom is
+browser zoom (`webFrame.setZoomFactor`), an OS DPI change, or a product control is the first
+thing the next turn must settle from source — **do not assume a control exists because the bullet
+names one.** That is this bullet's exact next slice, and it is why bullet 2 is not closed here.
