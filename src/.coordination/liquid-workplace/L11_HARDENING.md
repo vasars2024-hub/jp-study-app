@@ -320,3 +320,41 @@ its visual width at 200%. `em` does track it (`9.2em` matched at both zooms, bec
 resolves the container's font-size in the same painted space), but it is not a fix on its own — the
 breakpoint here was never the bug. Probed with four parallel `--cq*` custom properties on one
 element; both zooms in one artifact.
+
+## L11 bullet 2 — Video's zoom cell is no longer an empty harness, and it found two bars (2026-09-01, primary)
+
+`b1` — the Media Center inspector could not shrink. The cell was CAPPED last turn because the
+Video page rendered `video: false` and two `mc-video-empty` blocks. The page's own empty state
+carries seven library tiles, so the harness was populated through the product's route — one click
+on `button.mc-media-tile` (`E38 JoJo no Kimyou na Bouken - Ougon no Kaze 38 RAW`, a real local
+file), no native dialog, no fixture. Video is a LAUNCHER for the media workspace, so one honest
+`mc-video-empty` remains by design; `emptyCount` 2 -> 1 and the page now renders a chosen title,
+an inspector and an up-next shelf.
+
+Measured with content, it FAILS — and the first bar fails at 100% zoom too, so it was never a
+zoom defect either:
+
+| Video, cat4 | zoom 1 | zoom 2.0 |
+| --- | --- | --- |
+| loaded, before | FAIL `horizontal` — compact `main.mc-content 197>154` | FAIL `horizontal` + `contentGrowsNotChrome` |
+| loaded, after | **PASS 10/10** | FAIL `contentGrowsNotChrome` only |
+
+Two origins, found by walking only the elements whose PARENT does not also cross the edge:
+`.mc-section-head > div` is an unclassed flex wrapper at `min-width: auto` carrying the uppercased
+`Language-learning player` eyebrow's 126px unbreakable token (the head itself already had
+`min-width: 0`, one level too high — which is why the h2's ellipsis never engaged); and
+`.mc-inspector-score-row` used `repeat(3, 1fr)`, whose tracks floor at min-content, so
+`subtitle lines / vocabulary / MAL score` held the row at 193px in a 154px pane. `minmax(0, 1fr)`
+plus the wrapper's `min-width: 0` -> `main.mc-content` 197 > 154 becomes 154 = 154, 0 elements
+past the edge. The before rows above are the control: same harness, same content, same probe,
+at this HEAD minus the two declarations.
+
+**`contentGrowsNotChrome` at zoom 2 stays open, and it is the container-query/zoom class again.**
+Chrome is fixed in CSS px — sidebar 206, inspector 288 — and the queries that would collapse them
+(`@container mc (max-width: 1040px)` -> 174px, `(max-width: 820px)` -> 58px) compare against the
+PAINTED size, which at zoom 2 is double. So a window that is visually 540 CSS px wide reports
+2084 to the query and keeps its widest three-column chrome: 494 of 540 px of width is chrome, and
+the share grows 45.1% -> 49.9% as the box grows because the clipped inspector's height grows with
+it. 9 `@container mc (...)` at-rules are affected. Converting them to `em` is the candidate fix
+and is measured to track zoom correctly (see the previous entry); it is a whole-shell change, not
+this slice, and it is the exact next slice.
