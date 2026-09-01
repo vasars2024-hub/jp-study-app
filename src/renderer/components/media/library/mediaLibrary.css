@@ -1358,9 +1358,23 @@
   .medialib-rail__group,
   .medialib-rail .ui-sidebar {
     min-width: 0;
+    gap: var(--space-xs);
+  }
+
+  /* THE STRIP IS THE ITEM LIST, NOT THE GROUP. A `<details>` laid out as a row
+     puts its heading beside its own content box, and that content box is then a
+     shrink-to-fit flex item sized to its max-content — so `min-width: 0` on the
+     nav resolves against the nav's own 161px max-content instead of against the
+     rail, and the rail overflows a shell whose `overflow-x` is `hidden`. There
+     is no scrollbar and the 120px icon-only query sits BELOW the band, so it
+     hides nothing. Measured on Media at 100% zoom, window widths 250..340px
+     every 2px: 18 of 46 clipped, a continuous 264..298px band losing up to 35px
+     of navigation; as a column, 0 of 46. 200% zoom lands the 260x170 compact
+     window inside that same band, because a thin scrollbar is painted in device
+     pixels and does not scale, which is how this was first seen. */
+  .medialib-rail .ui-sidebar {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: var(--space-xs);
   }
 
   .medialib-rail .ui-sidebar__item {

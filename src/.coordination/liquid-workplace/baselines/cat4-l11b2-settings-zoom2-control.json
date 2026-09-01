@@ -1,0 +1,221 @@
+{
+  "label": "l11b2-settings-zoom2-CONTROL",
+  "surface": "Settings",
+  "win": "(focused)",
+  "rootKind": "floating window",
+  "viewport": "1264x821",
+  "globalCondition": {
+    "zoom": 2,
+    "uiRequest": null,
+    "uiPlan": null,
+    "productRoute": [
+      "src/renderer/appZoom.ts applyZoom() - applies without persisting; setZoom is the one that writes jp-app-zoom"
+    ],
+    "zoomFactorBefore": 1,
+    "zoomFactorDuring": 2,
+    "fontTokensBefore": {
+      "sm": "0.8125rem",
+      "md": "0.875rem",
+      "lg": "1rem"
+    },
+    "fontTokensDuring": {
+      "sm": "0.8125rem",
+      "md": "0.875rem",
+      "lg": "1rem"
+    },
+    "applied": true,
+    "heldThroughSweep": true,
+    "zoomFactorAfterSweep": 2,
+    "restored": true,
+    "driftedFields": [],
+    "persistedUnchanged": true
+  },
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "1920x1362",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 19.4,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 26.2,
+      "dominantCanvasPct": 94.7,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": false
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "520x340",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 2.7,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 25.7,
+      "dominantCanvasPct": 78.8,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1264x710",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 10.2,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 37.4,
+      "dominantCanvasPct": 89.9,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "sizesExpected": 3,
+  "sizesRan": 3,
+  "sizesUnreachable": [],
+  "contentGrowsNotChromePair": "default -> maximized",
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "1245x162 at grid 14,4",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 60px; top: 24px; width: 960px; height: 681px; z-index: 376;",
+      "restoredTo": "left: 60px; top: 24px; width: 960px; height: 681px; z-index: 376;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "181x155 at grid 26,17",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "the product's own .fwin-b[title=\"Maximize\"] (never an inline width: .fwin-max changes the applied CSS)",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 60px; top: 24px; width: 960px; height: 681px; z-index: 376;",
+      "restoredTo": "left: 60px; top: 24px; width: 960px; height: 681px; z-index: 380;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "945x112 at grid 10,7",
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [
+        "div.fwin-bar",
+        "nav.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 0,
+      "backdropOverlaps": [],
+      "deadRegionApplies": true,
+      "hostedWindowCount": 0,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 0,
+      "devOnlyExcluded": []
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": false,
+    "contentGrowsNotChrome": false,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "deadRegion",
+    "contentGrowsNotChrome"
+  ],
+  "unmeasuredBars": [],
+  "notApplicableBars": [],
+  "deadRegionPctBySize": [
+    "default 19.4%",
+    "compact 2.7%",
+    "maximized 10.2%"
+  ],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ]
+}

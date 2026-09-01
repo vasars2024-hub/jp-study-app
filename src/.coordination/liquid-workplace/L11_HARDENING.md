@@ -146,7 +146,7 @@ Trap: the first control run of the corrected probe VOIDed on `returned: false` w
 `denseWorkOnTranslucent` stuck at 1 while `oneMaterialReturned` was true — the liquid
 presentation's backdrop had not settled. Re-run clean. One gesture reading is noise here.
 
-### Bullet 2 — high contrast, zoom, text scaling, compact widths, reduced/disabled motion. **OPEN, 3 of 5 clauses measured.**
+### Bullet 2 — high contrast, zoom, text scaling, compact widths, reduced/disabled motion. **OPEN — all 5 clauses now MEASURED, 4 pass, text scaling fails with a number.**
 
 This bullet names five specific user requests, so it is scored against those words first and the
 RULE C grid second — a 16/16 built only from the default display preferences would not have
@@ -191,25 +191,188 @@ computed `transition-duration`/`animation-duration` exceeds the rubric's 0.01 s,
 Video 49 → 0 → 49** across 280 / 396 / 309 elements. Non-empty baseline, exact restore, three
 surfaces agreeing.
 
-**Zoom and text scaling — NOT MEASURED. Both are real; the next turn measures, it does not
-search.** The source evidence, gathered so nobody repeats the hunt:
+**Zoom — MEASURED, and it found a real defect on every window in the shell. `82c2c252`.**
+`appZoom` sizes `#root` to (100/z)vw x (100/z)vh so the PAINTED box stays exactly one viewport,
+which means at 200% the LAYOUT viewport halves while every window keeps the geometry it was
+authored at. `#root` is `overflow: hidden` deliberately, so the excess is not scrolled to — it is
+cut off. Measured before the fix: at zoom 2 a 960x680 Settings window painted **1920x1360** inside
+a **1264x821** desk and hung **776 px right / 587 px bottom** outside it, with no scrollbar and no
+route back except resizing the window by hand.
 
-- **Zoom is a shipped app feature, not browser zoom and not OS DPI.** `src/renderer/appZoom.ts`
-  scales `#root` with CSS `zoom` and re-sizes it to `(100/z)vw × (100/z)vh` so the painted box
-  stays exactly one viewport. `ZOOM_MIN 0.8`, `ZOOM_MAX 2.0`, `ZOOM_STEP 0.1`, snapped to 0.05.
-  **`applyZoom(factor)` applies WITHOUT persisting** — that is the probe-safe entry point;
-  `setZoom` writes `localStorage['jp-app-zoom']` and must not be used for a measurement.
-  `src/renderer/zoomCoords.ts` exists because Chromium reports pointer coords in UNZOOMED pixels
-  while layout is in zoomed ones, so any probe that clicks by coordinate while zoomed must divide
-  by `getZoomFactor()` or it will click the wrong element and report a dead control.
-- **Text scaling is `src/shared/uiCustomization.ts`**, which scales the `font-size-sm/md/lg`
-  tokens (line 668, ×1.15) among other token ladders — a preset system, not a `data-display-*`
-  attribute. The display-preference vocabulary is only `anim`, `bold`, `contrast`, `flashes`,
-  `focus`, `links`, `pointer`, `scroll`, `transparency`; there is no text-scale hook there, and
-  looking for one is the wrong search.
-- The instrument for both is **cat4's `clipped` / `overlaps` / `horizontal` / `contentGrowsNotChrome`
-  bars**, run at zoom 0.8 and 2.0 and at the scaled font tokens. `applyZoom` is not on `window`,
-  so a bridge run needs a real product route to it (a control or a shortcut) — reimplementing its
-  twenty lines inside `/eval` would measure the reimplementation, not the product.
+The shell now re-fits on `app-zoom-changed` through `clampLayoutToViewport` — the product's own
+primitive, whose header already described this failure ("overflowing it with no way to reach the
+far edge"). It was never reached from here because zoom is not a `resize` and does not re-hydrate.
+The fit is re-derived from the STORED layout, not the live windows, so zooming back out restores
+the authored size; and nothing is committed, so the clamp never overwrites that size.
 
-That is this bullet's exact next slice, and it is why bullet 2 is not closed here.
+| surface | zoom 2.0 before | zoom 2.0 after |
+| --- | --- | --- |
+| Settings | **FAIL** — deadRegion + contentGrowsNotChrome, default box 1920x1362, dead **19.4%** | **PASS 10/10**, 960x632, dead **6.7%** |
+
+**The mutation control disables only this effect** (`if (deskEl) return;` at the top of the
+subscriber) and returns the same FAIL with the same probe on the same route, so the PASS is the
+product's and not the instrument's. `cat4-l11b2-settings-zoom2.json`,
+`cat4-l11b2-settings-zoom2-control.json`.
+
+Two surfaces are NOT closed by this and are not claimed:
+- **Media** at zoom 2 is PASS on dead region (4.5%) but **FAILs `horizontal`** — a scroller or a
+  hidden overflow-x that only appears at 200%. `cat4-l11b2-media-zoom2.json`. Open.
+- **Video** at zoom 2 FAILs deadRegion 17.3% / 19.8%, chrome share 42.8 -> 51.1%. The clamp did
+  its half (1080x679 would have painted 2160x1358; it painted 1080x630). **But the Video page is
+  in its EMPTY state** — `video: false`, two `div.mc-video-empty` blocks — so the rubric caps this
+  cell rather than scoring it, and it is neither a pass nor a product FAIL until measured with
+  media loaded. `cat4-l11b2-video-zoom2.json`. Open.
+
+**Text scaling — MEASURED, and it FAILS. Half repaired in `1346cf0b`, half open.**
+The customization ladder carried three steps (`font-size-sm/md/lg`) while `theme/tokens.css`
+defines five. The two missing ones are the ones the renderer leans on hardest: `--font-size-xs` is
+the **most-used** font-size token in the app (**201** declarations against sm's 97) and
+`--font-size-2xs` adds **86**. So `bigger-text` could only ever move the text that was already
+largest. `UI_TOKEN_BASELINE` also said `font-size-sm: 12px` against the stylesheet's 0.8125rem =
+13px, so a relative nudge landed one step up the ladder rather than 15 percent of anything. Both
+corrected; the two new tokens also appear in the Theme Studio editor, which reads the same list.
+
+| surface | reach BEFORE | reach AFTER | layout bars |
+| --- | --- | --- | --- |
+| Media Center | — | **35% of 100** sampled text elements (11px 38->15, 12px 13->2, new 14px x15, 15px x24) | PASS 10/10, dead 2.6 / 0.5 / 3.9 |
+| Settings | 1 of 70 (13->14) | **1.4% — still 1 of 70** (13->15) | PASS 10/10, dead 4.8 / 0.7 / 7.0 |
+
+**The clause fails on Settings and the layout bars are not the reason.** Settings' own CSS
+hardcodes its sizes: across the renderer there are **2,408** `font-size` declarations and only
+**550** use a token — 316 of them literal `12px`, 243 `11px`, 147 `13px`. A whole-surface
+typography pass is what closes this, and folding one into a focused task is what CLAUDE.md
+forbids. So the number is published and the clause stays open.
+
+**TRAP, and it cost a landed fix to notice: `applyZoom` is NOT the probe-safe entry point.**
+The previous turn's note here said it was, on the reasoning that it does not persist. It does not
+dispatch `app-zoom-changed` either — and that event is the product's cross-surface zoom contract,
+which both the Settings slider and (now) the shell's re-fit hang off. A probe on `applyZoom`
+measures a state the product never reaches through its own control, and would have scored
+`82c2c252` as broken. Drive **`setZoom`**, and capture-patch-restore `jp-app-zoom` around it —
+including the ABSENT case, where the key must be REMOVED rather than written back as "1".
+
+**The instrument is a MODE on cat4** (`--zoom`, `--ui-request`), per RULE 1 — the whole existing
+three-size sweep runs under the condition. Correction 25 carries four guards, all of which fired
+at least once during this bullet:
+ (a) the condition must demonstrably apply — and correction 25b sharpened this after the first
+     version compared only the `--font-size-*` custom properties, which the product had
+     demonstrably rewritten, and so would have scored a surface that ignores those tokens
+     entirely as a clean pass. It samples the surface's own visible text now, and reports
+     `textReachLowerBoundPct`, because "changed" is a bit and one element of seventy satisfies it;
+ (b) it must still be applied AFTER the sweep — `installZoomResizeHook` re-applies the PERSISTED
+     zoom on any OS-window resize, so the `/bounds` lever on a root surface silently undoes it;
+ (c) restore is byte-compared, not eyeballed. `uiCss` `null` and `''` are the same state (no
+     customization CSS) and treating the product's own empty `<style>` element as drift VOIDed one
+     otherwise clean round trip;
+ (d) neither `jp-app-zoom` nor `jp-ui-customization-v1` may move. Both are compared before/after.
+
+**Still true and still useful from the previous turn's source hunt:** `src/renderer/zoomCoords.ts`
+exists because Chromium reports pointer coords in UNZOOMED pixels while layout is in zoomed ones,
+so any probe that clicks by coordinate while zoomed must divide by `getZoomFactor()`. Text scaling
+is `uiCustomization.ts`, a preset system — there is no `data-display-*` hook for it and looking
+for one is the wrong search. The display-preference vocabulary is only `anim`, `bold`, `contrast`,
+`flashes`, `focus`, `links`, `pointer`, `scroll`, `transparency`.
+
+**Bullet 2 does not close.** Four clauses pass; text scaling fails with a measured reach of 1.4%
+on Settings, and zoom leaves Media (`horizontal`) and Video (empty harness) open. The exact next
+slice is Media's `horizontal` failure at zoom 2 — it is the only one of the three that is a
+concrete named bar on a non-empty surface.
+
+## L11 bullet 2 — Media's `horizontal` FAIL is closed, and it was never a zoom bug (2026-09-01, primary)
+
+`b0` — `.medialib-rail__group` stays a COLUMN in the one-pane strip mode.
+
+The previous turn left this as "a scroller or a hidden overflow-x that only appears at 200%".
+It is neither, and it is not about zoom. `@container medialib (max-width: 420px)` turned the rail
+into a wrapping strip and applied `flex-direction: row; flex-wrap: wrap` to **two** selectors —
+the strip (`.medialib-rail .ui-sidebar`, correct) and the `<details>` group around it (wrong). A
+`<details>` laid out as a row puts its heading beside its own content box, and that content box is
+then a shrink-to-fit flex item sized to max-content, so `min-width: 0` on the nav resolves against
+the nav's own 161px rather than against the rail. The shell's `overflow: hidden auto` then clips it.
+
+**It reproduces at 100% zoom.** Live sweep of the Media window, 250..340px every 2px:
+
+| | clipped widths | worst |
+| --- | --- | --- |
+| before | **18 of 46** — a continuous 264..298px band | `medialib-shell` 165 > 130, 35px of nav unreachable |
+| after | **0 of 46** | — |
+
+Why 200% found it first: the `120px` icon-only container query hides the labels below the band and
+so hides the defect, and a `scrollbar-width: thin` scrollbar is painted in DEVICE px and does not
+scale — so at zoom 2 the same 260x170 compact window has ~5 more CSS px of content box (131 vs 126)
+and lands just inside the band instead of just under it.
+
+| cat4 Media | verdict |
+| --- | --- |
+| zoom 2.0, before | FAIL `horizontal`, compact `div.medialib-shell 165>131` |
+| zoom 2.0, after | **PASS 10/10** (`cat4-l11b2-media-zoom2-fixed.json`) |
+| zoom 2.0, mutation control (that one declaration re-added live) | **FAIL `horizontal`**, same `165>131` (`...-control.json`) |
+| zoom 1, after | PASS 10/10, no regression (`cat4-l11b3-media-nozoom.json`) |
+
+Condition guards all green on both graded runs: `applied` `heldThroughSweep` `restored`
+`persistedUnchanged` true, `driftedFields` [].
+
+**WITHDRAWN — this entry first published the opposite, and a discriminating re-test one slice
+later falsified it.** The claim was that a `@container` length is compared against the container's
+PAINTED size, so every px breakpoint would fire at half its visual width at 200%. It is not: the
+comparison uses the ZOOM-ADJUSTED size, the same number `clientWidth` reports, and it is
+self-consistent. Two measurements, either one sufficient:
+
+- the rail at zoom 2 is 123 adjusted / 246 painted, and `(max-width: 240px)` MATCHED — which
+  painted semantics forbids, since 246 > 240. The original entry had this datum and read it
+  backwards;
+- `.mc-root` at zoom 2 is 502 adjusted / 1004 painted, and `@container mc (max-width: 820px)`
+  MATCHED and did its job: the Media Center sidebar collapsed 206 -> 58 CSS px on cue.
+
+`em` agrees with `px` at both zooms rather than correcting it, because the container's font-size
+is zoom-adjusted too — so converting breakpoints to `em` buys nothing, and a slice was nearly
+spent doing it to nine `@container mc` at-rules.
+
+**The trap that IS real and worth keeping: a `scrollbar-width: thin` scrollbar is painted in
+DEVICE pixels and does not scale with app zoom.** So the same window has MORE CSS content width at
+200% than at 100% — the rail measures 118 at zoom 1 and 123 at zoom 2 — and a breakpoint at 120
+lands on opposite sides of it. That is the whole of why the clip below showed up at 200% first,
+and it is why a knife-edge responsive threshold is not safe under zoom even though the query
+itself is correct.
+
+## L11 bullet 2 — Video's zoom cell is no longer an empty harness, and it found two bars (2026-09-01, primary)
+
+`b1` — the Media Center inspector could not shrink. The cell was CAPPED last turn because the
+Video page rendered `video: false` and two `mc-video-empty` blocks. The page's own empty state
+carries seven library tiles, so the harness was populated through the product's route — one click
+on `button.mc-media-tile` (`E38 JoJo no Kimyou na Bouken - Ougon no Kaze 38 RAW`, a real local
+file), no native dialog, no fixture. Video is a LAUNCHER for the media workspace, so one honest
+`mc-video-empty` remains by design; `emptyCount` 2 -> 1 and the page now renders a chosen title,
+an inspector and an up-next shelf.
+
+Measured with content, it FAILS — and the first bar fails at 100% zoom too, so it was never a
+zoom defect either:
+
+| Video, cat4 | zoom 1 | zoom 2.0 |
+| --- | --- | --- |
+| loaded, before | FAIL `horizontal` — compact `main.mc-content 197>154` | FAIL `horizontal` + `contentGrowsNotChrome` |
+| loaded, after | **PASS 10/10** | FAIL `contentGrowsNotChrome` only |
+
+Two origins, found by walking only the elements whose PARENT does not also cross the edge:
+`.mc-section-head > div` is an unclassed flex wrapper at `min-width: auto` carrying the uppercased
+`Language-learning player` eyebrow's 126px unbreakable token (the head itself already had
+`min-width: 0`, one level too high — which is why the h2's ellipsis never engaged); and
+`.mc-inspector-score-row` used `repeat(3, 1fr)`, whose tracks floor at min-content, so
+`subtitle lines / vocabulary / MAL score` held the row at 193px in a 154px pane. `minmax(0, 1fr)`
+plus the wrapper's `min-width: 0` -> `main.mc-content` 197 > 154 becomes 154 = 154, 0 elements
+past the edge. The before rows above are the control: same harness, same content, same probe,
+at this HEAD minus the two declarations.
+
+**`contentGrowsNotChrome` at zoom 2 stays open, and it is NOT the breakpoints.** That was this
+turn's first hypothesis and it is disproved above: `@container mc (max-width: 820px)` fires
+correctly at zoom 2 and the sidebar does collapse 206 -> 58 CSS px. What remains is the
+INSPECTOR: `aside.mc-video-inspector` is a fixed 288 CSS px wide and 452 CSS px tall at every
+size, so across the pair the probe compares (default 540x315 CSS, chrome 45.1%) against
+(maximized 632x355 CSS, chrome 49.9%) — its width share falls 53% -> 46% as the box grows, but
+its CLIPPED HEIGHT grows with the box faster, and chrome's AREA share is what the bar measures.
+Both boxes are under `@container mc (max-width: 640px)`, which does not touch the inspector.
+
+Exact next slice: read what `(max-width: 640px)` already does to `.mc-video-layout`, and give the
+inspector the same treatment the drawer gets in `mediaLibrary.css` at 1240px — an overlay or a
+collapse, not a third fixed column — then re-run `cat4 --surface Video --zoom 2.0`, whose only
+remaining bar this is. Do NOT re-derive the container-query question; it is settled above.

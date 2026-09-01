@@ -73,6 +73,17 @@ export const UI_TOKENS: UiTokenSpec[] = [
   { token: 'font-body', kind: 'font', group: 'typography' },
   { token: 'font-display', kind: 'font', group: 'typography' },
   { token: 'font-mono', kind: 'font', group: 'typography' },
+  /*
+   * The typography ladder is FIVE steps in `theme/tokens.css`, and this list carried only the
+   * top three. `--font-size-xs` is the single most-used font-size token in the renderer (201
+   * declarations against `sm`'s 97) and `--font-size-2xs` adds another 86, so between them the
+   * two missing steps are most of the app's small text — every caption, chip, status line and
+   * toolbar label. A user who asked the product to make text bigger moved 1 of 70 visible text
+   * elements on Settings, because the two tokens their UI actually uses were not in the
+   * customization system at all. Measured under L11 bullet 2's text-scaling clause.
+   */
+  { token: 'font-size-2xs', kind: 'length', group: 'typography', min: 8, max: 20, unit: 'px' },
+  { token: 'font-size-xs', kind: 'length', group: 'typography', min: 8, max: 22, unit: 'px' },
   { token: 'font-size-sm', kind: 'length', group: 'typography', min: 9, max: 24, unit: 'px' },
   { token: 'font-size-md', kind: 'length', group: 'typography', min: 10, max: 28, unit: 'px' },
   { token: 'font-size-lg', kind: 'length', group: 'typography', min: 11, max: 34, unit: 'px' },
@@ -665,12 +676,25 @@ const INTENT_RULES: IntentRule[] = [
   {
     id: 'bigger-text',
     phrases: ['bigger text', 'larger text', 'increase font', 'bigger font', 'larger font'],
-    scale: { 'font-size-sm': 1.15, 'font-size-md': 1.15, 'font-size-lg': 1.15 },
+    // Every step of the ladder, or the request only reaches the text that was already largest.
+    scale: {
+      'font-size-2xs': 1.15,
+      'font-size-xs': 1.15,
+      'font-size-sm': 1.15,
+      'font-size-md': 1.15,
+      'font-size-lg': 1.15,
+    },
   },
   {
     id: 'smaller-text',
     phrases: ['smaller text', 'decrease font', 'smaller font', 'reduce text size'],
-    scale: { 'font-size-sm': 0.9, 'font-size-md': 0.9, 'font-size-lg': 0.9 },
+    scale: {
+      'font-size-2xs': 0.9,
+      'font-size-xs': 0.9,
+      'font-size-sm': 0.9,
+      'font-size-md': 0.9,
+      'font-size-lg': 0.9,
+    },
   },
   {
     id: 'compact-density',
@@ -720,7 +744,13 @@ export const UI_TOKEN_BASELINE: UiTokenPatch = {
   'radius-md': '10px',
   'radius-lg': '14px',
   'control-radius': '8px',
-  'font-size-sm': '12px',
+  // These must mirror `renderer/theme/tokens.css`, because a relative nudge ("bigger text")
+  // resolves from here whenever the profile has not set the token explicitly. `font-size-sm` said
+  // 12px against the stylesheet's 0.8125rem = 13px, so "bigger" landed on 14px — one step of the
+  // ladder, not 15 percent of anything.
+  'font-size-2xs': '11px',
+  'font-size-xs': '12px',
+  'font-size-sm': '13px',
   'font-size-md': '14px',
   'font-size-lg': '16px',
   'line-height-normal': '1.5',

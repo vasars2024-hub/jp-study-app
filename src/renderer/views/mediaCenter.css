@@ -984,6 +984,16 @@
   margin-bottom: 9px;
 }
 
+/* The head's own `min-width: 0` above stops one level short: the eyebrow and the
+   title live in an unclassed wrapper div, and a flex item defaults to
+   `min-width: auto`, so that wrapper carried its own min-content (the uppercased
+   `Language-learning player` eyebrow is one unbreakable 126px token) into a pane
+   narrower than it. The h2 already ellipsises; the wrapper was what refused to
+   shrink, which is why the ellipsis never engaged. */
+.mc-section-head > div {
+  min-width: 0;
+}
+
 .mc-section-head h2,
 .mc-panel-title strong,
 .mc-inspector-block h2,
@@ -1597,9 +1607,14 @@
   font-size: var(--mc-fs-meta, 12px);
 }
 
+/* `minmax(0, 1fr)`, not `1fr`: a `1fr` track floors at its content's min-content,
+   so the three score cells held `subtitle lines` / `vocabulary` / `MAL score` at
+   their longest word and pushed the inspector past the pane. The labels wrap
+   instead — 30px cells at the window's own 260px floor, still readable, still
+   reachable, where before the third one was off the edge behind a scroller. */
 .mc-inspector-score-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
   margin-bottom: 10px;
 }

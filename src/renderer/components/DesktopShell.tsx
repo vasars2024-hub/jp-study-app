@@ -102,7 +102,7 @@ import { startCompanionOsBridge, stopCompanionOsBridge } from '../environment/co
 import { startAchievementWatcher } from '../environment/achievements';
 import { loadPersonalization, onPersonalizationChanged } from '../osPersonalization';
 import { syncPillarboxWallImage } from '../pillarboxSettings';
-import { getZoomFactor } from '../appZoom';
+import { getZoomFactor, onZoomChanged } from '../appZoom';
 import { perfSetInteracting } from '../perf/perfHub';
 import {
   addUserWallpaper,
@@ -873,6 +873,62 @@ export default function DesktopShell({
       applyDesktopLayout(target);
     });
   }, [pinnedDesktop]);
+
+  /*
+   * A ZOOM CHANGE IS B4'S MONITOR CHANGE IN A SECOND SHAPE, and only the first shape was wired.
+   * `appZoom` sizes `#root` to (100/z)vw x (100/z)vh so the PAINTED box stays one viewport,
+   * which means at 200% the LAYOUT viewport halves while every window keeps the geometry it was
+   * authored at. `#root` is `overflow: hidden` deliberately (appZoom.ts, "never put
+   * document-level scrollbars on the OS shell"), so the excess is not scrolled to — it is cut off.
+   *
+   * Measured on this shell before this existed: at zoom 2 a 960x680 Settings window painted
+   * 1920x1360 inside a 1264x821 desk and hung 776 px right / 587 px bottom outside it, with no
+   * scrollbar and no way back except resizing the window by hand. The user who most needs 200%
+   * zoom lost the corner of every window. `clampLayoutToViewport`'s own header already describes
+   * this failure ("overflowing it with no way to reach the far edge") — it was simply never
+   * reached from here, because zoom is not a `resize` and does not re-hydrate.
+   *
+   * Two choices worth stating, because the obvious implementations are both wrong:
+   *  - The fit is re-derived from the STORED layout, not from the live windows. A clamp applied
+   *    to live state is NOT reversible: zooming back out would leave every window at its
+   *    shrunken size forever. Stored geometry always holds what the user authored, so zoom-out
+   *    restores it.
+   *  - Nothing is committed. This re-expresses stored geometry in the current viewport exactly
+   *    as the hydrate does, so it goes under the same `hydrating` guard the commit effect
+   *    already honours. Persisting the clamp would overwrite the authored size with a value
+   *    that is only correct at one zoom level.
+   */
+  useEffect(() => onZoomChanged(() => {
+    const deskEl = deskRef.current;
+    const viewport = {
+      w: deskEl?.clientWidth || 0,
+      h: (deskEl?.clientHeight || 0) - taskbarH(loadDesktopPrefs()),
+    };
+    if (viewport.w <= 0 || viewport.h <= 0) return;
+    const stored = getDesktopLayout(activeDesktopRef.current);
+    const storedById = new Map(stored.windows.map((snap) => [snap.id, snap]));
+    // A window opened this session may not be in storage yet, and it has to fit too — so it
+    // enters the fit at its live geometry rather than being skipped.
+    const merged = {
+      ...stored,
+      windows: winsRef.current.map((win) => storedById.get(win.id) ?? winToSnapshot(win)),
+    };
+    const fitted = clampLayoutToViewport(
+      merged,
+      viewport,
+      loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp',
+    );
+    const fittedById = new Map(fitted.windows.map((snap) => [snap.id, snap]));
+    hydrating.current = true;
+    setWins((prev) => prev.map((win) => {
+      const fit = fittedById.get(win.id);
+      if (!fit || (win.x === fit.x && win.y === fit.y && win.w === fit.w && win.h === fit.h)) return win;
+      return { ...win, x: fit.x, y: fit.y, w: fit.w, h: fit.h };
+    }));
+    queueMicrotask(() => {
+      hydrating.current = false;
+    });
+  }), []);
 
   useEffect(() => {
     if (hydrating.current) return;

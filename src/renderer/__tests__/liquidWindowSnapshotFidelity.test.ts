@@ -153,13 +153,17 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // beside a converter call is the exact shape that dropped `pinned` once and
     // `presentation` in main this turn.
     const uses = [...SHELL.matchAll(/winToSnapshot\((\w+)\)/g)];
-    // Three called with an argument (desktop move, tear-off, drag payload) and
-    // three passed bare to `.map` (the two commit paths and hydrate).
-    expect(uses.length).toBe(3);
+    // Four called with an argument (desktop move, tear-off, drag payload, and the
+    // zoom re-fit's fallback for a window that is not in the stored layout yet)
+    // and three passed bare to `.map` (the two commit paths and hydrate).
+    expect(uses.length).toBe(4);
     expect(SHELL.match(/map\(winToSnapshot\)/g) ?? []).toHaveLength(3);
     for (const use of uses) {
       const before = SHELL.slice(Math.max(0, use.index - 12), use.index);
-      expect(before, `winToSnapshot(${use[1]}) at ${use.index}`).toMatch(/\.\.\.$|[=(,:]\s*$|\bfunction /);
+      // `??` joins the zoom re-fit's two whole-window sources; it still passes the
+      // window whole, which is the only thing this guard is protecting. A
+      // hand-built `{ id: w.id, ... }` literal beside a call still fails it.
+      expect(before, `winToSnapshot(${use[1]}) at ${use.index}`).toMatch(/\.\.\.$|[=(,:]\s*$|\?\?\s*$|\bfunction /);
     }
   });
 
