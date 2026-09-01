@@ -65,6 +65,21 @@ const { spawnSync } = require('node:child_process');
 // straight to the interaction probe's -Title. `heavy` is the surface's HEAVIEST REAL
 // operation — the rubric's words — expressed as one renderer expression, because /eval
 // is synchronous and one expression is all it takes (a trailing `;` throws).
+// The Dictionary surface's real search load, as queries. Written as readable Japanese here and
+// emitted as \uXXXX escapes, because this string reaches the renderer as a PowerShell argument
+// and a transport that mangles it would still produce a clean main-availability reading -- every
+// mangled query is simply a cold miss. 28 distinct headwords, so a 20 s / 700 ms span never
+// repeats one and never measures the cache instead of the lookup.
+const DICT_QUERIES = [
+  '勉強', '走る', '泳ぐ', '登る', '降りる', '渡る', '曲がる', '進む', '戻る', '届ける',
+  '預ける', '借りる', '貸す', '返す', '払う', '売る', '買う', '配る', '集める', '並べる',
+  '調べる', '考える', '伝える', '育てる', '数える', '選ぶ', '答える', '続ける',
+];
+const DICT_QUERIES_JS = JSON.stringify(DICT_QUERIES).replace(
+  /[^\x20-\x7e]/g,
+  (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),
+);
+
 // A surface's "scroll the whole collection" load, written once. Picks the element inside the
 // root with the largest real overflow rather than naming a scroller per surface -- the same
 // ranking `cat7-collection-weight.cjs` uses, and for the same reason: a list that is not
@@ -809,11 +824,65 @@ const SPECS = {
     title: 'Dictionary',
     root: '.dict-view',
     heavy: {
-      label: '126 cold lookups',
+      // CORRECTED. This slot held L0's `126 cold unseen lookups` burst, described here as
+      // "L0's own reference load, kept verbatim". It is not L0's reference load -- it is L0's
+      // SENSITIVITY CONTROL, and L7_PERF_DICTIONARY.md:49 labels the row exactly that: the
+      // one that MUST breach so the instrument is proven able to see a breach. The same
+      // paragraph says the burst "caps whatever surface owns lookupTermsBatch, not this one".
+      // Scoring a deliberately-failing control as the surface's "HEAVIEST REAL operation"
+      // (this file's own words, line 65) made the cell unable to reach 10 by construction:
+      // 8,081.5 ms banked, 9,093.3 ms re-measured, against a 500 ms bar, forever.
+      //
+      // Source agrees it is not a real load. All five product call sites of
+      // `window.api.lookupTerm` -- agentToolRegistry.ts:128, BlancReadyToolPanels.tsx:1074
+      // and :1337, DictionaryResults.tsx:352, LensReaderPanel.tsx:228 -- issue ONE awaited
+      // lookup for one user action; the bulk path is `lookupTermsBatch`, reached only from
+      // main/mining.ts:1657. Nothing in the product fires 126 concurrent single-term IPCs.
+      //
+      // The surface's heaviest REAL operation is a search, banked at max 319.2 ms against the
+      // 500 ms bar, so that is what runs here now -- driven repeatedly through the window's
+      // OWN form, which is also the load L11 bullet 3 means by "while dictionaries are active".
+      label: 'a real search through the window own form, every 700 ms',
       durationMs: 20000,
-      // L0's own reference load, kept verbatim so this runner reproduces the baseline row
-      // rather than inventing a second, incomparable one.
-      js: `(() => { const w = ['走る','泳ぐ','登る','降りる','渡る','曲がる','進む','戻る','届く','届ける','預ける','借りる','貸す','返す','払う','売る','買う','配る','集める','並ぶ','並べる']; const suf = ['','が','を','に','で','は']; for (const s of suf) { for (const x of w) { window.api.lookupTerm(x + s).catch(() => {}); } } return 'fired ' + (w.length * suf.length); })()`,
+      js: `(() => {
+        delete window.__lqDictLoad;
+        const form = document.querySelector('form.dict-search');
+        if (!form) return 'REFUSE: no form.dict-search';
+        const input = form.querySelector('input');
+        const btn = form.querySelector('button');
+        if (!input || !btn) return 'REFUSE: the search form has no input or no button';
+        const words = ${DICT_QUERIES_JS};
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        const rec = { ticks: 0, seen: {}, distinct: 0, sawResults: false, entriesMin: Infinity, entriesMax: 0, last: null };
+        window.__lqDictLoad = rec;
+        const timer = setInterval(() => {
+          const w = words[rec.ticks % words.length];
+          setter.call(input, w);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          btn.click();
+          rec.ticks += 1;
+          rec.last = w;
+          if (!rec.seen[w]) { rec.seen[w] = 1; rec.distinct += 1; }
+          const n = document.querySelectorAll('.dict-entry').length;
+          if (n > 0) rec.sawResults = true;
+          rec.entriesMin = Math.min(rec.entriesMin, n);
+          rec.entriesMax = Math.max(rec.entriesMax, n);
+          if (rec.ticks >= words.length) clearInterval(timer);
+        }, 700);
+        return 'searching ' + words.length + ' words';
+      })()`,
+      // sawResults is the mojibake guard as much as the ran-at-all guard: these queries are
+      // Japanese, they travel to the renderer through a PowerShell argument, and a transport
+      // that mangles them still produces a perfectly clean main-availability distribution
+      // because every mangled query is a cold miss. No entry ever rendered => no claim.
+      proof: `(() => {
+        const r = window.__lqDictLoad;
+        if (!r) return 'REFUSE: the search load never armed';
+        if (r.ticks < 20) return 'REFUSE: only ' + r.ticks + ' searches ran';
+        if (r.distinct < 20) return 'REFUSE: only ' + r.distinct + ' distinct queries reached the input';
+        if (!r.sawResults) return 'REFUSE: no search rendered a .dict-entry, so the queries never reached the dictionary';
+        return r.ticks + ' searches, ' + r.distinct + ' distinct, entries ' + r.entriesMin + '-' + r.entriesMax + ', last ' + JSON.stringify(r.last);
+      })()`,
     },
     collection: { container: '.dict-view', row: '.dict-entry' },
   },
@@ -1225,6 +1294,14 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     if (!legs.heavyProof || /^REFUSE/.test(String(legs.heavyProof))) {
       voidedEarly.push(`heavy leg left no proof it ran: ${spec.heavy.label} answered ${JSON.stringify(legs.heavyProof)}`);
     }
+  } else {
+    // "No proof, no claim — the leg is VOID, never a 10" was written directly above and then
+    // applied only to specs that had opted IN, which is the opposite of what it says: a spec
+    // that declared no proof got the free pass, and a spec that wrote one got audited. 18 of
+    // the 21 specs with a heavy leg already declare `proof`; enforcing the rule as written
+    // VOIDs the remaining ones until theirs is written, which is the honest state, not a
+    // regression. Named rather than silently exempted.
+    voidedEarly.push(`heavy leg declares no proof, so "${spec.heavy.label}" cannot be told apart from an expression that refused: no proof, no claim`);
   }
   // Idle, taken AFTER the load, is what makes the heavy number mean something.
   step('idle');

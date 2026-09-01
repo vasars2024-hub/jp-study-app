@@ -531,3 +531,75 @@ The legs now also record `armed` and `after` raw, because a `cyclesDuring` void 
 distinguish "the load stopped early" from "the record was never there". Same family as the banked
 `deleting-probe-state-is-not-a-stop`. **The guards did their job: four legs VOIDed rather than
 reporting frame numbers taken under no load at all.**
+
+**`e9710c83` — the exact-next-slice was unrunnable, and the reason was one character.**
+The handoff opened on `cat7-perf.cjs --surface dictionary --under-load`. It does not run at
+HEAD, and it did not run at the two HEADs before it either: `98c78aa5` added a two-line note
+INSIDE the `LOAD_ARM` template literal (opened line 154) explaining the superseded-tick bug it
+had just fixed, and quoted the offending code in backticks. Inside a template literal a backtick
+is not a comment character — it CLOSES the template, so `if (gen mismatch ...` parsed as real JS:
+
+```
+SyntaxError: Unexpected token 'if'    at cat7-perf.cjs:163
+```
+
+So the file could not be LOADED, let alone run. **That, not the tick bug, is what voided both
+`--under-load` runs.** `git show HEAD:<path>` reproduces it, so it was committed breakage rather
+than local tree state. CONTROL: `node --check` over all 52 probes in the directory — one failure
+before (`cat7-perf.cjs`), zero after. The trap is now written down in the region itself, because
+the next author of a comment there will hit it too.
+
+**`<instrument commit>` — the reconciliation the last handoff asked for, and it went against the
+instrument.** The carried note said "the dictionary heavy leg blocks main 9,093.3 ms against a
+500 ms bar; L7 banks the same load at 8,081.5 ms and a repaired route at 6.0 ms; the two routes
+differ and reconciling them is its own slice." Reconciled, from the sources rather than from the
+note:
+
+- `L7_PERF_DICTIONARY.md:49` does not bank that row as a load. It labels it **`SENSITIVITY
+  CONTROL — 126 cold unseen lookups`** — the row that MUST breach so the instrument is proven
+  able to see a breach — and the paragraph under it says the burst "caps whatever surface owns
+  `lookupTermsBatch`, not this one." The Dictionary window's two REAL operations are in the rows
+  above it: one real search **319.2 ms**, `Find example sentences` **224.5 ms**, both under the
+  500 ms bar. **L7's verdict was already "both pass".**
+- `cat7-perf.cjs` line 65 says `heavy` is "the surface's **HEAVIEST REAL** operation — the
+  rubric's words". The dictionary spec had L0's sensitivity control in that slot, with a comment
+  claiming it was "L0's own reference load, kept verbatim". It is verbatim; it is the wrong row.
+  Scoring a deliberately-failing control as the surface's own work made this cell unable to reach
+  10 by construction, in every run anyone will ever do.
+- Source settles which route is real. All five product call sites of `window.api.lookupTerm`
+  (`agentToolRegistry.ts:128`, `BlancReadyToolPanels.tsx:1074` and `:1337`,
+  `DictionaryResults.tsx:352`, `LensReaderPanel.tsx:228`) issue ONE awaited lookup per user
+  action. The bulk path is `lookupTermsBatch`, reached only from `main/mining.ts:1657` — and that
+  is the 6.0 ms route, measured at `keys=126, withGloss=126`. **Nothing in the product fires 126
+  concurrent single-term IPCs.** The 9,093 ms is real arithmetic about a load nothing generates.
+
+So the 9,093 ms was never a Dictionary finding, and it was never a regression either. `heavy` is
+now the surface's real heaviest operation: a search driven through the window's own `form.dict-search`
+every 700 ms for the declared 20 s span — which is also exactly what L11 bullet 3 means by "while
+dictionaries are ACTIVE". 28 distinct headwords, so a 20 s span never repeats one and never
+measures the cache instead of the lookup.
+
+**This is a correction that makes MORE things VOID, not fewer.** Two guards came with it:
+
+1. The queries are emitted as `\uXXXX` escapes. They reach the renderer as a PowerShell argument,
+   and a transport that mangled them would still produce a perfectly clean main-availability
+   reading, because every mangled query is a cold miss.
+2. **`No proof, no claim` is now enforced as written.** That sentence sat directly above the check
+   and the check applied it only to specs that had opted IN — a spec declaring no `proof` got the
+   free pass and a spec that wrote one got audited, which is the rule inverted. 18 of the 21 specs
+   with a heavy leg already declare `proof`; the three that do not (`captures`, `manga`,
+   `dictionary`) now VOID until theirs is written. `dictionary`'s is written. **`captures` and
+   `manga` will VOID on their next run — named here rather than silently exempted.**
+
+Exercised live against the shipped spec strings, pulled out of `cat7-perf.cjs` rather than
+retyped: `ARM -> searching 28 words`, and 21 s later `PROOF -> 28 searches, 28 distinct, entries
+2-8, last "続ける"`. The Japanese round-tripped, which is what `sawResults` exists to prove.
+**Not yet re-scored** — a full `--under-load` run is ~20 minutes and did not fit this turn; see
+the trap below for why the first attempt produced nothing at all.
+
+**TRAP, and it cost this turn a run: the Bash tool's timeout is capped at 600000 ms.** A cat7
+`--under-load` run takes longer than that. Passing `timeout: 1200000` does not raise the cap — it
+is silently clamped, the pipeline is killed mid-run at ten minutes, and because the command ends
+in `| tail`, the output file is left **completely empty** and the exit status reads 0. Nothing is
+written to `baselines/`, so the only symptom is a run that appears never to have happened. Launch
+it detached (`Start-Process`) and poll the baseline file's mtime.
