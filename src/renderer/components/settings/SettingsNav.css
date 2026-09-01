@@ -1,0 +1,9 @@
+/*
+ * The active Advanced control uses a light violet gradient. The shared light-theme
+ * foreground is intentionally dark; keeping the dark-theme near-white override from
+ * styles.css measured only 1.41:1 in classic-light. Scope the correction to that theme
+ * so the dark palettes retain their existing contrast and visual hierarchy.
+ */
+:root[data-theme='classic-light'] .os-set-advanced-btn.on {
+  color: #312e81;
+}

@@ -824,9 +824,15 @@ function VideoPanel({
           <strong>{current?.title ?? t('mediaCenter.video.openPrompt')}</strong>
         </div>
         <div className="mc-video-actions">
-          <button type="button" className="mc-button mc-button-primary" onClick={() => void state.openFile()}>
-            <Icon name="folder-open" size={13} /> {t('mediaCenter.action.openVideo')}
-          </button>
+          {/* The empty stage already offers Select video and Browse folder. Repeating Open
+              video here made Video's default view cross the clarity bar at 13 visible
+              controls; once a source is loaded the stage entries disappear, so this action
+              returns here contextually and the replace-video flow remains one click away. */}
+          {state.src && (
+            <button type="button" className="mc-button mc-button-primary" onClick={() => void state.openFile()}>
+              <Icon name="folder-open" size={13} /> {t('mediaCenter.action.openVideo')}
+            </button>
+          )}
           <button
             type="button"
             className="mc-button"

@@ -1218,6 +1218,20 @@ const PLANT_JS = `(function(){
       var b = e.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !e.closest('.fwin-bar') && !e.closest(NAV); }).slice(0, 1);
   }
+  // A presentation toggle can make React replace a primary node after this plant runs.
+  // Keep a selector for the product declaration, so the control can re-apply the same
+  // falsification to the replacement before it scores Q3. Classes are preferable to a
+  // document-order index: the latter silently moves to a different control after reflow.
+  function stableSelector(e){
+    if (e.id) return '#' + CSS.escape(e.id);
+    var classes = [].slice.call(e.classList || []).filter(function(c){
+      return c.indexOf('cat5ctl-') !== 0;
+    }).slice(0, 4);
+    return e.tagName.toLowerCase() + classes.map(function(c){ return '.' + CSS.escape(c); }).join('');
+  }
+  window.__cat5primarySelectors = targets.map(stableSelector).filter(function(s, i, a){
+    return s && a.indexOf(s) === i;
+  });
   // The previous inline transform travels WITH each node, so the restore does not depend on
   // an array surviving a round trip through /eval and back in the same order.
   targets.forEach(function(e){
@@ -1563,6 +1577,32 @@ function scoreSnapshot(s) {
   }
   out.q6leg = q6leg;
 
+  // React may replace the planted buttons while the Liquid leg toggles presentation. An
+  // inline transform on the old, disconnected node then proves nothing and Q3 falsely stays
+  // YES. Re-apply by the declarations captured above; every replacement stores its own prior
+  // transform and the ordinary unplant path restores it.
+  if (CONTROL) {
+    out.replantedPrimaries = await evj(`(function(){
+      var selectors = window.__cat5primarySelectors || [];
+      var nodes = [];
+      selectors.forEach(function(sel){
+        [].slice.call(document.querySelectorAll(sel)).forEach(function(e){
+          if (nodes.indexOf(e) < 0) nodes.push(e);
+        });
+      });
+      var added = 0;
+      nodes.forEach(function(e){
+        if (e.getAttribute(${A(PLANT)}) !== 'moved') {
+          e.setAttribute(${A(PLANT)}, 'moved');
+          e.setAttribute(${A(PLANT)} + '-transform', e.style.transform || '');
+          added++;
+        }
+        e.style.transform = 'translateY(4000px)';
+      });
+      return JSON.stringify({ selectors: selectors, matched: nodes.length, replacements: added });
+    })()`);
+  }
+
   const cells = [];
   for (const plan of cellPlan) {
     step(`cell ${plan.label}`);
@@ -1749,7 +1789,7 @@ function scoreSnapshot(s) {
     out.verdict = out.score === 10 ? 'PASS 10/10' : out.score === 'VOID' ? 'VOID' : `${out.score}/10 — ${findings.length} question(s) answer NO`;
   }
 
-  await ev(`(function(){ ${PIN} = null; window.__cat5primary = null; window.__cat5primaries = null; return 'cleared'; })()`);
+  await ev(`(function(){ ${PIN} = null; window.__cat5primary = null; window.__cat5primaries = null; window.__cat5primarySelectors = null; return 'cleared'; })()`);
   fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n');
   console.log(JSON.stringify(out, null, 2));
   console.log('\nwrote', OUT);

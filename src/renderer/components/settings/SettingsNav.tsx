@@ -3,6 +3,7 @@ import { ContextualSurface } from '../liquid/LiquidSurface';
 import { groupLabelKey, groupOrder, SETTINGS_NAV } from './settingsRegistry';
 import type { SettingsPageId } from './types';
 import { useT } from '../../i18n';
+import './SettingsNav.css';
 
 export default function SettingsNav({
   page,
