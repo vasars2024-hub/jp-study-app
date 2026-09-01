@@ -816,11 +816,20 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 81004907 -- still ONE failure, the SAME one, and it
-         is still not ours. vitest: **995 files passed / 1 failed / 1 skipped, 12,862 tests
-         passed / 1 failed / 6 skipped** (up 21 tests: this turn added 5 extension-dispatch and
-         9 model-substitution tests). i18n exit 0 at 12,113 keys. architecture exit 0,
-         "Nothing new", 9 pending. eslint 0 errors on every touched .ts/.tsx.
+    <!-- status: open; evidence: 2026-09-01 6c140279 -- still ONE failure, the SAME one, and it
+         is still not ours. vitest: **995 files passed / 1 failed / 1 skipped, 12,883 tests
+         passed / 1 failed / 6 skipped** (up 21 again: 11 planner/status tests, 7 on the live
+         model substitution, 3 on the popup's pre-click status call). i18n exit 0 at 12,115
+         keys. architecture exit 0, "Nothing new", 9 pending. eslint 0 on all 13 touched
+         .ts/.tsx paths.
+         This run took TWO passes and the first one is the honest part of the record: the
+         first full run showed **2** failed, and the new one was mine --
+         mediaLibraryListRow.test.ts scans mediaLibrary.css as raw text from the
+         `@container medialib (max-width: 420px)` block to EOF with an unbounded `[\s\S]*?`,
+         so the words `display` + `none` appearing in a CSS COMMENT 350 lines below the block
+         satisfied it. `6c140279` rewords the comment rather than loosening the guard. Set
+         difference against the inherited baseline after that fix: zero new failures.
+         (superseded numbers from 2026-09-01 81004907: 12,862 tests, 12,113 keys)
          Re-checked the blocker at the top of this turn rather than inheriting it: the 27
          components are STILL dirty-and-mid-conversion in the main tree, so the finding below
          holds unchanged.

@@ -298,10 +298,14 @@ An empty result is a FINDING: say so and stop.
 12. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
    `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
    gate here — 327 pre-existing errors on a clean tree; prove "no new" by set-difference.
-   <!-- status: open; evidence: 2026-09-01 81004907 -- run this turn, after the last slice.
-        vitest **995 files passed / 1 FAILED / 1 skipped; 12,862 tests passed / 1 failed / 6
-        skipped**. i18n-check exit 0, 12,113 English keys all translated. architecture-audit
-        exit 0, "Nothing new", 9 known pending. eslint 0 errors on every touched .ts/.tsx.
+   <!-- status: open; evidence: 2026-09-01 6c140279 -- run this turn, after the last slice.
+        vitest **995 files passed / 1 FAILED / 1 skipped; 12,883 tests passed / 1 failed / 6
+        skipped**. i18n-check exit 0, 12,115 English keys all translated. architecture-audit
+        exit 0, "Nothing new", 9 known pending. eslint 0 errors on all 13 touched .ts/.tsx.
+        The first full run this turn showed TWO failed; the second was mine, a CSS comment
+        containing the words a raw-text narrow-width guard forbids in a rule. `6c140279`
+        fixes it and the re-run returns to one. Set difference after that: zero new failures.
+        (superseded: 2026-09-01 81004907, 12,862 tests / 12,113 keys)
         The single failure is i18n.test.ts's hardcoded-string ratchet (27 components, 763
         strings) and it is ANOTHER TRACK'S in-flight uncommitted conversion in the main tree --
         re-verified this turn, not inherited. This gate and FILES_APP_PLAN gate 37 are the same
