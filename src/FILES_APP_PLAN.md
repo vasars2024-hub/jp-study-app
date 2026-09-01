@@ -445,6 +445,20 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    start without evicting another track's instrument; same entry says why and what clears it.
 9. Deleting a derived item removes exactly it; the guard for irreplaceable media refuses without
    an explicit confirmation, proven by a refusal that actually fires.
+   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 8bb2fd8b (live) -- "exactly it":
+        the live probe deletes one of two real 4 KB files through the PRODUCTION
+        deleteFilesItemInMain and the bystander is still on disk after; the soft-delete half is
+        asserted on the production FilesApp, where one row leaves the list AND the item count
+        while its neighbour does not. The refusal FIRES rather than being asserted as a branch:
+        a delete with no confirmedItemId returns filesApp.delete.confirmationRequired with the
+        file still on disk, and an unknown id returns filesApp.delete.notFound. -->
+   <!-- decision: the request that crosses IPC carries an id and its confirmation and NOTHING
+        else -- no path, kind or referenced flag. Main re-resolves all three from its own index
+        immediately before acting, so a compromised renderer cannot downgrade a video or aim
+        Delete at an arbitrary file. Asserted on the sent object's own key list. -->
+   <!-- decision: the index is rebuilt with force:true for a delete rather than served from the
+        15-second cache. A stale path is exactly the input that trashes the wrong file, and a
+        delete is a rare user-initiated act, so one rebuild is the cheap side of that trade. -->
 10. **Opening routes through `planForPath`.** Clicking an item of each handled type opens the
    app that owns it, and a type with more than one candidate offers the ranked list rather than
    silently choosing. Proven with a file whose extension is ambiguous and whose handler is
@@ -493,6 +507,29 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    Bin (`shell.trashItem`) and it is restorable from there — verified by actually restoring one.
    An index-only row is soft-deleted with a working undo. Where neither applies, the confirm
    says so in different words from a recoverable delete.
+   <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 8bb2fd8b (live) --
+        debug/filesapp-trash-roundtrip.cjs, a real Electron main process calling the production
+        deleteFilesItemInMain with the real shell.trashItem: a self-created 4 KB file leaves the
+        disk, is FOUND IN THE BIN by its original path, is put back by the bin's own Restore
+        verb, and returns byte-identical and absent from the bin. "Verified by actually
+        restoring one" is that Restore verb, not a mock. The soft-delete half and the
+        different-words half are 9 tests on the production FilesApp; adverse control: 2 of 9. -->
+   <!-- defect found by the integration test, fixed in the same commit: a successful delete
+        removes the row, which clears the selection, which unmounts the inspector -- taking the
+        receipt and its Undo button with it. The Undo was unreachable in exactly the case it
+        exists for. The receipt is hoisted to the status dock, which never unmounts. Removing
+        that hoist turns 2 of 9 red. The control's own suite never saw it: it mounts the control
+        standalone with a fixed item, so the row it deletes can never leave. -->
+   <!-- TRAP for anyone reading the Recycle Bin from PowerShell, which cost three runs:
+        (a) Get-ChildItem cannot see into it; use Shell.Application Namespace(10).
+        (b) GetDetailsOf(item,0) honours "hide extensions" and returned `gate21-episode`, not
+            `gate21-episode.mkv` -- take the extension from the $R stub's own .Path.
+        (c) JSON.stringify is the WRONG quoter for a Windows path in PowerShell: it doubles
+            every backslash and PowerShell's escape char is the backtick, so the path compares
+            equal to nothing. Use a single-quoted PS literal.
+        (d) $ErrorActionPreference='Stop' aborts the enumeration on an unrelated item.
+        Each of these reported the file as ABSENT from a bin it was demonstrably sitting in --
+        i.e. each would have read as "trashItem does not work". Suspect the instrument. -->
 22. **View state persists.** Sort column, direction and view mode are remembered per folder
    across a restart.
    <!-- status: closed; evidence: 2026-08-31 0ef89ef0 -- shared/filesApp/viewState.ts + renderer/filesViewStateStore.ts; 26 tests (19 pure + 7 on the real component across a real unmount with the store's memory fallback cleared); every "remembered" claim paired with a neighbour folder that must not have moved; adverse control collapsing folderViewKey to one global key turns 6 of 26 red, 3 of them restart tests -->
