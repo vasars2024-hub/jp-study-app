@@ -11,6 +11,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import VirtualGrid from '../../VirtualGrid';
 import { Button, Select } from '../../ui';
 import Icon from '../../Icons';
+import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { useT } from '../../../i18n';
 import MediaPosterCard, {
   CARD_METRICS,
@@ -220,7 +221,7 @@ export default function MediaLibraryBrowser({
 
   return (
     <section className="medialib-browser" aria-label={t('media.browser.label')}>
-      <header className="medialib-browser__head">
+      <ContextualSurface as="header" className="medialib-browser__head">
         <div className="medialib-browser__heading">
           <h2 className="medialib-browser__title" title={title}>{title}</h2>
           <span className="medialib-browser__sub">
@@ -326,7 +327,7 @@ export default function MediaLibraryBrowser({
             {t('media.browser.add')}
           </Button>
         </div>
-      </header>
+      </ContextualSurface>
 
       <div className="medialib-browser__body">
         {entries.length === 0 ? (
