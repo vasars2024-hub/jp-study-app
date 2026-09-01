@@ -44,6 +44,7 @@ import {
   listAudioTracks,
   normalizeYouTubeAudioLang,
   planYoutubeAudioTrack,
+  youtubeAudioProbeArgs,
   youtubeFormatArgs,
   type YtDlpFormat,
 } from '../../shared/ytAudioLang';
@@ -988,7 +989,7 @@ if (process.argv.includes('--gateAudio')) {
     };
 
     const raw = await new Promise<string | null>((resolve) => {
-      const proc = spawn('yt-dlp', ['-J', '--no-playlist', '--no-warnings', url], { shell: true });
+      const proc = spawn('yt-dlp', youtubeAudioProbeArgs(url), { shell: true });
       let out = '';
       proc.stdout.on('data', (d: Buffer) => (out += d.toString()));
       proc.on('error', () => resolve(null));
