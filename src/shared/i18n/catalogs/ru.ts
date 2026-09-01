@@ -4824,6 +4824,7 @@ export const ru: Catalog = {
   'reading.action.dictionary': 'Найти в словаре',
   'reading.action.mine': 'Собрать лексику',
   'reading.action.jitenVocabulary': 'Лексика Jiten',
+  'reading.discovery.openPlanner': 'Открыть планировщик',
 
   // Library view (ru)
   'library.intro': 'Ваши книги и манга. Импортируйте файлы, чтобы начать читать.',

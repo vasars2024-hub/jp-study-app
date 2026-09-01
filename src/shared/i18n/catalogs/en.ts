@@ -4616,6 +4616,7 @@ export const en: Catalog = {
   'reading.action.dictionary': 'Look up',
   'reading.action.mine': 'Mine vocabulary',
   'reading.action.jitenVocabulary': 'Jiten vocabulary',
+  'reading.discovery.openPlanner': 'Open planner',
 
   // Library view (en)
   'library.intro': 'Your books and manga. Import files to start reading.',

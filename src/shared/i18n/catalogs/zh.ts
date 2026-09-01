@@ -4334,6 +4334,7 @@ export const zh: Catalog = {
   'reading.action.dictionary': '查词典',
   'reading.action.mine': '采集词汇',
   'reading.action.jitenVocabulary': 'Jiten 词汇',
+  'reading.discovery.openPlanner': '打开计划页',
 
   // Library view (zh)
   'library.intro': '你的图书和漫画。导入文件即可开始阅读。',

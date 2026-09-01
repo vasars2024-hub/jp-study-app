@@ -8,6 +8,10 @@ import {
   type ReadingDiscoverySnapshot,
 } from '../../../shared/readingDiscovery';
 import { normalizeReadingWorkspaceLibrary } from '../../../shared/readingWorkspace';
+import {
+  resolveReadingWorkspaceActions,
+  type ReadingWorkspaceActionId,
+} from '../../../shared/readingWorkspaceActions';
 import { NOVELS } from '../../data/novels';
 import type { ReadingSite } from '../../data/readingSites';
 import {
@@ -15,6 +19,13 @@ import {
   readingDiscoveryCoverUrl,
 } from '../../readingDiscoveryProviders';
 import { coverFallbackImage } from '../../utils/coverArt';
+import {
+  discoveryHostedActions,
+  discoveryJitenDeckId,
+  discoveryNavigation,
+  plannedJitenDeckIds,
+} from '../../utils/readingDiscoveryActions';
+import { setHandoffJson } from '../../pendingHandoff';
 import { useT } from '../../i18n';
 import Icon from '../Icons';
 import './readingUnifiedDiscovery.css';
@@ -24,13 +35,6 @@ export interface ReadingUnifiedDiscoveryProps {
   sites: readonly ReadingSite[];
   onOpenBook: (item: LibraryItem) => void;
   onSelectSite: (site: ReadingSite) => void;
-}
-
-function actionLabelKey(result: ReadingDiscoveryResult): string {
-  if (result.action.type === 'inspect-site') return 'reading.openSite';
-  if (result.action.type === 'open-external') return 'novels.action.openSource';
-  if (result.action.type === 'open-plan') return 'novels.action.plan';
-  return 'common.open';
 }
 
 export default function ReadingUnifiedDiscovery({
@@ -45,6 +49,15 @@ export default function ReadingUnifiedDiscovery({
   const [snapshot, setSnapshot] = useState<ReadingDiscoverySnapshot | null>(null);
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [preparing, setPreparing] = useState(false);
+  /**
+   * The Jiten decks already in the plan, read once per search.
+   *
+   * `JitenMiningPanel` can only mine what is in the plan, so this is what makes
+   * the Jiten action honest — see `plannedJitenDeckIds`. It is refreshed with
+   * the results rather than watched, because it only ever gates buttons that
+   * are painted from the same snapshot.
+   */
+  const [plannedDecks, setPlannedDecks] = useState<ReadonlySet<number>>(() => new Set<number>());
 
   useEffect(() => () => {
     generationRef.current += 1;
@@ -69,8 +82,17 @@ export default function ReadingUnifiedDiscovery({
     setPreparing(true);
     setSubmittedQuery(nextQuery);
     const libraryLoad = Promise.resolve(window.api.listLibrary?.() ?? []);
-    const libraryPayload = await libraryLoad.catch(() => []);
+    // A store that cannot be read withholds the Jiten action rather than
+    // failing the search: nothing else on this surface depends on the plan.
+    const planLoad = Promise.resolve(window.api.jitenGetStore?.())
+      .then((store) => plannedJitenDeckIds(store?.plan))
+      .catch(() => new Set<number>());
+    const [libraryPayload, planned] = await Promise.all([
+      libraryLoad.catch(() => []),
+      planLoad,
+    ]);
     if (generationRef.current !== generation) return;
+    setPlannedDecks(planned);
     const learnerContext = buildReadingDiscoveryLearnerContext(
       normalizeReadingWorkspaceLibrary(libraryPayload),
     );
@@ -102,25 +124,67 @@ export default function ReadingUnifiedDiscovery({
     activeRef.current?.cancel();
   };
 
-  const act = async (result: ReadingDiscoveryResult) => {
-    if (result.action.type === 'inspect-site') {
-      const site = sites.find((candidate) => candidate.id === result.action.siteId);
+  const openLibraryItem = async (itemId: string) => {
+    const items = await Promise.resolve(window.api.listLibrary?.() ?? []);
+    const item = Array.isArray(items)
+      ? items.find((candidate: LibraryItem) => candidate.id === itemId)
+      : undefined;
+    if (item) onOpenBook(item);
+  };
+
+  /**
+   * Performs one action from the shared Reading set.
+   *
+   * Every branch reuses wiring that already exists somewhere else in the app —
+   * `dict:lookup` is the global dictionary overlay's own channel, and the Jiten
+   * handoff is byte-for-byte what `NovelsContent.mineJitenSelected` dispatches.
+   * That is the point: unifying the *set* must not fork the *mechanism*, or the
+   * same button would behave differently depending on the door it was pressed
+   * behind.
+   */
+  const runAction = async (id: ReadingWorkspaceActionId, result: ReadingDiscoveryResult) => {
+    // A `const` local, because narrowing a property does not survive into the
+    // `find` callback below.
+    const { action } = result;
+    if (id === 'read' && action.type === 'open-library') {
+      await openLibraryItem(action.itemId);
+      return;
+    }
+    if (id === 'extract' && action.type === 'inspect-site') {
+      const site = sites.find((candidate) => candidate.id === action.siteId);
       if (site) onSelectSite(site);
       return;
     }
+    if (id === 'dictionary') {
+      // The same expression the registry's applicability rule reasons about, so
+      // what is looked up is what made the action available in the first place.
+      const { work } = result.entry;
+      const lookup = (work.titleNative || work.title).trim();
+      if (lookup) {
+        window.dispatchEvent(new CustomEvent('dict:lookup', { detail: { query: lookup } }));
+      }
+      return;
+    }
+    if (id === 'jitenVocabulary') {
+      const deckId = discoveryJitenDeckId(result);
+      // Never reached from a rendered button — the host withholds the action
+      // when the id does not parse — but the panel takes a number or nothing.
+      if (deckId === null) return;
+      setHandoffJson('jitenMining', { deckId, title: result.entry.work.title });
+      window.dispatchEvent(new CustomEvent('os:open', { detail: 'flashcards' }));
+      window.dispatchEvent(new CustomEvent('flashcards:openEpubMining'));
+    }
+  };
+
+  /** Leads somewhere else; not a Reading capability, so not in the set. */
+  const navigate = async (result: ReadingDiscoveryResult) => {
     if (result.action.type === 'open-external') {
       await window.api.openExternal(result.action.url);
       return;
     }
     if (result.action.type === 'open-plan') {
       window.dispatchEvent(new CustomEvent('os:open', { detail: 'novels' }));
-      return;
     }
-    const items = await Promise.resolve(window.api.listLibrary?.() ?? []);
-    const item = Array.isArray(items)
-      ? items.find((candidate: LibraryItem) => candidate.id === result.action.itemId)
-      : undefined;
-    if (item) onOpenBook(item);
   };
 
   const statusKey = snapshot
@@ -179,6 +243,7 @@ export default function ReadingUnifiedDiscovery({
         <div className="reading-unified-results" role="list">
           {snapshot.results.map((result) => {
             const coverUrl = readingDiscoveryCoverUrl(result.entry);
+            const navigation = discoveryNavigation(result);
             return (
             <article
               key={result.entry.key}
@@ -206,9 +271,45 @@ export default function ReadingUnifiedDiscovery({
                 <b lang="ja">{result.entry.work.title}</b>
                 <small className="muted">{result.entry.tags.slice(0, 3).join(' · ')}</small>
               </div>
-              <button type="button" className="btn" onClick={() => void act(result)}>
-                {t(actionLabelKey(result))}
-              </button>
+              {/*
+                Order, label and icon all come from the shared registry, so
+                "Look up" here is the same words and the same glyph as it is in
+                the Library drawer. Nothing is rendered disabled: a card lists
+                only what this surface can actually carry out for it.
+              */}
+              <div className="reading-unified-card-actions">
+                {resolveReadingWorkspaceActions(
+                  result.entry,
+                  discoveryHostedActions(result, plannedDecks),
+                ).map(
+                  (action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      className={action.primary ? 'btn primary' : 'btn'}
+                      data-reading-action={action.id}
+                      onClick={() => void runAction(action.id, result)}
+                    >
+                      <Icon name={action.icon as Parameters<typeof Icon>[0]['name']} size={13} />
+                      {t(action.labelKey)}
+                    </button>
+                  ),
+                )}
+                {navigation ? (
+                  <button
+                    type="button"
+                    className="btn subtle"
+                    data-reading-navigation={result.action.type}
+                    onClick={() => void navigate(result)}
+                  >
+                    <Icon
+                      name={navigation.icon as Parameters<typeof Icon>[0]['name']}
+                      size={13}
+                    />
+                    {t(navigation.labelKey)}
+                  </button>
+                ) : null}
+              </div>
             </article>
             );
           })}

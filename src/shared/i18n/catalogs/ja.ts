@@ -4352,6 +4352,7 @@ export const ja: Catalog = {
   'reading.action.dictionary': '辞書で調べる',
   'reading.action.mine': '語彙を採取',
   'reading.action.jitenVocabulary': 'Jiten の語彙',
+  'reading.discovery.openPlanner': 'プランナーを開く',
 
   // Library view (ja)
   'library.intro': '本やマンガをここに集めて、読み始めましょう。',
