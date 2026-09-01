@@ -147,3 +147,32 @@
     --glass-tint-strong: var(--panel);
   }
 }
+
+/* ---------- The tier the MACHINE forces — L11 "GPU-loss recovery" ---------
+   `perf.ts` is a saved user preference with NO hardware detection behind it
+   (default `performance`), so two states the machine imposes had no reader at
+   all: Chromium on a software rasteriser, and the GPU process dying under a
+   running app. A backdrop blur is the most GPU-dependent thing this app paints
+   and is exactly what must go in both. `theme/gpuFallback.ts` writes `data-gpu`
+   and explains how each is detected; it writes nothing when the GPU is healthy,
+   so the default install carries no marker.
+
+   Same tokens and the same opaque values as the transparency ladder above — one
+   vocabulary. (0,2,0) and last for the same reason it states: this outranks
+   whichever `[data-perf]` tier the user picked, because a tier the user chose
+   for a working GPU is not a decision about a GPU that has gone away.
+
+   `lost` is REVERSIBLE — `webglcontextrestored` removes the attribute and the
+   glass comes back. That is the whole point of the row: recovery, not a
+   permanent downgrade after one blip. */
+:root[data-gpu='software'],
+:root[data-gpu='lost'] {
+  --glass-blur: 0px;
+  --blur-sm: 0px;
+  --blur-md: 0px;
+  --blur-lg: 0px;
+  --blur-xl: 0px;
+  --blur-max: 0px;
+  --glass-tint: var(--panel);
+  --glass-tint-strong: var(--panel);
+}

@@ -326,6 +326,28 @@
   }
 }
 
+/* ---------- No accelerated compositor — L11 "GPU-loss recovery" ----------
+   The fifth degradation trigger, and the first one the MACHINE owns rather than
+   the user: `theme/gpuFallback.ts` writes `data-gpu` when Chromium is on a
+   software rasteriser (`software`) or when the GPU process has died under the
+   running app (`lost`, from `webglcontextlost`). Liquid is the only translucent
+   role, so it is the only one with anything to give up; anchor and work are
+   already `0px` in every variant.
+
+   `off`'s values verbatim again — the fourth trigger to reuse them, which is the
+   point of having them. Reversible: `webglcontextrestored` removes the attribute
+   and the material returns, so this is recovery rather than a one-way downgrade.
+   `perf.css` carries the shared `--glass-*`/`--blur-*` half of the same state. */
+:root[data-gpu='software'],
+:root[data-gpu='lost'] {
+  --lq-liquid-bg: var(--panel);
+  --lq-liquid-bg-raised: var(--panel-2);
+  --lq-liquid-blur: 0px;
+  --lq-liquid-saturate: 1;
+  --lq-ambient-bg: var(--bg);
+  --lq-ambient-blur: 0px;
+}
+
 /* ---------- Aero safe mode — the fourth trigger, same omission -----------
    §8 lists Aero safe mode among the protected systems and its own row asks for
    "replace blur/refraction with stable tint; no feature or layout loss".

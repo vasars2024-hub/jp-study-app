@@ -87,6 +87,7 @@ import { bootWallpaperFit } from './wallpaperFit';
 import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
 import { bootPerf } from './theme/perf';
+import { bootGpuFallback } from './theme/gpuFallback';
 import { installAssetPackSync } from './theme/assetPacks';
 import { installGlobalInteractionBudget } from './perf/perfHub';
 import { registerAeroProofSoundPack } from './audio/aeroProofPack';
@@ -239,6 +240,12 @@ bootMotionPrefs();
 void bootWindowChrome(loadDisplayPrefs().windowChromeMode);
 // Apply the saved performance tier (data-perf) pre-paint (Phase 1 · M9).
 bootPerf();
+// ...and the tier the MACHINE forces, which `data-perf` cannot express: it is a
+// saved user preference with no hardware detection behind it, so a box with no
+// accelerated compositing still asked for 8px of backdrop blur everywhere. Also
+// arms the `webglcontextlost`/`restored` pair, which is L11's "GPU-loss
+// recovery" — after bootPerf so the attribute it writes lands on top.
+bootGpuFallback();
 installGlobalInteractionBudget();
 bootWiredArchiveSettings();
 // Register the original source-generated Aero proof sounds before themes resolve
