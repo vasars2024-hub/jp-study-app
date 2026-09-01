@@ -1,0 +1,583 @@
+{
+  "surface": "settings",
+  "title": "Settings",
+  "root": ".os-settings-v2",
+  "at": "2026-09-01T05:30:54.383Z",
+  "strictMode": "on - figures carry the dev double-render tax; see correction 31",
+  "scene": {
+    "fwins": 3,
+    "fwinElements": 991,
+    "root": null,
+    "rootElements": null,
+    "documentElements": 1116,
+    "titles": [
+      "Settings",
+      "Media",
+      "Video"
+    ],
+    "theme": null,
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 296
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "elements": 281,
+    "deskWindows": 3,
+    "titles": [
+      "Settings",
+      "Media",
+      "Video"
+    ]
+  },
+  "process": {
+    "pid": 46072,
+    "uptimeSecAtStart": 14786,
+    "mainRssMbBefore": 152.1,
+    "mainRssMbAfter": 173.9,
+    "mainHeapUsedMbAfter": 322.9
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "frames": 111,
+    "runs": [
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 19.4,
+        "over100": 0,
+        "frames": 111
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.2,
+        "over100": 0,
+        "frames": 111
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.1,
+        "over100": 0,
+        "frames": 111
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 19.4,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 287
+      },
+      "scene_after": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 287
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1308
+      },
+      "jank_blocks": null,
+      "frames": 111,
+      "frame_min_ms": 13.9,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 19.4,
+      "frames_over_16": 52,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1822,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 3.3,
+      "main_max_ms": 15
+    },
+    "ceilingRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 19.4,
+        "over100": 0,
+        "frames": 111
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.2,
+        "over100": 0,
+        "frames": 111
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.1,
+        "over100": 0,
+        "frames": 111
+      }
+    ],
+    "themeControlRuns": [
+      {
+        "p50": 16.7,
+        "p95": 17.1,
+        "max": 50.2,
+        "over100": 0,
+        "mainMax": 10.5
+      },
+      {
+        "p50": 16.7,
+        "p95": 17.3,
+        "max": 50.2,
+        "over100": 0,
+        "mainMax": 11.4
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Settings",
+      "root": null,
+      "scene_before": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 296
+      },
+      "scene_after": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 303
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Settings",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 108,
+      "frame_min_ms": 15.7,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17.6,
+      "frame_max_ms": 33.4,
+      "frames_over_16": 54,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1812,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 4.1,
+      "main_max_ms": 11.1,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 17.6,
+          "max": 33.4,
+          "over100": 0,
+          "mainMax": 11.1,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 17,
+          "max": 234,
+          "over100": 2,
+          "mainMax": 12.2,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 17,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 10.2,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.4,
+          "over100": 0,
+          "mainMax": 11.3,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 17.1,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 11.6,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Settings",
+      "root": null,
+      "scene_before": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 276
+      },
+      "scene_after": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 273
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Settings",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 14,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 33.6,
+      "frames_over_16": 57,
+      "frames_over_33": 1,
+      "frames_over_100": 0,
+      "main_samples": 60,
+      "main_span_ms": 1811,
+      "main_p50_ms": 2.1,
+      "main_p95_ms": 4.7,
+      "main_max_ms": 12.1,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.6,
+          "over100": 0,
+          "mainMax": 12.1,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.1,
+          "over100": 0,
+          "mainMax": 11.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Settings",
+      "root": null,
+      "scene_before": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 280
+      },
+      "scene_after": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 274
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 48.1,
+        "restorePaintedMs": 97.2,
+        "restoredTo": null
+      },
+      "jank_blocks": null,
+      "frames": 106,
+      "frame_min_ms": 16.1,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17.3,
+      "frame_max_ms": 50.1,
+      "frames_over_16": 53,
+      "frames_over_33": 4,
+      "frames_over_100": 0,
+      "main_samples": 60,
+      "main_span_ms": 1819,
+      "main_p50_ms": 2.1,
+      "main_p95_ms": 5.6,
+      "main_max_ms": 10.2,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 17.3,
+          "max": 50.1,
+          "over100": 0,
+          "mainMax": 10.2,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 17.1,
+          "max": 66.8,
+          "over100": 0,
+          "mainMax": 10.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "settings: navigate every settings page, twice (DURING -DuringJs)",
+      "samples": 163,
+      "span_ms": 5028,
+      "min_ms": 1.5,
+      "p50_ms": 2,
+      "p95_ms": 3.9,
+      "max_ms": 23.6
+    },
+    "heavyProof": "24 pages x2 = 48 navigations at 87 ms, restored to Home",
+    "idle": {
+      "label": "settings: idle",
+      "samples": 165,
+      "span_ms": 5028,
+      "min_ms": 1.4,
+      "p50_ms": 1.9,
+      "p95_ms": 3.9,
+      "max_ms": 9.2
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Settings",
+      "root": null,
+      "scene_before": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 317
+      },
+      "scene_after": {
+        "fwins": 3,
+        "fwinElements": 991,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1116,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 277
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Settings",
+        "before": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "after": {
+          "x": "60px",
+          "y": "24px",
+          "w": "960px",
+          "h": "680px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 12,
+      "frames": 72,
+      "frame_min_ms": 12.7,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 100.4,
+      "frame_max_ms": 117.2,
+      "frames_over_16": 42,
+      "frames_over_33": 13,
+      "frames_over_100": 12,
+      "main_samples": 59,
+      "main_span_ms": 1827,
+      "main_p50_ms": 2,
+      "main_p95_ms": 3.2,
+      "main_max_ms": 5.6
+    }
+  },
+  "findings": [],
+  "voided": [],
+  "environment": [],
+  "score": 10,
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}

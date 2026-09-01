@@ -1,0 +1,247 @@
+{
+  "label": "l10-media",
+  "surface": "Video",
+  "win": "main",
+  "task": "click:.mc-nav > button:nth-of-type(2) >> wait:1400 >> type:.mc-global-search input=jojo >> wait:1200",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 79,
+    "controlCount": 32,
+    "box": "1080x679",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 4,
+    "total": 5
+  },
+  "latencyMs": {
+    "clickRecv": [
+      73.7
+    ],
+    "inputRecv": [
+      99.4,
+      72.8,
+      48.2,
+      24.3
+    ],
+    "worstRecv": 99.4,
+    "overBar100": 0,
+    "n": 5,
+    "clickStampUnscored": [
+      192.9
+    ],
+    "inputStampUnscored": [
+      100.3,
+      72.9,
+      48.5,
+      24.5
+    ],
+    "worstStampUnscored": 192.9
+  },
+  "steps": [
+    {
+      "step": "click:.mc-nav > button:nth-of-type(2)",
+      "target": {
+        "sel": ".mc-nav > button:nth-of-type(2)",
+        "label": "LibraryAll local media",
+        "disabled": false,
+        "at": "250,292"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:1400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "type:.mc-global-search input=jojo",
+      "target": {
+        "sel": ".mc-global-search input",
+        "text": "jojo",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:1200",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "clear:.mc-global-search input >> click:.mc-nav > button:nth-of-type(3) >> wait:1000",
+    "steps": [
+      "clear:.mc-global-search input",
+      "click:.mc-nav > button:nth-of-type(3)",
+      "wait:1000"
+    ],
+    "restored": true,
+    "baseHash": "1y4k8dr",
+    "afterHash": "1y4k8dr",
+    "liveRegionsBefore": [
+      "div.mc-video-empty|Video plays in the media workspace",
+      "div.mc-video-empty|Open the workspace to watch with subtitles, transcript and mining. It reports th",
+      "div.mc-video-empty|Open in the media workspace"
+    ],
+    "liveRegionsAfter": [
+      "div.mc-video-empty|Video plays in the media workspace",
+      "div.mc-video-empty|Open the workspace to watch with subtitles, transcript and mining. It reports th",
+      "div.mc-video-empty|Open in the media workspace"
+    ],
+    "textHashRoundTrip": {
+      "base": "1b8621i",
+      "after": "1b8621i"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "1080x679",
+      "total": 5,
+      "deadEnds": 0,
+      "worstRecv": 99.4
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "1080x679",
+      "total": 5,
+      "deadEnds": 0,
+      "worstRecv": 91.2
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "1080x679"
+    },
+    "liquidTotal": 5,
+    "standardTotal": 5
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.4
+    ]
+  }
+}

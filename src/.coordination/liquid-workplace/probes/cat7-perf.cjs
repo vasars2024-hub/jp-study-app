@@ -611,27 +611,40 @@ const SPECS = {
        * What Settings does at scale is swap pages. Each rail click unmounts one settings
        * panel and mounts another into `.os-set-pane-v2`, and the panels are the heavy
        * part — Appearance builds the theme/font pickers, Display the monitor matrix,
-       * Scraper the whole MAL/source console. 19 pages twice is 38 mounts, the heaviest
-       * real work this surface performs without touching the network or user data.
+       * Scraper the whole MAL/source console. Every page twice is the heaviest real work
+       * this surface performs without touching the network or user data.
        *
        * The page is persisted state, so the load restores the page it started on and the
        * proof REFUSES unless the rail came back to it.
+       *
+       * CORRECTION 39 (2026-09-01) — the tick interval is DERIVED, not fixed. This leg was
+       * written at 110 ms against a 19-page rail: 38 ticks, ~4.2 s, inside `durationMs`.
+       * The rail is 24 pages today, so 48 fixed ticks need 5.28 s, the sampling window shut
+       * at 5.0 s, and the proof read 38 of 48 and VOIDed the whole run — after every gesture
+       * had already been paid for. The load itself was fine (`ticks` reached 48 and the rail
+       * restored); only the arithmetic was stale. A hardcoded interval times out whenever the
+       * product grows a page, which is the one thing a settings rail reliably does. So the
+       * budget is declared and the interval falls out of it, and if the rail ever grows past
+       * what the floor can serve the leg REFUSES up front instead of half-running.
        */
       label: 'navigate every settings page, twice',
-      // 38 ticks at 110 ms is ~4.2 s plus a 200 ms settle for the restore check.
+      // BUDGET below + the 200 ms restore settle + slack must stay under this.
       durationMs: 5000,
       js: `(() => {
         delete window.__lqSettingsLoad;
+        const BUDGET = 4200, FLOOR = 45;
         const rail = document.querySelector('nav.os-set-nav-v2');
         if (!rail) return 'REFUSE: no settings rail';
         const btns = Array.from(rail.querySelectorAll('.os-set-nav-item'));
         if (btns.length < 10) return 'REFUSE: expected the full rail, found ' + btns.length + ' pages';
+        const total = btns.length * 2;
+        const every = Math.min(110, Math.floor(BUDGET / total));
+        if (every < FLOOR) return 'REFUSE: ' + total + ' navigations do not fit ' + BUDGET + ' ms above the ' + FLOOR + ' ms floor';
         const label = (b) => { const s = b.querySelector('span:not([class])'); return ((s && s.textContent) || '').trim(); };
         const activeIndex = btns.findIndex((b) => b.getAttribute('aria-current') === 'page');
         const startIndex = activeIndex < 0 ? 0 : activeIndex;
-        const rec = { pages: btns.length, start: label(btns[startIndex]), ticks: 0, restored: false };
+        const rec = { pages: btns.length, start: label(btns[startIndex]), ticks: 0, every, restored: false };
         window.__lqSettingsLoad = rec;
-        const total = btns.length * 2;
         const timer = setInterval(() => {
           btns[rec.ticks % btns.length].click();
           rec.ticks += 1;
@@ -643,15 +656,15 @@ const SPECS = {
               rec.restored = !!back && label(back) === rec.start;
             }, 200);
           }
-        }, 110);
-        return 'cycling ' + btns.length + ' pages twice from ' + rec.start;
+        }, every);
+        return 'cycling ' + btns.length + ' pages twice from ' + rec.start + ' at ' + every + ' ms';
       })()`,
       proof: `(() => {
         const r = window.__lqSettingsLoad;
         if (!r) return 'REFUSE: the load never armed';
         if (r.ticks < r.pages * 2) return 'REFUSE: only ' + r.ticks + ' of ' + (r.pages * 2) + ' navigations ran';
         if (!r.restored) return 'REFUSE: the rail did not return to ' + r.start;
-        return r.pages + ' pages x2 = ' + r.ticks + ' navigations, restored to ' + r.start;
+        return r.pages + ' pages x2 = ' + r.ticks + ' navigations at ' + r.every + ' ms, restored to ' + r.start;
       })()`,
     },
     collection: { container: '.os-set-pane-v2', row: '.os-set-quick-card' },

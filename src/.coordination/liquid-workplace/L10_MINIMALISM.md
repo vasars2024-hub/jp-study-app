@@ -91,7 +91,7 @@ separate window that does not mount `CommandPalette` at all; that is pre-existin
 Blanc's own track, where L9 established that the shell owns its own controls. Named here rather
 than passed over in silence.
 
-### Bullet 1 — IN PROGRESS, 4/16 cells, `2ae5fa57`
+### Bullet 1 — first 4 of 16 cells, `2ae5fa57` (superseded by the closure below)
 
 Samples: **Settings**, the 1,307-control census maximum; **Media Center**, the structurally
 different shared `player`/`video`/`music` root. Settings cat3 remains 10/10 (0 dense regions on
@@ -110,7 +110,54 @@ Anki, Flashcards, Game Arena, Statistics, Resources, Sticky Note, Visualizer, Mu
 City, Immersion, Calendar, YouTube, Scraper, Aero shell, Wired shell, and Blanc shell. Media,
 Video and Music are represented by their one shared Media Center root.
 
-### Exact next: finish bullet 1's 16 cells
+### Bullet 1 — CLOSED 2026-09-01. RULE C 16 of 16. `2ae5fa57`, `12c2b10a`, `4ece2839`, `<this>`.
 
-Run cat1, cat2, cat5, cat6, cat7 and cat8 on Settings and Media Center. Any failed category
-expands across the sampled-out list; only 16/16 with required expansions may close the bullet.
+The remaining twelve cells, each with its own control firing in its own run. No category failed
+at this point, so no expansion across the sampled-out list was owed.
+
+| cat | Settings | Media Center (Video) | control that discriminated |
+| --- | --- | --- | --- |
+| 1 accessibility | 10/10 | 10/10 | 5 injected defects moved 0→2 contrast / 5→7 sub-32 / 0→2 WCAG 2.5.8 / 0→1 unreachable, all restored, rect drift 0 |
+| 2 clunkiness | 10/10 | 10/10 | dead end + modal trap + scroll trap injected 0→1 each, restored 0 |
+| 5 UI clarity | 10/10 | 10/10 | separate `-control` run FAILED as required on Q2, Q3, Q4, Q5, Q10 |
+| 6 feature parity | 10/10 | 10/10 | per-row mutations: each fell **exactly its own row** (+ its declared cascade), 0 unexpected, all returned |
+| 7 performance | 10/10 | 10/10 | `--jank` 120 ms blocks: p95 17.6→100.4 ms, over-100 frames 0→12 (Settings); 16.9→100.3 and 0→12 (Video) |
+| 8 honest states | 10/10 | 10/10 | raw key + placeholder + mute-pair injected 0→1 each against a 9,784-key / 106-namespace catalog, restored 0 |
+
+Numbers behind the two that are only ever quoted as ratios. **cat1:** Settings 70 text runs, min
+contrast 6.18:1, 51 controls, 0 keyboard-unreachable, 0 WCAG-2.5.8 failures, 5 sub-32px by rect
+and **0 by hit box** (`.fwin-b` carries `lq-hit`); Media 79 runs, min 4.76:1, 33 controls, same
+zeros. Reduced-motion emulation took and released on both: 46→0→46 over-threshold animations on
+Settings, 40→0→40 on Media. **cat8:** 0 raw keys, 0 placeholders, 0 mute pairs on either; all
+four languages differ from English by 166 of 267 runs on Settings, so the surface is really
+translated rather than falling back. Media declares 2 empty-state hosts and names both.
+
+**cat7 scene and ceiling, without which the ms mean nothing.** 3 `.fwin`s / 991 window elements
+/ 1,116 document elements, viewport 1264×821, dpr 1; process uptime 14,786 s, so the restart bar
+is met. This session's ceiling is **16.7 ms p50** (60 Hz), not L0's 10.0 — the L0 rows are kept
+as provenance only. Settings drag p50 16.7 / p95 17.6 / 0 over 100; resize 16.7 / 16.9 / 0;
+theme swap painted in 48.1 ms and restored in 97.2. Video drag 16.7 / 16.9 / 0; resize 16.7 /
+16.9 / 0; theme painted 44.2 ms. Main-process block under each surface's heaviest real work:
+**23.6 ms** (Settings, 24 pages × 2 = 48 navigations) and **8.8 ms** (Video, 40 disclosure
+cycles over 7 tiles / 639 px), both far under the 500 ms bar, both restored to their start page.
+
+**Instrument correction 39, and the run it VOIDed first.** cat7 Settings scored **VOID** on its
+first pass: `heavy` answered `REFUSE: only 38 of 48 navigations ran`. Nothing was wrong with the
+app — the load reached all 48 ticks and restored the rail. The leg was written at a fixed 110 ms
+tick against a **19-page** rail (38 ticks, 4.2 s, inside the 5 s window); the rail is **24 pages**
+today, so 48 fixed ticks need 5.28 s and the sampling window shut first. Every gesture in that
+run was already paid for when the arithmetic voided it. The tick interval is now DERIVED from a
+declared 4,200 ms budget (`min(110, budget/ticks)`, floor 45 ms, REFUSE above it) and the run
+records what it used — 87 ms here. A fixed interval rots on the one thing a settings rail
+reliably does, which is grow a page.
+
+`sampled-out:` unchanged from the four cells above — Agent, Library, Novels, Reading Finder,
+Dictionary, Grammar, Notebook, Translate, Anki, Flashcards, Game Arena, Statistics, Resources,
+Sticky Note, Visualizer, Music widget, City, Immersion, Calendar, YouTube, Scraper, Aero shell,
+Wired shell, Blanc shell. Media, Video and Music share the one Media Center root that was scored.
+
+### Exact next: bullet 2 — labels, icons, spacing, motion, empty states, breakpoints
+
+Same two surfaces, same 16 cells, order cat1 → cat5 → cat8 first per the table above. Bullet 1's
+runs are NOT reusable for it: they scored redundant chrome, and bullet 2 asks a different
+question of the same pixels.
