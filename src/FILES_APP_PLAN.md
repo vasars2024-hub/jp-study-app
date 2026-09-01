@@ -438,8 +438,8 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    produced, captured **before** removal and compared after. Settings no longer carries them,
    and every search entry that pointed at `pageId: 'memory'` resolves to the Files app — a
    search hit landing on a page that no longer holds the row is a FAIL.
-   <!-- status: open; evidence: 2026-08-31 f26e9932 + d9bec5be + cd9ae66d -- panels on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files', parity rows landed as panel:system/memory (migrated) + panel:system/statistics (preserved); the "compared after" reading needs an EXCLUSIVE app and is blocked on the mergeback -->
-   <!-- status: open; evidence: 2026-09-01 3402a184 -- the AFTER COMPARISON now exists and
+   <!-- history (superseded by the closing tag below): 2026-08-31 f26e9932 + d9bec5be + cd9ae66d -- panels on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files', parity rows landed as panel:system/memory (migrated) + panel:system/statistics (preserved); the "compared after" reading needs an EXCLUSIVE app and is blocked on the mergeback -->
+   <!-- history (superseded by the closing tag below): 2026-09-01 3402a184 -- the AFTER COMPARISON now exists and
         RUNS, against the imported gate8-before.json rather than retyped values. 12 assertions
         across filesAppGate8Parity.test.tsx (8) and filesAppGate8Stats.test.tsx (4). Memory:
         all 8 card anchors EQUAL and in order; formatBytes(totalmem) and platform rendered off
@@ -452,12 +452,27 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
         index must still resolve) and EVERY one carries movedTo 'files', with 8 of the 9 anchor
         ids matching a card the panel renders. STILL OPEN on one clause only: that the live app
         ROUTES to this panel, which needs an exclusive Electron. -->
-   **3 of 4 clauses landed, gate still OPEN.** The before-capture exists
-   (`gate8-before.json`), and as of 2026-09-01 so does the after-comparison — it is a test that
-   imports the capture, not a live reading. What remains is strictly the live routing clause.
-   Blocker (a), the parity rows, is RESOLVED — see the 2026-08-31 (tenth) entry. Blocker (b)
-   needs an app this worker cannot start without evicting another track's instrument; same
-   entry says why and what clears it.
+   <!-- status: closed; evidence: 2026-09-01 64c22632 -- the last clause, measured LIVE in a
+        second dev instance this worktree now starts for itself (vite 5273 / bridge 39274 /
+        scratch userData), beside the other track's app. Typed "factory reset" into the real
+        Settings search and clicked the real hit: the Files app OPENED (fwin 3 -> 4), scoped to
+        Memory, and exactly ONE of its 8 cards carried .fa-panel-card.is-highlight -- "Factory
+        reset". Control (b), that the card id is carried rather than hardcoded: "Data inventory"
+        highlights "Settings inventory" instead, count still 1. Control (a), that the redirect
+        is not indiscriminate: "Accent colour" (not migrated) navigated Settings to Appearance
+        and opened NO Files window (fwin 4 -> 4). Settings-no-longer-carries-them, also live:
+        the nav rail lists 19 items, none matching /memory|storage/ or /statistic/.
+        2 of the 9 migrated entries were driven end to end; the other 7 share the single
+        `next === 'memory'` branch in SettingsApp.tsx:171 that both driven ones exercised, and
+        the committed test already pins all 9. -->
+   **CLOSED 2026-09-01.** All four clauses hold. The before-capture exists
+   (`gate8-before.json`), the after-comparison is a test that imports it rather than retyping
+   it, and the routing clause is now a live reading with two controls.
+   The routing lives in `SettingsApp.tsx:159` `navigate()`, NOT in the search box — four callers
+   reach it (search, nav rail, agent guided-navigation, recent pages) and a redirect in one
+   would leave the other three dead-ending. So `movedTo` is registry METADATA that no component
+   reads; grepping for a `movedTo` consumer finds only tests and concludes, wrongly, that the
+   routing was never built. It is keyed on `pageId === 'memory'`.
    TRAPS the comparison found, both in the instrument and both worth not repeating:
    `.fa-panel-table` also matches the agent-memory and agent-history tables, so an unscoped
    row count read 32 for a 30-domain inventory; and `knowledgeCounts()` is indexed by LEVEL
