@@ -561,3 +561,103 @@ export function sendBackgroundMessage(chromeStub: ChromeStub, msg: unknown): Pro
     }
   });
 }
+
+/* ------------------------------ popup sandbox ------------------------------ */
+
+/**
+ * popup.js is the one extension surface a `node:vm` context cannot host: every
+ * line of its top-level code is `document.getElementById(...)`, and its whole
+ * output is DOM. So the existing sandbox could only ever assert on its SOURCE —
+ * which is how three tests ended up grepping for a template literal instead of
+ * checking what it renders.
+ *
+ * This loads the real popup.html and the real three scripts, in the manifest's
+ * order, into one jsdom window, and lets a test read the DOM the user sees.
+ * `runScripts: 'outside-only'` is what makes it faithful: every `window.eval`
+ * shares ONE global scope, so `shared.js`'s top-level `const` is visible to
+ * popup.js exactly as it is in a browser. (Wrapping each file in its own
+ * function — the obvious alternative — silently breaks that and the scripts
+ * stop seeing each other.)
+ */
+export interface PopupOptions {
+  /** Answers `chrome.runtime.sendMessage`. Return undefined for "no response". */
+  respond?: (msg: JpMessage) => unknown;
+  /** Answers `chrome.tabs.sendMessage` — the content script's page scan. */
+  tabRespond?: (msg: JpMessage) => unknown;
+  /** What `chrome.tabs.query` resolves to. Default: one active tab, id 1. */
+  tabs?: unknown[];
+  /** Seed for `chrome.storage.local`, which settings.js reads on load. */
+  seed?: Record<string, unknown>;
+}
+
+export interface JpMessage {
+  type?: string;
+  [key: string]: unknown;
+}
+
+export interface PopupHarness {
+  window: Window & typeof globalThis;
+  document: Document;
+  chrome: ChromeStub;
+  /** Every message popup.js sent, in order — the request side of the contract. */
+  sent: JpMessage[];
+  /** Let the init IIFE and its awaited round trips run to completion. */
+  settle(ticks?: number): Promise<void>;
+  /** `textContent` of the first match, trimmed; '' when absent. */
+  text(selector: string): string;
+  /** The rendered `.pill` chips, in DOM order — what the popup actually shows. */
+  pills(): string[];
+  /** Close the window so `followTranscription`'s poll timer cannot outlive the test. */
+  dispose(): void;
+}
+
+export function loadPopupSandbox(options: PopupOptions = {}): PopupHarness {
+  // Required lazily: jsdom is heavy and every other consumer of this module
+  // runs in a plain node context that must not pay for it.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { JSDOM } = require('jsdom') as typeof import('jsdom');
+  const dom = new JSDOM(readExtensionFile('popup.html'), {
+    runScripts: 'outside-only',
+    url: 'chrome-extension://testtesttest/popup.html',
+  });
+  const win = dom.window as unknown as Window & typeof globalThis;
+  const sent: JpMessage[] = [];
+  const chromeStub = createChromeStub(options.seed ?? {});
+
+  // popup.js uses the CALLBACK form of sendMessage and reads `runtime.lastError`
+  // after it; createChromeStub's promise form would leave every `send()` pending
+  // forever. Same object otherwise, so storage/listeners stay shared.
+  chromeStub.runtime.sendMessage = (msg: JpMessage, cb?: (r: unknown) => void) => {
+    chromeStub.calls.push({ api: 'runtime.sendMessage', args: [msg] });
+    sent.push(msg);
+    const res = options.respond?.(msg);
+    // Asynchronous on purpose: a synchronous callback would hide any ordering
+    // bug where popup.js reads the DOM before its own await resumes.
+    if (cb) setTimeout(() => cb(res), 0);
+    return undefined;
+  };
+  chromeStub.tabs.query = ((): Promise<unknown[]> =>
+    Promise.resolve(options.tabs ?? [{ id: 1, active: true }])) as never;
+  chromeStub.tabs.sendMessage = ((_tabId: number, msg: JpMessage): Promise<unknown> =>
+    Promise.resolve(options.tabRespond?.(msg))) as never;
+
+  (win as unknown as Record<string, unknown>).chrome = chromeStub;
+  for (const file of ['shared.js', 'settings.js', 'popup.js']) {
+    win.eval(readExtensionFile(file));
+  }
+
+  const settle = async (ticks = 12) => {
+    for (let i = 0; i < ticks; i += 1) await new Promise((r) => setTimeout(r, 0));
+  };
+  return {
+    window: win,
+    document: win.document,
+    chrome: chromeStub,
+    sent,
+    settle,
+    text: (selector) => win.document.querySelector(selector)?.textContent?.trim() ?? '',
+    pills: () =>
+      Array.from(win.document.querySelectorAll('.pill')).map((el) => (el.textContent ?? '').trim()),
+    dispose: () => win.close(),
+  };
+}
