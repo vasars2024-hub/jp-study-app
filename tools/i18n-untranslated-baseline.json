@@ -140,7 +140,8 @@
     "filesApp.unit.kb",
     "filesApp.unit.mb",
     "filesApp.unit.gb",
-    "filesApp.review.rootPlaceholder"
+    "filesApp.review.rootPlaceholder",
+    "filesApp.cleanup.relocate.placeholder"
   ],
   "zh": [
     "aero.boot.kicker.default",
@@ -281,7 +282,8 @@
     "filesApp.unit.kb",
     "filesApp.unit.mb",
     "filesApp.unit.gb",
-    "filesApp.review.rootPlaceholder"
+    "filesApp.review.rootPlaceholder",
+    "filesApp.cleanup.relocate.placeholder"
   ],
   "ru": [
     "aero.boot.kicker.default",
@@ -428,6 +430,7 @@
     "wired.found.magi.consensus",
     "yt.download.bar",
     "yt.status.progress",
-    "filesApp.review.rootPlaceholder"
+    "filesApp.review.rootPlaceholder",
+    "filesApp.cleanup.relocate.placeholder"
   ]
 }

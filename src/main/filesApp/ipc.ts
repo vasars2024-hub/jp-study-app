@@ -15,6 +15,7 @@
  * hands it.
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
@@ -23,6 +24,8 @@ import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
 import type { FilesScanReport } from '../../shared/filesApp/scan';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
 import { createFilesDeletionMainDependencies, registerFilesDeletionIpc } from './deletionIpc';
+import { createCleanupSoftDelete, registerFilesCleanupIpc } from './cleanupIpc';
+import type { FilesCleanupLogEntry } from '../../shared/filesApp/cleanup';
 import { readFilesMineSource } from './mineSource';
 import { scanRoots } from './scan';
 import { watchRoots, type FilesWatchArrival, type FilesWatchSession } from './watch';
@@ -247,4 +250,71 @@ export function registerFilesAppIpc(): void {
       trashItem: (target) => shell.trashItem(target),
     }),
   );
+
+  /*
+   * Gates 32-35 — cleanup.
+   *
+   * `force: true` for the same reason Delete uses it: a plan built from a
+   * 15-second-old snapshot could hand `shell.trashItem` a path that has since
+   * moved, and cleanup removes in bulk. The renderer sends its settings with
+   * each call and they are re-normalized inside the handler, matching how gate
+   * 31's stability window crosses this boundary — main keeps no cleanup
+   * preference of its own, so there is exactly one writer for it.
+   */
+  registerFilesCleanupIpc(ipcMain, {
+    getItems: () => getFilesIndex(true).items,
+    userDataPath: () => app.getPath('userData'),
+    trashItem: (target) => shell.trashItem(target),
+    softDeleteRow: createCleanupSoftDelete(() => app.getPath('userData')),
+    // Settings travel with the request; there is no persisted main-side copy.
+    readSettings: () => undefined,
+    invalidate: invalidateFilesIndex,
+    appendLog: (entries) => appendCleanupLog(app.getPath('userData'), entries),
+    now: () => Date.now(),
+  });
+}
+
+/**
+ * Gate 35 — the log is a file, not a toast.
+ *
+ * A run's receipt has to outlive the window that started it: the gate asks that
+ * a Recycle-Bin-destined item be *restorable*, and a user who closed the app
+ * still needs to know which file to restore. Capped so a scheduled run cannot
+ * grow it without bound.
+ */
+const CLEANUP_LOG_FILE = 'files-cleanup-log.json';
+const CLEANUP_LOG_MAX_ENTRIES = 2_000;
+
+export function appendCleanupLog(
+  userDataPath: string,
+  entries: readonly FilesCleanupLogEntry[],
+): void {
+  if (!entries.length) return;
+  const file = path.join(userDataPath, CLEANUP_LOG_FILE);
+  let existing: FilesCleanupLogEntry[] = [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as { entries?: unknown };
+    if (Array.isArray(parsed?.entries)) existing = parsed.entries as FilesCleanupLogEntry[];
+  } catch {
+    // No log yet, or an unreadable one. Starting a fresh log is better than
+    // losing this run's receipt to a parse error in an older file.
+  }
+  const next = [...existing, ...entries].slice(-CLEANUP_LOG_MAX_ENTRIES);
+  try {
+    fs.writeFileSync(file, JSON.stringify({ entries: next }, null, 2), 'utf-8');
+  } catch {
+    // A log that cannot be written must not turn a completed removal into a
+    // reported failure; the in-result log is still returned to the caller.
+  }
+}
+
+export function readCleanupLog(userDataPath: string): FilesCleanupLogEntry[] {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(userDataPath, CLEANUP_LOG_FILE), 'utf-8'),
+    ) as { entries?: unknown };
+    return Array.isArray(parsed?.entries) ? (parsed.entries as FilesCleanupLogEntry[]) : [];
+  } catch {
+    return [];
+  }
 }

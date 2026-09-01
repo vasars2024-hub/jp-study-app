@@ -169,7 +169,7 @@ export function planCleanupInMain(
 
 function sanitizeRunRequest(value: unknown): FilesCleanupRunRequest | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const raw = value as { confirmedItemIds?: unknown; reportBuiltAt?: unknown };
+  const raw = value as { confirmedItemIds?: unknown; reportBuiltAt?: unknown; settings?: unknown };
   if (!Array.isArray(raw.confirmedItemIds) || raw.confirmedItemIds.length > 100_000) return null;
   const ids: string[] = [];
   for (const id of raw.confirmedItemIds) {
@@ -177,7 +177,7 @@ function sanitizeRunRequest(value: unknown): FilesCleanupRunRequest | null {
     ids.push(id);
   }
   if (typeof raw.reportBuiltAt !== 'number' || !Number.isFinite(raw.reportBuiltAt)) return null;
-  return { confirmedItemIds: ids, reportBuiltAt: raw.reportBuiltAt };
+  return { confirmedItemIds: ids, reportBuiltAt: raw.reportBuiltAt, settings: raw.settings };
 }
 
 /**
@@ -196,7 +196,12 @@ export async function runCleanupInMain(
     return { ranAt: now, trigger, log: [], skipped: [], removedBytes: 0 };
   }
 
-  const fresh = planCleanupInMain(dependencies);
+  // The settings that produced the report the user read, re-normalized here so
+  // a corrupted renderer document cannot widen what an old confirmation reaches.
+  const fresh = planCleanupInMain(
+    dependencies,
+    request.settings === undefined ? undefined : normalizeCleanupSettings(request.settings),
+  );
   const plan = resolveCleanupExecution(fresh, request);
 
   const log: FilesCleanupLogEntry[] = [];
@@ -354,6 +359,93 @@ export async function relocateBrokenLinkInMain(
   return { ok: true, itemId: raw.itemId, path: raw.path };
 }
 
+/* ------------------------------------------------------------------ *
+ * The one soft-delete adapter main owns.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Remove one `media.json` row, keeping the removed row so it can go back.
+ *
+ * The delete path deliberately refuses to soft-delete from main, because those
+ * rows are renderer-owned. `media.json` is the exception and the reason is
+ * ownership, not convenience: `main/media.ts` is its writer, so a renderer
+ * soft-delete of a media row would make two processes writers of one store.
+ * The undo is in-memory and session-scoped, which is what "an undo window"
+ * means here — the record is gone from the store immediately, and a restart
+ * without an Undo is the user having accepted the removal.
+ */
+const mediaUndoRows = new Map<string, unknown>();
+
+export function softDeleteMediaRow(
+  userDataPath: string,
+  itemId: string,
+): { undoToken: string } | null {
+  const rowId = itemId.startsWith('media:') ? itemId.slice('media:'.length) : null;
+  if (!rowId) return null;
+  const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
+  let doc: { items?: { id?: unknown }[] };
+  try {
+    doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as typeof doc;
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(doc.items)) return null;
+  const index = doc.items.findIndex((candidate) => candidate?.id === rowId);
+  if (index < 0) return null;
+  const [row] = doc.items.splice(index, 1);
+  try {
+    fs.writeFileSync(file, JSON.stringify(doc, null, 2), 'utf-8');
+  } catch {
+    return null;
+  }
+  const undoToken = `media-undo:${rowId}:${Date.now()}`;
+  mediaUndoRows.set(undoToken, row);
+  return { undoToken };
+}
+
+export function undoSoftDeletedMediaRow(userDataPath: string, undoToken: unknown): boolean {
+  if (typeof undoToken !== 'string') return false;
+  const row = mediaUndoRows.get(undoToken);
+  if (row === undefined) return false;
+  const file = path.join(userDataPath, MEDIA_LIBRARY_STORE_FILE);
+  let doc: { items?: unknown[] };
+  try {
+    doc = JSON.parse(fs.readFileSync(file, 'utf-8')) as typeof doc;
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(doc.items)) doc.items = [];
+  doc.items.push(row);
+  try {
+    fs.writeFileSync(file, JSON.stringify(doc, null, 2), 'utf-8');
+  } catch {
+    return false;
+  }
+  mediaUndoRows.delete(undoToken);
+  return true;
+}
+
+/**
+ * The production soft-delete: media rows go through the adapter above, and
+ * everything else is refused loudly rather than reported as removed. A row this
+ * cannot reverse must not appear in the log with an undo token that does
+ * nothing — gate 35's log is only worth having if every entry is true.
+ */
+export function createCleanupSoftDelete(
+  userDataPath: () => string,
+): (candidate: FilesCleanupCandidate) => Promise<{ undoToken: string }> {
+  return async (candidate) => {
+    if (candidate.source !== 'media') {
+      throw new Error(`No soft-delete adapter for source ${candidate.source}`);
+    }
+    const receipt = softDeleteMediaRow(userDataPath(), candidate.itemId);
+    if (!receipt) throw new Error(`media.json row not found for ${candidate.itemId}`);
+    return receipt;
+  };
+}
+
+export const FILES_CLEANUP_UNDO_CHANNEL = 'filesapp:cleanup-undo';
+
 /** Registration is dependency-injected so the boundary has a unit test. */
 export function registerFilesCleanupIpc(
   ipc: FilesIpcHandleRegistrar,
@@ -373,4 +465,9 @@ export function registerFilesCleanupIpc(
   ipc.handle(FILES_CLEANUP_RELOCATE_CHANNEL, (_event, request) =>
     relocateBrokenLinkInMain(request, dependencies),
   );
+  ipc.handle(FILES_CLEANUP_UNDO_CHANNEL, (_event, undoToken) => {
+    const restored = undoSoftDeletedMediaRow(dependencies.userDataPath(), undoToken);
+    if (restored) dependencies.invalidate();
+    return { ok: restored };
+  });
 }

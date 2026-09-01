@@ -342,6 +342,13 @@ export interface FilesCleanupRunRequest {
   confirmedItemIds: readonly string[];
   /** `builtAt` of the report those ids came from; drift is reported, not run. */
   reportBuiltAt: number;
+  /**
+   * The settings the dry run used, re-normalized in main exactly like gate
+   * 31's stability window. Carrying them means the re-derived report is the
+   * same report the user read; omitting them would let a policy change between
+   * the two plans silently widen what a stale confirmation reaches.
+   */
+  settings?: unknown;
 }
 
 export type FilesCleanupSkipReason =

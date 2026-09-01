@@ -636,6 +636,18 @@ declare global {
       filesDelete(
         request: import('../shared/filesApp/deletion').FilesDeleteRequest,
       ): Promise<import('../shared/filesApp/deletion').FilesDeletionResult>;
+      // Gates 32-35. `filesCleanupPlan` is the dry run and writes nothing.
+      filesCleanupPlan(
+        settings: import('../shared/filesApp/cleanup').FilesCleanupSettings,
+      ): Promise<import('../shared/filesApp/cleanup').FilesCleanupReport>;
+      filesCleanupRun(
+        request: import('../shared/filesApp/cleanup').FilesCleanupRunRequest,
+      ): Promise<import('../shared/filesApp/cleanup').FilesCleanupRunResult>;
+      filesCleanupRelocate(request: {
+        itemId: string;
+        path: string;
+      }): Promise<import('../main/filesApp/cleanupIpc').FilesRelocateResult>;
+      filesCleanupUndo(undoToken: string): Promise<{ ok: boolean }>;
 
       popOut(section: string): Promise<void>;
       popoutListOpen(): Promise<string[]>;

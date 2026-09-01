@@ -12,6 +12,11 @@ import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalo
 import type { FilesMineSourceResult } from './shared/filesApp/mining';
 import type { FilesScanReport } from './shared/filesApp/scan';
 import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
+import {
+  FILES_CLEANUP_PLAN_CHANNEL,
+  FILES_CLEANUP_RELOCATE_CHANNEL,
+  FILES_CLEANUP_RUN_CHANNEL,
+} from './shared/filesApp/cleanup';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -1062,6 +1067,27 @@ const api = {
     request: import('./shared/filesApp/deletion').FilesDeleteRequest,
   ): Promise<import('./shared/filesApp/deletion').FilesDeletionResult> =>
     ipcRenderer.invoke(FILES_DELETE_CHANNEL, request),
+
+  /**
+   * Gates 32-35 — cleanup. Same contract as Delete: the renderer names classes
+   * and ids, and main resolves every path, size and risk from the live stores.
+   * `filesCleanupPlan` writes nothing; only `filesCleanupRun` removes anything.
+   */
+  filesCleanupPlan: (
+    settings: import('./shared/filesApp/cleanup').FilesCleanupSettings,
+  ): Promise<import('./shared/filesApp/cleanup').FilesCleanupReport> =>
+    ipcRenderer.invoke(FILES_CLEANUP_PLAN_CHANNEL, settings),
+  filesCleanupRun: (
+    request: import('./shared/filesApp/cleanup').FilesCleanupRunRequest,
+  ): Promise<import('./shared/filesApp/cleanup').FilesCleanupRunResult> =>
+    ipcRenderer.invoke(FILES_CLEANUP_RUN_CHANNEL, request),
+  filesCleanupRelocate: (request: {
+    itemId: string;
+    path: string;
+  }): Promise<import('./main/filesApp/cleanupIpc').FilesRelocateResult> =>
+    ipcRenderer.invoke(FILES_CLEANUP_RELOCATE_CHANNEL, request),
+  filesCleanupUndo: (undoToken: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('filesapp:cleanup-undo', undoToken),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

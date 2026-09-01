@@ -65,6 +65,8 @@ interface Harness {
   trashed: string[];
   log: FilesCleanupLogEntry[];
   softDeleted: string[];
+  /** How many times the index cache was dropped — only after a real change. */
+  invalidations: () => number;
 }
 
 function harness(
@@ -75,10 +77,12 @@ function harness(
   const log: FilesCleanupLogEntry[] = [];
   const softDeleted: string[] = [];
   let clock = 10_000;
+  let invalidated = 0;
   return {
     trashed,
     log,
     softDeleted,
+    invalidations: () => invalidated,
     deps: {
       getItems: () => items(),
       userDataPath: () => root,
@@ -94,7 +98,9 @@ function harness(
         return { undoToken: `undo-${candidate.itemId}` };
       },
       readSettings: () => settings,
-      invalidate: () => {},
+      invalidate: () => {
+        invalidated += 1;
+      },
       appendLog: (entries) => log.push(...entries),
       now: () => (clock += 1),
     },
@@ -215,6 +221,8 @@ describe('gate 32 — cleanup dry-runs before it acts', () => {
     expect(fs.existsSync(empty)).toBe(false);
     // And nothing beyond the report moved.
     expect(h.trashed).toHaveLength(2);
+    // The 15-second index cache is dropped, and only because something changed.
+    expect(h.invalidations()).toBe(1);
     expect(result.removedBytes).toBe(fs.statSync(path.join(bin, 'Series ep02.mp4.part')).size);
   });
 

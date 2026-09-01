@@ -34,7 +34,8 @@ import {
   type DragEvent,
 } from 'react';
 import { useT } from '../../i18n';
-import { LANG_TAGS, type UiLang } from '../../../shared/i18n/core';
+import { LANG_TAGS } from '../../../shared/i18n/core';
+import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
 import VirtualList from '../VirtualList';
 import {
@@ -141,6 +142,7 @@ import {
 } from './filesAppScope';
 import { useFilesIndex } from './useFilesIndex';
 import { ScanReviewSheet } from './ScanReviewSheet';
+import { CleanupSheet } from './CleanupSheet';
 import { useFilesWatch } from './useFilesWatch';
 import { FilesDeletionControls, FilesDeletionReceipt } from './FilesDeletionControls';
 import {
@@ -200,7 +202,6 @@ function columnsFor(mode: FilesViewMode): readonly FilesSortColumn[] {
  */
 const FILES_DRAG_ITEM_TYPE = 'application/x-jp-files-item';
 
-type Translate = (k: string, v?: Record<string, string | number>) => string;
 
 /**
  * Which folder the rail's own controls act on.
@@ -221,34 +222,6 @@ interface FolderNotice {
   key: string;
   values?: Record<string, string | number>;
   tone: 'ok' | 'error';
-}
-
-/**
- * Bytes, rendered with the unit the number actually deserves.
- *
- * `lang` is threaded in rather than read from the OS: a bare `toLocaleString()`
- * formats digits and separators in the SYSTEM locale, which is independent of
- * the UI-language setting, so a Japanese UI on a German machine renders
- * `1.234,5`. `LANG_TAGS[lang]` is the same mapping `core.ts` uses for plural
- * rules and number formatting, so all three agree.
- */
-function formatSize(bytes: number | null, t: Translate, lang: UiLang): string {
-  if (bytes === null) return '—';
-  const units = ['filesApp.unit.b', 'filesApp.unit.kb', 'filesApp.unit.mb', 'filesApp.unit.gb'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  // toFixed opts out of locale digit formatting; toLocaleString does not.
-  const shown = unit === 0 ? value : Number(value.toFixed(1));
-  return t(units[unit], { n: shown.toLocaleString(LANG_TAGS[lang]) });
-}
-
-function formatDate(ms: number | null, lang: UiLang): string {
-  if (ms === null) return '—';
-  return new Date(ms).toLocaleString(LANG_TAGS[lang]);
 }
 
 /**
@@ -404,6 +377,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
      report in memory — a 5,000-row scan is not something to keep alive behind
      a hidden dialog. */
   const [scanOpen, setScanOpen] = useState(false);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
 
   /**
    * Which folder's view is on screen. The precedence — smart, then collection,
@@ -1633,6 +1607,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           >
             {t('filesApp.review.title')}
           </button>
+          {/* Gates 32-35: the dry run, its guard, and the log. Opening it plans
+              and removes nothing — the confirm inside is the only write. */}
+          <button
+            type="button"
+            className="fa-cleanup-open"
+            onClick={() => setCleanupOpen(true)}
+          >
+            {t('filesApp.cleanup.title')}
+          </button>
           {bulkSelectedIds.size > 0 ? (
             <>
               <button
@@ -2263,6 +2246,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         // index bus — the sheet is a sibling, so it cannot assume a remount.
         onImported={refresh}
       />
+    ) : null}
+    {cleanupOpen ? (
+      <CleanupSheet onClose={() => setCleanupOpen(false)} onChanged={refresh} />
     ) : null}
     </>
   );
