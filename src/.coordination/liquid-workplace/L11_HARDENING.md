@@ -182,14 +182,34 @@ nothing there to opacify; that is a correct reading, not a silent pass.
 **Compact widths — PASSES** on both surfaces via cat4's `allThreeSizes` + `restored` bars
 (`cat4-l11b1-settings.json`, `cat4-l11b1-video.json`, both PASS 10/10).
 
-**Reduced/disabled motion — PARTIAL.** cat1's motion leg drives the OS-level
+**Reduced/disabled motion — PASSES on both triggers.** cat1's motion leg drives the OS-level
 `prefers-reduced-motion` through `/emulate` and both surfaces pass (`duringOverThreshold 0`,
-emulation demonstrably taken and released). The product's OWN switch, `data-display-anim='none'`,
-is a second and independent trigger and has **not** been measured live.
+emulation demonstrably taken and released). The product's OWN switch is a second and independent
+trigger, and it was measured separately: counting every element in each floating window whose
+computed `transition-duration`/`animation-duration` exceeds the rubric's 0.01 s,
+`data-display-anim` `full → none → full` gives **Settings 46 → 0 → 46, Media 85 → 0 → 85,
+Video 49 → 0 → 49** across 280 / 396 / 309 elements. Non-empty baseline, exact restore, three
+surfaces agreeing.
 
-**Zoom and text scaling — NOT MEASURED, and no instrument covers them.** There is no
-`data-display-text-scale` hook in the sheet; the display-preference vocabulary is `anim`, `bold`,
-`contrast`, `flashes`, `focus`, `links`, `pointer`, `scroll`, `transparency`. Whether zoom is
-browser zoom (`webFrame.setZoomFactor`), an OS DPI change, or a product control is the first
-thing the next turn must settle from source — **do not assume a control exists because the bullet
-names one.** That is this bullet's exact next slice, and it is why bullet 2 is not closed here.
+**Zoom and text scaling — NOT MEASURED. Both are real; the next turn measures, it does not
+search.** The source evidence, gathered so nobody repeats the hunt:
+
+- **Zoom is a shipped app feature, not browser zoom and not OS DPI.** `src/renderer/appZoom.ts`
+  scales `#root` with CSS `zoom` and re-sizes it to `(100/z)vw × (100/z)vh` so the painted box
+  stays exactly one viewport. `ZOOM_MIN 0.8`, `ZOOM_MAX 2.0`, `ZOOM_STEP 0.1`, snapped to 0.05.
+  **`applyZoom(factor)` applies WITHOUT persisting** — that is the probe-safe entry point;
+  `setZoom` writes `localStorage['jp-app-zoom']` and must not be used for a measurement.
+  `src/renderer/zoomCoords.ts` exists because Chromium reports pointer coords in UNZOOMED pixels
+  while layout is in zoomed ones, so any probe that clicks by coordinate while zoomed must divide
+  by `getZoomFactor()` or it will click the wrong element and report a dead control.
+- **Text scaling is `src/shared/uiCustomization.ts`**, which scales the `font-size-sm/md/lg`
+  tokens (line 668, ×1.15) among other token ladders — a preset system, not a `data-display-*`
+  attribute. The display-preference vocabulary is only `anim`, `bold`, `contrast`, `flashes`,
+  `focus`, `links`, `pointer`, `scroll`, `transparency`; there is no text-scale hook there, and
+  looking for one is the wrong search.
+- The instrument for both is **cat4's `clipped` / `overlaps` / `horizontal` / `contentGrowsNotChrome`
+  bars**, run at zoom 0.8 and 2.0 and at the scaled font tokens. `applyZoom` is not on `window`,
+  so a bridge run needs a real product route to it (a control or a shortcut) — reimplementing its
+  twenty lines inside `/eval` would measure the reimplementation, not the product.
+
+That is this bullet's exact next slice, and it is why bullet 2 is not closed here.
