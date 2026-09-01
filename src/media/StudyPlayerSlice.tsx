@@ -61,6 +61,7 @@ import {
   type DirectstreamOpenGenerations,
   type DirectstreamOpenTicket,
 } from '../shared/directstreamOpenChannel';
+import { installSeanimeMediaAuth } from './seanimeMediaAuth';
 import {
   ensureSeanimeLibraryCovers,
   normalizeLibraryPath,
@@ -880,6 +881,11 @@ function StudyPlayerSession({
       }
     };
   }, [clientId, conn, connected, identityConfirmed, playbackRequest, proofConfig]);
+
+  React.useEffect(
+    () => installSeanimeMediaAuth({ baseUrl: conn.baseUrl, token: conn.token }),
+    [conn.baseUrl, conn.token],
+  );
 
   /**
    * The recovery. A local open that the sidecar cancelled mid-preparation answers 200 and
