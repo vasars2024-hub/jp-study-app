@@ -142,7 +142,8 @@ An empty result is a FINDING: say so and stop.
         that absence is asserted in `ytAudioLang.test.ts`. -->
 3. An audio-only download of a video with no subtitles produces a transcript with a stated
    cue count, through the existing transcription queue.
-   <!-- status: open; evidence: 2026-09-01 660f10c7 -- the run HAPPENED this time, end to end, and
+   <!-- history (superseded by the status tag below; kept because it is the control half):
+        2026-09-01 660f10c7 -- the run HAPPENED this time, end to end, and
         the gate still does not close. No longer "blocked on an exclusive Electron": this
         worktree drives its own app (vite 5273 / bridge 39274 / userData %TEMP%\jp-filesapp-
         scratch, 0 media rows at the start).
@@ -164,6 +165,36 @@ An empty result is a FINDING: say so and stop.
         A real user gets kotoba; I measured a model I downgraded, so the degenerate output is
         as likely to be my instrument as the product. The next turn re-runs on the DEFAULT
         tier and only then decides whether this is a product defect. -->
+   <!-- status: closed; evidence: 2026-09-01, re-run on the DEFAULT tier. It was the
+        INSTRUMENT, not the product -- the suspicion above is withdrawn.
+          setup      localStorage 'jp-study-whisper-model' REMOVED, so loadWhisperModelTier
+                     falls through to defaultWhisperTier('ja') = kotoba-whisper. Last turn's
+                     degenerate .srt moved aside first, so the row was genuinely untranscribed
+                     (status route confirmed: failed / job-ended-without-transcript).
+          subject    the SAME audio as last turn -- GSx0rW2aHs8, 54 s, yt-dlp's "has no
+                     subtitles", kind:"audio", zero .srt/.vtt/.ass in the profile at the start.
+          queue      queued -> preparing -> extracting-audio -> transcribing 0/2 -> 1/2 ->
+                     aligning 2/2 -> done, captured off the live onTranscriptionProgress
+                     stream, not inferred.
+          result     subtitles/<mediaId>/generated-ja.srt, 578 bytes, **8 cues**, coherent
+                     timed Japanese that matches the video's own title (a 1-minute
+                     self-introduction): 「みな 私の名前はカリリやん」…「どうぞよろしくお願いします」.
+          CONTROL    same audio, same queue, only the tier changed:
+                       whisper-base   (forced, 2026-09-01 660f10c7)  1 cue, 1,110 chars of
+                                      `カカカカ…` spanning 0-30 s -- degenerate
+                       kotoba-whisper (default, this run)            8 cues, 578 bytes, real
+                     So the number moved with the model, which is what says the pipeline was
+                     never the fault.
+          NOTE the first attempt on kotoba FAILED (14 min, queue emptied, no artifact) and the
+          repaired status route reported `failed / job-ended-without-transcript` rather than
+          `pending` forever -- the second attempt succeeded. Transient, most likely the 320 MB
+          model fetch; recorded because a user CAN hit it. -->
+   <!-- trap: `whisperRuntimeProfile.whisperModelForCpu` silently substitutes
+        `Xenova/whisper-base` for kotoba-whisper on the WASM path, and the worker's
+        `model-fallback` status message has ZERO consumers (grep it). So a machine without a
+        usable WebGPU adapter gets whisper-base quality while the settings still say
+        kotoba-whisper, and nothing says so. This run went WebGPU, so the 8 cues are kotoba's.
+        Not a gate-3 blocker; it IS an honest-states defect worth its own slice. -->
 4. A card mined from that transcript reaches its destination AND renders as
    transcript-derived; a card from human subtitles on the same surface does not carry that mark.
    <!-- status: closed; evidence: 2026-09-01 93237b79 -- live via `--gate4` on the real profile, both halves. Transcript
@@ -201,7 +232,8 @@ An empty result is a FINDING: say so and stop.
 11. The extension button transcribes the audio of the page being watched and returns a cue
    count, with a named refusal when no audio is resolvable. The result lands in the catalogue
    (gate 5), so it is mineable later without returning to the page.
-   <!-- status: open; evidence: 2026-09-01 660f10c7 -- driven LIVE for the first time, against this
+   <!-- history (superseded by the status tag below; kept for the defect it names):
+        2026-09-01 660f10c7 -- driven LIVE for the first time, against this
         worktree's own extension server (18865, owned by MY pid; 18765 is the other app's). The
         refusal half CLOSES; the cue-count half found a real defect and stays open.
           refusals, live, on one URL, distinct reasons:
@@ -231,6 +263,35 @@ An empty result is a FINDING: say so and stop.
         fallback, reports zero cues honestly, and distinguishes an active queue job from a
         retired job with no artifact. Forty focused tests pass. Gate remains OPEN until the
         live POST/status pair returns the measured cue count and the catalogue sees the result. -->
+   <!-- status: closed; evidence: 2026-09-01 5b2b8bd5 + 3ef98483 -- driven live end to end on
+        this worktree's own app (electron pid 22752, extension server 18865 verified owned by
+        THAT pid, not the other app's 18765).
+          POST /v1/transcribe   {state:"queued", videoId:"GSx0rW2aHs8", mediaId:"547bb49d-..."}
+          GET  .../status       BEFORE  failed / job-ended-without-transcript
+                                DURING  pending  (52 polls, 15 s apart)
+                                AFTER   transcribed, **cueCount 8**
+          -- three DISTINCT answers from one route on one videoId, which is the control that
+             the poller is reading state and not returning a constant.
+          catalogue   filesIndex() = 35 rows, EXACTLY ONE carries flags.transcribed:
+                      provenance whisper-transcript, source subtitles. The audio row it was
+                      derived from is deliberately NOT marked (provenance is a property of
+                      text). Control widened to all 35 and stayed at 1.
+          mineable    filesMineSource(that row's own location, 'subtitle') -> ok, readCount 8,
+                      8 passages, first `みな 私の名前はカリリやん` @0-3000ms. So "mineable later
+                      without returning to the page" is measured, not asserted.
+          refusal     re-confirmed live this turn: a Wikipedia URL -> notAVideoPage +
+                      reasonKey extension.transcribe.refuse.notAVideoPage.
+        AND the half no probe had checked: the BUTTON did not return a cue count. Grepping the
+        shipped extension for the status route returned NOTHING -- 3ef98483 repaired a route
+        with zero consumers, and `formatTranscribe` ended at "Transcribing in GrammarX -- it
+        will appear in the catalogue". 5b2b8bd5 wires `transcribe-status` into background.js
+        and `followTranscription` into popup.js, so the click now ends on
+        "Transcribed -- N cues" / a named failure / a live elapsed counter. 5 tests drive the
+        REAL background.js through chrome.runtime.onMessage; the adverse control (misspell the
+        route, delete the popup call) turns exactly 2 red. -->
+   <!-- trap: a route can be correct and still close no gate. The status route was measured
+        working by a PROBE while the product never called it. Grep the CONSUMER, not just the
+        producer. -->
    <!-- trap: the ONE reason this could not be measured before was never "an exclusive
         Electron". It was that a second dev instance had no extension server at all -- it lost
         the bind to 18765 and still advertised it. See 660f10c7; JP_EXTENSION_PORT fixes it. -->
