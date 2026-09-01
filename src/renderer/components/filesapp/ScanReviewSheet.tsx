@@ -47,7 +47,7 @@ import {
   onIngestSettingsChanged,
 } from '../../filesIngestSettingsStore';
 import { MAX_STABILITY_MS } from '../../../shared/filesApp/stability';
-import type { FilesScanReport } from '../../../shared/filesApp/scan';
+import type { FilesScanReportWithArchives } from '../../../shared/filesApp/archive';
 import type { DropCandidate, DropTargetId } from '../../../shared/fileRouting';
 import { executeImport, undoImports, type ImportReceipt } from '../../fileImportExecute';
 import { announceFilesIndexChanged } from '../../filesIndexBus';
@@ -77,7 +77,11 @@ type SheetState =
   | { status: 'idle' }
   | { status: 'scanning' }
   | { status: 'error'; reasonKey: string }
-  | { status: 'report'; report: FilesScanReport; candidates: Map<string, DropCandidate[]> }
+  | {
+      status: 'report';
+      report: FilesScanReportWithArchives;
+      candidates: Map<string, DropCandidate[]>;
+    }
   | { status: 'importing'; done: number; total: number }
   | { status: 'imported'; outcomes: ImportOutcome[]; receipts: ImportReceipt[] }
   | { status: 'undone'; count: number };
@@ -609,6 +613,79 @@ export function ScanReviewSheet({ onClose, settings, onImported }: ScanReviewShe
                     </li>
                   ))}
                 </ul>
+              </section>
+            ) : null}
+
+            {/*
+              * Gate 28. Contents, never rows to import: a member's path is
+              * `pack.zip!/ep01.srt`, which no importer can open, so this section
+              * deliberately offers no control. It reports what is inside so a
+              * user can decide about the archive ITSELF with the facts in hand.
+              */}
+            {(state.report.archives ?? []).length > 0 ? (
+              <section className="fa-review-group fa-review-archives">
+                <h3>
+                  {t('filesApp.review.archivesHeading', {
+                    count: (state.report.archives ?? []).length,
+                  })}
+                </h3>
+                {(state.report.archives ?? []).map((finding) => (
+                  <div className="fa-review-archive" key={finding.path}>
+                    <p className="fa-review-archive-name" title={finding.path}>
+                      {finding.path.replace(/^.*[\\/]/, '')}
+                    </p>
+                    {finding.report.unreadable ? (
+                      <p className="fa-review-reason">{t('filesApp.scan.skip.archiveUnreadable')}</p>
+                    ) : (
+                      <>
+                        <p className="fa-review-reason">
+                          {t('filesApp.review.archiveSummary', {
+                            found: finding.report.found,
+                            placed: finding.report.placed,
+                            ambiguous: finding.report.ambiguous,
+                            skipped: finding.report.skipped,
+                          })}
+                        </p>
+                        {finding.report.dominantTarget ? (
+                          <p className="fa-review-reason">
+                            {t('filesApp.review.archiveDominant', {
+                              target: t(`fileDrop.target.${finding.report.dominantTarget}`),
+                            })}
+                          </p>
+                        ) : null}
+                        {finding.report.truncated ? (
+                          <p className="fa-review-note">{t('filesApp.review.archiveTruncated')}</p>
+                        ) : null}
+                        <ul>
+                          {finding.report.byDestination.map((row) => (
+                            <li key={row.target} className="fa-review-destination">
+                              <span>{t(row.labelKey)}</span>
+                              <span className="fa-review-destination-count">
+                                {t('filesApp.review.destinationCount', {
+                                  total: row.total,
+                                  placed: row.placed,
+                                  ambiguous: row.ambiguous,
+                                })}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        {finding.report.skips.length > 0 ? (
+                          <ul>
+                            {finding.report.skips.map((skip) => (
+                              <li className="fa-review-row" key={skip.path}>
+                                <span className="fa-review-name" title={skip.path}>
+                                  {skip.path.replace(/^.*[\\/]/, '')}
+                                </span>
+                                <span className="fa-review-reason">{t(skip.reasonKey)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                ))}
               </section>
             ) : null}
 

@@ -11626,6 +11626,10 @@ export const ru: Catalog = {
   'filesApp.scan.skip.incomplete': 'Ещё скачивается — пропущено до завершения.',
   'filesApp.scan.skip.unreadable': 'Не удалось прочитать.',
   'filesApp.scan.skip.limit': 'Сканирование достигло предела по числу файлов и остановилось здесь.',
+  'filesApp.scan.skip.nestedArchive':
+    'Архив внутри архива — показан в списке, но не открыт.',
+  'filesApp.scan.skip.archiveUnreadable':
+    'Этот архив не удалось открыть, поэтому его содержимое неизвестно.',
   'filesApp.scan.summary':
     'Найдено {found}: {placed} размещено, {ambiguous} требуют выбора, {unplaced} без места, {skipped} пропущено.',
   'filesApp.scan.truncated':
@@ -11737,6 +11741,12 @@ export const ru: Catalog = {
   'filesApp.review.reviewHeading': 'Ждёт вашего решения ({count})',
   'filesApp.review.refusedHeading': 'Некуда положить ({count})',
   'filesApp.review.skippedHeading': 'Не рассмотрено ({count})',
+  'filesApp.review.archivesHeading': 'Внутри архивов ({count})',
+  'filesApp.review.archiveSummary':
+    'Внутри {found}; {placed} определено, {ambiguous} требует выбора, {skipped} пропущено.',
+  'filesApp.review.archiveDominant': 'В основном — {target}.',
+  'filesApp.review.archiveTruncated':
+    'Перечислена только первая часть этого архива.',
   'filesApp.review.knownHeading': 'Уже добавлено ({count})',
   'filesApp.ingest.known.alreadyImported': 'Это у вас уже есть.',
   'filesApp.review.warned': {

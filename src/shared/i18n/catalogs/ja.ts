@@ -10746,6 +10746,10 @@ export const ja: Catalog = {
   'filesApp.scan.skip.incomplete': 'ダウンロード中のため、完了するまでスキップしました。',
   'filesApp.scan.skip.unreadable': '読み取れませんでした。',
   'filesApp.scan.skip.limit': 'スキャンがファイル数の上限に達し、ここで停止しました。',
+  'filesApp.scan.skip.nestedArchive':
+    'アーカイブ内のアーカイブです。一覧に載せるだけで、開いていません。',
+  'filesApp.scan.skip.archiveUnreadable':
+    'このアーカイブを開けなかったため、中身は不明です。',
   'filesApp.scan.summary':
     '{found} 件見つかりました。{placed} 件は振り分け済み、{ambiguous} 件は選択が必要、{unplaced} 件は行き先なし、{skipped} 件はスキップ。',
   'filesApp.scan.truncated':
@@ -10842,6 +10846,12 @@ export const ja: Catalog = {
   'filesApp.review.reviewHeading': '確認待ち ({count})',
   'filesApp.review.refusedHeading': '置き場所なし ({count})',
   'filesApp.review.skippedHeading': '未確認 ({count})',
+  'filesApp.review.archivesHeading': 'アーカイブの中身 ({count})',
+  'filesApp.review.archiveSummary':
+    '中に {found} 件。{placed} 件を振り分け、{ambiguous} 件は選択が必要、{skipped} 件をスキップしました。',
+  'filesApp.review.archiveDominant': 'ほとんどが{target}です。',
+  'filesApp.review.archiveTruncated':
+    'このアーカイブは先頭部分のみを一覧にしました。',
   'filesApp.review.knownHeading': '取り込み済み ({count})',
   'filesApp.ingest.known.alreadyImported': 'これはすでに取り込み済みです。',
   'filesApp.review.warned': {

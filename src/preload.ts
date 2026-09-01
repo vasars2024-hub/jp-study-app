@@ -10,7 +10,7 @@ import {
 import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
 import type { FilesMineSourceResult } from './shared/filesApp/mining';
-import type { FilesScanReport } from './shared/filesApp/scan';
+import type { FilesScanReportWithArchives } from './shared/filesApp/archive';
 import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
 import {
   FILES_CLEANUP_PLAN_CHANNEL,
@@ -1035,7 +1035,7 @@ const api = {
     roots: string[],
     /** Gate 31: the ingest settings document's stability window, in ms. */
     options?: { stabilityMs?: number },
-  ): Promise<FilesScanReport> => ipcRenderer.invoke('filesapp:scan', roots, options),
+  ): Promise<FilesScanReportWithArchives> => ipcRenderer.invoke('filesapp:scan', roots, options),
   /**
    * Gate 25: watch these folders and tell me when something lands. Replaces the
    * previous set wholesale and re-baselines, so nothing already present is

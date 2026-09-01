@@ -11209,6 +11209,9 @@ export const en: Catalog = {
   'filesApp.scan.skip.incomplete': 'Still downloading — skipped until it is finished.',
   'filesApp.scan.skip.unreadable': 'Could not be read.',
   'filesApp.scan.skip.limit': 'The scan reached its file limit and stopped here.',
+  'filesApp.scan.skip.nestedArchive': 'An archive inside an archive — listed, not opened.',
+  'filesApp.scan.skip.archiveUnreadable':
+    'This archive could not be opened, so its contents are unknown.',
   'filesApp.scan.summary':
     'Found {found}; {placed} placed, {ambiguous} need a choice, {unplaced} have no home, {skipped} skipped.',
   'filesApp.scan.truncated':
@@ -11314,6 +11317,11 @@ export const en: Catalog = {
   'filesApp.review.reviewHeading': 'Waiting for you ({count})',
   'filesApp.review.refusedHeading': 'Nowhere to put these ({count})',
   'filesApp.review.skippedHeading': 'Not looked at ({count})',
+  'filesApp.review.archivesHeading': 'Inside archives ({count})',
+  'filesApp.review.archiveSummary':
+    '{found} inside; {placed} placed, {ambiguous} need a choice, {skipped} skipped.',
+  'filesApp.review.archiveDominant': 'Mostly {target}.',
+  'filesApp.review.archiveTruncated': 'Only the first part of this archive was listed.',
   'filesApp.review.knownHeading': 'Already brought in ({count})',
   'filesApp.ingest.known.alreadyImported': 'You already have this one.',
   'filesApp.review.warned': {

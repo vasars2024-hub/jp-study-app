@@ -10651,6 +10651,8 @@ export const zh: Catalog = {
   'filesApp.scan.skip.incomplete': '正在下载——在完成之前已跳过。',
   'filesApp.scan.skip.unreadable': '无法读取。',
   'filesApp.scan.skip.limit': '扫描已达到文件数量上限，在此停止。',
+  'filesApp.scan.skip.nestedArchive': '压缩包中的压缩包——已列出，未打开。',
+  'filesApp.scan.skip.archiveUnreadable': '无法打开此压缩包，因此内容未知。',
   'filesApp.scan.summary':
     '共找到 {found} 个：{placed} 个已归类，{ambiguous} 个需要选择，{unplaced} 个无处可放，{skipped} 个已跳过。',
   'filesApp.scan.truncated': '扫描在文件数量上限处停止，因此可能还有更多。',
@@ -10743,6 +10745,11 @@ export const zh: Catalog = {
   'filesApp.review.reviewHeading': '等待你确认（{count}）',
   'filesApp.review.refusedHeading': '无处安放（{count}）',
   'filesApp.review.skippedHeading': '未查看（{count}）',
+  'filesApp.review.archivesHeading': '压缩包内容（{count}）',
+  'filesApp.review.archiveSummary':
+    '内含 {found} 项；{placed} 项已归位，{ambiguous} 项需要选择，{skipped} 项已跳过。',
+  'filesApp.review.archiveDominant': '大多为{target}。',
+  'filesApp.review.archiveTruncated': '仅列出了此压缩包的前一部分。',
   'filesApp.review.knownHeading': '已经导入（{count}）',
   'filesApp.ingest.known.alreadyImported': '这一项你已经有了。',
   'filesApp.review.warned': {

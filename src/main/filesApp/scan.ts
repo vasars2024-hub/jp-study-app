@@ -34,7 +34,6 @@ import {
   isIncompleteName,
   scanEntryFor,
   type FilesScanEntry,
-  type FilesScanReport,
   type FilesScanSkip,
 } from '../../shared/filesApp/scan';
 import {
@@ -44,6 +43,12 @@ import {
   stabilityVerdict,
   type StabilityVerdict,
 } from '../../shared/filesApp/stability';
+import {
+  shouldExpandArchive,
+  type FilesArchiveFinding,
+  type FilesScanReportWithArchives,
+} from '../../shared/filesApp/archive';
+import { expandArchive } from './archive';
 
 /**
  * How many files one scan will classify.
@@ -87,6 +92,18 @@ export interface FilesScanOptions {
    * order must not have a second source of "earlier" folded into them.
    */
   stabilityFromMtime?: boolean;
+  /**
+   * Gate 28. Open an archive the router could not settle and classify what the
+   * index lists. On by default — "paste a folder sorts all of it" is the gate,
+   * and an unopened `.zip` is a hole in the sort. Off is for the walk's own
+   * tests, which measure skip rules and limits and must not also pay for a
+   * `.zip` read per fixture.
+   */
+  expandArchives?: boolean;
+  /** How many members ONE archive may contribute. See `ARCHIVE_MEMBER_LIMIT`. */
+  archiveMemberLimit?: number;
+  /** Test seam, threaded to `expandArchive`. Never writes. */
+  readArchiveIndex?: (archivePath: string) => import('../../shared/filesApp/archive').ArchiveMember[];
 }
 
 /**
@@ -98,7 +115,7 @@ export interface FilesScanOptions {
 export function scanRoots(
   roots: readonly string[],
   options: FilesScanOptions = {},
-): FilesScanReport {
+): FilesScanReportWithArchives {
   const classify = options.classify ?? planForPath;
   const limit = options.fileLimit ?? SCAN_FILE_LIMIT;
   const recursive = options.recursive ?? true;
@@ -106,10 +123,12 @@ export function scanRoots(
   const stability = options.stability;
   const stabilityMs = options.stabilityMs ?? DEFAULT_STABILITY_MS;
   const fromMtime = options.stabilityFromMtime ?? false;
+  const expandArchives = options.expandArchives ?? true;
   const startedAt = now();
 
   const entries: FilesScanEntry[] = [];
   const skips: FilesScanSkip[] = [];
+  const archives: FilesArchiveFinding[] = [];
   let truncated = false;
 
   const usableRoots: string[] = [];
@@ -209,20 +228,35 @@ export function scanRoots(
         skips.push({ path: full, reasonKey: SCAN_SKIP_UNREADABLE });
         continue;
       }
-      entries.push(
-        scanEntryFor(
-          { path: full, name: entry.name, sizeBytes: plan.sizeBytes, sniffed: plan.sniffed },
-          plan.candidates,
-        ),
+      const scanned = scanEntryFor(
+        { path: full, name: entry.name, sizeBytes: plan.sizeBytes, sniffed: plan.sniffed },
+        plan.candidates,
       );
+      entries.push(scanned);
+
+      // Gate 28. AFTER the entry is pushed, so an archive whose index cannot be
+      // read still counts as one classified file — the archive itself was
+      // classified perfectly well, it is only its contents that are unknown.
+      if (expandArchives && shouldExpandArchive(scanned)) {
+        archives.push({
+          path: full,
+          report: expandArchive(full, {
+            memberLimit: options.archiveMemberLimit,
+            readIndex: options.readArchiveIndex,
+          }),
+        });
+      }
     }
   }
 
-  return buildScanReport({
-    roots: usableRoots,
-    entries,
-    skips,
-    truncated,
-    elapsedMs: Math.max(0, now() - startedAt),
-  });
+  return {
+    ...buildScanReport({
+      roots: usableRoots,
+      entries,
+      skips,
+      truncated,
+      elapsedMs: Math.max(0, now() - startedAt),
+    }),
+    archives,
+  };
 }

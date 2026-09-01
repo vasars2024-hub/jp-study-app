@@ -21,7 +21,7 @@ import { dictionaryDb } from '../dictionary/db';
 import { revealTargetFor, type FilesIndexSnapshot, type FilesLocation } from '../../shared/filesApp/catalog';
 import { normalizeIngestSettings } from '../../shared/filesApp/ingest';
 import type { FilesMineSourceResult } from '../../shared/filesApp/mining';
-import type { FilesScanReport } from '../../shared/filesApp/scan';
+import type { FilesScanReportWithArchives } from '../../shared/filesApp/archive';
 import { buildFilesIndex, type FilesEnumeratorContext, type FilesSqliteLike } from './enumerators';
 import { createFilesDeletionMainDependencies, registerFilesDeletionIpc } from './deletionIpc';
 import { createCleanupSoftDelete, registerFilesCleanupIpc } from './cleanupIpc';
@@ -177,7 +177,7 @@ export function registerFilesAppIpc(): void {
    * caller that passed a hundred would hold the main process for minutes with
    * no way to interrupt it.
    */
-  ipcMain.handle('filesapp:scan', (_e, roots: unknown, options: unknown): FilesScanReport => {
+  ipcMain.handle('filesapp:scan', (_e, roots: unknown, options: unknown): FilesScanReportWithArchives => {
     const list = Array.isArray(roots)
       ? roots.filter((r): r is string => typeof r === 'string' && r.length > 0).slice(0, 8)
       : [];
