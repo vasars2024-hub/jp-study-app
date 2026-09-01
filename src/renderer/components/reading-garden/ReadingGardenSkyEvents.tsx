@@ -292,8 +292,23 @@ export function MooncapSkyDevConsole() {
 
   if (!import.meta.env.DEV) return null;
 
+  // `lq-hit-scope` is L2's hit-area floor applied by container: the toggle rendered
+  // 62x22 and the four action buttons 146x29 against category 1's 32px pointer floor,
+  // and they arrive as a family. The expander is a centred transparent `::after`, so
+  // nothing in the console grows visually. No `overflow: hidden` in this chain.
   return (
-    <div className="reading-garden-sky-console" data-open={open ? "1" : "0"}>
+    // `data-dev-only` is the machine-readable half of the `import.meta.env.DEV`
+    // guard four lines up. The rubric harnesses walk the running DEV app, so
+    // without it they score a debug overlay that no packaged build renders — this
+    // console alone accounted for every remaining category-4 failure on City
+    // (2 clipped, 8 overlaps at 260x170). It is an attribute rather than a class
+    // list the harness knows about, so any other dev-only surface can opt in the
+    // same way, and every element excluded by it is reported by name in the run.
+    <div
+      className="reading-garden-sky-console lq-hit-scope"
+      data-dev-only="true"
+      data-open={open ? "1" : "0"}
+    >
       <button
         type="button"
         className="reading-garden-sky-console-toggle"

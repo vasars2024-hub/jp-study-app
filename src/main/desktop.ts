@@ -276,6 +276,13 @@ class DesktopStore {
   private switchTo: DesktopIndex | null = null;
   /** Display hosting the main window, so secondary claims can be told apart. */
   private mainDisplayKey: string | null = null;
+  /**
+   * Keys that answered the last `syncAssignments`, so a claim can be told from a
+   * memory of one. `null` until the display service has reported even once, and
+   * that case deliberately keeps the older, stricter behaviour: an unknown
+   * display set must not silently switch the guard off.
+   */
+  private presentKeyCache: { keys: Set<string>; bases: Set<string> } | null = null;
   /** Desktops torn off the taskbar into their own window, so they count as owned. */
   private spawned = new Set<DesktopIndex>();
 
@@ -501,11 +508,8 @@ class DesktopStore {
      */
     const presentKeys = new Set(present.map((d) => d.key));
     const presentBases = new Set(present.map((d) => d.key.split('#')[0]));
-    const isStaleKey = (key: string): boolean =>
-      key !== PRIMARY_DISPLAY_KEY &&
-      !isSimulatedDisplayKey(key) &&
-      !presentKeys.has(key) &&
-      !presentBases.has(key.split('#')[0]);
+    this.presentKeyCache = { keys: presentKeys, bases: presentBases };
+    const isStaleKey = (key: string): boolean => !this.isDisplayAttached(key);
 
     const unmatched = present.filter(
       (d) => !this.schema.assignments.some((a) => a.displayKey === d.key),
@@ -711,9 +715,46 @@ class DesktopStore {
    * treat the other's commit as a foreign edit — the B2 ping-pong. Ownership is
    * disjoint by construction, so it never arises.
    */
+  /**
+   * True when this key currently maps to a connected display.
+   *
+   * Same three tiers `resolveDisplayKey` uses — exact key, base key ignoring the
+   * `#n` positional suffix, then the primary alias — so "attached" here means
+   * exactly what "absent" means everywhere else in the module. Before the
+   * display service has reported once the cache is `null` and every key reads as
+   * attached, which keeps the pre-existing behaviour rather than opening the
+   * guard during startup.
+   */
+  private isDisplayAttached(key: string): boolean {
+    if (key === PRIMARY_DISPLAY_KEY || isSimulatedDisplayKey(key)) return true;
+    const cache = this.presentKeyCache;
+    if (!cache) return true;
+    return cache.keys.has(key) || cache.bases.has(key.split('#')[0]);
+  }
+
+  /**
+   * A desktop is claimed only by a secondary shell that CAN exist right now.
+   *
+   * An assignment deliberately outlives its monitor (`resolveDisplayKey`: "the
+   * user unplugged a monitor, they did not reset its configuration"), and
+   * `syncDesktopWindows` only ever builds windows for displays in
+   * `listDisplays()`. Without the presence test the two disagreed, and the
+   * disagreement was a one-way door: the guard reads only the TARGET, so the
+   * shell happily let the user LEAVE a desktop whose display had been unplugged
+   * and then refused every attempt to return, stranding that desktop's windows,
+   * icons, notes and widgets with no way back. Measured live 2026-08-31 on a
+   * single-monitor machine holding six assignment rows from earlier sessions:
+   * `display|1920x1080|1` still held desktop 0 `enabled`, no display answered
+   * it, no secondary window existed for it, and `switchDesktop(0)` returned
+   * `desktop-on-another-display` forever.
+   */
   private isDesktopClaimedBySecondary(index: DesktopIndex): boolean {
     return this.schema.assignments.some(
-      (a) => a.enabled && a.desktopIndex === index && a.displayKey !== this.mainDisplayKey,
+      (a) =>
+        a.enabled &&
+        a.desktopIndex === index &&
+        a.displayKey !== this.mainDisplayKey &&
+        this.isDisplayAttached(a.displayKey),
     );
   }
 

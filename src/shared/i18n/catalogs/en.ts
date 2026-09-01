@@ -1399,6 +1399,17 @@ export const en: Catalog = {
   'search.motionParticles.desc': 'Confetti density for badges and level-ups',
   'search.motionCompanionWeight': 'Companion physics weight',
   'search.motionCompanionWeight.desc': 'How heavy companions feel when they fall',
+  'search.aeroSafeMode': 'Secret OS safe mode',
+  'search.aeroSafeMode.desc': 'A quiet, minimal-effects Secret OS that changes no study data and keeps your saved settings.',
+  'settings.motion.safeMode.on': 'Safe mode: on',
+  'settings.motion.safeMode.off': 'Safe mode: off',
+  'settings.motion.safeMode.enable': 'Turn on safe mode',
+  'settings.motion.safeMode.disable': 'Return to normal mode',
+  'settings.motion.safeMode.hint': 'Stops animation, particles, weather, companions, ambient audio and system sounds while Secret OS is in use. Turning it off restores your previous settings; no data is deleted.',
+  'settings.motion.safeMode.healthHealthy': 'Settings health: no damaged Secret OS settings found.',
+  'settings.motion.safeMode.healthWarning': 'Settings health: {count} damaged Secret OS store(s) found. Safe mode is available; study data is untouched and the check changes nothing.',
+  'settings.motion.safeMode.healthUnavailable': 'The settings could not be checked: local storage is not readable.',
+  'settings.motion.safeMode.rescan': 'Check again',
   'settings.motion.mode.normal': 'Normal',
   'settings.motion.mode.performance': 'Performance',
   'settings.motion.mode.disabled': 'Disabled',
@@ -2448,7 +2459,8 @@ export const en: Catalog = {
   'palette.commandPlaceholder': 'Type a command…',
   'palette.toolboxPlaceholder': 'Search Toolbox commands',
   'palette.escHint': 'esc',
-  'palette.noMatches': 'No matches.',
+  'palette.noMatches': 'Nothing to show here. Press Esc to close the palette.',
+  'palette.noMatchesFor': 'Nothing matches “{query}”. Try a shorter word, or press Esc to close.',
   'palette.openApp': 'Open app',
   'palette.needsView': '{category} — needs its view open',
   'palette.addWidget': 'Add widget · {category}',
@@ -3831,6 +3843,7 @@ export const en: Catalog = {
   'desktop.task.minimize': 'Minimize',
   'desktop.task.restore': 'Restore',
   'desktop.clipboardHistory': 'Clipboard history (Ctrl+Shift+V)',
+  'desktop.tray.hiddenIcons': 'Show hidden icons',
   'desktop.desktopN': 'Desktop {n}',
   'desktop.dragToDesktop': 'Drag to desktop · click to open',
   'desktop.dragToMove': 'Drag to move on desktop · click to open',
@@ -4614,6 +4627,7 @@ export const en: Catalog = {
   'reading.action.dictionary': 'Look up',
   'reading.action.mine': 'Mine vocabulary',
   'reading.action.jitenVocabulary': 'Jiten vocabulary',
+  'reading.discovery.openPlanner': 'Open planner',
 
   // Library view (en)
   'library.intro': 'Your books and manga. Import files to start reading.',
@@ -6919,6 +6933,8 @@ export const en: Catalog = {
   // Notifications (bell + center)
   'notifications.title': 'Notifications',
   'notifications.title.dnd': 'Notifications (Do not disturb)',
+  'notifications.wired.unreadError': 'Unread error notifications are waiting.',
+  'notifications.wired.noUnreadError': 'No unread error notifications.',
   'notifications.dismiss': 'Dismiss',
   'notifications.quiet': 'Quiet',
   'notifications.markAllRead': 'Mark all read',
@@ -7451,6 +7467,30 @@ export const en: Catalog = {
   'wired.widget.battery.desc': 'Industrial charge and warning gauge.',
   'wired.widget.network.title': 'Node Link Monitor',
   'wired.widget.network.desc': 'Ping graph and packet status.',
+  'blanc.masterSearch.dialog': 'Search Blanc',
+  'blanc.masterSearch.scope.all': 'All',
+  'blanc.masterSearch.placeholder': 'Search tools, study material and the library',
+  'blanc.masterSearch.hints': 'Up/down to choose \u00b7 Enter to open \u00b7 Esc to close',
+  'blanc.masterSearch.empty': 'Nothing in Blanc matched.',
+  'blanc.masterSearch.group.tools': 'Tools',
+  'blanc.masterSearch.group.commands': 'Commands',
+  'blanc.masterSearch.group.appDrawer': 'App Drawer',
+  'blanc.masterSearch.group.settings': 'Settings',
+  'blanc.masterSearch.group.savedWords': 'Saved Words',
+  'blanc.masterSearch.group.deckCards': 'Deck Cards',
+  'blanc.masterSearch.group.dictionary': 'Dictionary Entries',
+  'blanc.masterSearch.group.grammar': 'Grammar',
+  'blanc.masterSearch.group.library': 'Library',
+  'blanc.masterSearch.source.deckCard': 'Deck card',
+  'blanc.masterSearch.source.dictionaryJa': 'Japanese dictionary',
+  'blanc.masterSearch.source.dictionaryZh': 'Chinese dictionary',
+  'blanc.masterSearch.source.grammarJa': 'Japanese grammar',
+  'blanc.masterSearch.source.grammarZh': 'Chinese grammar',
+  'blanc.masterSearch.source.library': 'Library',
+  'blanc.masterSearch.source.unfiled': 'Unfiled',
+  'blanc.masterSearch.source.book': 'Book',
+  'blanc.masterSearch.source.manga': 'Manga',
+  'blanc.masterSearch.source.lookupCount': '{count} lookups',
 
   // ---- Blanc Toolbox settings ----
   // Blanc → Local AI Agent panel. Converted in slice 52; the panel had never been
@@ -8300,6 +8340,7 @@ export const en: Catalog = {
   'mediaCenter.video.openStudy': 'Open Study Mode',
   'mediaCenter.video.learningControls': 'Learning controls',
   'mediaCenter.video.subtitleTranscription': 'Subtitle & transcription',
+  'mediaCenter.video.advancedTools': 'Transcription, watch folder and downloads',
   'mediaCenter.video.youtube': 'Open from YouTube',
   'mediaCenter.video.libraryQueue': 'Library queue',
   'mediaCenter.video.videoCount': '{count} videos',
@@ -11389,6 +11430,33 @@ export const en: Catalog = {
   'filesApp.system.agentMemory.deleted': 'Agent memory deleted.',
   'filesApp.system.agentMemory.cleared': 'Agent memory cleared.',
 
+  // Files app deletion: recovery semantics stay visibly distinct (gates 9/21).
+  'filesApp.delete.action': 'Delete',
+  'filesApp.delete.confirmAction': 'Confirm delete',
+  'filesApp.delete.cancel': 'Cancel',
+  'filesApp.delete.undo': 'Undo',
+  'filesApp.delete.confirmTrash':
+    'Send “{name}” to the Recycle Bin? You can restore the file from there.',
+  'filesApp.delete.confirmMediaTrash':
+    'Send irreplaceable media “{name}” to the Recycle Bin? This removes it from the app, but the file remains restorable from the Recycle Bin.',
+  'filesApp.delete.confirmSoft':
+    'Remove the record for “{name}” from Files? No file goes to the Recycle Bin, and Undo is available briefly.',
+  'filesApp.delete.refuseComputed':
+    'This is a calculated reading, not stored material, so there is nothing to delete.',
+  'filesApp.delete.refuseNotTrashable':
+    'This item is not a file the desktop process can send to the Recycle Bin. Refresh Files and try again.',
+  'filesApp.delete.invalidRequest': 'The delete request was not valid. Nothing was removed.',
+  'filesApp.delete.notFound': 'That item is no longer in Files. Nothing was removed.',
+  'filesApp.delete.confirmationRequired':
+    'This media needs its own explicit confirmation before it can be moved to the Recycle Bin.',
+  'filesApp.delete.confirmationMismatch':
+    'The selection changed while confirmation was open. Nothing was removed.',
+  'filesApp.delete.failed': 'The item could not be deleted. Nothing else was removed.',
+  'filesApp.delete.trashed': '“{name}” was moved to the Recycle Bin.',
+  'filesApp.delete.softDeleted': '“{name}” was removed from Files. Undo is available briefly.',
+  'filesApp.delete.undoRestored': 'The record was restored.',
+  'filesApp.delete.undoExpired': 'The Undo window has expired; the record remains removed.',
+  'filesApp.delete.undoFailed': 'The record could not be restored. It remains removed.',
 };
 
 

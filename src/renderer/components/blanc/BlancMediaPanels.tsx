@@ -15,6 +15,7 @@
  * `BlancFlashcardsPanel` is still a `BlancViewHost` embed — the remaining
  * Pillar 0 violation in this stream.
  */
+import { useEffect } from 'react';
 import { useT } from '../../i18n';
 import {
   MediaEmptyLibrary,
@@ -197,8 +198,21 @@ export function BlancMediaPanel() {
  * inside `.blanc-flashcards-embed`, which gives the review card and deck
  * explorer a bounded, scrolling frame (see `theme/blanc-media.css`).
  */
-export function BlancFlashcardsPanel() {
+export function BlancFlashcardsPanel({
+  searchRequest,
+}: {
+  searchRequest?: { query: string; key: number } | null;
+}) {
   const state = useFlashcards(true);
+  const { setFolderFilter, setMode, setOverviewTab, setSearch } = state;
+
+  useEffect(() => {
+    if (!searchRequest?.query) return;
+    setMode('overview');
+    setOverviewTab('epub');
+    setFolderFilter('all');
+    setSearch(searchRequest.query);
+  }, [searchRequest, setFolderFilter, setMode, setOverviewTab, setSearch]);
 
   let body: JSX.Element;
   if (state.mode === 'review') body = <FlashcardReviewMode state={state} />;

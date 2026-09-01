@@ -18,6 +18,7 @@ import React, { useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import BlancShell, { BlancLockscreen } from './components/blanc/BlancShell';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { withStrictMode } from './strictRoot';
 import ToastHost from './components/ToastHost';
 import GlobalDictionaryOverlay from './components/GlobalDictionaryOverlay';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
@@ -47,6 +48,7 @@ import './theme/tokens.css';
 // only, ~2 KB, and it cannot restyle anything on its own (`liquidTokens.test.ts`
 // pins that structurally).
 import './theme/liquid-tokens.css';
+import './theme/liquid-surfaces.css';
 // styles.css is NOT booted here: it is 468 KB of Study OS rules that only the
 // ported panels need, and they pull it lazily via theme/studyos-compat.css.
 // Blanc's own page baseline now lives in theme/blanc.css.
@@ -58,6 +60,9 @@ import './theme/blanc.css';
 // which still hold Study OS values in this window, so importing it alone would
 // have dressed Blanc in the Study OS material. This is the adapter that stops it.
 import './theme/blanc-liquid.css';
+import './theme/blanc-shell-liquid.css';
+// Native component accessibility repairs belong outside the token-only adapter.
+import './theme/blanc-shell-a11y.css';
 
 window.addEventListener('beforeunload', clearOnExitIfConfigured);
 
@@ -153,11 +158,11 @@ if (container) {
   // flashes English. English is already loaded — a microtask for most sessions.
   void initI18n().then(() => {
     createRoot(container).render(
-      <React.StrictMode>
+      withStrictMode(
         <AppErrorBoundary>
           <BlancRoot />
-        </AppErrorBoundary>
-      </React.StrictMode>,
+        </AppErrorBoundary>,
+      ),
     );
     applyZoom(loadZoom());
   });

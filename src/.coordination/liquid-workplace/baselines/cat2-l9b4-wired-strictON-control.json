@@ -1,0 +1,227 @@
+{
+  "label": "l9b4-wired-strictON-control",
+  "surface": "@.os-desktop-wired",
+  "win": "main",
+  "task": "click:.os-start-btn >> wait:500 >> click:.os-start-btn >> wait:400 >> click:.os-desktop-switch:not(.active) >> wait:800",
+  "presentation": "main-window section (no per-window presentation)",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 203,
+    "controlCount": 110,
+    "box": "1264x821",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 3,
+    "keystrokes": 0,
+    "total": 3
+  },
+  "latencyMs": {
+    "clickRecv": [
+      118.1,
+      49.9,
+      8.7
+    ],
+    "inputRecv": [],
+    "worstRecv": 118.1,
+    "overBar100": 1,
+    "n": 3,
+    "clickStampUnscored": [
+      147.5,
+      51.9,
+      16.7
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 147.5
+  },
+  "steps": [
+    {
+      "step": "click:.os-start-btn",
+      "target": {
+        "sel": ".os-start-btn",
+        "label": "NODE",
+        "disabled": false,
+        "at": "53,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.os-start-btn",
+      "target": {
+        "sel": ".os-start-btn",
+        "label": "NODE",
+        "disabled": false,
+        "at": "53,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "click:.os-desktop-switch:not(.active)",
+      "target": {
+        "sel": ".os-desktop-switch:not(.active)",
+        "label": "REMOTE FEED",
+        "disabled": false,
+        "at": "246,794"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": true,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:800",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.os-desktop-switch:not(.active)",
+    "steps": [
+      "click:.os-desktop-switch:not(.active)"
+    ],
+    "restored": true,
+    "baseHash": "1m9f3g1",
+    "afterHash": "1m9f3g1",
+    "liveRegionsBefore": [
+      "div.mc-video-empty|Video plays in the media workspace",
+      "div.mc-video-empty|Open the workspace to watch with subtitles, transcript and mining. It reports th",
+      "div.mc-video-empty|Open in the media workspace"
+    ],
+    "liveRegionsAfter": [
+      "div.mc-video-empty|Video plays in the media workspace",
+      "div.mc-video-empty|Open the workspace to watch with subtitles, transcript and mining. It reports th",
+      "div.mc-video-empty|Open in the media workspace"
+    ],
+    "textHashRoundTrip": {
+      "base": "1rtehrc",
+      "after": "1rtehrc"
+    }
+  },
+  "stepsDriven": 3,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "N/A-single-path",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": false,
+    "costParity": "N/A-single-path"
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "latency"
+  ],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ]
+}

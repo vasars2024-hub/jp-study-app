@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { LibraryItem } from '../../../shared/types';
+import type { CollectedToolsStore } from '../../../shared/collectedTools';
 import {
   BLANC_TABS,
   type BlancTabId,
@@ -19,6 +20,18 @@ import Icon, { type IconName } from '../Icons';
 import VirtualList from '../VirtualList';
 import FocusMusicBar from '../FocusMusicBar';
 import ClipboardHistoryPanel from '../ClipboardHistoryPanel';
+import BlancMasterSearch from './BlancMasterSearch';
+import {
+  BLANC_DICTIONARY_QUERY_EVENT,
+  BLANC_MASTER_SETTINGS,
+  appDrawerMasterContent,
+  blancMasterSourceLabels,
+  deckCardMasterContent,
+  dictionaryEntryMasterContent,
+  grammarPointMasterContent,
+  libraryItemMasterContent,
+  savedWordMasterContent,
+} from './blancMasterSources';
 import {
   loadBlancMode,
   loadBlancMemory,
@@ -80,6 +93,10 @@ import {
 } from '../../keyboardShortcuts';
 import { clearLockscreenPin, hasLockscreenPin, loadLockscreen, saveLockscreen, setLockscreenPin, verifyLockscreenPin } from '../../lockscreenSettings';
 import { getActiveProfile } from '../../profileState';
+import { loadSaved, type SavedWord } from '../../savedWords';
+import { loadLookupHistory, type LookupHistoryEntry } from '../../lookupHistory';
+import { setStudyLang } from '../../studyEnvironment';
+import type { NormalizedGrammarPoint } from '../../data/grammar';
 import {
   addDeckCards,
   loadDeck,
@@ -226,16 +243,58 @@ export default function BlancShell({
   initialBook: LibraryItem | null;
   onInitialBookConsumed: () => void;
 }) {
+  const { t, lang } = useT();
   const [settings, setSettings] = useState<BlancModeSettings>(() => loadBlancMode());
   const [memory, setMemory] = useState<BlancMemorySettings>(() => loadBlancMemory());
   const [workspaceFull, setWorkspaceFull] = useState(false);
   const [taskbarHidden, setTaskbarHidden] = useState(false);
+  const [compactToolsOpen, setCompactToolsOpen] = useState(false);
+  const deferredNavFrame = useRef<number | null>(null);
   const [tab, setTab] = useState<BlancTabId>(() => {
     const savedMemory = loadBlancMemory();
     return savedMemory.rememberLastTab ? loadBlancMode().lastTab : 'read';
   });
   const [book, setBook] = useState<LibraryItem | null>(initialBook);
+  const [masterSearchOpen, setMasterSearchOpen] = useState(false);
+  const [masterDrawer, setMasterDrawer] = useState<CollectedToolsStore>(() => ({
+    version: 1,
+    tools: [],
+    folders: [],
+  }));
+  const [masterSavedWords, setMasterSavedWords] = useState<SavedWord[]>([]);
+  const [masterDeckCards, setMasterDeckCards] = useState<DeckFlashcard[]>([]);
+  const [masterDictionaryEntries, setMasterDictionaryEntries] = useState<LookupHistoryEntry[]>([]);
+  const [masterGrammarPoints, setMasterGrammarPoints] = useState<NormalizedGrammarPoint[]>([]);
+  const [masterLibraryItems, setMasterLibraryItems] = useState<LibraryItem[]>([]);
+  const [masterDeckRequest, setMasterDeckRequest] = useState<{ query: string; key: number } | null>(null);
+  const [masterGrammarRequest, setMasterGrammarRequest] = useState<{ id: string; key: number } | null>(null);
   const clock = useMinuteClock();
+  const masterCommandShortcuts = useMemo(
+    () => new Map(getBindings().map((binding) => [binding.id, binding.keys])),
+    [masterSearchOpen],
+  );
+  const masterSourceLabels = useMemo(() => blancMasterSourceLabels(t), [lang, t]);
+  const masterContent = useMemo(
+    () => [
+      ...appDrawerMasterContent(masterDrawer.tools, masterDrawer.folders),
+      ...BLANC_MASTER_SETTINGS,
+      ...savedWordMasterContent(masterSavedWords),
+      ...deckCardMasterContent(masterDeckCards, masterSourceLabels),
+      ...dictionaryEntryMasterContent(masterDictionaryEntries, masterSourceLabels),
+      ...grammarPointMasterContent(masterGrammarPoints, masterSourceLabels),
+      ...libraryItemMasterContent(masterLibraryItems, masterSourceLabels),
+    ],
+    [
+      masterDeckCards,
+      masterDictionaryEntries,
+      masterDrawer.folders,
+      masterDrawer.tools,
+      masterGrammarPoints,
+      masterLibraryItems,
+      masterSavedWords,
+      masterSourceLabels,
+    ],
+  );
 
   useEffect(() => {
     // The renderer's index.html title ("日本語 Study") would otherwise override
@@ -244,6 +303,9 @@ export default function BlancShell({
   }, []);
   useEffect(() => onBlancModeChanged(setSettings), []);
   useEffect(() => onBlancMemoryChanged(setMemory), []);
+  useEffect(() => () => {
+    if (deferredNavFrame.current !== null) window.cancelAnimationFrame(deferredNavFrame.current);
+  }, []);
   useEffect(() => {
     void window.api.blancSetFullScreen(workspaceFull);
   }, [workspaceFull]);
@@ -258,6 +320,44 @@ export default function BlancShell({
     setBook(initialBook);
     onInitialBookConsumed();
   }, [initialBook, onInitialBookConsumed]);
+  useEffect(() => {
+    const onToolboxCommand = (event: Event): void => {
+      const command = (event as CustomEvent<string>).detail;
+      if (command === 'toolbox.search' || command === 'toolbox.commandPalette') {
+        setMasterSearchOpen(true);
+      }
+    };
+    window.addEventListener('toolbox:command', onToolboxCommand);
+    return () => window.removeEventListener('toolbox:command', onToolboxCommand);
+  }, []);
+  useEffect(() => {
+    if (!masterSearchOpen) return;
+    let current = true;
+    setMasterSavedWords(loadSaved());
+    setMasterDeckCards(loadDeck());
+    setMasterDictionaryEntries(loadLookupHistory());
+    setMasterGrammarPoints([]);
+    setMasterLibraryItems([]);
+    setMasterDrawer({ version: 1, tools: [], folders: [] });
+    void window.api.toolsList().then((store) => {
+      if (current) setMasterDrawer(store);
+    }).catch(() => {
+      if (current) setMasterDrawer({ version: 1, tools: [], folders: [] });
+    });
+    void window.api.listLibrary().then((items) => {
+      if (current) setMasterLibraryItems(items);
+    }).catch(() => {
+      if (current) setMasterLibraryItems([]);
+    });
+    void import('../../data/grammar').then(({ GRAMMAR }) => {
+      if (current) setMasterGrammarPoints(GRAMMAR);
+    }).catch(() => {
+      if (current) setMasterGrammarPoints([]);
+    });
+    return () => {
+      current = false;
+    };
+  }, [masterSearchOpen]);
   useEffect(() => {
     const onSelectTab = (event: Event): void => {
       const next = (event as CustomEvent<BlancTabId>).detail;
@@ -300,6 +400,24 @@ export default function BlancShell({
     if (memory.rememberLastTab) setSettings(setBlancLastTab(next));
   };
 
+  const chooseNavTab = (next: BlancTabId): void => {
+    if (deferredNavFrame.current !== null) {
+      window.cancelAnimationFrame(deferredNavFrame.current);
+      deferredNavFrame.current = null;
+    }
+    if (next !== 'settings') {
+      chooseTab(next);
+      return;
+    }
+    // Settings owns the shell's largest synchronous mount. Let the pressed nav control paint
+    // before beginning that work; deep links still use chooseTab directly so their next-frame
+    // focus and scroll contract is unchanged.
+    deferredNavFrame.current = window.requestAnimationFrame(() => {
+      deferredNavFrame.current = null;
+      chooseTab(next);
+    });
+  };
+
   const patchDark = (on: boolean): void => {
     setSettings(setBlancDarkMode(on));
   };
@@ -313,7 +431,11 @@ export default function BlancShell({
 
   return (
     <div className={`blanc-root${settings.darkMode ? ' is-dark' : ''}${workspaceFull ? ' is-workspace-full' : ''}${taskbarHidden ? ' is-taskbar-hidden' : ''}`}>
-      <aside className="blanc-taskbar" aria-label="Blanc Mode sections">
+      <aside
+        className="blanc-taskbar lq-liquid"
+        data-lq-role="liquid"
+        aria-label="Blanc Mode sections"
+      >
         <div className="blanc-brand">
           <span className="blanc-brand-mark" aria-hidden />
           <span>Blanc</span>
@@ -333,7 +455,7 @@ export default function BlancShell({
               key={id}
               type="button"
               className={`blanc-nav-btn${!book && tab === id ? ' active' : ''}`}
-              onClick={() => chooseTab(id)}
+              onClick={() => chooseNavTab(id)}
               title={TAB_META[id].label}
             >
               <Icon name={TAB_META[id].icon} size={16} />
@@ -351,7 +473,7 @@ export default function BlancShell({
       </aside>
 
       <main className="blanc-main">
-        <header className="blanc-top">
+        <header className="blanc-top lq-liquid" data-lq-role="liquid">
           <div className="blanc-title">
             {book && (
               <button type="button" className="blanc-small-btn" onClick={() => setBook(null)}>
@@ -360,8 +482,30 @@ export default function BlancShell({
             )}
             <span>{title}</span>
           </div>
-          <FocusMusicBar />
-          <div className="blanc-top-tools">
+          <button
+            type="button"
+            className="blanc-compact-tools-toggle"
+            aria-expanded={compactToolsOpen}
+            aria-controls="blanc-top-context"
+            onClick={() => setCompactToolsOpen((open) => !open)}
+          >
+            Context tools
+          </button>
+          <div
+            id="blanc-top-context"
+            className={`blanc-top-context${compactToolsOpen ? ' is-open' : ''}`}
+          >
+            <FocusMusicBar />
+            <div className="blanc-top-tools">
+            <button
+              type="button"
+              className="blanc-icon-btn"
+              title="Search Blanc (Ctrl+F)"
+              aria-label="Search Blanc"
+              onClick={() => setMasterSearchOpen(true)}
+            >
+              <Icon name="search" size={15} />
+            </button>
             {canExpandWorkspace && (
               <button
                 type="button"
@@ -392,6 +536,7 @@ export default function BlancShell({
             <time className="blanc-clock">
               {clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </time>
+            </div>
           </div>
         </header>
 
@@ -408,13 +553,13 @@ export default function BlancShell({
           ) : tab === 'deck' ? (
             <BlancDeckPanel advanced={settings.advanced} />
           ) : tab === 'flashcards' ? (
-            <BlancFlashcardsPanel />
+            <BlancFlashcardsPanel searchRequest={masterDeckRequest} />
           ) : tab === 'media' ? (
             <BlancMediaPanel />
           ) : tab === 'stats' ? (
             <BlancStatisticsPanel />
           ) : tab === 'tools' ? (
-            <BlancToolsPanel onOpenBook={setBook} />
+            <BlancToolsPanel onOpenBook={setBook} grammarRequest={masterGrammarRequest} />
           ) : tab === 'blocks' ? (
             <MonoBlocks />
           ) : (
@@ -445,6 +590,94 @@ export default function BlancShell({
           <Icon name="chevron" size={15} />
         </button>
       )}
+      <BlancMasterSearch
+        open={masterSearchOpen}
+        tools={BLANC_TOOLS}
+        content={masterContent}
+        commands={TOOLBOX_SHORTCUT_COMMANDS.map((command) => ({
+          ...command,
+          shortcut: masterCommandShortcuts.get(command.id) ?? command.defaultShortcut,
+        }))}
+        onClose={() => setMasterSearchOpen(false)}
+        onOpenTool={(id) => {
+          if (!BLANC_TOOL_IDS.includes(id as BlancToolId)) return;
+          setMasterSearchOpen(false);
+          setBook(null);
+          chooseTab('tools');
+          window.requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: id }));
+          });
+        }}
+        onRunCommand={(id) => {
+          setMasterSearchOpen(false);
+          runCommand(id);
+        }}
+        onOpenContent={(result) => {
+          setMasterSearchOpen(false);
+          if (result.kind === 'shortcut') {
+            const shortcut = masterDrawer.tools.find((item) => item.id === result.id);
+            if (!shortcut) return;
+            if (shortcut.kind === 'tool') {
+              window.requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent('toolbox:open-tool', { detail: shortcut.url }));
+              });
+              return;
+            }
+            void window.api.launchTarget(shortcut.url).then((failure) => {
+              if (failure) {
+                window.dispatchEvent(new CustomEvent('os:toast', {
+                  detail: { message: failure, kind: 'error' },
+                }));
+              }
+            });
+            return;
+          }
+          if (result.kind === 'setting') {
+            chooseTab('settings');
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                const section = document.querySelector<HTMLElement>(
+                  `[data-blanc-setting="${result.id}"]`,
+                );
+                section?.scrollIntoView({ block: 'start' });
+                section?.focus({ preventScroll: true });
+              });
+            });
+            return;
+          }
+          if (result.kind === 'library-item') {
+            const item = masterLibraryItems.find((candidate) => candidate.id === result.id);
+            if (item) setBook(item);
+            return;
+          }
+          if (result.kind === 'deck-card') {
+            const card = masterDeckCards.find((candidate) => candidate.id === result.id);
+            if (!card) return;
+            setMasterDeckRequest((previous) => ({ query: card.word || card.front || '', key: (previous?.key ?? 0) + 1 }));
+            chooseTab('flashcards');
+            return;
+          }
+          if (result.kind === 'grammar-point') {
+            setMasterGrammarRequest((previous) => ({ id: result.id, key: (previous?.key ?? 0) + 1 }));
+            chooseTab('tools');
+            window.requestAnimationFrame(() => {
+              window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: 'grammar' }));
+            });
+            return;
+          }
+          if (result.kind === 'dictionary-entry' && result.language) {
+            setStudyLang(result.language);
+          }
+          chooseTab('tools');
+          window.requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent('toolbox:select-tool', { detail: 'dictionary' }));
+            window.requestAnimationFrame(() => {
+              const query = result.kind === 'dictionary-entry' ? result.title : result.id;
+              window.dispatchEvent(new CustomEvent(BLANC_DICTIONARY_QUERY_EVENT, { detail: query }));
+            });
+          });
+        }}
+      />
       <ClipboardHistoryPanel />
     </div>
   );
@@ -1119,7 +1352,11 @@ function writeToolList(key: string, value: BlancToolId[]): void {
   }
 }
 
-function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => void): JSX.Element {
+function renderBlancTool(
+  tool: BlancToolId,
+  onOpenBook: (item: LibraryItem) => void,
+  grammarRequest: { id: string; key: number } | null,
+): JSX.Element {
   if (tool === 'coverage') return <ToolboxCoveragePanel />;
   if (tool === 'furigana') return <BlancFuriganaPanel />;
   if (tool === 'counter-reader') return <BlancCounterPanel />;
@@ -1150,7 +1387,7 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   if (tool === 'batch-converter') return <BatchConverterPanel />;
   if (tool === 'app-drawer') return <BlancAppDrawerPanel />;
   if (tool === 'dictionary') return <BlancDictionaryPanel />;
-  if (tool === 'grammar') return <BlancGrammarPanel />;
+  if (tool === 'grammar') return <BlancGrammarPanel focusRequest={grammarRequest} />;
   if (tool === 'reading-finder') return <BlancReadingFinderPanel onOpenBook={onOpenBook} />;
   if (tool === 'resources') return <BlancResourcesPanel />;
   if (tool === 'notification-center') return <NotificationCenterPanel />;
@@ -1164,7 +1401,13 @@ function renderBlancTool(tool: BlancToolId, onOpenBook: (item: LibraryItem) => v
   return <BlancCalendarPanel />;
 }
 
-function BlancToolsPanel({ onOpenBook }: { onOpenBook: (item: LibraryItem) => void }) {
+function BlancToolsPanel({
+  onOpenBook,
+  grammarRequest,
+}: {
+  onOpenBook: (item: LibraryItem) => void;
+  grammarRequest: { id: string; key: number } | null;
+}) {
   const [toolboxSettings, setToolboxSettings] = useState<ToolboxSettings>(() => loadToolboxSettings());
   const [query, setQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(() => loadToolboxSettings().sidebarExpanded);
@@ -2440,11 +2683,15 @@ function AutomationBuilderPanel() {
           Existing Windows automation builder detected as a PowerShell side tool. It records cursor movement, clicks, keys, waits, and session configs without adding AI to Blanc.
         </p>
         <div className="blanc-command-row">
-          <input readOnly value={AUTOMATION_BUILDER.directLaunchCommand} aria-label="Automation Builder launch command" />
+          <input
+            readOnly
+            value={command ?? 'automation-builder.ps1 was not found in this install.'}
+            aria-label="Automation Builder launch command"
+          />
           <button type="button" onClick={() => void launchBuilder()}>
             Launch
           </button>
-          <button type="button" onClick={() => void copyCommand()}>
+          <button type="button" onClick={() => void copyCommand()} disabled={!command}>
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
@@ -2661,7 +2908,7 @@ function BlancSettingsPanel({
 
   return (
     <div className="blanc-panel blanc-settings-panel">
-      <fieldset>
+      <fieldset data-blanc-setting="interface" tabIndex={-1}>
         <legend>{t('blanc.settings.interface')}</legend>
         <LanguageSelect />
         <label className="blanc-check">
@@ -2682,13 +2929,13 @@ function BlancSettingsPanel({
         </label>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="models" tabIndex={-1}>
         <legend>{t('blanc.settings.models')}</legend>
         <p className="blanc-note">{t('blanc.settings.modelsDesc')}</p>
         <BlancModelsPanel />
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="memory" tabIndex={-1}>
         <legend>{t('blanc.settings.memory')}</legend>
         <p className="blanc-warning">
           {t('blanc.settings.memoryWarning')}
@@ -2733,7 +2980,7 @@ function BlancSettingsPanel({
         </button>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="lockscreen" tabIndex={-1}>
         <legend>{t('blanc.settings.lockscreen')}</legend>
         <div className="blanc-folder-row">
           <input
@@ -2766,7 +3013,7 @@ function BlancSettingsPanel({
         {pinMsg && <p className="blanc-note">{pinMsg}</p>}
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="control-center" tabIndex={-1}>
         <legend>{t('blanc.settings.controlCenter')}</legend>
         <div className="blanc-settings-toolbar">
           <input
@@ -2947,7 +3194,7 @@ function BlancSettingsPanel({
         </details>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="theme" tabIndex={-1}>
         <legend>Theme</legend>
         <div className="blanc-segmented">
           {BLANC_THEME_PRESETS.map((preset) => (
@@ -3062,7 +3309,7 @@ function BlancSettingsPanel({
         </p>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="custom-css" tabIndex={-1}>
         <legend>{t('blanc.settings.customCss.legend')}</legend>
         <p className="blanc-note">{t('blanc.settings.customCss.intro')}</p>
         <textarea
@@ -3103,7 +3350,7 @@ function BlancSettingsPanel({
         <p className="blanc-note">{t('blanc.settings.customCss.guardNote')}</p>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="launcher-order" tabIndex={-1}>
         <legend>Launcher order</legend>
         <p className="blanc-note">
           The order tools appear in the launcher. Only enabled tools are listed; search results are
@@ -3183,7 +3430,7 @@ function BlancSettingsPanel({
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset data-blanc-setting="tool-visibility" tabIndex={-1}>
         <legend>{t('blanc.settings.toolVisibility')}</legend>
         <div className="blanc-tool-management">
           {listBlancToolboxModules().map((module) => (
@@ -3220,7 +3467,7 @@ function BlancSettingsPanel({
 
       <ToolboxShortcutSettingsPanel />
 
-      <fieldset>
+      <fieldset data-blanc-setting="mode" tabIndex={-1}>
         <legend>{t('blanc.settings.mode')}</legend>
         <p className="blanc-note">{t('blanc.settings.modeNote')}</p>
         <button type="button" onClick={() => void setBlancModeEnabled(false)}>
@@ -3308,7 +3555,7 @@ function ToolboxShortcutSettingsPanel() {
   });
 
   return (
-    <fieldset>
+    <fieldset data-blanc-setting="shortcuts" tabIndex={-1}>
       <legend>{t('blanc.shortcuts.title')}</legend>
       <p className={validation.ok ? 'blanc-note' : 'blanc-warning'}>
         {t('blanc.shortcuts.registry', {

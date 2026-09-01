@@ -964,6 +964,14 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'System',
   },
   {
+    id: 'aero-safe-mode',
+    titleKey: 'search.aeroSafeMode',
+    descKey: 'search.aeroSafeMode.desc',
+    keywords: ['secret os', 'aero', 'safe mode', 'recovery', 'sensory', 'audio', 'particles'],
+    pageId: 'motion',
+    group: 'System',
+  },
+  {
     id: 'motion-mode',
     titleKey: 'search.motionMode',
     descKey: 'search.motionMode.desc',

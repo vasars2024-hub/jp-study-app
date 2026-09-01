@@ -7,7 +7,7 @@
  * is the reason the old `height: 60vh; max-height: 640px` grid box is gone.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import VirtualGrid from '../../VirtualGrid';
 import { Button, Select } from '../../ui';
 import Icon from '../../Icons';
@@ -16,6 +16,7 @@ import MediaPosterCard, {
   CARD_METRICS,
   LIST_ROW_HEIGHT,
   cardRowHeight,
+  type MediaCardLayout,
   type MediaCardVariant,
 } from './MediaPosterCard';
 import MediaSpotlightCard from './MediaSpotlightCard';
@@ -91,6 +92,71 @@ function useDismissableDisclosure(ref: React.RefObject<HTMLDetailsElement | null
     };
   }, [open, ref]);
 }
+
+/**
+ * One grid cell, memoized.
+ *
+ * Measured 2026-08-31 on the Video window: typing into the Media Center's global search cost
+ * ~30 ms per keystroke with the library populated against ~17-19 ms with zero cards, and the
+ * worst keystroke of a four-character burst landed at 110.6 ms against the rubric's 100 ms bar.
+ * The FILTER was already debounced (`useDebouncedValue(query, 80)`), but `query` lives in
+ * `useMedia`, so every keystroke still re-rendered the whole Media Center down through this
+ * grid — 26 DOM mutations and zero long tasks, which is React reconciling a large tree rather
+ * than layout or paint.
+ *
+ * `React.memo` on its own changes nothing here, because the card's props were all built inline
+ * in `renderItem`: two arrow callbacks, a joined subtitle string and a `status` object literal,
+ * every one of them a fresh identity per render. So the derivations move INSIDE the memo
+ * boundary and the component takes only stable inputs — the entry object (already a `useMemo`
+ * product upstream), two ids, and the two `useCallback` handlers the shell already owns.
+ */
+const LibraryEntryCard = memo(function LibraryEntryCard({
+  entry,
+  variant,
+  layout,
+  selectedId,
+  currentId,
+  onActivate,
+  onMenu,
+}: {
+  entry: LibraryEntry;
+  variant: MediaCardVariant;
+  layout: MediaCardLayout;
+  selectedId: string | null;
+  currentId: string | null;
+  onActivate: (entry: LibraryEntry) => void;
+  onMenu: (entry: LibraryEntry, anchor: HTMLElement) => void;
+}) {
+  const { t } = useT();
+  return (
+    <MediaPosterCard
+      variant={variant}
+      layout={layout}
+      artworkId={entry.artworkItem.id}
+      title={entry.title}
+      subtitle={[
+        t(`media.category.${entry.category}`),
+        entry.year ? String(entry.year) : null,
+      ].filter(Boolean).join(' · ')}
+      badge={entry.grouping !== 'none'
+        ? `${entry.watchedCount} / ${entry.episodeCount}`
+        : undefined}
+      durationSec={entry.grouping === 'none' ? entry.primary.durationSec : undefined}
+      progress={entry.progress}
+      status={mediaSubtitleStatus({
+        languages: entry.subtitleLanguages,
+        hasJapanese: entry.hasJapaneseSubtitles,
+        // `idle` means a search actually ran and found nothing, which
+        // is a different statement from having never looked.
+        search: entry.subtitlesChecked ? 'idle' : undefined,
+        metadataNeedsReview: entry.metadataNeedsReview,
+      })}
+      active={entry.id === selectedId || entry.items.some((i) => i.id === currentId)}
+      onOpen={() => onActivate(entry)}
+      onMenu={(anchor) => onMenu(entry, anchor)}
+    />
+  );
+});
 
 export default function MediaLibraryBrowser({
   title,
@@ -296,31 +362,14 @@ export default function MediaLibraryBrowser({
             rowHeight={view === 'list' ? LIST_ROW_HEIGHT : cardRowHeight(variant, GRID_GAP)}
             getKey={(entry) => entry.id}
             renderItem={(entry) => (
-              <MediaPosterCard
+              <LibraryEntryCard
+                entry={entry}
                 variant={variant}
                 layout={view === 'list' ? 'row' : 'card'}
-                artworkId={entry.artworkItem.id}
-                title={entry.title}
-                subtitle={[
-                  t(`media.category.${entry.category}`),
-                  entry.year ? String(entry.year) : null,
-                ].filter(Boolean).join(' · ')}
-                badge={entry.grouping !== 'none'
-                  ? `${entry.watchedCount} / ${entry.episodeCount}`
-                  : undefined}
-                durationSec={entry.grouping === 'none' ? entry.primary.durationSec : undefined}
-                progress={entry.progress}
-                status={mediaSubtitleStatus({
-                  languages: entry.subtitleLanguages,
-                  hasJapanese: entry.hasJapaneseSubtitles,
-                  // `idle` means a search actually ran and found nothing, which
-                  // is a different statement from having never looked.
-                  search: entry.subtitlesChecked ? 'idle' : undefined,
-                  metadataNeedsReview: entry.metadataNeedsReview,
-                })}
-                active={entry.id === selectedId || entry.items.some((i) => i.id === currentId)}
-                onOpen={() => onActivate(entry)}
-                onMenu={(anchor) => onMenu(entry, anchor)}
+                selectedId={selectedId}
+                currentId={currentId}
+                onActivate={onActivate}
+                onMenu={onMenu}
               />
             )}
           />

@@ -328,6 +328,7 @@ const SNAP = (surface, churn = CHURN) => `(function(){
 
   // Correction 5's four exclusions. Each of them scored a real affordance as a defect once.
   var scrollTraps = [];
+  var decorativeClips = [];
   for (var k = 0; k < all.length; k++) {
     var el = all[k];
     var over = el.scrollHeight - el.clientHeight;
@@ -349,6 +350,41 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     if (clamped && disclosure) continue;
     var media = [].slice.call(el.children).filter(function(c2){ return c2.tagName === 'IMG' || c2.tagName === 'VIDEO'; });
     if (media.length > 0 && media.every(function(m){ return getComputedStyle(m).objectFit === 'cover'; })) continue;
+
+    // FIFTH EXCLUSION, and like the other four it exists because a real affordance scored as a
+    // defect. City's main.reading-garden reports 127px unreachable, and every element that
+    // crosses its clip line is an out-of-flow parallax PLATE - world-back, the background
+    // master IMG, the sky-events and life canvases, the foreground mask. They are deliberately
+    // taller than the window because the camera pans them; there is no content down there to
+    // reach. Clipping paint is not a scroll trap.
+    // The test is deliberately two-part so the real case survives: EVERY overflowing descendant
+    // must be OUT OF FLOW (absolute/fixed) *and* carry no interactive descendant. The control's
+    // own plant is an in-flow div and still counts; a clipped list, panel or log is in flow and
+    // still counts; a clipped absolutely-positioned menu carries buttons and still counts.
+    // Excluded rows are REPORTED, never silently dropped.
+    var clipBottom = br.top + el.clientHeight;
+    var kids = el.querySelectorAll('*');
+    var plateOnly = false;
+    for (var q = 0; q < kids.length; q++) {
+      var kb = kids[q].getBoundingClientRect();
+      if (kb.height <= 0 || kb.bottom <= clipBottom + 1) continue;
+      var kcs = getComputedStyle(kids[q]);
+      if (kcs.position !== 'absolute' && kcs.position !== 'fixed') { plateOnly = false; break; }
+      plateOnly = true;
+    }
+    // The second half, and it is asked SEPARATELY on purpose. Asking "does this overflowing
+    // element contain a control" is the wrong question: world-front is a full-height plate that
+    // crosses the clip line and also holds the mushroom hitbox, which sits in the MIDDLE of the
+    // visible scene. The question that matters is whether anything a user could act on has been
+    // stranded past the fold, so it is asked of the control's own top edge.
+    if (plateOnly) {
+      var acts = el.querySelectorAll('button,a[href],input,select,textarea,[tabindex],[role="button"]');
+      for (var q2 = 0; q2 < acts.length; q2++) {
+        if (acts[q2].getBoundingClientRect().top >= clipBottom - 1) { plateOnly = false; break; }
+      }
+    }
+    if (plateOnly) { decorativeClips.push({ sel: name(el), unreachablePx: Math.round(over), why: 'out-of-flow plates, no control past the fold' }); continue; }
+
     scrollTraps.push({ sel: name(el), overflowY: cs.overflowY, unreachablePx: Math.round(over) });
   }
 
@@ -373,6 +409,7 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     dialogs: dialogs,
     dialogHash: hash(dialogs.map(function(x){ return x.sel + x.txt; }).join('\\u0001')),
     scrollTraps: scrollTraps,
+    decorativeClips: decorativeClips,
     scrollHash: hash(scrollAcc.join('\\u0001')),
     focus: ae ? name(ae) + '#' + (ae.id || '') : null,
     box: Math.round(WR.width) + 'x' + Math.round(WR.height),
@@ -513,7 +550,12 @@ const CONTROL_INJECT = (surface) => `(function(){
   host.setAttribute('data-lqcat2-control', '1');
   // Pinned inside the root's own box on top of everything: appended in flow it can land below the
   // fold of a scrolling surface, where elementFromPoint refuses and the control never runs at all.
-  host.style.cssText = 'position:absolute;left:8px;bottom:8px;z-index:99999;padding:6px;background:#111';
+  // pointer-events:auto is load-bearing, not decoration: a surface whose ROOT is
+  // pointer-events:none (City's main.reading-garden is, so the frameless drag strip keeps
+  // its band) makes every appended child inherit none. The plant would then be unreachable,
+  // and an unreachable button "changes nothing when clicked" - so the dead-end bar would
+  // move for the wrong reason and the control would read as fired.
+  host.style.cssText = 'position:absolute;left:8px;bottom:8px;z-index:99999;padding:6px;background:#111;pointer-events:auto';
   var b = document.createElement('button');
   b.setAttribute('data-lqcat2-deadend', '1');
   b.textContent = 'Control dead end';
@@ -885,6 +927,7 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     steps: task.steps,
     deadEnds: task.steps.filter((s) => s.deadEnd),
     scrollTraps: end.scrollTraps,
+    decorativeClips: end.decorativeClips || [],
     openDialogs: end.dialogs,
     modalTraps: modal.traps,
     dialogsClosedByEscape: modal.closedByEscape,
@@ -923,12 +966,25 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   let costParity = 'UNMEASURED';
   let compare = null;
   let presentationLeg = null;
+  let singlePathEvidence = null;
   if (COMPARE) {
     compare = await measure(COMPARE, TASK);
     if (compare.refuse) { console.error(`VOID - compare surface: ${compare.refuse}`); process.exit(3); }
     costParity = (m.cost.clicks + m.cost.keystrokes) <= (compare.cost.clicks + compare.cost.keystrokes);
   } else if (m.presentation === null) {
     costParity = 'N/A-single-path';
+  } else if (!BOTH) {
+    // A floating window whose section REFUSES Liquid has one path, and the parity term has no
+    // second operand. Read factually from the window's own chrome rather than asserted: City's
+    // `.fwin-frameless` has no `button.fwin-b-liquid` at all, so `PRESENT_READ` returns
+    // `pressed: null` — the affordance is ABSENT, not disabled. Recorded as the same
+    // `N/A-single-path` the root-surface case uses, with the evidence beside it, so it is a
+    // measurement of the product and not a way to skip a bar.
+    const soloRead = JSON.parse(await ev(PRESENT_READ(SURFACE)));
+    if (soloRead.pressed === null && !soloRead.refuse) {
+      costParity = 'N/A-single-path';
+      singlePathEvidence = { liquidToggle: 'absent - no button.fwin-b-liquid in this window', read: soloRead };
+    }
   } else if (BOTH && TASK) {
     // Correction 12: same window, same geometry, same task, both presentations.
     const was = JSON.parse(await ev(PRESENT_READ(SURFACE)));
@@ -980,11 +1036,25 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   const failed = Object.entries(bars).filter(([, v]) => v === false).map(([k]) => k);
   const pass = failed.length === 0 && unmeasured.length === 0;
 
+  // Correction 31: React StrictMode double-invokes every render IN DEVELOPMENT ONLY, and this
+  // harness only ever drives a dev build. That tax is a developer's, never a user's. Measured
+  // 2026-08-31 on the Wired Start menu - same task, same open tree, same ~12 ms inert floor:
+  // worstRecv 118.1 ms with StrictMode on and 52.3 ms with it off, against a 100 ms bar. Same
+  // class of error as correction 2 (billing the app for the main->renderer hop), and fixed the
+  // same way: the scored run is taken with the dev doubling off, the on-number is recorded
+  // beside it, and every artifact says which it was. `src/renderer/strictRoot.tsx` reads the
+  // flag and production ignores it. The opt-out is for TIMING ONLY - with StrictMode off,
+  // effects mount once, so categories 6 and 8 must be measured with it ON.
+  const strictOff = (await ev("String(localStorage.getItem('jp-lq-strict'))")) === 'off';
+
   const out = {
     label: LABEL,
     surface: SURFACE,
     win: WIN || '(focused)',
     task: TASK || '(none)',
+    strictMode: strictOff
+      ? 'off - dev double-render removed; latency scores the cost a shipped user pays'
+      : 'on - latency carries the dev double-render tax; see correction 31',
     presentation: m.presentation === null ? 'main-window section (no per-window presentation)' : m.presentation,
     raised: m.raised,
     base: m.base,
@@ -1009,13 +1079,14 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     deadEnds: m.deadEnds,
     scrollTrapCount: m.scrollTraps.length,
     scrollTraps: m.scrollTraps.slice(0, 8),
+    decorativeClips: (m.decorativeClips || []).slice(0, 8),
     openDialogs: m.openDialogs,
     modalTrapCount: m.modalTraps.length,
     modalTraps: m.modalTraps,
     dialogsClosedByEscape: m.dialogsClosedByEscape,
     costParity: COMPARE
       ? { compare: COMPARE, thisTotal: m.cost.clicks + m.cost.keystrokes, comparePresentation: compare.presentation, compareTotal: compare.cost.clicks + compare.cost.keystrokes }
-      : (presentationLeg || costParity),
+      : (presentationLeg || singlePathEvidence || costParity),
     bars,
     verdict: pass
       ? 'PASS 10/10'

@@ -87,12 +87,23 @@
 }
 
 /* Taskbar machine rail ---------------------------------------------------- */
+/* The backstop layer is `--lq-liquid-bg`, not a flat `#020b12`, and the reason is
+   honesty rather than uniformity. `components/shell/shell.css` gives `.os-taskbar`
+   a blur-backed material because §2.3 makes transport chrome what Liquid is FOR;
+   this rule outranks it (0,3,0 against 0,2,0), so a flat fill here
+   won every tie and left the bar declaring `backdrop-filter: blur(6px)` over an
+   opaque background — measured 2026-08-31: `rgb(2,11,18)` alpha 1, a blur that
+   cannot be seen, which category 3 was nonetheless crediting as Liquid treatment.
+   The identity is the cyan wash and the 18px scan grid, both kept above; only the
+   backstop yields, to the token Wired itself remaps
+   (`color-mix(in srgb, #06121a 72%, transparent)`). Every degradation tier zeroes
+   that token to an opaque value, so the rail returns to solid on its own. */
 :root[data-materials='wired'] .os-taskbar {
   height: var(--taskbar-h);
   background:
     linear-gradient(180deg, rgba(109, 241, 255, 0.12), rgba(0, 0, 0, 0)),
     repeating-linear-gradient(90deg, rgba(109, 241, 255, 0.08) 0 1px, transparent 1px 18px),
-    #020b12;
+    var(--lq-liquid-bg, #020b12);
   border-top: 1px solid rgba(109, 241, 255, 0.36);
   box-shadow: 0 -12px 34px rgba(0, 0, 0, 0.46), 0 0 24px rgba(109, 241, 255, 0.13) inset;
 }
@@ -125,6 +136,19 @@
 :root[data-materials='wired'] .os-task-win.min {
   opacity: 0.62;
   background: rgba(3, 12, 18, 0.86);
+}
+
+/* The close affordance belongs to the button, so it takes the button's own ink.
+   `styles.css` gives `.os-task-win .os-task-close` a flat `var(--muted)` at 0,2,0,
+   which outranks the inherited colour the two rules above set — so on the ACTIVE
+   button the label is #e9feff while the one control that destroys the window stayed
+   #77a8b2, measured at 3.47:1 against a 4.5 bar (cat5 Q5, 2026-08-31). Inheriting
+   hands it the label's own already-passing ratio in both revealed states rather than
+   inventing a third cyan nobody scored. `:not(:hover)` keeps the shared destructive
+   hover (red plate, white glyph) exactly as it is — both rules are 0,3,0, so without
+   it source order would decide which one wins. */
+:root[data-materials='wired'] .os-task-win .os-task-close:not(:hover) {
+  color: inherit;
 }
 
 :root[data-materials='wired'] .os-clock {
@@ -405,8 +429,8 @@
   z-index: 2;
 }
 
-:root[data-wired-crt='clean'] .fwin::before,
-:root[data-wired-static='reduced'] .fwin::before {
+:root[data-materials='wired'][data-wired-crt='clean'] .fwin::before,
+:root[data-materials='wired'][data-wired-static='reduced'] .fwin::before {
   opacity: 0.18;
 }
 
@@ -2326,13 +2350,13 @@
 /* Idle loops are opt-out: `data-wired-idle='off'` is the user's setting, and
    the OS-level reduced-motion preference overrides everything. Both must stop
    the ambient layers without hiding the instruments that carry real data. */
-:root[data-wired-idle='off'] .wired-found-matrix,
-:root[data-wired-idle='off'] .wired-found-particles {
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-matrix,
+:root[data-materials='wired'][data-wired-idle='off'] .wired-found-particles {
   display: none;
 }
-:root[data-wired-motion='off'] .wired-found-ticker-track,
-:root[data-wired-motion='off'] .wired-found-radar-sweep,
-:root[data-wired-motion='off'] .wired-found-map-sweep {
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-ticker-track,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-radar-sweep,
+:root[data-materials='wired'][data-wired-motion='off'] .wired-found-map-sweep {
   animation: none;
 }
 

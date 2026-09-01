@@ -372,9 +372,9 @@
   }
 }
 
-:root[data-wired-idle='off'] .wgt-clock-time::after,
-:root[data-wired-idle='off'] .wgt-analog-face,
-:root[data-wired-idle='off'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
-:root[data-wired-idle='off'] .wgt-sys-dot {
+:root[data-materials='wired'][data-wired-idle='off'] .wgt-clock-time::after,
+:root[data-materials='wired'][data-wired-idle='off'] .wgt-analog-face,
+:root[data-materials='wired'][data-wired-idle='off'] .wgt-heatmap-grid .wgt-heat-cell:nth-child(23n + 7),
+:root[data-materials='wired'][data-wired-idle='off'] .wgt-sys-dot {
   animation: none;
 }

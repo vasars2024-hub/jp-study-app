@@ -111,6 +111,14 @@
       "status": "accepted",
       "note": "The EN→JA fusion plan's F7 ship gate. Its real consumer is tools/fusion-eval.cjs, which esbuild-bundles this file at run time by path — the same kind of runtime reference the static import graph cannot follow as importWorker.ts, and the same pattern tools/grammar-audit.cjs and tools/i18n-check.cjs already use. It is deliberately not imported by the app: the harness scores the pipeline from outside it, needs real media and the Whisper runtime, and must not become something product code can call. If tools/fusion-eval.cjs is ever deleted, this becomes a genuine orphan and should be deleted with it."
     },
+    "test-only-module:src/renderer/components/filesapp/FilesDeletionControls.tsx": {
+      "status": "pending",
+      "note": "Files gates 9/21/30 deletion session: policy, exact soft-delete overlay and tests are built on feat/nyaa-subtitles while the FilesApp consumer is still isolated on wt/files-app. It deliberately sends only an item id across IPC and stays pending until mergeback connects the inspector action and main re-resolves that id from its authoritative index. Remove this entry at that connection; accepting it would hide an unfinished delete path."
+    },
+    "test-only-module:src/main/filesApp/deletionIpc.ts": {
+      "status": "pending",
+      "note": "Files gates 9/21 main delete boundary: it re-resolves the renderer's item id from the authoritative index, repeats the media confirmation and is covered by adverse IPC tests. The index IPC and its registration currently live only on wt/files-app, so this stays pending until mergeback supplies the lookup and registerFilesAppIpc calls registerFilesDeletionIpc. Remove this entry then; shell.trashItem must never be wired without that lookup."
+    },
     "test-only-module:src/renderer/components/liquid/LiquidDock.tsx": {
       "status": "pending",
       "note": "Same L2 boundary the LiquidAppScaffold.tsx entry used to describe — that entry is now DELETED, because the Files app (renderer/components/filesapp/FilesApp.tsx) is a real product surface built on the spine, which is exactly the condition its note said would close it. The dock is the compact-width home for the rail's routes, which the scaffold drops below its `medium` breakpoint; it and AdaptiveRail/ContextToolbar (reachable through it) complete §5.2's primitive list. The Files app fills the rail from the scaffold directly and does not hand its routes to a dock, so this one is still unimported. Closes when a surface passes its compact breakpoint with routes to relocate."
@@ -122,6 +130,18 @@
     "test-only-module:src/shared/filesApp/notebookAbsorption.ts": {
       "status": "pending",
       "note": "FILES_APP_PLAN.md gate 7's evidence, at a finer grain than routeParity.ts: one row per Notebook STREAM naming the Files enumerator that indexes it and the section that still shows it. Test-only for the same reason and by the same pattern as routeParity.ts above -- shared/__tests__/filesAppNotebookAbsorption.test.ts re-derives the stream vocabulary from renderer/notebookTimeline.ts, the enumerator ids from both registries, the route from AppSection.tsx and every symbol from the named module. Marked 'pending', not 'accepted': its natural app consumer is the same per-item \"also reachable in <section>\" affordance routeParity is waiting on, plus a Files-app diagnostic for the two streams the index cannot see (plan, transcript). When either lands this entry comes out rather than being re-justified."
+    },
+    "orphan-module:src/media/StudyBottomBar.tsx": {
+      "status": "pending",
+      "note": "Last residue of boss-audit finding 1 against 9fa37b59, the build closure that committed product modules ahead of their consumer. That audit reported 15 unclassified identities at HEAD; twelve were closed by wiring real consumers and these three could not be, because their only consumer is VideoCoreStudyOverlay.tsx and that file is mid-rewrite in the shared tree (936 insertions / 662 deletions, uncommitted, owned by the study-workspace track) alongside untracked src/media/studyWorkspace.css. Wiring it here would mean committing another track's in-flight refactor. Pending, not accepted: the bar IS the replacement for .study-control-dock and is meant to render. Remove all three entries when that overlay rewrite lands and the audit reports them reachable."
+    },
+    "orphan-module:src/media/StudyDocks.tsx": {
+      "status": "pending",
+      "note": "Same stranded slice as StudyBottomBar.tsx — the dock layout half. It takes a blockId -> element map from the overlay, so the overlay rewrite is the only thing that can import it. Closes with that commit."
+    },
+    "orphan-module:src/media/StudyWorkspaceCustomizer.tsx": {
+      "status": "pending",
+      "note": "Same stranded slice as StudyBottomBar.tsx — the Customize Workspace chrome. It renders null unless the overlay passes `customizing`, so it too has exactly one possible consumer. Closes with that commit."
     }
   }
 }

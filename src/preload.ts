@@ -11,6 +11,7 @@ import type { SeanimeLibraryFile } from './shared/seanimeStudyLibrary';
 import type { FilesIndexSnapshot, FilesLocation } from './shared/filesApp/catalog';
 import type { FilesMineSourceResult } from './shared/filesApp/mining';
 import type { FilesScanReport } from './shared/filesApp/scan';
+import { FILES_DELETE_CHANNEL } from './shared/filesApp/deletion';
 import type { ReadingLensStatus, LensInit, LensOpenMode } from './main/readingLens';
 import type { ReadingLensCapture } from './shared/readingLens';
 import type {
@@ -1053,6 +1054,14 @@ const api = {
     ipcRenderer.on('filesapp:watch-arrival', handler);
     return () => ipcRenderer.removeListener('filesapp:watch-arrival', handler);
   },
+  /**
+   * Delete one Files-index item through its authoritative id. Paths, kinds and
+   * risk classifications never cross this bridge; main resolves them again.
+   */
+  filesDelete: (
+    request: import('./shared/filesApp/deletion').FilesDeleteRequest,
+  ): Promise<import('./shared/filesApp/deletion').FilesDeletionResult> =>
+    ipcRenderer.invoke(FILES_DELETE_CHANNEL, request),
 
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open

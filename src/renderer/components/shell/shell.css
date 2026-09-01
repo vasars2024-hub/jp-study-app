@@ -64,6 +64,56 @@
   gap: var(--space-sm);
 }
 
+/* Tray overflow ("show hidden icons") — a small command list, not a settings
+   panel, so it drops the 360px body width and the header the other flyouts use.
+   Anchored by the shared .os-flyout rule, i.e. above the tray in every shell. */
+.os-flyout--tray {
+  width: auto;
+  min-width: 200px;
+}
+.os-tray-overflow-body {
+  padding: var(--space-2xs);
+  gap: 2px;
+}
+.os-tray-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.os-tray-overflow-item:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+/* The chevron points at the panel: up when the icons are hidden, down while
+   they are showing, which is the affordance Windows users already read. */
+.os-tray-overflow-btn[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.os-tray-overflow-btn svg {
+  transition: transform var(--dur-fast, 140ms) var(--ease-standard, ease);
+}
+html.reduce-motion .os-tray-overflow-btn svg {
+  transition: none !important;
+}
+
+/* A visible, keyboard-reachable route home from an open window stack. This is
+   the taskbar's standard Show desktop idiom, and aria-pressed exposes the
+   reversible state without making a second competing control system. */
+.os-show-desktop-btn[aria-pressed='true'] {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
 /* Notification Center */
 .os-notif-empty {
   text-align: center;
@@ -852,6 +902,60 @@ html.reduce-motion .fwin .fwin-bar,
 html.reduce-motion .fwin .fwin-title,
 html.reduce-motion .fwin .fwin-b {
   transition: none !important;
+}
+
+/* ---- The taskbar is transport chrome, under EVERY material -----------------
+   §2.3 of the Liquid plan names navigation and transport as what Liquid is FOR,
+   and the shell's taskbar is the largest instance of both in the product. It was
+   opaque under every material: measured 2026-08-31 on the Wired shell,
+   `rgb(2,11,18)` at alpha 1 with `backdrop-filter: none`.
+
+   `styles.css:14654` deliberately made it solid, and that note — "translucent
+   mix showed the dark wallpaper through" — is correct, and is the reason this
+   rule is BLUR-backed rather than a plain alpha mix. `--lq-liquid-blur` is the
+   whole difference between the two, and every degradation tier in
+   `liquid-tokens.css` already zeroes it (high contrast, battery, Aero safe
+   mode), at which point `--lq-liquid-bg` is itself opaque and the taskbar
+   returns to solid chrome on its own. The fallback is the old behaviour, not a
+   broken middle.
+
+   WHY IT LIVES HERE rather than in `liquid-tokens.css`, where it was first
+   written (`67594273`, moved 2026-08-31): that sheet is L2's "tokens without
+   changing existing app output" gate and is structurally forbidden to paint —
+   `renderer/__tests__/liquidTokens.test.ts` requires every selector to be
+   `:root` and every declaration a `--lq-*` property. The rule went red there on
+   the next full run. Its natural home is the sheet that already styles this
+   element, and the selector is unchanged by the move.
+
+   This rule is deliberately NOT material-scoped: it is the cross-shell default,
+   driven entirely by `--lq-*` tokens that each material remaps, so no shell's
+   colour is hardcoded. Specificity is (0,2,0) — class + attribute. Wired's own
+   `:root[data-materials='wired'] .os-taskbar` is (0,3,0) and still wins the
+   `background` it needs for the cyan wash and scan grid; it composites over
+   `var(--lq-liquid-bg)` as its backstop for exactly that reason (see
+   `wired-shell.css`, "Taskbar machine rail"). Dropping `data-lq-role` in
+   `DesktopShell` reverts the material with it. */
+.os-taskbar[data-lq-role='liquid'] {
+  background: var(--lq-liquid-bg);
+  border-top: 1px solid var(--lq-liquid-border);
+  backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate, 1));
+  /* The three properties this rule sets, and nothing else — so the transition is a
+     STATE CHANGE by construction rather than ambient motion. All three genuinely
+     change under the shell without the element moving: every degradation tier in
+     `liquid-tokens.css` (high contrast, battery, Aero safe mode) zeroes
+     `--lq-liquid-blur` and hands back an opaque `--lq-liquid-bg`, and each material
+     remaps all three. Measured 2026-08-31 on the Wired shell: this bar is the shell's
+     ONLY Liquid-treated region and its `transition-duration` read `0s`, so glass
+     snapped to solid chrome in one frame and the user saw a repaint rather than the
+     same object changing. `--lq-motion-move` collapses to 0.001ms under both
+     `prefers-reduced-motion` and the in-app `html.reduce-motion`, so displacement-free
+     users get the snap back without a second media query here. Dropping
+     `data-lq-role` in `DesktopShell` still reverts the material and its motion
+     together. */
+  transition:
+    background-color var(--lq-motion-move) var(--lq-ease-move),
+    border-top-color var(--lq-motion-move) var(--lq-ease-move),
+    backdrop-filter var(--lq-motion-move) var(--lq-ease-move);
 }
 
 /* ---- P2.2 taskbar ---------------------------------------------------------

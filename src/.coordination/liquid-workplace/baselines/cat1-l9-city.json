@@ -1,0 +1,269 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "theme": "forest-night",
+  "presentation": "standard",
+  "box": "680x739",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 31,
+    "unmeasurable": 0,
+    "minRatio": 4.62,
+    "minOwner": "p \"Force sky events\" 8px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 0,
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 12,
+    "smallest": "button.reading-garden-sky-console-toggle 22px",
+    "smallestPx": 22,
+    "under32Count": 10,
+    "under32": [
+      {
+        "el": "button.reading-garden-sky-console-toggle",
+        "min": 22,
+        "nearest": 79.6
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.reading-garden-info-close",
+        "min": 28,
+        "nearest": 319.3
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 33
+      },
+      {
+        "el": "button.is-active",
+        "min": 29,
+        "nearest": 70.3
+      },
+      {
+        "el": "button",
+        "min": 29,
+        "nearest": 62.8
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 12,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 97,
+    "beforeLongest": {
+      "el": "div.reading-garden-cloud-sprite",
+      "dur": 193
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 97,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".fwin-frameless",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": "forest-night",
+    "box": "680x739",
+    "deferredVisibilityOwners": 0,
+    "controls": 12,
+    "measured": 12,
+    "belowFloorByRect": 10,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.fwin-b.lq-hit",
+      "rect": "30x24",
+      "rectMin": 24,
+      "hit": "32x32.5",
+      "hitMin": 32,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.fwin-frameless-controls",
+        "button.fwin-b.lq-hit",
+        "div.fwin-body.fwin-body-flush.fwin-body-frameless",
+        "div.fwin-body.fwin-body-flush.fwin-body-frameless"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 0,
+    "disabled": [],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        10,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        12,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        10,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

@@ -304,3 +304,11 @@
   --lq-liquid-saturate: 1;
   --lq-ambient-blur: 0px;
 }
+
+/* The taskbar's Liquid material lives in `components/shell/shell.css`, next to
+   the rest of the taskbar's own styling — NOT here. This sheet declares tokens
+   and paints nothing, which is L2's gate ("add Liquid semantic tokens without
+   changing existing app output") and is enforced by
+   `renderer/__tests__/liquidTokens.test.ts`: every selector must be `:root`,
+   every declaration a `--lq-*` custom property. A real rule here is invisible
+   to that intent and goes red on the next full run. */

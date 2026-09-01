@@ -1,0 +1,131 @@
+{
+  "label": "l9-palette-control",
+  "surface": "@.palette",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "forest-night",
+  "rect": "620x509",
+  "textRuns": 143,
+  "devOnlyRuns": 0,
+  "wordRuns": 143,
+  "textHash": 1220890951,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9760,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9760 catalog keys / 105 namespaces",
+  "raised": "root surface - no taskbar button",
+  "drive": {
+    "input": ".palette-input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "restoredAfterEscape": null,
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 2,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "Nothing matches “zzqqxxnosuchthing”. Try a shorter word, or press Esc to close."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "languagesDiffer"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

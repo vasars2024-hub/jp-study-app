@@ -1,0 +1,225 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "rootKind": "section inside a floating window",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "680x709",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 0,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 0,
+      "dominantCanvasPct": 99.4,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "260x170",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 0,
+      "deadRegionBasis": "visible surface",
+      "chromePct": 0,
+      "dominantCanvasPct": 98.1,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": true
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [
+    {
+      "kind": "maximized",
+      "refuse": "no Maximize button - refusing to fake it with an inline width",
+      "noMaximizeAffordance": true,
+      "chromeButtons": 3,
+      "chromeButtonTitles": [
+        "Pop out into its own window",
+        "Minimize",
+        "Close"
+      ],
+      "frameless": true
+    }
+  ],
+  "sizesExpected": 2,
+  "sizesRan": 2,
+  "sizesUnreachable": [
+    "maximized - this window is .fwin-frameless and its own chrome offers no Maximize, so the product never paints it maximized (titles reported under refusedLegs)"
+  ],
+  "contentGrowsNotChromePair": "compact -> default (no maximize affordance on this window)",
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": null,
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [],
+      "artPlateClipCount": 20,
+      "artPlateClips": [
+        "div.reading-garden-world",
+        "img.reading-garden-background-master",
+        "div.reading-garden-world",
+        "canvas.reading-garden-sky-events",
+        "div.reading-garden-moonbeam",
+        "div.reading-garden-environment-light",
+        "div.reading-garden-cloud-sprite",
+        "canvas."
+      ],
+      "artPlateOverlapCount": 436,
+      "artPlateOverlaps": [
+        "div.reading-garden-sky x div.reading-garden-world (678x707)",
+        "div.reading-garden-sky x img.reading-garden-background-master (678x707)",
+        "div.reading-garden-sky x div.reading-garden-world (678x707)",
+        "div.reading-garden-sky x canvas.reading-garden-sky-events (678x707)",
+        "div.reading-garden-sky x div.reading-garden-stars (678x707)",
+        "div.reading-garden-sky x img.reading-garden-moon (128x128)"
+      ],
+      "artPlateOverflowCount": 1,
+      "artPlateOverflow": [
+        "main.reading-garden 831>678 (hidden)"
+      ],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "inline style.width/height on the .fwin (synchronous, so measure-and-restore is safe)",
+      "requested": "260x170",
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 185;",
+      "restoredTo": "left: 94px; top: 54px; width: 680px; height: 709px; z-index: 185;",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": null,
+      "deadRegionBasis": "visible surface",
+      "chromeParts": [],
+      "artPlateClipCount": 22,
+      "artPlateClips": [
+        "div.reading-garden-world",
+        "img.reading-garden-background-master",
+        "div.reading-garden-world",
+        "canvas.reading-garden-sky-events",
+        "div.reading-garden-moonbeam",
+        "div.reading-garden-environment-light",
+        "div.reading-garden-cloud-sprite",
+        "canvas."
+      ],
+      "artPlateOverlapCount": 546,
+      "artPlateOverlaps": [
+        "div.reading-garden-sky x div.reading-garden-world (258x168)",
+        "div.reading-garden-sky x img.reading-garden-background-master (258x168)",
+        "div.reading-garden-sky x div.reading-garden-world (258x168)",
+        "div.reading-garden-sky x canvas.reading-garden-sky-events (258x168)",
+        "div.reading-garden-sky x div.reading-garden-stars (258x168)",
+        "div.reading-garden-sky x img.reading-garden-planet (24x24)"
+      ],
+      "artPlateOverflowCount": 1,
+      "artPlateOverflow": [
+        "main.reading-garden 316>258 (hidden)"
+      ],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": true,
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "artPlateExclusion": {
+      "hangsOutBy": 279,
+      "plantIsPlate": true,
+      "clippedDidNotRise": true,
+      "countedAsPlate": true,
+      "namedInArtPlateClips": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 0,
+        "restored": 0
+      },
+      "artPlateClipCount": {
+        "base": 20,
+        "dirty": 21,
+        "restored": 22
+      },
+      "removalProven": true
+    },
+    "provenPagerDeadRegion": {
+      "applicable": false,
+      "reason": "no proven pager on its last page"
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "200x140",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "restored": true
+    }
+  }
+}

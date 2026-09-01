@@ -1,0 +1,232 @@
+{
+  "label": "l9b4-wired",
+  "surface": "@.os-desktop-wired",
+  "win": "(focused)",
+  "theme": "wired-archive",
+  "presentation": null,
+  "box": "1264x821",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 13,
+    "unmeasurable": 0,
+    "minRatio": 7.65,
+    "minOwner": "span.os-clock-date \"Aug 31\" 10.5px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 0,
+    "decorativeSkipped": 4,
+    "decorativeWorst": [
+      {
+        "el": "span.wired-wall-kana",
+        "text": "語 彙 文 法 記 憶 読 解 聴 解",
+        "px": 30,
+        "large": true,
+        "ratio": 1.46,
+        "bar": 3,
+        "inactive": false,
+        "decorative": true
+      }
+    ],
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 12,
+    "smallest": "button.os-tray-btn 34px",
+    "smallestPx": 34,
+    "under32Count": 0,
+    "under32": [],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 12,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 3,
+    "beforeLongest": {
+      "el": "g",
+      "dur": 12
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 3,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".os-desktop-wired",
+    "floor": 32,
+    "presentation": null,
+    "theme": "wired-archive",
+    "box": "1264x821",
+    "deferredVisibilityOwners": 0,
+    "controls": 12,
+    "measured": 12,
+    "belowFloorByRect": 0,
+    "belowFloorByHit": 0,
+    "belowFloor": [],
+    "smallestHit": {
+      "el": "button.os-tray-btn",
+      "rect": "34x40",
+      "rectMin": 34,
+      "hit": "34.5x40.5",
+      "hitMin": 34.5,
+      "shrunk": false,
+      "shrunkBy": 0,
+      "blockers": [
+        "div.os-taskbar.os-taskbar-full",
+        "div.os-tray",
+        "div.os-taskbar.os-taskbar-full",
+        "div.os-taskbar.os-taskbar-full"
+      ]
+    },
+    "stolenCount": 0,
+    "stolen": [],
+    "worstShrunkBy": 0,
+    "occludedCount": 0,
+    "occluded": [],
+    "disabledCount": 0,
+    "disabled": [],
+    "disclosedForRun": 1,
+    "disclosuresRestored": true,
+    "scrollLeaks": [],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 0,
+      "stolenCount": 0,
+      "occludedCount": 0
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": true,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true,
+      "decorativeExemptionIsNarrow": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        2,
+        2,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "label": "l9b4-wired",
+  "surface": "@.os-desktop-wired",
+  "win": "(focused)",
+  "rootKind": "desktop-window surface (no .fwin above it)",
+  "viewport": "1264x821",
+  "sizes": [
+    {
+      "kind": "default",
+      "box": "1264x821",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 59.5,
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromePct": 0,
+      "dominantCanvasPct": 100,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": "NOT-APPLICABLE"
+      },
+      "restored": true
+    },
+    {
+      "kind": "compact",
+      "box": "924x561",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 54,
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromePct": 0,
+      "dominantCanvasPct": 100,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": "NOT-APPLICABLE"
+      },
+      "restored": true
+    },
+    {
+      "kind": "maximized",
+      "box": "1600x1000",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "deadPctViewport": 63.4,
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromePct": 0,
+      "dominantCanvasPct": 100,
+      "bars": {
+        "clipped": true,
+        "overlaps": true,
+        "horizontal": true,
+        "deadRegion": "NOT-APPLICABLE"
+      },
+      "restored": true
+    }
+  ],
+  "refusedLegs": [],
+  "sizesExpected": 3,
+  "sizesRan": 3,
+  "sizesUnreachable": [],
+  "contentGrowsNotChromePair": "default -> maximized",
+  "detail": [
+    {
+      "kind": "default",
+      "sizeMechanism": "as found",
+      "requested": null,
+      "achieved": null,
+      "clampedByOsMinimum": null,
+      "restoredFrom": null,
+      "restoredTo": null,
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "1074x575 at grid 0,9",
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromeParts": [],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 3,
+      "backdropOverlaps": [
+        "div.wired-wall-atmosphere behind div.os-taskbar (1264x56)",
+        "div.wired-wall-atmosphere behind div.os-task-wins (515x40)",
+        "div.wired-wall-atmosphere behind div.os-tray (429x40)"
+      ],
+      "deadRegionApplies": false,
+      "hostedWindowCount": 3,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
+    },
+    {
+      "kind": "compact",
+      "sizeMechanism": "bridge /bounds on the OS window (root surface: no frame, no Maximize button)",
+      "requested": "260x170",
+      "achieved": "924x561",
+      "clampedByOsMinimum": true,
+      "restoredFrom": "1264x821",
+      "restoredTo": "1264x821",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "739x379 at grid 0,9",
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromeParts": [],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 6,
+      "backdropOverlaps": [
+        "div.wired-wall-atmosphere behind div.os-taskbar (924x56)",
+        "div.wired-wall-atmosphere behind div.os-desktop-switches (189x40)",
+        "div.wired-wall-atmosphere behind div.os-task-wins (175x40)",
+        "div.wired-wall-atmosphere behind div.os-tray (429x40)",
+        "span.wired-wall-kana behind div.os-taskbar (41x19)",
+        "span.wired-wall-kana behind div.os-tray (41x11)"
+      ],
+      "deadRegionApplies": false,
+      "hostedWindowCount": 3,
+      "artPlateOverflowCount": 1,
+      "artPlateOverflow": [
+        "div.os-task-wins 332>175 (scroller)"
+      ],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
+    },
+    {
+      "kind": "maximized",
+      "sizeMechanism": "bridge /bounds on the OS window (root surface: no frame, no Maximize button)",
+      "requested": "display-max",
+      "achieved": "1600x1000",
+      "clampedByOsMinimum": false,
+      "restoredFrom": "1264x821",
+      "restoredTo": "1264x821",
+      "clippedList": [],
+      "overlapList": [],
+      "horizontalScrollerList": [],
+      "hiddenOverflowXList": [],
+      "deadRegionBox": "1400x725 at grid 0,9",
+      "deadRegionBasis": "NOT SCORED - window-hosting shell: the empty area is the workspace 3 detached window(s) open into, not layout that failed to fill",
+      "chromeParts": [],
+      "artPlateClipCount": 0,
+      "artPlateClips": [],
+      "artPlateOverlapCount": 0,
+      "artPlateOverlaps": [],
+      "backdropOverlapCount": 3,
+      "backdropOverlaps": [
+        "div.wired-wall-atmosphere behind div.os-taskbar (1600x56)",
+        "div.wired-wall-atmosphere behind div.os-task-wins (851x40)",
+        "div.wired-wall-atmosphere behind div.os-tray (429x40)"
+      ],
+      "deadRegionApplies": false,
+      "hostedWindowCount": 3,
+      "artPlateOverflowCount": 0,
+      "artPlateOverflow": [],
+      "devOnlyExcludedCount": 1,
+      "devOnlyExcluded": [
+        "div.reading-garden-sky-console (+8 descendants)"
+      ]
+    }
+  ],
+  "bars": {
+    "clipped": true,
+    "overlaps": true,
+    "horizontal": true,
+    "deadRegion": "NOT-APPLICABLE",
+    "contentGrowsNotChrome": true,
+    "allThreeSizes": true,
+    "restored": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notApplicableBars": [
+    "deadRegion"
+  ],
+  "deadRegionPctBySize": [
+    "default 59.5%",
+    "compact 54%",
+    "maximized 63.4%"
+  ],
+  "visibleAtEveryRead": true,
+  "notMeasuredHere": [
+    "contrast and focus order (rubric category 1 harness)",
+    "input cost and dead ends (rubric category 2 harness)"
+  ],
+  "control": {
+    "injectedClip": {
+      "moved": true,
+      "backToBaseline": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "artPlateExclusion": {
+      "hangsOutBy": 280,
+      "plantIsPlate": true,
+      "clippedDidNotRise": true,
+      "countedAsPlate": true,
+      "namedInArtPlateClips": true,
+      "clipped": {
+        "base": 0,
+        "dirty": 0,
+        "restored": 0
+      },
+      "artPlateClipCount": {
+        "base": 0,
+        "dirty": 1,
+        "restored": 0
+      },
+      "removalProven": true
+    },
+    "backdropExclusion": {
+      "plantIsInertAndHidden": true,
+      "plantCarriesText": true,
+      "plantPaintedInFront": true,
+      "overlapsRose": true,
+      "notExcusedAsBackdrop": true,
+      "backToBaseline": true,
+      "overlaps": {
+        "base": 0,
+        "dirty": 3,
+        "restored": 0
+      },
+      "backdropOverlapCount": {
+        "base": 3,
+        "dirty": 5,
+        "restored": 3
+      },
+      "removalProven": true
+    },
+    "provenPagerDeadRegion": {
+      "applicable": false,
+      "reason": "no proven pager on its last page"
+    },
+    "subMinimumShrink": {
+      "requested": "200x140",
+      "box": "924x561",
+      "clipped": 0,
+      "overlaps": 0,
+      "horizontalScrollers": 0,
+      "hiddenOverflowX": 0,
+      "restored": true
+    }
+  }
+}

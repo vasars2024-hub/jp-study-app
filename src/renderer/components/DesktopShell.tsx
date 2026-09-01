@@ -35,6 +35,7 @@ import {
 } from '../liquidWindowPresentation';
 import type { LiquidPresentationState } from '../../shared/liquidWindowState';
 import { loadDisplayPrefs } from '../displayPrefs';
+import { captureVisibleWindowMinStates, setCapturedWindowsMinimized } from '../showDesktopState';
 import DropRouter from './DropRouter';
 import {
   beginDeskDrag,
@@ -673,6 +674,12 @@ export default function DesktopShell({
   const { t } = useT();
   const material = useAppMaterialSet();
   const wired = material === 'wired';
+  // Which Start panel to build. Aero and Wired share the two-column secret-OS
+  // menu; every other material gets the legacy grid. Both used to be mounted on
+  // every open and CSS hid the loser (`aero-shell.css:24`, `:1851`,
+  // `wired-shell.css:145`), so a single open paid for 528 nodes and 106 inline
+  // SVGs to show at most half of them.
+  const secretStartMenu = material === 'aero' || material === 'wired';
   const deskRef = useRef<HTMLDivElement>(null);
   const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
@@ -720,6 +727,17 @@ export default function DesktopShell({
   const [notes, setNotes] = useState<Record<string, NoteData>>({});
   const [widgets, setWidgets] = useState<WidgetSnapshot[]>([]);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  /**
+   * Tray overflow ("show hidden icons"), the shell's own progressive-disclosure
+   * idiom. The secondary tray commands live behind it rather than in the bar; it
+   * obscures nothing — the panel is one click or one Enter away and every item
+   * keeps its label there, which the 32px icon buttons in the bar never had.
+   */
+  const [trayOverflowOpen, setTrayOverflowOpen] = useState(false);
+  const trayOverflowBtnRef = useRef<HTMLButtonElement | null>(null);
+  /** The exact visible-window set hidden by the taskbar's Show desktop action. */
+  const showDesktopRestoreState = useRef<ReadonlyMap<string, boolean | undefined> | null>(null);
+  const [showDesktopActive, setShowDesktopActive] = useState(false);
   const [wall, setWall] = useState<WallChoice & { path?: string }>({ kind: 'preset', id: 'crimsonveil' });
   const [wallImage, setWallImage] = useState<string | null>(null);
   const [wallVideo, setWallVideo] = useState<string | null>(null);
@@ -772,6 +790,20 @@ export default function DesktopShell({
   useEffect(() => {
     winsRef.current = wins;
   }, [wins]);
+  useEffect(() => {
+    if (!showDesktopActive) return;
+    const restoreState = showDesktopRestoreState.current;
+    // Opening or restoring any window ends the transient Show desktop state.
+    // A switch to a desktop that does not own the captured ids does too.
+    if (
+      !restoreState
+      || !wins.some((window) => restoreState.has(window.id))
+      || wins.some((window) => !window.min)
+    ) {
+      showDesktopRestoreState.current = null;
+      setShowDesktopActive(false);
+    }
+  }, [showDesktopActive, wins]);
   useEffect(() => {
     notesRef.current = notes;
   }, [notes]);
@@ -1656,6 +1688,25 @@ export default function DesktopShell({
   // point reaches it the same way `close` does rather than by hoisting it.
   const toggleLiquidRef = useRef<(id: string) => void>(() => undefined);
   const switchDesktopRef = useRef<(target: DesktopIndex) => Promise<void>>(() => Promise.resolve());
+  const showDesktopRef = useRef<() => void>(() => undefined);
+  const restoreShownDesktopRef = useRef<() => void>(() => undefined);
+
+  const showDesktop = (): void => {
+    const restoreState = captureVisibleWindowMinStates(winsRef.current);
+    if (restoreState.size === 0) return;
+    showDesktopRestoreState.current = restoreState;
+    setShowDesktopActive(true);
+    setWins((windows) => setCapturedWindowsMinimized(windows, restoreState, true));
+  };
+  const restoreShownDesktop = (): void => {
+    const restoreState = showDesktopRestoreState.current;
+    if (!restoreState) return;
+    showDesktopRestoreState.current = null;
+    setShowDesktopActive(false);
+    setWins((windows) => setCapturedWindowsMinimized(windows, restoreState, false));
+  };
+  showDesktopRef.current = showDesktop;
+  restoreShownDesktopRef.current = restoreShownDesktop;
 
   useEffect(() => {
     const onWidgets = () => setGalleryOpen((o) => !o);
@@ -1823,9 +1874,11 @@ export default function DesktopShell({
           return;
         }
         case 'showDesktop':
-          setWins((ws) => ws.map((w) => ({ ...w, min: true })));
+          showDesktopRef.current();
           return;
         case 'restoreAll':
+          showDesktopRestoreState.current = null;
+          setShowDesktopActive(false);
           setWins((ws) => ws.map((w) => ({ ...w, min: false })));
           return;
         case 'pinTop': {
@@ -2729,299 +2782,324 @@ export default function DesktopShell({
             }}
             onDrop={(e) => dropStartAppOnDesktop(e)}
           />
-          <div
-            className="os-start os-start-legacy"
-            onDragOver={(e) => {
-              // Keep drops on the panel itself from landing on the desktop.
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = 'none';
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <div className="os-start-title">GrammarX</div>
-            <div className="os-start-hint">
-              {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
-            </div>
-            <button
-              type="button"
-              className="os-start-search"
-              onClick={() => {
-                setStartOpen(false);
-                window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+          {!secretStartMenu && (
+            <div
+              className="os-start os-start-legacy"
+              onDragOver={(e) => {
+                // Keep drops on the panel itself from landing on the desktop.
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'none';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-              <span className="os-start-search-ph">{t('desktop.startSearch')}</span>
-              <kbd className="os-start-search-kbd">Ctrl P</kbd>
-            </button>
-            <div className="os-start-groups">
-              {startGroups.map((g) => (
-                <section key={g.id} className="os-start-group" aria-label={t(g.labelKey)}>
-                  <h3 className="os-start-group-label">{t(g.labelKey)}</h3>
-                  <div className="os-start-grid">
-                    {g.apps.map((a) => {
-                      const pinned = isAppPinned(a.id);
-                      return (
-                        <div
-                          key={a.id}
-                          className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            className="os-start-app"
-                            draggable
-                            title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
-                            onDragStart={(e) => beginStartAppDrag(a, e)}
-                            onDragEnd={endStartAppDrag}
-                            onClick={() => open(a.id)}
-                          >
-                            <span className={`os-start-app-ic app-${a.id}`}>
-                              <Icon name={a.glyph} size={24} />
-                            </span>
-                            {t(a.labelKey)}
-                          </button>
-                          <button
-                            type="button"
-                            className={`os-start-tile-pin${pinned ? ' on' : ''}`}
-                            title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
-                            draggable={false}
-                            onClick={() => togglePinApp(a)}
-                          >
-                            <Icon name="pin" size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-              <section className="os-start-group" aria-label={t('desktop.startCategory.shortcuts')}>
-                <h3 className="os-start-group-label">{t('desktop.startCategory.shortcuts')}</h3>
-                <div className="os-start-grid">
-                  <button
-                    type="button"
-                    className="os-start-app special"
-                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
-                  >
-                    <span className="os-start-app-ic tone-widgets">
-                      <Icon name="widgets" size={24} />
-                    </span>
-                    {t('desktop.widgets')}
-                  </button>
-                  <button type="button" className="os-start-app special" onClick={openNote}>
-                    <span className="os-start-app-ic tone-note">
-                      <Icon name="note" size={24} />
-                    </span>
-                    {t('desktop.stickyNote')}
-                  </button>
-                  <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
-                    <span className="os-start-app-ic tone-add">
-                      <Icon name="plus" size={24} />
-                    </span>
-                    {t('desktop.addApp')}
-                  </button>
-                </div>
-              </section>
-            </div>
-            <div className="os-start-footer">
-              <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
-                <Icon name="settings" size={16} />
-                <span>{t('palette.section.settings')}</span>
-              </button>
-              <button
-                type="button"
-                className="os-start-foot-btn"
-                onClick={() => {
-                  setStartOpen(false);
-                  window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <line x1="4" y1="9" x2="20" y2="9" />
-                  <line x1="4" y1="15" x2="20" y2="15" />
-                  <circle cx="9" cy="9" r="2.2" />
-                  <circle cx="15" cy="15" r="2.2" />
-                </svg>
-                <span>{t('desktop.quick')}</span>
-              </button>
-              <span className="os-start-foot-spacer" />
-              <button
-                type="button"
-                className="os-start-foot-btn power"
-                title={t('desktop.restartShell')}
-                aria-label={t('desktop.restartShell')}
-                onClick={async () => {
-                  const ok = await confirmDialog({
-                    title: 'Restart shell',
-                    message: 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
-                    confirmLabel: 'Restart',
-                  });
-                  if (ok) window.location.reload();
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 3v9" />
-                  <path d="M6.5 7a8 8 0 1 0 11 0" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div
-            className="os-start os-start-aero-menu"
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.dataTransfer.dropEffect = 'none';
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <div className="os-start-aero-head">
-              <span className="os-start-aero-avatar" aria-hidden="true">
-                <Icon name="logo" size={24} />
-              </span>
-              <div className="os-start-aero-id">
-                <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
-                <div className="os-start-aero-sub">
-                  {wired
-                    ? startAppDragging
-                      ? 'PATCH MODULE INTO LOCAL DESKTOP'
-                      : 'LAYER-09 / ROUTER INDEX'
-                    : startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
-                </div>
+              <div className="os-start-title">GrammarX</div>
+              <div className="os-start-hint">
+                {startAppDragging ? t('desktop.dropToPlace') : t('desktop.startHint')}
               </div>
               <button
                 type="button"
-                className="os-start-aero-search"
-                title="Search"
-                aria-label="Search"
+                className="os-start-search"
                 onClick={() => {
                   setStartOpen(false);
                   window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                 }}
               >
-                <Icon name="search" size={17} />
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <span className="os-start-search-ph">{t('desktop.startSearch')}</span>
+                <kbd className="os-start-search-kbd">Ctrl P</kbd>
               </button>
+              <div className="os-start-groups">
+                {startGroups.map((g) => (
+                  <section key={g.id} className="os-start-group" aria-label={t(g.labelKey)}>
+                    <h3 className="os-start-group-label">{t(g.labelKey)}</h3>
+                    <div className="os-start-grid">
+                      {g.apps.map((a) => {
+                        const pinned = isAppPinned(a.id);
+                        return (
+                          <div
+                            key={a.id}
+                            className={`os-start-tile${pinned ? ' pinned' : ''}${startAppDragging === a.id ? ' drag-source' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className="os-start-app"
+                              draggable
+                              title={pinned ? t('desktop.dragToMove') : t('desktop.dragToDesktop')}
+                              onDragStart={(e) => beginStartAppDrag(a, e)}
+                              onDragEnd={endStartAppDrag}
+                              onClick={() => open(a.id)}
+                            >
+                              <span className={`os-start-app-ic app-${a.id}`}>
+                                <Icon name={a.glyph} size={24} />
+                              </span>
+                              {t(a.labelKey)}
+                            </button>
+                            <button
+                              type="button"
+                              className={`os-start-tile-pin${pinned ? ' on' : ''}`}
+                              title={pinned ? t('desktop.removeFromDesktop') : t('desktop.addToDesktop')}
+                              draggable={false}
+                              onClick={() => togglePinApp(a)}
+                            >
+                              <Icon name="pin" size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+                <section className="os-start-group" aria-label={t('desktop.startCategory.shortcuts')}>
+                  <h3 className="os-start-group-label">{t('desktop.startCategory.shortcuts')}</h3>
+                  <div className="os-start-grid">
+                    <button
+                      type="button"
+                      className="os-start-app special"
+                      onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                    >
+                      <span className="os-start-app-ic tone-widgets">
+                        <Icon name="widgets" size={24} />
+                      </span>
+                      {t('desktop.widgets')}
+                    </button>
+                    <button type="button" className="os-start-app special" onClick={openNote}>
+                      <span className="os-start-app-ic tone-note">
+                        <Icon name="note" size={24} />
+                      </span>
+                      {t('desktop.stickyNote')}
+                    </button>
+                    <button type="button" className="os-start-app special" onClick={() => void addShortcut()}>
+                      <span className="os-start-app-ic tone-add">
+                        <Icon name="plus" size={24} />
+                      </span>
+                      {t('desktop.addApp')}
+                    </button>
+                  </div>
+                </section>
+              </div>
+              <div className="os-start-footer">
+                <button type="button" className="os-start-foot-btn" onClick={() => open('settings')}>
+                  <Icon name="settings" size={16} />
+                  <span>{t('palette.section.settings')}</span>
+                </button>
+                <button
+                  type="button"
+                  className="os-start-foot-btn"
+                  onClick={() => {
+                    setStartOpen(false);
+                    window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <line x1="4" y1="9" x2="20" y2="9" />
+                    <line x1="4" y1="15" x2="20" y2="15" />
+                    <circle cx="9" cy="9" r="2.2" />
+                    <circle cx="15" cy="15" r="2.2" />
+                  </svg>
+                  <span>{t('desktop.quick')}</span>
+                </button>
+                <span className="os-start-foot-spacer" />
+                <button
+                  type="button"
+                  className="os-start-foot-btn power"
+                  title={t('desktop.restartShell')}
+                  aria-label={t('desktop.restartShell')}
+                  onClick={async () => {
+                    const ok = await confirmDialog({
+                      title: 'Restart shell',
+                      message: 'Restart the GrammarX shell? Unsaved text in fields may be lost.',
+                      confirmLabel: 'Restart',
+                    });
+                    if (ok) window.location.reload();
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 3v9" />
+                    <path d="M6.5 7a8 8 0 1 0 11 0" />
+                  </svg>
+                </button>
+              </div>
             </div>
-
-            <div className="os-start-aero-columns">
-              <section className="os-start-aero-main" aria-label="Study programs">
-                <div className="os-start-aero-label">{wired ? 'NODE INDEX' : 'Study programs'}</div>
-                <div className="os-start-aero-programs">
-                  {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
+          )}
+          {secretStartMenu && (
+            <div
+              className="os-start os-start-aero-menu"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'none';
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <div className="os-start-aero-head">
+                <span className="os-start-aero-avatar" aria-hidden="true">
+                  <Icon name="logo" size={24} />
+                </span>
+                <div className="os-start-aero-id">
+                  <div className="os-start-aero-title">{wired ? 'WIRED ARCHIVE' : 'Secret GrammarX'}</div>
+                  <div className="os-start-aero-sub">
+                    {wired
+                      ? startAppDragging
+                        ? 'PATCH MODULE INTO LOCAL DESKTOP'
+                        : 'LAYER-09 / ROUTER INDEX'
+                      : startAppDragging ? 'Drop on the desktop to place the app' : 'Personal study desktop'}
+                  </div>
                 </div>
                 <button
                   type="button"
-                  className="os-start-aero-all"
+                  className="os-start-aero-search"
+                  title="Search"
+                  aria-label="Search"
                   onClick={() => {
                     setStartOpen(false);
                     window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
                   }}
                 >
-                  <span>{wired ? 'LOCATE MODULE' : 'All programs'}</span>
-                  <Icon name="chevron" size={14} />
-                </button>
-              </section>
-
-              <aside className="os-start-aero-side" aria-label="Places and tools">
-                <div className="os-start-aero-label">{wired ? 'CHANNELS' : 'Places'}</div>
-                <div className="os-start-aero-places">
-                  {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
-                </div>
-                <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : 'Tools'}</div>
-                <div className="os-start-aero-tools">
-                  <button
-                    type="button"
-                    className="os-start-aero-tool"
-                    onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
-                  >
-                    <Icon name="widgets" size={17} />
-                    <span>{wired ? 'Module rack' : 'Widgets'}</span>
-                  </button>
-                  <button type="button" className="os-start-aero-tool" onClick={openNote}>
-                    <Icon name="note" size={17} />
-                    <span>{wired ? 'Field note' : 'Sticky note'}</span>
-                  </button>
-                  <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
-                    <Icon name="plus" size={17} />
-                    <span>{wired ? 'Mount module...' : 'Add app...'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="os-start-aero-tool"
-                    onClick={() => {
-                      setStartOpen(false);
-                      window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
-                    }}
-                  >
-                    <Icon name="wrench" size={17} />
-                    <span>{wired ? 'Relay panel' : 'Quick settings'}</span>
-                  </button>
-                </div>
-              </aside>
-            </div>
-
-            <div className="os-start-aero-footer">
-              <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
-                <Icon name="settings" size={16} />
-                <span>{wired ? 'SYS / Service Panel' : 'Control panel'}</span>
-              </button>
-              <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
-                <button
-                  type="button"
-                  className="os-start-aero-power"
-                  title="Sleep Secret OS"
-                  aria-label="Sleep Secret OS"
-                  onClick={sleepSecretOs}
-                >
-                  <Icon name="pause" size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="os-start-aero-power"
-                  title="Restart Secret OS"
-                  aria-label="Restart Secret OS"
-                  onClick={() => void restartSecretOs()}
-                >
-                  <Icon name="refresh" size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="os-start-aero-power shutdown"
-                  title="Shut down Secret OS"
-                  aria-label="Shut down Secret OS"
-                  onClick={() => void shutdownSecretOs()}
-                >
-                  <Icon name="power" size={15} />
+                  <Icon name="search" size={17} />
                 </button>
               </div>
+
+              <div className="os-start-aero-columns">
+                <section className="os-start-aero-main" aria-label="Study programs">
+                  <div className="os-start-aero-label">{wired ? 'NODE INDEX' : 'Study programs'}</div>
+                  <div className="os-start-aero-programs">
+                    {startPrimaryApps.map((app) => renderAeroStartApp(app, 'program'))}
+                  </div>
+                  <button
+                    type="button"
+                    className="os-start-aero-all"
+                    onClick={() => {
+                      setStartOpen(false);
+                      window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }));
+                    }}
+                  >
+                    <span>{wired ? 'LOCATE MODULE' : 'All programs'}</span>
+                    <Icon name="chevron" size={14} />
+                  </button>
+                </section>
+
+                <aside className="os-start-aero-side" aria-label="Places and tools">
+                  <div className="os-start-aero-label">{wired ? 'CHANNELS' : 'Places'}</div>
+                  <div className="os-start-aero-places">
+                    {startPlaceApps.map((app) => renderAeroStartApp(app, 'place'))}
+                  </div>
+                  <div className="os-start-aero-label">{wired ? 'SERVICE PORTS' : 'Tools'}</div>
+                  <div className="os-start-aero-tools">
+                    <button
+                      type="button"
+                      className="os-start-aero-tool"
+                      onClick={() => { setGalleryOpen(true); setStartOpen(false); }}
+                    >
+                      <Icon name="widgets" size={17} />
+                      <span>{wired ? 'Module rack' : 'Widgets'}</span>
+                    </button>
+                    <button type="button" className="os-start-aero-tool" onClick={openNote}>
+                      <Icon name="note" size={17} />
+                      <span>{wired ? 'Field note' : 'Sticky note'}</span>
+                    </button>
+                    <button type="button" className="os-start-aero-tool" onClick={() => void addShortcut()}>
+                      <Icon name="plus" size={17} />
+                      <span>{wired ? 'Mount module...' : 'Add app...'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="os-start-aero-tool"
+                      onClick={() => {
+                        setStartOpen(false);
+                        window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'));
+                      }}
+                    >
+                      <Icon name="wrench" size={17} />
+                      <span>{wired ? 'Relay panel' : 'Quick settings'}</span>
+                    </button>
+                  </div>
+                </aside>
+              </div>
+
+              <div className="os-start-aero-footer">
+                <button type="button" className="os-start-aero-footer-btn" onClick={() => open('settings')}>
+                  <Icon name="settings" size={16} />
+                  <span>{wired ? 'SYS / Service Panel' : 'Control panel'}</span>
+                </button>
+                <div className="os-start-aero-power-cluster" aria-label="Secret OS power">
+                  <button
+                    type="button"
+                    className="os-start-aero-power"
+                    title="Sleep Secret OS"
+                    aria-label="Sleep Secret OS"
+                    onClick={sleepSecretOs}
+                  >
+                    <Icon name="pause" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="os-start-aero-power"
+                    title="Restart Secret OS"
+                    aria-label="Restart Secret OS"
+                    onClick={() => void restartSecretOs()}
+                  >
+                    <Icon name="refresh" size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="os-start-aero-power shutdown"
+                    title="Shut down Secret OS"
+                    aria-label="Shut down Secret OS"
+                    onClick={() => void shutdownSecretOs()}
+                  >
+                    <Icon name="power" size={15} />
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
       {/* Per-display taskbar mode. 'none' hides it entirely; 'windows-only'
           drops the Start button and desktop switcher and keeps the window
           list, which is what a secondary monitor usually wants. */}
+      {/* The taskbar switches windows and desktops, so `navigation` is the
+          accurate landmark, and `data-lq-role="liquid"` is the same shared
+          contract `LiquidAppScaffold` marks its rail and dock with. Both were
+          missing: measured 2026-08-31 on the Wired shell, this 1264x56 bar with
+          12 focusables classified as a plain Anchor, so the shell's primary
+          transport chrome was invisible to landmark navigation and scored
+          outside category 3's denominator entirely. One element, every shell. */}
       <div
         className={`os-taskbar os-taskbar-${taskbarMode}`}
         ref={taskbarRef}
         hidden={taskbarMode === 'none'}
+        role="navigation"
+        aria-label={t('settings.monitors.taskbar')}
+        data-lq-role="liquid"
       >
         {taskbarMode === 'full' && (
           <>
+            {/* The shell's popup-owning chrome declares itself. Measured 2026-08-31 on
+                the Wired shell: Start, Widgets, Search, Clipboard, Quick settings and the
+                bell all open a menu or a flyout and not one of them carried
+                `aria-haspopup`, so nothing but sighted pointer use could tell a launcher
+                from a plain command. `aria-expanded` is set only where this component
+                genuinely owns the open state — a stale expanded state is worse than none,
+                and the four dispatch-only tray buttons keep their panels' state in the
+                panels themselves. */}
             <button
               className={`os-start-btn ${startOpen ? 'active' : ''}`}
+              data-primary
               title={wired ? 'NODE ROUTER' : t('desktop.start')}
+              aria-haspopup="menu"
+              aria-expanded={startOpen}
               onClick={() => setStartOpen((o) => !o)}
             >
               <Icon name="logo" size={22} />
@@ -3032,10 +3110,12 @@ export default function DesktopShell({
                 exactly the ownership collision the single-writer rule avoids. */}
             {!secondary && (
               <div className="os-desktop-switches">
-                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} onClick={() => void switchDesktop(0)}>
+                {/* `active` was a class and nothing else: which desktop you are on was
+                    carried only in paint. `aria-pressed` states it programmatically. */}
+                <button className={`os-desktop-switch ${activeDesktop === 0 ? 'active' : ''}`} aria-pressed={activeDesktop === 0} onClick={() => void switchDesktop(0)}>
                   {wired ? 'LOCAL NODE' : t('desktop.desktopN', { n: 1 })}
                 </button>
-                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} onClick={() => void switchDesktop(1)}>
+                <button className={`os-desktop-switch ${activeDesktop === 1 ? 'active' : ''}`} aria-pressed={activeDesktop === 1} onClick={() => void switchDesktop(1)}>
                   {wired ? 'REMOTE FEED' : t('desktop.desktopN', { n: 2 })}
                 </button>
               </div>
@@ -3157,6 +3237,7 @@ export default function DesktopShell({
             className="os-tray-btn"
             title={t('palette.searchPlaceholder')}
             aria-label={t('palette.searchPlaceholder')}
+            aria-haspopup="dialog"
             onClick={() => window.dispatchEvent(new CustomEvent('palette:open', { detail: 'search' }))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
@@ -3164,24 +3245,29 @@ export default function DesktopShell({
               <path d="M21 21l-4.3-4.3" />
             </svg>
           </button>
-          <button className={`os-tray-btn ${galleryOpen ? 'active' : ''}`} title={t('desktop.widgets')} onClick={() => setGalleryOpen((o) => !o)}>
-            <Icon name="app" size={18} />
-          </button>
+          {/* Widgets, Clipboard history and Settings live behind this, exactly as
+              Windows tucks its secondary tray icons behind a chevron. */}
           <button
-            className="os-tray-btn"
-            title={t('desktop.clipboardHistory')}
-            onClick={() => window.dispatchEvent(new CustomEvent('clipboard:open'))}
+            type="button"
+            ref={trayOverflowBtnRef}
+            className={`os-tray-btn os-tray-overflow-btn ${trayOverflowOpen ? 'active' : ''}`}
+            title={t('desktop.tray.hiddenIcons')}
+            aria-label={t('desktop.tray.hiddenIcons')}
+            aria-haspopup="dialog"
+            aria-expanded={trayOverflowOpen}
+            aria-controls={TRAY_OVERFLOW_ID}
+            onClick={() => setTrayOverflowOpen((o) => !o)}
           >
-            <Icon name="clipboard" size={18} />
-          </button>
-          <button className="os-tray-btn" title={t('palette.section.settings')} onClick={() => open('settings')}>
-            <Icon name="settings" size={18} />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 14l6-6 6 6" />
+            </svg>
           </button>
           <button
             type="button"
             className="os-tray-btn"
             title={t('quickSettings.title')}
             aria-label={t('quickSettings.title')}
+            aria-haspopup="dialog"
             onClick={() => window.dispatchEvent(new CustomEvent('shell:toggleQuickSettings'))}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -3199,8 +3285,36 @@ export default function DesktopShell({
             hour12={!deskPrefs.clock24h}
             showDate={!!deskPrefs.clockShowDate}
           />
+          <button
+            type="button"
+            className={`os-tray-btn os-show-desktop-btn ${showDesktopActive ? 'active' : ''}`}
+            title={t(showDesktopActive ? 'commands.window.restoreAll' : 'commands.window.showDesktop')}
+            aria-label={t(showDesktopActive ? 'commands.window.restoreAll' : 'commands.window.showDesktop')}
+            aria-pressed={showDesktopActive}
+            disabled={!showDesktopActive && !wins.some((window) => !window.min)}
+            onClick={() => {
+              if (showDesktopActive) restoreShownDesktopRef.current();
+              else showDesktopRef.current();
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="12" rx="1.5" />
+              <path d="M8 20h8M12 17v3" />
+            </svg>
+          </button>
         </div>
       </div>
+      {trayOverflowOpen && (
+        <TrayOverflow
+          onClose={() => {
+            setTrayOverflowOpen(false);
+            trayOverflowBtnRef.current?.focus();
+          }}
+          galleryOpen={galleryOpen}
+          onWidgets={() => setGalleryOpen((o) => !o)}
+          onSettings={() => open('settings')}
+        />
+      )}
       <DesktopLayerHost />
       <QuickSettings />
       <NotificationCenter />
@@ -3279,16 +3393,123 @@ export default function DesktopShell({
  * dispatches (blinks while unread), red = an unread error is present.
  */
 function WiredTrayLamps() {
+  const { t } = useT();
   const [, setTick] = useState(0);
   useEffect(() => onNotificationsChanged(() => setTick((n) => n + 1)), []);
   const unread = getNotifications().filter((n) => !n.read);
   const hasError = unread.some((n) => n.kind === 'error');
   return (
-    <span className="wired-tray-lamps" aria-hidden="true">
-      <i className="wired-lamp wired-lamp-link on" />
-      <i className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`} />
-      <i className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`} />
+    <span className="wired-tray-lamps">
+      <i className="wired-lamp wired-lamp-link on" aria-hidden="true" />
+      <i
+        className={`wired-lamp wired-lamp-pending${unread.length > 0 ? ' on blink' : ''}`}
+        aria-hidden="true"
+      />
+      <i
+        className={`wired-lamp wired-lamp-error${hasError ? ' on' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        <span className="sr-only">
+          {t(hasError ? 'notifications.wired.unreadError' : 'notifications.wired.noUnreadError')}
+        </span>
+      </i>
     </span>
+  );
+}
+
+/**
+ * The id the tray chevron names through `aria-controls`. It has to be a module
+ * constant so the toggle and the panel cannot drift apart — a disclosure whose
+ * `aria-controls` points at nothing is worse than no disclosure at all.
+ */
+const TRAY_OVERFLOW_ID = 'os-tray-overflow';
+
+/**
+ * Tray overflow panel — the "show hidden icons" flyout.
+ *
+ * The three secondary tray commands render here with their labels showing, so
+ * the disclosure is not a pure cost: in the bar they were 32px unlabelled icon
+ * buttons whose only naming was a `title` tooltip. Nothing becomes unreachable
+ * — Settings still opens from Start, the palette and Quick Settings' "All
+ * settings", and Widgets still has its desktop context menu.
+ */
+function TrayOverflow({
+  onClose,
+  galleryOpen,
+  onWidgets,
+  onSettings,
+}: {
+  onClose: () => void;
+  galleryOpen: boolean;
+  onWidgets: () => void;
+  onSettings: () => void;
+}) {
+  const { t } = useT();
+  const panelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    // Focus the panel itself rather than the first item: the items are commands,
+    // and landing on one makes Enter fire something the user only meant to reveal.
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+
+  /*
+   * `popup` mirrors the bar's own contract from a2e9c1ce: the two that open a
+   * flyout say so, and Settings — which opens a window — stays a plain command.
+   * Only Widgets carries `aria-expanded`; Clipboard dispatches a CustomEvent and
+   * its panel owns the state, so a stale `false` over an open panel is worse.
+   */
+  const items: { id: string; label: string; icon: ReactNode; popup?: boolean; expanded?: boolean; run: () => void }[] = [
+    { id: 'widgets', label: t('desktop.widgets'), icon: <Icon name="app" size={18} />, popup: true, expanded: galleryOpen, run: onWidgets },
+    {
+      id: 'clipboard',
+      label: t('desktop.clipboardHistory'),
+      icon: <Icon name="clipboard" size={18} />,
+      popup: true,
+      run: () => window.dispatchEvent(new CustomEvent('clipboard:open')),
+    },
+    { id: 'settings', label: t('palette.section.settings'), icon: <Icon name="settings" size={18} />, run: onSettings },
+  ];
+
+  return (
+    <>
+      <div className="os-panel-backdrop" onMouseDown={onClose} />
+      <aside
+        ref={panelRef}
+        tabIndex={-1}
+        id={TRAY_OVERFLOW_ID}
+        className="os-flyout os-flyout--tray anim-slide-up"
+        role="dialog"
+        aria-label={t('desktop.tray.hiddenIcons')}
+      >
+        <div className="os-flyout-body os-tray-overflow-body">
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="os-tray-overflow-item ui-focusable"
+              aria-haspopup={item.popup ? 'dialog' : undefined}
+              aria-expanded={item.expanded}
+              onClick={() => {
+                item.run();
+                onClose();
+              }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -3584,16 +3805,25 @@ const FloatingWindow = memo(function FloatingWindow({
       {isGarden && (
         <>
           <div className="fwin-drag-strip" onPointerDown={dragStart} aria-hidden />
+          {/* `lq-hit` on each button, exactly as the framed bar above already does. It was
+              missing only here, and category 1 measured the consequence: the same `.fwin-b`
+              owns a 32x32.5 pointer region in `.fwin-bar` and 30.5x24.5 inside
+              `.fwin-frameless-controls`. The expander did not "fail to survive this host" —
+              it was never applied to it. */}
           <div className="fwin-frameless-controls">
             {canPopOut && (
-              <button className="fwin-b" title={t('desktop.popOut')} onClick={onPopOut}>
+              <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
               </button>
             )}
-            <button className="fwin-b" title={t('desktop.minimize')} onClick={onMinimize}>
+            <button className="fwin-b lq-hit" title={t('desktop.minimize')} onClick={onMinimize}>
               ─
             </button>
-            <button className="fwin-b fwin-close" title={t('common.close')} onClick={onClose}>
+            <button
+              className="fwin-b lq-hit fwin-close"
+              title={t('common.close')}
+              onClick={onClose}
+            >
               ×
             </button>
           </div>

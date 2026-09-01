@@ -314,7 +314,18 @@ export default function CommandPalette() {
           <span className="palette-hint muted">{t('palette.escHint')}</span>
         </div>
         <ul ref={listRef} className="palette-list">
-          {results.length === 0 && <li className="palette-empty muted">{t('palette.noMatches')}</li>}
+          {/* An empty state has to say what was searched and how to get out of it. "No matches."
+              said neither, and at 11 characters it did not even clear the honest-states message
+              bar — the palette is the entry point a keyboard user reaches, so it is the one
+              surface where a dead end with no way back is worst. The query is echoed so a typo
+              is visible, and Esc is named because the backdrop click is the only other exit. */}
+          {results.length === 0 && (
+            <li className="palette-empty muted">
+              {query.trim()
+                ? t('palette.noMatchesFor', { query: query.trim() })
+                : t('palette.noMatches')}
+            </li>
+          )}
           {results.map((r, i) => (
             <li key={r.key} data-idx={i}>
               <button

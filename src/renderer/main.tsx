@@ -5,6 +5,7 @@ import App from './App';
 import SystemDictOverlay from './components/SystemDictOverlay';
 import ReadingLensOverlay from './components/lens/ReadingLensOverlay';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { withStrictMode } from './strictRoot';
 import { applyZoom, installZoomResizeHook, loadZoom } from './appZoom';
 import { bootOsLook } from './components/DesktopSettings';
 import { bootDisplayPrefs, loadDisplayPrefs } from './displayPrefs';
@@ -42,6 +43,7 @@ import './motion/motion-system.css';
 import './components/ui/ui.css';
 // Accessibility foundation (Phase 1 · M8) — imported late to reinforce.
 import './theme/a11y.css';
+import './theme/aero-safe-mode.css';
 // Performance tiers (Phase 1 · M9).
 import './theme/perf.css';
 // Liquid Workplace semantic tokens (L2). Declares --lq-* custom properties on
@@ -94,6 +96,7 @@ import { installWiredArchiveLifecycle } from './wiredArchiveLifecycle';
 import { applyBlancModeClass, isBlancWindow } from './blancMode';
 import { initAgentOperationalState } from './agentOperationalClient';
 import { installLocalAgentAutomationHost } from './localAgentAutomationHost';
+import { bootAeroSafeMode } from './aeroSafeMode';
 
 // Hydrates this window's view of the main-owned Agent queue, memory and
 // automations, and performs the one-way localStorage adoption. The schedule
@@ -193,13 +196,25 @@ installZoomResizeHook();
 registerFrutigerAero();
 registerWiredArchive();
 bootTheme();
+bootAeroSafeMode();
 // The Blanc window (index.html?blanc=1) shares this entry with Study OS, but
 // has its own visual language and must never adopt the secret material packs
 // (aero/wired). Strip `data-materials` after bootTheme and keep it stripped, so
 // `useAeroMaterials()`/`useWiredMaterials()` stay false and Blanc renders its
 // own flat, sharp look regardless of the shared theme choice. The dedicated
-// blancMain.tsx entry does the same; this covers the fallback entry that is
-// actually loaded today.
+// blancMain.tsx entry does the same.
+//
+// CORRECTION (L9 bullet 4): this used to say the fallback entry "is actually
+// loaded today". It is not, and has not been since the Pillar 1 bundle split —
+// `main.ts:545` loads `blanc.html?blanc=1` in dev and packaged alike,
+// `blanc.html:14` points at blancMain.tsx, and `blanc-harness.html:175` does
+// too. Nothing in the tree now loads main.tsx with `?blanc=1`. Kept anyway,
+// because if anything ever does, this is the ONLY defence in that window:
+// main.tsx imports styles.css and every secret material pack, so it really does
+// own a `:root[data-theme='wired-archive']` palette block, and stripping
+// data-materials does NOT stop that palette (measured: --bg #0c1410 → #02070d
+// with materials already absent). blancMain.tsx is safe instead by NOT
+// importing those sheets — guarded by `__tests__/secretIdentityScope.test.ts`.
 if (isBlancWindow()) {
   const stripStudyOsMaterials = (): void =>
     document.documentElement.removeAttribute('data-materials');
@@ -293,32 +308,32 @@ if (container) {
       // Profile state powers the popup's Anki mining target; nothing else boots.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <SystemDictOverlay />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
     } else if (isReadingLens) {
       // Mining target comes from the active profile; the shell/environment stay dormant.
       initProfileState().catch((err) => console.error('[profileState] init failed:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <ReadingLensOverlay />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
     } else {
       await import('./levelLists')
         .then(({ restoreLevelListsFromIdb }) => restoreLevelListsFromIdb())
         .catch((err) => console.warn('[level-lists] startup restore skipped:', err));
       createRoot(container).render(
-        <React.StrictMode>
+        withStrictMode(
           <AppErrorBoundary>
             <App />
-          </AppErrorBoundary>
-        </React.StrictMode>,
+          </AppErrorBoundary>,
+        ),
       );
       // Re-apply after mount so compensated size is correct once #root is live.
       applyZoom(loadZoom());

@@ -7,9 +7,42 @@
   container: reading-garden / size;
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  /*
+   * `min-height` BEATS `height` and `max-height` in CSS — the used height is
+   * max(min-height, min(max-height, height)) — so a flat 420px floor is not a
+   * floor, it is an override, and it silently won every time the window was
+   * shorter than 420. Measured at 260x170: this element stayed 420 tall inside a
+   * 170px window and 251px of it hung below the frame. Everything the garden
+   * positions is positioned inside it, so the mushroom (y=254), its hitbox
+   * (y=259) and the sky console (y=230) all sat under the fold — the scene's ONLY
+   * interactive control, unreachable, with no scrollbar because this box is
+   * `overflow: hidden`. `gardenWorldRect` projects off this element's box too, so
+   * the world was being cover-fitted into a 420px area of which 170 was visible.
+   *
+   * `min(420px, 100%)` keeps the floor wherever there is room for it — the
+   * percentage resolves because the parent's height is definite, which is the same
+   * reason `height: 100%` above works — and yields to the window when there is not.
+   */
+  min-height: min(420px, 100%);
   overflow: hidden;
   isolation: isolate;
+  /* `z-index` + `pointer-events` together, and neither works without the other.
+     `isolation: isolate` (needed by the blended sky layers) makes this element a
+     stacking context, so every `z-index` inside it — the info chrome's 16, the sky
+     console's 18 — is trapped BELOW `.fwin-drag-strip`, which is `z-index: 2` in
+     the window's own context. Measured live on City: the strip painted over the top
+     12 px of `.reading-garden-info-close`, and `elementFromPoint` down its centre
+     returned `DIV.fwin-drag-strip` for y+0, y+4 and y+8. `z-index: 2` here ties the
+     strip and wins on source order (the body follows the strip in `DesktopShell`),
+     while the frameless window buttons at 3 stay above.
+     Raising it alone is a REGRESSION: this element paints an opaque `#050711`, so it
+     would then swallow the drag band and the window could no longer be dragged —
+     verified, `elementFromPoint(400, 40)` became `MAIN.reading-garden`. `pointer-events:
+     none` gives the band back: all three interactive groups (`.reading-garden-info`,
+     `.reading-garden-sky-console`, the mushroom hitbox) already re-enable `auto`
+     explicitly against a `none` ancestor, so all 9 controls still own their centres. */
+  z-index: 2;
+  pointer-events: none;
   color: #e7f3ed;
   background: #050711;
   font-family: Inter, "Segoe UI Variable", "Segoe UI", sans-serif;
@@ -218,8 +251,11 @@
   background: rgba(133, 207, 202, 0.16);
 }
 
+/* 0.55 measured 3.54:1 composited onto the garden's opaque `#050711`, at 9px. The
+   minimum alpha of this same hue that clears 4.5 is 0.65; 0.68 is taken instead so a
+   lighter patch of scene behind the console still clears. */
 .reading-garden-sky-console-body > small {
-  color: rgba(157, 187, 181, 0.55);
+  color: rgba(157, 187, 181, 0.68);
   font-size: 9px;
   letter-spacing: 0.02em;
 }
@@ -1012,7 +1048,14 @@
   font-weight: 400;
   font-style: italic;
   letter-spacing: 0.045em;
+  /* `line-height: 0.95` is deliberate display leading, but the italic Palatino glyph box is
+     taller than the line box: measured live at 36px, `clientHeight` 34 against `scrollHeight`
+     41, so `overflow: hidden` (which is here only to serve the ellipsis) was cutting 7px off
+     the bottom of the title. Padding rather than a bigger `line-height`: the painted baseline
+     does not move, which is what a display title's leading is chosen for. 0.2em covers the
+     7px at every size in the clamp because the overflow scales with the font. */
   line-height: 0.95;
+  padding-bottom: 0.2em;
   text-shadow:
     0 0 18px rgba(112, 232, 226, 0.35),
     0 0 42px rgba(118, 100, 137, 0.28),
@@ -1084,9 +1127,14 @@
   gap: 2px;
 }
 
+/* THE 0.52 EYEBROW FAMILY — three rules, one defect. `dt`, the observation label and
+   the music heading all painted this hue at 0.52 and all measured 3.90-3.91:1 at 8px.
+   The IDENTICAL hue at 0.58 is already used two rules away (`.reading-garden-info > p`,
+   the panel eyebrow) and measures 4.62, so the family was inconsistent with itself, not
+   deliberately quieter. 0.62 is 0.58 plus headroom for the scene behind the blur. */
 .reading-garden-info-dossier dt {
   margin: 0;
-  color: rgba(174, 211, 205, 0.52);
+  color: rgba(174, 211, 205, 0.62);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -1111,8 +1159,9 @@
   background: rgba(4, 12, 20, 0.22);
 }
 
+/* Same 0.52 eyebrow family as `.reading-garden-info-dossier dt`; see the note there. */
 .reading-garden-info-observation > span {
-  color: rgba(174, 211, 205, 0.52);
+  color: rgba(174, 211, 205, 0.62);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -1168,16 +1217,20 @@
   gap: 8px;
 }
 
+/* Same 0.52 eyebrow family as `.reading-garden-info-dossier dt`; see the note there. */
 .reading-garden-info-music-heading > span {
-  color: rgba(174, 211, 205, 0.52);
+  color: rgba(174, 211, 205, 0.62);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
+/* The now-playing track name, and the narrowest miss of the seven: 4.49 against 4.5 at
+   0.55. A one-hundredth-of-a-point failure is still a failure and still gets the real
+   fix — 0.56 is the bare minimum, 0.62 leaves the same headroom as the rest. */
 .reading-garden-info-music-heading > small {
-  color: rgba(190, 216, 210, 0.55);
+  color: rgba(190, 216, 210, 0.62);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 10px;
   font-style: italic;
@@ -1220,8 +1273,14 @@
   font-size: 10px;
 }
 
+/* `min-height` and not `lq-hit-scope`: an `<input>` is a replaced element, `::after`
+   generates no box on it, and a scope that appeared to cover it would leave it under
+   the floor while reading as fixed (`liquid-controls.css` says so in as many words).
+   The slider measured a 20.5px pointer region; its own box IS its hit area. The track
+   stays where it is painted — the extra height is padding around the thumb. */
 .reading-garden-info-music-volume input[type="range"] {
   width: 100%;
+  min-height: var(--lq-hit-target, 32px);
   accent-color: #70e8e2;
   cursor: pointer;
 }

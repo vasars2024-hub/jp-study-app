@@ -1,0 +1,32 @@
+{
+  "label": "l9-city-canvases",
+  "title": "@.fwin-frameless",
+  "container": ".reading-garden",
+  "row": ".reading-garden canvas",
+  "rows": 13,
+  "rowsSource": "domRows",
+  "domRows": 13,
+  "nodes": 120,
+  "scrollHeight": 821,
+  "clientHeight": 677,
+  "overdraw": 1.2,
+  "scroller": "reading-garden stage-band-1",
+  "distinctRowHeights": 12,
+  "heights": {
+    "1121.99": 2,
+    "164.52": 1,
+    "176.27": 1,
+    "199.77": 1,
+    "205.65": 1,
+    "229.15": 1,
+    "240.9": 1,
+    "123.41": 1,
+    "100.96": 1,
+    "89.75": 1,
+    "67.09": 1,
+    "146.39": 1
+  },
+  "spacerHeight": 1122,
+  "verdict": "INERT",
+  "at": "2026-08-31T11:29:55.266Z"
+}

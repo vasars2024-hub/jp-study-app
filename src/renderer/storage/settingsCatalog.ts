@@ -60,13 +60,14 @@ export const SETTINGS_DOMAINS: SettingsDomainDef[] = [
   {
     id: 'appearance',
     label: 'Theme & appearance',
-    description: 'Theme id, accent, personalization density, custom CSS.',
+    description: 'Theme id, accent, personalization density, custom CSS, Secret OS safe mode.',
     category: 'Personalization',
     lsKeys: [
       'jp-os-theme',
       'jp-os-accent',
       'jp-os-personalization-v1',
       'jp-os-custom-css-v1',
+      'jp-os-aero-safe-mode-v1',
     ],
     clearable: true,
     clearConfirm: 'Reset theme, accent, personalization, and custom CSS?',

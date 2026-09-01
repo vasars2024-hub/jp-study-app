@@ -766,6 +766,50 @@ migration; they are the only two zeros with work still owed to them.
    shared with the preceding key. A whole-key search reads exactly like "no notes".
 5. **The census reports only what MAIN sees.** `outputs/notes` will read 0 in that output
    forever. That is correct and is not a regression.
+### 2026-08-31 — codexB, Gate 21 inspector integration checkpoint
+
+Product commits: `f42f2860` adds the reusable inspector confirmation/Undo surface;
+`1e192d1b` prevents a delayed delete receipt from leaking onto a changed selection;
+`5b5ec40e` keeps the destructive confirmation on an opaque Liquid Work anchor.
+Focused deletion boundary: **6/6 files, 48/48 tests**; touched-path ESLint **0 errors**.
+Gate 21 remains open: primary2 must wire this control into `FilesApp.tsx` after sync-down,
+then a self-created file must be trashed and actually restored from the Windows Recycle Bin.
+
+### 2026-08-31 — codexA, Gate 9/21 main-lane checkpoint map
+
+Product commits: `00d1648a` absolute target validation; `1f33f52a` typed preload bridge;
+`e5664e2d` 18 localized deletion outcomes; `fe619969` browser adapter and result mapping.
+Turn-wide gates after all four: **949/1** Vitest files, **12,271/6** tests, i18n **11,812**,
+architecture **Nothing new**, ESLint **0 errors**. Gates 9/21 remain open for live integration.
+
+### 2026-08-31 — codexA, Gate 9/21 absolute-target boundary
+
+The privileged deletion boundary now refuses relative and drive-relative paths from a malformed
+authoritative snapshot before `shell.trashItem` can run. Absolute Windows drive, UNC and POSIX
+controls pass; **2 of 2** relative-path controls return the named failure with **0** trash calls
+and **0** cache invalidations. Focused result: **11 of 11 tests pass**. Gates 9/21 remain open
+until the merged Files inspector drives the bridge and one Recycle Bin fixture is restored.
+
+### 2026-08-31 — codexA, Gate 9/21 typed renderer bridge
+
+Preload now invokes the shared `filesapp:delete` channel with only the versioned request; the
+renderer declaration returns the same validated result union. The source guard proves both
+surfaces share the contract, **31 of 31** focused deletion tests pass, and the production preload
+bundle builds from **26 modules**. Gate 21 remains open pending the inspector and live restore.
+
+### 2026-08-31 — codexA, Gate 9/21 honest deletion copy
+
+All **18** deletion interaction/result keys now exist in EN/JA/ZH/RU. Recycle Bin, soft-delete
+with Undo, computed refusal, stale selection and failure are distinct messages; no raw key needs
+to become the Files inspector's error UI. `i18n-check` passes at **11,811** English keys and the
+catalog/deletion guard passes **16 of 16** tests. Gate 21 remains open pending live integration.
+
+### 2026-08-31 — codexA, Gate 9/21 browser session outcomes
+
+The renderer session now adapts the typed preload, returns a named result for a stale bridge,
+and maps trash, soft-delete, failure, restored, expired and failed-Undo receipts to **19**
+localized outcome keys. Focused deletion result: **34 of 34 tests pass**. The exact remaining
+Gate 21 work is production inspector wiring plus one live trash-and-restore fixture.
 
 ### 2026-08-30 — codexA, Gate 1 renderer-store census and deck contract
 

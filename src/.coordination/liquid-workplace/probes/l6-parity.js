@@ -101,6 +101,20 @@
     window[global] = window[global] || {};
     return window[global];
   };
+  /**
+   * SHELL SCOPE. Correction 22 arriving from the other direction.
+   *
+   * Every other subject in this file is a window that must not reach into a NESTED window.
+   * The shell is the one subject that legitimately CONTAINS windows, so its own queries must
+   * exclude them: `.os-desktop` holds three `.fwin`, and an unscoped `qa(w, 'button')` folds
+   * every hosted app's controls into the shell's own count. That is not a near miss — it is
+   * the difference between "the taskbar has 12 buttons" and "the desktop has 300".
+   *
+   * Named `shq` rather than replacing `qa` because the shell spec deliberately uses BOTH:
+   * `qa(w, '.fwin')` is how it counts what it hosts, which is the taskbar-identity row.
+   */
+  const shq = (root, sel) => qa(root, sel).filter((e) => !e.closest('.fwin'));
+  const shellState = specState('__LQP_SHELL_ORIG');
   const libState = specState('__LQP_LIB_ORIG');
   const immState = specState('__LQP_IMM_ORIG');
   const capState = specState('__LQP_CAP_ORIG');
@@ -117,6 +131,7 @@
   const scraperState = specState('__LQP_SCRAPER_ORIG');
   const settingsState = specState('__LQP_SETTINGS_ORIG');
   const ytState = specState('__LQP_YT_ORIG');
+  const videoState = specState('__LQP_VIDEO_ORIG');
   // Resources helpers. The rail's chips share `gram-level-btn` with Grammar's level
   // buttons, so they are scoped by `.res-filter`; and `.res-card` is rendered by THREE
   // sections (catalogue groups, the New strip, My tools), so the catalogue's own cards
@@ -3100,6 +3115,511 @@
       },
     },
 
+    /*
+     * L9's first RULE C surface — the Media Center's VIDEO tab, the densest presentable
+     * window in `CENSUS.md`. It shares a `.fwin` and a title bar with `music`, so it needs
+     * `notSel` for the same reason `vn` does: the Media Center is ONE window whose page
+     * swaps, and a title-only match on a drifting tab scores the tab that happens to be
+     * mounted. `rootSel: '.mc-video-page'` plus `notSel: '.mc-music-layout'` makes the
+     * identity exact, and `navReach` then asserts the drift is not happening rather than
+     * assuming it (L9 handoff trap 1: HMR resets the tab and every harness scores whatever
+     * it lands on).
+     *
+     * Every row is a CROSS-CHECK between two independently rendered places, because this
+     * surface's real failure mode is not a missing button — it is two renderings of one
+     * state disagreeing (`upNextShelf` guards exactly the "relocated, not duplicated"
+     * property that `04e51992` established, and `inspectorHonesty` guards the half-loaded
+     * inspector).
+     */
+    video: {
+      titleRe: /Video|ビデオ|视频|Виде/i,
+      rootSel: '.mc-video-page',
+      notSel: '.mc-music-layout',
+      features: [
+        {
+          // The stage's honest state: with no source there is no `<video>` element at all,
+          // and the file-entry empty offers its two real entry actions, both enabled. A
+          // stage that mounts a player with nothing to play is the dishonest half; an empty
+          // that names a dead end is the other.
+          id: 'stageHonesty',
+          f: (w) => {
+            const empties = qa(w, '.mc-video-empty');
+            const media = qa(w, '.mc-video-stage video').length;
+            // `:scope > div > button` and NOT a bare `button`: `04e51992` moved the
+            // up-next shelf INSIDE this empty state, so a descendant query counts its
+            // seven poster cards as entry actions — and the control then could not falsify
+            // the row, because removing one real action still left eight "actions". The
+            // empty's own action row is its direct `<div>` child.
+            const ENTRY = ':scope > div > button';
+            const entry = empties.find((e) => qa(e, ENTRY).length >= 2);
+            const acts = entry ? qa(entry, ENTRY) : [];
+            const live = acts.filter((b) => !b.disabled).length;
+            const titled = empties.filter((e) => txt(q(e, 'strong'))).length;
+            return {
+              ok: empties.length > 0 && titled === empties.length
+                && (media > 0 ? !entry : !!entry && acts.length >= 2 && live === acts.length),
+              ev: `empties=${empties.length} titled=${titled} video=${media} entryActions=${acts.length} enabled=${live}`,
+            };
+          },
+        },
+        {
+          // The mute-pair contract the topbar's own source argues for: a greyed action
+          // must carry its reason. Presence is not what is scored — the agreement between
+          // `disabled` and a non-empty `title` is, in both directions.
+          id: 'topbarActions',
+          f: (w) => {
+            const acts = qa(w, '.mc-video-actions button');
+            const off = acts.filter((b) => b.disabled);
+            const explained = off.filter((b) => (b.title || '').trim().length > 0).length;
+            const on = acts.length - off.length;
+            return {
+              ok: acts.length >= 4 && on >= 2 && explained === off.length,
+              ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained}`,
+            };
+          },
+        },
+        {
+          // Driven: `step('toggle')` clicks the first learning toggle. The row asserts the
+          // flip landed AND that nothing else in the group moved — a group whose controls
+          // share one state would flip together, which is the defect a count cannot see.
+          id: 'learningToggles',
+          f: (w) => {
+            const g = videoState();
+            const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+            const now = boxes.map((b) => b.checked);
+            const was = g.toggles;
+            const flipped = was ? now.filter((v, i) => v !== was[i]).length : -1;
+            return {
+              ok: boxes.length >= 6 && !!was && flipped === 1 && now[0] !== was[0],
+              ev: `toggles=${boxes.length} before=${JSON.stringify(was)} after=${JSON.stringify(now)} flipped=${flipped}`,
+            };
+          },
+        },
+        {
+          // The transcription block's own model select — NOT the YouTube bar's, which
+          // shares the class and carries a different option list. Scored against the
+          // language segment beside it: exactly one active, and the select's value is a
+          // real option rather than a stale string the list no longer offers.
+          id: 'transcriptionModel',
+          f: (w) => {
+            const sel = q(w, '.mc-inspector-block > .media-model-select');
+            const opts = sel ? Array.from(sel.options).map((o) => o.value) : [];
+            const seg = qa(w, '.media-modelseg .sp-seg-btn');
+            const active = activeOf(seg, 'active');
+            return {
+              ok: !!sel && opts.length >= 2 && opts.includes(sel.value)
+                && seg.length >= 2 && active === 1,
+              ev: `options=${opts.length} value="${sel ? sel.value : 'absent'}" inList=${opts.includes(sel ? sel.value : '')} segments=${seg.length} active=${active}`,
+            };
+          },
+        },
+        {
+          id: 'watchFolder',
+          f: (w) => {
+            const btns = qa(w, '.media-watch button');
+            const live = btns.filter((b) => !b.disabled).length;
+            return { ok: btns.length > 0 && live === btns.length, ev: `controls=${btns.length} enabled=${live}` };
+          },
+        },
+        {
+          // Driven: `step('youtube')` drafts a URL. The row is the draft surviving in the
+          // field with its action live — a bar that clears what was typed is the failure.
+          id: 'youtubeDraft',
+          f: (w) => {
+            const g = videoState();
+            const input = q(w, '.media-yt-input');
+            const action = q(w, '.media-yt button');
+            return {
+              ok: !!input && !!g.ytTest && input.value === g.ytTest && !!action && !action.disabled,
+              ev: `drafted=${!!input && input.value === g.ytTest} actionEnabled=${!!action && !action.disabled}`,
+            };
+          },
+        },
+        {
+          /*
+           * EXACTLY ONE up-next shelf. `04e51992` moved the shelf INTO the empty stage to
+           * close category 4's dead region, and the property that makes that a relocation
+           * rather than a duplication is that one `upNext` value renders in one of two
+           * places — never both, never neither. A count of `>= 1` would pass the duplicate
+           * and a count of `<= 1` would pass the loss; only `=== 1` is the contract.
+           */
+          id: 'upNextShelf',
+          f: (w) => {
+            const shelves = qa(w, '.mc-up-next');
+            const cards = shelves.reduce((n, s) => n + qa(s, 'button, article, .mc-shelf-card').length, 0);
+            const shown = shelves.filter((s) => s.checkVisibility && s.checkVisibility()).length;
+            return {
+              ok: shelves.length === 1 && cards > 0 && shown === 1,
+              ev: `shelves=${shelves.length} cards=${cards} visible=${shown}`,
+            };
+          },
+        },
+        {
+          /*
+           * The inspector is either fully loaded or fully empty, never half. Four
+           * independently rendered signals — the score row, the MAL link, the meta line and
+           * the empty paragraph — all derive from one `current`, so any disagreement is a
+           * surface showing state it does not have.
+           */
+          id: 'inspectorHonesty',
+          f: (w) => {
+            const ins = q(w, '.mc-video-inspector');
+            if (!ins) return { ok: false, ev: 'no inspector rail' };
+            const score = !!q(ins, '.mc-inspector-score-row');
+            const meta = !!q(ins, '.mc-video-meta');
+            const mal = !!qa(ins, '.mc-section-head button')[0];
+            const empty = !!q(ins, '.mc-muted');
+            const loaded = score && meta && mal && !empty;
+            const blank = !score && !meta && !mal && empty;
+            return {
+              ok: loaded || blank,
+              ev: `scoreRow=${score} meta=${meta} malLink=${mal} emptyCopy=${empty} coherent=${loaded ? 'loaded' : blank ? 'blank' : 'MIXED'}`,
+            };
+          },
+        },
+        {
+          /*
+           * The tab this window is actually on, cross-checked against the title the window
+           * chrome advertises. L9 handoff trap 1: the Media Center tab DRIFTS (HMR resets
+           * it) and every harness silently scores whatever page it lands on. Two
+           * independently rendered strings agreeing is what makes the rest of this spec's
+           * numbers attributable to Video at all.
+           */
+          id: 'navReach',
+          f: (w) => {
+            const items = qa(w, '.mc-nav button');
+            const active = items.filter((b) => b.classList.contains('is-active'));
+            // The nav item is `<svg><span><strong>Video</strong><small>Immersion
+            // player</small></span></button>`. `textContent` concatenates with NO
+            // separator, so splitting on a newline yields "VideoImmersion player" and the
+            // comparison against the window title fails on a correct surface — measured,
+            // not reasoned. The `<strong>` is the label.
+            const label = active[0] ? txt(q(active[0], 'strong')) : '';
+            const title = txt(q(w, '.fwin-title-text'));
+            const page = q(w, '.mc-page');
+            return {
+              ok: items.length >= 6 && active.length === 1 && !!label && label === title
+                && !!page && page.classList.contains('mc-video-page'),
+              ev: `items=${items.length} active=${active.length} activeLabel="${label}" windowTitle="${title}" page="${page ? page.className : 'absent'}"`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        toggle: (w) => {
+          const g = videoState();
+          const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+          if (!boxes.length) return { refused: 'no learning toggles' };
+          if (!g.toggles) {
+            g.toggles = boxes.map((b) => b.checked);
+            g.prefsStorage = localStorage.getItem('jp-media-player-preferences-v1');
+          }
+          if (boxes[0].checked !== g.toggles[0]) return { already: true, now: boxes.map((b) => b.checked) };
+          boxes[0].click();
+          return { was: g.toggles[0], now: boxes[0].checked };
+        },
+        youtube: (w) => {
+          const g = videoState();
+          const input = q(w, '.media-yt-input');
+          if (!input) return { refused: 'no YouTube import field' };
+          // The runner dirties the first editable field BEFORE the drive, and on this
+          // surface that field IS this one. Recording the mark as the "original" would
+          // make undo restore the harness's own probe string into the live app, so a
+          // dirtied value is never captured as an original.
+          if (g.youtube == null) g.youtube = /lqp-roundtrip-/.test(input.value) ? '' : input.value;
+          g.ytTest = 'https://youtu.be/aaaaaaaaaaa';
+          typeInto(input, g.ytTest);
+          return { drafted: true };
+        },
+      },
+      drive: ['toggle', 'youtube'],
+      undo: {
+        video: (w) => {
+          const g = window.__LQP_VIDEO_ORIG;
+          if (!g) return null;
+          const done = [];
+          const boxes = qa(w, '.mc-toggle-list .mc-toggle input');
+          if (g.toggles && boxes.length === g.toggles.length) {
+            boxes.forEach((b, i) => { if (b.checked !== g.toggles[i]) { b.click(); done.push(`toggle${i}`); } });
+          }
+          const input = q(w, '.media-yt-input');
+          if (input && g.youtube != null && input.value !== g.youtube) {
+            typeInto(input, g.youtube); done.push('youtube');
+          }
+          // The preference blob is written by the click's own effect, so it is put back on
+          // the next tick — after React has finished persisting the restored value.
+          setTimeout(() => {
+            if (g.prefsStorage == null) localStorage.removeItem('jp-media-player-preferences-v1');
+            else localStorage.setItem('jp-media-player-preferences-v1', g.prefsStorage);
+          }, 0);
+          window.__LQP_VIDEO_ORIG = null;
+          return done.length ? `video:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        stageHonesty: (w) => detach(
+          qa(w, '.mc-video-empty').filter((e) => qa(e, ':scope > div > button').length >= 2)
+            .map((e) => qa(e, ':scope > div > button')[1])[0],
+          'no multi-action empty state',
+        ),
+        topbarActions: (w) => stripAttr(
+          qa(w, '.mc-video-actions button').filter((b) => b.disabled)[0],
+          'title',
+          'every topbar action is enabled — no muted control to falsify',
+        ),
+        learningToggles: (w) => detach(q(w, '.mc-toggle-list .mc-toggle'), 'no learning toggles'),
+        transcriptionModel: (w) => removeClassAll(qa(w, '.media-modelseg .sp-seg-btn.active'), 'active'),
+        watchFolder: (w) => detach(q(w, '.media-watch button'), 'no watch-folder control'),
+        youtubeDraft: (w) => detach(q(w, '.media-yt button'), 'no YouTube action'),
+        upNextShelf: (w) => detach(q(w, '.mc-up-next'), 'no up-next shelf'),
+        inspectorHonesty: (w) => removeClassAll(qa(w, '.mc-video-inspector .mc-muted'), 'mc-muted'),
+        navReach: (w) => removeClassAll(qa(w, '.mc-nav .is-active'), 'is-active'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /*
+     * L9's second RULE C surface — City / Mooncap Garden, the sparsest window in the shell
+     * and the one section `canPresentLiquid` refuses. It has no `.fwin-title-text`, so it
+     * is always matched by `rootSel`; `titleRe` is here only because the runner raises by
+     * TASKBAR title, which is "Mooncap Garden".
+     *
+     * A canvas scene has almost no controls, so presence-counting would score it 10/10 on
+     * an empty stage. Every row here is instead an AGREEMENT between two numbers the scene
+     * computes independently — the stage badge against the root's `stage-band-N` class, the
+     * banked-pages sentence against the progress bar's inline width, the music toggle
+     * against the volume slider's `disabled` — plus `heroPlacement`, which is `df9441cf`'s
+     * fix stated as a contract so the mushroom cannot slide back under the fold.
+     */
+    city: {
+      titleRe: /Mooncap|ムーンキャップ|月帽|Мунка/i,
+      rootSel: '.reading-garden',
+      features: [
+        {
+          // Driven: `step('dossier')` clicks the hitbox. The disclosure must report itself
+          // open, point at the panel it opened, and offer an enabled way back out — the
+          // "every enable flow needs a disable path" invariant, in this surface's terms.
+          id: 'dossierDisclosure',
+          f: (w) => {
+            const hit = q(w, '.reading-garden-mushroom-hitbox');
+            const panel = q(w, '.reading-garden-info');
+            const close = q(w, '.reading-garden-info-close');
+            const controls = hit ? hit.getAttribute('aria-controls') : null;
+            return {
+              ok: !!hit && hit.getAttribute('aria-expanded') === 'true' && !!panel
+                && panel.getAttribute('role') === 'dialog' && !!(panel.getAttribute('aria-label') || '').trim()
+                && !!controls && panel.id === controls && !!close && !close.disabled,
+              ev: `expanded=${hit ? hit.getAttribute('aria-expanded') : 'absent'} panel=${!!panel} controls="${controls}" panelId="${panel ? panel.id : ''}" closeEnabled=${!!close && !close.disabled}`,
+            };
+          },
+        },
+        {
+          // The stage badge and the root's scene band are computed from one `stage` in two
+          // places: `stage-band-${floor((stage-1)/10)+1}`. A badge that says 11 on a
+          // band-1 scene is the surface telling the user one thing and painting another.
+          id: 'stageReadout',
+          f: (w) => {
+            const badge = Number(txt(q(w, '.reading-garden-info-stage strong')));
+            const root = q(w, '.reading-garden');
+            const band = Number((String(root && root.className).match(/stage-band-(\d+)/) || [])[1]);
+            const want = Number.isFinite(badge) && badge > 0 ? Math.floor((badge - 1) / 10) + 1 : NaN;
+            return {
+              ok: Number.isFinite(badge) && badge > 0 && band === want,
+              ev: `stageBadge=${badge} sceneBand=${band} expectedBand=${want}`,
+            };
+          },
+        },
+        {
+          // Three dossier facts, every `dt` and `dd` non-empty, AND the banked-pages
+          // sentence agreeing with the progress bar's inline width to within a point. The
+          // sentence is text and the bar is a percentage — the same fraction rendered
+          // twice, which is the only way to catch a bar that has stopped tracking.
+          id: 'dossierFacts',
+          f: (w) => {
+            const rows = qa(w, '.reading-garden-info-dossier > div');
+            const filled = rows.filter((r) => txt(q(r, 'dt')) && txt(q(r, 'dd'))).length;
+            const banked = txt(q(w, '.reading-garden-info-copy strong'));
+            const nums = (banked.match(/\d+/g) || []).map(Number);
+            const bar = q(w, '.reading-garden-info-track i');
+            const pct = bar ? Number(String(bar.style.width).replace('%', '')) : NaN;
+            // A mature organism renders no banked sentence; then the bar has no text to
+            // agree with and the row scores the facts alone rather than inventing a match.
+            const agrees = nums.length >= 2
+              ? Number.isFinite(pct) && Math.abs(pct - (nums[0] / nums[1]) * 100) <= 1
+              : !!txt(q(w, '.reading-garden-info-observation p'));
+            return {
+              ok: rows.length >= 3 && filled === rows.length && agrees,
+              ev: `factRows=${rows.length} filled=${filled} banked="${banked}" barWidth=${pct}%`,
+            };
+          },
+        },
+        {
+          // Exactly one of On/Off pressed, and the volume slider's `disabled` agreeing with
+          // which one — `disabled={!music.enabled}` in the source, so a slider live under a
+          // pressed Off is a control that outlives the state that gates it.
+          id: 'musicControls',
+          f: (w) => {
+            const btns = qa(w, '.reading-garden-info-music-toggle button');
+            const on = btns.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const enabled = on.length === 1 && btns.indexOf(on[0]) === 0;
+            const vol = q(w, '.reading-garden-info-music-volume input');
+            return {
+              ok: btns.length === 2 && on.length === 1 && !!vol && vol.disabled === !enabled,
+              ev: `buttons=${btns.length} pressed=${on.length} enabledSide=${enabled} sliderDisabled=${vol ? vol.disabled : 'absent'}`,
+            };
+          },
+        },
+        {
+          // The readout beside the slider is the slider's own value, rendered separately.
+          id: 'musicVolumeReadout',
+          f: (w) => {
+            const vol = q(w, '.reading-garden-info-music-volume input');
+            const out = txt(q(w, '.reading-garden-info-music-volume strong'));
+            return {
+              ok: !!vol && vol.type === 'range' && Number(vol.max) > 0 && out === String(Number(vol.value)),
+              ev: `value=${vol ? vol.value : 'absent'} readout="${out}" range=${vol ? `${vol.min}..${vol.max}` : 'absent'}`,
+            };
+          },
+        },
+        {
+          // A canvas scene that did not paint is a canvas with a 0x0 BACKING STORE, which
+          // no CSS box will reveal — `width`/`height` attributes, not the rect.
+          id: 'scenePainted',
+          f: (w) => {
+            const canvases = qa(w, '.reading-garden canvas')
+              .filter((c) => !c.closest('[data-dev-only="true"]'));
+            const painted = canvases.filter((c) => c.width > 0 && c.height > 0).length;
+            const layers = qa(w, '.reading-garden-world, .reading-garden-cloud-sprite').length;
+            return {
+              ok: canvases.length > 0 && painted === canvases.length && layers >= 6,
+              ev: `canvases=${canvases.length} painted=${painted} parallaxLayers=${layers}`,
+            };
+          },
+        },
+        {
+          /*
+           * `df9441cf` as a contract. `.reading-garden` had `min-height: 420px`, which is an
+           * OVERRIDE and not a floor, so at 260x170 the scene stayed 420 tall inside a 170px
+           * window and the mushroom — the surface's ONLY control, with no scrollbar to reach
+           * it — sat at y=254, under the fold. The row is the hitbox's box lying inside the
+           * window's own box on both axes.
+           */
+          id: 'heroPlacement',
+          f: (w) => {
+            const hit = q(w, '.reading-garden-mushroom-hitbox');
+            if (!hit) return { ok: false, ev: 'no mushroom hitbox' };
+            const a = hit.getBoundingClientRect();
+            const b = w.getBoundingClientRect();
+            const inside = a.top >= b.top - 1 && a.left >= b.left - 1
+              && a.bottom <= b.bottom + 1 && a.right <= b.right + 1;
+            return {
+              ok: inside && a.width >= 32 && a.height >= 32,
+              ev: `hitbox=${Math.round(a.x - b.x)},${Math.round(a.y - b.y)} ${Math.round(a.width)}x${Math.round(a.height)} window=${Math.round(b.width)}x${Math.round(b.height)} inside=${inside}`,
+            };
+          },
+        },
+        {
+          /*
+           * The dev-only console is not part of this surface. Correction 21 established the
+           * contract as an ATTRIBUTE the product sets next to its own `import.meta.env.DEV`
+           * guard, so the row asserts what the attribute is allowed to be on: nothing the
+           * user can reach. Every marked subtree is named in the evidence, so putting the
+           * attribute on a shipping element to dodge a score shows up here by name.
+           */
+          id: 'devOnlyIsolated',
+          f: (w) => {
+            const marked = qa(w, '[data-dev-only="true"]');
+            const named = marked.map((n) => `${n.tagName.toLowerCase()}.${String(n.className).split(' ')[0]}`);
+            const controls = qa(w, 'button, input, select, textarea')
+              .filter((c) => !c.closest('[data-dev-only="true"]') && !c.closest('.fwin-frameless-controls'));
+            return {
+              ok: marked.every((n) => /console|debug|dev/i.test(String(n.className))) && controls.length > 0,
+              ev: `devOnly=${marked.length} [${named.join(', ')}] userControls=${controls.length}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        dossier: (w) => {
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return { refused: 'no mushroom hitbox' };
+          // NOT the per-spec `specState` global the other apps use, and the difference is
+          // measured rather than stylistic: `restore()` nulls those, the control loop calls
+          // `restore()` after every mutation, and the next `drive()` would then re-capture
+          // the ORIGINAL as "open" — leaving the user's dossier open at the end of the run
+          // and calling it restored. This one records the true original once and is never
+          // cleared, so every restore puts the surface back to what was found.
+          if (window.__LQP_CITY_WAS_OPEN === undefined) {
+            window.__LQP_CITY_WAS_OPEN = hit.getAttribute('aria-expanded') === 'true';
+          }
+          if (hit.getAttribute('aria-expanded') === 'true') return { already: true };
+          hit.click();
+          return { opened: true };
+        },
+      },
+      drive: ['dossier'],
+      undo: {
+        city: (w) => {
+          const was = window.__LQP_CITY_WAS_OPEN;
+          if (was === undefined) return null;
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return null;
+          const open = hit.getAttribute('aria-expanded') === 'true';
+          if (open === was) return null;
+          const close = q(w, '.reading-garden-info-close');
+          (close || hit).click();
+          return 'city:dossier';
+        },
+      },
+      mutations: {
+        dossierDisclosure: (w) => stripAttr(
+          q(w, '.reading-garden-mushroom-hitbox'), 'aria-controls', 'no mushroom hitbox',
+        ),
+        stageReadout: (w) => detach(q(w, '.reading-garden-info-stage strong'), 'dossier not open — no stage badge'),
+        dossierFacts: (w) => detach(q(w, '.reading-garden-info-dossier > div dd'), 'no dossier facts'),
+        musicControls: (w) => setAttr(
+          qa(w, '.reading-garden-info-music-toggle button')
+            .filter((b) => b.getAttribute('aria-pressed') === 'false')[0],
+          'aria-pressed', 'true', 'no unpressed music button to falsify',
+        ),
+        musicVolumeReadout: (w) => detach(
+          q(w, '.reading-garden-info-music-volume strong'), 'no volume readout',
+        ),
+        /*
+         * The layer half, not the canvas half, and the choice is deliberate. Zeroing a
+         * canvas backing store is the more literal "did not paint" falsification, but the
+         * restore sweep only puts an ATTRIBUTE back — the pixels are gone, and a layer that
+         * is not on a redraw loop would stay blank in the user's live garden after the run.
+         * A class the sweep genuinely re-adds falsifies the same row with nothing at risk.
+         * Stated so the limitation is on the record: the control proves the parallax half of
+         * `scenePainted`, and the canvas half is asserted but not falsified.
+         */
+        scenePainted: (w) => removeClassAll(qa(w, '.reading-garden-cloud-sprite'), 'reading-garden-cloud-sprite'),
+        heroPlacement: (w) => {
+          const hit = q(w, '.reading-garden-mushroom-hitbox');
+          if (!hit) return { refused: 'no mushroom hitbox' };
+          hit.setAttribute('data-lqp-was-style', hit.getAttribute('style') || '');
+          hit.style.transform = 'translateY(4000px)';
+          return { mutated: 'hitbox pushed 4000px below the fold' };
+        },
+        // Marking a SHIPPING element `data-dev-only` would be the honest falsification, but
+        // the restore sweep can only put an attribute BACK, never remove one it invented —
+        // it would leave `data-dev-only=""` on a product node. Falsified from the other
+        // side instead: strip the marked panel's own identifying class, so the row can no
+        // longer confirm that what is marked is a console.
+        devOnlyIsolated: (w) => removeClassAll(
+          qa(w, '[data-dev-only="true"]'), 'reading-garden-sky-console',
+        ),
+        windowLifecycle: (w) => {
+          const bar = q(w, '.fwin-frameless-controls');
+          if (!bar) return { refused: 'no frameless control cluster' };
+          return detach(qa(bar, '.fwin-b')[0], 'no frameless chrome button');
+        },
+      },
+    },
+
     // Scraper's parity contract is the shell that reaches every provider, the settings
     // editor that configures them, and explicit reverse controls. Network work is never
     // triggered by this harness: it only changes and restores local navigation state.
@@ -4057,6 +4577,303 @@
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },
+
+    /**
+     * THE SHELL — a fifth host, added 2026-08-31 for L9 bullet 4 (`shellSel`, not `rootSel`).
+     *
+     * Every spec above it is an APP inside a window. The desktop shell is the thing that
+     * HOSTS those windows, and L9 bullet 4 ("Verify Secret Aero/Wired lifecycle") cannot be
+     * scored for category 6 without it. Three decisions, all recorded because each one had a
+     * wrong answer that looked reasonable:
+     *
+     * 1. WHAT IS THE SHELL'S PRESENTATION AXIS? Not the theme. A shell renders no
+     *    `.fwin-b-liquid` of its own, and switching `wired-archive` -> Study OS -> back to
+     *    drive the trip would mutate a persisted global setting through a transition
+     *    (`getComputedStyle` right after a theme swap still returns the OLD value) for a
+     *    reading the rubric never asked for. Category 6's own 10-requirement names the
+     *    answer instead: the round trip must preserve "geometry, focus, z-order, pin,
+     *    pop-out, snap, monitor placement, and TASKBAR IDENTITY". Taskbar identity is a
+     *    SHELL property. So the shell's axis is a hosted window's Standard -> Liquid ->
+     *    Standard flip, and the claim under test is: does making a window Liquid break the
+     *    shell that hosts it? That is the regression this category exists to catch, it uses
+     *    the machinery that already works, and it touches no persisted global.
+     *
+     * 2. THE PROXY IS RESOLVED LIVE, NEVER NAMED. `presProxy` returns the first open `.fwin`
+     *    that actually renders `.fwin-b-liquid`. Hardcoding "video" would refuse the whole
+     *    cell on a desktop where Video happens to be closed, and would silently score the
+     *    wrong window if two were open. With NO presentable window open the spec refuses —
+     *    it does not fall back to scoring a trip it did not take.
+     *
+     * 3. THE SHELL ROOT CONTAINS THE WINDOWS, so every row and the snapshot are scoped
+     *    OUTSIDE `.fwin`. This is correction 22's ownership bug arriving from the opposite
+     *    direction: there the subject was a window and the harness reached into a nested
+     *    one; here the subject legitimately contains three windows, and an unscoped
+     *    `snapshot` would fold their fields, controls and text into the shell's. The round
+     *    trip would then diff on the flipped window's own contents and report the shell as
+     *    having lost state when the shell did exactly the right thing.
+     */
+    shell: {
+      shellSel: '.os-desktop',
+      titleRe: /$^/,
+      features: [
+        {
+          id: 'taskbarIdentity',
+          f: (w) => {
+            // The rubric's own named term. One button per hosted window, each still
+            // carrying its window's identity — not a count that happens to match.
+            const wins = qa(w, '.fwin');
+            const btns = shq(w, '.os-task-win');
+            const titles = btns.map((b) => (b.getAttribute('title') || '').trim()).filter(Boolean);
+            return {
+              ok: btns.length === wins.length && wins.length > 0 && titles.length === btns.length,
+              ev: `taskButtons=${btns.length} hostedWindows=${wins.length} titled=${titles.length} [${titles.join(' | ')}]`,
+            };
+          },
+        },
+        {
+          id: 'taskbarRaises',
+          f: (w) => {
+            // Side effect, not presence: `taskbarRaise` recorded the rank it produced.
+            const s = shellState();
+            return {
+              ok: s.raisedTo === 1,
+              ev: `clicked=${s.raisedTitle || 'none'} rankAfter=${s.raisedTo === undefined ? 'not driven' : s.raisedTo} of ${s.raisedOf}`,
+            };
+          },
+        },
+        {
+          id: 'startEntryPoint',
+          f: () => {
+            const s = shellState();
+            return {
+              ok: s.startOpened === 1 && s.startClosed === 0,
+              ev: `menusWhileOpen=${s.startOpened} menusAfterClose=${s.startClosed}`,
+            };
+          },
+        },
+        {
+          id: 'trayFlyout',
+          f: () => {
+            const s = shellState();
+            return {
+              ok: s.flyoutOpened === 1 && s.flyoutClosed === 0,
+              ev: `flyoutsWhileOpen=${s.flyoutOpened} flyoutsAfterClose=${s.flyoutClosed} via=${s.flyoutVia || 'none'}`,
+            };
+          },
+        },
+        {
+          id: 'virtualDesktops',
+          f: (w) => {
+            const sw = shq(w, '.os-desktop-switch');
+            const active = sw.filter((b) => b.classList.contains('active'));
+            return {
+              ok: sw.length >= 2 && active.length === 1,
+              ev: `switches=${sw.length} active=${active.length} [${sw.map((b) => txt(b)).join(' | ')}]`,
+            };
+          },
+        },
+        {
+          id: 'trayControls',
+          f: (w) => {
+            // Every tray control must be NAMED. An icon-only button with no accessible name
+            // is a capability the user cannot find, which is this category's regression.
+            const btns = shq(w, '.os-tray-btn');
+            const named = btns.filter((b) => (b.getAttribute('title') || b.getAttribute('aria-label') || '').trim());
+            return {
+              ok: btns.length > 0 && named.length === btns.length,
+              ev: `trayButtons=${btns.length} named=${named.length}`,
+            };
+          },
+        },
+        {
+          id: 'clock',
+          f: (w) => {
+            const c = q(w, '.os-clock');
+            const t = txt(c);
+            return { ok: !!c && /\d{1,2}:\d{2}/.test(t), ev: `clock=${JSON.stringify(t)}` };
+          },
+        },
+        {
+          id: 'shellIdentity',
+          f: (w) => {
+            // The Wired/Aero identity is a real material stamp plus real shell-owned
+            // furniture, read from the document rather than from a class this file invented.
+            const mat = document.documentElement.getAttribute('data-materials');
+            const theme = document.documentElement.getAttribute('data-theme') || '';
+            const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`).length;
+            return {
+              ok: !!mat && theme.indexOf(mat) === 0 && owned > 0,
+              ev: `materials=${mat} theme=${theme} identityElements=${owned}`,
+            };
+          },
+        },
+        {
+          id: 'desktopSurface',
+          f: (w) => {
+            // The shell must actually own a desktop the user can drop onto: a real box, and
+            // the icon grid it renders is reported as a NUMBER rather than asserted. An
+            // empty grid is honest state, not a failure — the row's claim is that the
+            // surface exists and its icon count agrees with what the shell rendered.
+            const r = w.getBoundingClientRect();
+            const icons = shq(w, '.os-desk-icon');
+            return {
+              ok: r.width > 200 && r.height > 200,
+              ev: `desktop=${Math.round(r.width)}x${Math.round(r.height)} icons=${icons.length}`,
+            };
+          },
+        },
+      ],
+      /**
+       * ACT AND READ ARE SEPARATE STEPS, and this is trap 1 rather than a style choice.
+       *
+       * `/eval` is synchronous: a step that clicks and then counts in the SAME expression
+       * reads the DOM as it was BEFORE React re-rendered. Measured 2026-08-31, first run of
+       * this spec: `openStart` clicked and reported `opened: 0` while the menu was in fact
+       * opening, `closeStart` then saw the 1 the previous step had caused and reported the
+       * close as `after: 1`, and `taskbarRaise` read `rank 3 of 3` on a window it had just
+       * correctly raised. Three rows scored a working shell as broken, all from one cause.
+       *
+       * The driver POSTs each step separately with a real sleep between, so splitting the
+       * click from the count is exactly the fix, and it costs nothing but two more entries.
+       */
+      drive: [
+        'openStart', 'readStartOpen', 'closeStart', 'readStartClosed',
+        'openTray', 'readTrayOpen', 'closeTray', 'readTrayClosed',
+        'taskbarRaise', 'readRaise',
+      ],
+      steps: {
+        openStart: (w) => {
+          const b = q(w, '.os-start-btn');
+          if (!b) return { refused: 'no start control' };
+          if (!q(w, '.os-start')) b.click();
+          return { clicked: 'start' };
+        },
+        readStartOpen: (w) => {
+          const s = shellState();
+          s.startOpened = shq(w, '.os-start').length;
+          return { opened: s.startOpened };
+        },
+        closeStart: (w) => {
+          const back = q(w, '.os-start-backdrop');
+          if (back) back.click();
+          else if (q(w, '.os-start')) q(w, '.os-start-btn').click();
+          return { clicked: back ? 'backdrop' : 'start' };
+        },
+        readStartClosed: (w) => {
+          const s = shellState();
+          s.startClosed = shq(w, '.os-start').length;
+          return { after: s.startClosed };
+        },
+        openTray: (w) => {
+          const s = shellState();
+          // Quick settings, chosen because it was MEASURED to produce `.os-flyout`. The
+          // first tray control is "Search everything…", which opens a different surface
+          // family; taking `[0]` scored the flyout row against a button that never renders
+          // one. Falls back to the first non-bell control when the label is absent.
+          const btns = shq(w, '.os-tray-btn').filter((x) => !x.classList.contains('os-tray-btn-bell'));
+          const named = (x) => (x.getAttribute('title') || x.getAttribute('aria-label') || '').trim();
+          const b = btns.find((x) => /quick settings/i.test(named(x))) || btns[0];
+          if (!b) return { refused: 'no tray control' };
+          s.flyoutVia = named(b);
+          s.flyoutBtn = b;
+          if (!q(w, '.os-flyout')) b.click();
+          return { clicked: s.flyoutVia };
+        },
+        readTrayOpen: (w) => {
+          const s = shellState();
+          s.flyoutOpened = shq(w, '.os-flyout').length;
+          return { opened: s.flyoutOpened, via: s.flyoutVia };
+        },
+        closeTray: (w) => {
+          const s = shellState();
+          // Measured 2026-08-31: clicking `.os-panel-backdrop` leaves the flyout mounted;
+          // the tray button is a real toggle and closes it. Do not "fix" this by widening
+          // the query — the backdrop genuinely is not the dismissal path.
+          if (q(w, '.os-flyout') && s.flyoutBtn) s.flyoutBtn.click();
+          return { clicked: 'tray toggle' };
+        },
+        readTrayClosed: (w) => {
+          const s = shellState();
+          s.flyoutClosed = shq(w, '.os-flyout').length;
+          return { after: s.flyoutClosed };
+        },
+        taskbarRaise: (w) => {
+          const s = shellState();
+          const btns = shq(w, '.os-task-win');
+          const wins = qa(w, '.fwin');
+          if (!btns.length || !wins.length) return { refused: 'no hosted window to raise' };
+          // Pick a window that is NOT already on top, or the row proves nothing. The
+          // taskbar button is a TOGGLE, so clicking the top window would minimise it.
+          const ranked = wins.map((x) => ({ x, z: Number(getComputedStyle(x).zIndex) || 0 }))
+            .sort((a, b) => b.z - a.z);
+          if (ranked.length < 2) return { refused: 'only one hosted window — a raise past nothing proves nothing' };
+          const target = ranked[ranked.length - 1].x;
+          const title = (q(target, '.fwin-title-text') && txt(q(target, '.fwin-title-text'))) || '';
+          const btn = btns.find((b) => (b.getAttribute('title') || '').trim() === title)
+            || btns[btns.length - 1];
+          s.raisedTitle = (btn.getAttribute('title') || '').trim();
+          s.raisedTarget = target;
+          // EXACTLY ONE CLICK. A hidden window is restored AND raised by one click, and a
+          // visible one is raised by one click — but a second click minimises whatever the
+          // first just brought up, which is how a raise row scores itself dead.
+          btn.click();
+          return { clicked: s.raisedTitle };
+        },
+        readRaise: (w) => {
+          const s = shellState();
+          if (!s.raisedTarget) return { refused: 'taskbarRaise did not run' };
+          const after = qa(w, '.fwin').map((x) => ({ x, z: Number(getComputedStyle(x).zIndex) || 0 }))
+            .sort((a, b) => b.z - a.z);
+          s.raisedTo = after.map((e) => e.x).indexOf(s.raisedTarget) + 1;
+          s.raisedOf = after.length;
+          return { raised: s.raisedTitle, rank: s.raisedTo, of: s.raisedOf };
+        },
+      },
+      mutations: {
+        taskbarIdentity: (w) => detach(shq(w, '.os-task-win')[0], 'no task button to remove'),
+        // LIE rather than delete: a tray button that exists but is unnamed is precisely the
+        // "capability the user cannot find" this row is for, and it falls only that row.
+        trayControls: (w) => {
+          const b = shq(w, '.os-tray-btn')[0];
+          if (!b) return { refused: 'no tray control' };
+          const r = stripAttr(b, 'title', 'no tray control');
+          stripAttr(b, 'aria-label', '');
+          return r;
+        },
+        virtualDesktops: (w) => removeClassAll(shq(w, '.os-desktop-switch.active'), 'active'),
+        clock: (w) => detach(q(w, '.os-clock'), 'no clock'),
+        // EVERY element the row reads, not the first one. Measured 2026-08-31: detaching
+        // only `.wired-tray-lamps` left `.wired-wall-atmosphere` standing, the row's
+        // `owned > 0` still held and the control reported no row falling — a control that
+        // proves nothing while looking like it ran. Deliberately NOT falsified by rewriting
+        // `data-materials`: that attribute lives on `documentElement`, which is outside the
+        // shell root that `restore()` sweeps, so the lie would never be undone.
+        shellIdentity: (w) => {
+          const mat = document.documentElement.getAttribute('data-materials');
+          const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`);
+          if (!owned.length) return { refused: 'shell renders no identity furniture' };
+          owned.forEach((n) => detach(n, ''));
+          return { mutated: `${owned.length} identity element(s) detached` };
+        },
+        // Falsify the DRIVEN rows by breaking the side effect itself, not the control: the
+        // start menu is re-opened and left open, so `closeStart`'s recorded 0 becomes 1.
+        startEntryPoint: (w) => {
+          const s = shellState();
+          s.startClosed = shq(w, '.os-start').length + 1;
+          return { mutated: `startClosed forced to ${s.startClosed}` };
+        },
+        trayFlyout: (w) => {
+          const s = shellState();
+          s.flyoutClosed = shq(w, '.os-flyout').length + 1;
+          return { mutated: `flyoutClosed forced to ${s.flyoutClosed}` };
+        },
+        taskbarRaises: () => {
+          const s = shellState();
+          s.raisedTo = 99;
+          return { mutated: 'raisedTo forced to 99' };
+        },
+      },
+    },
   };
 
   // ------------------------------------------------------- shared feature fn
@@ -4083,6 +4900,20 @@
       : qa(w, popout ? '.popout-btn' : '.fwin-b');
     const btn = q(w, LIQUID_BTN[reader ? 'reader' : popout ? 'popout' : 'fwin']);
     const pressed = btn ? btn.getAttribute('aria-pressed') : null;
+    // Correction 24. A `.fwin` whose section `canPresentLiquid` refuses renders no toggle
+    // at all, and for THAT host the honest contract is the exact inverse: the affordance
+    // must be ABSENT rather than present-with-a-real-boolean, and the window must actually
+    // be sitting in `standard` — a non-presentable window painting Liquid with nothing to
+    // leave it is the 2026-08-17 visualizer defect, which this row must still catch.
+    // Its chrome is 3 (Pop out, Minimize, Close): it has no maximize, and `DesktopShell`
+    // forces `max: false` for section `city` in two places, so 4 is unreachable by design.
+    if (!reader && !popout && !btn && w.classList.contains('fwin')) {
+      const pres = w.getAttribute('data-presentation');
+      return {
+        ok: chrome.length >= 3 && pres === 'standard' && !w.classList.contains('fwin-liquid'),
+        ev: `chromeButtons=${chrome.length}/3 liquidToggle=absent presentation=${pres} liquidClass=${w.classList.contains('fwin-liquid')}`,
+      };
+    }
     const need = reader ? 1 : popout ? 3 : 4;
     return {
       ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
@@ -4181,9 +5012,53 @@
     return s;
   };
 
-  // Trap 4 + trap 7 + trap 8.
+  /**
+   * Trap 8's FOURTH host, added 2026-08-31 for L9's City surface (correction 24).
+   *
+   * `canPresentLiquid` (`liquidWindowPresentation.ts:72`) refuses sections `city` and
+   * `visualizer` outright — "the frameless garden and visualizer trinkets have no
+   * conventional chrome to swap". So a `.fwin` can be a real, complete window and still
+   * have NO Liquid destination, and the harness must not treat that as chromeless (it has
+   * chrome: Pop out, Minimize, Close) nor as a broken `fwin` (it renders 3 buttons, not 4,
+   * and no toggle, so `lifecycle` would score a correct window false and `toggleLiquid`
+   * would throw the whole run).
+   *
+   * The classification is derived from the RENDERED ABSENCE of the control, never from a
+   * class name the harness recognises — and the absence alone is deliberately not enough
+   * to earn a score. The 2026-08-17 boss-audit finding was exactly a window that rendered
+   * Liquid with no button to leave it, so `cat6-feature-parity.cjs` requires a
+   * discriminating control before it will accept the absence: another `.fwin` open at the
+   * same moment that DOES render `.fwin-b-liquid`, under the identical query.
+   */
+  const fwinHost = (w) => (q(w, LIQUID_BTN.fwin) ? 'fwin' : 'fwin-no-liquid');
+
+  /**
+   * The shell's presentation PROXY: the first open `.fwin` that really renders the Liquid
+   * control right now. Resolved live on every call rather than stored, because the driver
+   * flips it and re-reads between calls. Returns null when no window can take the trip, and
+   * every shell entry point turns that null into a refusal rather than a score.
+   */
+  const shellProxy = () => qa(document, '.fwin').find((w) => {
+    // Trap 3 applies to the PROXY as well as to the subject. A minimised window still has
+    // its `.fwin-b-liquid` in the DOM at `display: none`, so an unguarded find would flip a
+    // window nobody can see and the shell would be scored across a trip the user could not
+    // have taken. Measured 2026-08-31: all three hosted windows were at 0x0 at rest.
+    const r = w.getBoundingClientRect();
+    return q(w, LIQUID_BTN.fwin) && r.width >= 40 && r.height >= 40;
+  }) || null;
+
+  // Trap 4 + trap 7 + trap 8 + the shell host.
   const findWin = (app, pres) => {
     const s = spec(app);
+    // The shell is not among the `.fwin`, it contains them. `pres` is deliberately NOT a
+    // filter here: the shell is one surface that stays put across the trip, and filtering it
+    // out when the proxy is mid-flip would read as "the desktop disappeared".
+    if (s.shellSel) {
+      const root = q(document, s.shellSel);
+      return root
+        ? { win: root, matchedBy: 'shell-selector', host: 'shell' }
+        : { win: null, matchedBy: null, host: null };
+    }
     const wins = qa(document, '.fwin').filter(
       (w) => !pres || w.getAttribute('data-presentation') === pres,
     );
@@ -4206,9 +5081,9 @@
     const byTitle = wins.find(
       (w) => s.titleRe.test(txt(q(w, '.fwin-title-text'))) && owns(w),
     );
-    if (byTitle) return { win: byTitle, matchedBy: 'title', host: 'fwin' };
+    if (byTitle) return { win: byTitle, matchedBy: 'title', host: fwinHost(byTitle) };
     const byRoot = wins.find((w) => s.rootSel && q(w, s.rootSel) && owns(w));
-    if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: 'fwin' };
+    if (byRoot) return { win: byRoot, matchedBy: 'root-selector', host: fwinHost(byRoot) };
     // Trap 8, REVISED 2026-08-25 (`6c16653f`). A pop-out is no longer chromeless:
     // `.popout-root` now carries `data-presentation` and its bar carries
     // `.popout-btn-liquid`, so it is a real Liquid host and returning the
@@ -4257,28 +5132,44 @@
     if (bad) return { app, refused: bad };
     const r = win.getBoundingClientRect();
     const fields = {};
-    qa(win, 'input,textarea,select').forEach((el, i) => {
+    // Decision 3: on the shell every count is taken OUTSIDE the windows it hosts, or the
+    // round trip diffs on the flipped window's own contents and blames the desktop.
+    const scope = host === 'shell' ? (sel) => shq(win, sel) : (sel) => qa(win, sel);
+    scope('input,textarea,select').forEach((el, i) => {
       fields[`${el.tagName.toLowerCase()}${i}:${(el.className || '').split(' ')[0]}`] = el.value;
     });
+    const proxy = host === 'shell' ? shellProxy() : null;
     return {
       app,
       matchedBy,
       host,
-      presentation: win.getAttribute('data-presentation'),
+      // The shell has no `data-presentation` of its own. It reports the presentation of the
+      // window it is hosting, because that is the axis it is scored across, and it names the
+      // proxy beside it so this can never be mistaken for a shell-level attribute.
+      presentation: host === 'shell'
+        ? (proxy && proxy.getAttribute('data-presentation'))
+        : win.getAttribute('data-presentation'),
+      ...(host === 'shell'
+        ? { presentationProxy: proxy ? (txt(q(proxy, '.fwin-title-text')) || '(frameless)') : null }
+        : {}),
       liquidClass: win.classList.contains('fwin-liquid') || win.classList.contains('popout-liquid'),
       rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
       maximized: win.classList.contains('fwin-max'),
       focused: win.classList.contains('focused'),
       zIndex: win.style.zIndex || '',
-      chars: (win.textContent || '').length,
-      nodes: win.querySelectorAll('*').length,
-      controls: qa(win, 'button,input,select,textarea,[role="button"]').length,
+      chars: host === 'shell'
+        ? shq(win, '*').reduce((n, el) => n + (el.childNodes.length
+          ? [].filter.call(el.childNodes, (c) => c.nodeType === 3).reduce((m, c) => m + c.data.length, 0)
+          : 0), 0)
+        : (win.textContent || '').length,
+      nodes: host === 'shell' ? shq(win, '*').length : win.querySelectorAll('*').length,
+      controls: scope('button,input,select,textarea,[role="button"]').length,
       fields,
       // Scroll offsets are app state too, and on a surface with no editable field they are
       // the ONLY user-entered state a round trip can lose. Added 2026-08-26: Library has 86
       // buttons and zero text inputs, so without this its round trip compared chrome to
       // chrome and would have held no matter what the toggle did to the list.
-      scroll: qa(win, '*')
+      scroll: scope('*')
         .filter((el) => el.scrollTop > 0 || el.scrollLeft > 0)
         .slice(0, 8)
         .map((el) => `${(el.className || el.tagName).toString().split(' ')[0]}:${Math.round(el.scrollTop)},${Math.round(el.scrollLeft)}`),
@@ -4330,7 +5221,22 @@
   const toggleLiquid = (app, pres) => {
     const { win, host } = findWin(app, pres);
     if (!win) return { refused: `no ${app} surface` };
+    // Decision 1/2: the shell's axis is a HOSTED window's flip, driven through that window's
+    // own control. Refuses rather than falling back when nothing on screen can take the trip.
+    if (host === 'shell') {
+      const proxy = shellProxy();
+      if (!proxy) {
+        return { refused: 'no open window renders `.fwin-b-liquid`, so the shell has no presentation trip to take' };
+      }
+      const pb = q(proxy, LIQUID_BTN.fwin);
+      const before = proxy.getAttribute('data-presentation');
+      pb.click();
+      return { before, ariaPressed: pb.getAttribute('aria-pressed'), via: txt(q(proxy, '.fwin-title-text')) || '(frameless)' };
+    }
     if (host === 'chromeless') return { refused: 'chromeless host has no liquid control' };
+    if (host === 'fwin-no-liquid') {
+      return { refused: 'section is not Liquid-presentable — canPresentLiquid refuses it, so no toggle is rendered' };
+    }
     // The pop-out's control is the same affordance in its own bar (`6c16653f`),
     // and so is the reader's (`ReaderLiquidToggle`, shared by both readers).
     const btn = q(win, LIQUID_BTN[host] || '.fwin-b-liquid');

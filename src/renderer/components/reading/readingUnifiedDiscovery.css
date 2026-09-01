@@ -58,11 +58,32 @@
 
 .reading-unified-card {
   min-width: 0;
+  /*
+    Wraps because the card carries the shared Reading action set now, not one
+    button: a Jiten result offers three, and at the 280px minimum of the grid
+    track they cannot sit beside the cover and the copy. The actions take the
+    second line and the cover stays put.
+  */
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+}
+
+.reading-unified-card-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  margin-left: auto;
+  gap: 6px;
+}
+
+.reading-unified-card-actions .btn {
+  gap: 5px;
+  padding: 4px 9px;
+  font-size: 11px;
 }
 
 .reading-unified-card-cover {
@@ -85,7 +106,8 @@
 
 .reading-unified-card-copy {
   display: grid;
-  flex: 1 1 auto;
+  /* A basis rather than `auto`, so the actions wrap below before the title does. */
+  flex: 1 1 140px;
   min-width: 0;
   gap: 2px;
 }

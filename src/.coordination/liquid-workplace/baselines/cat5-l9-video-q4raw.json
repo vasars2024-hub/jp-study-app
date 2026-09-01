@@ -1,0 +1,379 @@
+{
+  "surface": "Video",
+  "label": "l9-video-q4raw",
+  "control": false,
+  "at": "2026-08-31T09:58:02.809Z",
+  "category": 5,
+  "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
+  "hostClass": "fwin",
+  "box": "1080x700",
+  "bodyScrollTop": 0,
+  "presentationAsFound": "standard",
+  "cat6": {
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "missing": true
+  },
+  "axes": {
+    "theme": [
+      "forest-night",
+      "classic-light"
+    ]
+  },
+  "storeBefore": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
+  },
+  "storeAfter": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "storeIdentical": true,
+  "restored": {
+    "theme": "forest-night",
+    "presentation": "standard",
+    "box": "1080x700",
+    "plantResidue": 0
+  },
+  "questions": [
+    {
+      "id": 1,
+      "q": "dominant task immediately obvious",
+      "verdict": "YES",
+      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "numbers": {
+        "entryPoints": 2,
+        "primaryInputs": 1,
+        "accentButtons": 1,
+        "accentList": [
+          "button.mc-button::Open video"
+        ],
+        "inputList": [
+          "input."
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "q": "current location and way back obvious",
+      "verdict": "YES",
+      "bar": "a non-empty location label AND at least one way back",
+      "numbers": {
+        "titleText": "Video",
+        "titleFrom": "span.fwin-title",
+        "backAffordances": 2,
+        "backList": [
+          "×",
+          "Back"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "q": "primary actions visible without hunting",
+      "verdict": "YES",
+      "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
+      "numbers": {
+        "primaryAction": "button.mc-button",
+        "insideBodyViewport": true,
+        "explicitlyMarked": true
+      }
+    },
+    {
+      "id": 4,
+      "q": "advanced tools discoverable without cluttering",
+      "verdict": "NO",
+      "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
+      "numbers": {
+        "collapsedDisclosures": 1,
+        "scannedControls": 17,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "chromeControlsRaw": 23,
+        "summaryHeaders": 2,
+        "behindDisclosure": 4,
+        "disclosures": {
+          "total": 2,
+          "open": 1
+        },
+        "ariaDisclosures": [],
+        "scannedList": [
+          "HomeYour media at a glance",
+          "LibraryAll local media",
+          "VideoImmersion player",
+          "MusicListening room",
+          "Study ModeMine and review",
+          "Media SettingsPlayback and s",
+          "Back",
+          "Forward",
+          "Search your media library…",
+          "Open media",
+          "Open video",
+          "Media workspace",
+          "Subtitles",
+          "Generate",
+          "Open in the media workspace",
+          "Select a video",
+          "Browse folder"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "q": "every readable surface has stable contrast",
+      "verdict": "YES",
+      "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
+      "numbers": {
+        "verdict": "YES",
+        "cells": [
+          {
+            "theme": "forest-night",
+            "measured": 80,
+            "unmeasurable": 0,
+            "minRatio": 4.74,
+            "failingCount": 0,
+            "worst": {
+              "el": "p.mc-muted",
+              "ratio": 4.74,
+              "bar": 4.5,
+              "bg": "section.mc-inspector-block@100%",
+              "text": "Choose a file from your "
+            }
+          },
+          {
+            "theme": "classic-light",
+            "measured": 80,
+            "unmeasurable": 0,
+            "minRatio": 4.77,
+            "failingCount": 0,
+            "worst": {
+              "el": "summary.",
+              "ratio": 4.77,
+              "bar": 4.5,
+              "bg": "gradient layer 1 of 2 on div.mc-root over div.mc-root@100%",
+              "text": "Transcription, watch fol"
+            }
+          }
+        ],
+        "failing": [],
+        "themeAxisMoved": true
+      }
+    },
+    {
+      "id": 6,
+      "q": "Liquid motion explains a real relationship",
+      "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "YES",
+      "numbers": {
+        "measuredIn": "liquid",
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
+        },
+        "liquidRegions": 4,
+        "byBackdropFilter": 5,
+        "byContextualPaint": 4,
+        "carryingATransition": 4,
+        "infiniteAnimationsOnLiquid": 0,
+        "liquidMaterialTotal": 7,
+        "decoratedLeaves": [
+          "span.mc-tile-episode",
+          "span.mc-tile-episode",
+          "span.mc-tile-episode"
+        ],
+        "regionList": [
+          "aside.lq-contextual",
+          "header.lq-contextual",
+          "nav.lq-contextual",
+          "aside.lq-contextual"
+        ],
+        "withoutTransition": [],
+        "inStandardPresentation": 2
+      }
+    },
+    {
+      "id": 7,
+      "q": "standard mode remains fully normal",
+      "bar": "category 6's parity: the same features reachable in standard as in Liquid",
+      "verdict": "MEASURE",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "parity": null
+      }
+    },
+    {
+      "id": 8,
+      "q": "Liquid can be turned off without losing state",
+      "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
+      "verdict": "MEASURE",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
+        "roundTrip": null
+      }
+    },
+    {
+      "id": 9,
+      "q": "all pre-migration features reachable and functional",
+      "bar": "category 6's row agreement: no row reachable in only one presentation",
+      "verdict": "MEASURE",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "rowsAgree": null,
+        "onlyInOne": null
+      }
+    },
+    {
+      "id": 10,
+      "q": "still feels like itself, not a generic card dashboard",
+      "verdict": "YES",
+      "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
+      "numbers": {
+        "identityMarkers": {
+          "floatingWindowChrome": true,
+          "surfaceChrome": true,
+          "taskbar": true,
+          "desktopLayer": true,
+          "themeToken": true
+        },
+        "identityCount": 5,
+        "markerSet": "chromed (5 markers, bar 3 = 60%)",
+        "fillsViewport": false,
+        "bespokePrefixes": [
+          "medialib:21"
+        ],
+        "contentDominant": "img.medialib-card__img media",
+        "contentFrac": 0.04,
+        "cardUniformity": 0,
+        "cardControlSignatures": 0,
+        "cardHost": null,
+        "cardHostDetail": null,
+        "cardHosts": [],
+        "dashboardHosts": 0
+      }
+    }
+  ],
+  "altThemeVerdicts": {
+    "q1": "YES",
+    "q2": "YES",
+    "q3": "YES",
+    "q4": "NO",
+    "q6": "YES",
+    "q10": "YES"
+  },
+  "altThemeNumbers": {
+    "theme": "classic-light",
+    "controlsPainted": 35,
+    "q1": {
+      "entryPoints": 2,
+      "primaryInputs": 1,
+      "accentButtons": 1,
+      "accentList": [
+        "button.mc-button::Open video"
+      ],
+      "inputList": [
+        "input."
+      ]
+    },
+    "q4": {
+      "collapsedDisclosures": 1,
+      "scannedControls": 17,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "chromeControlsRaw": 23,
+      "summaryHeaders": 2,
+      "behindDisclosure": 4,
+      "disclosures": {
+        "total": 2,
+        "open": 1
+      },
+      "ariaDisclosures": [],
+      "scannedList": [
+        "HomeYour media at a glance",
+        "LibraryAll local media",
+        "VideoImmersion player",
+        "MusicListening room",
+        "Study ModeMine and review",
+        "Media SettingsPlayback and s",
+        "Back",
+        "Forward",
+        "Search your media library…",
+        "Open media",
+        "Open video",
+        "Media workspace",
+        "Subtitles",
+        "Generate",
+        "Open in the media workspace",
+        "Select a video",
+        "Browse folder"
+      ]
+    },
+    "q6": {
+      "liquidRegions": 2,
+      "byBackdropFilter": 5,
+      "byContextualPaint": 2,
+      "carryingATransition": 2,
+      "infiniteAnimationsOnLiquid": 0,
+      "liquidMaterialTotal": 5,
+      "decoratedLeaves": [
+        "span.mc-tile-episode",
+        "span.mc-tile-episode",
+        "span.mc-tile-episode"
+      ],
+      "regionList": [
+        "aside.lq-contextual",
+        "header.lq-contextual"
+      ],
+      "withoutTransition": []
+    },
+    "q10": {
+      "identityMarkers": {
+        "floatingWindowChrome": true,
+        "surfaceChrome": true,
+        "taskbar": true,
+        "desktopLayer": true,
+        "themeToken": true
+      },
+      "identityCount": 5,
+      "markerSet": "chromed (5 markers, bar 3 = 60%)",
+      "fillsViewport": false,
+      "bespokePrefixes": [
+        "medialib:21"
+      ],
+      "contentDominant": "img.medialib-card__img media",
+      "contentFrac": 0.04,
+      "cardUniformity": 0,
+      "cardControlSignatures": 0,
+      "cardHost": null,
+      "cardHostDetail": null,
+      "cardHosts": [],
+      "dashboardHosts": 0
+    }
+  },
+  "controlsPaintedA": 35,
+  "findings": [
+    "Q4 advanced tools discoverable without cluttering"
+  ],
+  "voided": [
+    "Q7 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "Q8 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json",
+    "Q9 is MEASURE — no category-6 baseline at src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-video-q4raw.json"
+  ],
+  "score": "VOID",
+  "verdict": "VOID"
+}

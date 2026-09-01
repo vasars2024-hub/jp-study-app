@@ -1,0 +1,177 @@
+{
+  "label": "l9b4-blanc",
+  "surface": "@.blanc-root",
+  "win": "blanc",
+  "task": "click:.blanc-nav-btn[title=\"Settings\"] >> wait:500",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "main-window section (no per-window presentation)",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 121,
+    "controlCount": 25,
+    "box": "1264x761",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      0.3
+    ],
+    "inputRecv": [],
+    "worstRecv": 0.3,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      1.6
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 1.6
+  },
+  "steps": [
+    {
+      "step": "click:.blanc-nav-btn[title=\"Settings\"]",
+      "target": {
+        "sel": ".blanc-nav-btn[title=\"Settings\"]",
+        "label": "Settings",
+        "disabled": false,
+        "at": "86,424"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "deadEnd": false
+    },
+    {
+      "step": "wait:500",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "deadEnd": false
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.blanc-nav-btn[title=\"Stats\"] >> wait:500",
+    "steps": [
+      "click:.blanc-nav-btn[title=\"Stats\"]",
+      "wait:500"
+    ],
+    "restored": true,
+    "baseHash": "jyul6z",
+    "afterHash": "jyul6z",
+    "liveRegionsBefore": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "liveRegionsAfter": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "textHashRoundTrip": {
+      "base": "1r5psro",
+      "after": "1r5psro"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "N/A-single-path",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": "N/A-single-path"
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      3
+    ]
+  }
+}

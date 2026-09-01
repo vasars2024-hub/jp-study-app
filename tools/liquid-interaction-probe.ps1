@@ -62,6 +62,14 @@
   `title=` field in the gesture record is the only place that showed. Pass it whenever the score
   names a surface. The largest-area default is kept so previously recorded runs reproduce.
 
+  CORRECTION 29, 2026-08-31. A FRAMELESS window has no title element at all, so substring
+  matching selects every window and the largest-area tie-break then drives whichever one
+  happens to be biggest -- the exact `probe-picks-first-visible-fwin` shape, one level up.
+  `-Title` therefore also accepts `@<css-selector>`: the target is the `.fwin` that matches the
+  selector or contains an element matching it. This is the same `@selector` window-naming form
+  cat4 and cat8 already use (`--surface @.fwin-frameless`), so one convention names a titleless
+  window across every category. A selector matching no window REFUSES rather than falling back.
+
 .PARAMETER Root
   CSS selector for a surface that replaces the desktop shell and therefore has no `.fwin` chrome.
   Drag dispatches pointer events only on that root; resize drives the debug bridge's `/bounds`
@@ -227,14 +235,21 @@ $gestureJs = switch ($Interaction) {
 "@
       }
     } else {
-      $sel = if ($Interaction -eq 'drag') { '.fwin-bar' } else { '.fwin-resize' }
+      # `.fwin-drag-strip` is the frameless window's own drag handle; it has no `.fwin-bar`.
+      # Both are offered so one selector serves both chrome shapes, and a window carrying
+      # neither still refuses below rather than measuring a gesture it never performed.
+      $sel = if ($Interaction -eq 'drag') { '.fwin-bar, .fwin-drag-strip' } else { '.fwin-resize' }
       $titleJs = ($Title | ConvertTo-Json -Compress)
       @"
 (() => {
   const WANT = $titleJs;
+  // Correction 29: '@<selector>' names a window structurally, for the frameless windows that
+  // carry no title element for a substring to match.
+  const BY_SELECTOR = WANT.charAt(0) === '@' ? WANT.slice(1) : '';
   const wins = [...document.querySelectorAll('.fwin')].filter((w) => getComputedStyle(w).display !== 'none')
     .filter((w) => {
       if (!WANT) return true;
+      if (BY_SELECTOR) return w.matches(BY_SELECTOR) || !!w.querySelector(BY_SELECTOR);
       const t = w.querySelector('.fwin-title-text, .fwin-title');
       return !!t && (t.textContent || '').indexOf(WANT) >= 0;
     });
@@ -250,7 +265,7 @@ $gestureJs = switch ($Interaction) {
   Element.prototype.setPointerCapture = function () {}; Element.prototype.releasePointerCapture = function () {};
   const ev = (type, x, y) => grip.dispatchEvent(new PointerEvent(type, {
     bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1, isPrimary: true }));
-  window.__lip = { done: false, title: (target.w.querySelector('.fwin-title-text') || {}).textContent || '?', before: before };
+  window.__lip = { done: false, title: (target.w.querySelector('.fwin-title-text') || {}).textContent || WANT || '?', before: before };
   ev('pointerdown', sx, sy);
   const N = 60, AMP = 140;
   let i = 0;

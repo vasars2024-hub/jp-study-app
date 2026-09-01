@@ -1,0 +1,432 @@
+{
+  "surface": "@.fwin-frameless",
+  "label": "l9-city",
+  "control": false,
+  "at": "2026-08-31T07:57:48.383Z",
+  "category": 5,
+  "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
+  "hostClass": "fwin",
+  "box": "680x709",
+  "bodyScrollTop": 0,
+  "presentationAsFound": "standard",
+  "cat6": {
+    "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l9-city.json",
+    "verdict": "PASS 10/10",
+    "parity": {
+      "standard": "9/9",
+      "liquid": "n/a — section is not Liquid-presentable",
+      "na": 0,
+      "equal": null,
+      "rowsAgree": null,
+      "failing": [],
+      "onlyInOne": []
+    },
+    "roundTrip": {
+      "diffs": [
+        {
+          "key": "zIndex",
+          "before": "196",
+          "after": "198"
+        }
+      ]
+    }
+  },
+  "axes": {
+    "theme": [
+      "forest-night",
+      "classic-light"
+    ]
+  },
+  "storeBefore": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "q6leg": {
+    "presentationAsFound": "standard",
+    "toggle": "no-control",
+    "refused": "surface has no Liquid presentation control"
+  },
+  "storeAfter": {
+    "jp-os-theme": "forest-night",
+    "jp-os-theme-engine-v": "1"
+  },
+  "storeIdentical": true,
+  "restored": {
+    "theme": "forest-night",
+    "presentation": "standard",
+    "box": "680x709",
+    "plantResidue": 0
+  },
+  "questions": [
+    {
+      "id": 1,
+      "q": "dominant task immediately obvious",
+      "verdict": "NO",
+      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "numbers": {
+        "entryPoints": 0,
+        "primaryInputs": 0,
+        "accentButtons": 0,
+        "accentList": [],
+        "inputList": []
+      }
+    },
+    {
+      "id": 2,
+      "q": "current location and way back obvious",
+      "verdict": "NO",
+      "bar": "a non-empty location label AND at least one way back",
+      "numbers": {
+        "titleText": "",
+        "titleFrom": null,
+        "backAffordances": 1,
+        "backList": [
+          "×"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "q": "primary actions visible without hunting",
+      "verdict": "NO",
+      "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
+      "numbers": {
+        "primaryAction": null,
+        "insideBodyViewport": false,
+        "explicitlyMarked": false
+      }
+    },
+    {
+      "id": 4,
+      "q": "advanced tools discoverable without cluttering",
+      "verdict": "YES",
+      "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
+      "numbers": {
+        "collapsedDisclosures": 1,
+        "scannedControls": 8,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "chromeControlsRaw": 8,
+        "summaryHeaders": 0,
+        "behindDisclosure": 0,
+        "disclosures": {
+          "total": 0,
+          "open": 0
+        },
+        "ariaDisclosures": [],
+        "scannedList": [
+          "⧉",
+          "─",
+          "×",
+          "Show Mooncap dossier",
+          "Sky sim",
+          "Star",
+          "Asteroid",
+          "Ice barrage"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "q": "every readable surface has stable contrast",
+      "verdict": "NO",
+      "bar": "no failing text run in EITHER theme, and the two themes must not report an identical minimum",
+      "numbers": {
+        "verdict": "NO",
+        "cells": [
+          {
+            "theme": "forest-night",
+            "measured": 9,
+            "unmeasurable": 6,
+            "minRatio": 12.4,
+            "failingCount": 0,
+            "worst": {
+              "el": "button.fwin-b",
+              "ratio": 12.4,
+              "bar": 4.5,
+              "bg": "div.fwin-frameless-controls@72% over section.fwin@100%",
+              "text": "⧉"
+            }
+          },
+          {
+            "theme": "classic-light",
+            "measured": 9,
+            "unmeasurable": 6,
+            "minRatio": 1.61,
+            "failingCount": 3,
+            "worst": {
+              "el": "button.fwin-b",
+              "ratio": 1.61,
+              "bar": 4.5,
+              "bg": "div.fwin-frameless-controls@72% over section.fwin@100%",
+              "text": "⧉"
+            }
+          }
+        ],
+        "failing": [
+          {
+            "el": "button.fwin-b",
+            "ratio": 1.61,
+            "bar": 4.5,
+            "bg": "div.fwin-frameless-controls@72% over section.fwin@100%",
+            "text": "⧉"
+          },
+          {
+            "el": "button.fwin-b",
+            "ratio": 1.61,
+            "bar": 4.5,
+            "bg": "div.fwin-frameless-controls@72% over section.fwin@100%",
+            "text": "─"
+          },
+          {
+            "el": "button.fwin-b",
+            "ratio": 1.61,
+            "bar": 4.5,
+            "bg": "div.fwin-frameless-controls@72% over section.fwin@100%",
+            "text": "×"
+          }
+        ],
+        "themeAxisMoved": true
+      }
+    },
+    {
+      "id": 6,
+      "q": "Liquid motion explains a real relationship",
+      "bar": "every Liquid-treated region carries a state-change transition and none loops forever",
+      "verdict": "NO-SUBJECT",
+      "numbers": {
+        "measuredIn": null,
+        "leg": {
+          "presentationAsFound": "standard",
+          "toggle": "no-control",
+          "refused": "surface has no Liquid presentation control"
+        },
+        "liquidRegions": 2,
+        "byBackdropFilter": 3,
+        "byContextualPaint": 0,
+        "carryingATransition": 1,
+        "infiniteAnimationsOnLiquid": 0,
+        "liquidMaterialTotal": 3,
+        "decoratedLeaves": [
+          "button.reading-garden-sky-console-toggle"
+        ],
+        "regionList": [
+          "div.fwin-frameless-controls",
+          "div.reading-garden-sky-console-body"
+        ],
+        "withoutTransition": [
+          "div.reading-garden-sky-console-body"
+        ],
+        "inStandardPresentation": 2
+      }
+    },
+    {
+      "id": 7,
+      "q": "standard mode remains fully normal",
+      "bar": "category 6's parity: the same features reachable in standard as in Liquid",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": "no-liquid-host: the only presentation is standard",
+        "parity": {
+          "standard": "9/9",
+          "liquid": "n/a — section is not Liquid-presentable",
+          "na": 0,
+          "equal": null,
+          "rowsAgree": null,
+          "failing": [],
+          "onlyInOne": []
+        }
+      }
+    },
+    {
+      "id": 8,
+      "q": "Liquid can be turned off without losing state",
+      "bar": "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": "no-liquid-host: absence proved against a neighbour that renders the control, plus the minimize/restore trip",
+        "liquidAbsence": {
+          "windowsOpen": 2,
+          "targetHasLiquidControl": false,
+          "targetPresentation": "standard",
+          "targetChromeButtons": 3,
+          "othersWithLiquidControl": [
+            "Video"
+          ]
+        },
+        "lifecycleTrip": {
+          "trip": "minimize -> restore (taskbar)",
+          "zBefore": {
+            "rank": 1,
+            "of": 2,
+            "z": "196"
+          },
+          "zAfter": {
+            "rank": 1,
+            "of": 2,
+            "z": "198"
+          },
+          "rankHeld": true
+        },
+        "roundTrip": {
+          "diffs": [
+            {
+              "key": "zIndex",
+              "before": "196",
+              "after": "198"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 9,
+      "q": "all pre-migration features reachable and functional",
+      "bar": "category 6's row agreement: no row reachable in only one presentation",
+      "verdict": "YES",
+      "numbers": {
+        "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": "no-liquid-host: shares Q7 evidence — one presentation, one row set",
+        "rowsAgree": null,
+        "onlyInOne": []
+      }
+    },
+    {
+      "id": 10,
+      "q": "still feels like itself, not a generic card dashboard",
+      "verdict": "YES",
+      "bar": ">=3 identity markers OF THE SET ITS HOST CLASS CAN HAVE (chromed 3/5, chromeless 3/4), and (uniformity < 0.80 OR one control signature = a gallery, not a dashboard)",
+      "numbers": {
+        "identityMarkers": {
+          "floatingWindowChrome": false,
+          "surfaceChrome": false,
+          "taskbar": true,
+          "desktopLayer": true,
+          "themeToken": true
+        },
+        "identityCount": 3,
+        "markerSet": "chromed (5 markers, bar 3 = 60%)",
+        "fillsViewport": false,
+        "bespokePrefixes": [
+          "fwin:4",
+          "reading:33",
+          "world:3",
+          "cloud:6",
+          "distant:3"
+        ],
+        "contentDominant": "img.reading-garden-background-master media",
+        "contentFrac": 2.11,
+        "cardUniformity": 0,
+        "cardControlSignatures": 0,
+        "cardHost": null,
+        "cardHostDetail": null,
+        "cardHosts": [],
+        "dashboardHosts": 0
+      }
+    }
+  ],
+  "altThemeVerdicts": {
+    "q1": "NO",
+    "q2": "NO",
+    "q3": "NO",
+    "q4": "YES",
+    "q6": "NO",
+    "q10": "YES"
+  },
+  "altThemeNumbers": {
+    "theme": "classic-light",
+    "controlsPainted": 8,
+    "q1": {
+      "entryPoints": 0,
+      "primaryInputs": 0,
+      "accentButtons": 0,
+      "accentList": [],
+      "inputList": []
+    },
+    "q4": {
+      "collapsedDisclosures": 1,
+      "scannedControls": 8,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "chromeControlsRaw": 8,
+      "summaryHeaders": 0,
+      "behindDisclosure": 0,
+      "disclosures": {
+        "total": 0,
+        "open": 0
+      },
+      "ariaDisclosures": [],
+      "scannedList": [
+        "⧉",
+        "─",
+        "×",
+        "Show Mooncap dossier",
+        "Sky sim",
+        "Star",
+        "Asteroid",
+        "Ice barrage"
+      ]
+    },
+    "q6": {
+      "liquidRegions": 2,
+      "byBackdropFilter": 3,
+      "byContextualPaint": 0,
+      "carryingATransition": 1,
+      "infiniteAnimationsOnLiquid": 0,
+      "liquidMaterialTotal": 3,
+      "decoratedLeaves": [
+        "button.reading-garden-sky-console-toggle"
+      ],
+      "regionList": [
+        "div.fwin-frameless-controls",
+        "div.reading-garden-sky-console-body"
+      ],
+      "withoutTransition": [
+        "div.reading-garden-sky-console-body"
+      ]
+    },
+    "q10": {
+      "identityMarkers": {
+        "floatingWindowChrome": false,
+        "surfaceChrome": false,
+        "taskbar": true,
+        "desktopLayer": true,
+        "themeToken": true
+      },
+      "identityCount": 3,
+      "markerSet": "chromed (5 markers, bar 3 = 60%)",
+      "fillsViewport": false,
+      "bespokePrefixes": [
+        "fwin:4",
+        "reading:33",
+        "world:3",
+        "cloud:6",
+        "distant:3"
+      ],
+      "contentDominant": "img.reading-garden-background-master media",
+      "contentFrac": 2.11,
+      "cardUniformity": 0,
+      "cardControlSignatures": 0,
+      "cardHost": null,
+      "cardHostDetail": null,
+      "cardHosts": [],
+      "dashboardHosts": 0
+    }
+  },
+  "controlsPaintedA": 8,
+  "findings": [
+    "Q1 dominant task immediately obvious",
+    "Q2 current location and way back obvious",
+    "Q3 primary actions visible without hunting",
+    "Q5 every readable surface has stable contrast"
+  ],
+  "voided": [
+    "Q6 is NO-SUBJECT — the surface has no subject for this question"
+  ],
+  "score": "VOID",
+  "verdict": "VOID"
+}

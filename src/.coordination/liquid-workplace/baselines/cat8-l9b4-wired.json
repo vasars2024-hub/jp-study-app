@@ -1,0 +1,199 @@
+{
+  "label": "l9b4-wired",
+  "surface": "@.os-desktop-wired",
+  "win": "main",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": "wired-archive",
+  "rect": "1264x821",
+  "textRuns": 14,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 371,
+  "hostedWindowsExcluded": 3,
+  "wordRuns": 13,
+  "textHash": -889520541,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 1,
+      "messages": [
+        "Unread error notifications are waiting."
+      ]
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9782,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9782 catalog keys / 106 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 14,
+        "textHash": -889520541,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 14,
+        "textHash": 1885050866,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 3,
+        "diffExamples": [
+          {
+            "i": 11,
+            "was": "Unread error notifications are",
+            "now": "未読のエラー通知があります。"
+          },
+          {
+            "i": 12,
+            "was": "03:38 PM",
+            "now": "午後03:38"
+          },
+          {
+            "i": 13,
+            "was": "Aug 31",
+            "now": "8月31日"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 14,
+        "textHash": 908883666,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 3,
+        "diffExamples": [
+          {
+            "i": 11,
+            "was": "Unread error notifications are",
+            "now": "有未读错误通知。"
+          },
+          {
+            "i": 12,
+            "was": "03:38 PM",
+            "now": "下午03:38"
+          },
+          {
+            "i": 13,
+            "was": "Aug 31",
+            "now": "8月31日"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 14,
+        "textHash": -1596850870,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 2,
+        "diffExamples": [
+          {
+            "i": 11,
+            "was": "Unread error notifications are",
+            "now": "Есть непрочитанные уведомления"
+          },
+          {
+            "i": 13,
+            "was": "Aug 31",
+            "now": "31 авг."
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 3,
+    "baseRuns": 14,
+    "diffShare": 0.2143
+  },
+  "statesObservable": [
+    "error"
+  ],
+  "statesNotObservable": [
+    "empty",
+    "loading",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "hostedIsolation": true,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

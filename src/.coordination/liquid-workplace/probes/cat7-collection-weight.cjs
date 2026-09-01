@@ -69,12 +69,20 @@ async function ev(js) {
 // `probe-picks-first-visible-fwin` is a recorded false-scoring in this repo.
 // With no --title the whole document is the scope, which is what a full-window
 // surface (Settings, a pop-out) needs.
+// Correction 29, 2026-08-31: `--title @<selector>` names the window STRUCTURALLY, for the
+// frameless windows that carry no title element. Same form as cat4/cat8's `--surface
+// @.fwin-frameless` and the interaction probe's `-Title`, so one convention names a
+// titleless window in every category. Substring-matching a titleless window would fall
+// through to "no window", and this probe would then refuse on a surface that is on screen.
+const TITLE_SELECTOR = TITLE.charAt(0) === '@' ? TITLE.slice(1) : '';
 const SCOPE = TITLE
   ? `([].slice.call(document.querySelectorAll('.fwin')).filter(function(w){
       var r = w.getBoundingClientRect();
       if (!(r.width > 0 && r.height > 0)) return false;
-      var t = w.querySelector('.fwin-title-text, .fwin-title');
-      return !!t && (t.textContent || '').indexOf(${JSON.stringify(TITLE)}) >= 0;
+      ${TITLE_SELECTOR
+    ? `return w.matches(${JSON.stringify(TITLE_SELECTOR)}) || !!w.querySelector(${JSON.stringify(TITLE_SELECTOR)});`
+    : `var t = w.querySelector('.fwin-title-text, .fwin-title');
+      return !!t && (t.textContent || '').indexOf(${JSON.stringify(TITLE)}) >= 0;`}
     })[0])`
   : '(document)';
 

@@ -52,6 +52,11 @@ import {
   type ScraperSiteRule,
 } from '../../shared/scraperSiteRules';
 import { applyExtractionSettings } from './extractionRules';
+import {
+  applyEpisodeProcessing,
+  missingEpisodeNumbers,
+  missingEpisodesNote,
+} from './episodeProcessingRules';
 import { buildImageRows, episodeThumbnailFor } from './imageSet';
 import { scraperRequest } from './http';
 import { scraperLog, scraperLogsFor } from './logBus';
@@ -350,6 +355,7 @@ export function buildRuleRows(
   });
 
   rows = applyExtractionSettings(rows, settings.extraction);
+  rows = applyEpisodeProcessing(rows, processing).rows;
   if (processing.naturalSort) rows = [...rows].sort((a, b) => a.number - b.number);
   return rows;
 }
@@ -431,6 +437,7 @@ export function buildEpisodeRows(
     const filler = new Set(episodes.filter((e) => e.filler).map((e) => e.number));
     rows = rows.filter((row) => !filler.has(row.number));
   }
+  rows = applyEpisodeProcessing(rows, processing, { skipKindFilter: true }).rows;
   if (processing.naturalSort) rows.sort((a, b) => a.number - b.number);
   return rows;
 }
@@ -592,7 +599,12 @@ async function runWithSiteRule(
     found: job.rows.length,
     failed: validated.failures,
     bytes: 0,
-    note: extraction.ok ? '' : 'Some rule checks did not pass.',
+    note: [
+      extraction.ok ? '' : 'Some rule checks did not pass.',
+      settings.episodeProcessing.detectMissingNumbers
+        ? missingEpisodesNote(missingEpisodeNumbers(job.rows))
+        : '',
+    ].filter(Boolean).join(' '),
   };
   job.result = {
     jobId: job.id,
@@ -768,6 +780,9 @@ async function run(job: Job, emit: JobEmitter): Promise<void> {
     failed: validated.failures,
     bytes: job.rows.reduce((total, row) => total + row.sizeBytes, 0),
     note: [
+      settings.episodeProcessing.detectMissingNumbers
+        ? missingEpisodesNote(missingEpisodeNumbers(job.rows))
+        : '',
       releases.length ? `${releases.length} index result(s).` : '',
       streams.length ? `${streams.length} playable stream(s).` : '',
     ].filter(Boolean).join(' '),

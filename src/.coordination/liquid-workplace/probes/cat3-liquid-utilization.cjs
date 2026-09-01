@@ -34,6 +34,13 @@
  *   A. blur the first runtime Work region (0 must increase);
  *   B. make the whole runtime surface deliberately all-glass (every Work region must fail).
  * The all-glass control is a temporary attribute plus stylesheet, not a surface-specific node.
+ *
+ * A surface with NO runtime Work region cannot be perturbed by either, and used to return
+ * `VOID - no runtime Work region exists to falsify` — the instrument declining to score a
+ * legitimate shape (a frameless canvas surface). It now falls back to controls C and D, which
+ * PLANT the two scored terms instead of perturbing them; see `plantControls`. When that leg
+ * passes and the surface's contextual denominator is genuinely 0, the two contextual bars are
+ * satisfied vacuously and the run reports `vacuousContextual: true` alongside the score.
  */
 'use strict';
 
@@ -128,16 +135,64 @@ async function raise() {
  * contract every Liquid host writes (`.fwin`, `.popout-root`, the reader root), and
  * `.fwin-b-liquid` is the only control that changes it. A root that carries neither is
  * simply not presentable and is scored as it stands.
+ *
+ * CORRECTION 32 (2026-08-31, backup): `toggle` used to be a bare
+ * `root.querySelector('.fwin-b-liquid')`, a DESCENDANT search. That is right for a `.fwin`
+ * root, whose own toggle sits in its own title bar, and wrong for every `@selector` SHELL
+ * root, which CONTAINS floating windows and therefore contains their toggles. Measured on
+ * `@.os-desktop-wired`: the shell root has `data-presentation` null and is not a `.fwin`,
+ * but two toggles matched inside it — owned by 'SIG-VID / Signal Archive' and
+ * 'SYS / Service Panel'. The harness read that as "presentable, currently standard" and
+ * REFUSED, so category 3 could not be scored on any shell surface at all. Worse, the
+ * `--presentation liquid` escape hatch would have "fixed" it by clicking a nested WINDOW's
+ * toggle and scoring the shell in a presentation nobody set.
+ *
+ * The rule is ownership, not containment: a toggle belongs to this root only when the
+ * nearest presentable host above it IS this root. `PRESENTABLE_HOST` is the selector set
+ * every Liquid host writes, so this stays surface-agnostic.
  */
+const PRESENTABLE_HOST = '.fwin, .popout-root, [data-presentation]';
+
+/**
+ * The root's OWN body, by the same ownership rule and for the same reason as
+ * CORRECTION 33 in `l1-surface-roles.js`: on a shell root, `.fwin-body` matches a nested
+ * WINDOW's body. Both of this harness's uses were hitting it — the control-A path resolver
+ * and the plant host. Measured on `@.os-desktop-wired`: the plant mounted its 145px nodes
+ * inside a 0x0 minimised window body, so `planted` came back identical to `base`
+ * ([0,1,1,1,0] three times) and the run scored `VOID - the planted control did not falsify`
+ * while the product bars were in fact all passing.
+ */
+const OWN_BODY_EXPR = `(function(root){
+  var bodies = [].slice.call(root.querySelectorAll('.fwin-body'));
+  for (var i = 0; i < bodies.length; i += 1) {
+    if (bodies[i].closest('.fwin') === root) return bodies[i];
+  }
+  return root;
+})`;
+
+const OWN_TOGGLE_EXPR = `(function(root){
+  var candidates = [].slice.call(root.querySelectorAll('.fwin-b-liquid'));
+  for (var i = 0; i < candidates.length; i += 1) {
+    var host = candidates[i].closest(${JSON.stringify(PRESENTABLE_HOST)});
+    if (host === root) return candidates[i];
+  }
+  return null;
+})`;
+
 async function readPresentation() {
   return JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     if (!root) return JSON.stringify({ refuse: 'surface not found while reading presentation' });
+    var own = (${OWN_TOGGLE_EXPR})(root);
+    var nested = root.querySelectorAll('.fwin-b-liquid').length;
     return JSON.stringify({
       attr: root.getAttribute('data-presentation'),
       liquid: root.classList.contains('fwin-liquid') || root.classList.contains('popout-liquid')
         || root.getAttribute('data-presentation') === 'liquid',
-      toggle: !!root.querySelector('.fwin-b-liquid')
+      toggle: !!own,
+      // Kept in the receipt so a shell root reads as "not presentable, N nested toggles
+      // ignored" rather than looking like the toggle search simply found nothing.
+      nestedToggles: own ? nested - 1 : nested
     });
   })()`));
 }
@@ -146,8 +201,10 @@ async function clickPresentationToggle() {
   const clicked = JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     if (!root) return JSON.stringify({ refuse: 'surface disappeared before the presentation toggle' });
-    var btn = root.querySelector('.fwin-b-liquid');
-    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle' });
+    // Same ownership rule as readPresentation (correction 32): clicking a nested window's
+    // toggle would change a window this run does not own and leave it changed.
+    var btn = (${OWN_TOGGLE_EXPR})(root);
+    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle of its own' });
     btn.click();
     return JSON.stringify({ ok: true });
   })()`));
@@ -182,7 +239,7 @@ async function read() {
 }
 
 const RESOLVE_PATH = `(function(root, parts){
-  var node = root.querySelector('.fwin-body') || root;
+  var node = (${OWN_BODY_EXPR})(root);
   for (var i = 0; node && i < parts.length; i += 1) node = node.children[parts[i]];
   return node;
 })`;
@@ -245,6 +302,74 @@ async function restoreOne(pathParts, before) {
   })()`));
   if (settled.refuse) return settled;
   return { ...restored, material: settled.material };
+}
+
+/**
+ * Controls C and D — the EMPTY-DENOMINATOR falsification.
+ *
+ * Controls A and B both need a runtime Work region to attack: A blurs one, B makes the whole
+ * surface glass and requires every Work region to fail. A surface that HAS no dense work and no
+ * contextual chrome — a frameless full-bleed canvas, which is what City / Mooncap Garden is, and
+ * what the Visualizer and the widget surfaces are — gives them nothing to move, so the leg
+ * returned `VOID - no runtime Work region exists to falsify` and the whole score with it. That
+ * VOID is not a defect in the surface; it is the instrument declining to score a legitimate
+ * shape. Measured 2026-08-31 on City: 43 regions, `Work 0`, `Liquid-eligible 0`, `Ambient 39`.
+ *
+ * The fix is to falsify by PLANTING rather than by perturbing, which needs no existing
+ * population and attacks the two scored terms directly:
+ *
+ *   C. append a `<nav>` — contextual by landmark, carrying NO `lq-` class. `eligibleTotal` must
+ *      rise by exactly 1 and `sharedPrimitiveEligible` must NOT, so the `sharedPrimitives` bar
+ *      goes false. That is the low score the rubric requires this category to be able to produce.
+ *   D. append a translucent `<div>` holding an `<input>` — dense by form content, on glass by its
+ *      own alpha. `denseWorkOnTranslucent` must rise by exactly 1, so `denseWorkAnchored` goes
+ *      false too.
+ *
+ * Both plants are surface-agnostic: no selector, no class of the surface's own, sized off the
+ * measured root so they clear the instrument's 1% area floor wherever they land. They are
+ * `pointer-events: none` and removed by attribute, and the `finally` block removes them again on
+ * any throw. A surface with a real Work region keeps controls A and B unchanged, so every
+ * baseline banked before this addition re-derives identically.
+ */
+async function plantControls() {
+  return JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface disappeared before the plant controls' });
+    if (root.querySelector('[data-lq-cat3-plant]')) {
+      return JSON.stringify({ refuse: 'a prior category-3 plant is still mounted' });
+    }
+    var host = (${OWN_BODY_EXPR})(root);
+    var r = root.getBoundingClientRect();
+    // The instrument ignores anything under 1% of the window area and under 8px a side.
+    var side = Math.max(96, Math.ceil(Math.sqrt(r.width * r.height * 0.02)));
+    var box = 'position:absolute;left:0;top:0;z-index:-2147483640;pointer-events:none;'
+      + 'width:' + side + 'px;height:' + side + 'px;overflow:hidden;';
+
+    var nav = document.createElement('nav');
+    nav.setAttribute('data-lq-cat3-plant', 'contextual');
+    nav.setAttribute('style', box);
+    nav.textContent = 'cat3 control C';
+    host.appendChild(nav);
+
+    var dense = document.createElement('div');
+    dense.setAttribute('data-lq-cat3-plant', 'dense');
+    dense.setAttribute('style', box + 'background-color:rgba(30,30,40,0.5);');
+    dense.appendChild(document.createElement('input'));
+    host.appendChild(dense);
+
+    return JSON.stringify({ side: side, host: host.className || host.tagName });
+  })()`));
+}
+
+async function removePlants() {
+  return JSON.parse(await ev(`(function(){
+    var planted = [].slice.call(document.querySelectorAll('[data-lq-cat3-plant]'));
+    for (var i = 0; i < planted.length; i += 1) planted[i].remove();
+    return JSON.stringify({
+      removed: planted.length,
+      stillMounted: document.querySelectorAll('[data-lq-cat3-plant]').length
+    });
+  })()`));
 }
 
 async function injectAllGlass() {
@@ -370,8 +495,63 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
     if (CONTROL) {
       const work = base.detail.find((row) => row.role === 'Work' && Array.isArray(row.path));
       if (!work) {
-        out.control = { verdict: 'VOID - no runtime Work region exists to falsify' };
-        out.verdict = 'VOID - negative control could not run';
+        // No runtime Work region: falsify by planting instead of by perturbing. See
+        // `plantControls` for why the old VOID here was the instrument's limit, not the
+        // surface's defect.
+        const planted = await plantControls();
+        if (planted.refuse) throw new Error(planted.refuse);
+        const dirty = await read();
+        const removed = await removePlants();
+        const restored = await read();
+
+        const movedEligible = dirty.eligibleTotal === base.eligibleTotal + 1;
+        const sharedHeld = dirty.sharedPrimitiveEligible === base.sharedPrimitiveEligible;
+        const movedDense = dirty.denseWorkOnTranslucent === base.denseWorkOnTranslucent + 1;
+        const returned = JSON.stringify(metricTuple(restored)) === JSON.stringify(metricTuple(base));
+        const cleaned = removed.stillMounted === 0;
+        const proven = movedEligible && sharedHeld && movedDense && returned && cleaned;
+        out.control = {
+          kind: 'plant',
+          why: 'the surface has no runtime Work region; controls A and B have nothing to perturb',
+          plantSidePx: planted.side,
+          counts: {
+            base: metricTuple(base),
+            planted: metricTuple(dirty),
+            restored: metricTuple(restored),
+          },
+          movedEligible,
+          sharedHeld,
+          movedDense,
+          returned,
+          cleaned,
+          // What the bars WOULD have read while the plants were mounted — the low score the
+          // rubric requires this category to be able to produce, on this surface.
+          barsWhilePlanted: {
+            denseWorkAnchored: dirty.denseWorkOnTranslucent === 0,
+            sharedPrimitives: dirty.eligibleTotal > 0
+              && dirty.sharedPrimitiveEligible === dirty.eligibleTotal,
+          },
+          verdict: proven
+            ? 'CONTROL FAILED AS REQUIRED - category 3 instrument is proven by plant'
+            : 'VOID - the planted control did not falsify and restore',
+        };
+        if (!proven) {
+          out.verdict = 'VOID - negative control did not falsify';
+        } else if (base.eligibleTotal === 0) {
+          // A denominator of zero is now a MEASURED zero: control C proved the walk would have
+          // counted a contextual region had one existed, and control D that it would have caught
+          // dense work on glass. §2.3 asks that Liquid be used where the plan says to and nowhere
+          // else — a surface with no navigation, transport or inspector chrome satisfies both
+          // halves vacuously, and that is a pass, not a FAIL for an absent denominator.
+          out.bars.contextualTreated = true;
+          out.bars.sharedPrimitives = true;
+          out.vacuousContextual = true;
+          out.verdict = Object.values(out.bars).every(Boolean)
+            ? 'PASS 10/10'
+            : 'FAIL';
+          out.failedBars = Object.entries(out.bars)
+            .filter(([, value]) => !value).map(([name]) => name);
+        }
       } else {
         const one = await injectOne(work.path);
         if (one.refuse) throw new Error(one.refuse);
@@ -431,6 +611,8 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
       await ev(`(function(){
         var style = document.querySelector('style[data-lq-cat3-control-style]');
         if (style) style.remove();
+        var planted = [].slice.call(document.querySelectorAll('[data-lq-cat3-plant]'));
+        for (var i = 0; i < planted.length; i += 1) planted[i].remove();
         var root = ${ROOT_EXPR};
         if (root) root.removeAttribute('data-lq-cat3-control-all-glass');
         return true;

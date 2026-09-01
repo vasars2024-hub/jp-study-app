@@ -21,6 +21,7 @@ import {
   type SoundCategory,
   type SoundPackManifest,
 } from './soundPack';
+import { isAeroSafeModeApplied, onAeroSafeModeChanged } from '../aeroSafeMode';
 
 const LS_ENABLED = 'jp-os-sound-enabled';
 const LS_VOLUME = 'jp-os-sound-volume';
@@ -192,6 +193,7 @@ class SoundEngine {
 
   /** Battery Saver (perf tier) suppresses ambient categories. */
   private perfAllows(category: SoundCategory): boolean {
+    if (isAeroSafeModeApplied()) return false;
     const perf = document.documentElement.getAttribute('data-perf') ?? 'balanced';
     if (perf === 'battery') return category !== 'environment' && category !== 'companion';
     return true;
@@ -403,6 +405,10 @@ class SoundEngine {
 
 /** Singleton engine. */
 export const soundEngine = new SoundEngine();
+
+onAeroSafeModeChanged((state) => {
+  if (state.enabled && isAeroSafeModeApplied()) soundEngine.stopAll();
+});
 
 /** Convenience: play a sound from anywhere. */
 export function playSound(category: SoundCategory, name: string, opts?: PlayOptions): Promise<void> {

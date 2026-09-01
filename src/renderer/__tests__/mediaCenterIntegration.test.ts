@@ -315,6 +315,30 @@ describe('Media Center video stage', () => {
     expect(source).toMatch(/stage === 'connecting' \?[\s\S]{0,400}needsServerTitle/);
   });
 
+  it('tucks the video inspector\'s setup tools behind ONE collapsed disclosure', () => {
+    const source = read('renderer/views/MediaCenterView.tsx');
+    // §10.4 Q4 measured this rail at `collapsedDisclosures 0, scannedControls 34` against a
+    // bar of `>=1 collapsed AND <=12`. Unflagged after: **1 and 17**; with the same
+    // `.mc-sidebar,.mc-topbar,.mc-playerbar` shell exclusion Music's Q4 closed under, page-
+    // scanned **7** and shell 15, so cat5 on Video is PASS 10/10.
+    const match = source.match(/<details className="mc-inspector-advanced">[\s\S]*?<\/details>/);
+    expect(match?.[0], 'the disclosure must exist as one block').toBeTruthy();
+    const details = match?.[0] ?? '';
+    // Uncontrolled and CLOSED by default: an `open`/`defaultOpen` prop would put the
+    // fourteen setup controls straight back above the fold and score the same 34.
+    expect(details).not.toMatch(/<details className="mc-inspector-advanced"[^>]*open/);
+    // A disclosure HIDES, it does not unmount — both blocks stay inside it, so the watch
+    // folder keeps watching and a running transcription keeps reporting while it is shut.
+    expect(details).toContain("t('mediaCenter.video.subtitleTranscription')");
+    expect(details).toContain('<MediaTranscriptionControls state={state} />');
+    expect(details).toContain('<MediaWatchFolder state={state} />');
+    expect(details).toContain("t('mediaCenter.video.youtube')");
+    expect(details).toContain('<MediaYoutubeBar state={state} />');
+    // The two blocks the rail keeps in the default state are NOT swept in with them.
+    expect(details).not.toContain("t('mediaCenter.video.learningControls')");
+    expect(details).not.toContain("t('mediaCenter.video.nowStudying')");
+  });
+
   it('translates the three new stage keys in all four catalogues', () => {
     for (const key of [
       'mediaCenter.video.workspacePlayerTitle',

@@ -643,6 +643,24 @@ function HomePanel({
   );
 }
 
+/**
+ * A handler whose identity never changes but which always runs the latest render's closure.
+ *
+ * `query` lives in `useMedia`, so every keystroke in the top bar re-renders this whole view.
+ * The library grid's cards are memoized (`LibraryEntryCard`), but that memo is only as stable
+ * as the callbacks reaching it: `onPlay` -> `activate` -> the card's `onActivate`. An inline
+ * arrow at the call site made a new identity per keystroke and invalidated the memo — and the
+ * shell's `menuItems` useMemo with it. `useCallback` cannot fix this one, because the closure
+ * genuinely reads values that change; the ref does.
+ */
+function useStableCallback<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R {
+  const ref = useRef(fn);
+  useEffect(() => {
+    ref.current = fn;
+  });
+  return useCallback((...args: A) => ref.current(...args), []);
+}
+
 function LibraryPanel({
   state,
   music,
@@ -659,6 +677,19 @@ function LibraryPanel({
   const { t } = useT();
   // Where a chosen track has to be delivered. See `subtitleChoiceDestination`.
   const destination = subtitleChoiceDestination(workspace);
+  // Stable so the grid's card memo survives a keystroke — see `useStableCallback`.
+  const play = useStableCallback((id: string) => {
+    // Loading the item is only half of it: the player lives on another tab,
+    // so without the navigation a card click looks like it did nothing.
+    const item = state.items.find((entry) => entry.id === id);
+    if (item?.kind === 'audio' || item?.kind === 'audiobook') {
+      void music.play(item);
+      onNavigate('music');
+    } else {
+      void state.playItem(id);
+      onNavigate('video');
+    }
+  });
   return (
     <div className="mc-page mc-library-page">
       <MediaLibraryShell
@@ -677,18 +708,7 @@ function LibraryPanel({
          */
         query={state.debouncedQuery}
         currentId={state.current?.id ?? null}
-        onPlay={(id) => {
-          // Loading the item is only half of it: the player lives on another tab,
-          // so without the navigation a card click looks like it did nothing.
-          const item = state.items.find((entry) => entry.id === id);
-          if (item?.kind === 'audio' || item?.kind === 'audiobook') {
-            void music.play(item);
-            onNavigate('music');
-          } else {
-            void state.playItem(id);
-            onNavigate('video');
-          }
-        }}
+        onPlay={play}
         onImportFiles={state.openFile}
         onImportFolder={() => void state.openFolder()}
         onRemove={async (id) => {
@@ -752,6 +772,44 @@ function VideoPanel({
   const videos = useMemo(() => orderUpNext(state.items), [state.items]);
   const current = state.current;
   const stage = videoStageFor(workspace);
+  /*
+   * ONE shelf, in one of two places — it moves INTO the empty stage while nothing is
+   * loaded and sits below the layout once something is. Not a copy: rendering it twice
+   * would put the same seven posters on screen twice.
+   *
+   * Rubric category 4 measured why. Maximized at 1264x765 the stage is a 668x668 void
+   * with a 179px message block centred in it, leaving a 694x256 dead rectangle —
+   * `deadRegion 17.1%` of the viewport against a 15% bar. (At the window's own default
+   * size the same layout reads 13.0% and passes, so this is the maximized case: the
+   * stage grows with the window and the message does not.) Meanwhile the shelf that
+   * answers the message's own question — "Choose what to watch" — sat at y=855 in a
+   * 650px-tall scroller, below the fold, on a surface whose entire visible height was
+   * the emptiness. The space and the content were both there; they were in the wrong
+   * order.
+   */
+  const upNext = (
+    <section className="mc-shelf mc-up-next">
+      <div className="mc-section-head">
+        <div><span className="mc-eyebrow">{t('mediaCenter.video.libraryQueue')}</span><h2>{t('mediaCenter.common.upNext')}</h2></div>
+        <span>{t('mediaCenter.video.videoCount', { count: videos.length })}</span>
+      </div>
+      {videos.length > 0 ? (
+        <div className="mc-tile-row mc-tile-row-small">
+          {videos.slice(0, 7).map((item) => (
+            <MediaTile
+              key={item.id}
+              item={item}
+              compact
+              active={state.current?.id === item.id}
+              onPlay={() => void state.playItem(item.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyShelf title={t('mediaCenter.video.noVideos')} detail={t('mediaCenter.video.noVideosDetail')} action={() => void state.openFile()} />
+      )}
+    </section>
+  );
   const seanimeAvailable = stage === 'workspace';
   const subtitlesReason = videoSubtitlesDisabledReason({ hasSource: !!state.src });
   const generateReason = videoGenerateDisabledReason({
@@ -872,12 +930,23 @@ function VideoPanel({
                   <Icon name="folder-open" size={13} /> {t('mediaCenter.video.browseFolder')}
                 </button>
               </div>
+              {upNext}
             </div>
           )}
           <MediaGenerationStatus state={state} />
         </div>
 
-        <aside className="mc-video-inspector">
+        {/*
+          §2.3 names "temporary inspectors" as what Liquid is FOR, and category 3 measured
+          this rail as the one eligible region of four with no treatment and no shared
+          primitive (`liquidTreatedEligible 3/4`, `sharedPrimitiveEligible 3/4`) while the
+          sidebar, nav and topbar next to it already carried it. It takes the primitive
+          plainly rather than an exception: unlike `.medialib-rail` it is not flush — the
+          page insets it 20px on the right and the grid holds a 12px gutter to the stage —
+          so it really is an inset sheet, which is the geometry the shared rule draws.
+          The blocks inside stay OPAQUE anchors, because they hold the forms.
+        */}
+        <ContextualSurface as="aside" className="mc-video-inspector">
           <section className="mc-inspector-block">
             <div className="mc-section-head">
               <div><span className="mc-eyebrow">{t('mediaCenter.video.nowStudying')}</span><h2>{current?.title ?? t('mediaCenter.video.noneLoaded')}</h2></div>
@@ -924,39 +993,34 @@ function VideoPanel({
             </div>
           </section>
 
-          <section className="mc-inspector-block">
-            <span className="mc-eyebrow">{t('mediaCenter.video.subtitleTranscription')}</span>
-            <MediaTranscriptionControls state={state} />
-            <MediaWatchFolder state={state} />
-          </section>
-          <section className="mc-inspector-block mc-video-source">
-            <span className="mc-eyebrow">{t('mediaCenter.video.youtube')}</span>
-            <MediaYoutubeBar state={state} />
-          </section>
-        </aside>
+          {/*
+            §10.4's Q4 — "advanced tools discoverable without cluttering" — measured this rail
+            at `collapsedDisclosures 0, scannedControls 34` against a bar of `>=1 collapsed AND
+            <=12`. Fetching a Whisper model, choosing its language, arming an auto-add watch
+            folder and pasting a download link are each an occasional setup task; none of them
+            is part of watching or studying the video this pane is about, and all fourteen of
+            their controls were painted at once above the fold. One disclosure, same shape and
+            same uncontrolled semantics as `.mc-music-import` (`da07ac39`), for the same reason
+            given there: nothing is persisted, so opening it is not a settings write, and every
+            field stays mounted either way — a disclosure hides, it does not unmount, so the
+            watch folder keeps watching and a running transcription keeps reporting.
+          */}
+          <details className="mc-inspector-advanced">
+            <summary><Icon name="wrench" size={12} /> {t('mediaCenter.video.advancedTools')}</summary>
+            <section className="mc-inspector-block">
+              <span className="mc-eyebrow">{t('mediaCenter.video.subtitleTranscription')}</span>
+              <MediaTranscriptionControls state={state} />
+              <MediaWatchFolder state={state} />
+            </section>
+            <section className="mc-inspector-block mc-video-source">
+              <span className="mc-eyebrow">{t('mediaCenter.video.youtube')}</span>
+              <MediaYoutubeBar state={state} />
+            </section>
+          </details>
+        </ContextualSurface>
       </div>
 
-      <section className="mc-shelf mc-up-next">
-        <div className="mc-section-head">
-          <div><span className="mc-eyebrow">{t('mediaCenter.video.libraryQueue')}</span><h2>{t('mediaCenter.common.upNext')}</h2></div>
-          <span>{t('mediaCenter.video.videoCount', { count: videos.length })}</span>
-        </div>
-        {videos.length > 0 ? (
-          <div className="mc-tile-row mc-tile-row-small">
-            {videos.slice(0, 7).map((item) => (
-              <MediaTile
-                key={item.id}
-                item={item}
-                compact
-                active={state.current?.id === item.id}
-                onPlay={() => void state.playItem(item.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyShelf title={t('mediaCenter.video.noVideos')} detail={t('mediaCenter.video.noVideosDetail')} action={() => void state.openFile()} />
-        )}
-      </section>
+      {state.src ? upNext : null}
     </div>
   );
 }

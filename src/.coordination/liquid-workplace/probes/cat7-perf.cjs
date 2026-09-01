@@ -332,6 +332,126 @@ const SPECS = {
     },
     collection: { container: '.res-view', row: '.res-card' },
   },
+  video: {
+    title: 'Video',
+    root: '.mc-video-page',
+    heavy: {
+      // The Video section is a LAUNCHER, not a player, and that fact picks this leg. Its stage
+      // renders `workspace`/`connecting`/`needs-server` copy (MediaCenterView.tsx:890-921) and
+      // hands playback to the media-workspace window; `playItem` calls main's media:open and
+      // then dispatches `os:open` to navigate away (MediaContent.tsx:995-1001), so it writes
+      // resume state AND leaves the surface — it cannot be the repeatable read-only load.
+      // What the page itself does at scale is mount and unmount the inspector's three setup
+      // tools behind `<details class="mc-inspector-advanced">` (06708e7c) while the Up Next
+      // shelf paints its artwork tiles. Cycle the disclosure and sweep the shelf together,
+      // and put both back exactly as they were found.
+      label: 'cycle the inspector disclosure across the recent-media shelf',
+      durationMs: 3000,
+      js: `(() => {
+        delete window.__lqVideoLoad;
+        const det = document.querySelector('.mc-video-page details.mc-inspector-advanced');
+        if (!det) return 'REFUSE: no advanced inspector disclosure on the Video page';
+        const shelf = [].slice.call(document.querySelectorAll('.mc-video-page .mc-video-empty'))
+          .filter((e) => e.scrollHeight - e.clientHeight > 20)
+          .sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))[0];
+        if (!shelf) return 'REFUSE: the Up Next shelf has no scrollable overflow to sweep';
+        const openStart = det.open;
+        const scrollStart = shelf.scrollTop;
+        const rec = {
+          openStart, scrollStart, ticks: 0, opens: 0, closes: 0,
+          overflow: shelf.scrollHeight - shelf.clientHeight,
+          tiles: document.querySelectorAll('.mc-video-page .mc-media-tile').length,
+          maxScroll: 0, restored: false,
+        };
+        window.__lqVideoLoad = rec;
+        const timer = setInterval(() => {
+          det.open = !det.open;
+          if (det.open) rec.opens += 1; else rec.closes += 1;
+          rec.ticks += 1;
+          // sin(0..pi) returns the shelf to its own starting offset on the last tick.
+          const d = Math.sin((rec.ticks / 40) * Math.PI);
+          shelf.scrollTop = scrollStart + Math.round(d * rec.overflow);
+          rec.maxScroll = Math.max(rec.maxScroll, shelf.scrollTop);
+          if (rec.ticks >= 40) {
+            clearInterval(timer);
+            det.open = openStart;
+            shelf.scrollTop = scrollStart;
+            setTimeout(() => { rec.restored = det.open === openStart && shelf.scrollTop === scrollStart; }, 120);
+          }
+        }, 60);
+        return 'cycling the disclosure over ' + rec.overflow + ' px of shelf';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqVideoLoad;
+        if (!r) return 'REFUSE: Video load never armed';
+        if (r.ticks < 40 || r.opens < 15 || r.closes < 15) return 'REFUSE: incomplete Video cycle ' + JSON.stringify(r);
+        if (r.maxScroll < r.overflow * 0.8) return 'REFUSE: the shelf never swept its overflow ' + JSON.stringify(r);
+        if (!r.restored) return 'REFUSE: Video did not restore open=' + r.openStart + ' scrollTop=' + r.scrollStart;
+        return 'cycled ' + r.ticks + ' disclosures (' + r.opens + ' open / ' + r.closes + ' closed) over ' + r.tiles
+          + ' tiles and ' + r.overflow + ' px, restored';
+      })()`,
+    },
+    collection: { container: '.mc-up-next', row: '.mc-media-tile' },
+  },
+  city: {
+    // Mooncap Garden is FRAMELESS: no `.fwin-title-text` for a substring to match, so it is
+    // named structurally by correction 29's `@selector` form — the same way cat4 and cat8
+    // already name it (`--surface @.fwin-frameless`). `.reading-garden` is inside a `.fwin`,
+    // so the gesture legs take the window path, not the -Root path; driving -Root here would
+    // resize the whole Electron OS window instead of the garden's own window.
+    title: '@.fwin-frameless',
+    root: '.reading-garden',
+    heavy: {
+      // City is the one sampled surface whose load runs UNPROMPTED: seven `<canvas>` layers,
+      // 48 stars and 22 dust motes animate continuously whether or not anyone touches it. The
+      // only user-driven work on top of that is the mushroom hitbox, which mounts and unmounts
+      // the whole dossier dialog (`#reading-garden-info`, ReadingGarden.tsx:461-469). The sky
+      // console's Star/Asteroid/Ice-barrage buttons are NOT usable here: they are
+      // `import.meta.env.DEV`-gated `data-dev-only` debug controls (correction 28), so firing
+      // them would score the product against a panel no user has.
+      label: 'open and close the dossier over the running garden animation',
+      durationMs: 3000,
+      js: `(() => {
+        delete window.__lqCityLoad;
+        const hit = document.querySelector('.reading-garden .reading-garden-mushroom-hitbox');
+        if (!hit) return 'REFUSE: the mushroom hitbox is absent, so City has no user-driven load';
+        const openAtStart = hit.getAttribute('aria-expanded') === 'true';
+        const rec = {
+          openAtStart, ticks: 0, opened: 0, closed: 0, restored: false,
+          canvases: document.querySelectorAll('.reading-garden canvas').length,
+        };
+        window.__lqCityLoad = rec;
+        const timer = setInterval(() => {
+          hit.click();
+          rec.ticks += 1;
+          if (document.querySelector('#reading-garden-info')) rec.opened += 1; else rec.closed += 1;
+          if (rec.ticks >= 20) {
+            clearInterval(timer);
+            setTimeout(() => {
+              if ((hit.getAttribute('aria-expanded') === 'true') !== openAtStart) hit.click();
+              setTimeout(() => { rec.restored = (hit.getAttribute('aria-expanded') === 'true') === openAtStart; }, 160);
+            }, 160);
+          }
+        }, 130);
+        return 'toggling the dossier over ' + rec.canvases + ' animating canvases';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqCityLoad;
+        if (!r) return 'REFUSE: City load never armed';
+        if (r.ticks < 20 || r.opened < 8 || r.closed < 8) return 'REFUSE: incomplete City cycle ' + JSON.stringify(r);
+        if (r.canvases < 7) return 'REFUSE: only ' + r.canvases + ' canvases were animating; the ambient load was not present';
+        if (!r.restored) return 'REFUSE: City did not restore the dossier to expanded=' + r.openAtStart;
+        return 'toggled the dossier ' + r.ticks + ' times (' + r.opened + ' open / ' + r.closed + ' closed) over '
+          + r.canvases + ' animating canvases, restored';
+      })()`,
+    },
+    // City has NO windowed collection, and the field is kept only to record what its weight
+    // was actually sampled as. `cat7-collection-weight` will call the canvas stack INERT here
+    // — it finds a 1,122 px "spacer" that is really the parallax world layer — and that
+    // verdict is an artifact of asking a canvas surface a list question, not a defect. The
+    // number that matters from that run is `nodes: 120` for 7 continuously painting canvases.
+    collection: { container: '.reading-garden', row: '.reading-garden canvas' },
+  },
   music: {
     title: 'Music',
     root: '.mc-music-page',
@@ -606,6 +726,62 @@ const SPECS = {
     },
     collection: { container: '.dict-view', row: '.dict-entry' },
   },
+  shell: {
+    // The shell is the root OS window rather than a floating app, so the interaction
+    // probe drives its Root branch. The structural root also prevents a foreign theme
+    // from being mistaken for the Wired identity this L9 cell is certifying.
+    title: 'Wired shell',
+    root: '.os-desktop-wired',
+    heavy: {
+      // Start is the shell's largest reversible synchronous mount: on this scene it
+      // adds roughly 300 nodes and 50 controls. Cycling it exercises the taskbar,
+      // launcher and hosted-window scene without changing a preference or user data.
+      label: 'mount and unmount the Start router 24 times',
+      durationMs: 4000,
+      js: `(() => {
+        delete window.__lqShellLoad;
+        const root = document.querySelector('.os-desktop-wired');
+        const start = root && root.querySelector('.os-start-btn');
+        if (!start) return 'REFUSE: no Wired Start router';
+        const openAtStart = start.getAttribute('aria-expanded') === 'true';
+        const rec = {
+          openAtStart, ticks: 0, opened: 0, closed: 0,
+          minNodes: root.querySelectorAll('*').length,
+          maxNodes: root.querySelectorAll('*').length,
+          restored: false,
+        };
+        window.__lqShellLoad = rec;
+        const timer = setInterval(() => {
+          start.click();
+          rec.ticks += 1;
+          if (start.getAttribute('aria-expanded') === 'true') rec.opened += 1;
+          else rec.closed += 1;
+          const nodes = root.querySelectorAll('*').length;
+          rec.minNodes = Math.min(rec.minNodes, nodes);
+          rec.maxNodes = Math.max(rec.maxNodes, nodes);
+          if (rec.ticks >= 24) {
+            clearInterval(timer);
+            setTimeout(() => {
+              if ((start.getAttribute('aria-expanded') === 'true') !== openAtStart) start.click();
+              setTimeout(() => {
+                rec.restored = (start.getAttribute('aria-expanded') === 'true') === openAtStart;
+              }, 160);
+            }, 160);
+          }
+        }, 120);
+        return 'cycling Start over ' + rec.minNodes + ' initial nodes';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqShellLoad;
+        if (!r) return 'REFUSE: shell load never armed';
+        if (r.ticks < 24 || r.opened < 10 || r.closed < 10) return 'REFUSE: incomplete shell cycle ' + JSON.stringify(r);
+        if (r.maxNodes - r.minNodes < 200) return 'REFUSE: Start mounted only ' + (r.maxNodes - r.minNodes) + ' nodes';
+        if (!r.restored) return 'REFUSE: Start did not restore expanded=' + r.openAtStart;
+        return 'cycled Start ' + r.ticks + ' times (' + r.opened + ' open / ' + r.closed + ' closed), mounted '
+          + (r.maxNodes - r.minNodes) + ' nodes and restored expanded=' + r.openAtStart;
+      })()`,
+    },
+  },
 };
 
 // L0-baseline-1, recorded 2026-08-16 in PERF_BASELINE_RESTART.md. PROVENANCE, NOT THE BAR —
@@ -686,7 +862,14 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       var r = w.getBoundingClientRect(); return r.width > 0 && r.height > 0;
     });
     var t = function(w){ var e = w.querySelector('.fwin-title-text, .fwin-title'); return e ? (e.textContent || '').trim() : ''; };
-    var mine = wins.filter(function(w){ return t(w).indexOf(${JSON.stringify(spec.title)}) >= 0; });
+    // Correction 29: a spec whose title starts with '@' names its window by SELECTOR, because
+    // a frameless window has no title element and substring-matching '' matches every window —
+    // which would let an absent surface be scored on whichever window happened to be open.
+    var want = ${JSON.stringify(spec.title)};
+    var bySel = want.charAt(0) === '@' ? want.slice(1) : '';
+    var mine = wins.filter(function(w){
+      return bySel ? (w.matches(bySel) || !!w.querySelector(bySel)) : t(w).indexOf(want) >= 0;
+    });
     var root = document.querySelector(${JSON.stringify(spec.root)});
     return JSON.stringify({
       windows: wins.length, titles: wins.map(t),
@@ -901,9 +1084,21 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // the pin forbids.
   if (spec.partial) voided.push(`PARTIAL SURFACE: ${spec.partial}`);
   const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
+  // Correction 31 (shared with the cat2 harness, where it was measured). React StrictMode
+  // double-invokes every render IN DEVELOPMENT ONLY and this harness only ever drives a dev
+  // build, so every frame/latency figure here carries a tax production strips. Wired Start
+  // menu, same task and same open tree: worstRecv 118.1 ms with StrictMode on, 52.3 ms off,
+  // against a 100 ms bar. Stamped rather than corrected here, because this category's own
+  // numbers are frame-time under load and nobody has yet re-derived the tax for THAT leg -
+  // do not assume the 2.3x from cat2 transfers. `src/renderer/strictRoot.tsx` reads the flag.
+  const strictOff = (await ev("String(localStorage.getItem('jp-lq-strict'))")) === 'off';
+
   const out = {
     surface: SURFACE, title: spec.title, root: spec.root,
     at: new Date().toISOString(),
+    strictMode: strictOff
+      ? 'off - dev double-render removed; see correction 31'
+      : 'on - figures carry the dev double-render tax; see correction 31',
     scene: legs.drag ? legs.drag.scene_before : null,
     surfaceWindow: {
       mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',

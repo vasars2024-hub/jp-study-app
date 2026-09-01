@@ -486,6 +486,47 @@ describe('desktop store schema v3', () => {
       const store = await freshStore();
       expect(store.switchDesktop(1.5).ok).toBe(false);
     });
+
+    /*
+     * An assignment outlives its monitor by design, so "a display is assigned
+     * here" and "a shell can exist here" are different questions. The guard read
+     * only the first, and because it inspects the TARGET alone the mismatch was
+     * a one-way door: leaving the desktop was allowed, returning never was.
+     */
+    it('does not let an UNPLUGGED display claim a desktop', async () => {
+      const store = await freshStore();
+      store.setMainDisplayKey('main-panel');
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
+      // The display service reports: only the main panel is attached now.
+      store.syncAssignments([{ key: 'main-panel', primary: true }]);
+      expect(store.switchDesktop(1).ok).toBe(true);
+    });
+
+    // The adverse control for the test above. If presence-checking ever widens
+    // into "never claimed", this is the assertion that goes red, so the fix
+    // cannot silently become a deletion of the guard.
+    it('still refuses while that display IS attached', async () => {
+      const store = await freshStore();
+      store.setMainDisplayKey('main-panel');
+      store.setAssignment({ displayKey: 'second-panel', desktopIndex: 1, enabled: true });
+      store.syncAssignments([
+        { key: 'main-panel', primary: true },
+        { key: 'second-panel', primary: false },
+      ]);
+      const res = store.switchDesktop(1);
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe('desktop-on-another-display');
+    });
+
+    // The user-visible shape of the bug: leave, then come back.
+    it('can return to a desktop whose display was unplugged after leaving it', async () => {
+      const store = await freshStore();
+      store.setMainDisplayKey('main-panel');
+      store.setAssignment({ displayKey: 'gone-panel', desktopIndex: 0, enabled: true });
+      store.syncAssignments([{ key: 'main-panel', primary: true }]);
+      expect(store.switchDesktop(1).ok).toBe(true);
+      expect(store.switchDesktop(0).ok).toBe(true);
+    });
   });
 
   describe('corrupt input', () => {

@@ -28,7 +28,7 @@ const CSS = readFileSync(CSS_PATH, 'utf8');
  * that must stay tokenised are the ones a light palette inverts: near-white INK, and near-black
  * translucent SLABS opaque enough to be read as the background of the text on them.
  */
-const INK_CEILING = 44;
+const INK_CEILING = 42;
 const SLAB_CEILING = 16;
 
 const TOKEN_BLOCK_END = CSS.indexOf('.mc-root,\n.mc-root * {');
@@ -84,6 +84,15 @@ describe('Media Center theme ink and material tokens', () => {
     expect(ruleBody('.mc-music-now .music-nowplaying {'))
       .toMatch(/background:\s*var\(--mc-inset-glass/);
     expect(ruleBody('.mc-queue-summary {')).toMatch(/background:\s*var\(--mc-inset-glass-soft/);
+  });
+
+  it('sources the tile and row TITLE ink the Video surface paints from a token', () => {
+    // Measured live 2026-08-31 on the Video empty state: both rules hardcoded #dfe0e6, so in
+    // `classic-light` the seven recent-media titles painted rgb(223,224,230) on the white
+    // `--mc-stage-plate` at 1.09:1 against a 4.5 bar. After: cat5 Q5 reports 0 failing runs in
+    // both themes across 89 measured runs.
+    expect(ruleBody('.mc-tile-copy strong {')).toMatch(/color:\s*var\(--mc-tile-ink/);
+    expect(ruleBody('.mc-study-row-copy strong {')).toMatch(/color:\s*var\(--mc-tile-ink/);
   });
 
   it('keeps the active nav row\'s sub-label on its own ink', () => {

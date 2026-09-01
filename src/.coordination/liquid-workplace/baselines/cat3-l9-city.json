@@ -1,0 +1,80 @@
+{
+  "label": "l9-city",
+  "surface": "@.fwin-frameless",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": false,
+  "box": "680x709",
+  "presentation": "standard",
+  "windowOwnPaint": {
+    "alpha": 1,
+    "backdrop": "blur(10px)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 43,
+  "controlsSkipped": 5,
+  "byRole": {
+    "Work": 0,
+    "Liquid-eligible": 0,
+    "Anchor": 4,
+    "Anchor(holds work)": 0,
+    "Ambient": 39
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 0,
+  "sharedPrimitiveEligible": 0,
+  "eligibleTotal": 0,
+  "theme": "forest-night",
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "kind": "plant",
+    "why": "the surface has no runtime Work region; controls A and B have nothing to perturb",
+    "plantSidePx": 99,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "planted": [
+        1,
+        1,
+        0,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "movedEligible": true,
+    "sharedHeld": true,
+    "movedDense": true,
+    "returned": true,
+    "cleaned": true,
+    "barsWhilePlanted": {
+      "denseWorkAnchored": false,
+      "sharedPrimitives": false
+    },
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven by plant"
+  },
+  "vacuousContextual": true
+}
