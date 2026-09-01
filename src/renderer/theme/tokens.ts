@@ -151,7 +151,10 @@ export const shellZIndex = {
 export const TOKEN_GROUPS: readonly TokenGroup[] = [
   {
     tier: 'Typography · size',
-    description: 'rem-based scale; --font-size-md (14px) is the body base.',
+    description: 'rem-based scale; --font-size-md (14px) is the body base. Every step is emitted '
+      + 'as `calc(<value> * var(--display-font-scale, 1))`, so Settings > Display > base font '
+      + 'moves the whole ladder; the scale defaults to 1 and the values below are the resolved '
+      + 'sizes at that default.',
     tokens: [
       { name: '--font-size-2xs', value: '0.6875rem', description: 'Dense status/toolbar text (11px).' },
       { name: '--font-size-xs', value: '0.75rem', description: 'Captions, chips (12px).' },

@@ -230,6 +230,26 @@ describe('ui customization — CSS generation', () => {
     }
   });
 
+  it('keeps a pinned font size riding the display base font, and scales nothing else', () => {
+    // These declarations are `!important`, so they replace `theme/tokens.css`'s
+    // `calc(<step> * var(--display-font-scale, 1))` outright. Without re-applying the scale, a
+    // profile that pins one step of the ladder would make Settings > Display > base font stop
+    // working for exactly that step — the two text-size affordances would cancel rather than
+    // compose. Measured live: the base font reached 0 of Settings' 70 text elements before the
+    // ladder carried the scale.
+    const { document } = patchUiTokens(doc(), 'default', {
+      'font-size-sm': '15px',
+      'space-md': '20px',
+      'line-height-normal': '1.8',
+    }, opts);
+    const css = profileToCss(profileOf(document, 'default'));
+    expect(css).toContain('--font-size-sm: calc(15px * var(--display-font-scale, 1)) !important;');
+    // Layout and rhythm are not typography sizes: scaling them would turn a base-font
+    // preference into a whole-app zoom, which is a separate control.
+    expect(css).toContain('--space-md: 20px !important;');
+    expect(css).toContain('--line-height-normal: 1.8 !important;');
+  });
+
   it('a theme with no overrides produces no stylesheet at all', () => {
     // The scope guard for the `!important` above: stock Default must stay inert.
     expect(profileToCss(profileOf(doc(), 'default'))).toBe('');
