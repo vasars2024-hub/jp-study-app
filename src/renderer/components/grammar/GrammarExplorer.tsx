@@ -83,9 +83,15 @@ export interface GrammarExplorerProps {
   /** Renders the detail pane for the focused record. Supplied by the view. */
   renderDetail: (point: NormalizedGrammarPoint) => React.ReactNode;
   className?: string;
+  /** Optional shell deep link. The key lets selecting the same record refocus it. */
+  focusRequest?: { id: string; key: number } | null;
 }
 
-export default function GrammarExplorer({ renderDetail, className = '' }: GrammarExplorerProps) {
+export default function GrammarExplorer({
+  renderDetail,
+  className = '',
+  focusRequest,
+}: GrammarExplorerProps) {
   const { t } = useT();
   const [filters, setFilters] = useState<PracticeFilters>(() =>
     loadPracticeFilters(EXPLORER_FILTERS_KEY),
@@ -168,6 +174,10 @@ export default function GrammarExplorer({ renderDetail, className = '' }: Gramma
       return next;
     });
   }, [historyIndex]);
+
+  useEffect(() => {
+    if (focusRequest && byId.has(focusRequest.id)) focus(focusRequest.id);
+  }, [byId, focus, focusRequest]);
 
   const goHistory = useCallback(
     (delta: number) => {

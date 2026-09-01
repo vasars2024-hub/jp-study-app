@@ -9,6 +9,7 @@
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import DictionaryResults, { type DictLang } from '../DictionaryResults';
+import { BLANC_DICTIONARY_QUERY_EVENT, readBlancDictionaryQuery } from './blancMasterSources';
 import { getStudyLang, onStudyLangChanged, setStudyLang } from '../../studyEnvironment';
 import {
   loadClipboardHistory,
@@ -111,6 +112,16 @@ export function BlancDictionaryPanel() {
   const [query, setQuery] = useState('');
 
   useEffect(() => onStudyLangChanged(setLang), []);
+  useEffect(() => {
+    const onMasterSearchQuery = (event: Event): void => {
+      const next = readBlancDictionaryQuery(event);
+      if (!next) return;
+      setInput(next);
+      setQuery(next);
+    };
+    window.addEventListener(BLANC_DICTIONARY_QUERY_EVENT, onMasterSearchQuery);
+    return () => window.removeEventListener(BLANC_DICTIONARY_QUERY_EVENT, onMasterSearchQuery);
+  }, []);
 
   const isZh = lang === 'zh';
 
@@ -911,7 +922,11 @@ const GRAMMAR_MODES = [
 
 type GrammarMode = (typeof GRAMMAR_MODES)[number]['id'];
 
-export function BlancGrammarPanel() {
+export function BlancGrammarPanel({
+  focusRequest,
+}: {
+  focusRequest?: { id: string; key: number } | null;
+}) {
   const [mode, setMode] = useState<GrammarMode>('grammar');
   const [practiceSeed, setPracticeSeed] = useState<Partial<PracticeFilters> | undefined>();
   const corpusSize = useMemo(() => dedupeGrammarByTitle(GRAMMAR).length, []);
@@ -926,6 +941,10 @@ export function BlancGrammarPanel() {
     window.addEventListener('grammar:open-practice', onPractice);
     return () => window.removeEventListener('grammar:open-practice', onPractice);
   }, []);
+
+  useEffect(() => {
+    if (focusRequest) setMode('grammar');
+  }, [focusRequest]);
 
   return (
     <div className="blanc-tool-detail">
@@ -952,7 +971,10 @@ export function BlancGrammarPanel() {
       <fieldset>
         <legend>{GRAMMAR_MODES.find((m) => m.id === mode)?.label}</legend>
         {mode === 'grammar' ? (
-          <GrammarExplorer renderDetail={(point) => <GrammarDetail key={point.id} point={point} />} />
+          <GrammarExplorer
+            focusRequest={focusRequest}
+            renderDetail={(point) => <GrammarDetail key={point.id} point={point} />}
+          />
         ) : mode === 'practice' ? (
           <GrammarPracticePanel initialFilters={practiceSeed} />
         ) : mode === 'review' ? (
