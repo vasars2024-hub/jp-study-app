@@ -35,6 +35,7 @@ import { importKanjidic } from './importers/kanjidic';
 import { importStarDict } from './importers/stardict';
 import { importTatoeba } from './importers/tatoeba';
 import { migrateLegacyYomitanStores } from './migrate';
+import { runDictionaryRead, type DictionaryReadReply, type DictionaryReadRequest } from './readProtocol';
 import { runSourceLangRelabel } from './sourceLang';
 import type {
   DictionaryImportKind,
@@ -286,5 +287,60 @@ export function attachDictionaryImportWorker(port: ParentPort): void {
   port.start?.();
 }
 
+export interface ReadWorkerDeps {
+  openDb: (dir: string) => SqliteDb;
+}
+
+/**
+ * The other role this bundle can play: a long-lived process answering the main
+ * process's dictionary reads on its own SQLite handle, so a cold page fault is
+ * taken here rather than on Electron's main loop (`readProtocol.ts` has the
+ * measurement). One process, many reads, until the parent kills it.
+ *
+ * Which role a process has is decided by what it is sent — a read process never
+ * receives `start`, an import process never `read` — so both attach to the same
+ * port and each ignores the other's messages. Reads are answered strictly in
+ * arrival order on one handle: the scan-shaped reads yield between windows, and
+ * interleaving two of them on one connection buys nothing the caller can see.
+ */
+export function attachDictionaryReadWorker(port: ParentPort, deps: ReadWorkerDeps): void {
+  let db: SqliteDb | null = null;
+  let dbDir = '';
+  let queue: Promise<void> = Promise.resolve();
+
+  port.on('message', (event) => {
+    const message = event?.data as DictionaryReadRequest | undefined;
+    if (!message || typeof message !== 'object' || message.type !== 'read') return;
+    queue = queue.then(async () => {
+      let reply: DictionaryReadReply;
+      try {
+        if (!db || !db.open || dbDir !== message.dbDir) {
+          if (db?.open) db.close();
+          db = deps.openDb(message.dbDir);
+          dbDir = message.dbDir;
+        }
+        const value = await runDictionaryRead(db, message.kind, message.query);
+        reply = { type: 'readResult', id: message.id, ok: true, value };
+      } catch (error) {
+        // An error is an answer. A read that threw and said nothing would look,
+        // from the parent, exactly like a process that hung.
+        reply = {
+          type: 'readResult',
+          id: message.id,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+      port.postMessage(reply);
+    });
+  });
+  port.start?.();
+}
+
 const port = parentPort();
-if (port) attachDictionaryImportWorker(port);
+if (port) {
+  attachDictionaryImportWorker(port);
+  // `readonly` skips the migration ladder: this role must never change the
+  // file, and the main process has already brought it up to date at boot.
+  attachDictionaryReadWorker(port, { openDb: (dir) => openDictionaryDb({ dir, readonly: true }) });
+}

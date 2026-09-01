@@ -43,17 +43,10 @@ import { clampLookupLimit } from '../shared/dictionaryLookup';
 import { legacyBatchToLookupResult } from './dictionary/legacyInterlinear';
 import {
   lookupChineseInDictionary,
-  lookupInDictionaryDb,
   lookupOfflineInterlinearFromStore,
   resetChineseDictionaryCache,
-  findSemanticNeighborsInDb,
-  findLexiconCompoundsInDb,
   findLexiconCollocationsInDb,
-  findExampleSentencesInDb,
-  findLexiconEtymologyInDb,
-  findLexiconFrequencyInDb,
   findLexiconFrequencyRanksInDb,
-  findLexiconXrefsInDb,
   getHeadwordAudioFromDb,
   listDictionarySources,
   listDictionaryPairs,
@@ -84,6 +77,7 @@ import {
 } from '../shared/lexiconExplainPrompt';
 import { normalizePolicy } from '../shared/agentExecutionBridge';
 import { dictionaryDir } from './dictionary/db';
+import { disposeDictionaryReads, readDictionary } from './dictionary/readIpc';
 import { warmDictionaryPages, type DictWarmResult } from './dictionary/warmup';
 import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
 import {
@@ -251,8 +245,11 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   // SQLite/FTS is the canonical any-to-any path. It is additive during the
   // migration: installations whose legacy JSON stores have not been imported
   // yet still use the existing Yomitan/Jisho path below, unchanged.
+  //
+  // Read off the main process (`dictionary/readProtocol.ts`): a cold page of
+  // the 540 MB file is then the worker's stall, not the whole app's.
   try {
-    const unified = lookupInDictionaryDb({ text: q, limit: pageSize });
+    const unified = await readDictionary('lookup', { text: q, limit: pageSize });
     if (unified.entries.length) {
       const converted = lookupResultToDictResult(unified);
       // Preserve the legacy popup's pitch/frequency contract while the unified
@@ -281,7 +278,7 @@ export async function lookupTerm(query: string, limit?: number): Promise<DictRes
   // approximate answer can never displace a real one.
   try {
     const approximate = lookupResultToDictResult(
-      lookupInDictionaryDb({ text: q, limit: pageSize, fuzzy: true }),
+      await readDictionary('lookup', { text: q, limit: pageSize, fuzzy: true }),
     );
     if (approximate.approximate) return approximate;
   } catch {
@@ -753,6 +750,9 @@ export function cancelScheduledDictionaryWarmup(): void {
 }
 
 export function registerDictionaryIpc(): void {
+  // The read worker (`dictionary/readIpc.ts`) is spawned on first use; this is
+  // the one place that knows the app is leaving, so it is where it is reaped.
+  app.on('before-quit', disposeDictionaryReads);
   scheduleDictionaryWarmup();
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number) => lookupTerm(query, limit));
@@ -831,7 +831,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:semanticNeighbors',
-    (_e, text: unknown, options?: unknown): LexiconNeighborResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconNeighborResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -839,7 +839,7 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconNeighborResult = { query, probedSenses: [], neighbors: [] };
       if (!query) return empty;
       try {
-        return findSemanticNeighborsInDb({
+        return await readDictionary('neighbors', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),
@@ -866,7 +866,7 @@ export function registerDictionaryIpc(): void {
         // Awaited inside the try, like `dict:examples`: the scan yields the event
         // loop between windows, so a database that goes away mid-scan rejects here
         // rather than escaping as an unhandled rejection.
-        return await findLexiconCompoundsInDb({
+        return await readDictionary('compounds', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),
@@ -921,7 +921,7 @@ export function registerDictionaryIpc(): void {
         // Awaited inside the try on purpose: the scan yields the event loop
         // between windows, so a database that goes away mid-scan rejects here
         // rather than escaping as an unhandled rejection.
-        return await findExampleSentencesInDb({
+        return await readDictionary('examples', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           glossLangs: readLangList(raw.glossLangs),
@@ -938,7 +938,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:etymology',
-    (_e, text: unknown, options?: unknown): LexiconEtymologyResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconEtymologyResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -946,7 +946,7 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconEtymologyResult = { query, etymologies: [] };
       if (!query) return empty;
       try {
-        return findLexiconEtymologyInDb({
+        return await readDictionary('etymology', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           limit: MAX_ETYMOLOGY_RESULTS,
@@ -961,7 +961,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:frequency',
-    (_e, text: unknown, options?: unknown): LexiconFrequencyResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconFrequencyResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -969,7 +969,7 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconFrequencyResult = { query, entries: [] };
       if (!query) return empty;
       try {
-        return findLexiconFrequencyInDb({
+        return await readDictionary('frequency', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           limit: MAX_FREQUENCY_RESULTS,
@@ -1007,7 +1007,7 @@ export function registerDictionaryIpc(): void {
   );
   ipcMain.handle(
     'dict:xrefs',
-    (_e, text: unknown, options?: unknown): LexiconXrefResult => {
+    async (_e, text: unknown, options?: unknown): Promise<LexiconXrefResult> => {
       const raw = options && typeof options === 'object' && !Array.isArray(options)
         ? options as Record<string, unknown>
         : {};
@@ -1015,7 +1015,7 @@ export function registerDictionaryIpc(): void {
       const empty: LexiconXrefResult = { query, xrefs: [] };
       if (!query) return empty;
       try {
-        return findLexiconXrefsInDb({
+        return await readDictionary('xrefs', {
           text: query,
           sourceLangs: readLangList(raw.sourceLangs),
           limit: MAX_XREF_RESULTS,
