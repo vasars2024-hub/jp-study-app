@@ -72,6 +72,8 @@ const SURFACE = arg('surface', '');
 const WIN = arg('win', '');
 const OUT = arg('out', '');
 const CONTROL = has('control');
+const MODE = arg('mode', 'full');
+const MAX_STOPS = Number(arg('max-stops', '160'));
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
   process.exit(2);
@@ -766,7 +768,277 @@ async function bail(code, msg) {
   process.exit(code);
 }
 
+/* ========================================================================== --mode keyboard
+ *
+ * L11 bullet 1 — "full keyboard and screen-reader pass". The default mode already answers
+ * `unreachable`: how many controls REFUSE focus. That is focusability, not a traversal, and
+ * it cannot see the four things this bullet actually names — the order you arrive in, whether
+ * you can see where you are, whether you can get out, and whether a screen reader is told
+ * anything at each stop. So this is a MODE on the category-1 harness, not a new probe.
+ *
+ * IT PRESSES A REAL TAB KEY. `sendInputEvent` through the bridge's `/key` route, one POST per
+ * stop, because a dispatched `KeyboardEvent` does NOT move focus in Chromium — focus movement
+ * is browser behaviour, not a listener, so a synthetic keydown walk would report one stop and
+ * call the surface a trap. (Sibling of the banked "synthetic click does not focus" trap.)
+ *
+ * WHAT EACH BAR MEANS:
+ *   noTrap          no stop repeats consecutively — Tab always moves
+ *   walkTerminates  the walk ends somewhere real: back at its own start, or on a VISIBLE,
+ *                   NAMED control of the host shell. This bar was written as "the cycle
+ *                   closes" and that was wrong — the first run scored FAIL because Tab
+ *                   correctly handed focus to the desktop Start button, which is what a
+ *                   non-modal window is supposed to do. Trapping would be the defect.
+ *   everyStopNamed  a screen reader is told something at every stop (text, aria-label, title,
+ *                   aria-labelledby). Unnamed stops are listed by position, never counted only.
+ *   everyStopRinged a keyboard focus indicator is painted. Read as `:focus-visible` styles,
+ *                   which is exactly what a REAL Tab produces and a `.focus()` call may not.
+ *   everyStopPainted a stop with a 0x0 or off-viewport box is a control you can reach and
+ *                   cannot see; scrolling is allowed, being invisible is not.
+ *
+ * ORDER: `orderInversions` counts stops that jump BACKWARD past a whole row against the visual
+ * top-to-bottom, left-to-right order. Reported, not scored — a deliberate tab order (a rail
+ * that hands off to its panel) legitimately reads as an inversion, and scoring it would
+ * generate findings the way a flat 24 px rule did for hit areas.
+ */
+const KEY_READ = `(function(){
+  var root = ${ROOT_EXPR};
+  var el = document.activeElement;
+  if (!el || el === document.body) return JSON.stringify({ none: true, inside: false });
+  var st = getComputedStyle(el);
+  var box = el.getBoundingClientRect();
+  var WS = String.fromCharCode(32, 9, 10, 13, 160, 8203);
+  var norm = function (s) {
+    var out = ''; var gap = false;
+    for (var i = 0; i < String(s).length; i++) {
+      var ch = String(s).charAt(i);
+      if (WS.indexOf(ch) >= 0) { gap = out.length > 0; continue; }
+      if (gap) { out += ' '; gap = false; }
+      out += ch;
+    }
+    return out;
+  };
+  var labelledBy = '';
+  var ids = (el.getAttribute('aria-labelledby') || '').split(' ');
+  for (var j = 0; j < ids.length; j++) {
+    if (!ids[j]) continue;
+    var lab = document.getElementById(ids[j]);
+    if (lab) labelledBy += ' ' + (lab.textContent || '');
+  }
+  // A wrapping or associated LABEL is where a checkbox gets its name, and leaving it out is
+  // how the first run of this mode reported six Video toggles named "on" — that is the
+  // \`value\` attribute's default for a checkbox, not a name, and falling through to it turned
+  // six potentially unnamed stops into six passes. Labels first, and \`value\` is never a name
+  // for a checkbox or a radio.
+  var labelText = '';
+  if (el.id) {
+    var forLab = document.querySelector('label[for="' + el.id + '"]');
+    if (forLab) labelText = forLab.textContent || '';
+  }
+  if (!norm(labelText)) {
+    var wrap = el.closest('label');
+    if (wrap) labelText = wrap.textContent || '';
+  }
+  var isBox = el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type || '');
+  var name = norm(el.textContent || '') || norm(el.getAttribute('aria-label') || '')
+    || norm(labelledBy) || norm(labelText) || norm(el.getAttribute('title') || '')
+    || (isBox ? '' : norm(el.value || '')) || norm(el.getAttribute('placeholder') || '');
+  // A ring is any painted focus affordance, not only \`outline\`: this shell draws several
+  // with box-shadow, and one with a background swap. Reading only outline reported the whole
+  // Settings rail as unringed on an earlier hand check.
+  var outline = st.outlineStyle !== 'none' && parseFloat(st.outlineWidth) > 0;
+  var shadow = st.boxShadow && st.boxShadow !== 'none';
+  var vw = document.documentElement.clientWidth;
+  var vh = document.documentElement.clientHeight;
+  var cls = (el.className && typeof el.className === 'string') ? el.className.split(' ')[0] : '';
+  return JSON.stringify({
+    none: false,
+    id: el.tagName.toLowerCase() + (cls ? '.' + cls : '') + '@'
+      + Math.round(box.left) + ',' + Math.round(box.top),
+    tag: el.tagName.toLowerCase(),
+    role: el.getAttribute('role') || '',
+    name: name.slice(0, 48),
+    ring: outline || !!shadow,
+    ringBy: outline ? 'outline ' + st.outlineWidth : (shadow ? 'box-shadow' : 'none'),
+    w: Math.round(box.width),
+    h: Math.round(box.height),
+    x: Math.round(box.left),
+    y: Math.round(box.top),
+    onScreen: box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0
+      && box.left < vw && box.top < vh,
+    inside: !!(root && root.contains(el))
+  });
+})()`;
+
+const seedJs = `(function(){
+  var root = ${ROOT_EXPR};
+  if (!root) return JSON.stringify({ refuse: 'surface not found' });
+  var sel = 'a[href],button,input,select,textarea,summary,[tabindex]';
+  var first = [].slice.call(root.querySelectorAll(sel)).filter(function(e){
+    var b = e.getBoundingClientRect();
+    return b.width > 0 && b.height > 0 && !e.disabled && e.tabIndex >= 0;
+  })[0];
+  if (!first) return JSON.stringify({ refuse: 'surface has no tabbable control' });
+  first.focus();
+  return JSON.stringify({ seeded: first.tagName.toLowerCase() });
+})()`;
+
+const styleJs = (idx, css) => `(function(){
+  var g = window.__LQKB || (window.__LQKB = {});
+  var root = ${ROOT_EXPR};
+  var sel = 'a[href],button,input,select,textarea,summary,[tabindex]';
+  var el = [].slice.call(root.querySelectorAll(sel)).filter(function(e){
+    var b = e.getBoundingClientRect();
+    return b.width > 0 && b.height > 0 && !e.disabled && e.tabIndex >= 0;
+  })[${idx}];
+  if (!el) return JSON.stringify({ refuse: 'plant index does not resolve' });
+  if (${css === null ? 'true' : 'false'}) {
+    if (!g.el) return JSON.stringify({ refuse: 'nothing planted' });
+    if (g.was === null) g.el.removeAttribute('style'); else g.el.setAttribute('style', g.was);
+    var back = g.el.getAttribute('style');
+    window.__LQKB = {};
+    return JSON.stringify({ restored: true, styleNow: back === null ? null : back });
+  }
+  g.el = el;
+  g.was = el.getAttribute('style');
+  el.setAttribute('style', (g.was ? g.was + ';' : '') + ${JSON.stringify(String(css))});
+  return JSON.stringify({ planted: true, on: el.tagName.toLowerCase() });
+})()`;
+
+async function keyboardWalk() {
+  // EVERY walk re-seeds, and the control run is why. The first walk ends with focus on the
+  // shell's Start button — correctly — so the second walk started outside the surface, read
+  // `left` on its very first sample and returned 0 stops. The control then compared 36 against
+  // 0 and VOIDed a working instrument.
+  const seed = JSON.parse(await ev(seedJs));
+  if (seed.refuse) return { stops: 0, refuse: seed.refuse };
+  await new Promise((r) => { setTimeout(r, 120); });
+  const stops = [];
+  const seen = new Map();
+  let left = null;
+  let exit = null;
+  let cycled = false;
+  for (let i = 0; i < MAX_STOPS; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const stop = JSON.parse(await ev(KEY_READ));
+    if (stop.none) { left = 'focus fell to document.body'; break; }
+    if (!stop.inside) {
+      left = `focus left the surface at ${stop.id} (${stop.name || 'unnamed'})`;
+      exit = stop;
+      break;
+    }
+    if (stops.length && stops[stops.length - 1].id === stop.id && stops[stops.length - 1].name === stop.name) {
+      stop.repeatOfPrevious = true;
+    }
+    const key = `${stop.id}|${stop.name}`;
+    if (seen.has(key) && i > 0) { cycled = true; break; }
+    seen.set(key, i);
+    stops.push(stop);
+    // eslint-disable-next-line no-await-in-loop
+    await post('/key', { key: 'Tab' });
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => { setTimeout(r, 60); });
+  }
+  const unnamed = stops.filter((s) => !s.name);
+  const unringed = stops.filter((s) => !s.ring);
+  const unpainted = stops.filter((s) => !s.onScreen);
+  const trapped = stops.filter((s) => s.repeatOfPrevious);
+  // Visual order = top-to-bottom in 24 px bands, then left-to-right. An inversion is a stop
+  // that arrives a whole band ABOVE its predecessor; within a band, columns are free.
+  let inversions = 0;
+  for (let i = 1; i < stops.length; i += 1) {
+    if (stops[i].y < stops[i - 1].y - 24) inversions += 1;
+  }
+  return {
+    stops: stops.length,
+    cycled,
+    leftSurface: left,
+    // A non-modal window is SUPPOSED to hand focus on to the shell; trapping it would be the
+    // defect. The first run scored `cycleClosed` false because Tab correctly reached the
+    // desktop Start button — the bar was wrong, not the shell. What must hold is that the walk
+    // TERMINATES somewhere real: back at its own start, or on a visible, named host control.
+    exitedTo: exit ? `${exit.id} "${exit.name || '(unnamed)'}" onScreen=${exit.onScreen}` : null,
+    terminatesWell: cycled || !!(exit && exit.onScreen && exit.name),
+    unnamed: unnamed.map((s) => s.id),
+    unringed: unringed.map((s) => `${s.id} "${s.name}"`),
+    unpainted: unpainted.map((s) => `${s.id} ${s.w}x${s.h}`),
+    trapped: trapped.map((s) => s.id),
+    orderInversions: inversions,
+    walk: stops.map((s) => `${s.name || '(unnamed)'} [${s.tag}${s.role ? ' ' + s.role : ''}] ${s.ringBy}`),
+  };
+}
+
+async function runKeyboard() {
+  const raised = await raise();
+  await post('/focus', {});
+  await new Promise((r) => { setTimeout(r, 300); });
+  const seeded = JSON.parse(await ev(seedJs));
+  if (seeded.refuse) {
+    console.error(`REFUSE - ${seeded.refuse}. A surface with nothing to Tab to measures as a`
+      + ' perfect keyboard pass, which is the empty-harness false pass the rubric caps at 0.');
+    process.exitCode = 2;
+    return;
+  }
+  const base = await keyboardWalk();
+  const out = {
+    label: LABEL, mode: 'keyboard', surface: SURFACE, win: WIN || '(focused)', raised, seeded, base,
+  };
+
+  if (CONTROL) {
+    // Two plants, because the two bars fail in different ways and one plant proves one bar.
+    // The ring plant must raise `unringed` by exactly one; the tabindex plant must REMOVE a
+    // stop from the walk. Both restore, and the restore is verified by re-walking, not asserted.
+    const ring = JSON.parse(await ev(styleJs(2, 'outline:none !important;box-shadow:none !important')));
+    await new Promise((r) => { setTimeout(r, 150); });
+    const ringWalk = await keyboardWalk();
+    await ev(styleJs(2, null));
+    await new Promise((r) => { setTimeout(r, 150); });
+    const ringBack = await keyboardWalk();
+    out.control = {
+      ringPlant: ring.refuse || ring.planted,
+      unringedBefore: base.unringed.length,
+      unringedDuring: ringWalk.unringed.length,
+      unringedAfter: ringBack.unringed.length,
+      stopsBefore: base.stops,
+      stopsDuring: ringWalk.stops,
+      stopsAfter: ringBack.stops,
+      movedByOne: ringWalk.unringed.length === base.unringed.length + 1,
+      returned: ringBack.unringed.length === base.unringed.length && ringBack.stops === base.stops,
+    };
+    out.control.verdict = out.control.movedByOne && out.control.returned
+      ? 'CONTROL FAILED AS REQUIRED - the walk sees a stripped focus ring and loses it again'
+      : 'VOID - the planted ring loss was not seen, or the surface did not return';
+  }
+
+  const bars = {
+    noTrap: base.trapped.length === 0,
+    walkTerminates: base.terminatesWell,
+    everyStopNamed: base.unnamed.length === 0,
+    everyStopRinged: base.unringed.length === 0,
+    everyStopPainted: base.unpainted.length === 0,
+    scopeNonEmpty: base.stops >= 5,
+  };
+  out.bars = bars;
+  out.failedBars = Object.entries(bars).filter(([, v]) => !v).map(([n]) => n);
+  out.verdict = Object.values(bars).every(Boolean) ? 'PASS 10/10' : 'FAIL';
+  if (CONTROL && !out.control.verdict.startsWith('CONTROL FAILED')) {
+    out.verdict = 'VOID - negative control did not falsify';
+  }
+  const text = JSON.stringify(out, null, 2);
+  if (OUT) fs.writeFileSync(OUT, text);
+  console.log(text);
+  process.exitCode = out.verdict.startsWith('PASS') ? 0 : 1;
+}
+
 (async () => {
+  if (MODE === 'keyboard') {
+    await runKeyboard();
+    return;
+  }
+  if (MODE !== 'full') {
+    console.error(`REFUSE - unknown --mode "${MODE}". This harness has two: full (default) and keyboard.`);
+    process.exitCode = 2;
+    return;
+  }
   const raised = await raise();
   const disclosed = await ariaDisclose(true);
   if (disclosed.refuse) { console.error(`REFUSE - aria-disclosure leg: ${disclosed.refuse}`); process.exit(2); }

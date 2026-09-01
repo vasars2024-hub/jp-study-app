@@ -1,0 +1,55 @@
+{
+  "label": "l11b1-settings",
+  "mode": "keyboard",
+  "surface": "Settings",
+  "win": "(focused)",
+  "raised": "already-on-top",
+  "seeded": {
+    "seeded": "button"
+  },
+  "base": {
+    "stops": 7,
+    "cycled": false,
+    "leftSurface": "focus fell to document.body",
+    "exitedTo": null,
+    "terminatesWell": false,
+    "unnamed": [],
+    "unringed": [],
+    "unpainted": [],
+    "trapped": [],
+    "orderInversions": 0,
+    "walk": [
+      "⧉ [button] outline 2px",
+      "◇ [button] outline 2px",
+      "─ [button] outline 2px",
+      "▢ [button] outline 2px",
+      "× [button] outline 2px",
+      "Search settings [input] outline 2px",
+      "theme [button] outline 2px"
+    ]
+  },
+  "control": {
+    "ringPlant": true,
+    "unringedBefore": 0,
+    "unringedDuring": 1,
+    "unringedAfter": 0,
+    "stopsBefore": 7,
+    "stopsDuring": 7,
+    "stopsAfter": 7,
+    "movedByOne": true,
+    "returned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - the walk sees a stripped focus ring and loses it again"
+  },
+  "bars": {
+    "noTrap": true,
+    "walkTerminates": false,
+    "everyStopNamed": true,
+    "everyStopRinged": true,
+    "everyStopPainted": true,
+    "scopeNonEmpty": true
+  },
+  "failedBars": [
+    "walkTerminates"
+  ],
+  "verdict": "FAIL"
+}

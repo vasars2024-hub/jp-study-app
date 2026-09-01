@@ -389,3 +389,38 @@ a cell must name the page it was taken on.**
 **Trap paid for again:** editing `MediaCenterView.tsx` HMR-reset BOTH Media Center windows to
 the Library tab, and the next `--app video` run correctly refused with "the video surface is
 not open". Click the Video nav entry back before scoring, and re-read `videoPage` to confirm.
+
+## L11 bullet 1 — the keyboard leg opens (2026-09-01, NOT closed)
+
+`cat1-accessibility.cjs --mode keyboard`, a MODE on the category-1 harness (RULE 1). The
+default mode already answers `unreachable` — how many controls REFUSE focus — which is
+focusability, not a traversal, and cannot see the four things the bullet names: the order you
+arrive in, whether you can see where you are, whether you can get out, and whether a screen
+reader is told anything at each stop. **It presses a real Tab** through the bridge's `/key`
+route (`sendInputEvent`), because a dispatched `KeyboardEvent` does not move focus in
+Chromium — a synthetic walk would report one stop and call every surface a trap.
+
+**Media Center (Video): PASS 10/10.** 36 stops, 0 unnamed, 0 unringed, 0 unpainted, 0 traps,
+3 order inversions (reported, not scored). Exits correctly to `button.os-start-btn "Start"`.
+Control: a stripped focus ring on stop 3 moved `unringed` 0 -> 1 -> 0 with stops 36/36/36.
+
+**Settings: FAIL `walkTerminates`, and this is an OBSERVATION, not yet a filed defect.** The
+walk reaches **7 stops** — five chrome buttons, `Search settings`, one button named `theme` —
+and then focus falls to `document.body`. It never reaches the 25-item rail or the Home cards.
+Reproduced twice, identically. What is NOT yet discriminated: the Video walk proves the
+instrument can cross out of a surface (it reached Start), so a fall to `body` is not the
+instrument giving up — but "last tabbable in the document, wrapping through body" has not been
+ruled out. **Next turn's first act:** press one more Tab from `body` and record where it
+lands; if it re-enters at the top of the document, this is normal wrap and the bar needs the
+wrap case; if it stays on `body`, the settings rail is keyboard-unreachable past `theme`.
+
+**Two instrument corrections, both made before anything was scored.** The first run named six
+Video toggles `"on"` — that is a checkbox's default `value`, not a name. Labels (`for=` then
+a wrapping `<label>`) now resolve first and `value` is never a name for a checkbox or radio;
+the six read Auto-pause / Loop line / Furigana / Dual sub / Dictation mode / Shadowing mode,
+so there was no product defect there, only a false pass waiting to happen. The second: the bar
+was written as `cycleClosed` and scored Video FAIL because Tab correctly handed focus to the
+desktop Start button — a non-modal window is SUPPOSED to hand off, and trapping would be the
+defect. It is now `walkTerminates`: back at its own start, or on a visible, named host control.
+Every walk also re-seeds, because the second walk of the control run started outside the
+surface and returned 0 stops, and the control compared 36 against 0 and VOIDed a working probe.
