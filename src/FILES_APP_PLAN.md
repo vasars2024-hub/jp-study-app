@@ -439,10 +439,30 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
    and every search entry that pointed at `pageId: 'memory'` resolves to the Files app — a
    search hit landing on a page that no longer holds the row is a FAIL.
    <!-- status: open; evidence: 2026-08-31 f26e9932 + d9bec5be + cd9ae66d -- panels on the OLD page's own readers, MemoryPage.tsx deleted, 9 entries repointed via movedTo:'files', parity rows landed as panel:system/memory (migrated) + panel:system/statistics (preserved); the "compared after" reading needs an EXCLUSIVE app and is blocked on the mergeback -->
+   <!-- status: open; evidence: 2026-09-01 3402a184 -- the AFTER COMPARISON now exists and
+        RUNS, against the imported gate8-before.json rather than retyped values. 12 assertions
+        across filesAppGate8Parity.test.tsx (8) and filesAppGate8Stats.test.tsx (4). Memory:
+        all 8 card anchors EQUAL and in order; formatBytes(totalmem) and platform rendered off
+        a stubbed window.api.systemGetMetrics; the inventory table 30 rows / 24 sized, the six
+        largest by the capture's own byte values in the capture's order. Statistics: 14
+        stats-bar-col for the capture's recentDays=14, and knowledge reports the measured 0 on
+        every tier. Three controls: totalmem x2 renders the doubled figure and NOT the
+        original; scaling the inventory bytes x3 moves the rendered sizes; recentDays 7 renders
+        7 columns. Search half: 9 entries keep pageId 'memory' by design (types.ts:109 -- the
+        index must still resolve) and EVERY one carries movedTo 'files', with 8 of the 9 anchor
+        ids matching a card the panel renders. STILL OPEN on one clause only: that the live app
+        ROUTES to this panel, which needs an exclusive Electron. -->
    **3 of 4 clauses landed, gate still OPEN.** The before-capture exists
-   (`gate8-before.json`); the after-comparison does not. Blocker (a), the parity rows, is
-   RESOLVED — see the 2026-08-31 (tenth) entry. Blocker (b) needs an app this worker cannot
-   start without evicting another track's instrument; same entry says why and what clears it.
+   (`gate8-before.json`), and as of 2026-09-01 so does the after-comparison — it is a test that
+   imports the capture, not a live reading. What remains is strictly the live routing clause.
+   Blocker (a), the parity rows, is RESOLVED — see the 2026-08-31 (tenth) entry. Blocker (b)
+   needs an app this worker cannot start without evicting another track's instrument; same
+   entry says why and what clears it.
+   TRAPS the comparison found, both in the instrument and both worth not repeating:
+   `.fa-panel-table` also matches the agent-memory and agent-history tables, so an unscoped
+   row count read 32 for a 30-domain inventory; and `knowledgeCounts()` is indexed by LEVEL
+   (`counts[1..3]`), so a `{ known, learning, unknown }` stub renders "undefined" in every
+   card and reads as a product defect.
 9. Deleting a derived item removes exactly it; the guard for irreplaceable media refuses without
    an explicit confirmation, proven by a refusal that actually fires.
    <!-- status: closed; evidence: 2026-08-31 c7035ae6 (wiring) + 341b94e4 (live) -- "exactly it":
