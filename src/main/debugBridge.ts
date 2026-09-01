@@ -501,12 +501,23 @@ async function handle(
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
       if (win.isMinimized()) win.restore();
+      // Windows will not hand foreground to a background process on request
+      // alone; `steal` is what makes the focus below actually take effect.
+      //
+      // IT MUST COME FIRST. On Windows `app.focus({ steal: true })` focuses the
+      // application's FIRST window, so calling it after `win.focus()` takes the
+      // foreground straight back off every window but that one. Measured
+      // 2026-08-31: /focus on the Blanc window returned `focused: false` on every
+      // attempt while window 1 stayed focused, so no second-window shell could be
+      // raised through this route at all — and because Chromium throttles
+      // requestAnimationFrame in an occluded window, every frame number a QA pass
+      // recorded for such a surface was a throttle artifact rather than renderer
+      // cost. Stealing for the app, then focusing the requested window, is the
+      // order that actually lands.
+      app.focus({ steal: true });
       win.show();
       win.moveTop();
       win.focus();
-      // Windows will not hand foreground to a background process on request
-      // alone; `steal` is what makes the focus above actually take effect.
-      app.focus({ steal: true });
       writeStateSnapshot();
       return {
         code: 200,

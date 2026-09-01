@@ -21,13 +21,63 @@
   padding: var(--blanc-s2) var(--blanc-s4);
 }
 
+/*
+ * The context disclosure, at EVERY width rather than only at the OS minimum.
+ *
+ * Blanc authored this disclosure and then painted its toggle only under
+ * `max-width:780px and max-height:420px`, so at every normal size the region was
+ * `display: contents` and its eleven controls — a six-control media transport plus search,
+ * fullscreen, language, Advanced and Dark — sat permanently in the shell's chrome. Measured
+ * 2026-08-31: 22 controls to scan at rest against category 5's bar of 12, of which exactly
+ * one belonged to the open tool. That is the shell's own clutter, and the shell already
+ * shipped the fix one media query away.
+ *
+ * Nothing is removed and nothing becomes unreachable: the toggle is one click, states its
+ * position in `aria-expanded`, and the region keeps its id so `aria-controls` still names it.
+ * The clock moved out in the same change — it is read, not operated, and a <time> is not a
+ * control. Liquid's own words for this are progressive disclosure and compact contextual
+ * tools; a permanent transport bar in a study shell's chrome is neither.
+ */
+.blanc-root .blanc-top {
+  position: relative;
+}
+
+/*
+ * The declaration and the paint have to agree. Master search is marked `primary` because it
+ * IS the shell's dominant action, and a `primary` that paints identically to every other icon
+ * button is a claim nothing backs -- exactly the shape of dishonesty this directory keeps
+ * catching. It gets a real accent fill; `--blanc-accent-strong` is Blanc's own token, not a
+ * borrowed shell colour.
+ */
+.blanc-root .blanc-top-search.primary {
+  border-color: var(--blanc-accent);
+  background: var(--blanc-active);
+  color: var(--blanc-accent-strong);
+}
+
 /* Dense transport controls and form controls stay on stable opaque islands. */
 .blanc-root .blanc-top-context {
-  display: contents;
+  display: none;
+}
+
+.blanc-root .blanc-top-context.is-open {
+  position: absolute;
+  z-index: 30;
+  inset: calc(100% + var(--blanc-s1)) var(--blanc-s2) auto;
+  max-height: calc(100vh - 108px);
+  overflow: auto;
+  display: grid;
+  gap: var(--blanc-s2);
+  padding: var(--blanc-s2);
+  border: 1px solid var(--lq-anchor-border);
+  border-radius: var(--blanc-radius-md);
+  background: var(--lq-anchor-bg);
+  box-shadow: var(--blanc-shadow);
 }
 
 .blanc-root .blanc-compact-tools-toggle {
-  display: none;
+  display: inline-flex;
+  margin-left: auto;
 }
 
 .blanc-root .blanc-top.lq-liquid :is(.focus-music-bar, .blanc-top-tools) {
@@ -84,29 +134,8 @@
     align-items: center;
   }
 
-  .blanc-root .blanc-compact-tools-toggle {
-    display: inline-flex;
-    margin-left: auto;
-  }
-
-  .blanc-root .blanc-top-context {
-    display: none;
-  }
-
-  .blanc-root .blanc-top-context.is-open {
-    position: absolute;
-    z-index: 30;
-    inset: calc(100% + var(--blanc-s1)) var(--blanc-s2) auto;
-    max-height: calc(100vh - 108px);
-    overflow: auto;
-    display: grid;
-    gap: var(--blanc-s2);
-    padding: var(--blanc-s2);
-    border: 1px solid var(--lq-anchor-border);
-    border-radius: var(--blanc-radius-md);
-    background: var(--lq-anchor-bg);
-    box-shadow: var(--blanc-shadow);
-  }
+  /* The compact-tools disclosure used to be declared here and nowhere else. It is
+     unconditional now, so this block keeps only what is specific to the OS minimum. */
 
   .blanc-root .blanc-content,
   .blanc-root .blanc-statistics-panel > fieldset {

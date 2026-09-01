@@ -2090,4 +2090,135 @@ at rest — 11 taskbar (Hide, 9 sections, Exit) and 11 top (a full 6-control med
 plus search, fullscreen, language, Advanced, Dark). Blanc ships a `Context tools` disclosure
 that already tucks exactly these away, but `blanc-shell-liquid.css:87` only paints it under
 `max-width:780px and max-height:420px`, so the disclosure the shell authored is dead at every
-normal size. RULE C: **14 of 16.**
+normal size. RULE C: still **13 of 16** — a 9/10 cell is not a closed cell.
+
+## 2026-08-31 — primary — cat5 Blanc CLOSES 10/10: the disclosure the shell already owned
+
+Q4 was the one real product finding left, and Blanc had shipped its own fix one media query
+away. `blanc-shell-liquid.css:87` painted the `Context tools` toggle only under
+`max-width:780px and max-height:420px`; everywhere else `.blanc-top-context` was
+`display: contents` and its eleven controls sat permanently in the chrome. Three changes, in
+the order they were forced:
+
+1. **The disclosure is unconditional.** Toggle always painted, region hidden unless `.is-open`,
+   the `.is-open` popover hoisted out of the media query. Driven live: closed 0 controls →
+   open 11 (Previous/Play/Next/Mix/Select a song/Volume/Search/Fullscreen/language/Advanced/
+   Dark, 1076x104) → reclosed 0, `aria-expanded` tracking each way. Nothing removed, nothing
+   unreachable. The clock moved OUT — it is read, not operated, and a `<time>` is not a control.
+2. **That broke Q1 and Q3, and the break was informative.** Blanc's two entry points had been
+   a volume slider and a language dropdown; with them behind the drawer `entryPoints` went to
+   0. Neither was ever an entry point — the old YES was weak. Master search is Blanc's dominant
+   cross-tool action (`6b488974`) and a Ctrl+F affordance behind a click is not an affordance,
+   so it is promoted into the bar and marked `primary`. `.blanc-top-search.primary` gets a real
+   accent fill in the same commit: a `primary` painting identically to every other icon button
+   is a claim nothing backs.
+3. **Correction 34 — a route map is one scan, not N.** Even at 13, the rail alone spent 9 of
+   Q4's 12-control budget, so no amount of tucking TOOLS away could pass. Q4 asks about
+   advanced tools; a navigation landmark's destinations are the surface's map. Three guards,
+   and the third is the one that matters: a real `nav`/`role=navigation`, at least 3, and
+   EXACTLY ONE control signature among them (Q10's gallery discriminator reused). Measured:
+   `.os-taskbar` also carries `role="navigation"` but holds THREE signatures
+   (`os-desktop-switch`, `os-task-win`, tray), so the Wired cell cannot collapse at all.
+
+**cat5 · Blanc = PASS 10/10, controlled.** Q1 `entryPoints 1`; Q3 `primaryAction
+button.blanc-icon-btn, explicitlyMarked true`; Q4 `13 → 5`, the one collapse published as
+`navRouteGroups: [{NAV.blanc-nav, BUTTON.blanc-nav-btn, routes 9, countedAs 1}]` beside
+`scannedBeforeNavCollapse: 13`; Q5 `.is-dark` 5.27 → 5.74. Control failed as required on Q2,
+Q3, Q4, Q5, Q10. Restore verified — rootClass identical, theme null, storeIdentical, 0 residue.
+
+**cat6 Blanc RE-RUN after the chrome change, not assumed:** still PASS 10/10, parity 8/8 both
+presentations, round trip 0 diffs, its own control failed as required. Banked.
+
+**RULE C: 14 of 16** — all eight Wired plus Blanc cat1–cat6, counted from this doc's own
+per-cell PASS lines. sampled-out, unchanged: City, Video, Library, Captures, Immersion,
+Manga, Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources,
+Scraper, Settings, YouTube. Next: **cat7 and cat8 on Blanc**, which close bullet 4.
+
+## 2026-08-31 — primary — cat8 Blanc PASS 10/10: the shell owns its own language control
+
+Two harness corrections, both the shape category 5 paid for two turns ago — the category-8
+vocabulary was Study OS's, so a shell that is not Study OS could not answer.
+
+- **35 the language control.** `[data-setting-id="ui-language"]` is a Settings CARD. Blanc runs
+  in its own BrowserWindow, renders no Settings page at all, and owns the control outright
+  (`BlancShell.tsx:700`, a `<select>` whose options already carry the same four `lang` tags).
+  `--langs` refused on every tag, `languagesDiffer` came back UNMEASURED, and the cell could not
+  score better than UNMEASURED — an instrument verdict wearing a product one. The fallback is
+  deliberately narrow, because the reason the card scoping exists still holds: the select must
+  carry an option for ALL FOUR tags or it is not a language chooser. Two things the button path
+  never needed — React's value tracker dedupes a plain `.value` assignment, so the native
+  prototype setter is what makes the dispatched `change` real; and the control lives inside the
+  `Context tools` drawer, so the leg opens the `aria-controls` disclosure and CLOSES IT AGAIN,
+  since every `run()` must see the resting chrome the baseline was measured on.
+- **36 a filter behind a disclosure is still this surface's filter.** Corrections 9 and 10 made
+  `--drive-click` and `--drive-input` alternatives, which is right for a chip set and wrong for a
+  shell: a shell's one authored adverse state lives behind its master search. Blanc at rest
+  paints a volume range and two checkboxes and NO text field; `.blanc-top-search` mounts one
+  (307 → 477 elements on `.blanc-root`). A click-only leg measures the search open and EMPTY,
+  which names no state. Given both, the click is the opener and the typing leg runs inside it;
+  `restored` is still asserted against the RESTING hash, so a drawer left open fails exactly as
+  a stranded query does. Neither flag alone changes behaviour.
+
+**cat8 · Blanc = PASS 10/10, controlled.** At 1264×761: **116** text runs (105 carrying words),
+**0** raw keys against a 9,782-key catalogue, **0** placeholders, **0** mute pairs of **0**
+disabled controls, and the one observable state named — `Nothing in Blanc matched.` Four
+languages produced **4** distinct hashes with **40 of 116 = 34.48%** of runs moving and 0 raw
+keys in any of them; en/en restored. Control planted a key, a placeholder and an unexplained
+disabled button: **0/0/0 → 1/1/1 → 0/0/0**, back to baseline. Residue after both runs: 346
+document elements (exactly at rest), drawer closed, search closed, 0 plants, no error boundary.
+
+**RULE C: 15 of 16.** sampled-out, unchanged: City, Video, Library, Captures, Immersion, Manga,
+Novels, VN, Calendar, Flashcards, Games, Notebook, Statistics, Music, Resources, Scraper,
+Settings, YouTube. Only **cat7 · Blanc** is left, and it needs an instrument that can measure a
+surface living in a second OS window at all.
+
+## 2026-08-31 — primary — cat7 Blanc CLOSES the bullet: /focus could not focus any window but the first
+
+**The blocker was a product defect in the debug bridge, not a probe gap.** `/focus` ran
+`win.focus()` and THEN `app.focus({ steal: true })`; on Windows that call focuses the
+application's FIRST window, so it took the foreground straight back off every other one.
+Measured against the old binary: /focus on the Blanc window returned `focused: false` on three
+consecutive attempts while window 1 stayed focused. Since Chromium throttles rAF in an occluded
+window, that made every frame number anyone could record for a second-window shell a THROTTLE
+ARTIFACT rather than renderer cost — a category-7 score for Blanc was not merely unmeasured, it
+was unmeasurABLE, and any number taken anyway would have been a fabricated finding. Stealing for
+the app first, then focusing the requested window, lands: the same request against the restarted
+main returns `focused: true` with window 1 unfocused. That IS the control — same call, same
+window, opposite answer, and only main changed.
+
+**Correction 30 — one pin, carried end to end.** `-Win` on both PowerShell instruments and
+`--win` on the runner, so /focus, /eval, /bounds and `-DuringJs` all address ONE window. A spec
+names its window as a URL/title substring resolved from /health (`winMatch: 'blanc.html'`), never
+a literal id: BrowserWindow ids are creation order and change on every restart, so a hardcoded
+`2` scores whatever happened to open second. The interaction probe asserts the requested window
+holds the foreground BEFORE and AFTER the gesture — with two windows of one app, "something is
+focused" no longer rules out the throttle.
+
+**The trap, banked, because it cost three runs:** PowerShell variable names are CASE-INSENSITIVE.
+`$win = <focused window>` silently overwrote the `-Win` PARAMETER, so the new assertion compared
+a window id against a stringified window OBJECT and VOIDed every run — naming the right symptom
+for the wrong reason, which is the expensive kind.
+
+**cat7 · Blanc = PASS 10/10, no findings, no voids.** Scene: **0** floating windows,
+`.blanc-root` **308** elements, **346** document elements at 1264×761; PID 46072 uptime 247 s.
+Session ceiling p50/p95 **16.7/16.8 ms** across three readings, 0 frames over 100. Drag
+16.7/16.8/max **17.3**, resize 16.7/16.8/**17.6**, theme 16.7/16.8/**31.2** against a
+hidden-root theme control of 16.7/16.8; every scene stable, every gesture a closed loop (drag
+1264×761 → 1264×761, resize the same through /bounds), all main maxima **≤ 11.7 ms** against the
+500 ms bar. Heavy leg — the master search is Blanc's Start-equivalent, the one control that
+builds a cross-tool index in a single reversible synchronous mount: **20** ticks (10 open / 10
+closed), **170** nodes mounted, restored `open=false`; main p50/p95/max **2.0/3.0/49.4 ms** over
+a 6,019 ms span, against an idle control of 2.1/4.4/9.9. Sensitivity control (`--jank`): 12
+injected 120 ms blocks produced **12** frames over 100 ms and p95 **100.3**, where the clean drag
+had **0** and 16.8 — the recorder demonstrably sees the frames it reports. Residue: 307/346
+elements, theme null, search closed, route Stats, both window bounds byte-identical.
+
+**RULE C: 16 of 16 — L9 bullet 4 CLOSES.** Every cell is 10/10 across the two representative
+shells, so no category failed and no expansion was forced. Counted from this doc's own per-cell
+lines: Wired cat1 (`bc7816d6`, re-scored after the tree changed), cat2–cat8; Blanc cat1–cat8.
+Surfaces were chosen as the densest (Wired: taskbar, tray, launcher, hosted windows) and the most
+different (Blanc: its own BrowserWindow, no `.fwin` at all, a left rail instead of a taskbar) —
+and that second choice is what paid: five of the seven corrections banked in this bullet exist
+only because Blanc is not Study OS. `sampled-out:` Aero shell, Lockscreen, Mini widget, City,
+Video, Library, Captures, Immersion, Manga, Novels, VN, Calendar, Flashcards, Games, Notebook,
+Statistics, Music, Resources, Scraper, Settings, YouTube, notifications, onboarding, help.

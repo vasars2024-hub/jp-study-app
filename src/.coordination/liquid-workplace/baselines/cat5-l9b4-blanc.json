@@ -2,7 +2,7 @@
   "surface": "@.blanc-root",
   "label": "l9b4-blanc",
   "control": false,
-  "at": "2026-09-01T00:52:53.626Z",
+  "at": "2026-09-01T00:59:20.805Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "shell",
@@ -74,14 +74,13 @@
       "verdict": "YES",
       "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
       "numbers": {
-        "entryPoints": 2,
-        "primaryInputs": 2,
-        "accentButtons": 0,
-        "accentList": [],
-        "inputList": [
-          "input.",
-          "select."
-        ]
+        "entryPoints": 1,
+        "primaryInputs": 0,
+        "accentButtons": 1,
+        "accentList": [
+          "button.blanc-icon-btn::"
+        ],
+        "inputList": []
       }
     },
     {
@@ -104,51 +103,50 @@
       "verdict": "YES",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "input.",
+        "primaryAction": "button.blanc-icon-btn",
         "insideBodyViewport": true,
-        "explicitlyMarked": false
+        "explicitlyMarked": true
       }
     },
     {
       "id": 4,
       "q": "advanced tools discoverable without cluttering",
-      "verdict": "NO",
+      "verdict": "YES",
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 1,
-        "scannedControls": 22,
+        "scannedControls": 5,
         "shellChromeSelector": null,
         "shellControls": 0,
         "shellList": [],
-        "chromeControlsRaw": 22,
+        "scannedBeforeNavCollapse": 13,
+        "navRouteGroups": [
+          {
+            "landmark": "NAV.blanc-nav",
+            "signature": "BUTTON.blanc-nav-btn",
+            "routes": 9,
+            "countedAs": 1
+          }
+        ],
+        "chromeControlsRaw": 13,
         "summaryHeaders": 0,
         "behindDisclosure": 0,
         "disclosures": {
           "total": 0,
           "open": 0
         },
-        "ariaDisclosures": [],
+        "ariaDisclosures": [
+          {
+            "region": "div.blanc-top-context",
+            "controlsTaken": 0
+          }
+        ],
         "scannedList": [
           "Hide",
           "Read",
-          "Mine",
-          "Deck",
-          "Cards",
-          "Media",
-          "Stats",
-          "Toolbox",
-          "Blocks",
-          "Settings",
           "Exit Blanc",
-          "Previous track",
-          "Play",
-          "Next track",
-          "Mix off",
-          "Choose a song2 tracks · clic",
-          "Volume",
           "Search Blanc",
-          "BUTTON",
-          "English日本語中文Русский"
+          "Context tools"
         ]
       }
     },
@@ -163,31 +161,31 @@
           {
             "cell": ".is-dark=off",
             "theme": null,
-            "measured": 20,
+            "measured": 15,
             "unmeasurable": 0,
-            "minRatio": 5.27,
+            "minRatio": 5.94,
             "failingCount": 0,
             "worst": {
-              "el": "span.focus-music-vol-value",
-              "ratio": 5.27,
+              "el": "span.",
+              "ratio": 5.94,
               "bar": 4.5,
-              "bg": "div.focus-music-bar@100%",
-              "text": "100"
+              "bg": "aside.blanc-taskbar@100%",
+              "text": "Hide"
             }
           },
           {
             "cell": ".is-dark=on",
             "theme": null,
-            "measured": 20,
+            "measured": 15,
             "unmeasurable": 0,
-            "minRatio": 5.74,
+            "minRatio": 6.46,
             "failingCount": 0,
             "worst": {
-              "el": "span.focus-music-vol-value",
-              "ratio": 5.74,
+              "el": "span.",
+              "ratio": 6.46,
               "bar": 4.5,
-              "bg": "div.focus-music-bar@100%",
-              "text": "100"
+              "bg": "aside.blanc-taskbar@100%",
+              "text": "Hide"
             }
           }
         ],
@@ -289,7 +287,7 @@
         "markerSet": "chromed (5 markers, bar 3 = 60%)",
         "fillsViewport": true,
         "bespokePrefixes": [
-          "blanc:5"
+          "blanc:4"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
@@ -306,58 +304,56 @@
     "q1": "YES",
     "q2": "YES",
     "q3": "YES",
-    "q4": "NO",
+    "q4": "YES",
     "q6": "YES",
     "q10": "YES"
   },
   "altThemeNumbers": {
     "theme": null,
-    "controlsPainted": 22,
+    "controlsPainted": 13,
     "q1": {
-      "entryPoints": 2,
-      "primaryInputs": 2,
-      "accentButtons": 0,
-      "accentList": [],
-      "inputList": [
-        "input.",
-        "select."
-      ]
+      "entryPoints": 1,
+      "primaryInputs": 0,
+      "accentButtons": 1,
+      "accentList": [
+        "button.blanc-icon-btn::"
+      ],
+      "inputList": []
     },
     "q4": {
       "collapsedDisclosures": 1,
-      "scannedControls": 22,
+      "scannedControls": 5,
       "shellChromeSelector": null,
       "shellControls": 0,
       "shellList": [],
-      "chromeControlsRaw": 22,
+      "scannedBeforeNavCollapse": 13,
+      "navRouteGroups": [
+        {
+          "landmark": "NAV.blanc-nav",
+          "signature": "BUTTON.blanc-nav-btn",
+          "routes": 9,
+          "countedAs": 1
+        }
+      ],
+      "chromeControlsRaw": 13,
       "summaryHeaders": 0,
       "behindDisclosure": 0,
       "disclosures": {
         "total": 0,
         "open": 0
       },
-      "ariaDisclosures": [],
+      "ariaDisclosures": [
+        {
+          "region": "div.blanc-top-context",
+          "controlsTaken": 0
+        }
+      ],
       "scannedList": [
         "Hide",
         "Read",
-        "Mine",
-        "Deck",
-        "Cards",
-        "Media",
-        "Stats",
-        "Toolbox",
-        "Blocks",
-        "Settings",
         "Exit Blanc",
-        "Previous track",
-        "Play",
-        "Next track",
-        "Mix off",
-        "Choose a song2 tracks · clic",
-        "Volume",
         "Search Blanc",
-        "BUTTON",
-        "English日本語中文Русский"
+        "Context tools"
       ]
     },
     "q6": {
@@ -386,7 +382,7 @@
       "markerSet": "chromed (5 markers, bar 3 = 60%)",
       "fillsViewport": true,
       "bespokePrefixes": [
-        "blanc:5"
+        "blanc:4"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
@@ -398,11 +394,9 @@
       "dashboardHosts": 0
     }
   },
-  "controlsPaintedA": 22,
-  "findings": [
-    "Q4 advanced tools discoverable without cluttering"
-  ],
+  "controlsPaintedA": 13,
+  "findings": [],
   "voided": [],
-  "score": 9,
-  "verdict": "9/10 — 1 question(s) answer NO"
+  "score": 10,
+  "verdict": "PASS 10/10"
 }

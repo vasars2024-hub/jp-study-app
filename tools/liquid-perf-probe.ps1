@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Liquid rubric category 7 instrument: the longest main-process block under load.
 
@@ -40,6 +40,12 @@ param(
   [switch]$Control,
   [string]$DuringJs,
   [int]$DurationMs = 0,
+  # CORRECTION, 2026-08-31 (sibling of the interaction probe's correction 30). /eval resolves the
+  # FOCUSED OS window, so -DuringJs for a surface that lives in its own BrowserWindow -- Blanc,
+  # the Agent pop-out -- ran against the desktop's document, found nothing, and the load silently
+  # never happened while the distribution still read clean. Pinning the window is what makes a
+  # heavy leg for a non-main surface measurable at all. Unset, behaviour is unchanged.
+  [string]$Win = '',
   [switch]$AsJson
 )
 
@@ -84,7 +90,9 @@ if ($Control -or $DuringJs) {
   } else {
     "(() => { const t = Date.now(); while (Date.now() - t < 1500) {} return 'blocked'; })()"
   }
-  $json = @{ js = $duringExpr } | ConvertTo-Json -Compress
+  $duringBody = @{ js = $duringExpr }
+  if ($Win) { $duringBody['window'] = $Win }
+  $json = $duringBody | ConvertTo-Json -Compress
   $content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, 'application/json')
   $controlTask = $client.PostAsync($evalUri, $content)
   Start-Sleep -Milliseconds 120

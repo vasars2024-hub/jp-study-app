@@ -1,7 +1,7 @@
 {
   "label": "l9b4-blanc",
   "app": "blancShell",
-  "win": "blanc",
+  "win": "2",
   "raised": "n/a — the shell is the host, not a window",
   "matchedBy": "shell-selector",
   "host": "shell",

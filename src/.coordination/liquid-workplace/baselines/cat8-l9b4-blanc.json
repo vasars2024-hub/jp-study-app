@@ -1,0 +1,262 @@
+{
+  "label": "l9b4-blanc",
+  "surface": "@.blanc-root",
+  "win": "2",
+  "lang": "en",
+  "storedLang": "en",
+  "theme": null,
+  "rect": "1264x761",
+  "textRuns": 116,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 105,
+  "textHash": -558823087,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 9782,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "9782 catalog keys / 106 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 116,
+        "textHash": -558823087,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 116,
+        "textHash": 856754992,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 40,
+        "diffExamples": [
+          {
+            "i": 25,
+            "was": "day streak",
+            "now": "連続日数"
+          },
+          {
+            "i": 27,
+            "was": "read today",
+            "now": "今日読んだ時間"
+          },
+          {
+            "i": 29,
+            "was": "characters today",
+            "now": "今日読んだ文字数"
+          },
+          {
+            "i": 31,
+            "was": "total time",
+            "now": "合計時間"
+          },
+          {
+            "i": 33,
+            "was": "total characters",
+            "now": "合計文字数"
+          },
+          {
+            "i": 35,
+            "was": "days active",
+            "now": "学習した日数"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 116,
+        "textHash": 1344534266,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 40,
+        "diffExamples": [
+          {
+            "i": 25,
+            "was": "day streak",
+            "now": "连续天数"
+          },
+          {
+            "i": 27,
+            "was": "read today",
+            "now": "今日阅读时长"
+          },
+          {
+            "i": 29,
+            "was": "characters today",
+            "now": "今日阅读字数"
+          },
+          {
+            "i": 31,
+            "was": "total time",
+            "now": "总时长"
+          },
+          {
+            "i": 33,
+            "was": "total characters",
+            "now": "总字数"
+          },
+          {
+            "i": 35,
+            "was": "days active",
+            "now": "学习天数"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 116,
+        "textHash": 1458156253,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 40,
+        "diffExamples": [
+          {
+            "i": 25,
+            "was": "day streak",
+            "now": "серия дней"
+          },
+          {
+            "i": 27,
+            "was": "read today",
+            "now": "прочитано сегодня"
+          },
+          {
+            "i": 29,
+            "was": "characters today",
+            "now": "символов сегодня"
+          },
+          {
+            "i": 31,
+            "was": "total time",
+            "now": "всего времени"
+          },
+          {
+            "i": 33,
+            "was": "total characters",
+            "now": "всего символов"
+          },
+          {
+            "i": 35,
+            "was": "days active",
+            "now": "дней с занятиями"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": "en"
+    },
+    "after": {
+      "html": "en",
+      "stored": "en"
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 40,
+    "baseRuns": 116,
+    "diffShare": 0.3448
+  },
+  "drive": {
+    "input": ".blanc-master-search-input-row input",
+    "value": "zzqqxxnosuchthing",
+    "originalValue": "",
+    "openedBy": {
+      "click": ".blanc-top-search",
+      "clickedLabel": ""
+    },
+    "restoredAfterEscape": true,
+    "restoredAfterUndo": null,
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 120,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "Nothing in Blanc matched."
+          ]
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}
