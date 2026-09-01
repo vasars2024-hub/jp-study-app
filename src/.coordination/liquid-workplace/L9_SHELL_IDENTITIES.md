@@ -1971,7 +1971,7 @@ so the question is real and `.blanc-taskbar-reveal` is the answer under test. Ne
 `presAxis` (read + flip), checked before the `.fwin`-proxy branch in `toggleLiquid` and in
 `snapshot`'s presentation; the flip presses the user's control, never a class write.
 
-**cat6 · Blanc = PASS 10/10** (`ce4e3c76`). Parity **8/8 standard, 8/8 liquid**, `rowsAgree` true,
+**cat6 · Blanc = PASS 10/10** (`5d82ece6`). Parity **8/8 standard, 8/8 liquid**, `rowsAgree` true,
 `onlyInOne` empty, `na` 0. Round trip standard→liquid→standard: **0 diffs**, `fieldsHeld` and
 `shellHeld` true, 1264x761 either side. All **15** drive steps ran with **0 refusals**. Control:
 **8 of 8 mutations fell exactly their own row**, 8/8→7/8 each, every one restored to 8/8. Live
@@ -1985,3 +1985,35 @@ itself. If a later worker wants the stronger reading, dirty the `.blanc-lang` se
 
 **RULE C: 13 of 16 passing cells** — all eight Wired plus Blanc cat1–cat4 and cat6. Next: **cat5
 Blanc**, which is now unblocked and will read Q7/Q8/Q9 from `cat6-l9b4-blanc.json`; then cat7, cat8.
+
+## 2026-08-31 — primary — cat5 Blanc measured: 7 of 10, VOID, and the three terms named
+
+Run with the cat6 baseline in place. **Q7/Q8/Q9 flipped VOID → YES** off `cat6-l9b4-blanc.json`
+exactly as the harness's "NO CATEGORY-6 BASELINE, NO SCORE" refusal intends — that refusal, not
+the plan's cat5→cat6 reading, is why cat6 had to run first. Q1 Q2 Q3 Q10 also YES.
+
+**cat5 · Blanc = VOID, 7 of 10.** Recorded as VOID rather than 7/10-and-moving-on because the
+rubric caps an uncontrolled or no-subject cell at VOID. `cat5-l9b4-blanc.json` is committed as the
+honest baseline. The three open terms, each with the analysis the next turn would otherwise redo:
+
+1. **Q4 NO — `scannedControls` 23 against a bar of 12, `shellChromeSelector` null.** The 23
+   include the Stats tool's own controls: `.blanc-content` hosts the 42 separately-scored Blanc
+   tools, so charging the shell for them makes Blanc's number a function of which tool is open —
+   the same defect the Wired cell hit at 47 controls, and the same principle as cat6 decision 3.
+   The lever already exists: `--shell-chrome "<selectors>"` (cat5 line 141). **The exclusion goes
+   on `.blanc-content`, NOT on `.blanc-taskbar, .blanc-top`** — those two ARE the chrome Blanc
+   authors and excluding them would be the escape hatch that option's own header forbids. Needs a
+   control proving Q4 can still fail once scoped.
+2. **Q5 NO plus `theme left as null, wanted null` VOID.** 118 runs measured in one cell and the
+   alt cell never applied: `--alt` defaults to `classic-light`, which is a Study OS theme, and
+   Blanc's alt is its OWN identity family — `settings.darkMode` renders `.is-dark` on
+   `.blanc-root` (`BlancShell.tsx:433`). The harness drives its alt cell by setting an ATTRIBUTE
+   on `documentElement` (`ALT_ATTR`), so a class on the Blanc root is out of its reach as written.
+   Either give the alt axis a root+class form, or have Blanc mirror dark mode onto an attribute.
+   Same shape as the Wired Q5 finding ("a shell's alt must come from its own identity family").
+3. **Q6 NO-SUBJECT — `refused: surface has no Liquid presentation control`.** cat5 detects the
+   toggle itself and does not know about the `presAxis` seam this turn added to `l6-parity.js`.
+   Blanc now demonstrably HAS a presentation trip (cat6 drove it, 0 diffs), so this is an
+   instrument gap, not a product gap. Teach cat5's q6 leg to ask `__LQP` for the axis.
+
+**RULE C: still 13 of 16.** Next turn OPENS on term 1, then 2, then 3, re-running cat5 after each.
