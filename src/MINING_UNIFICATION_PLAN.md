@@ -309,6 +309,53 @@ An empty result is a FINDING: say so and stop.
 
 ## Progress
 
+### 2026-09-01 (later) — two honest-state repairs no gate covers, both driven live
+
+Gate 12 is the only gate left on this plan and it is blocked on another track's uncommitted
+i18n conversion (see `FILES_APP_PLAN.md` gate 37, re-verified this turn: the 27 files are
+still dirty in the main tree). So this turn went at the two defects the previous one *found*
+while closing gates 3 and 11 and could not fit.
+
+**`23e22a1e` — a video that was never downloaded did not fail, it never started.**
+`resolveExtensionTranscribeStatus` collapsed every no-transcript case into
+`failed/job-ended-without-transcript`. With no media row there is nothing
+`enqueueTranscription` could have been handed, so that asserts a job that does not exist —
+the generic-error lie the named-refusal table exists to prevent, and the first thing anything
+polling on page load would hit. New `notStarted/no-local-media`, keyed off the same fact the
+POST turns into its `notDownloaded` refusal; a test pins the two routes together.
+
+LIVE, one session, one route, three answers — the discrimination is the evidence:
+
+| videoId | machine state | answer |
+| --- | --- | --- |
+| `dQw4w9WgXcQ` | no media row | `notStarted` / `no-local-media`, `canDownload: true` |
+| `jNQXAC9IVRw` | media row, no transcript, queue idle | `failed` / `job-ended-without-transcript` |
+| `GSx0rW2aHs8` | generated track on disk | `transcribed`, **cueCount 8** |
+
+Row 2 is the control that matters: `notStarted` did not swallow `failed`. Before this commit
+rows 1 and 2 returned the identical string. 4 tests + 2 controls; adverse control forcing the
+branch off turns exactly 2 red.
+
+**`4efc4245` — say which model is running WHILE it runs.** `81004907` put the substituted
+model on the finished track's label. That is the record, not the disclosure: the track only
+exists once the run ends, minutes later, and never at all when it errors. `modelSubstitution`
+now rides `TranscriptionProgress`, hoisted above the queue's `emit` closure and re-emitted the
+instant the first chunk announces it.
+
+LIVE on `jNQXAC9IVRw` (19 s, one chunk) with `jp-study-whisper-device` forced to `cpu`,
+captured beforehand as unset and restored to unset: 7 broadcasts, the first four `sub: null`
+and the last three carrying `{requested: onnx-community/kotoba-whisper-v2.2-ONNX, used:
+Xenova/whisper-base}`. The shipped `MediaJobStrip` rendered
+**"Me at the zoo | Aligning | running whisper-base"** with the tooltip naming the model that
+was asked for. The 5th event is the extra emit: `total` was **1**, so without it a
+single-chunk job has no later `transcribing` emit and would have shown nothing at all.
+
+**Known limit, stated rather than papered over.** The queue is in-memory, so after a restart
+"enqueued and failed" and "never enqueued for a downloaded file" are indistinguishable and
+both read `failed`. Row 2 above is really the second. The user-facing next step is identical
+in both ("queue it from the Media library"), so this buys no behaviour — it is recorded here
+so the next worker does not read `failed` as proof a job ran.
+
 ### 2026-09-01 — gate 11 polling follows the queue's real sink
 
 - `3ef98483` adds one shared status resolver and makes both POST deduplication and GET status
