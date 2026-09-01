@@ -4,25 +4,15 @@ Authority: `src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` §L10. Gate: *one coher
 language with individual app character preserved.* Opened 2026-08-31 by `primary`, the turn
 L9 bullet 4 closed at RULE C 16/16 (`f729d88e`).
 
-## The instrument decision, made here so no turn re-derives it
+## Instrument order — corrected 2026-09-01
 
-RULE C's shape — 2 representative surfaces × all 8 rubric categories = 16 cells — was written
-for bullets that CERTIFY A SURFACE, which is what every L1–L9 bullet does. **L10's four bullets
-do not certify a surface; each asserts one property ACROSS surfaces.** Applied literally, L10
-would cost 4 × 16 = 64 cells, most of them re-scoring shells L9 already scored 10/10, and the
-category that actually answers the bullet would be one cell in sixteen.
+RULE C applies verbatim: **2 representative surfaces × all 8 categories = 16 cells per bullet**.
+The earlier version of this note narrowed each L10 bullet to only the categories named below;
+that contradicted the relay pin's explicit “cutting categories is forbidden” rule and is
+retracted. The table now controls measurement order only. No bullet closes below 16/16, and a
+failed category still expands across the sampled-out surfaces as RULE C requires.
 
-**Decision: each L10 bullet is scored on the rubric categories that can falsify it, across a
-NAMED sample of surfaces — never fewer categories than the bullet's own words require, and
-never a surface skipped in silence.** The two RULE C guarantees that matter are kept verbatim:
-a category is never dropped to make a bullet pass, and every skipped surface is listed under
-`sampled-out:`. What changes is only that a consistency claim is measured with the instrument
-that can disprove it, rather than with all eight regardless.
-
-Reversible if wrong: nothing here bakes into product code, and a later turn can widen any
-bullet to the full 16 cells without redoing the measurements taken under this rule.
-
-| bullet | the claim | category that can falsify it | instrument |
+| bullet | the claim | categories to run first | instrument |
 | --- | --- | --- | --- |
 | 1 | no redundant chrome / card nesting | cat3 Liquid utilization, cat4 use of space | `cat3-liquid-utilization.cjs`, `cat4-use-of-space.cjs` |
 | 2 | labels, icons, spacing, motion, empty states, breakpoints reconciled | cat1 accessibility (motion, targets), cat5 UI clarity, cat8 honest states | `cat1-accessibility.cjs`, `cat5-ui-clarity.cjs`, `cat8-honest-states.cjs` |
@@ -101,7 +91,26 @@ separate window that does not mount `CommandPalette` at all; that is pre-existin
 Blanc's own track, where L9 established that the shell owns its own controls. Named here rather
 than passed over in silence.
 
-### Exact next: bullet 1
+### Bullet 1 — IN PROGRESS, 4/16 cells, `2ae5fa57`
 
-Redundant chrome and card nesting, scored cat3 + cat4 on Settings and Media Center per the
-table above.
+Samples: **Settings**, the 1,307-control census maximum; **Media Center**, the structurally
+different shared `player`/`video`/`music` root. Settings cat3 remains 10/10 (0 dense regions on
+glass, 13/13 contextual and shared) and cat4 remains 10/10 at 960×680, 260×170 and 1264×765.
+
+Media cat3 first FAILED at 6/7 treated/shared: `header.medialib-browser__head` was the one bare
+contextual landmark. It now uses `ContextualSurface`; the rerun is 7/7 with dense-on-glass 0.
+Media cat4 first FAILED at compact only: `.medialib-shell` was 126px wide with 158px hidden
+content. The compact toolbar now removes repeated visible labels while keeping them accessible;
+all three sizes pass with horizontal failures 1 → 0. Both harnesses' adverse controls fired and
+restored. Cat3 also gained the missing 450ms all-glass restore settle after its first Settings
+run falsely read a CSS transition as 2 stuck regions; the re-run moved 0 → 1/2 → 0 as required.
+
+`sampled-out:` Agent, Library, Novels, Reading Finder, Dictionary, Grammar, Notebook, Translate,
+Anki, Flashcards, Game Arena, Statistics, Resources, Sticky Note, Visualizer, Music widget,
+City, Immersion, Calendar, YouTube, Scraper, Aero shell, Wired shell, and Blanc shell. Media,
+Video and Music are represented by their one shared Media Center root.
+
+### Exact next: finish bullet 1's 16 cells
+
+Run cat1, cat2, cat5, cat6, cat7 and cat8 on Settings and Media Center. Any failed category
+expands across the sampled-out list; only 16/16 with required expansions may close the bullet.
