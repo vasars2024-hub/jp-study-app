@@ -1,0 +1,704 @@
+{
+  "surface": "dictionary",
+  "title": "Dictionary",
+  "root": ".dict-view",
+  "at": "2026-09-01T19:48:50.295Z",
+  "strictMode": "on - figures carry the dev double-render tax; see correction 31",
+  "scene": {
+    "fwins": 4,
+    "fwinElements": 1254,
+    "root": null,
+    "rootElements": null,
+    "documentElements": 1383,
+    "titles": [
+      "Settings",
+      "Media",
+      "Video",
+      "Dictionary"
+    ],
+    "theme": null,
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 249
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "elements": 270,
+    "deskWindows": 4,
+    "titles": [
+      "Settings",
+      "Media",
+      "Video",
+      "Dictionary"
+    ]
+  },
+  "process": {
+    "pid": 46072,
+    "uptimeSecAtStart": 66204,
+    "mainRssMbBefore": 102.3,
+    "mainRssMbAfter": 497.8,
+    "mainHeapUsedMbAfter": 336.2
+  },
+  "sessionCeiling": {
+    "p50": 16.7,
+    "p95": 16.8,
+    "frames": 109,
+    "runs": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 66.9,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.8,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 18.5,
+        "over100": 0,
+        "frames": 110
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 66.9,
+    "l0P50": 10,
+    "note": "THIS DISPLAY IS SLOWER THAN L0'S — L0 ms are not comparable, only the ratio to this ceiling is",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 240
+      },
+      "scene_after": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 240
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1304
+      },
+      "jank_blocks": null,
+      "frames": 109,
+      "frame_min_ms": 16.4,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.9,
+      "frame_max_ms": 66.9,
+      "frames_over_16": 59,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1819,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 6.7,
+      "main_max_ms": 24.5
+    },
+    "ceilingRuns": [
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 66.9,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.9,
+        "max": 18.8,
+        "over100": 0,
+        "frames": 109
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 18.5,
+        "over100": 0,
+        "frames": 110
+      }
+    ],
+    "themeControlRuns": [
+      {
+        "p50": 16.7,
+        "p95": 17.2,
+        "max": 217.3,
+        "over100": 2,
+        "mainMax": 10.8
+      },
+      {
+        "p50": 16.7,
+        "p95": 16.8,
+        "max": 83.7,
+        "over100": 0,
+        "mainMax": 13.2
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Dictionary",
+      "root": null,
+      "scene_before": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 249
+      },
+      "scene_after": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 256
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Dictionary",
+        "before": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 106,
+      "frame_min_ms": 16.1,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 16.8,
+      "frame_max_ms": 83.4,
+      "frames_over_16": 55,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1824,
+      "main_p50_ms": 2.3,
+      "main_p95_ms": 15.5,
+      "main_max_ms": 35.6,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 83.4,
+          "over100": 0,
+          "mainMax": 35.6,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 50.2,
+          "max": 434.7,
+          "over100": 2,
+          "mainMax": 167,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 33.5,
+          "over100": 0,
+          "mainMax": 18.3,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 50.2,
+          "over100": 0,
+          "mainMax": 10.8,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 17.9,
+          "max": 50.2,
+          "over100": 0,
+          "mainMax": 17.1,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Dictionary",
+      "root": null,
+      "scene_before": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 282
+      },
+      "scene_after": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 289
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Dictionary",
+        "before": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 115,
+      "frame_min_ms": 15.4,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 17,
+      "frame_max_ms": 50.2,
+      "frames_over_16": 59,
+      "frames_over_33": 2,
+      "frames_over_100": 0,
+      "main_samples": 57,
+      "main_span_ms": 1828,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 6.6,
+      "main_max_ms": 73,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 735.5,
+          "max": 1771.8,
+          "over100": 5,
+          "mainMax": 11.8,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 17,
+          "max": 50.2,
+          "over100": 0,
+          "mainMax": 73,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 150.5,
+          "over100": 1,
+          "mainMax": 104.3,
+          "breached": true
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 33.6,
+          "over100": 0,
+          "mainMax": 12.5,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.8,
+          "max": 50.3,
+          "over100": 0,
+          "mainMax": 12.8,
+          "breached": false
+        }
+      ],
+      "unstable": true
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Dictionary",
+      "root": null,
+      "scene_before": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 293
+      },
+      "scene_after": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 297
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 78.1,
+        "restorePaintedMs": 194,
+        "restoredTo": null
+      },
+      "jank_blocks": null,
+      "frames": 99,
+      "frame_min_ms": 15.3,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 18.2,
+      "frame_max_ms": 150.3,
+      "frames_over_16": 53,
+      "frames_over_33": 3,
+      "frames_over_100": 1,
+      "main_samples": 53,
+      "main_span_ms": 1810,
+      "main_p50_ms": 2.6,
+      "main_p95_ms": 17.8,
+      "main_max_ms": 82.9,
+      "repeats": [
+        {
+          "p50": 16.7,
+          "p95": 18.2,
+          "max": 150.3,
+          "over100": 1,
+          "mainMax": 82.9,
+          "breached": false
+        },
+        {
+          "p50": 16.7,
+          "p95": 16.9,
+          "max": 133.8,
+          "over100": 1,
+          "mainMax": 14.2,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "dictionary: a real search through the window own form, every 700 ms (DURING -DuringJs)",
+      "samples": 413,
+      "span_ms": 20195,
+      "min_ms": 1.6,
+      "p50_ms": 2.2,
+      "p95_ms": 126.5,
+      "max_ms": 1182
+    },
+    "heavyProof": "25 searches, 25 distinct, entries 0-8, last \"数える\"",
+    "idle": {
+      "label": "dictionary: idle",
+      "samples": 605,
+      "span_ms": 20013,
+      "min_ms": 1.2,
+      "p50_ms": 2.1,
+      "p95_ms": 7.5,
+      "max_ms": 343.3
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Dictionary",
+      "root": null,
+      "scene_before": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 264
+      },
+      "scene_after": {
+        "fwins": 4,
+        "fwinElements": 1254,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 1383,
+        "titles": [
+          "Settings",
+          "Media",
+          "Video",
+          "Dictionary"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 271
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Dictionary",
+        "before": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "after": {
+          "x": "162px",
+          "y": "114px",
+          "w": "820px",
+          "h": "580px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 11,
+      "frames": 67,
+      "frame_min_ms": 15.3,
+      "frame_p50_ms": 16.7,
+      "frame_p95_ms": 116.9,
+      "frame_max_ms": 117.1,
+      "frames_over_16": 37,
+      "frames_over_33": 13,
+      "frames_over_100": 11,
+      "main_samples": 59,
+      "main_span_ms": 1830,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 4.5,
+      "main_max_ms": 10.8
+    },
+    "underLoad": {
+      "drag": {
+        "p50": 16.7,
+        "p95": 33.4,
+        "max": 50.1,
+        "over100": 0,
+        "mainMax": 186.5,
+        "sceneStable": false,
+        "sceneFwinsBefore": 4,
+        "sceneFwinsAfter": 4,
+        "sceneElementsBefore": 1032,
+        "sceneElementsAfter": 1283,
+        "closedLoop": true,
+        "load": {
+          "label": "a real search through the window own form, every 700 ms",
+          "cyclesDuring": 0,
+          "workDuring": 4,
+          "workBefore": 0,
+          "workAfter": 4,
+          "refusals": 0,
+          "last": "searching 28 words",
+          "armed": {
+            "gen": 13,
+            "cycles": 1,
+            "refusals": 0,
+            "last": "searching 28 words"
+          },
+          "after": {
+            "gen": 13,
+            "cycles": 1,
+            "refusals": 0,
+            "last": "searching 28 words"
+          }
+        },
+        "idle": {
+          "p50": 16.7,
+          "p95": 16.8,
+          "over100": 0
+        }
+      },
+      "resize": {
+        "p50": 16.7,
+        "p95": 33.4,
+        "max": 50.2,
+        "over100": 0,
+        "mainMax": 234.5,
+        "sceneStable": false,
+        "sceneFwinsBefore": 4,
+        "sceneFwinsAfter": 4,
+        "sceneElementsBefore": 1032,
+        "sceneElementsAfter": 1283,
+        "closedLoop": true,
+        "load": {
+          "label": "a real search through the window own form, every 700 ms",
+          "cyclesDuring": 0,
+          "workDuring": 4,
+          "workBefore": 0,
+          "workAfter": 4,
+          "refusals": 0,
+          "last": "searching 28 words",
+          "armed": {
+            "gen": 15,
+            "cycles": 1,
+            "refusals": 0,
+            "last": "searching 28 words"
+          },
+          "after": {
+            "gen": 15,
+            "cycles": 1,
+            "refusals": 0,
+            "last": "searching 28 words"
+          }
+        },
+        "idle": {
+          "p50": 16.7,
+          "p95": 17,
+          "over100": 0
+        }
+      }
+    },
+    "underLoadProof": "4 searches this leg, 4 distinct, entries 6-8, last \"登る\""
+  },
+  "findings": [
+    "heaviest real operation (a real search through the window own form, every 700 ms): main blocked 1182 ms, over the 500 ms bar"
+  ],
+  "voided": [
+    "resize: readings disagree across repeats (BREACH, clean, BREACH, clean, clean); the majority is reported and the leg is UNSTABLE"
+  ],
+  "environment": [],
+  "score": "VOID",
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}

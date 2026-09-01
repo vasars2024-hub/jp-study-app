@@ -157,16 +157,33 @@ const scrollProof = `(() => {
  *     run's numbers. The renderer stops itself on wall-clock time even if nothing ever calls
  *     the stop, and every tick re-checks its own generation id so a second arm cannot leave the
  *     first one running.
- *  2. CYCLES ACROSS THE GESTURE, not merely a load that once started. The counter is read
- *     before and after the reading; fewer than two cycles in between means the load was over
+ *  2. WORK ACROSS THE GESTURE, not merely a load that once started. The counter is read
+ *     before and after the reading; too little movement in between means the load was over
  *     (or throttled to nothing) while the frames were being recorded, and the leg is VOID
  *     rather than a flattering PASS. This is the same false-pass shape as the `heavy` leg's
  *     `proof`, one layer up.
+ *
+ *     WHICH counter, and this is correction 33, which cost every under-load run this harness
+ *     has ever taken. It used to count ARMS -- how many times the re-arm timer called
+ *     `heavy.js`. Two things made that unreadable. The re-arm interval resolved to
+ *     `Math.min(deadlineMs, 2000)` = 2000 ms for every surface, while a gesture spans ~1800 ms,
+ *     so "at least two cycles across the gesture" was arithmetically unsatisfiable BY
+ *     CONSTRUCTION -- no surface could ever pass it. And a `heavy.js` is not a pulse: most are
+ *     self-timed programs (dictionary schedules 28 searches over 20 s and returns at once), so
+ *     re-arming stacked a second interval on the first AND, because each one opens with
+ *     `delete window.__lqDictLoad`, wiped the receipt the leg was about to be judged on. That
+ *     is the whole of "REFUSE: only 2 searches ran": the counter had been reset 2 s earlier,
+ *     not the load having failed.
+ *     So the interval is now the load's OWN declared `durationMs` -- a load is never re-armed
+ *     while it is still running -- and a spec may declare `progress`, an expression returning a
+ *     monotonic count of REAL work (dictionary: searches actually issued). Where it exists it
+ *     replaces the arm count, which makes this guard strictly harder to satisfy: it now proves
+ *     the surface did work while the frames were recorded, not merely that a timer fired.
  *  3. THE SENSITIVITY CONTROL. A clean under-load reading only means something if the recorder
  *     can see load at all, so `--under-load` turns `--jank` on and the existing control check
  *     applies: if injected 120 ms blocks do NOT worsen the distribution, every number is void.
  */
-const LOAD_ARM = (heavyJs, deadlineMs) => `(() => {
+const LOAD_ARM = (heavyJs, deadlineMs, cycleMs) => `(() => {
   const gen = (window.__lqLoadGen = (window.__lqLoadGen || 0) + 1);
   const run = function () { return ${heavyJs}; };
   const rec = { gen, cycles: 0, refusals: 0, last: null, until: Date.now() + ${deadlineMs} };
@@ -195,7 +212,7 @@ const LOAD_ARM = (heavyJs, deadlineMs) => `(() => {
     try { r = String(run()); } catch (e) { r = 'REFUSE: ' + String(e); }
     rec.last = r.slice(0, 120);
     if (/^REFUSE/.test(r)) rec.refusals += 1; else rec.cycles += 1;
-    setTimeout(cycle, ${Math.max(200, Math.min(deadlineMs, 2000))});
+    setTimeout(cycle, ${Math.max(200, Math.min(deadlineMs, Number(cycleMs) > 0 ? Number(cycleMs) : 2000))});
   };
   cycle();
   return 'armed gen=' + gen + ' until=' + rec.until;
@@ -845,6 +862,10 @@ const SPECS = {
       label: 'a real search through the window own form, every 700 ms',
       durationMs: 20000,
       js: `(() => {
+        // Clear the PREVIOUS run's interval before dropping the record that holds its handle,
+        // or the handle is unreachable and the old loop keeps searching underneath the new one
+        // (correction 33: leg 2 was measuring twice the load leg 1 did).
+        if (window.__lqDictLoad && window.__lqDictLoad.timer) clearInterval(window.__lqDictLoad.timer);
         delete window.__lqDictLoad;
         const form = document.querySelector('form.dict-search');
         if (!form) return 'REFUSE: no form.dict-search';
@@ -869,7 +890,25 @@ const SPECS = {
           rec.entriesMax = Math.max(rec.entriesMax, n);
           if (rec.ticks >= words.length) clearInterval(timer);
         }, 700);
+        rec.timer = timer;
         return 'searching ' + words.length + ' words';
+      })()`,
+      // The under-load receipt (correction 33). `ticks` is incremented once per search that
+      // actually reached the input, so its movement across a gesture is proof the surface was
+      // doing its real work WHILE the frames were recorded — not that a timer fired. -1 rather
+      // than null when the record is absent, so "never armed" and "armed but idle" stay
+      // distinguishable in the banked JSON.
+      progress: `(window.__lqDictLoad ? window.__lqDictLoad.ticks : -1)`,
+      // The same receipt re-scaled for the under-load legs, which span ~1.8 s each and can
+      // physically issue only 2-3 searches at 700 ms. Both CORRECTNESS checks are kept
+      // verbatim — armed at all, and .dict-entry actually rendered, which is the mojibake
+      // guard and the one that matters most; only the DURATION threshold moves, 20 -> 2.
+      loadProof: `(() => {
+        const r = window.__lqDictLoad;
+        if (!r) return 'REFUSE: the search load never armed';
+        if (r.ticks < 2) return 'REFUSE: only ' + r.ticks + ' searches ran across the gesture';
+        if (!r.sawResults) return 'REFUSE: no search rendered a .dict-entry, so the queries never reached the dictionary';
+        return r.ticks + ' searches this leg, ' + r.distinct + ' distinct, entries ' + r.entriesMin + '-' + r.entriesMax + ', last ' + JSON.stringify(r.last);
       })()`,
       // sawResults is the mojibake guard as much as the ran-at-all guard: these queries are
       // Japanese, they travel to the renderer through a PowerShell argument, and a transport
@@ -1323,17 +1362,24 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       step(`${g} UNDER LOAD (${spec.heavy.label})`);
       // The gesture's own duration is not exposed, so the deadline covers the slowest observed
       // reading with room to spare; the loop stops itself either way.
-      await ev(LOAD_ARM(spec.heavy.js, 120000));
+      await ev(LOAD_ARM(spec.heavy.js, 120000, spec.heavy.durationMs));
       const armed = JSON.parse(await ev(LOAD_READ));
+      const workBefore = spec.heavy.progress ? Number(await ev(spec.heavy.progress)) : null;
       let reading;
       let after;
+      let workAfter = null;
       try {
         reading = ps(IPROBE, ['-Interaction', g, ...interactionScope, '-AsJson']);
       } finally {
         after = JSON.parse(await ev(LOAD_READ));
+        if (spec.heavy.progress) workAfter = Number(await ev(spec.heavy.progress));
         await ev(LOAD_STOP);
       }
       const cyclesDuring = after.cycles - armed.cycles;
+      // Where the spec declares real work, that is the receipt; the arm count is kept beside it
+      // as provenance rather than dropped, because a disagreement between the two is itself
+      // diagnostic (arms advancing while work does not = the load is re-arming over itself).
+      const workDuring = spec.heavy.progress && workBefore >= 0 && workAfter >= 0 ? workAfter - workBefore : null;
       legs.underLoad[g] = {
         p50: reading.frame_p50_ms,
         p95: reading.frame_p95_ms,
@@ -1341,18 +1387,35 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
         over100: reading.frames_over_100,
         mainMax: reading.main_max_ms,
         sceneStable: reading.scene_stable,
+        // The two halves the under-load scene test actually needs, recorded rather than
+        // collapsed into one boolean: windows opening/closing would make the frames
+        // incomparable, content drift inside the loaded surface is the load doing its job.
+        sceneFwinsBefore: reading.scene_before ? reading.scene_before.fwins : null,
+        sceneFwinsAfter: reading.scene_after ? reading.scene_after.fwins : null,
+        sceneElementsBefore: reading.scene_before ? reading.scene_before.fwinElements : null,
+        sceneElementsAfter: reading.scene_after ? reading.scene_after.fwinElements : null,
+        closedLoop: reading.gesture ? reading.gesture.closedLoop === true : false,
         // `armed` and `after` raw, not only their difference: a leg that voids on
         // `cyclesDuring` is otherwise indistinguishable between "the load stopped early" and
         // "the record was never there", and that ambiguity cost a diagnosis once already.
         load: {
-          label: spec.heavy.label, cyclesDuring, refusals: after.refusals, last: after.last, armed, after,
+          label: spec.heavy.label, cyclesDuring, workDuring, workBefore, workAfter,
+          refusals: after.refusals, last: after.last, armed, after,
         },
       };
     }
     // Restore whatever the load disturbed, through the load's own receipt, before the surface is
     // handed back. `scrollAll` returns its scroller to the offset it started on; anything that
     // refused is reported rather than assumed harmless.
-    legs.underLoadProof = spec.heavy.proof ? await ev(spec.heavy.proof) : null;
+    // `heavy.proof` is calibrated to the heavy leg's full span (dictionary: 28 searches over
+    // 20 s). Two ~1.8 s gestures cannot reach that bar, so reusing it verbatim REFUSED on a
+    // load that was working perfectly — the third of correction 33's three false voids. A spec
+    // may declare `loadProof` for this context; it must keep every check that is about
+    // CORRECTNESS (dictionary: armed at all, and results actually rendered — the mojibake
+    // guard) and re-scale only the ones that are about DURATION.
+    legs.underLoadProof = spec.heavy.loadProof || spec.heavy.proof
+      ? await ev(spec.heavy.loadProof || spec.heavy.proof)
+      : null;
   }
 
   const memAfter = await get('/mem');
@@ -1396,11 +1459,25 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       if (!r) continue;
       const idle = legs[g];
       r.idle = idle ? { p50: idle.frame_p50_ms, p95: idle.frame_p95_ms, over100: idle.frames_over_100 } : null;
-      if (!r.sceneStable) { voided.push(`${g} under load: the scene moved during the gesture`); continue; }
+      // Scene stability, under load, is NOT the idle test (correction 33). The idle legs void
+      // when the document's element count moves, and that is right for them. Here the load's
+      // whole purpose is to change the surface — the dictionary rewrites its results list on
+      // every search — so the idle test can only ever fail, the same unsatisfiable-by-
+      // construction shape as the arm counter above. What must still hold is everything that
+      // would make the FRAMES incomparable: no window opened or closed, and the dragged window
+      // ended where it started. Content drift inside the loaded surface is recorded as data.
+      const fwinsMoved = r.sceneFwinsBefore !== r.sceneFwinsAfter;
+      if (fwinsMoved || !r.closedLoop) {
+        voided.push(`${g} under load: the scene moved during the gesture (windows ${r.sceneFwinsBefore} -> ${r.sceneFwinsAfter}, closed loop ${r.closedLoop})`);
+        continue;
+      }
       // Refusal 2 of this mode: a load that was over before the frames were recorded turns the
-      // whole leg back into the idle measurement it was supposed to differ from.
-      if (r.load.cyclesDuring < 2) {
-        voided.push(`${g} under load: the load completed only ${r.load.cyclesDuring} cycle(s) across the gesture (${r.load.refusals} refusals, last: ${JSON.stringify(r.load.last)}), so these frames were not recorded under load`);
+      // whole leg back into the idle measurement it was supposed to differ from. Where the spec
+      // declares `progress` this asks for real work, not arms — see correction 33.
+      const receipt = r.load.workDuring === null ? r.load.cyclesDuring : r.load.workDuring;
+      const receiptKind = r.load.workDuring === null ? 'cycle(s)' : 'unit(s) of real work';
+      if (!(receipt >= 2)) {
+        voided.push(`${g} under load: the load completed only ${receipt} ${receiptKind} across the gesture (${r.load.refusals} refusals, last: ${JSON.stringify(r.load.last)}), so these frames were not recorded under load`);
         continue;
       }
       if (r.p50 > ceilingP50 * 1.5) findings.push(`${g} under load (${r.load.label}): p50 ${r.p50} ms against a ${ceilingP50} ms control (idle was ${r.idle ? r.idle.p50 : '?'} ms)`);
