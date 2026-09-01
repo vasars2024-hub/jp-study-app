@@ -201,6 +201,38 @@ subtitles twice and any asset count overstates by six. Gate 5's own FAIL conditi
 category returning 0 while files exist", which does not occur, so it closes — but the count is
 recorded as 54/48 rather than rounded to 48.
 
+### 2026-09-01 (later) — that defect is FIXED, and gate 5's numbers are corrected downward
+
+`e973a7b4`. File-backed rows now dedupe on `filesItemPathKey` inside `buildFilesIndex`, first
+enumerator to claim a path wins, and `FILES_ENUMERATORS`' order is documented as load-bearing:
+the record-backed readers precede the filename walkers, so a recorded sidecar keeps the
+record's real `whisper-transcript` provenance rather than a guess made from its name plus a
+false `orphan` flag. Dropped rows are counted per enumerator (`duplicatePathCount`), because a
+drop nobody counts looks like a reader that never found the file. `withRendererItems` gets the
+same guard; it drops nothing today and is there so the first file-backed renderer enumerator
+cannot re-introduce this.
+
+`--dupes` now prints **two passes in one run**: a CONTROL that flattens every enumerator's raw
+output with no deduplication (what the code did before), and the shipped snapshot.
+
+```
+CONTROL (no dedupe):  1985 rows, 1836 distinct files, 6 duplicate rows  [download + media-subtitle 6]
+PRODUCTION:           1979 rows, 1836 distinct files, 0 duplicate rows
+reported dropped:     downloads 6, total 6 == control
+GATE (dupes): PASS
+```
+
+That control is the point: a fix that had merely stopped one enumerator from *looking* would
+move both numbers together. Only a deduplication moves the second while the first stands still.
+
+**The gate 5 figures above are superseded and the correction is downward.** The live index is
+**1,979 rows, 87 mineable, 1,892 refused** — by media type 20 book / **65** subtitle / 2
+transcript, by provenance 20 `book-text` / **55** `human-subs` / 8 `whisper-transcript` /
+4 `unknown`, `auto-captions` still stated empty. Six files had been counted twice, so **93 was
+never a real number**; refusals are unchanged, since a duplicate row is dropped before it is
+judged. The disk control that exposed the defect now agrees exactly: downloads sidecars
+**48 / 48** where it read 54 before.
+
 Gates 6, 7, 8 look substantially built by the same absorption (`shared/filesApp/mining.ts`
 carries `mineabilityOf`, `buildFilesMineDrafts`, `deckProvenanceFor` and
 `buildFilesMineNoteRequest`); they are NOT claimed here, because none has been measured
