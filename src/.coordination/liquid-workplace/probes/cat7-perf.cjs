@@ -138,6 +138,17 @@ const scrollProof = `(() => {
 })()`;
 
 /**
+ * The under-load receipt for every `scrollAll` leg (correction 33, generalised). Without it a
+ * scroll spec VOIDs under load BY CONSTRUCTION: the load's own 91 x 20 ms span is ~1.8 s, its
+ * re-arm interval is its `durationMs` (3 s), and a ~1.8 s gesture can never see a whole cycle
+ * — flashcards read `0 cycle(s)` on both legs on 2026-09-01 while `last` proved the load was
+ * running. Ticks are the real work here: each one moves a virtual list and remounts its rows.
+ * -1 rather than null when the record is absent, so "never armed" and "armed but idle" stay
+ * distinguishable in the banked JSON.
+ */
+const scrollProgress = `(window.__lqScrollLoad ? window.__lqScrollLoad.ticks : -1)`;
+
+/**
  * `--under-load` — L11 bullet 3's own words, which no leg above answers.
  *
  * The bullet is "drag/resize at target frame rate WHILE media, dictionaries, and large lists are
@@ -246,6 +257,7 @@ const SPECS = {
       label: 'scroll the whole library',
       durationMs: 2500,
       js: scrollAll('.library'),
+      progress: scrollProgress,
       proof: scrollProof,
     },
     collection: { container: '.library', row: '.card' },
@@ -262,6 +274,7 @@ const SPECS = {
       label: 'scroll the whole site rail',
       durationMs: 2500,
       js: scrollAll('.immersion-root'),
+      progress: scrollProgress,
       proof: scrollProof,
     },
     collection: { container: '.immersion-root', row: '.immersion-site-row' },
@@ -273,7 +286,7 @@ const SPECS = {
     // `.novel-scroller` has no `.fwin` ancestor because the reader replaces the desktop shell,
     // so the runner selects the root-window gesture path from the DOM fact above.
     root: '.novel-scroller',
-    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller'), proof: scrollProof },
+    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller'), progress: scrollProgress, proof: scrollProof },
     collection: { container: '.novel-scroller', row: '.novel-content p' },
   },
   manga: {
@@ -318,6 +331,7 @@ const SPECS = {
       label: 'scroll the whole deck',
       durationMs: 3000,
       js: scrollAll('.flash-view'),
+      progress: scrollProgress,
       proof: scrollProof,
     },
     collection: { container: '.flash-group-body-vlist', row: '.flash-row' },
@@ -332,6 +346,7 @@ const SPECS = {
       label: 'scroll the whole notebook timeline',
       durationMs: 3000,
       js: scrollAll('.gx-notebook'),
+      progress: scrollProgress,
       proof: scrollProof,
     },
     collection: { container: '.gx-notebook-timeline', row: '.gx-notebook-item' },
@@ -349,6 +364,7 @@ const SPECS = {
       label: 'scroll the whole statistics view',
       durationMs: 2500,
       js: scrollAll('.fwin:has(.stats-view) .fwin-body'),
+      progress: scrollProgress,
       proof: scrollProof,
     },
     collection: { container: '.stats-view', row: '.stats-book-row' },
@@ -573,6 +589,10 @@ const SPECS = {
       // The 50 ms timer is renderer-scheduled and measured live at ~68 ms under the
       // concurrent health sampler; four seconds covers all 48 ticks plus restoration.
       durationMs: 4000,
+      // The under-load receipt (correction 33): 48 ticks x 50 ms is ~2.4 s against a 4 s
+      // re-arm, so a ~1.8 s gesture never sees a whole cycle — VOIDed on both legs on
+      // 2026-09-01 with `last` proving the load was running. Ticks are the real work.
+      progress: `(window.__lqMusicLoad ? window.__lqMusicLoad.ticks : -1)`,
       js: `(() => {
         delete window.__lqMusicLoad;
         const select = document.querySelector('.mc-music-sort select');

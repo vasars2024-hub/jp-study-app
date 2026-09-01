@@ -652,3 +652,121 @@ treating it as a surface defect), and the heavy leg reports **main blocked 1182 
 the earlier 5114.8 ms reading was inflated by the stacked intervals this commit removed, so the
 honest figure is 1182 ms — still 2.4x the bar, on a surface whose search is supposed to be off
 the main event loop (CLAUDE.md, Performance).
+
+## 2026-09-01 (primary, evening) — L11 bullet 3: the 1182 ms was the disk, and it now belongs to another process
+
+`02932db7`. **Re-derived before touching code, on the receipt's own instrument** — `/health`
+round-trips, which run on main (`tools/liquid-perf-probe.ps1`), sampled at 15 ms across a real
+`form.dict-search` submit or a direct `window.api` call, old binary, warm session (uptime 18.8 h):
+
+| call | main held |
+| --- | --- |
+| first search of this session, 勉強, through the form | **11,525 ms** |
+| second search, 走る | **3,798 ms**; third, 泳ぐ, 152 ms |
+| `dict:examples` first call, 登る (direct) | **7,796 ms**; 107–133 ms on the next three words |
+| `dict:frequency` first call | **6,836 ms**; 45–56 ms after |
+| `dict:etymology` first call | **3,742 ms**; 61–73 ms after |
+| `lookupTerm` alone, 8 fresh words, everything warm | 62–167 ms; the two "outlier" words re-timed warm at 66–127 ms |
+| six form searches, everything warm | 141–263 ms |
+
+So the queries were never the cost: warm they are indexed probes at 45–260 ms, which is what
+`L7_PERF_DICTIONARY.md` banks as passing. **The cost is where the page lives.** This machine had
+1.2 GB of 30 GB free, standby list 1.1 GB, page file 5.9 GB in use (peak 17 GB); main's private
+bytes were 659 MB against a **190 MB** working set — most of its heap paged out — and `dict.db`
+is 537 MB under a 256 MB `mmap_size`. An evicted page is a fault taken INSIDE the synchronous
+`better-sqlite3` call, on main. `warmup.ts` had already found exactly this ("`lookup()`'s first
+touch of the `headwords` pages, one unbroken synchronous block") and pays it once per boot; memory
+pressure takes it straight back, and the bullet's 20 s / 28-word load is precisely a walk across
+pages nobody warmed. The `1182 ms` was the mild case of the same thing.
+
+**The fix is the one CLAUDE.md names: the reads leave main.** A utility process on its own handle
+— the SAME bundle the import worker already builds, so `forge.config.ts` is untouched; a process
+is a reader or an importer by what it is sent. `dictionary/readProtocol.ts` is the contract and
+the one dispatch table both ends share (the worker calls it on its handle, main calls it on its
+own when the worker cannot be used, so the two routes answer identically by construction);
+`readClient.ts` is the main-side state machine with three invariants — a read is a QUESTION, not
+a process (a crash re-runs it in-process rather than answering "nothing matched"); a worker that
+cannot be used is given up on once, out loud, never in a retry loop (a spawn that throws, or two
+exits inside 5 s of spawning); nothing waits forever (60 s, then the wedged process is replaced
+and its other reads answered here). Seven reads moved: the lookup itself and the six expansions.
+Three stay on main on purpose and say so: collocations (it WRITES), the batch frequency read (a
+`Map`), the interlinear read (a synchronous legacy-store callback). 12 unit cases across
+`dictionaryReadClient.test.ts` (fake process: id routing, error reply, mid-read death, respawn
+storm, spawn failure, timeout, dispose) and `dictionaryReadWorker.test.ts` (real SQLite file:
+own handle, arrival order, error-as-answer, deaf to `start`/`cancel`). Product 489 lines, tests
+343, this doc's lines are the only evidence written into the repo.
+
+**After — same instrument, fresh process (restart 16:29 EDT), then the cache evicted on purpose
+with `tools/evict-file-cache.ps1 -TargetGb 4` (standby 1,094 → 3,060 MB):**
+
+| call | work took | main held |
+| --- | --- | --- |
+| first search of the new process, 勉強 | entries painted at 338 ms | **8.7 ms** worst over 498 samples |
+| `dict:examples` 答える after eviction | **1,225 ms** in the worker | **9.6 ms** worst |
+| form search 選ぶ after eviction | entries at 168 ms | 782.8 ms — ONE sample, 8.9 s after the submit |
+| idle control, 20 s, after a fresh eviction, no search | — | 8.2 ms |
+| form search 続ける after a fresh eviction, 20 s | entries at 385 ms | **10.8 ms** |
+
+The work is as slow as it ever was — 1.2 s for a cold examples read — and main no longer knows.
+The one 782.8 ms sample did not reproduce on the idle control or the repeat, so it is reported,
+not scored (`one-gesture-reading-is-noise`). `/mem`'s process metrics list the new
+`jp-dictionary-read` utility at 141 MB working set; the import worker's role is untouched.
+
+**cat7 `--under-load --surface dictionary`, strict OFF, fresh process (uptime 480 s at start):
+PASS 10/10, no findings, no voids, ceiling clean.** Same runner, same spec, same 28 headwords as
+`bc88587a`'s VOID:
+
+| leg | `bc88587a` (before) | this run |
+| --- | --- | --- |
+| heavy: 28 real searches over 20 s, main availability | max **1182** / p95 126.5 ms, 20,195 ms span | max **9.0** / p95 3.1 ms, 667 samples over 20,011 ms |
+| heavy proof | 25 searches | `28 searches, 28 distinct, entries 0-8, last "続ける"` |
+| idle resize | max 343.3 ms, UNSTABLE (2 of 5 breached) | max 8.9 ms, stable |
+| drag under load | p50 16.7 / p95 33.4 / max 50.1, mainMax 186.5 | p50 16.7 / p95 **16.8** / max 17.4, over100 0, mainMax **12.0** |
+| resize under load | p50 16.7 / p95 33.4 / max 50.2, mainMax 234.5 | p50 16.7 / p95 **16.8** / max 17.1, over100 0, mainMax **12.1** |
+| work across each gesture | 4 searches | 3 searches, 3 distinct, `entries 6-8` |
+| sensitivity control (`-Jank`) | — | 12 frames over 100 ms, p95 100.3 — the recorder sees what it reports |
+
+The bullet's words are "media, dictionaries, and large lists". Dictionaries is the cell above.
+**Large lists:** `--surface flashcards --under-load` — the deck is a VirtualList carrying
+**331,582 px** of overflow, the largest list on this profile — VOIDed on its first run for an
+INSTRUMENT reason: `flashcards` had no `progress` receipt, so the leg keyed on `cyclesDuring`,
+and a scroll load's own span (91 x 20 ms ≈ 1.8 s) against its 3 s re-arm interval can never show
+a whole cycle inside a ~1.8 s gesture — `0 cycle(s)` on both legs while `last` read `scrolling
+flash-group-body-vlist over=331582`. That is correction 33's shape, one spec over. Fixed once for
+all six `scrollAll` specs (flashcards, library, immersion, novels, notebook, statistics) with a
+shared `scrollProgress` = the load's own tick counter; 17 probe lines. The idle half of that first
+run was already clean: heavy max 10.5 ms, drag/resize/theme mainMax 10–12.3 ms, over100 0. Its
+ceiling leg carried one 952.7 ms machine stall, stamped as environment by the runner itself.
+**Media:** the `video` heavy leg can no longer arm at 1080x679 — both `.mc-video-empty` shelves
+read 0 px of overflow where every banked run swept 637–639 px — because bullet 2's own repair
+`4d6a7ce7` turned the stage into a grid stack that no longer clips the shelf. Right fix, dead
+fixture; the spec needs a different load, and that is instrument work named here, not done. The
+banked media surface that still arms is `music` (its own window, `cat7-l8-music.json`); see the
+lines below for what it and the flashcards re-run produced.
+
+**All three clauses, measured under load, same session, strict OFF, ceiling clean on every run:**
+
+| `--surface … --under-load` | drag under load | resize under load | work across the gesture | heavy leg (main) | control |
+| --- | --- | --- | --- | --- | --- |
+| dictionary (search every 700 ms) | p50 16.7 / p95 16.8 / max 17.4, over100 0, mainMax 12.0 | p50 16.7 / p95 16.8 / max 17.1, over100 0, mainMax 12.1 | 3 searches / 3 searches | max 9.0 ms | 12 over 100, p95 100.3 |
+| flashcards (VirtualList, 331,582 px) | p50 16.7 / p95 16.8 / max 17.7, over100 0, mainMax 12.6 | p50 16.7 / p95 33.0 / max 33.5, over100 0, mainMax 12.1 | 91 ticks / 91 ticks | max 8.2 ms | 13 over 100, p95 117 |
+| music (four sort modes cycled, own window) | p50 16.7 / p95 33.5 / max 50.2, over100 0, mainMax 10.7 | p50 16.7 / p95 18.2 / max 50.1, over100 0, mainMax 12.0 | 48 sorts / 48 sorts | max 7.8 ms | 12 over 100, p95 116.9 |
+
+**PASS 10/10, PASS 10/10, PASS 10/10** — no findings, no voids, `closedLoop` true on every leg,
+every load restored what it touched (`restored recent`, `restored to 0`, entries painted). The
+first flashcards and music runs VOIDed on the receipt gap above and their idle/heavy halves were
+already clean; the re-runs are the numbers in the table. The p95 33 ms readings are one dropped
+frame per two at a 16.7 ms ceiling, under the runner's 2x bar and matching what the same
+surfaces read IDLE in `cat7-flashcards-perf.json` (resize p95 33.4) — the load did not move them.
+Windows opened for the runs (Library, Flashcards, Music) were closed through their own `×`; the
+Media window was navigated Library → Music → Library and back; `jp-lq-strict` removed and the
+shell reloaded. The banked JSONs live outside the repo this time
+(`%LOCALAPPDATA%\Temp\claude\…\scratchpad\cat7-*-underload*.json`, `cat7-dictionary-readworker.json`):
+the receipt is this section plus the re-runnable commands, not another 500 lines of evidence.
+
+**L11 bullet 3 CLOSES.** Left open and named: (1) `initYomitan → loadAllIndices` still parses
+162 MB of legacy JSON synchronously on main at BOOT (plain node: 3.5 s read + 1.7 s parse before
+the merge), a startup block that is not this bullet's question; (2) the `video` heavy leg needs
+a load that exists post-`4d6a7ce7`; (3) every non-scroll, non-dictionary, non-music spec still
+lacks a `progress` receipt and will VOID under load exactly as flashcards and music did first —
+the fix is one line per spec, naming the load's own tick counter.
