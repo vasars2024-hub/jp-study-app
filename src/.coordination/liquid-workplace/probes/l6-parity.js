@@ -2434,21 +2434,41 @@
       rootSel: '.manga-canvas',
       features: [
         {
-          // The page actually rendered, cross-checked against the seek's declared
-          // position. A stage that renders page 1 while the seek says 7 is the
-          // stale-detail defect in its manga form, and a count of images would
-          // miss it entirely — there is exactly one `<img>` either way.
+          /*
+           * The page actually rendered, cross-checked against the seek's declared
+           * position. A stage that renders page 1 while the seek says 7 is the
+           * stale-detail defect in its manga form, and a count of images would miss it
+           * entirely — there is exactly one `<img>` either way.
+           *
+           * THE COMMENT ABOVE IS OLDER THAN THE CROSS-CHECK, and for a while it was a
+           * fact about this file rather than about the surface: the predicate asked only
+           * `declared >= 1`, so it compared the seek to the number 1 and never to the
+           * page on screen. It therefore passed the exact defect it names. Measured live
+           * 2026-09-02 on a 17-page volume: seek reading `12`, stage rendering
+           * `pages/0001.png` with `alt` "Page 1", `First page` still DISABLED — and the
+           * row scored 7/7 in both presentations.
+           *
+           * The rendered page is read from the image's OWN identity: `alt` is
+           * `t('manga.pageAlt', { n })` (MangaReader.tsx:1982/2010), so the numeral
+           * survives all four locales, and the `pages/000N` basename is the fallback.
+           * It is a MEMBERSHIP test, not equality, because the spread layout renders two
+           * pages at once and the declared one only has to be among them.
+           */
           id: 'pageRender',
           f: (w) => {
             const stage = q(w, '.manga-stage');
             const seek = q(w, '.reader-seek');
-            const img = stage ? q(stage, 'img') : null;
-            const box = img ? img.getBoundingClientRect() : null;
-            const painted = !!box && box.width > 40 && box.height > 40;
+            const imgs = stage ? qa(stage, 'img') : [];
+            const boxes = imgs.map((i) => i.getBoundingClientRect());
+            const painted = boxes.filter((b) => b.width > 40 && b.height > 40);
+            const rendered = mangaRenderedPages(w);
             const declared = seek ? Number(seek.value) : NaN;
+            const agree = rendered.includes(declared);
             return {
-              ok: painted && Number.isFinite(declared) && declared >= 1,
-              ev: `img=${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'none'} seekPage=${declared} of ${seek ? seek.max : '?'}`,
+              ok: painted.length > 0 && Number.isFinite(declared) && declared >= 1 && agree,
+              ev: `img=${boxes[0] ? `${Math.round(boxes[0].width)}x${Math.round(boxes[0].height)}` : 'none'}`
+                + ` painted=${painted.length}/${imgs.length} seekPage=${declared} of ${seek ? seek.max : '?'}`
+                + ` rendered=[${rendered.join(',')}] agree=${agree}`,
             };
           },
         },
@@ -2547,18 +2567,34 @@
         // The round trip's real content. Captures and Library drive SCROLL because
         // they have no text field; a manga reader has no meaningful scroll either
         // (one page fills the stage), so page position is the state a bad trip loses.
+        /*
+         * COMMITS the jump, and the version this replaces did not. `.reader-seek` is a
+         * SCRUBBER: `onChange` only sets `scrub`, a preview, and the page changes on
+         * `onPointerUp` / `onKeyUp` (MangaReader.tsx:2069-2086). So `.value = n` plus
+         * `input`/`change` wrote a number into a controlled input that React then ignored,
+         * and this step returned that same number as `page` — the drive reporting its own
+         * write back to itself. `typeInto` is the native-value-setter route (Trap 2) and
+         * the `keyup` is the product's own commit, exactly as `novels.chapterSettle` does
+         * it. Proven by the product's other route: clicking `Next page` DOES move the
+         * stage, so the reader was never broken — the instrument was.
+         */
         page: (w, n) => {
           const seek = q(w, '.reader-seek');
           if (!seek) return { refused: 'no page seek' };
           const g = mangaState();
-          if (g.page == null) g.page = seek.value;
+          // Captured from the STAGE, not from the seek. `pageTransport`'s mutation sets
+          // `max="1"`, which clamps the seek's value to 1 — so a baseline read off the
+          // seek is silently rewritten by another mutation, and that cycle's undo then
+          // compares 1 against 1, finds nothing to do, and leaves the reader where the
+          // drive put it. The rendered page is immune to the clamp.
+          if (g.page == null) g.page = String(mangaRenderedPages(w)[0] || seek.value);
           const max = Number(seek.max) || 1;
           // Clamped to the volume, so a shorter book refuses nothing and lands somewhere real.
           const want = String(Math.min(Math.max(Number(n) || 3, 1), max));
-          seek.value = want;
-          seek.dispatchEvent(new Event('input', { bubbles: true }));
-          seek.dispatchEvent(new Event('change', { bubbles: true }));
-          return { page: seek.value, of: seek.max };
+          const renderedBefore = mangaRenderedPages(w);
+          typeInto(seek, want);
+          seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+          return { page: seek.value, of: seek.max, from: g.page, renderedBefore };
         },
         // Idempotent by construction — it SETS a named mode rather than cycling, so
         // the driver re-running the drive once per mutation cannot walk the surface
@@ -2590,11 +2626,16 @@
           }
           if (g.page != null) {
             const seek = q(w, '.reader-seek');
-            if (seek && seek.value !== g.page) {
-              seek.value = g.page;
-              seek.dispatchEvent(new Event('input', { bubbles: true }));
-              seek.dispatchEvent(new Event('change', { bubbles: true }));
-              done.push('page');
+            // Compared against the STAGE for the same reason the capture reads it.
+            const now = String(mangaRenderedPages(w)[0] || (seek ? seek.value : ''));
+            if (seek && now !== g.page) {
+              // The step's commit route, for the same reason. Writing the value alone
+              // restored nothing, and the old undo could report `page` as restored while
+              // the reader stayed exactly where the drive had left it. It never showed,
+              // because the old step had not moved it either.
+              typeInto(seek, g.page);
+              seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+              done.push(`page=${now}->${g.page}`);
             }
           }
           window.__LQP_MANGA_ORIG = null;
@@ -2621,6 +2662,15 @@
           q(w, LIQUID_BTN.reader) && q(w, LIQUID_BTN.reader).getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
           'no liquid control',
         ),
+      },
+      cascades: {
+        // TRUE, and only visible once `pageRender` started cross-checking. Clamping the
+        // seek to `max="1"` clamps its VALUE to 1 as well, so the transport stops
+        // declaring the page the stage is showing — the disagreement `pageRender` exists
+        // to catch is a real consequence of breaking the transport, not collateral. It is
+        // declared here rather than engineered away: a row that cannot be made to fall by
+        // any mutation is the other way this instrument goes wrong.
+        pageTransport: ['pageRender'],
       },
     },
 
@@ -5630,6 +5680,26 @@
    * `--lq-reading-measure` is `none` BY DESIGN (a grid of covers and a live browser guest
    * are not passages). A spec that wants the clamp scores it as its own row.
    */
+  /**
+   * The page numbers the manga stage is ACTUALLY showing, read off each image's own
+   * identity rather than off the control that claims to have moved it.
+   *
+   * `alt` is `t('manga.pageAlt', { n: pageIdx + 1 })` (MangaReader.tsx:1982/2010), so the
+   * numeral is present in all four locales even though the surrounding word is not; the
+   * `pages/000N.<ext>` basename is the fallback for a build that ever drops the alt.
+   * Returns an array because the spread layout renders two pages at once.
+   */
+  function mangaRenderedPages(w) {
+    const stage = q(w, '.manga-stage');
+    if (!stage) return [];
+    return qa(stage, 'img').map((img) => {
+      const nums = String(img.alt || '').match(/\d+/g);
+      if (nums && nums.length) return Number(nums[nums.length - 1]);
+      const m = String(img.currentSrc || img.src).match(/(\d+)\.[a-z0-9]+(?:\?.*)?$/i);
+      return m ? Number(m[1]) : NaN;
+    }).filter((n) => Number.isFinite(n));
+  }
+
   function canvasPlacement(w) {
     const c = q(w, '.lq-reading');
     if (!c) return { ok: false, ev: 'no reading canvas' };
