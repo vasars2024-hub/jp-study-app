@@ -449,3 +449,79 @@ disagree and one of them is wrong.
 
 **State: 0 rows written.** The writer is landed and UNARMED until a live cat6 run banks a
 `rowEvidence` artifact. That run is the next turn's opening slice.
+
+## 2026-09-02 — the writer is ARMED, and arming it found the instrument reading too early
+
+`ff63d811`, `1ec440ab`, `ba0d1070`, `e272640b`. Ledger **50 rows / 7 apps -> 62 rows /
+9 apps**, 57 `both` / 5 `pending`; `notWritten` **19 -> 17** root components.
+
+### The armament run found a real defect in cat6, not in the writer
+
+The opening slice was "re-derive Dictionary's rows and add ZERO". The live run came back
+**FAIL** — `lookup` unreachable at `chars=275 nodes=47`, `resultActions` at `actions=0`.
+Reading the SAME window through the SAME expression after the run: `chars=2345 nodes=262
+hasTaberu=true hasJMdict=true actions=20`. Both rows were live the whole time.
+
+A FIXED SLEEP IS NOT A SETTLE. `step()` returns as soon as it has clicked; the effect
+arrives later. And the two parity checks are not simultaneous, so the standard half can read
+pre-resolve and the liquid half post-resolve — which is a **fabricated parity regression**,
+and `REGRESSION` is a status this writer would have written into the ledger.
+
+`settle()` polls `chars|nodes|controls` until two consecutive reads agree, before the parity
+check and before each round-trip snapshot. It excludes `fields` on purpose: the fields are
+what the round trip COMPARES, and settling on them would make the instrument wait for its
+own answer. An unconverged settle costs `roundTripHeld` only.
+
+| run | settling | standard | liquid | verdict |
+| --- | --- | --- | --- | --- |
+| `--step-ms 0 --settle-tries 0` | off | **5/7** | **7/7** | FAIL on all three bars |
+| `--step-ms 0` | on | 7/7 | 7/7 | PASS 10/10, zero round-trip diffs |
+
+Same window, same profile, same command; the only difference is `--settle-tries 0`. The
+settle's own trace is the proof it did something: `275|47|16 -> 2345|262|50 -> 2345|262|50`.
+`--settle-tries 0` DROPS the bar term rather than scoring it false, because zero tries can
+never produce two agreeing reads and failing a control by arithmetic proves nothing.
+
+Naturalistic half, with its rate rather than an adjective: the race bit **2 of the first 3**
+runs and **0 of the 6** after. It is a COLD-START race — once the dictionary DB is open the
+query resolves inside 700 ms — which is why it survived every previous cat6 run.
+
+### What was written
+
+| app | rows | added | how the authored half was obtained |
+| --- | --- | --- | --- |
+| dictionary | 7 | **0** | back-derived from the 7 hand-written rows; the zero IS the test |
+| calendar | 5 | 5 | authored from source; first app with no prior ledger row |
+| settings | 7 | 7 | authored from source |
+
+**The dictionary zero is stronger than it looks.** The dedupe key is `app|feature`, so one
+mistyped feature string writes an EIGHTH row instead of matching. `added: 0` therefore also
+certifies that all seven authored strings match the hand-written ledger verbatim — the one
+link in this chain that had never had a control on it.
+
+**A false claim in `parity-row-metadata.json` was corrected, not left.** Its provenance note
+said the dictionary `windowLifecycle` row "has NO spec id and is deliberately absent".
+`l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for EVERY app, and the
+live run refused by that name — the refusal working. Six of seven had been written; the
+seventh existed in the ledger and was missing only its authored half.
+
+Writer self-control: **6 armed / 6 fired** across the two new runs
+(liquid-unreachable -> REGRESSION, unknown row id -> REFUSED by name, VOID -> writes nothing).
+
+### Not a defect, checked rather than assumed
+
+Settings' drive log shows `closeSearch -> expanded:"true"`, which reads as an Escape that
+did not close the panel. Reading the same input afterwards: `expanded:"false"`, no panel,
+value empty. The step reads the attribute in the SAME synchronous `/eval` as the keydown, so
+its return value is one React render behind. The product is correct; the STEP's report is
+stale. Same class as the defect above, one layer out.
+
+### What b2 still needs, exactly
+
+15 of the 24 specs still have no metadata block, and the 5 `pending` rows are still
+mediaWorkspace's — they have a destination now but no SUBJECT, because
+`seanimeStudyLibrary()` returns `{ok:true,files:[]}` on this profile. The next apps to
+author are the data-independent ones (`scraper`, `resources`, `city`, `shell`); the
+data-dependent ones (`flashcards`, `statistics`, `library`, `music`, `video`, `youtube`)
+need a profile with real content or they measure an empty harness, which is capped, not
+skipped.
