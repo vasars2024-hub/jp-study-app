@@ -1066,3 +1066,60 @@ already carries the restart/uptime refusal — never a new probe file.
 
 desktop-layout.json is sha256 byte-identical to the pre-turn copy after all of this, cadence
 included.
+
+## 2026-09-01, latest — CLAUSE 5, LONG-SESSION MEMORY: CLOSED. Bullet 4 closes with it.
+
+The predicted slice was right and the previous turn's diagnosis was exactly correct: this was an
+INSTRUMENT limit, not a leak. `/mem` runs `gc()` in MAIN's isolate and cannot collect a renderer
+heap, so a Liquid clause scored on it credits the wrong process.
+
+**PRODUCT — `/rmem`, `src/main/debugBridge.ts`.** A renderer-memory route over the same CDP
+session `/emulate` already uses: `HeapProfiler.collectGarbage`, then `Runtime.getHeapUsage` and
+`Memory.getDOMCounters`. It returns the before/after pair so the collection is falsifiable rather
+than assumed, and it detaches only a session it opened itself and only when `/emulate` holds no
+override on that webContents — detaching someone else's would silently clear a live emulation.
+
+**INSTRUMENT — `--long-session` MODE on `cat7-perf.cjs` (correction 34), not a new probe.** It
+reuses the file's refusals, bridge client and retry policy. It refuses without a COLLECTOR CONTROL
+that both arms and fires, and `--churn` adds a per-cycle mount/unmount round trip through the
+window's own title-bar controls.
+
+**COLLECTOR CONTROL — armed AND fired**, which is the whole difference from last turn. A 1.2M-object
+plant plus a 20,000-span detached subtree: heap **115.1 -> 147.4 MB (+32.3)**, nodes
+**3,056 -> 43,057 (+40,001 = 2x20,000 spans-and-text +1 div, exact)**. After `delete` plus one
+collection: **115.1 MB and 3,056 nodes — byte-identical to base**, 32.3 MB and 40,001 nodes freed.
+The 2026-09-01 reading above could not do this and that is precisely why it did not close.
+
+**THE FIRST SURFACE VOIDED, CORRECTLY, AND THAT IS THE FINDING.** Dictionary toggle-only ran clean
+(nodes 1,379 flat x12, documents 1, listeners 684 flat, heap +0.1 MB) — and it means almost nothing:
+the mean per-cycle difference between the liquid and standard halves was **0 nodes and 0.0 MB**.
+Liquid presentation on an already-open window is CSS-only, so "nodes flat" was true of a cadence
+that never allocated a node to prove it. `--churn` on Dictionary then VOIDed at a 13-node delta —
+the Dictionary window is **30 elements** in its empty state, the smallest on the desk. Measured
+directly, not inferred: 3 windows = 1,379 nodes, 2 = 1,366, 0 = 261 after collection, `.fwin *`
+696 -> 669 -> 0. The guard is discriminating, not broken.
+
+**THE CLOSING NUMBER — Flashcards, the densest window on this profile (874 elements), 12 churn
+cycles.** Each cycle opens it, Makes it Liquid, Returns to standard, Closes it. Per cycle it really
+mounts and unmounts **1,661 DOM nodes, 203 event listeners and 8.1 MB of heap**
+(closed 1,395n/684L/106.6 MB <-> open+liquid 3,056n/887L/115.1 MB). Across cycles 1 -> 12, both
+samples taken CLOSED and both after a forced collection:
+
+  nodes      1,395 -> 1,395   **0**
+  listeners    684 -> 684     **0**
+  documents      1 -> 1       **0**
+  heap       106.6 -> 106.8   **+0.2 MB**
+  main       privateMb 436.2 -> 436.2, heapUsed 290.8 -> 290.9, detachedContexts 0 -> 0
+
+Receipt: 12 liquid observations, **0** windows still liquid after a standard half, peak 4 `.fwin` /
+1,587 elements, **0 refusals**. Renderer pid 56756, main pid 47360, uptime 634 s at start.
+
+`growthAcrossCycles` exists because `growth` is the wrong pair in churn mode: the baseline is taken
+with the surface OPEN and the run ends CLOSED, so a clean run reports -1,661 nodes and a reader
+either dismisses it or misreads it. Cycle 1 closed vs cycle N closed is like-for-like.
+
+TRAPS for the next worker: (1) `Memory.getDOMCounters().nodes` counts text nodes — the 40,001 above
+is 20,000 spans + 20,000 text nodes + 1 div, and a probe expecting element counts will read double.
+(2) The plant must be on-heap OBJECTS; a typed array's backing store is external and moves a pool
+V8 does not own. (3) `os:open <section>` on an already-open window RAISES it, it does not remount —
+churn only measures a mount because the previous cycle closed it.

@@ -1,0 +1,337 @@
+{
+  "surface": "flashcards",
+  "title": "Flashcards",
+  "root": ".flash-view",
+  "mode": "long-session",
+  "at": "2026-09-02T01:41:45.188Z",
+  "process": {
+    "pid": 47360,
+    "uptimeSecAtStart": 634,
+    "rendererPid": 56756
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "deskWindows": 4,
+    "titles": [
+      "Dictionary",
+      "Grammar",
+      "Library",
+      "Flashcards"
+    ]
+  },
+  "legs": {
+    "collectorControl": {
+      "base": {
+        "ok": true,
+        "webContentsId": 1,
+        "pid": 56756,
+        "gcRequested": true,
+        "gcRan": true,
+        "usedMb": 115.1,
+        "totalMb": 116.4,
+        "documents": 1,
+        "nodes": 3056,
+        "jsEventListeners": 887,
+        "beforeGc": {
+          "usedMb": 115.5,
+          "totalMb": 139.9,
+          "documents": 1,
+          "nodes": 3056,
+          "jsEventListeners": 909
+        }
+      },
+      "planted": {
+        "ok": true,
+        "webContentsId": 1,
+        "pid": 56756,
+        "gcRequested": true,
+        "gcRan": true,
+        "usedMb": 147.4,
+        "totalMb": 148.7,
+        "documents": 1,
+        "nodes": 43057,
+        "jsEventListeners": 887,
+        "beforeGc": {
+          "usedMb": 147.4,
+          "totalMb": 156.5,
+          "documents": 1,
+          "nodes": 43057,
+          "jsEventListeners": 887
+        }
+      },
+      "released": {
+        "ok": true,
+        "webContentsId": 1,
+        "pid": 56756,
+        "gcRequested": true,
+        "gcRan": true,
+        "usedMb": 115.1,
+        "totalMb": 116.4,
+        "documents": 1,
+        "nodes": 3056,
+        "jsEventListeners": 887,
+        "beforeGc": {
+          "usedMb": 147.4,
+          "totalMb": 149,
+          "documents": 1,
+          "nodes": 43057,
+          "jsEventListeners": 887
+        }
+      },
+      "plantHeapMb": 32.3,
+      "plantNodes": 40001,
+      "freedHeapMb": 32.3,
+      "freedNodes": 40001
+    },
+    "longSession": {
+      "cycles": 12,
+      "mode": "churn — open flashcards, Make Liquid, Return to standard, Close, every cycle",
+      "refusals": [],
+      "baseline": {
+        "ok": true,
+        "webContentsId": 1,
+        "pid": 56756,
+        "gcRequested": true,
+        "gcRan": true,
+        "usedMb": 115.1,
+        "totalMb": 116.7,
+        "documents": 1,
+        "nodes": 3056,
+        "jsEventListeners": 887,
+        "beforeGc": {
+          "usedMb": 115.1,
+          "totalMb": 116.4,
+          "documents": 1,
+          "nodes": 3056,
+          "jsEventListeners": 887
+        }
+      },
+      "after": {
+        "ok": true,
+        "webContentsId": 1,
+        "pid": 56756,
+        "gcRequested": true,
+        "gcRan": true,
+        "usedMb": 106.8,
+        "totalMb": 108.2,
+        "documents": 1,
+        "nodes": 1395,
+        "jsEventListeners": 685,
+        "beforeGc": {
+          "usedMb": 106.8,
+          "totalMb": 108.2,
+          "documents": 1,
+          "nodes": 1395,
+          "jsEventListeners": 685
+        }
+      },
+      "cycleSamples": [
+        {
+          "cycle": 1,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.6,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 115.1,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 2,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.6,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.6,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 3,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.6,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 4,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 115.2,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 5,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.6,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 6,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 686,
+          "liquidUsedMb": 114.6,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 7,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.6,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 8,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.7,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 115.3,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 9,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.8,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.7,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 10,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.8,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 685,
+          "liquidUsedMb": 114.7,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 11,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.8,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 114.7,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        },
+        {
+          "cycle": 12,
+          "liquidWindows": 1,
+          "standardWindows": 0,
+          "fwins": 4,
+          "elements": 1587,
+          "usedMb": 106.8,
+          "nodes": 1395,
+          "documents": 1,
+          "listeners": 684,
+          "liquidUsedMb": 115.3,
+          "liquidNodes": 3056,
+          "liquidListeners": 887
+        }
+      ],
+      "main": {
+        "privateMbBefore": 436.2,
+        "privateMbAfter": 436.2,
+        "heapUsedMbBefore": 290.8,
+        "heapUsedMbAfter": 290.9,
+        "detachedContextsBefore": 0,
+        "detachedContextsAfter": 0
+      },
+      "receipt": {
+        "liquidObserved": 12,
+        "standardObserved": 0,
+        "peakFwins": 4,
+        "peakElements": 1587,
+        "liquidHalfNodeDelta": 1661,
+        "liquidHalfHeapMb": 8.1,
+        "note": "liquidObserved counts windows found at [data-presentation=\"liquid\"] after each liquid half; standardObserved is the same read after each standard half and must be 0. liquidHalfNodeDelta/liquidHalfHeapMb are the mean per-cycle difference between the two halves, both sampled after a forced collection — they say how much the presentation actually allocates, which is what makes a flat growth number mean something."
+      },
+      "growth": {
+        "usedMb": -8.3,
+        "nodes": -1661,
+        "documents": 0,
+        "listeners": -202,
+        "mainPrivateMb": 0
+      },
+      "growthAcrossCycles": {
+        "usedMb": 0.2,
+        "nodes": 0,
+        "documents": 0,
+        "listeners": 0,
+        "from": 1,
+        "to": 12,
+        "mainPrivateMb": 0
+      }
+    }
+  },
+  "findings": [],
+  "voided": [],
+  "score": 10
+}
