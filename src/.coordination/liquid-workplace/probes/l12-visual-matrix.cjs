@@ -243,6 +243,9 @@ function sourceSections() {
   return m[1].split(',').map((s) => (s.match(/'([^']+)'/) || [])[1]).filter(Boolean);
 }
 
+/** Holds the in-flight manifest so the crash handler at the bottom can bank a partial. */
+const PARTIAL = { m: null, out: null };
+
 const cfgPath = path.join(REPO, 'debug', 'bridge.json');
 if (!fs.existsSync(cfgPath)) {
   console.error('REFUSE - no debug/bridge.json; the app is not running with the debug bridge');
@@ -252,11 +255,31 @@ const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
 const H = { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function post(route, body) {
-  const r = await fetch(`http://127.0.0.1:${cfg.port}${route}`, {
-    method: 'POST', headers: H, body: JSON.stringify(body || {}),
-  });
-  return r.json();
+/**
+ * A 650-cell run is roughly 4,000 short-lived HTTP connections, and ONE of them failing must
+ * not cost the whole sweep. Measured the expensive way: a full run died at cell 164 with a
+ * bare `TypeError: fetch failed` while `/health` answered normally seconds later — the app
+ * was fine, a single socket was not. Retried with backoff, and the cause is unwrapped when
+ * it finally gives up, because `fetch failed` on its own names nothing.
+ */
+let retries = 0;
+async function post(route, body, tries = 4) {
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${cfg.port}${route}`, {
+        method: 'POST', headers: H, body: JSON.stringify(body || {}),
+      });
+      return await r.json();
+    } catch (e) {
+      retries += 1;
+      if (i === tries - 1) {
+        const cause = e && e.cause ? ` (cause: ${e.cause.code || e.cause.message || e.cause})` : '';
+        throw new Error(`${route} failed after ${tries} attempts: ${e.message}${cause}`);
+      }
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  return null;
 }
 /** `/eval` takes ONE expression and never awaits a promise — banked trap. */
 async function ev(js) {
@@ -664,6 +687,11 @@ ${rows}`;
     apps: {},
     totals: {},
   };
+  // A crash mid-sweep must still bank what it measured. Without this a run that dies at
+  // cell 164 of 650 leaves nothing at all, and the next worker cannot tell a hard product
+  // failure from a dropped socket.
+  PARTIAL.m = manifest;
+  PARTIAL.out = OUT || path.join(REPO, 'debug', 'l12-matrix-manifest.json');
 
   // ---- open every requested app once, and record which ones are presentable ----
   const live = [];
@@ -874,6 +902,7 @@ ${rows}`;
   console.log(JSON.stringify({
     out: path.relative(REPO, out).replace(/\\/g, '/'),
     ...manifest.totals,
+    retries,
     controls: manifest.controls && {
       c0: manifest.controls.c0.identical, c1: manifest.controls.c1.pass,
       c2: manifest.controls.c2.pass, c3: manifest.controls.c3.pass,
@@ -885,4 +914,16 @@ ${rows}`;
     atlas: ATLAS,
   }, null, 2));
   if (manifest.void) process.exit(1);
-})().catch((e) => { console.error(String((e && e.stack) || e)); process.exit(1); });
+})().catch((e) => {
+  console.error(String((e && e.stack) || e));
+  if (PARTIAL.m && PARTIAL.out) {
+    PARTIAL.m.aborted = { at: new Date().toISOString(), error: String((e && e.message) || e), cellsBanked: PARTIAL.m.cells.length, retries };
+    PARTIAL.m.certifiable = false;
+    try {
+      fs.writeFileSync(PARTIAL.out, `${JSON.stringify(PARTIAL.m, null, 2)}
+`);
+      console.error(`PARTIAL manifest written: ${path.relative(REPO, PARTIAL.out)} (${PARTIAL.m.cells.length} cells)`);
+    } catch (w) { console.error(`could not write partial manifest: ${w.message}`); }
+  }
+  process.exit(1);
+});
