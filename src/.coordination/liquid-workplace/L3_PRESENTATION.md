@@ -241,3 +241,65 @@ the bar to a bare `<header>` → 1 (primitive/landmark); drop the opt-in class j
 **0 files** here, against the **77** the standard halves were driven on in 2026-08-17. The
 readiness pane states it honestly itself. A row measured only on an empty harness is capped, not
 skipped. **Re-drive those five on a scanned library; that is all that is left of them.**
+
+## 2026-09-01 (primary2) — L12 bullet 3, the fresh-profile clause. It could not be measured, and why.
+
+`JP_USER_DATA_DIR` (main.ts:140) is the repo's only fresh-profile instrument, and it was
+**broken for the one file this clause is about**. `src/main/desktop.ts` built its store at
+module scope; the constructor resolves `app.getPath('userData')`, and an ES import is evaluated
+before `main.ts:142` applies the redirect. So it READ the real profile and WROTE the scratch one.
+
+MEASURED, not inferred. A userData dir created empty (0 entries; `[main] JP_USER_DATA_DIR ->
+userData = …\Temp\jp-freshprofile-20260901` in the log) came up holding the real profile's
+**8 desktops**, widget id `wgt-mrmkpxj7-tpja`, `aurora` City wallpaper, authored viewports
+1904x985 / 944x453 / 642x385, `globalZTop 10802` — all identical to `%APPDATA%\jp-study-app`.
+WHAT NAMED THIS MODULE AS THE SINGLE CAUSE: `profiles.json` beside it was correctly seeded
+(fresh `activeProfileId=p1-ja-focus` and the code's own labels vs the real profile's renamed
+"English → Japanese" / `seed-zh-ja`), so the redirect itself worked. A module-scope scan of
+`src/main` finds three other eager instantiations — RateLimiter x2, AsyncLocalStorage — none
+touching userData. Fixed in `fab72cac`, lazily through the existing `desktopStore()` accessor.
+
+AFTER, same procedure on the same wiped dir: **3 desktops, all seed** — Study / City / Desktop 3,
+`windows 0`, `widgets 0`, `icons 0`, `crimsonveil`, `layoutEpoch 1`, `globalZTop 10`. The
+3 `assignments` are filled live by `syncAssignments()` from the 3 attached displays, not read
+from disk. MUTATION CONTROL on the new test: restoring the eager `const store = new DesktopStore()`
+fails 2 of its 3 cases while the third — reads the real profile when NO redirect is applied —
+keeps passing, so the test is specific rather than vacuous.
+
+WHY IT MATTERED BEYOND THE READING: `load()` calls `atomicWriteJson(filePath, next)` on any schema
+migration, and at import time `filePath` was the real profile. A scratch-profile run could have
+rewritten the 8.6 GB profile that has no restore point. It did not fire only because the file was
+already at v3.
+
+FIRST-RUN, now visible for the first time: the fresh desktop comes up behind **two overlays at
+once** — a `.consent` country-sharing modal and an 8-step `.tour-root` — over a desktop with
+**zero icons**. Both dismissed through their own controls (`No thanks`, then Esc). Not a Liquid
+defect and not repaired here; recorded because no loaded-profile probe can see it.
+
+FRESH-PROFILE LIQUID ROUND TRIP, driven through the product's own title-bar control on a profile
+that did not exist before this turn. Default is CONVENTIONAL: `data-presentation=standard`,
+`lq.*` storage keys **0 of 11**, `data-window-chrome=standard`.
+
+| property | standard | liquid |
+| --- | --- | --- |
+| `.fwin` background | `rgb(13, 12, 18)` | `color(srgb 0.101961 0.0941176 0.137255 / 0.72)` |
+| `.fwin` backdrop-filter | `none` | `blur(8px) saturate(1.25)` |
+| `.fwin` border-radius | `12px` | `16px` |
+| `.fwin-bar` background | `rgb(10, 9, 16)` | `rgba(0, 0, 0, 0)` |
+| `.fwin-body` background | `rgba(0, 0, 0, 0)` | `rgb(26, 24, 35)` — opaque anchor, decision 1 holding |
+| rect | 60,24 820x580 | 60,24 820x580 — the shell does not move a window that goes Liquid |
+| persisted | key absent | `{v:1,mode:liquid,standardRect:{60,24,820,580},standardMaximized:false}` |
+
+**ROUND TRIP byte-identical over the whole 18-property snapshot by `-ceq`, and the `presentation`
+key is REMOVED from the fresh profile's own `desktop-layout.json` — not written as `standard`.**
+DISCRIMINATING CONTROL, and it came free: the first return attempt used the label
+`Return to standard` where the product says `Return to standard window`, so no click landed —
+the same comparison returned **False** with the key still present. The True is a real transition.
+
+STILL OPEN in bullet 3, said plainly. (a) `electron-forge package` has NOT been run. Do not try to
+substitute `npx vite build --config vite.main.config.ts`: forge's VitePlugin injects `build.lib.entry`,
+so standalone it builds the default root with none of the renderer's aliases and dies on
+`@/app/(main)/_features/…` from `src/media/MediaWorkspace.tsx` — a **harness** error, not a product
+one, and it fails identically for the preload config. (b) A real kill-and-relaunch persistence leg
+on the fresh profile was not run; the loaded-profile equivalent is `282f53fb`. (c) The gate results
+are still not recorded against L12's own words.
