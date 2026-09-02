@@ -2835,10 +2835,6 @@
                 ? Math.round(rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top)
                 : 0;
               const expect = declared * pitch;
-              // A deck shorter than its own pane has nothing to virtualize, so rendering all
-              // of it is correct rather than a failure. The scroll-range equation still has
-              // to hold for it.
-              const windowed = expect > el.clientHeight ? declared > rows.length : true;
               return {
                 declared,
                 rendered: rows.length,
@@ -2846,13 +2842,34 @@
                 sh: el.scrollHeight,
                 expect,
                 ratio: expect > 0 ? el.scrollHeight / expect : 0,
-                windowed,
               };
             });
-            const good = read.filter((r) => r.pitch > 0 && r.windowed && r.ratio >= 0.9 && r.ratio <= 1.1);
+            // THE WINDOW IS A CAP, NOT A RATIO — corrected 2026-09-02 after this row read
+            // false on a correct surface. The old term was
+            // `expect > clientHeight ? declared > rendered : true`, which demands that ANY
+            // group taller than its pane render fewer rows than it declares. A 5-card group
+            // is 540px in a 420px pane, so it qualified — and `VirtualList` still rendered
+            // all 5, because its window is derived from the VIEWPORT, not from the
+            // collection: measured live, 420px pane / 108px pitch, rendered was 5, 5, 7, 16,
+            // 16 against declared 5, 5, 7, 144, 3074. That is `min(declared, 16)` exactly.
+            // Rendering a 7-item collection whole is what a windowing list SHOULD do.
+            //
+            // What virtualization actually promises is that the rendered count stops growing
+            // while the declared count does not, so the cap is read off the DOM and then has
+            // to be DEMONSTRATED: some collection must exceed it. Without that clause a desk
+            // where every group is tiny would score 10 for a list that renders everything —
+            // "renders it all" and "windows correctly" are the same measurement until one
+            // collection is bigger than the window.
+            const cap = Math.max(...read.map((r) => r.rendered));
+            const maxDeclared = Math.max(...read.map((r) => r.declared));
+            const ceilingProven = cap < maxDeclared;
+            const good = read.filter((r) => r.pitch > 0
+              && r.ratio >= 0.9 && r.ratio <= 1.1
+              && r.rendered === Math.min(r.declared, cap));
             return {
-              ok: good.length === read.length,
-              ev: read.map((r) => `${r.declared}cards/${r.rendered}rendered pitch=${r.pitch} sh=${r.sh} expected=${r.expect} ratio=${r.ratio.toFixed(3)}`).join(' | '),
+              ok: ceilingProven && good.length === read.length,
+              ev: `cap=${cap} maxDeclared=${maxDeclared} ceilingProven=${ceilingProven} | `
+                + read.map((r) => `${r.declared}cards/${r.rendered}rendered pitch=${r.pitch} sh=${r.sh} expected=${r.expect} ratio=${r.ratio.toFixed(3)}`).join(' | '),
             };
           },
         },
