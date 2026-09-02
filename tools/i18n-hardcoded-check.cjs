@@ -25,6 +25,7 @@
  */
 'use strict';
 
+/* eslint-disable @typescript-eslint/no-var-requires -- a .cjs build tool; `import` is not available here */
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
