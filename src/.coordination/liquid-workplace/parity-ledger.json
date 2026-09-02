@@ -2463,20 +2463,18 @@
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 5 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 5 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 21, and 5 declared specs still have NO row at all — notebook, immersion, novels, manga, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 3 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 3 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 23, and 3 declared specs still have NO row at all — notebook, immersion, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
       "at": "2026-09-02 (re-derived by debug/_p2g-notwritten.cjs)",
       "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
       "harnessSpecs": 25,
-      "specsWithRows": 20,
-      "specsWithNoRows": 5,
+      "specsWithRows": 22,
+      "specsWithNoRows": 3,
       "noRows": [
         "notebook",
         "immersion",
-        "novels",
-        "manga",
         "vn"
       ],
       "noRowsByCause": {
@@ -2486,8 +2484,6 @@
         "noSubjectEvidence": "notebook: FILES_APP_PLAN gate 7b deletes the Notebook section. `AppSection.tsx` has no `case 'notebook'`, `LEGACY_WIN_SECTION_ALIASES` (shared/desktop.ts:76) maps notebook -> files, and `NotebookContent.tsx` survives only as a Blanc import. Driven live on this branch: os:open `notebook` opens a window titled \"Files\" whose body root is `DIV.lq-scaffold.fa-shell`, 52 buttons, 0 `.gx-notebook` in the whole document.",
         "awaitingAuthoring": [
           "immersion",
-          "novels",
-          "manga",
           "vn"
         ]
       },
@@ -2499,10 +2495,10 @@
   },
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
-    "rows": 168,
+    "rows": 184,
     "withNamedControl": 126,
     "declaredNone": 4,
-    "silent": 37,
+    "silent": 53,
     "silentByApp": {
       "dictionary": 7,
       "mediaWorkspace": 5,
@@ -2510,12 +2506,17 @@
       "grammar": 5,
       "translate": 4,
       "agent": 5,
-      "captures": 3
+      "captures": 3,
+      "novels": 9,
+      "manga": 7
     },
     "silentByCause": {
       "predatingTheClause": 37,
-      "b2WaveNotTranscribed": 0,
-      "b2WaveApps": []
+      "b2WaveNotTranscribed": 16,
+      "b2WaveApps": [
+        "novels",
+        "manga"
+      ]
     },
     "note": "`silent` means this ledger records no control clause for the row. It is a gap in the LEDGER, not a disproof of the row — but it is a real gap and it is not monotone. THIS BLOCK RETRACTS ITS OWN EARLIER CLAIM: it used to end \"New rows now say NONE DECLARED explicitly, so `silent` can only shrink\", and the 2026-09-02 merge of the two concurrent b2 waves falsified that — silent went 45/120 -> 93/168, because the main tree's row writer (debug/_pr4-rows.cjs) copies only `rowEvidence` into `observed` while this tree's (probes/l6-parity-rows.cjs) also copies `control.mutations`. See `silentByCause`: the `b2WaveNotTranscribed` rows DID have per-row mutations run by cat6 and their receipts survive, so those are recoverable by transcription; the `predatingTheClause` rows are the older ones written before any writer said anything about controls. Two writers, one ledger, one claim that only held for one of them."
   }

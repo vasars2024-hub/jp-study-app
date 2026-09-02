@@ -1293,3 +1293,31 @@ The spec is **annotated, not deleted**. On a tree where the Notebook section sti
 still a correct spec, and this branch is the one that is unusual. The annotation carries the
 three-row control table so the next worker does not spend a run discovering that
 `cat6 --app notebook` refuses — it refuses correctly, and now says why.
+
+### Addendum, same day: the gap reproduced within the hour, which is the argument for fixing the writer
+
+A second sync-down landed while this turn was running: **168 → 184 rows / 21 → 23 apps**,
+`novels` (9) and `manga` (7) joining from the main tree. Auto-merged, and **validated rather
+than trusted** — 0 duplicate `app|feature` keys, all **53** transcribed clauses still present,
+the `notebook` spec annotation intact and `l6-parity.js` still parsing.
+
+`silent` went **37 → 53** immediately, and `silentByCause` names the cause without anyone
+having to guess: `predatingTheClause: 37`, `b2WaveNotTranscribed: 16`, `b2WaveApps:
+[novels, manga]`. The 16 new rows have the same shape as the 53 this turn recovered, for the
+same reason — they came through the same non-transcribing writer.
+
+So the recovery is a **mop, not a fix**. `debug/_p2i-transcribe.cjs` is now written to survive
+the next wave rather than being a one-shot: its app list is **derived** from the ledger (every
+app with a control-less row that has a `_pr4-meta-*` block), and an app whose cat6 receipt is
+not banked yet is **skipped with a reason** rather than refused, because "that run is not
+finished" is not a defect. Run against the merged ledger it correctly reports:
+
+    SKIPPED (not a defect):
+      manga: no qualifying PASS receipt banked yet -- run cat6 for it first
+      novels: no qualifying PASS receipt banked yet -- run cat6 for it first
+    DRY RUN: 0 rows ... Considered apps: manga, novels.
+
+— it finds the two new apps, declines to invent anything, and leaves the already-transcribed
+rows alone. **The durable fix is one line in the other writer**: `debug/_pr4-rows.cjs` should
+copy `control.mutations` into `observed` the way `probes/l6-parity-rows.cjs` already does. Until
+it does, every wave adds silent rows and someone transcribes them afterwards.
