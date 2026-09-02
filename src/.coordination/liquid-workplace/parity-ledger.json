@@ -1959,6 +1959,104 @@
       "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 980x660 in both. `dirtiedField` is null and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and this surface's only text field is the round answer box, which exists only inside a live round. The answer field's own reversibility is scored by `typingInput` instead."
+    },
+    {
+      "app": "settings",
+      "feature": "Reach every settings destination from the category rail, with each entry both named and titled",
+      "currentRoute": "Settings window > `.os-set-nav-item` rail",
+      "standardDestination": "at least ten rail entries, EXACTLY one carrying `aria-current=\"page\"`, and every single one carrying BOTH a visible label span and a non-empty `title` — the two are counted separately on purpose",
+      "liquidDestination": "the same rail on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`; the rail is navigation, which is what the plan nominates for Liquid, while the settings pane beside it stays a dense high-contrast anchor",
+      "keyboardRoute": "every entry is a `<button>` in the window's focus order and publishes its own current-page state",
+      "dataStateOwner": "renderer settings route state; the drive returns to Home and the spec's undo clicks the originally-current entry back by label",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.categoryRail; the mutation strips `aria-current` from the current entry",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD items=23 current=1 named=23 titled=23 || LIQUID items=23 current=1 named=23 titled=23 || CONTROL aria-current stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Live: `items=23 current=1 named=23 titled=23`. Both the span and the `title` are required because below 420px of `.os-set-body` the label is CLIPPED and `title` is the only text left — an entry with one but not the other is stranded in exactly one width tier, which counting either alone would never show."
+    },
+    {
+      "app": "settings",
+      "feature": "Navigate 23 destinations by group rather than as one flat list, with each group's list wired to its own label",
+      "currentRoute": "Settings window > `.os-set-nav-group` / `.os-set-nav-group-label` / `.os-set-nav-list`",
+      "standardDestination": "at least three groups, EVERY group carrying a non-empty label, exactly as many lists as groups, and every list's `aria-labelledby` RESOLVING to an element that exists in this window",
+      "liquidDestination": "the same grouping on the liquid material, with the labelledby wiring unchanged",
+      "keyboardRoute": "each list is an `aria-labelledby`-wired region, so a screen reader announces which group it entered rather than reading 23 unbroken buttons",
+      "dataStateOwner": "static rail structure from the settings registry; read-only for this row",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.groupedNavigation; the mutation strips `aria-labelledby` from a list",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD groups=5 labelled=5 lists=5 wired=5 || LIQUID groups=5 labelled=5 lists=5 wired=5 || CONTROL aria-labelledby stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Live: `groups=5 labelled=5 lists=5 wired=5`. `wired` is a RESOLUTION, not a presence check — an `aria-labelledby` pointing at an id that does not exist announces nothing and reads identically to a correct one in any attribute-counting probe."
+    },
+    {
+      "app": "settings",
+      "feature": "Find a setting by name, and dismiss the results panel again",
+      "currentRoute": "Settings window > `.os-set-search-input` and the panel it owns via `aria-controls`",
+      "standardDestination": "an enabled search input that owns a real panel by id and publishes a well-formed `aria-expanded`, AND a DISMISSAL that works: with a query typed and the panel open, Escape collapses it to `aria-expanded=\"false\"` with the panel unmounted",
+      "liquidDestination": "the same field and panel on the liquid material; the search panel is a temporary inspector, which is what the plan nominates for Liquid treatment",
+      "keyboardRoute": "the field is in the window's focus order, the panel is announced through `aria-controls`/`aria-expanded`, and Escape is the dismissal",
+      "dataStateOwner": "renderer search-field state; the drive types `theme`, clears back to empty, dismisses, and the spec's undo re-clears and re-dismisses if anything is left",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.settingsSearch, driven through steps `search` / `closeSearch` / `readSearchClosed`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || LIQUID input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || CONTROL aria-controls stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "STRENGTHENED THIS TURN, and the old bar is why. It asked only that `aria-expanded` be a well-formed boolean — which a widget stuck permanently open passes. It now scores the dismissal: driven, `expandedAfterEscape=false panelMounted=false`; undriven, the same row reads `dismissal=not driven` and correctly scores FALSE (6/7). The read had to move into its own bridge leg because React commits the collapse after the dispatching task, so the old same-expression read reported `\"true\"` on every run and would have had a worker filing drive residue that was not there."
+    },
+    {
+      "app": "settings",
+      "feature": "Show or hide the advanced settings destinations, with the toggle's claim matching what the rail is actually showing",
+      "currentRoute": "Settings window > `.os-set-advanced-btn`",
+      "standardDestination": "a titled toggle publishing a well-formed `aria-pressed`, AND agreement with the rail — pressed true means advanced entries are actually marked in the rail, pressed false means there are none",
+      "liquidDestination": "the same toggle on the liquid material, with the agreement unchanged",
+      "keyboardRoute": "a `<button>` in the window's focus order with a real pressed state and a `title`",
+      "dataStateOwner": "persisted advanced-mode preference; NOT touched by this drive — the row reads the agreement in whatever state it finds, it never flips the toggle",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.advancedDisclosure; the mutation strips the button's own `aria-pressed`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD pressed=true advancedItemsInRail=5 agrees=true || LIQUID pressed=true advancedItemsInRail=5 agrees=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Live: `pressed=true advancedItemsInRail=5 agrees=true`. The row is the AGREEMENT, not the button: a toggle reading true over a rail showing zero advanced entries is a control that claims an effect it does not have, and that is invisible to any check that reads only the attribute. This profile has advanced mode ON, so the `pressed=false / dots=0` branch is UNMEASURED here and must not be quoted as covered. The mutation deliberately targets `.os-set-advanced-btn` and not `.fwin-b-liquid`, so this row and `windowLifecycle` stay independent."
+    },
+    {
+      "app": "settings",
+      "feature": "Know which settings page you are on — the pane is the app's main landmark and names itself after the rail's current entry",
+      "currentRoute": "Settings window > `.os-set-pane-v2`",
+      "standardDestination": "`role=\"main\"`, a non-empty `data-settings-page`, and an `aria-label` that EQUALS the label of the rail entry currently marked `aria-current=\"page\"`",
+      "liquidDestination": "the same pane on the liquid material; the pane is dense settings work and stays a stable high-contrast anchor rather than becoming glass",
+      "keyboardRoute": "the pane is the `main` landmark, so it is reachable by landmark navigation and announces its own name on arrival",
+      "dataStateOwner": "renderer settings route state; the drive visits `Appearance` and returns to Home within its own step sequence",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.pageRegion; the mutation strips the pane's `aria-label`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD role=main page=home label=Home rail=Home || LIQUID role=main page=home label=Home rail=Home || CONTROL aria-label stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Live: `role=main page=home label=Home rail=Home`. Scored as an equality against the rail rather than `label.length > 0`, because a pane that keeps announcing the previous page after a rail click is exactly how a keyboard user loses track of where they are — and it passes every presence check. The mutation detaches the LABEL, not the pane: removing the pane would take `homeOverview` with it and the row would fall for the wrong reason."
+    },
+    {
+      "app": "settings",
+      "feature": "Use the Settings home page as real content — status chips that state a value, and quick cards that are working destinations",
+      "currentRoute": "Settings window > Home > `.os-set-status-chip` and `.os-set-quick-card`",
+      "standardDestination": "at least three status chips with EVERY chip publishing both a value and its caption, and at least four quick cards with EVERY card carrying text and none of them disabled",
+      "liquidDestination": "the same overview on the liquid material",
+      "keyboardRoute": "the quick cards are enabled controls in the window's focus order; the chips are read-only status",
+      "dataStateOwner": "derived app state (the chips read live app status); the drive navigates away and back but writes nothing",
+      "automatedProof": "probes/l6-parity.js SPECS.settings.homeOverview; the mutation detaches a chip's value",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD chips=5 valued=5 quickCards=10 live=10 || LIQUID chips=5 valued=5 quickCards=10 live=10 || CONTROL element detached: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Live: `chips=5 valued=5 quickCards=10 live=10`. `valued` and `live` are the row, not the counts: a splash screen renders five chips and ten cards too. A chip with a caption and no value, or a card rendered `disabled`, is the honest-states failure this catches, and the mutation removes exactly one chip's `strong` to prove the predicate can see it."
+    },
+    {
+      "app": "settings",
+      "feature": "Enter and leave Liquid from the window's own chrome, without losing geometry or state",
+      "currentRoute": "Settings `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+      "standardDestination": "a conventional `.fwin` with its full chrome cluster and the Liquid control reading `aria-pressed=false`",
+      "liquidDestination": "`.fwin-liquid`, `data-presentation=\"liquid\"`, the same control reading `aria-pressed=true`, and the same 960x680 box",
+      "keyboardRoute": "the chrome buttons are in the window's focus order",
+      "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
+      "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app settings round trip",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "status": "both",
+      "_note": "Round trip standard -> liquid -> standard: `dirtiedField=\"os-set-search-input\"`, fieldsHeld true, shellHeld true, 0 diffs, 960x680 in both. This is one of the few surfaces in the ledger where the round trip had a REAL editable field to dirty, so `fieldsHeld` here is a measurement rather than a vacuous true."
     }
   ],
   "notWritten": {
@@ -1969,22 +2067,21 @@
       "specs with NO rows in this tree, re-derived live 2026-09-02 rather than asserted: notebook, calendar, games, immersion, novels, manga, vn, city, scraper, resources, settings, shell, blancShell (13 of 25; it was 19 before this turn)"
     ],
     "derived": {
-      "at": "2026-09-02 (backup), L12 b2",
+      "at": "2026-09-02 (backup), L12 b2, after settings",
       "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
       "harnessSpecs": 25,
-      "specsWithRows": 17,
-      "specsWithNoRows": 8,
+      "specsWithRows": 18,
+      "specsWithNoRows": 7,
       "noRows": [
         "notebook",
         "vn",
         "city",
         "scraper",
         "resources",
-        "settings",
         "shell",
         "blancShell"
       ],
-      "note": "Re-derived after games landed: window.__LQP.apps() = 25 specs against 18 distinct app keys in rows[]. city, scraper, resources, shell and blancShell are written in the concurrent worker tree and arrive here by merge, so this figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (18) exceeds specs with rows (17). vn is the one spec left with a live window and NO subject: its library is empty on this profile, and adding one would write to the user real library, which that spec own safety note forbids."
+      "note": "Re-derived after games and settings landed: window.__LQP.apps() = 25 specs against 19 distinct app keys in rows[]. FIVE of the seven remaining (city, scraper, resources, shell, blancShell) are written in the concurrent worker tree and arrive here by merge. notebook subject was DELETED by the files-app track on this branch (LEGACY_WIN_SECTION_ALIASES maps notebook -> files), so it has no surface to drive. vn has a live window and NO subject: its library is empty on this profile and adding one would write to the user real library, which that spec own safety note forbids. THAT IS THE WHOLE REMAINDER FOR THIS TREE - no spec left here is both drivable and unwritten. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (19) exceeds specs with rows (18)."
     }
   }
 }

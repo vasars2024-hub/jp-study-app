@@ -4462,15 +4462,20 @@
         {
           // Settings search is the second route in, and the one the command palette uses.
           // Collapsed at rest is part of the contract: an `aria-expanded` that never says
-          // false is the dishonest-state shape.
+          // false is the dishonest-state shape. So the row scores the DISMISSAL, not the
+          // attribute's spelling — the drive opens the panel with a real query and Escape has
+          // to take it back down, panel unmounted, read in its own leg. `expanded` being a
+          // well-formed boolean was the old bar and a widget stuck open passes it.
           id: 'settingsSearch',
           f: (w) => {
+            const g = settingsState();
             const input = q(w, '.os-set-search-input');
             const controls = input && input.getAttribute('aria-controls');
             const expanded = input && input.getAttribute('aria-expanded');
             return {
-              ok: !!input && !input.disabled && !!controls && /^(true|false)$/.test(String(expanded)),
-              ev: `input=${!!input} controls=${controls || 'absent'} expanded=${expanded}`,
+              ok: !!input && !input.disabled && !!controls && /^(true|false)$/.test(String(expanded))
+                && g.collapsedAfterEscape === true,
+              ev: `input=${!!input} controls=${controls || 'absent'} expanded=${expanded} dismissal=${g.searchEv || 'not driven'}`,
             };
           },
         },
@@ -4568,12 +4573,35 @@
         // `focusout`, so a synthetic blur commits nothing and the panel stays open with an
         // EMPTY query. That is not a product state — it is drive residue, and it cost a
         // category-5 run: Q4 counts `[aria-expanded="false"]` as the surface's one collapsed
-        // disclosure, so a left-open panel scored a real 10 as a 9. Escape is synchronous.
+        // disclosure, so a left-open panel scored a real 10 as a 9.
+        //
+        // THE ESCAPE HANDLER IS SYNCHRONOUS; THE ATTRIBUTE IS NOT. This step used to return
+        // `aria-expanded` read in the same expression as the dispatch, and it therefore
+        // reported `"true"` on every run — the pre-render value, because React commits the
+        // state change after the dispatching task. Measured 2026-09-02: the receipt said
+        // `expanded:"true"` while the live surface, read one call later, was
+        // `expanded:"false" panelMounted:false`. A worker reading that receipt would file
+        // drive residue that is not there, which is exactly the false finding the comment
+        // above exists to prevent. So the dispatch and the read are now two legs, the way
+        // `blancShell` already splits `closeSearch` / `readSearchClosed`.
         closeSearch: (w) => {
           const el = q(w, '.os-set-search-input');
           if (!el) return { refused: 'no settings search field' };
           el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
-          return { expanded: el.getAttribute('aria-expanded') };
+          return { sent: 'Escape' };
+        },
+        readSearchClosed: (w) => {
+          const g = settingsState();
+          const el = q(w, '.os-set-search-input');
+          if (!el) return { refused: 'no settings search field' };
+          const panelId = el.getAttribute('aria-controls');
+          const panel = panelId ? q(w, `#${panelId}`) || document.getElementById(panelId) : null;
+          g.collapsedAfterEscape = el.getAttribute('aria-expanded') === 'false' && !panel;
+          g.searchEv = `expandedAfterEscape=${el.getAttribute('aria-expanded')} panelMounted=${!!panel}`;
+          if (!g.collapsedAfterEscape) {
+            return { refused: `Escape left the search panel open — ${g.searchEv}` };
+          }
+          return { collapsedAfterEscape: true, ev: g.searchEv };
         },
         // The drive ends with the search box EMPTY on purpose, so the pane's scroll offset is
         // the only user-entered state left for a bad presentation toggle to lose.
@@ -4595,6 +4623,7 @@
         ['search', 'theme'],
         ['search', ''],
         'closeSearch',
+        'readSearchClosed',
         ['scroll', '120'],
       ],
       undo: {

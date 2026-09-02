@@ -998,3 +998,75 @@ concurrent worker's and arrive by merge; `vn` has no subject on this profile; `n
 subject was deleted by the files-app track. So the genuinely-open set for this tree is
 **settings** alone. Ledger: **134 → 144 rows / 17 → 18 apps**, 144 `both`, 0 `pending`,
 0 duplicate `app|feature` keys.
+
+### settings — 7 rows, and a row that was passing on the spelling of an attribute
+
+`cat6-feature-parity.cjs --app settings` returned **PASS 7/7** in both presentations,
+`na=0`, `rowsAgree=true`, round trip `standard → liquid → standard` with
+`dirtiedField="os-set-search-input"`, `fieldsHeld=true`, `shellHeld=true`, **0 diffs**, box
+**960x680** in both, **0 drive refusals**. All **7** declared mutations fell exactly their own
+row (7/7 → 6/7) and restored. Receipts: `debug/_pb2-settings.json` (before the instrument fix),
+`debug/_pb2-settings2.json` (after). This is one of the very few surfaces in the ledger where
+the round trip had a REAL editable field to dirty, so `fieldsHeld` here is a measurement and
+not a vacuous true.
+
+**THE INSTRUMENT DEFECT, and it was two defects wearing one coat.** The spec's `closeSearch`
+step read `aria-expanded` in the SAME expression that dispatched Escape, and its comment said
+in as many words "Escape is synchronous". The handler is; the attribute is not — React commits
+the collapse after the dispatching task, so the leg reported `expanded:"true"` on **every run
+it has ever made**. Read one bridge call later the live surface was `expanded:"false"
+panelMounted:false`. A worker reading that receipt would have filed drive residue in the
+settings search panel, which is *precisely* the false finding that comment exists to prevent —
+it cost a category-5 run once already, when a left-open panel scored a real 10 as a 9.
+
+Underneath it was the larger one: **`settingsSearch` asked only that `aria-expanded` be a
+well-formed boolean**, which a widget stuck permanently open passes. The row now scores the
+DISMISSAL. `closeSearch` returns `{sent:'Escape'}` and a new `readSearchClosed` leg reads the
+result in its own POST and REFUSES if the panel is still up — the idiom `blancShell` already
+uses for `closeSearch` / `readSearchClosed`, so this is the existing pattern applied, not a new
+one invented.
+
+The strengthened row discriminates, measured both ways on the live window:
+
+- driven — `dismissal=expandedAfterEscape=false panelMounted=false`, **7/7**
+- undriven — `dismissal=not driven`, row **false**, **6/7**
+
+Before the change the undriven read scored this row TRUE. That is the whole difference between
+a row that says a search box exists and a row that says a search box can be dismissed.
+
+What the other rows ask that presence scoring would have accepted:
+
+- `categoryRail` counts the visible label span AND the `title` separately (`items=23 current=1
+  named=23 titled=23`), because below 420px of `.os-set-body` the label is clipped and `title`
+  is the only text left — an entry with one but not the other is stranded in exactly one width
+  tier, and counting either alone would never show it.
+- `groupedNavigation` RESOLVES each list's `aria-labelledby` against the document
+  (`groups=5 labelled=5 lists=5 wired=5`). A labelledby pointing at an id that does not exist
+  announces nothing and is indistinguishable from a correct one in any attribute count.
+- `pageRegion` is an equality against the rail (`role=main page=home label=Home rail=Home`),
+  not `label.length > 0`. A pane still announcing the previous page after a rail click is how a
+  keyboard user loses their place, and it passes every presence check.
+- `advancedDisclosure` is the AGREEMENT (`pressed=true advancedItemsInRail=5 agrees=true`), not
+  the button. A toggle reading true over a rail with zero advanced entries claims an effect it
+  does not have. **This profile has advanced mode ON, so the `pressed=false / dots=0` branch is
+  UNMEASURED** and must not be quoted as covered. The drive never flips the toggle — it is a
+  persisted preference and the row reads whatever state it finds.
+- `homeOverview` scores `valued=5/5` and `live=10/10`, not the raw counts: a splash screen
+  renders five chips and ten cards too.
+
+Nothing persisted was changed: the drive visits `Appearance` and returns, types and clears the
+search box, dismisses the panel and scrolls the pane; `restore` returned `settings:scroll` and
+the window was left on Home in `standard`.
+
+### The gap after this slice — and this tree has no drivable spec left
+
+`window.__LQP.apps()` = **25** specs against **19** distinct `app` keys in `rows[]` →
+**7 of 25 specs have no row in this tree**: notebook, vn, city, scraper, resources, shell,
+blancShell. Five (`city`, `scraper`, `resources`, `shell`, `blancShell`) are the concurrent
+worker's and arrive by merge. `notebook`'s subject was **deleted by the files-app track on this
+branch** — `LEGACY_WIN_SECTION_ALIASES` maps `notebook → files`. `vn` has a live window and no
+subject: an empty library, and adding one writes to the user's real library, which that spec's
+own safety note forbids.
+
+**So the remainder is not work this tree can do.** Ledger: **144 → 151 rows / 18 → 19 apps**,
+151 `both`, 0 `pending`, 0 duplicate `app|feature` keys.
