@@ -177,3 +177,67 @@ sections. Positive: **79/79** across `liquidWindowPresentation` (33), `liquidWin
 does NOT restore it — the live renderer writes its in-memory windows back over the commit. Close the
 probe windows through their real `.fwin-close` controls and let the renderer persist; only that came
 back identical.
+
+## 2026-09-01 — L3.2 host FOUR: the Media workspace overlay (`f2619b91`)
+
+Three hosts became four. `.fwin` (desktop window) · `.popout-root` (`?popout=<section>`) ·
+`.reader` (full-screen reader) · **`.seanime-host` (the Media workspace overlay)**. The fourth was
+found the way the third was: not by looking for surfaces without a toggle, but because
+`parity-ledger.json` had **six rows stuck on one recorded blocker** — no window chrome, no
+`Make Liquid` control, no `data-presentation`, so per-window presentation state could not reach it
+at all. Six of fifty rows, one cause.
+
+**Decision 1, and it has a second reason the reader's does not.** The overlay adopts the INTERIOR
+and never the frame. The reader's reason applies — it fills the OS window edge to edge, so a
+`backdrop-filter` would sample the desktop compositor and paint nothing, the inert glass rule 2
+forbids on `.fwin-bar`. The extra one is in `styles.css`'s own comment on `.seanime-host`: it is
+opaque **on purpose**, so that everything numbered below it is HIDDEN rather than merely behind.
+A translucent root would not read as material; it would put the desktop grid back on screen
+underneath an `aria-modal` dialog. So the root keeps its opaque stage, the bar takes
+`ContextualSurface as="header"` (no extra DOM node, landmark preserved), and the body — player,
+readiness table, mined review list — stays dense work on its anchor.
+
+**Live, through the product's own controls, `data-presentation` standard → liquid → standard:**
+
+| | conventional | liquid |
+| --- | --- | --- |
+| overlay class | `seanime-host` | `seanime-host workspace-liquid` |
+| root background | `rgb(13, 12, 18)` | `rgb(13, 12, 18)` — unchanged, decision 1 |
+| root `backdrop-filter` | `none` | `none` — unchanged, decision 1 |
+| bar background | `rgba(0, 0, 0, 0)` | `color(srgb 0.101961 0.0941176 0.137255 / 0.72)` |
+| bar border colour | `rgb(45, 43, 55)` | `color(srgb 0.960784 0.956863 0.968627 / 0.14)` |
+| bar border width | `0px 0px 1px` | `0px 0px 1px` — the flush-strip exception |
+| bar radius / shadow | `0px` / `none` | `0px` / `none` — same exception |
+| bar padding | `6px 10px` | `4px 8px` |
+| bar height | 51px | 47px |
+| toggle `aria-pressed` | `false` | `true` |
+| toggle label | `Make Liquid` | `Return to standard window` |
+| toggle fill | `rgba(0, 0, 0, 0)` | `color(srgb 1 0.180392 0.301961 / 0.16)` + inset ring at 0.4 |
+| `lq.workspace.presentation` | absent | `{v:1,mode:liquid,standardRect:{x:0,y:0,w:1264,h:821}}` |
+
+**ROUND TRIP: byte-identical over all 18 measured properties by `-ceq`, storage included.** The key
+is REMOVED on return, not written as `{mode:'standard'}`, so never-toggled and toggled-back are
+indistinguishable. `standardRect` is a real 1264x821 and not the clamped `1x1` that `parseRect`
+would have accepted.
+
+**RESTART PERSISTENCE, measured in the same run:** entered Liquid, `/reload`ed the renderer, polled
+for `.os-taskbar`, reopened the overlay — it came back `seanime-host workspace-liquid`, same tint,
+same `4px 8px`, `aria-pressed` still `true`, blob byte-identical. Then returned to standard and
+confirmed `'lq.workspace.presentation' in localStorage === false`. **Nothing persisted from this
+run.**
+
+**Parity drive in Liquid (row 8):** Library → Readiness hid the library pane (computed `display`
+block → none, `hidden` set, box **1264x774 → 0x0**) with `#media-workspace` **and**
+`.study-player-slice` still MOUNTED; Readiness → Library restored **1264x774 exactly**. Same
+reversibility as the standard half.
+
+**THREE MUTATION CONTROLS, each naming exactly the right case, both files restored byte-identical:**
+drop the workspace from every `:is()` → 2 failed (interior paint + flush-strip exception); revert
+the bar to a bare `<header>` → 1 (primitive/landmark); drop the opt-in class join → 1
+(`data-presentation`).
+
+**A NUMBER AGAINST THIS WORK:** rows 7, 9, 10, 11 and 12 are **not** claimed.
+`window.api.seanimeStudyLibrary()` returned `{ok:true, files:[]}` — the media server has scanned
+**0 files** here, against the **77** the standard halves were driven on in 2026-08-17. The
+readiness pane states it honestly itself. A row measured only on an empty harness is capped, not
+skipped. **Re-drive those five on a scanned library; that is all that is left of them.**
