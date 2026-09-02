@@ -17,6 +17,7 @@
  *   node src/.coordination/liquid-workplace/probes/l12-visual-matrix.cjs \
  *     [--apps all|a,b,c] [--themes all|+hidden|a,b] [--presentations standard,liquid] \
  *     [--states normal,maximized] [--out file] [--control] [--keep] [--atlas] [--no-freeze]
+ *     [--address section|title]
  *
  * ---------------------------------------------------------------------------------
  * THE TRAP THIS HARNESS EXISTS TO NOT FALL INTO, and it has burned this repo twice.
@@ -412,21 +413,62 @@ async function applyTheme(id) {
  * search finds nested windows' toggles and drives the wrong surface.
  */
 /**
- * A `.fwin` carries NO `data-section` — measured, not assumed: its only attributes are
- * `class`, `data-presentation` and an inline `style`. So a window is addressed by its
- * TITLE, exactly as cat3 does, and the section -> title map is DERIVED LIVE by diffing
- * the open title set across the `os:open` rather than restated as a table here (a table
- * would be the hardcoded surface list this harness exists to avoid, and it would rot the
- * first time a window is renamed or localised).
+ * A WINDOW IS ADDRESSED BY ITS SECTION, AND ADDRESSING IT BY TITLE FABRICATED TWO OF THE
+ * TWENTY-FIVE APP ROWS IN EVERY RUN THIS HARNESS HAS EVER MADE.
+ *
+ * The docstring this replaces said "a `.fwin` carries NO `data-section` — measured, not
+ * assumed", and it was true when written, so the window was resolved by the text in its
+ * title bar. What was never checked is whether a title IS an identity here. It is not:
+ * `DesktopShell.tsx` renders an EMPTY title for `visualizer`, `musicwidget` and the
+ * frameless `city`. `Array.prototype.find` over an empty-string key returns whichever of
+ * the three comes first in the DOM, so all three resolved to ONE window — every read,
+ * every toggle, every crop.
+ *
+ * MEASURED IN THE BANKED EVIDENCE, before a line of this was changed:
+ *   - `baselines/l12-matrix-maximized.json` — the three apps share ONE sha256 per theme
+ *     (`8b409b38…` at oled-black, `e4975e0f…` at paper). Three apps, one image.
+ *   - `baselines/l12-matrix-normal.json` — all three carry the visualizer's own
+ *     `380x200` rect, although `musicwidget` opens at 430x190 and `city` at 680x800
+ *     (`DesktopShell.tsx` line ~1707). 6 of 13 themes give byte-identical triples; the
+ *     other 7 differ only because the visualizer animates between shots.
+ *   - `city` cannot be maximized at all (`isMaximized` excludes the frameless garden)
+ *     yet was recorded `maximized` at 1264x765.
+ * So the atlas's "100% app-universe" was 23 of 25, and its published product fact —
+ * "3 of 25 surfaces offer no Liquid presentation" — is wrong about `musicwidget`, whose
+ * `canPresentLiquid` is TRUE and whose bar renders the toggle. Only `city` and
+ * `visualizer` genuinely refuse.
+ *
+ * The fix is in the PRODUCT, not here: `.fwin` now carries `data-section`, which is
+ * already this repo's idiom (`media/StudyBlocks.tsx:54`). That keeps the harness free of
+ * the hardcoded surface table the old docstring rightly refused, while giving it a key
+ * that cannot collide, cannot be localised and cannot be renamed by a product string.
+ *
+ * `--address title` restores the old behaviour and is this fix's FALSIFIER: the same run
+ * under it reproduces the collapse, and under `section` it does not. Ambiguity is now a
+ * REFUSAL rather than a silent first-match — `count` rides in every read, and any resolve
+ * that does not see exactly one window reports itself instead of guessing.
  */
+const ADDRESS = arg('address', 'section');
+if (ADDRESS !== 'section' && ADDRESS !== 'title') {
+  console.error(`REFUSE - --address must be 'section' or 'title', got ${JSON.stringify(ADDRESS)}`);
+  process.exit(2);
+}
 const TITLES = "JSON.stringify([...document.querySelectorAll('.fwin')]"
   + ".map(w => (w.querySelector('.fwin-title-text')||{}).textContent || ''))";
-const winExpr = (title) => `[...document.querySelectorAll('.fwin')]`
-  + `.find(w => ((w.querySelector('.fwin-title-text')||{}).textContent||'') === ${JSON.stringify(title)})`;
+/** Every `.fwin` as `{section,title}`, so a collision can be COUNTED rather than argued. */
+const WINDOW_KEYS = "JSON.stringify([...document.querySelectorAll('.fwin')].map(w => ({"
+  + " section: w.getAttribute('data-section'),"
+  + " title: (w.querySelector('.fwin-title-text')||{}).textContent || '' })))";
+const matchExpr = (key) => (ADDRESS === 'title'
+  ? `((w.querySelector('.fwin-title-text')||{}).textContent||'') === ${JSON.stringify(key)}`
+  : `w.getAttribute('data-section') === ${JSON.stringify(key)}`);
+const winsExpr = (key) => `[...document.querySelectorAll('.fwin')].filter(w => ${matchExpr(key)})`;
+const winExpr = (key) => `${winsExpr(key)}[0]`;
 
 async function readPresentation(section) {
-  return J(`JSON.stringify((()=>{var w=${winExpr(section)};`
-    + `if(!w) return {present:false};`
+  return J(`JSON.stringify((()=>{var ws=${winsExpr(section)};var w=ws[0];`
+    + `if(!w) return {present:false, count:0};`
+    + `if(ws.length>1) return {present:false, count:ws.length, ambiguous:true};`
     + `var own=[...w.querySelectorAll('.fwin-b-liquid')].filter(b=>b.closest('.fwin')===w);`
     + `return {present:true, attr:w.getAttribute('data-presentation'),`
     + ` liquid:w.classList.contains('fwin-liquid')||w.getAttribute('data-presentation')==='liquid',`
@@ -436,6 +478,7 @@ async function readPresentation(section) {
 
 async function setPresentation(section, want) {
   const cur = await readPresentation(section);
+  if (cur.ambiguous) return { ok: false, reason: `${cur.count} windows answer to this key — refusing to guess`, ...cur };
   if (!cur.present) return { ok: false, reason: 'no window' };
   const isLiquid = cur.liquid;
   if ((want === 'liquid') === isLiquid) return { ok: true, changed: false, ...cur };
@@ -463,7 +506,9 @@ async function setPresentation(section, want) {
  * report `supported:false` rather than being scored as a failure.
  */
 async function readState(title) {
-  return J(`JSON.stringify((()=>{var w=${winExpr(title)};if(!w) return {present:false};`
+  return J(`JSON.stringify((()=>{var ws=${winsExpr(title)};var w=ws[0];`
+    + `if(!w) return {present:false, count:0};`
+    + `if(ws.length>1) return {present:false, count:ws.length, ambiguous:true};`
     + `var close=w.querySelector('.fwin-close');`
     + `var glyph=[...w.querySelectorAll('.fwin-b')].filter(b=>b.closest('.fwin')===w&&(b.textContent||'').trim()==='\\u25A2');`
     + `var sib=close&&close.previousElementSibling;`
@@ -474,6 +519,7 @@ async function readState(title) {
 
 async function setState(title, want) {
   const cur = await readState(title);
+  if (cur.ambiguous) return { ok: false, reason: `${cur.count} windows answer to this key — refusing to guess`, ...cur };
   if (!cur.present) return { ok: false, reason: 'no window' };
   if (want === 'normal' && !cur.maximized) return { ok: true, changed: false, ...cur };
   if (want === 'maximized' && cur.maximized) return { ok: true, changed: false, ...cur };
@@ -491,12 +537,47 @@ async function setState(title, want) {
 }
 
 /**
- * Open a section and return the TITLE of the window that appeared. `os:open` on an
- * already-open window RAISES it and does not remount (banked trap), so a section whose
- * window is already up yields no new title — that is reported as `alreadyOpen` rather
- * than silently mapped to whatever window happened to be last in the list.
+ * Open a section and return the KEY the rest of the run addresses it by.
+ *
+ * Under `--address section` that key is the section itself, and the wait condition is the
+ * thing actually wanted — exactly one `.fwin[data-section=…]` on the desk — rather than a
+ * multiset diff of titles. The diff is what let the empty-title collision through: three
+ * sections each produced one fresh `''`, the diff was satisfied, and the resolve that
+ * followed picked the first `''` in the DOM. It also could not tell "opened" from
+ * "already open", because `os:open` RAISES an existing window and mints no new title.
+ *
+ * Under `--address title` (the falsifier) the old diff is kept verbatim, so the defect is
+ * reproducible on demand instead of only in the archive.
  */
 async function openSection(section) {
+  if (ADDRESS === 'section') {
+    const before = await J(WINDOW_KEYS);
+    const already = before.filter((w) => w.section === section).length;
+    await ev(`(window.dispatchEvent(new CustomEvent('os:open', { detail: ${JSON.stringify(section)} })), 'opened')`);
+    for (let i = 0; i < 24; i += 1) {
+      await sleep(250);
+      const p = await readPresentation(section);
+      if (p.ambiguous) {
+        return { present: false, reason: `${p.count} windows carry data-section="${section}" — refusing to guess`, count: p.count };
+      }
+      if (p.present) {
+        const keys = await J(WINDOW_KEYS);
+        const mine = keys.find((w) => w.section === section);
+        return { present: true, title: section, label: mine ? mine.title : '', alreadyOpen: already > 0, ...p };
+      }
+    }
+    // Two very different things end up here and must not share one sentence: the product
+    // declining to open a windowed surface, and a BUILD WITHOUT `data-section`, where
+    // every resolve would fail identically and the run would report 25 dead apps.
+    const keys = await J(WINDOW_KEYS);
+    if (keys.length && keys.every((w) => w.section == null)) {
+      console.error(`REFUSE - ${keys.length} .fwin on the desk and NONE carries data-section;`
+        + ' this build predates the attribute. Re-run with --address title, knowing it'
+        + ' collapses every empty-title section onto one window.');
+      process.exit(2);
+    }
+    return { present: false, reason: 'no new .fwin appeared' };
+  }
   const before = await J(TITLES);
   await ev(`(window.dispatchEvent(new CustomEvent('os:open', { detail: ${JSON.stringify(section)} })), 'opened')`);
   for (let i = 0; i < 24; i += 1) {
@@ -719,6 +800,14 @@ ${rows}`;
     runId: RUN_ID,
     shotDir: path.relative(REPO, SHOT_DIR).replace(/\\/g, '/'),
     bridge: { pid: cfg.pid, port: cfg.port },
+    // HOW A WINDOW WAS ADDRESSED, and the collision census that goes with it. Banked in
+    // every manifest because the archive could not answer this question about itself:
+    // three runs' worth of app rows were fabricated by title collisions and nothing in
+    // the artifact said which key had been used, so the defect was invisible until the
+    // rects were compared by hand. `titleCollisions` is measured on the live desk after
+    // every requested app is open, and a run under `--address title` is expected to be
+    // NON-zero here — that is the falsifier, not a warning to silence.
+    addressing: { mode: ADDRESS, titleCollisions: null, sectionCollisions: null },
     dimensions: {
       apps: requested, themes, presentations, states,
       themeCatalog: allThemes.map((t) => ({ id: t.id, light: t.light })),
@@ -753,6 +842,27 @@ ${rows}`;
           : null,
     };
     if (p.present) { live.push(app); titleOf[app] = p.title; }
+  }
+  // The census, on the desk this run actually built. A group is a set of open windows
+  // that share a key; a collision is every member past the first, i.e. exactly the number
+  // of app rows a first-match resolve would have fabricated.
+  {
+    const keys = await J(WINDOW_KEYS);
+    const census = (pick) => {
+      const seen = new Map();
+      for (const w of keys) {
+        const k = pick(w);
+        seen.set(k, (seen.get(k) || 0) + 1);
+      }
+      const groups = [...seen.entries()].filter(([, n]) => n > 1);
+      return {
+        collisions: groups.reduce((n, [, c]) => n + c - 1, 0),
+        groups: groups.map(([k, n]) => ({ key: k === '' ? '(empty)' : k, windows: n })),
+      };
+    };
+    manifest.addressing.titleCollisions = census((w) => w.title);
+    manifest.addressing.sectionCollisions = census((w) => w.section);
+    manifest.addressing.sectionAttrMissing = keys.filter((w) => w.section == null).length;
   }
   if (!live.length) {
     console.error('REFUSE - none of the requested apps opened a window'); process.exit(2);

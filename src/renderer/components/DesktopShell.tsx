@@ -3680,6 +3680,22 @@ const FloatingWindow = memo(function FloatingWindow({
   const isMusicWidget = win.section === 'musicwidget';
   const isGarden = win.section === 'city';
   const isMaximized = Boolean(win.max) && !isGarden;
+  // The `.fwin` root also carries `data-section`, so a window can be addressed
+  // by WHAT IT IS rather than by the localised text in its title bar. Three
+  // sections render an EMPTY title — `visualizer`, `musicwidget` and the
+  // frameless `city` (see `title` below) — so title is not an identity at all,
+  // and every instrument that resolved a window by title silently collapsed all
+  // three onto whichever came first in the DOM. Measured, not reasoned about:
+  // in `liquid-workplace/baselines/l12-matrix-maximized.json` the three apps
+  // share ONE sha256 per theme (`8b409b38…` at oled-black, `e4975e0f…` at
+  // paper), and in the 650-cell normal run all three carry the visualizer's own
+  // 380x200 rect although musicwidget opens at 430x190 and city at 680x800.
+  // `city` cannot even be maximized (`isMaximized` above excludes it) yet was
+  // recorded maximized. It also published a false product fact: the L12 atlas
+  // reported "3 of 25 surfaces offer no Liquid presentation", but
+  // `canPresentLiquid('musicwidget')` is TRUE and the bar below renders its
+  // toggle — only `city` and `visualizer` genuinely refuse.
+  // `data-section` is already the idiom here (`media/StudyBlocks.tsx:54`).
   // Liquid presentation is opt-in per window and reversible. The frameless
   // garden and visualizer have no conventional chrome to swap, so they do not
   // offer it. Note keeps conventional paper as its default and uses Liquid only
@@ -3841,6 +3857,7 @@ const FloatingWindow = memo(function FloatingWindow({
     <section
       ref={winRef}
       className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isGarden ? 'fwin-frameless' : ''} ${isMaximized ? 'fwin-max' : ''} ${liquid ? 'fwin-liquid' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
+      data-section={win.section}
       data-presentation={liquid ? 'liquid' : 'standard'}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
