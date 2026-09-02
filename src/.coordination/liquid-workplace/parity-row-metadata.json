@@ -493,6 +493,60 @@
           "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\""
         }
       }
+    },
+    "mediaCenter": {
+      "standardDestination": "the named page replaces `.mc-content` in-window",
+      "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
+      "features": {
+        "navRail": {
+          "feature": "Section rail: Home / Library / Video / Music / Study Mode / Readiness / Review / Discover",
+          "currentRoute": "Media Center window > `.mc-nav`: Home / Library / Video / Music / Study Mode always visible; Readiness / Review / Discover behind `details.mc-nav-group` (collapsed by default, forced open while one of them is the active tab), plus `Ctrl+1..8` on `.mc-root` regardless of the disclosure",
+          "keyboardRoute": "all eight are real buttons, focusable",
+          "dataStateOwner": "view state, local to MediaCenterView"
+        },
+        "libraryShelves": {
+          "feature": "Library shelves: Home / Recently added / Continue watching / Study queue / Favorites / Tracking / media type",
+          "currentRoute": "Media Center > Library > `.ui-sidebar__item` rail",
+          "keyboardRoute": "nine real buttons carrying `aria-current`",
+          "dataStateOwner": "MediaLibraryShell scope, persisted under its own key"
+        },
+        "librarySearch": {
+          "feature": "Library search narrows the grid",
+          "currentRoute": "Media Center > top bar > `.mc-global-search input`",
+          "keyboardRoute": "a real `type=search` input, focusable",
+          "dataStateOwner": "MediaState.query -> debouncedQuery -> searchMediaHub"
+        },
+        "sortAndViewMode": {
+          "feature": "Sort and view mode (grid / list)",
+          "currentRoute": "Media Center > Library > `.medialib-browser__tools > details.medialib-view` — one disclosure holding the sort `<select>` and the grid/list group; the active sort is printed on the closed summary",
+          "keyboardRoute": "a real `<select>` plus two `aria-pressed` buttons",
+          "dataStateOwner": "per-category sort state; view persisted"
+        },
+        "perItemActions": {
+          "feature": "Per-item actions (card `More actions` menu)",
+          "currentRoute": "Media Center > Library > `.medialib-card__more`",
+          "keyboardRoute": "a real button; the menu takes Escape and arrow keys",
+          "dataStateOwner": "MediaLibraryShell cardMenu state"
+        },
+        "historyHonest": {
+          "feature": "History: Back / Forward across Media Center pages",
+          "currentRoute": "Media Center > top bar > `.mc-history-buttons`",
+          "keyboardRoute": "two real buttons with a real `disabled`",
+          "dataStateOwner": "MediaCenterView history trail"
+        },
+        "workspaceLauncher": {
+          "feature": "Route out to the Media workspace and back",
+          "currentRoute": "Media Center > `.mc-nav > details.mc-nav-group > .mc-seanime-link`, then the host bar's `Close`",
+          "keyboardRoute": "both are real buttons",
+          "dataStateOwner": "openMediaWorkspace / mediaWorkspaceHostExists"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close, Make Liquid",
+          "currentRoute": "Media Center window > `.fwin-b` chrome",
+          "keyboardRoute": "five real buttons; the Liquid toggle carries `aria-pressed`",
+          "dataStateOwner": "DesktopShell window state"
+        }
+      }
     }
   }
 }

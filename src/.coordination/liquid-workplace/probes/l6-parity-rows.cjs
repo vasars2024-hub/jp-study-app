@@ -71,6 +71,31 @@ const many = (name) => args.reduce((a, v, i) => (v === `--${name}` && args[i + 1
 const DRY = has('dry');
 const SELF_CONTROL = has('self-control');
 const MILESTONE = arg('milestone', '');
+/*
+ * `--refresh` — RE-PROVE a row that is already in the ledger. Added 2026-09-02 (primary2).
+ *
+ * The gap it closes, measured rather than supposed: this writer is APPEND-ONLY (it filters
+ * `add` by `!have.has(app|feature)`), so a row written by an instrument that no longer
+ * exists can never be upgraded. `mediaCenter`'s 8 rows are exactly that — driven 2026-08-25
+ * by `window.__L6M`, which `cat6-feature-parity.cjs` superseded, and so 8 of the ledger's
+ * silent rows by construction rather than by anyone's neglect. Without this they stay silent
+ * forever no matter how well the surface is re-driven.
+ *
+ * It APPENDS, it never overwrites: the original observation and its provenance stay in
+ * `observed`, and the re-drive is added after a ` || RE-DRIVEN ` marker naming the run. A
+ * ledger that quietly replaced an older reading with a newer one would be unfalsifiable
+ * about its own history.
+ *
+ * Refusals, each preventing a specific false row:
+ *   - a row whose key is NOT already present is not a refresh; it goes through the normal
+ *     add path, and asking to refresh it REFUSES rather than silently adding.
+ *   - a row whose mutation did not arm is SKIPPED by name, exactly as on the add path: an
+ *     unarmed control proves nothing whether the row is new or old.
+ *   - a row that already carries a re-drive from this same run artifact is left alone, so
+ *     running it twice cannot stack duplicate clauses.
+ *   - the run must still be PASS with `control.mutations` present, the same bar as an add.
+ */
+const REFRESH = has('refresh');
 
 const PROOF = 'probes/cat6-feature-parity.cjs --app <app> (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run\'s `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed';
 
@@ -222,9 +247,42 @@ const fresh = [];
 const refusals = [];
 const summary = [];
 
+const byKey = new Map(ledger.rows.map((r) => [`${r.app}|${r.feature}`, r]));
+const refreshed = [];
+
 for (const { name, run } of runs) {
   const r = rowsFromRun(run, meta, name);
   if (r.refused) { refusals.push(r.refused); continue; }
+  if (REFRESH) {
+    // The marker is keyed on the RUN ARTIFACT'S OWN NAME, so re-running this command with
+    // the same receipt is a no-op and re-running it with a genuinely newer one appends.
+    const marker = `RE-DRIVEN from ${name}`;
+    const missing = r.rows.filter((row) => !byKey.has(`${row.app}|${row.feature}`));
+    if (missing.length) {
+      refusals.push(`${name}: --refresh asked for ${missing.length} row(s) that are NOT in the ledger (${missing.map((x) => x.feature).join(' / ')}) — that is an ADD, run without --refresh`);
+      continue;
+    }
+    const touched = [];
+    const already = [];
+    for (const row of r.rows) {
+      const live = byKey.get(`${row.app}|${row.feature}`);
+      if (String(live.observed).includes(marker)) { already.push(row.feature); continue; }
+      live.observed = `${live.observed} || ${marker} (${new Date().toISOString().slice(0, 10)}): ${row.observed}`;
+      // Status is re-derived from the fresh run, because that is the reading that is
+      // re-runnable. A refresh that kept a stale `pending` would be the whole point missed.
+      live.status = row.status;
+      live.automatedProof = row.automatedProof;
+      touched.push(row.feature);
+    }
+    refreshed.push(...touched);
+    summary.push({
+      run: name, app: r.app, verdict: r.verdict, mode: 'refresh',
+      rows: r.rows.length, refreshed: touched.length, alreadyCarryingThisRun: already,
+      skipped: r.skipped,
+      statuses: r.rows.reduce((a, row) => ((a[row.status] = (a[row.status] || 0) + 1), a), {}),
+    });
+    continue;
+  }
   const add = r.rows.filter((row) => !have.has(`${row.app}|${row.feature}`));
   add.forEach((row) => have.add(`${row.app}|${row.feature}`));
   fresh.push(...add);
@@ -243,6 +301,22 @@ for (const { name, run } of runs) {
 if (refusals.length) {
   console.error(`REFUSED (${refusals.length}):`);
   refusals.forEach((x) => console.error(`  - ${x}`));
+}
+if (REFRESH) {
+  if (DRY) {
+    console.log(JSON.stringify({ dry: true, mode: 'refresh', wouldRefresh: refreshed.length, rows: refreshed, summary }, null, 2));
+    process.exitCode = refusals.length ? 1 : 0;
+    return;
+  }
+  if (refreshed.length) {
+    if (MILESTONE) ledger.milestone = MILESTONE;
+    fs.writeFileSync(LEDGER, `${JSON.stringify(ledger, null, 2)}\n`, 'utf8');
+  }
+  console.log(JSON.stringify({
+    mode: 'refresh', refreshed: refreshed.length, rows: refreshed, total: ledger.rows.length, summary,
+  }, null, 2));
+  process.exitCode = refusals.length ? 1 : 0;
+  return;
 }
 if (!fresh.length) {
   console.log(JSON.stringify({ added: 0, note: 'nothing new — every derived row is already in the ledger', summary }, null, 2));

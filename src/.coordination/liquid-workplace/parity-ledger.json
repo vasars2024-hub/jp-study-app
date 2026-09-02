@@ -188,9 +188,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "all eight are real buttons, focusable",
       "dataStateOwner": "view state, local to MediaCenterView",
-      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "railButtons=9, active=1 in liquid AND in standard — `is-active` is exclusive in both. 9, not the previous 8, because `.mc-seanime-link` now renders inside `.mc-nav`. Ctrl+8 reaches Discover with the group CLOSED and force-opens it (l1-q4-mc-walk.cjs, 18/18). Control: making a second rail entry active flips this row 8/8 -> 7/8 and nothing else",
+      "observed": "railButtons=9, active=1 in liquid AND in standard — `is-active` is exclusive in both. 9, not the previous 8, because `.mc-seanime-link` now renders inside `.mc-nav`. Ctrl+8 reaches Discover with the group CLOSED and force-opens it (l1-q4-mc-walk.cjs, 18/18). Control: making a second rail entry active flips this row 8/8 -> 7/8 and nothing else || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: railButtons=9 active=1 activeLabel=\"Library\" breadcrumb=\"Library\" || liquid: railButtons=9 active=1 activeLabel=\"Library\" breadcrumb=\"Library\" || negative control `navRail` -> 5/6 (baseline 6/6), fell=[navRail], restored 6/6",
       "status": "both"
     },
     {
@@ -201,9 +201,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "nine real buttons carrying `aria-current`",
       "dataStateOwner": "MediaLibraryShell scope, persisted under its own key",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "shelves=9, current=1 in both presentations; switching Continue watching -> Recently added took the grid 1 -> 5 cards and the header 1 title/2 files -> 8 titles/36 files, identically in liquid and standard",
+      "observed": "shelves=9, current=1 in both presentations; switching Continue watching -> Recently added took the grid 1 -> 5 cards and the header 1 title/2 files -> 8 titles/36 files, identically in liquid and standard || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: shelves=6 current=1 named=6 currentLabel=\"Home\" || liquid: shelves=6 current=1 named=6 currentLabel=\"Home\" || negative control `libraryShelves` -> 5/6 (baseline 6/6), fell=[libraryShelves], restored 6/6",
       "status": "both"
     },
     {
@@ -227,9 +227,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "a real `<select>` plus two `aria-pressed` buttons",
       "dataStateOwner": "per-category sort state; view persisted",
-      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "sortOptions=7, viewButtons=2, pressed=1 in both presentations. Driven through the disclosure: opening it, changing the sort REORDERS the shelf (first card 「パラッ」… -> The Big O on a 36-entry shelf) and the density flips aria-pressed false/true; Escape and an outside pointerdown both close it. Control: pressing both view buttons flips this row alone",
+      "observed": "sortOptions=7, viewButtons=2, pressed=1 in both presentations. Driven through the disclosure: opening it, changing the sort REORDERS the shelf (first card 「パラッ」… -> The Big O on a 36-entry shelf) and the density flips aria-pressed false/true; Escape and an outside pointerdown both close it. Control: pressing both view buttons flips this row alone || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: sortOptions=4 sortValue=\"recently-added\" viewButtons=2 pressed=1 named=2 || liquid: sortOptions=4 sortValue=\"recently-added\" viewButtons=2 pressed=1 named=2 || negative control `sortAndViewMode` -> 5/6 (baseline 6/6), fell=[sortAndViewMode], restored 6/6",
       "status": "both"
     },
     {
@@ -253,9 +253,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "two real buttons with a real `disabled`",
       "dataStateOwner": "MediaCenterView history trail",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "both reflect real depth rather than being always-enabled chrome: on the liquid window (which had navigated) back.disabled=false / forward.disabled=true; on the standard window (which had not) back.disabled=true / forward.disabled=true",
+      "observed": "both reflect real depth rather than being always-enabled chrome: on the liquid window (which had navigated) back.disabled=false / forward.disabled=true; on the standard window (which had not) back.disabled=true / forward.disabled=true || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: Back: disabled=false title=\"Back\" | Forward: disabled=true title=\"You are on the newest section — there is not\" || liquid: Back: disabled=false title=\"Back\" | Forward: disabled=true title=\"You are on the newest section — there is not\" || negative control `historyHonest` -> 5/6 (baseline 6/6), fell=[historyHonest], restored 6/6",
       "status": "both"
     },
     {
@@ -266,9 +266,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "both are real buttons",
       "dataStateOwner": "openMediaWorkspace / mediaWorkspaceHostExists",
-      "automatedProof": "probes/l6m-parity-run.cjs (`window.__L6M` check + driven steps, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "`.seanime-host` count 0 -> 1 -> 0 in both presentations, driven at this tree with the launcher inside the disclosure. The enable has its disable, which is the invariant this row exists for. NOTE: the host mounts at `body > div > .seanime-host`, OUTSIDE the window that opened it",
+      "observed": "`.seanime-host` count 0 -> 1 -> 0 in both presentations, driven at this tree with the launcher inside the disclosure. The enable has its disable, which is the invariant this row exists for. NOTE: the host mounts at `body > div > .seanime-host`, OUTSIDE the window that opened it || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: launcher=1 label=\"Media workspace\" disabled=false title=\"\" hostsInDocument=0 || liquid: launcher=1 label=\"Media workspace\" disabled=false title=\"\" hostsInDocument=0 || negative control `workspaceLauncher` -> 5/6 (baseline 6/6), fell=[workspaceLauncher], restored 6/6",
       "status": "both"
     },
     {
@@ -279,9 +279,9 @@
       "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
       "keyboardRoute": "five real buttons; the Liquid toggle carries `aria-pressed`",
       "dataStateOwner": "DesktopShell window state",
-      "automatedProof": "probes/l6-parity-dictionary.js (`window.__L6M.check()`, 8/8 in BOTH presentations, 2026-08-25)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app mediaCenter (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L6 category 6, Video window)",
-      "observed": "chromeButtons=5 in both; liquidAriaPressed=true on the liquid window and false on the standard one — a real boolean, i.e. the enable has a disable. Control: stripping `aria-pressed` flips this row alone",
+      "observed": "chromeButtons=5 in both; liquidAriaPressed=true on the liquid window and false on the standard one — a real boolean, i.e. the enable has a disable. Control: stripping `aria-pressed` flips this row alone || RE-DRIVEN from _p2j-mediacenter4.json (2026-09-02): standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 5/6 (baseline 6/6), fell=[windowLifecycle], restored 6/6",
       "status": "both"
     },
     {
@@ -2561,14 +2561,14 @@
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 2 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 2 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 24, and 2 declared specs still have NO row at all — notebook, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 2 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 2 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 26 apps, parity-ledger.json carries rows for 24, and 2 declared specs still have NO row at all — notebook, vn. EVERY ledger app now has a spec: `mediaCenter` was the last one without, and got one on 2026-09-02, so the whole ledger is re-derivable by this route. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
       "at": "2026-09-02 (re-derived by debug/_p2g-notwritten.cjs)",
       "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
-      "harnessSpecs": 25,
-      "specsWithRows": 23,
+      "harnessSpecs": 26,
+      "specsWithRows": 24,
       "specsWithNoRows": 2,
       "noRows": [
         "notebook",
@@ -2583,22 +2583,20 @@
           "vn"
         ]
       },
-      "ledgerAppsWithNoSpec": [
-        "mediaCenter"
-      ],
+      "ledgerAppsWithNoSpec": [],
       "note": "Counts THIS tree. A worker measuring before a merge sees a smaller figure, honestly, and it is not the project total."
     }
   },
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
     "rows": 191,
-    "withNamedControl": 126,
+    "withNamedControl": 132,
     "declaredNone": 4,
-    "silent": 60,
+    "silent": 54,
     "silentByApp": {
       "dictionary": 7,
       "mediaWorkspace": 5,
-      "mediaCenter": 8,
+      "mediaCenter": 2,
       "grammar": 5,
       "translate": 4,
       "agent": 5,
@@ -2608,7 +2606,7 @@
       "immersion": 7
     },
     "silentByCause": {
-      "predatingTheClause": 37,
+      "predatingTheClause": 31,
       "b2WaveNotTranscribed": 23,
       "b2WaveApps": [
         "novels",

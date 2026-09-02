@@ -1436,3 +1436,86 @@ ledger apps (16) exceeds specs-with-rows (15).
 **sampled-out:** `vn` (no subject on this profile, above); `city`, `scraper`, `resources`,
 `shell`, `blancShell` (owned by the concurrent worker); `notebook`, `calendar`, `games`,
 `settings` (not reached this turn — they are the next turn's opening slice).
+
+## 2026-09-02 (primary2) — `mediaCenter` was the last ledger app with no spec, and a candidate defect died
+
+Commits: `2ab8709d` (the spec), plus this turn's `--refresh` mode on the row writer.
+
+`mediaCenter` was the one app in this ledger carrying rows and declaring no `SPECS` entry, so
+`notWritten.derived` could not re-derive it by any route and `ledgerAppsWithNoSpec` had named
+it for days. Its 8 rows were also the largest single block with no recorded control — **not
+because anyone neglected them**, but by construction: they were driven 2026-08-25 by
+`window.__L6M`, an instrument `cat6-feature-parity.cjs` superseded and cannot re-run. A row
+whose instrument no longer exists cannot be re-proved, and the ledger's own writer is
+append-only, so it would have stayed silent no matter how well the surface was driven.
+
+**`cat6-feature-parity.cjs --app mediaCenter`: PASS 10/10.** Parity **6/6 standard == 6/6
+liquid**, 2 `na`, `rowsAgree` true, round trip held (`fieldsHeld` and `shellHeld`, 0 diffs),
+and **6 of 8 mutations armed, every one flipping exactly its own row and returning**.
+
+### Three things the first draft got wrong, and the receipt caught all three
+
+1. **`windowLifecycle`'s obvious control DID NOT FIRE.** Detaching one `.fwin-b` is the
+   literal falsification and it is inert here: `lifecycle()` requires `chrome.length >= 4`
+   and this shell renders **five** (Pop out, Make Liquid, Minimize, Maximize, Close), so
+   removing one leaves 4 and the row correctly stays up. The receipt said so in as many
+   words — `fellRows: []`, `exactlyOwnRow: false`, whole run **VOID**. Falsified through
+   `aria-pressed` on the Liquid toggle instead, which is the clause with no slack in it and
+   is the same one `__L6M` used, so the two instruments attack the same thing.
+2. **`librarySearch` reached the right verdict from false evidence, twice.** It scored `na`
+   reading "the library page is not the mounted tab" while the page was plainly mounted,
+   because the field is `LABEL.mc-global-search > INPUT` in the **shell topbar**, carries no
+   className at all, and its subject follows the tab ("Search your media library…" on
+   Library, "Search songs, artists, albums…" on Music). Two class-anchored selectors missed
+   it. A quiet row is exactly where right-verdict/wrong-reason ships unnoticed.
+3. **The drive step navigated AWAY from the tab four rows depend on.** It now MOUNTS Library,
+   idempotently, and the undo walks back with the product's own Back button rather than
+   re-clicking the origin (which would push a third trail entry and leave the window with a
+   longer history than it was found with).
+
+### A candidate defect from the last handoff is DISPROVEN, and the drive was the bug
+
+The last handoff carried, deliberately unfiled, "Media Center **Back stays `disabled` after
+the FIRST in-window navigation** (Home -> Library)". It reproduced on a second gesture — so
+the reading was real. The cause is not. `AppSection.tsx:79` mounts the `player` section as
+`<MediaCenterView initialTab="library" />`, so the window **opens on Library**; clicking
+Library is `setTab(same)`, and `setTab` correctly returns the trail unchanged
+(`MediaCenterView.tsx:1800`). Driven decisively on a **never-before-created** window: `os:open
+video` came up with breadcrumb **`Video`** and Back disabled, and Library -> Music enabled it
+(`title` "Back", `disabled=false`). The product opens on its own section and never on Home.
+**One gesture is noise even when it repeats; what settles it is a case where the two
+explanations predict different things.** Recorded in the spec's `steps.library` comment so the
+next worker does not re-derive it.
+
+### Three counts this spec deliberately does not hardcode
+
+Each is different here from the ledger prose that first named it, and all three are DERIVED
+from available media: the library shelf rail reads **6** (prose said 9), the sort `<select>`
+**4** options (prose said 7), and the section rail moves with workspace availability
+(**9** here, `.mc-seanime-link` included). Hardcoding any of them repeats
+`library.inboxFilters` exactly — a threshold a smaller profile can never reach, which then
+reads as a dead feature. Shelf "current" is **`aria-current="true"`**, not a class; a
+class-based selector matched **6 of 6** and could not fail.
+
+### `--refresh`, and why it is not "overwrite"
+
+`l6-parity-rows.cjs` filters new rows by `!have.has(app|feature)`, so it could only ever ADD.
+`--refresh` **appends** a `RE-DRIVEN from <run>` clause carrying the fresh evidence and the
+control, keyed on the run artifact's own filename so a second run is a no-op (proved: 6 then
+**0**, `alreadyCarryingThisRun` naming all six). The original observation and its `__L6M`
+provenance stay in the row. **Three plants, all fired**: a metadata `feature` string naming no
+ledger row -> REFUSED "that is an ADD, run without --refresh" (planted on the tracked metadata
+file under `--dry`, restored **byte-identical**, sha256
+`ea9a79fb…c52d3c` before and after); a `VOID` verdict -> REFUSED "only a PASS run may write";
+an armed mutation flipped to `armed:false` -> that row dropped **by name**, 6 -> 5.
+
+**Ledger: 191 rows / 24 apps / 0 duplicate `app|feature` keys, 182 `both` / 9 `pending`.
+`silent` 60 -> 54; `mediaCenter` 8 -> 2.** The two that stay silent are `librarySearch` and
+`perItemActions`, whose mutations are **UNARMABLE on this profile** (0 `.medialib-card`) and
+which are therefore named in the control verdict as NOT control-proved rather than counted.
+`ledgerAppsWithNoSpec` is now **empty**. 26 specs, rows for 24, and **2 specs still have no
+row: `notebook`** (its subject is deleted on this branch — see the 2026-09-02 section above)
+**and `vn`** (empty library on both profiles; adding one writes to the user's real library,
+which that spec's safety note forbids).
+
+**sampled-out:** none — this section covers one app and drove all eight of its rows.
