@@ -525,3 +525,41 @@ author are the data-independent ones (`scraper`, `resources`, `city`, `shell`); 
 data-dependent ones (`flashcards`, `statistics`, `library`, `music`, `video`, `youtube`)
 need a profile with real content or they measure an empty harness, which is capped, not
 skipped.
+
+### Scraper: a VOID, and inside it a probe that asks a question the product deliberately stopped answering
+
+`cat6 --app scraper` on this profile: **VOID**, 4/7 both presentations, `drawerCategories`,
+`settingsFields` and `reverseControls` all unreachable, 2 driven refusals, control VOID.
+The writer refused it, which is correct — a VOID run writes no ledger row.
+
+The proximate cause is an EMPTY HARNESS and the instrument said so on both halves at once:
+the settings drawer is closed on a fresh profile, `switchDrawer` REFUSED with `drawer
+categories unavailable`, and the two mutations that own those rows could not be armed
+(`no current drawer category`, `no settings field control`) so `exactlyOwnRow` came out
+false and the control VOIDed. `l6-parity.js`'s scraper drive is
+`['switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch']` — it has no
+step that OPENS the drawer, so it assumes a state a fresh profile does not have.
+
+**But `reverseControls` has a second, independent defect, and this one would survive opening
+the drawer.** The row reads:
+
+    const opener = qa(w, '.scr-topbar-actions button[aria-pressed="true"]');
+
+`.scr-topbar-actions` is ScraperTopBar.tsx:38-105, and it contains exactly ONE
+`aria-pressed`, at :91 — the **advanced-mode** toggle. The drawer opener at :78-86 carries
+`aria-expanded` + `aria-controls` instead, and the source comment says why in as many words:
+"A disclosure, not a toggle button… `aria-pressed` was the wrong contract twice over: a
+screen reader announced 'not pressed' for a panel that is closed, and nothing in the DOM
+linked the control to the region it opens."
+
+So the product was CORRECTED and the probe still asks the old question. The consequence is
+not a false negative, it is a latent **false positive**: with the drawer shut and advanced
+mode ON, `pressedOpeners` counts the advanced toggle and `reverseControls` would score a
+reversal affordance that is not on screen. Same class as the banked "control must attack the
+scored term" trap, one layer out.
+
+FIX, named rather than taken, because it needs a live re-run to verify: add an `openDrawer`
+step at the head of the scraper drive (click `.scr-topbar-actions [aria-controls]` when
+`aria-expanded` is false) with a matching `undo` that closes it only if the drive opened it,
+and re-point `reverseControls` at `aria-expanded="true"` on the disclosure that actually
+owns the drawer. Artifact: gitignored `debug/_p2f-cat6-scraper.json`.
