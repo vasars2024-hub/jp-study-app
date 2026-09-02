@@ -1126,7 +1126,7 @@
       "dataStateOwner": "renderer deck store over the local Anki collection and the EPUB mining decks",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.deckTabs; probes/cat6-feature-parity.cjs --app flashcards",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD tabs=2 active=1 activeCount=3235 || LIQUID tabs=2 active=1 activeCount=3235",
+      "observed": "STANDARD tabs=2 active=1 activeCount=3235 || LIQUID tabs=2 active=1 activeCount=3235 || negative control `deckTabs` -> 7/8 (baseline 8/8), fell=[deckTabs], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both"
     },
     {
@@ -1139,7 +1139,7 @@
       "dataStateOwner": "renderer folder assignment store",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.folderRail (arithmetic, not presence)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD all=3235 unfiled+folders=3235 activeChips=1 chips=4 || LIQUID all=3235 unfiled+folders=3235 activeChips=1 chips=4",
+      "observed": "STANDARD all=3235 unfiled+folders=3235 activeChips=1 chips=4 || LIQUID all=3235 unfiled+folders=3235 activeChips=1 chips=4 || negative control `folderRail` -> 7/8 (baseline 8/8), fell=[folderRail], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both",
       "_note": "The row is arithmetic on purpose: a chip whose count is decorative passes a presence check and fails this one."
     },
@@ -1153,7 +1153,7 @@
       "dataStateOwner": "renderer deck store, grouped by the card's source book",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.bookGroups (badge sum vs whichever denominator is on screen)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD groups=5 badgeSum=3235 expected=3235 titled=5 basis=All chip || LIQUID groups=5 badgeSum=3235 expected=3235 titled=5 basis=All chip",
+      "observed": "STANDARD groups=5 badgeSum=3235 expected=3235 titled=5 basis=All chip || LIQUID groups=5 badgeSum=3235 expected=3235 titled=5 basis=All chip || negative control `bookGroups` -> 7/8 (baseline 8/8), fell=[bookGroups], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both"
     },
     {
@@ -1166,7 +1166,7 @@
       "dataStateOwner": "renderer deck store; `aria-setsize` publishes the collection's true size on every item",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.virtualizedList — scroll range = declared x pitch, AND rendered = min(declared, cap) with the cap demonstrated by a collection that exceeds it",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD cap=16 maxDeclared=3074 ceilingProven=true | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 7cards/7rendered pitch=108 sh=766 expected=756 ratio=1.013 | 144cards/16rendered pitch=108 sh=15562 expected=15552 ratio=1.001 | 3074cards/16rendered pitch=108 sh=332002 expected=331992 ratio=1.000 || LIQUID cap=16 maxDeclared=3074 ceilingProven=true | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 7cards/7rendered pitch=108 sh=766 expected=756 ratio=1.013 | 144cards/16rendered pitch=108 sh=15562 expected=15552 ratio=1.001 | 3074cards/16rendered pitch=108 sh=332002 expected=331992 ratio=1.000",
+      "observed": "STANDARD cap=16 maxDeclared=3074 ceilingProven=true | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 7cards/7rendered pitch=108 sh=766 expected=756 ratio=1.013 | 144cards/16rendered pitch=108 sh=15562 expected=15552 ratio=1.001 | 3074cards/16rendered pitch=108 sh=332002 expected=331992 ratio=1.000 || LIQUID cap=16 maxDeclared=3074 ceilingProven=true | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 5cards/5rendered pitch=108 sh=556 expected=540 ratio=1.030 | 7cards/7rendered pitch=108 sh=766 expected=756 ratio=1.013 | 144cards/16rendered pitch=108 sh=15562 expected=15552 ratio=1.001 | 3074cards/16rendered pitch=108 sh=332002 expected=331992 ratio=1.000 || negative control `virtualizedList` -> 7/8 (baseline 8/8), fell=[virtualizedList], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both",
       "_note": "INSTRUMENT CORRECTED IN THE SAME COMMIT AS THIS ROW. The old term demanded `declared > rendered` for any group taller than its pane, which a 5-card group in a 420px pane can never satisfy — VirtualList's window comes from the VIEWPORT, not the collection, so it correctly rendered 5 of 5. Measured: rendered 5/5/7/16/16 against declared 5/5/7/144/3074, i.e. min(declared, 16) exactly; a second read after a re-mount gave a cap of 12 and the same identity held, so the cap is not a constant and hardcoding 16 would have been wrong too. CONTROL ON THE RELAXATION, run live: detach the two groups larger than the cap and the row still FAILS (`cap=7 maxDeclared=7 ceilingProven=false`) — a desk where every group is tiny cannot buy a 10. Both bodies re-attached, row true again, 5 bodies."
     },
@@ -1180,7 +1180,7 @@
       "dataStateOwner": "renderer deck store; remove is the reverse path for every added card",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.cardRows (worded == meant == removable == rendered)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=49 worded=49 meaning=49 removable=49 || LIQUID rows=49 worded=49 meaning=49 removable=49",
+      "observed": "STANDARD rows=49 worded=49 meaning=49 removable=49 || LIQUID rows=49 worded=49 meaning=49 removable=49 || negative control `cardRows` -> 7/8 (baseline 8/8), fell=[cardRows], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both"
     },
     {
@@ -1193,7 +1193,7 @@
       "dataStateOwner": "renderer deck store",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.deckStrip",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD stripCards=24 worded=24 withReadingOrMeaning=24 || LIQUID stripCards=24 worded=24 withReadingOrMeaning=24",
+      "observed": "STANDARD stripCards=24 worded=24 withReadingOrMeaning=24 || LIQUID stripCards=24 worded=24 withReadingOrMeaning=24 || negative control `deckStrip` -> 7/8 (baseline 8/8), fell=[deckStrip], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both"
     },
     {
@@ -1206,7 +1206,7 @@
       "dataStateOwner": "renderer view state, per group",
       "automatedProof": "probes/l6-parity.js SPECS.flashcards.groupCollapse (aria agrees with the mounted body, on all groups)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD groups=5 ariaExpandedPresent=5 agreesWithMountedBody=5 || LIQUID groups=5 ariaExpandedPresent=5 agreesWithMountedBody=5",
+      "observed": "STANDARD groups=5 ariaExpandedPresent=5 agreesWithMountedBody=5 || LIQUID groups=5 ariaExpandedPresent=5 agreesWithMountedBody=5 || negative control `groupCollapse` -> 7/8 (baseline 8/8), fell=[groupCollapse], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both",
       "_note": "The reverse of every expand: a group that opens and cannot close is the enable-without-disable defect §2 forbids."
     },
@@ -1220,7 +1220,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app flashcards, round trip standard -> liquid -> standard with the search field dirtied first",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 7/8 (baseline 8/8), fell=[windowLifecycle], restored 8/8 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-flashcards2.json` (2026-09-02 07:48), not re-run here",
       "status": "both",
       "_note": "Round trip measured on this window: field held, shell held, 0 diffs, box 820x580 in both presentations."
     },
@@ -1585,7 +1585,7 @@
       "dataStateOwner": "main-process knowledge store, re-derived from the Anki collection on sync",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.knowledgeSummary; probes/cat6-feature-parity.cjs --app statistics",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD cards=4 complete=4 syncEnabled=true || LIQUID cards=4 complete=4 syncEnabled=true",
+      "observed": "STANDARD cards=4 complete=4 syncEnabled=true || LIQUID cards=4 complete=4 syncEnabled=true || negative control `knowledgeSummary` -> 8/9 (baseline 9/9), fell=[knowledgeSummary], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both",
       "_note": "The row scores value AND label per card: a card that renders its caption over an empty figure passes a presence check and fails this one."
     },
@@ -1599,7 +1599,7 @@
       "dataStateOwner": "derived in the renderer from the knowledge store",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.levelEstimate (role + non-empty badge + title)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD role=status badge=\"Beginner\" title=\"Estimated level\" || LIQUID role=status badge=\"Beginner\" title=\"Estimated level\"",
+      "observed": "STANDARD role=status badge=\"Beginner\" title=\"Estimated level\" || LIQUID role=status badge=\"Beginner\" title=\"Estimated level\" || negative control `levelEstimate` -> 8/9 (baseline 9/9), fell=[levelEstimate], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both"
     },
     {
@@ -1612,7 +1612,7 @@
       "dataStateOwner": "main-process study statistics",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.summaryMetrics",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD cards=9 complete=9 || LIQUID cards=9 complete=9",
+      "observed": "STANDARD cards=9 complete=9 || LIQUID cards=9 complete=9 || negative control `summaryMetrics` -> 8/9 (baseline 9/9), fell=[summaryMetrics], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both"
     },
     {
@@ -1625,7 +1625,7 @@
       "dataStateOwner": "main-process study statistics, per day",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.activityChart (bars == labelled)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD bars=14 labelled=14 || LIQUID bars=14 labelled=14",
+      "observed": "STANDARD bars=14 labelled=14 || LIQUID bars=14 labelled=14 || negative control `activityChart` -> 8/9 (baseline 9/9), fell=[activityChart], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both",
       "_note": "labelled == bars is the bar, not `bars > 0`: an unlabelled chart is a picture of data, which §6 counts as a dishonest state."
     },
@@ -1639,7 +1639,7 @@
       "dataStateOwner": "main-process study statistics keyed by book",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.bookBreakdown",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=16 complete=16 || LIQUID rows=16 complete=16",
+      "observed": "STANDARD rows=16 complete=16 || LIQUID rows=16 complete=16 || negative control `bookBreakdown` -> 8/9 (baseline 9/9), fell=[bookBreakdown], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both"
     },
     {
@@ -1652,7 +1652,7 @@
       "dataStateOwner": "main-process resume tracker",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.showResume",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=4 controls=4 labelled=4 || LIQUID rows=4 controls=4 labelled=4",
+      "observed": "STANDARD rows=4 controls=4 labelled=4 || LIQUID rows=4 controls=4 labelled=4 || negative control `showResume` -> 8/9 (baseline 9/9), fell=[showResume], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both"
     },
     {
@@ -1665,7 +1665,7 @@
       "dataStateOwner": "renderer view state; the harness restores the original scrollTop in `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.recentActivity, driven through SPECS.statistics.drive",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD button=true target=true scrolled=true || LIQUID button=true target=true scrolled=true",
+      "observed": "STANDARD button=true target=true scrolled=true || LIQUID button=true target=true scrolled=true || negative control `recentActivity` -> 8/9 (baseline 9/9), fell=[recentActivity], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both",
       "_note": "THIS ROW IS WHY THE AUTHORING TOOL DRIVES BEFORE IT READS. Its claim is that the jump WORKS, so it compares scrollTop before and after: read without the spec's own step sequence, on a surface that is already scrolled, it reports `scrolled=false` and a live feature reads dead. Measured under the drive: before 0 -> after 814, moved true."
     },
@@ -1679,7 +1679,7 @@
       "dataStateOwner": "main-process study statistics — this is the destructive path, which is why it is disclosed rather than exposed",
       "automatedProof": "probes/l6-parity.js SPECS.statistics.resetRecovery (details present AND closed AND both names non-empty)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD details=true closed=true summary=\"Reset\" action=\"Reset\" || LIQUID details=true closed=true summary=\"Reset\" action=\"Reset\"",
+      "observed": "STANDARD details=true closed=true summary=\"Reset\" action=\"Reset\" || LIQUID details=true closed=true summary=\"Reset\" action=\"Reset\" || negative control `resetRecovery` -> 8/9 (baseline 9/9), fell=[resetRecovery], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both",
       "_note": "The action is NOT driven, deliberately: it deletes study history in the user's real profile and this ledger has no undo for it. The row scores its reachability and its default-closed state, and says so."
     },
@@ -1693,7 +1693,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app statistics, round trip standard -> liquid -> standard",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 8/9 (baseline 9/9), fell=[windowLifecycle], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-statistics.json` (2026-09-02 07:53), not re-run here",
       "status": "both",
       "_note": "Round trip on this window: shell held, 0 diffs, box 820x580 in both. The dirtied-field half is reported as `null` — this surface has NO editable text field, which is a weaker round trip than Flashcards' and is recorded as such rather than passed silently."
     },
@@ -1707,7 +1707,7 @@
       "dataStateOwner": "main-process library index, grouped by folder",
       "automatedProof": "probes/l6-parity.js SPECS.library.folderTree; probes/cat6-feature-parity.cjs --app library",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chips=4 active=1 counted=4 || LIQUID chips=4 active=1 counted=4",
+      "observed": "STANDARD chips=4 active=1 counted=4 || LIQUID chips=4 active=1 counted=4 || negative control `folderTree` -> 8/9 (baseline 9/9), fell=[folderTree], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both",
       "_note": "A rail with two actives is a filter that lost its exclusivity while still rendering — invisible until the list stops agreeing with it."
     },
@@ -1721,7 +1721,7 @@
       "dataStateOwner": "renderer view state over the main-process library index; not persisted, and the harness restores it",
       "automatedProof": "probes/l6-parity.js SPECS.library.folderFilter, driven through SPECS.library.drive step `folder`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD activeChip=\"Unfiled 21\" declared=21 cards=21 cardsBefore=24 || LIQUID activeChip=\"All 24\" declared=24 cards=24 cardsBefore=21",
+      "observed": "STANDARD activeChip=\"Unfiled 21\" declared=21 cards=21 cardsBefore=24 || LIQUID activeChip=\"All 24\" declared=24 cards=24 cardsBefore=21 || negative control: NONE DECLARED for this row -- the run's other 6 rows were controlled (cat6 receipt `debug/_pr4-library2.json`, 2026-09-02 07:58), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The step picks the LARGEST non-active folder rather than a fixed one, so the count has to change for the row to mean anything."
     },
@@ -1735,7 +1735,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.library.sortOrder, driven through step `sort`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD sort=\"title\" groups=2 titles=21 outOfOrder=0 || LIQUID sort=\"title\" groups=2 titles=24 outOfOrder=0",
+      "observed": "STANDARD sort=\"title\" groups=2 titles=21 outOfOrder=0 || LIQUID sort=\"title\" groups=2 titles=24 outOfOrder=0 || negative control: NONE DECLARED for this row -- the run's other 6 rows were controlled (cat6 receipt `debug/_pr4-library2.json`, 2026-09-02 07:58), this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -1748,7 +1748,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.library.groupBy, driven through step `group`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD group=\"lang\" groups=2 heads=2 cards=21 summed=21 || LIQUID group=\"lang\" groups=2 heads=2 cards=24 summed=24",
+      "observed": "STANDARD group=\"lang\" groups=2 heads=2 cards=21 summed=21 || LIQUID group=\"lang\" groups=2 heads=2 cards=24 summed=24 || negative control `groupBy` -> 8/9 (baseline 9/9), fell=[groupBy], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both"
     },
     {
@@ -1761,7 +1761,7 @@
       "dataStateOwner": "renderer view state",
       "automatedProof": "probes/l6-parity.js SPECS.library.layoutSwitch",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD modes=2 pressed=1 mode=grid containerMounted=true || LIQUID modes=2 pressed=1 mode=grid containerMounted=true",
+      "observed": "STANDARD modes=2 pressed=1 mode=grid containerMounted=true || LIQUID modes=2 pressed=1 mode=grid containerMounted=true || negative control `layoutSwitch` -> 8/9 (baseline 9/9), fell=[layoutSwitch], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both"
     },
     {
@@ -1774,7 +1774,7 @@
       "dataStateOwner": "renderer view state; the chip SETS are derived from the library's own contents (`filterOptions.langs` / `.levels`, LibraryView.tsx:1165/1175)",
       "automatedProof": "probes/l6-parity.js SPECS.library.inboxFilters — groups found by their own `All` head, one active per group",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chips=5 active=2 groups=2 sizes=[3,2] activePerGroup=[1,1] || LIQUID chips=5 active=2 groups=2 sizes=[3,2] activePerGroup=[1,1]",
+      "observed": "STANDARD chips=5 active=2 groups=2 sizes=[3,2] activePerGroup=[1,1] || LIQUID chips=5 active=2 groups=2 sizes=[3,2] activePerGroup=[1,1] || negative control `inboxFilters` -> 8/9 (baseline 9/9), fell=[inboxFilters], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both",
       "_note": "INSTRUMENT CORRECTED AND GIVEN ITS FIRST CONTROL IN THE SAME COMMIT AS THIS ROW. The old bar was `chips.length >= 6 && active === 2`, and the 6 was one profile's data written into the instrument: the chip sets are derived, so a library with three languages and ONE level renders 3 + 2 = 5 and can never reach 6. Measured live: `All | Japanese | Unknown | All | L7`. The rail is now split at its own `All` heads (never the English word — the label is translated) and the invariant is stated per group, which is strictly stronger than `active === 2`: two actives in one group and none in the other satisfied the old bar. It had NO mutation at all until now; the new one makes a second chip active inside the FIRST group and it flips exactly this row, 9/9 -> 8/9."
     },
@@ -1788,7 +1788,7 @@
       "dataStateOwner": "main-process library index; remove is the reverse path for every import",
       "automatedProof": "probes/l6-parity.js SPECS.library.cardActions (removes == files == cards)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD cards=21 remove=21 folder=21 || LIQUID cards=24 remove=24 folder=24",
+      "observed": "STANDARD cards=21 remove=21 folder=21 || LIQUID cards=24 remove=24 folder=24 || negative control `cardActions` -> 8/9 (baseline 9/9), fell=[cardActions], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both",
       "_note": "The controls are scored for presence per card and NOT driven: removing a card writes the user's real library and this ledger has no undo for it."
     },
@@ -1802,7 +1802,7 @@
       "dataStateOwner": "layout only",
       "automatedProof": "probes/l6-parity.js `canvasPlacement`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD canvas=772 doc=772 docked=0 sheets=0 sum=772 covered=false || LIQUID canvas=772 doc=772 docked=0 sheets=0 sum=772 covered=false",
+      "observed": "STANDARD canvas=772 doc=772 docked=0 sheets=0 sum=772 covered=false || LIQUID canvas=772 doc=772 docked=0 sheets=0 sum=772 covered=false || negative control: NONE DECLARED for this row -- the run's other 6 rows were controlled (cat6 receipt `debug/_pr4-library2.json`, 2026-09-02 07:58), this one is asserted from its own reading only",
       "status": "both",
       "_note": "No measure clamp is scored here: Library runs the FILL policy (`--lq-reading-measure: none`) by design, because a grid of covers is not a passage."
     },
@@ -1816,7 +1816,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app library, round trip standard -> liquid -> standard",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 8/9 (baseline 9/9), fell=[windowLifecycle], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-library2.json` (2026-09-02 07:58), not re-run here",
       "status": "both",
       "_note": "Round trip on this window: shell held, 0 diffs, box 820x580 in both. The dirtied-field half is `null` — this surface has no editable text field, recorded as the weaker round trip it is."
     },
@@ -1830,7 +1830,7 @@
       "dataStateOwner": "main-process music library index",
       "automatedProof": "probes/l6-parity.js SPECS.music.libraryRows; probes/cat6-feature-parity.cjs --app music",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=2 complete=2 || LIQUID rows=2 complete=2",
+      "observed": "STANDARD rows=2 complete=2 || LIQUID rows=2 complete=2 || negative control `libraryRows` -> 9/10 (baseline 10/10), fell=[libraryRows], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both"
     },
     {
@@ -1843,7 +1843,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.music.librarySearch, driven through steps `searchNarrow` + `searchRestore`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD input=true before=2 narrowed=0 restored=2 || LIQUID input=true before=2 narrowed=0 restored=2",
+      "observed": "STANDARD input=true before=2 narrowed=0 restored=2 || LIQUID input=true before=2 narrowed=0 restored=2 || negative control `librarySearch` -> 9/10 (baseline 10/10), fell=[librarySearch], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "The row scores the RESTORE as well as the narrow: a filter that cannot be undone is the enable-without-disable defect §2 forbids."
     },
@@ -1857,7 +1857,7 @@
       "dataStateOwner": "renderer view state, mirrored into `localStorage['jp-music-sort']`; the spec's `undo` restores BOTH, including removing the key when it did not exist",
       "automatedProof": "probes/l6-parity.js SPECS.music.sortOrder, driven through step `sort`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD sort=title titles=2 ordered=true || LIQUID sort=title titles=2 ordered=true",
+      "observed": "STANDARD sort=title titles=2 ordered=true || LIQUID sort=title titles=2 ordered=true || negative control `sortOrder` -> 9/10 (baseline 10/10), fell=[sortOrder], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both"
     },
     {
@@ -1870,7 +1870,7 @@
       "dataStateOwner": "renderer player state; selecting is `play(s)` (MusicContent.tsx:404) and there is no select-without-playing affordance",
       "automatedProof": "probes/l6-parity.js SPECS.music.playerSelection, driven through the new step `pick`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD active=1 selected=\"e2e-audio-ja\" now=\"e2e-audio-ja\" || LIQUID active=1 selected=\"e2e-audio-ja\" now=\"e2e-audio-ja\"",
+      "observed": "STANDARD active=1 selected=\"e2e-audio-ja\" now=\"e2e-audio-ja\" || LIQUID active=1 selected=\"e2e-audio-ja\" now=\"e2e-audio-ja\" || negative control `playerSelection` -> 9/10 (baseline 10/10), fell=[playerSelection], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "THIS ROW AND THE FOUR BELOW HAD NO SUBJECT UNTIL THIS COMMIT. The drive never selected a track, so on a library with two real songs the surface scored 5/10 in BOTH presentations and five live features read as missing. Measured one click later on the same window: now-playing `Choose a track` -> `e2e-audio-ja`, active 0 -> 1, queue active 0 -> 1, seek max 1 -> 90, like `aria-pressed` absent -> false, hint recovery actions 0 -> 2."
     },
@@ -1884,7 +1884,7 @@
       "dataStateOwner": "renderer player state; this player has NO `<audio>` element (0 media elements while the seek advanced), so it is Web Audio",
       "automatedProof": "probes/l6-parity.js SPECS.music.transport",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD play=true enabled=6 seek=true max=90 || LIQUID play=true enabled=6 seek=true max=90",
+      "observed": "STANDARD play=true enabled=6 seek=true max=90 || LIQUID play=true enabled=6 seek=true max=90 || negative control `transport` -> 9/10 (baseline 10/10), fell=[transport], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "`seek.max` 1 -> 90 is the discriminating number: an unloaded transport still renders, and only a real duration separates it from a loaded one."
     },
@@ -1898,7 +1898,7 @@
       "dataStateOwner": "renderer liked-songs store",
       "automatedProof": "probes/l6-parity.js SPECS.music.like",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD like=true enabled=true pressed=false || LIQUID like=true enabled=true pressed=false",
+      "observed": "STANDARD like=true enabled=true pressed=false || LIQUID like=true enabled=true pressed=false || negative control `like` -> 9/10 (baseline 10/10), fell=[like], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "Asserted explicitly rather than assumed: Like was the one capability the deleted page transport had that the player bar lacked, so it is its own row instead of a clause inside `transport`. The control is scored for presence and pressed-state and NOT driven — liking writes the user's real collection."
     },
@@ -1912,7 +1912,7 @@
       "dataStateOwner": "main-process lyric store, per track",
       "automatedProof": "probes/l6-parity.js SPECS.music.lyricsRecovery",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD lines=0 hint=true recovery=2 || LIQUID lines=0 hint=true recovery=2",
+      "observed": "STANDARD lines=0 hint=true recovery=2 || LIQUID lines=0 hint=true recovery=2 || negative control `lyricsRecovery` -> 9/10 (baseline 10/10), fell=[lyricsRecovery], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "This is the honest-empty-state row: `lines=0` is not a failure, `lines=0` with no hint and no way out would be. Measured here: lines 0, hint present, 2 enabled recovery actions."
     },
@@ -1926,7 +1926,7 @@
       "dataStateOwner": "renderer player state",
       "automatedProof": "probes/l6-parity.js SPECS.music.queueMirror",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD songs=2 queue=2 active=1/1 || LIQUID songs=2 queue=2 active=1/1",
+      "observed": "STANDARD songs=2 queue=2 active=1/1 || LIQUID songs=2 queue=2 active=1/1 || negative control `queueMirror` -> 9/10 (baseline 10/10), fell=[queueMirror], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "The queue is also the route the SEARCH cannot take away — narrowing the library to nothing leaves `.music-song` 0 and the queue 2, which is why the `pick` step falls back to it."
     },
@@ -1940,7 +1940,7 @@
       "dataStateOwner": "renderer draft state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.music.youtubeDraft, driven through step `youtube`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD draft=true actionEnabled=true || LIQUID draft=true actionEnabled=true",
+      "observed": "STANDARD draft=true actionEnabled=true || LIQUID draft=true actionEnabled=true || negative control `youtubeDraft` -> 9/10 (baseline 10/10), fell=[youtubeDraft], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "The draft is typed and the enabled action observed; the import is NOT executed. It reaches the network and writes to the user's library, and this ledger has no undo for it."
     },
@@ -1954,7 +1954,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app music, round trip standard -> liquid -> standard with the search field dirtied first",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 9/10 (baseline 10/10), fell=[windowLifecycle], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-music3.json` (2026-09-02 08:08), not re-run here",
       "status": "both",
       "_note": "Round trip on this window: field held, shell held, 0 diffs, box 1080x700 in both."
     },
@@ -1968,7 +1968,7 @@
       "dataStateOwner": "renderer player state; `video=0` here is the truthful reading of a stage with nothing loaded",
       "automatedProof": "probes/l6-parity.js SPECS.video.stageHonesty; probes/cat6-feature-parity.cjs --app video",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD empties=2 titled=2 video=0 entryActions=2 enabled=2 || LIQUID empties=2 titled=2 video=0 entryActions=2 enabled=2",
+      "observed": "STANDARD empties=2 titled=2 video=0 entryActions=2 enabled=2 || LIQUID empties=2 titled=2 video=0 entryActions=2 enabled=2 || negative control `stageHonesty` -> 8/10 (baseline 10/10), fell=[stageHonesty, topbarActions], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "This is the category-8 question asked inside category 6: an empty stage is correct, an empty stage with no name and no way out is not. Measured: 2 empty states, both titled, 2 enabled entry actions."
     },
@@ -1982,7 +1982,7 @@
       "dataStateOwner": "renderer player state",
       "automatedProof": "probes/l6-parity.js SPECS.video.topbarActions (`explained` == `disabled`)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD actions=2 enabled=0 disabled=2 explained=2 primary=0 source=false stageEntry=true stageLive=2 || LIQUID actions=2 enabled=0 disabled=2 explained=2 primary=0 source=false stageEntry=true stageLive=2",
+      "observed": "STANDARD actions=2 enabled=0 disabled=2 explained=2 primary=0 source=false stageEntry=true stageLive=2 || LIQUID actions=2 enabled=0 disabled=2 explained=2 primary=0 source=false stageEntry=true stageLive=2 || negative control `topbarActions` -> 9/10 (baseline 10/10), fell=[topbarActions], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "`explained=2 disabled=2` is the bar. Two of these actions share ONE disabled-reason tooltip, which is exactly the collision that made naming controls by `title` produce a false duplicate in cat6's `--mode duplication`."
     },
@@ -1996,7 +1996,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.video.learningToggles, driven through step `toggle`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD toggles=6 before=[false,false,false,true,false,false] after=[true,false,false,true,false,false] flipped=1 || LIQUID toggles=6 before=[false,false,false,true,false,false] after=[true,false,false,true,false,false] flipped=1",
+      "observed": "STANDARD toggles=6 before=[false,false,false,true,false,false] after=[true,false,false,true,false,false] flipped=1 || LIQUID toggles=6 before=[false,false,false,true,false,false] after=[true,false,false,true,false,false] flipped=1 || negative control `learningToggles` -> 9/10 (baseline 10/10), fell=[learningToggles], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "Driven: `was false -> now true`. Read without the drive it reports `flipped=-1`, which is why the authoring tool runs the spec's own steps before it reads."
     },
@@ -2010,7 +2010,7 @@
       "dataStateOwner": "main-process ASR configuration; the value shown is the configured tier",
       "automatedProof": "probes/l6-parity.js SPECS.video.transcriptionModel (value ∈ options)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD options=4 value=\"kotoba-whisper\" inList=true segments=2 active=1 || LIQUID options=4 value=\"kotoba-whisper\" inList=true segments=2 active=1",
+      "observed": "STANDARD options=4 value=\"kotoba-whisper\" inList=true segments=2 active=1 || LIQUID options=4 value=\"kotoba-whisper\" inList=true segments=2 active=1 || negative control `transcriptionModel` -> 9/10 (baseline 10/10), fell=[transcriptionModel], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "Measured: 4 options, value `kotoba-whisper`, in the list. The row asserts the CONFIGURED tier is coherent; it does not assert the model is downloaded — the configured tier and the on-disk cache are different facts, and confusing them has hung live ASR runs here before."
     },
@@ -2024,7 +2024,7 @@
       "dataStateOwner": "main-process library watch configuration",
       "automatedProof": "probes/l6-parity.js SPECS.video.watchFolder",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD controls=1 enabled=1 || LIQUID controls=1 enabled=1",
+      "observed": "STANDARD controls=1 enabled=1 || LIQUID controls=1 enabled=1 || negative control `watchFolder` -> 9/10 (baseline 10/10), fell=[watchFolder], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "Scored for reachability and NOT driven: it opens a native OS folder dialog, which the bridge cannot see and which would leave a modal the harness cannot dismiss."
     },
@@ -2038,7 +2038,7 @@
       "dataStateOwner": "renderer draft state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.video.youtubeDraft, driven through step `youtube`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD drafted=true actionEnabled=true || LIQUID drafted=true actionEnabled=true",
+      "observed": "STANDARD drafted=true actionEnabled=true || LIQUID drafted=true actionEnabled=true || negative control `youtubeDraft` -> 9/10 (baseline 10/10), fell=[youtubeDraft], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "The draft is typed and the enabled action observed; the import is NOT executed — it reaches the network and writes the user's library."
     },
@@ -2052,7 +2052,7 @@
       "dataStateOwner": "main-process library index and resume tracker",
       "automatedProof": "probes/l6-parity.js SPECS.video.upNextShelf",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD shelves=1 cards=7 visible=1 || LIQUID shelves=1 cards=7 visible=1",
+      "observed": "STANDARD shelves=1 cards=7 visible=1 || LIQUID shelves=1 cards=7 visible=1 || negative control `upNextShelf` -> 9/10 (baseline 10/10), fell=[upNextShelf], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "7 cards on this profile's 80-file library. This is one of the rows the other worker's empty profile would have scored on an empty harness and had capped."
     },
@@ -2066,7 +2066,7 @@
       "dataStateOwner": "renderer selection state over the library index",
       "automatedProof": "probes/l6-parity.js SPECS.video.inspectorHonesty",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD scoreRow=false meta=false malLink=false emptyCopy=true coherent=blank || LIQUID scoreRow=false meta=false malLink=false emptyCopy=true coherent=blank",
+      "observed": "STANDARD scoreRow=false meta=false malLink=false emptyCopy=true coherent=blank || LIQUID scoreRow=false meta=false malLink=false emptyCopy=true coherent=blank || negative control `inspectorHonesty` -> 9/10 (baseline 10/10), fell=[inspectorHonesty], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "The row scores COHERENCE, not emptiness: a blank inspector is fine, an inspector showing a MAL link for nothing is the dishonest state it exists to catch."
     },
@@ -2080,7 +2080,7 @@
       "dataStateOwner": "renderer route state, persisted per window",
       "automatedProof": "probes/l6-parity.js SPECS.video.navReach (rail label == page == window title)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD items=9 active=1 activeLabel=\"Video\" windowTitle=\"Video\" page=\"mc-page mc-video-page\" || LIQUID items=9 active=1 activeLabel=\"Video\" windowTitle=\"Video\" page=\"mc-page mc-video-page\"",
+      "observed": "STANDARD items=9 active=1 activeLabel=\"Video\" windowTitle=\"Video\" page=\"mc-page mc-video-page\" || LIQUID items=9 active=1 activeLabel=\"Video\" windowTitle=\"Video\" page=\"mc-page mc-video-page\" || negative control `navReach` -> 9/10 (baseline 10/10), fell=[navReach], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "TRAP FOR THE NEXT WORKER: `os:open` with detail `video` opens the Media Center on whatever tab it last persisted — it came up on **Library** here, and cat6 correctly refused with `no video surface` rather than scoring the wrong page. Click the rail's `Video` entry first. 9 rail items, 1 active."
     },
@@ -2094,7 +2094,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app video, round trip standard -> liquid -> standard with a field dirtied first",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 9/10 (baseline 10/10), fell=[windowLifecycle], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-video.json` (2026-09-02 08:11), not re-run here",
       "status": "both",
       "_note": "Round trip on this window: field held, shell held, 0 diffs, box 1080x700 in both."
     },
@@ -2108,7 +2108,7 @@
       "dataStateOwner": "main-process YouTube playlist store",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.playlistRail; probes/cat6-feature-parity.cjs --app youtube",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD items=2 titled=2 active=1 planBadge=0 || LIQUID items=2 titled=2 active=1 planBadge=0",
+      "observed": "STANDARD items=2 titled=2 active=1 planBadge=0 || LIQUID items=2 titled=2 active=1 planBadge=0 || negative control `playlistRail` -> 9/10 (baseline 10/10), fell=[playlistRail], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both"
     },
     {
@@ -2121,7 +2121,7 @@
       "dataStateOwner": "main-process YouTube folder store",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.folderTree",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD folders=3 headed=3 playlists=1 filed=1 || LIQUID folders=3 headed=3 playlists=1 filed=1",
+      "observed": "STANDARD folders=3 headed=3 playlists=1 filed=1 || LIQUID folders=3 headed=3 playlists=1 filed=1 || negative control `folderTree` -> 9/10 (baseline 10/10), fell=[folderTree], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both"
     },
     {
@@ -2134,7 +2134,7 @@
       "dataStateOwner": "main-process YouTube playlist store",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.addPlaylist (disabled state matches the field's emptiness)",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD field=\"\" submitDisabled=true expected=true || LIQUID field=\"\" submitDisabled=true expected=true",
+      "observed": "STANDARD field=\"\" submitDisabled=true expected=true || LIQUID field=\"\" submitDisabled=true expected=true || negative control `addPlaylist` -> 9/10 (baseline 10/10), fell=[addPlaylist], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "The row scores the AGREEMENT between field and submit, not the presence of either: `field=\"\" submitDisabled=true expected=true`. The add itself is not executed — it writes the user's real playlist store."
     },
@@ -2148,7 +2148,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.tabSwitching, driven through steps `openNews` + `openPlaylist`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD tabs=2 active=1 onNews=false list=true prefs=true || LIQUID tabs=2 active=1 onNews=false list=true prefs=true",
+      "observed": "STANDARD tabs=2 active=1 onNews=false list=true prefs=true || LIQUID tabs=2 active=1 onNews=false list=true prefs=true || negative control `tabSwitching` -> 9/10 (baseline 10/10), fell=[tabSwitching], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both"
     },
     {
@@ -2161,7 +2161,7 @@
       "dataStateOwner": "main-process YouTube playlist store, per playlist",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.videoRows, reached through step `openPlaylist`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=16 titled=16 thumbed=16 meta=16 listitems=16 || LIQUID rows=16 titled=16 thumbed=16 meta=16 listitems=16",
+      "observed": "STANDARD rows=16 titled=16 thumbed=16 meta=16 listitems=16 || LIQUID rows=16 titled=16 thumbed=16 meta=16 listitems=16 || negative control `videoRows` -> 9/10 (baseline 10/10), fell=[videoRows], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "Reads `rows=0` without the drive because the window opens on the News tab; the drive opens a playlist first. This is the same class as `statistics.recentActivity` — a row read outside its own step sequence answers a different question."
     },
@@ -2175,7 +2175,7 @@
       "dataStateOwner": "main-process YouTube store plus the local download index",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.rowActions",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD rows=16 threeActions=16 titled=16 openImpliesDownloaded=16 || LIQUID rows=16 threeActions=16 titled=16 openImpliesDownloaded=16",
+      "observed": "STANDARD rows=16 threeActions=16 titled=16 openImpliesDownloaded=16 || LIQUID rows=16 threeActions=16 titled=16 openImpliesDownloaded=16 || negative control `rowActions` -> 9/10 (baseline 10/10), fell=[rowActions], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "`openImpliesDownloaded` is the honesty clause: offering Open for a file that is not on disk is a control that cannot do what it says. None of the three actions is executed — they download, delete or write the user's library."
     },
@@ -2189,7 +2189,7 @@
       "dataStateOwner": "renderer selection state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.selectionActions, driven through step `selectRow`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD actions=4 selected=1 logDisabled=false planDisabled=false expected=false || LIQUID actions=4 selected=0 logDisabled=true planDisabled=true expected=true",
+      "observed": "STANDARD actions=4 selected=1 logDisabled=false planDisabled=false expected=false || LIQUID actions=4 selected=0 logDisabled=true planDisabled=true expected=true || negative control `selectionActions` -> 9/10 (baseline 10/10), fell=[selectionActions], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "Driven: selection 0 -> 1, on the row \"What's the difference between \\\"Para\\\" and…\". Neither bulk action is executed; both write the user's study data."
     },
@@ -2203,7 +2203,7 @@
       "dataStateOwner": "main-process YouTube playlist store, per playlist",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.playlistPreferences, reached through the drive",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD prefs=11 named=11 controls=10 valued=10 subChips=4 || LIQUID prefs=11 named=11 controls=10 valued=10 subChips=4",
+      "observed": "STANDARD prefs=11 named=11 controls=10 valued=10 subChips=4 || LIQUID prefs=11 named=11 controls=10 valued=10 subChips=4 || negative control `playlistPreferences` -> 9/10 (baseline 10/10), fell=[playlistPreferences], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both"
     },
     {
@@ -2216,7 +2216,7 @@
       "dataStateOwner": "renderer view state; restored by the spec's `undo`",
       "automatedProof": "probes/l6-parity.js SPECS.youtube.progressiveDisclosure, driven through step `openTools`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD disclosures=2 summaried=2 controlsHeld=2 open=1 || LIQUID disclosures=2 summaried=2 controlsHeld=2 open=1",
+      "observed": "STANDARD disclosures=2 summaried=2 controlsHeld=2 open=1 || LIQUID disclosures=2 summaried=2 controlsHeld=2 open=1 || negative control `progressiveDisclosure` -> 9/10 (baseline 10/10), fell=[progressiveDisclosure], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "Driven: `was false -> now true`. Read closed it reports `open=0`, which is the correct DEFAULT and not a failure — the row's claim is that the disclosure opens and holds its controls, so it is scored under the drive. TRAP THE OTHER TRACK PAID FOR: a closed `<details>` child still reports its open box, so only `checkVisibility` and the element's own height are true here."
     },
@@ -2230,7 +2230,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/cat6-feature-parity.cjs --app youtube, round trip standard -> liquid -> standard with a field dirtied first",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 9/10 (baseline 10/10), fell=[windowLifecycle], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr4-youtube.json` (2026-09-02 08:15), not re-run here",
       "status": "both",
       "_note": "Round trip on this window: field held, shell held, 0 diffs, box 980x640 in both."
     }
@@ -2239,39 +2239,34 @@
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 10 root components — was 19 on 2026-09-01 and 17 earlier on 2026-09-02. calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 16, and 10 declared specs still have NO row at all — notebook, statistics, library, immersion, novels, manga, vn, music, video, youtube. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 5 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 5 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 21, and 5 declared specs still have NO row at all — notebook, immersion, novels, manga, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
-      "at": "2026-09-02 (primary), L12 b2",
-      "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
+      "at": "2026-09-02 (re-derived by debug/_p2g-notwritten.cjs)",
+      "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
       "harnessSpecs": 25,
-      "specsWithRows": 12,
-      "specsWithNoRows": 13,
+      "specsWithRows": 20,
+      "specsWithNoRows": 5,
       "noRows": [
         "notebook",
-        "calendar",
-        "games",
         "immersion",
         "novels",
         "manga",
-        "vn",
-        "city",
-        "scraper",
-        "resources",
-        "settings",
-        "shell",
-        "blancShell"
+        "vn"
       ],
-      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (13) exceeds specs with rows (12)."
+      "ledgerAppsWithNoSpec": [
+        "mediaCenter"
+      ],
+      "note": "Counts THIS tree. A worker measuring before a merge sees a smaller figure, honestly, and it is not the project total."
     }
   },
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
-    "rows": 120,
-    "withNamedControl": 73,
-    "declaredNone": 1,
-    "silent": 45,
+    "rows": 168,
+    "withNamedControl": 126,
+    "declaredNone": 4,
+    "silent": 37,
     "silentByApp": {
       "dictionary": 7,
       "mediaWorkspace": 5,
@@ -2279,9 +2274,13 @@
       "grammar": 5,
       "translate": 4,
       "agent": 5,
-      "captures": 3,
-      "flashcards": 8
+      "captures": 3
     },
-    "note": "`silent` rows are the older ones, written before l6-parity-rows.cjs said anything when a spec declared no mutation for a row. They are not disproved — most were driven live — but the ledger does not record a control for them, and that gap is a fact about the ledger rather than about the product. New rows now say NONE DECLARED explicitly, so `silent` can only shrink."
+    "silentByCause": {
+      "predatingTheClause": 37,
+      "b2WaveNotTranscribed": 0,
+      "b2WaveApps": []
+    },
+    "note": "`silent` means this ledger records no control clause for the row. It is a gap in the LEDGER, not a disproof of the row — but it is a real gap and it is not monotone. THIS BLOCK RETRACTS ITS OWN EARLIER CLAIM: it used to end \"New rows now say NONE DECLARED explicitly, so `silent` can only shrink\", and the 2026-09-02 merge of the two concurrent b2 waves falsified that — silent went 45/120 -> 93/168, because the main tree's row writer (debug/_pr4-rows.cjs) copies only `rowEvidence` into `observed` while this tree's (probes/l6-parity-rows.cjs) also copies `control.mutations`. See `silentByCause`: the `b2WaveNotTranscribed` rows DID have per-row mutations run by cat6 and their receipts survive, so those are recoverable by transcription; the `predatingTheClause` rows are the older ones written before any writer said anything about controls. Two writers, one ledger, one claim that only held for one of them."
   }
 }

@@ -1191,3 +1191,62 @@ entry, which is why ledger apps (13) exceeds specs-with-rows (12).
 
 **Ledger this turn: 50 → 106 rows, 7 → 13 apps, 106 `both` / 0 `pending`, 0 duplicate
 `app|feature` keys — validated after every write, not asserted.**
+
+## 2026-09-02 (primary2) — the merge falsified this ledger's own claim about itself, and 53 controls were recovered rather than re-run
+
+The two concurrent b2 waves used **two different row writers**, and only one of them wrote
+down the controls it ran. `probes/l6-parity-rows.cjs` (this tree) copies both `rowEvidence`
+**and** `control.mutations` into a row's `observed`. The main tree's `debug/_pr4-rows.cjs`
+copies only `rowEvidence`. Same harness, same per-row mutations, same `PASS 10/10` verdicts —
+one writer simply does not transcribe the control.
+
+So the merge moved a number **against** this ledger: `controlCoverage` went **45 silent of 120
+→ 93 of 168**, and the block's own closing sentence — *"New rows now say NONE DECLARED
+explicitly, so `silent` can only shrink"* — was false the moment the two halves met. That
+sentence is now **retracted in the block itself**, not quietly dropped, and `silentByCause`
+splits the number by the two causes because they have two different remedies.
+
+### The controls were never lost, only unwritten
+
+cat6 banks its whole run. `debug/_pr4-<app>*.json` in the main tree carries
+`control.mutations` for every row: the mutation name, `preBaseline`, `reachable` after it was
+applied, `fellRows`, `exactlyOwnRow`, `afterRestore` and `returned`. `debug/_p2i-transcribe.cjs`
+copies those into the ledger through an identity chain that is **verified, not assumed**:
+
+| link | how it is established | measured |
+| --- | --- | --- |
+| receipt → run | the receipt is chosen **by its own content** — the unique file whose `verdict` is `PASS 10/10`, whose control verdict is `CONTROL FAILED AS REQUIRED`, and **every** one of whose mutations has `exactlyOwnRow` and `returned` true | 1 of 1 per app; the pre-fix `VOID`/`FAIL` receipts sitting beside them (`_pr4-flashcards.json`, `_pr4-library.json`, `_pr4-music.json`, `_pr4-music2.json`) are correctly **not** picked up |
+| mutation → row id | every `mutation` name must be a row id declared in that app's meta | 53 of 53, 0 unknown |
+| row id → ledger row | the meta's `feature` string must match **exactly one** ledger row of that app | 56 metaIds ↔ 56 ledger rows, 1:1, 0 duplicates, 0 unmatched either way |
+
+**Result: 53 rows given a transcribed control, 3 explicitly none-declared** (`library` declares
+6 mutations for 9 rows), 56 touched. `controlCoverage` **93 silent → 37**, `withNamedControl`
+**73 → 126 of 168**, and `silentByCause.b2WaveNotTranscribed` is **0** — the whole recoverable
+class is recovered. The 37 that remain genuinely pre-date any writer saying anything about
+controls; they are a different problem and the block now says so.
+
+### Provenance is part of the clause, because this process did not run these controls
+
+Every transcribed clause ends `-- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6
+receipt \`debug/_pr4-<app>.json\` (<mtime>), not re-run here`. A control someone else ran must
+never read like one this turn ran. The clause names the file and that receipt's own timestamp
+so the next worker can go back to the source.
+
+### The transcriber's own negative control — three plants, three refusals, restored
+
+Run against a **copy** of the youtube receipt+meta in `debug/_p2i-ctrl/` (`PR4_DIR` exists only
+for this), baseline **10 of 10 transcribed**:
+
+| plant | attacks | result |
+| --- | --- | --- |
+| meta `playlistRail.feature` changed to a string no ledger row carries | row id → ledger row | `REFUSED: youtube/playlistRail: feature matched 0 ledger rows, expected exactly 1` |
+| `mutations[3].exactlyOwnRow = false` | receipt → run | `REFUSED: youtube: expected exactly 1 qualifying PASS receipt, found 0` — the receipt stops qualifying at all |
+| `mutations[2].mutation = "notADeclaredRowId"` | mutation → row id | `REFUSED: youtube: mutation "notADeclaredRowId" is not a declared row id` |
+
+Baseline restored after each: **10 of 10** again. The writer also refuses to overwrite a row
+that already carries a control clause, so it cannot silently replace one worker's measured
+control with another's transcription.
+
+**Ledger after this turn: 168 rows / 21 apps, 0 duplicate `app|feature` keys, 126 named
+controls / 4 none-declared / 37 silent.** `notWritten` re-derived: **5 of 25 specs still have
+no row at all** — notebook, immersion, novels, manga, vn.
