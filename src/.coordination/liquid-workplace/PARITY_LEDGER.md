@@ -1437,6 +1437,213 @@ ledger apps (16) exceeds specs-with-rows (15).
 `shell`, `blancShell` (owned by the concurrent worker); `notebook`, `calendar`, `games`,
 `settings` (not reached this turn — they are the next turn's opening slice).
 
+### calendar — 5 rows, added later the same turn. It passed on the first run
+
+`129 → 134 rows, 16 → 17 apps, 134 `both` / 0 `pending`, 0 duplicate keys.` PASS 10/10, 5/5 in
+both presentations, 0 drive refusals, 18 driven steps, box 820x580 in both, all five mutations
+`exactlyOwnRow` and restored. **No instrument repair was needed**, which is worth recording
+because three of the previous four apps did need one — a spec written carefully enough that the
+first live run is the measurement.
+
+What the rows actually ask, as opposed to what presence scoring would have accepted:
+
+- `viewModes` requires `visited=4/4` — four ARRIVALS, walked week → day → agenda → month and
+  recorded in spec state. Read without the walk it would score `buttons=4 active=1` on a
+  segment whose other three modes render nothing.
+- `monthGrid` asserts exactly 42 cells, not `>= 28`: a six-week grid is the layout, and a month
+  rendered with fewer cells silently drops the leading and trailing days that make the previous
+  and next month reachable by click. Measured `dows=7 cells=42 numbered=42`.
+- `dateTransport` requires `shiftedAndReturned=true`, both halves. A transport that moves and
+  cannot return is the reversibility defect this ledger keeps finding on other surfaces. Its
+  three buttons must also be NAMED — an unlabelled arrow is not a control a screen reader can
+  use — and it must carry a real `input[type="date"]` to jump with.
+- `eventComposer` requires the composer complete when open (6 inputs, 3 selects, 1 textarea, 2
+  actions) AND `.cal-modal` absent at read time, so an open flow that cannot be reversed fails.
+  `type="button"` is asserted because a default-type button inside that form would submit it and
+  create an event in the user's calendar. **The drive opens and closes and never submits.**
+
+`dirtiedField` is `null` on this surface and the reason is written into the row rather than
+glossed: the driver dirties the first VISIBLE text field, and the composer holding this
+surface's six inputs is CLOSED at round-trip time. The composer's own reversibility is scored by
+`eventComposer` instead, so nothing is lost by that.
+
+**Gap after this slice: 9 of 25 specs have no row in this tree** — notebook, games, vn, city,
+scraper, resources, settings, shell, blancShell. Five (`city`, `scraper`, `resources`, `shell`,
+`blancShell`) are the concurrent worker's and arrive by merge; `vn` has no subject on this
+profile. So the genuinely-open set for this tree is **notebook, games, settings** plus `vn` if
+the user ever adds a visual novel.
+
+## 2026-09-02 (backup) — L12 b2: Game Arena, and the two rows whose empty state is the only branch this profile can reach
+
+### games — 10 rows, and it passed on the first run
+
+`cat6-feature-parity.cjs --app games` returned **PASS 10/10** with no repair: parity
+standard **10/10** = liquid **10/10**, `na=0`, `rowsAgree=true`, round trip
+`standard → liquid → standard` with `shellHeld=true` and **0 diffs**, box **980x660** in both
+presentations, **0 drive refusals** across 5 legs. All **10** declared mutations flipped
+**exactly their own row** (10/10 → 9/10 each) and every one restored to 10/10 —
+`CONTROL FAILED AS REQUIRED`. Receipt: `debug/_pb1-games.json`.
+
+**The drive is load-bearing, and the undriven read proves it.** Read passively, the same ten
+predicates score **5 of 10**: `gameCatalog` `selectionWorks=false`, `typingInput`
+`round=not driven`, `scoreHud` `hud=not driven`, `levelSettings` `stable=false` (no captured
+baseline), and `materialScope` `probe threw: Cannot read properties of null` because the
+catalogue entry active on arrival was `Sentence Builder`, which renders no kana picker. Those
+five are not defects; they are the five rows that cannot be answered without driving. The drive
+switches to `Kana Sprint` (rail index 0 → 3), starts a round, types into it, aborts it and
+settles.
+
+What the rows ask that presence scoring would have accepted:
+
+- `gameCatalog` requires `selectionWorks=true` — the stage head read back in a LATER bridge call
+  agreeing with the entry that was clicked. 15 entries, all `type="button"`, all carrying both a
+  name and a blurb, exactly one active. A rail that renders perfectly and switches nothing
+  passes every presence check ever written.
+- `stageIdentity` is an EQUALITY against the rail, not `title.length > 0`: `stage="Kana Sprint"
+  listed="Kana Sprint" descMatches=true`. A stale title after a switch is the defect.
+- `typingInput` scores the disabled → enabled TRANSITION: `value="ro" submitDisabled true->false
+  readyStateReturned=true`. An enabled submit read once proves nothing.
+- `scoreHud` cross-checks two surfaces: the ready panel declares **5** rounds and the in-round
+  HUD's own total is **5**. HUD `["1/5","60s","Combo 0","Best 0"]`, timer
+  `role="progressbar"` `aria-valuenow=99`, labelled. A HUD counting to a different total than
+  the panel promised is invisible to presence scoring.
+- `levelSettings` asserts STABILITY across the switch — the level is arena-wide, not per game,
+  so `Level 1` before and `Level 1` after (`meta=[Level 1 | English | No high score yet]`). A
+  per-game decoration would drift here and nothing else in the suite would notice.
+- `materialScope`'s mutation is deliberately ADDITIVE (a second `primary` on a mode button)
+  rather than a detach, because `chosen === 1` has to fail upward as well as downward.
+
+**Two rows are scored on their honest-empty branch, and that is written into the rows rather
+than glossed.** This profile has no word list uploaded and no round history, so `sourceMaterial`
+reads `note="No word list uploaded for this level" pct=noList scaleX=0 agrees=true` and
+`roundHistory` reads `rows=0 emptyState="No rounds recorded for this game y[et]"`.
+`exposureTracking` reads `seen=0/10 statedPct=0 derivedPct=0 scaleX=0`, and **0 = 0 = 0 is a
+weak discriminator** — a broken derivation satisfies it too. Those three rows' strength here
+comes from their mutations taking exactly their own row, not from the numbers. The populated
+branches are UNMEASURED on this profile and must not be quoted as covered.
+
+Nothing was written to the user's data: the round is **aborted**, never submitted (the drive
+clicks the active catalogue entry, which discards the session), so no score and no history row
+was recorded. The spec's undo restored `games:selection+scroll+options` and the window was left
+in `standard`.
+
+### The gap, re-derived again
+
+`window.__LQP.apps()` = **25** specs against **18** distinct `app` keys in `rows[]` →
+**8 of 25 specs have no row in this tree**: notebook, vn, city, scraper, resources, settings,
+shell, blancShell. Five (`city`, `scraper`, `resources`, `shell`, `blancShell`) are the
+concurrent worker's and arrive by merge; `vn` has no subject on this profile; `notebook`'s
+subject was deleted by the files-app track. So the genuinely-open set for this tree is
+**settings** alone. Ledger: **134 → 144 rows / 17 → 18 apps**, 144 `both`, 0 `pending`,
+0 duplicate `app|feature` keys.
+
+### settings — 7 rows, and a row that was passing on the spelling of an attribute
+
+`cat6-feature-parity.cjs --app settings` returned **PASS 7/7** in both presentations,
+`na=0`, `rowsAgree=true`, round trip `standard → liquid → standard` with
+`dirtiedField="os-set-search-input"`, `fieldsHeld=true`, `shellHeld=true`, **0 diffs**, box
+**960x680** in both, **0 drive refusals**. All **7** declared mutations fell exactly their own
+row (7/7 → 6/7) and restored. Receipts: `debug/_pb2-settings.json` (before the instrument fix),
+`debug/_pb2-settings2.json` (after). This is one of the very few surfaces in the ledger where
+the round trip had a REAL editable field to dirty, so `fieldsHeld` here is a measurement and
+not a vacuous true.
+
+**THE INSTRUMENT DEFECT, and it was two defects wearing one coat.** The spec's `closeSearch`
+step read `aria-expanded` in the SAME expression that dispatched Escape, and its comment said
+in as many words "Escape is synchronous". The handler is; the attribute is not — React commits
+the collapse after the dispatching task, so the leg reported `expanded:"true"` on **every run
+it has ever made**. Read one bridge call later the live surface was `expanded:"false"
+panelMounted:false`. A worker reading that receipt would have filed drive residue in the
+settings search panel, which is *precisely* the false finding that comment exists to prevent —
+it cost a category-5 run once already, when a left-open panel scored a real 10 as a 9.
+
+Underneath it was the larger one: **`settingsSearch` asked only that `aria-expanded` be a
+well-formed boolean**, which a widget stuck permanently open passes. The row now scores the
+DISMISSAL. `closeSearch` returns `{sent:'Escape'}` and a new `readSearchClosed` leg reads the
+result in its own POST and REFUSES if the panel is still up — the idiom `blancShell` already
+uses for `closeSearch` / `readSearchClosed`, so this is the existing pattern applied, not a new
+one invented.
+
+The strengthened row discriminates, measured both ways on the live window:
+
+- driven — `dismissal=expandedAfterEscape=false panelMounted=false`, **7/7**
+- undriven — `dismissal=not driven`, row **false**, **6/7**
+
+Before the change the undriven read scored this row TRUE. That is the whole difference between
+a row that says a search box exists and a row that says a search box can be dismissed.
+
+What the other rows ask that presence scoring would have accepted:
+
+- `categoryRail` counts the visible label span AND the `title` separately (`items=23 current=1
+  named=23 titled=23`), because below 420px of `.os-set-body` the label is clipped and `title`
+  is the only text left — an entry with one but not the other is stranded in exactly one width
+  tier, and counting either alone would never show it.
+- `groupedNavigation` RESOLVES each list's `aria-labelledby` against the document
+  (`groups=5 labelled=5 lists=5 wired=5`). A labelledby pointing at an id that does not exist
+  announces nothing and is indistinguishable from a correct one in any attribute count.
+- `pageRegion` is an equality against the rail (`role=main page=home label=Home rail=Home`),
+  not `label.length > 0`. A pane still announcing the previous page after a rail click is how a
+  keyboard user loses their place, and it passes every presence check.
+- `advancedDisclosure` is the AGREEMENT (`pressed=true advancedItemsInRail=5 agrees=true`), not
+  the button. A toggle reading true over a rail with zero advanced entries claims an effect it
+  does not have. **This profile has advanced mode ON, so the `pressed=false / dots=0` branch is
+  UNMEASURED** and must not be quoted as covered. The drive never flips the toggle — it is a
+  persisted preference and the row reads whatever state it finds.
+- `homeOverview` scores `valued=5/5` and `live=10/10`, not the raw counts: a splash screen
+  renders five chips and ten cards too.
+
+Nothing persisted was changed: the drive visits `Appearance` and returns, types and clears the
+search box, dismisses the panel and scrolls the pane; `restore` returned `settings:scroll` and
+the window was left on Home in `standard`.
+
+### The gap after this slice — and this tree has no drivable spec left
+
+`window.__LQP.apps()` = **25** specs against **19** distinct `app` keys in `rows[]` →
+**7 of 25 specs have no row in this tree**: notebook, vn, city, scraper, resources, shell,
+blancShell. Five (`city`, `scraper`, `resources`, `shell`, `blancShell`) are the concurrent
+worker's and arrive by merge. `notebook`'s subject was **deleted by the files-app track on this
+branch** — `LEGACY_WIN_SECTION_ALIASES` maps `notebook → files`. `vn` has a live window and no
+subject: an empty library, and adding one writes to the user's real library, which that spec's
+own safety note forbids.
+
+**So the remainder is not work this tree can do.** Ledger: **144 → 151 rows / 18 → 19 apps**,
+151 `both`, 0 `pending`, 0 duplicate `app|feature` keys.
+
+### Two live checks that found nothing, recorded as the negative results they are
+
+**The Media Center "Back" candidate is WITHDRAWN.** The 2026-09-02 primary2 handoff filed it
+as one reading, deliberately not as a defect, and asked for a repeat: *"Back stays `disabled`
+after the FIRST in-window navigation (Home → Library) and enables only after the second."*
+Repeated here on the main tree's profile with **every read in its own bridge leg**, and the
+control run in the same script:
+
+| leg | back `disabled` | tab |
+| --- | --- | --- |
+| as found | `true` (title: "This is the first section you opened…") | Library |
+| nav 1, read in the SAME expression (**CONTROL**) | `true` | — |
+| nav 1, read one leg later | **`false`**, title "Back" | Home |
+| nav 2 | `false` | Music |
+| Back | `false`, forward now `false` too | Home |
+| Back again | `true`, honest reason text | Library |
+
+The same-expression read **reproduces the reported symptom exactly**, and the separated read
+contradicts it. `MediaCenterView.tsx:1738-1750` keeps a real trail with `at`, and it walks
+Music → Home → Library correctly with both ends disabling and both tooltips carrying the
+reason rather than the label. So the candidate was an off-by-one in the instrument, not a
+control that claims an effect it does not have — and the trap is now written into
+`cat6-feature-parity.cjs`'s trap list, because the settings spec's `closeSearch` had the
+identical bug in the same turn. Receipt: `debug/_bk3-mc.cjs`.
+
+**Game Arena's Settings entry lands, cold and warm.** `openArenaSettings`
+(`GameArenaContent.tsx:113`) opens the Settings section and then fires `settings:navigate` on
+an **80 ms `setTimeout`** — a race against the Settings window mounting its own listener,
+which is the shape that leaves a user on Settings Home wondering where the setting went. Both
+cases measured, with the warm case parked on Home first so "already there" could not pass for
+a hit: **cold** (nothing open, Settings mounts from scratch) → `page=study`, pane
+`Profile & dictionary`, `[data-setting-id="game-arena"]` present and highlighted; **warm**
+(Settings already up, parked on Home, `gameArenaOnPage=0`) → the same landing. No defect.
+Receipt: `debug/_bk6-arena-settings.cjs`.
+
 ## 2026-09-02 (primary2) — `mediaCenter` was the last ledger app with no spec, and a candidate defect died
 
 Commits: `2ab8709d` (the spec), plus this turn's `--refresh` mode on the row writer.

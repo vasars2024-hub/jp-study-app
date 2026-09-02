@@ -80,36 +80,14 @@
  * A control that cannot run says `n/a` with its reason. It never scores a pass.
  *
  * ---------------------------------------------------------------------------------
- * TWO ADDITIONS MADE WHEN BULLET 1 CLOSED (2026-09-02), both forced by what its final
- * evidence actually looks like, neither optional:
- *
- * (1) `--manifest a.json,b.json` — MORE THAN ONE SOURCE RUN. Bullet 1 did not close as one
- *     manifest and could not have: the state axis needs a maximized pass, and sweeping
- *     25 apps x 13 themes x 2 presentations x 2 states is 1,300 cells of Electron driving.
- *     It closed as a 650-cell `normal` run over all 13 themes plus a 100-cell `maximized`
- *     run over the two extreme ones. An atlas that could only read one of those would have
- *     to declare the state axis `not-swept` while the evidence for it sits on disk.
- *
- *     COVERAGE IS STILL COMPUTED PER SOURCE RUN, and that is the whole subtlety. Taking the
- *     union of the declared dimensions instead would fabricate a 1,300-cell universe that
- *     nobody ever intended to capture and then report 599 cells "never attempted" — a
- *     blocker invented by the atlas out of its own arithmetic. Each run is scored against
- *     the cartesian product IT declared; the aggregate is the sum, not a cross-product.
- *     Only axis effectiveness, integrity and duplication read the merged cell set, because
- *     those three ask questions about images and are indifferent to which run banked them.
- *
- * (2) `--shots-root <dir>` — the PNGs need not live under this checkout. Bullet 1 ran in the
- *     main tree and its 710 plates are in that tree's gitignored `debug/shots/`; this file
- *     runs from a worktree. Copying 59 MB of PNGs across to re-hash them would be the
- *     wrong fix twice over — the disk is nearly full, and an atlas that can only verify
- *     images sitting in its own checkout is exactly the un-rebuildable artifact the
- *     separate-module decision above was made to avoid.
- *
- * ---------------------------------------------------------------------------------
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-atlas.cjs \
- *     [--manifest a.json[,b.json...]] [--shots-root <dir>] [--out <atlas.json>] \
+ *     [--manifest a.json[,b.json,...]] [--out <atlas.json>] \
  *     [--sheet debug/shots/l12-atlas.html] [--control]
+ *
+ * `--manifest` takes a comma-separated LIST and order is precedence — a later manifest
+ * supersedes an earlier one on the same cell coordinate. See `mergeManifests` for why
+ * bullet 1's evidence is three runs and what the merge is allowed to combine.
  *
  * WHAT IS COMMITTED: the atlas JSON only. The contact sheet is HTML that references
  * gitignored PNGs by relative path, so it lands in `debug/shots/` beside them.
@@ -126,13 +104,8 @@ const arg = (name, dflt) => {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
 const has = (name) => process.argv.indexOf(`--${name}`) >= 0;
-/** Where a cell's `file` path is rooted. Defaults to this checkout; see addition (2) above. */
-const SHOTS_ROOT = path.resolve(REPO, arg('shots-root', REPO));
 
 const AXES = ['app', 'theme', 'presentation', 'state'];
-
-/** The identity of a cell: one photograph of one app in one configuration. */
-const cellKey = (c) => JSON.stringify([c.app, c.theme, c.presentation, c.state]);
 
 /** The key of a cell with one axis removed — the group inside which that axis varies. */
 function groupKey(cell, without) {
@@ -201,7 +174,7 @@ function integrity(cells) {
   const mismatches = [];
   for (const c of cells) {
     if (!c.ok || !c.file || !c.sha256) continue;
-    const abs = path.join(SHOTS_ROOT, c.file);
+    const abs = path.join(REPO, c.file);
     if (!fs.existsSync(abs)) { missing += 1; continue; }
     const sha = crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex');
     if (sha === c.sha256) verified += 1;
@@ -238,54 +211,26 @@ function integrity(cells) {
  * failures.
  */
 /**
- * WHICH SURFACE/AXIS-VALUE PAIRS THE PRODUCT SIMPLY DOES NOT OFFER, derived mechanically
- * from the manifest's own per-cell booleans and NEVER from its prose.
+ * THE SAME DEFECT ON THE STATE AXIS, found the moment the state axis was actually merged
+ * in: 4 of the 5 "failed" cells are `note` at `maximized`, and the manifest's own error
+ * says the reason — a frameless sticky note has no maximize control to drive. That is the
+ * identical product gap as `presentable: false`, one axis over.
  *
- * The first version of this only understood the PRESENTATION axis, via the app summary's
- * `presentable` flag, and the state axis caught it out the moment bullet 1 actually swept
- * one: the maximized run's four `note` cells came back `stateReached: false` because a
- * frameless sticky note has no maximize control, and the atlas called them capture
- * FAILURES and refused to certify — the same false blocker as the nine Liquid cells one
- * revision earlier, one axis over. Generalising is the fix; special-casing `note` would
- * only move the bug to the next surface.
- *
- * The test is a property of the SURFACE, not of one attempt: for a given (app, axis value)
- * the axis must have gone unreached in EVERY cell that asked for it, and there must be at
- * least two such cells. One flake among four attempts stays `failed`, which is what
- * separates "this control does not exist" from "this click did not land" without reading a
- * single error string. The reason is then quoted VERBATIM from the manifest's own record.
+ * It is matched on the harness's own emitted shape rather than on a per-app flag ONLY
+ * because the harness records no `maximizable` field; the reason still comes from the
+ * manifest, never from this file's guess. The pattern is deliberately narrow — it demands
+ * the harness's exact "surface has no <thing> control of its own" clause — so that a real
+ * capture failure (`Error: UnknownVizError`, the compositor flake on `agent`) cannot be
+ * laundered into `unavailable`. That cell staying `failed` is this rule's negative control.
  */
-function unavailability(manifest) {
-  const reachedField = { presentation: 'presentationReached', state: 'stateReached' };
-  const map = new Map();
-  for (const axis of ['presentation', 'state']) {
-    const groups = new Map();
-    for (const c of manifest.cells || []) {
-      const k = JSON.stringify([c.app, c[axis]]);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(c);
-    }
-    for (const list of groups.values()) {
-      if (list.length < 2) continue;
-      if (!list.every((c) => c[reachedField[axis]] === false)) continue;
-      map.set(JSON.stringify([axis, list[0].app, list[0][axis]]), {
-        axis,
-        app: list[0].app,
-        value: list[0][axis],
-        cells: list.length,
-        reason: list[0].error || null,
-      });
-    }
-  }
-  return map;
-}
+const STATE_UNAVAILABLE = /^state [^:]+: surface has no [^:]*control of its own\b/i;
 
-function classify(cell, manifest, unav) {
+function classify(cell, manifest) {
   if (cell.ok) return 'captured';
-  const u = unav || unavailability(manifest);
-  for (const axis of ['presentation', 'state']) {
-    if (u.has(JSON.stringify([axis, cell.app, cell[axis]]))) return 'unavailable';
-  }
+  const app = (manifest.apps || {})[cell.app] || {};
+  const dflt = ((manifest.dimensions || {}).presentations || ['standard'])[0];
+  if (app.opened && app.presentable === false && cell.presentation !== dflt) return 'unavailable';
+  if (app.opened && STATE_UNAVAILABLE.test(cell.error || '')) return 'unavailable';
   return 'failed';
 }
 
@@ -299,23 +244,22 @@ function coverage(manifest) {
   const declared = apps.length * themes.length * pres.length * states.length;
   const seen = new Set();
   for (const c of manifest.cells || []) {
-    seen.add(cellKey(c));
+    seen.add([c.app, c.theme, c.presentation, c.state].join('\u0000'));
   }
   const absent = [];
   for (const a of apps) {
     for (const t of themes) {
       for (const p of pres) {
         for (const s of states) {
-          if (!seen.has(cellKey({ app: a, theme: t, presentation: p, state: s }))) absent.push({ app: a, theme: t, presentation: p, state: s });
+          if (!seen.has([a, t, p, s].join('\u0000'))) absent.push({ app: a, theme: t, presentation: p, state: s });
         }
       }
     }
   }
   const cells = manifest.cells || [];
   const captured = cells.filter((c) => c.ok).length;
-  const unav = unavailability(manifest);
-  const unavailable = cells.filter((c) => classify(c, manifest, unav) === 'unavailable');
-  const failed = cells.filter((c) => classify(c, manifest, unav) === 'failed');
+  const unavailable = cells.filter((c) => classify(c, manifest) === 'unavailable');
+  const failed = cells.filter((c) => classify(c, manifest) === 'failed');
   const openedApps = Object.entries(manifest.apps || {})
     .filter(([, v]) => v.opened).map(([k]) => k);
   const canonical = d.canonicalSections || null;
@@ -329,11 +273,19 @@ function coverage(manifest) {
     // The product gap, named. These surfaces have NO Liquid presentation to photograph.
     unavailableSurfaces: [...new Set(unavailable.map((c) => c.app))],
     unavailableReason: unavailable.length ? (unavailable[0].error || null) : null,
-    // Per-axis, because a surface with no maximize control and a surface with no Liquid
-    // toggle are two different product gaps and were being reported as one number.
-    unavailableByAxis: [...unav.values()].map((u) => ({
-      axis: u.axis, app: u.app, value: u.value, cells: u.cells, reason: u.reason,
-    })),
+    /**
+     * Once the state axis merged in there are TWO kinds of product gap (no presentation
+     * toggle, no maximize control) and one `unavailableReason` string silently described
+     * both by the first one it happened to meet. Grouped, so each gap is named with the
+     * surfaces it actually applies to.
+     */
+    unavailableByReason: Object.entries(
+      unavailable.reduce((acc, c) => {
+        const why = c.error || 'no reason recorded';
+        (acc[why] = acc[why] || new Set()).add(c.app);
+        return acc;
+      }, {}),
+    ).map(([reason, apps]) => ({ reason, surfaces: [...apps], cells: unavailable.filter((c) => (c.error || 'no reason recorded') === reason).length })),
     attainableCells: attainable,
     attainableCompleteness: attainable ? +((100 * captured) / attainable).toFixed(2) : 0,
     neverAttempted: absent.length,
@@ -361,92 +313,6 @@ function coverage(manifest) {
   };
 }
 
-/**
- * MERGING SOURCE RUNS. See addition (1) in the header for why coverage is deliberately NOT
- * merged. What IS merged is the cell set — the photographs — because integrity, duplication
- * and axis effectiveness are questions about images and do not care which run banked them.
- *
- * A collision (two runs claiming the same app/theme/presentation/state) is the one thing
- * that could silently corrupt this: whichever manifest was listed last would shadow the
- * other and the atlas would index a picture it never accounted for. Collisions are counted
- * and named, the FIRST occurrence wins, and a collision is a certification blocker — two
- * runs disagreeing about one cell means at least one of them is stale.
- */
-function mergeSources(manifests) {
-  const byKey = new Map();
-  const collisions = [];
-  for (const m of manifests) {
-    for (const c of m.cells || []) {
-      const k = cellKey(c);
-      if (byKey.has(k)) { collisions.push({ cell: `${c.app}/${c.presentation}/${c.theme}/${c.state}`, from: m.__file }); continue; }
-      byKey.set(k, { ...c, __from: m.__file });
-    }
-  }
-  const apps = {};
-  for (const m of manifests) for (const [k, v] of Object.entries(m.apps || {})) if (!apps[k]) apps[k] = v;
-  const union = (sel) => [...new Set(manifests.flatMap((m) => (m.dimensions || {})[sel] || []))];
-  return {
-    cells: [...byKey.values()],
-    apps,
-    collisions,
-    dimensions: {
-      apps: union('apps'),
-      themes: union('themes'),
-      presentations: union('presentations'),
-      states: union('states'),
-      canonicalSections: (manifests[0].dimensions || {}).canonicalSections || null,
-      themeCatalog: (manifests.find((m) => ((m.dimensions || {}).themeCatalog || []).length) || { dimensions: {} }).dimensions.themeCatalog || [],
-    },
-  };
-}
-
-/**
- * The aggregate of the per-run coverages. Sums, never a cross-product: three runs of 10
- * cells each cover 30 cells, not 1,000. Rates are recomputed from the summed numerators
- * and denominators rather than averaged, because averaging percentages over runs of
- * different sizes is its own small fabrication.
- */
-function aggregateCoverage(perSource, merged) {
-  const sum = (f) => perSource.reduce((n, s) => n + (f(s) || 0), 0);
-  const declared = sum((s) => s.coverage.declaredCells);
-  const captured = sum((s) => s.coverage.capturedCells);
-  const unavailable = sum((s) => s.coverage.unavailableCells);
-  const attainable = declared - unavailable;
-  const d = merged.dimensions;
-  const canonical = d.canonicalSections || null;
-  const surfaces = [...new Set(perSource.flatMap((s) => s.coverage.unavailableSurfaces))];
-  const openedApps = Object.entries(merged.apps).filter(([, v]) => v.opened).map(([k]) => k);
-  return {
-    declaredCells: declared,
-    presentCells: sum((s) => s.coverage.presentCells),
-    capturedCells: captured,
-    failedCells: sum((s) => s.coverage.failedCells),
-    unavailableCells: unavailable,
-    unavailableSurfaces: surfaces,
-    unavailableReason: (perSource.find((s) => s.coverage.unavailableReason) || { coverage: {} }).coverage.unavailableReason || null,
-    attainableCells: attainable,
-    attainableCompleteness: attainable ? +((100 * captured) / attainable).toFixed(2) : 0,
-    neverAttempted: sum((s) => s.coverage.neverAttempted),
-    neverAttemptedExamples: perSource.flatMap((s) => s.coverage.neverAttemptedExamples).slice(0, 6),
-    completeness: declared ? +((100 * captured) / declared).toFixed(2) : 0,
-    // Distinct cells actually indexed, which is what the atlas can show a reader.
-    distinctCellsIndexed: merged.cells.length,
-    mergeCollisions: merged.collisions.length,
-    mergeCollisionExamples: merged.collisions.slice(0, 6),
-    appsRequested: d.apps.length,
-    appsOpened: openedApps.length,
-    appsPresentable: Object.values(merged.apps).filter((v) => v.presentable).length,
-    canonicalSections: canonical,
-    unavailableByAxis: perSource.flatMap((s) => s.coverage.unavailableByAxis),
-    sampledOut: [...new Set(perSource.flatMap((s) => s.coverage.sampledOut))],
-    universeCoverage: canonical ? +((100 * d.apps.length) / canonical).toFixed(2) : null,
-    themeCatalog: (d.themeCatalog || []).length || null,
-    themesSampledOut: (d.themeCatalog || []).map((t) => t.id).filter((id) => !d.themes.includes(id)),
-    themeUniverseCoverage: (d.themeCatalog || []).length
-      ? +((100 * d.themes.length) / d.themeCatalog.length).toFixed(2) : null,
-  };
-}
-
 /** Check (D). */
 function duplicates(cells) {
   const by = new Map();
@@ -468,23 +334,134 @@ function duplicates(cells) {
   };
 }
 
-function assemble(manifests) {
-  const merged = mergeSources(manifests);
-  const perSource = manifests.map((m) => ({
-    manifest: m.__file,
-    generatedAt: m.generatedAt,
-    certifiable: !!m.certifiable,
-    void: m.void || null,
-    hasControls: !!m.controls,
-    controls: m.controls
-      ? Object.fromEntries(Object.entries(m.controls).map(([k, v]) => [k, v.pass === undefined ? v.identical : v.pass]))
-      : null,
-    caretFrozen: m.caretFrozen,
-    dimensions: m.dimensions || {},
-    coverage: coverage(m),
-  }));
-  const cells = merged.cells;
-  const cov = aggregateCoverage(perSource, merged);
+const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join(' ');
+
+/**
+ * MULTI-MANIFEST ASSEMBLY — why the atlas takes a LIST and not a file.
+ *
+ * Bullet 1's evidence was never one manifest and structurally cannot be. The matrix is a
+ * live instrument driving a real desk, so its axes were swept in separate runs: the full
+ * 13-theme sweep at `normal`, a `maximized` run for the state axis, and an oled-black
+ * re-capture made after the plate-namespace fix. An assembler that reads ONE of those can
+ * never report the state axis as anything but `not-swept`, and it re-hashes stale plates
+ * that a later run has already replaced. Both were live findings, not hypotheticals:
+ * over the full matrix alone this file reported `state: not-swept` and 21 integrity
+ * mismatches whose replacements were sitting in a manifest it could not open.
+ *
+ * The merge is a UNION OF CELLS WITH LAST-WINS PRECEDENCE, and the two honesty rules that
+ * make it safe to trust are:
+ *
+ *   1. NOTHING DERIVED IS MERGED. Only `cells`, `dimensions` and `apps` are unioned; every
+ *      computed number — coverage, axis effectiveness, integrity, duplication — is then
+ *      re-derived by `assemble()` from the union. Hand-merging a computed block while its
+ *      inputs change underneath is how a merged artifact keeps pre-merge counts and lies.
+ *   2. SUPERSESSION IS COUNTED AND NAMED, never silent. A later run replacing an earlier
+ *      cell is the whole point, but it is also indistinguishable from an atlas quietly
+ *      dropping evidence it found inconvenient, so every replaced coordinate is recorded
+ *      with the source that lost it.
+ *
+ * Certification is CONJUNCTIVE across sources: the merge is certifiable only if every
+ * contributing run ran its controls and passed them. One un-controlled manifest in the
+ * list voids the atlas rather than being averaged away.
+ */
+function mergeManifests(loaded) {
+  if (loaded.length === 1) return { manifest: loaded[0].manifest, provenance: null };
+
+  const cells = new Map();
+  const superseded = [];
+  const dims = { apps: [], themes: [], presentations: [], states: [], themeCatalog: [] };
+  const apps = {};
+  const perSource = [];
+
+  for (const { file, manifest } of loaded) {
+    for (const c of manifest.cells || []) {
+      const key = CELL_KEY(c);
+      const prior = cells.get(key);
+      if (prior) {
+        superseded.push({
+          app: c.app, theme: c.theme, presentation: c.presentation, state: c.state,
+          supersededFrom: prior.__source, by: file,
+        });
+        const idx = perSource.find((s) => s.file === prior.__source);
+        if (idx) idx.superseded += 1;
+      }
+      cells.set(key, { ...c, __source: file });
+    }
+    const d = manifest.dimensions || {};
+    for (const axis of ['apps', 'themes', 'presentations', 'states']) {
+      for (const v of d[axis] || []) if (!dims[axis].includes(v)) dims[axis].push(v);
+    }
+    for (const t of d.themeCatalog || []) {
+      if (!dims.themeCatalog.some((x) => x.id === t.id)) dims.themeCatalog.push(t);
+    }
+    if (d.canonicalSections) dims.canonicalSections = d.canonicalSections;
+    for (const [id, v] of Object.entries(manifest.apps || {})) {
+      const cur = apps[id] || {};
+      // OR, not last-wins: a surface opened in ANY run really was opened, and
+      // `presentable` is a property of the product rather than of one run's luck.
+      apps[id] = { ...cur, ...v, opened: !!(cur.opened || v.opened), presentable: !!(cur.presentable || v.presentable) };
+    }
+    perSource.push({
+      file,
+      runId: manifest.runId || null,
+      generatedAt: manifest.generatedAt || null,
+      cells: (manifest.cells || []).length,
+      // Incremented in place by LATER sources that replace one of this source's cells;
+      // surviving = cells - superseded, and it is reported rather than inferred.
+      superseded: 0,
+      certifiable: !!manifest.certifiable,
+      controlsRan: !!manifest.controls,
+      caretFrozen: !!manifest.caretFrozen,
+    });
+  }
+
+  // Controls AND-ed across sources; a key any source failed is failed for the merge.
+  const controlKeys = [...new Set(loaded.flatMap(({ manifest }) => Object.keys(manifest.controls || {})))];
+  const controls = controlKeys.length ? {} : null;
+  for (const k of controlKeys) {
+    const passes = loaded
+      .map(({ manifest }) => (manifest.controls || {})[k])
+      .filter((v) => v !== undefined)
+      .map((v) => (v.pass === undefined ? v.identical : v.pass));
+    controls[k] = { pass: passes.every(Boolean) };
+  }
+  const uncontrolled = loaded.filter(({ manifest }) => !manifest.controls).map(({ file }) => file);
+  const notCertifiable = loaded.filter(({ manifest }) => !manifest.certifiable).map(({ file }) => file);
+
+  // sampledOut survives the merge only where EVERY source skipped it.
+  const sampledOut = (loaded[0].manifest.sampledOut || [])
+    .filter((s) => loaded.every(({ manifest }) => (manifest.sampledOut || []).includes(s)));
+
+  const merged = {
+    schema: 'l12-visual-matrix/v1',
+    generatedAt: loaded.map(({ manifest }) => manifest.generatedAt).filter(Boolean).sort().pop() || null,
+    dimensions: dims,
+    apps,
+    sampledOut,
+    cells: [...cells.values()].map(({ __source, ...c }) => c),
+    controls: uncontrolled.length ? null : controls,
+    certifiable: notCertifiable.length === 0,
+    void: notCertifiable.length ? `sources not certifiable on their own controls: ${notCertifiable.join(', ')}` : null,
+    caretFrozen: loaded.every(({ manifest }) => manifest.caretFrozen),
+  };
+
+  return {
+    manifest: merged,
+    provenance: {
+      sources: perSource,
+      mergedCells: cells.size,
+      supersededCells: superseded.length,
+      // Named, per rule 2 above. Truncated only in the printed list, never in the count.
+      supersededExamples: superseded.slice(0, 12),
+      uncontrolledSources: uncontrolled,
+      nonCertifiableSources: notCertifiable,
+    },
+  };
+}
+
+function assemble(manifest) {
+  const cells = manifest.cells || [];
+  const cov = coverage(manifest);
   const axes = AXES.map((a) => axisEffect(cells, a));
   const integ = integrity(cells);
   const dup = duplicates(cells);
@@ -497,14 +474,8 @@ function assemble(manifests) {
    * and no indexed image was rewritten under it.
    */
   const blockers = [];
-  for (const s of perSource) {
-    if (!s.hasControls) blockers.push(`source run ${s.manifest} had no controls (--control was not passed) — it is not certification evidence and neither is this atlas`);
-    else if (!s.certifiable) blockers.push(`source run ${s.manifest} is not certifiable: ${s.void || 'a matrix control failed'}`);
-  }
-  if (cov.mergeCollisions > 0) {
-    blockers.push(`${cov.mergeCollisions} cells are claimed by more than one source run `
-      + `(${cov.mergeCollisionExamples.map((c) => c.cell).join(', ')}) — two runs disagreeing about one cell means at least one is stale, and the atlas would be indexing a photograph it did not account for`);
-  }
+  if (!manifest.controls) blockers.push('source run had no controls (--control was not passed) — it is not certification evidence and neither is this atlas');
+  else if (!manifest.certifiable) blockers.push(`source run is not certifiable: ${manifest.void || 'a matrix control failed'}`);
   if (cov.neverAttempted > 0) blockers.push(`${cov.neverAttempted} declared cells were never attempted`);
   if (cov.failedCells > 0) blockers.push(`${cov.failedCells} cells failed to capture`);
   /**
@@ -513,15 +484,9 @@ function assemble(manifests) {
    * It is a genuine L12 finding and belongs in the risk register, not in a verdict that
    * would be unfixable by any amount of photography.
    */
-  const gaps = [];
-  for (const axis of ['presentation', 'state']) {
-    const rows = cov.unavailableByAxis.filter((u) => u.axis === axis);
-    if (!rows.length) continue;
-    const surfaces = [...new Set(rows.map((u) => u.app))];
-    gaps.push(`${surfaces.length} of ${cov.appsOpened} surfaces never reach a value on the '${axis}' axis `
-      + `(${surfaces.join(', ')}) — ${rows.reduce((n, u) => n + u.cells, 0)} declared cells cannot exist. `
-      + `Reported as a product gap, not an atlas defect: ${rows[0].reason}`);
-  }
+  const gaps = (cov.unavailableByReason || []).map((g) => `${g.surfaces.length} of ${cov.appsOpened} surfaces `
+    + `(${g.surfaces.join(', ')}) — ${g.cells} declared cells cannot exist. `
+    + `Reported as a product gap, not an atlas defect: ${g.reason}`);
   for (const a of decorative) blockers.push(`axis '${a}' moved no pixels in any comparable group — it is decorative, so the atlas does not cover that dimension`);
   for (const a of axes.filter((x) => x.verdict === 'partial')) {
     blockers.push(`axis '${a.axis}' moved pixels in only ${a.groupsWhereItMoved} of ${a.comparableGroups} comparable groups`
@@ -533,11 +498,17 @@ function assemble(manifests) {
     schema: 'l12-atlas/v1',
     bullet: 'L12 bullet 4 — final visual atlas',
     generatedAt: new Date().toISOString(),
-    // One entry per source run, each carrying the coverage it is scored against. The
-    // top-level `coverage` is the sum of these, never a cross-product of their dimensions.
-    sources: perSource,
-    shotsRoot: SHOTS_ROOT === REPO ? 'this checkout' : SHOTS_ROOT.replace(/\\/g, '/'),
-    dimensions: merged.dimensions,
+    source: {
+      schema: manifest.schema,
+      generatedAt: manifest.generatedAt,
+      certifiable: !!manifest.certifiable,
+      void: manifest.void || null,
+      controls: manifest.controls
+        ? Object.fromEntries(Object.entries(manifest.controls).map(([k, v]) => [k, v.pass === undefined ? v.identical : v.pass]))
+        : null,
+      caretFrozen: manifest.caretFrozen,
+    },
+    dimensions: manifest.dimensions || {},
     coverage: cov,
     axisEffectiveness: axes,
     integrity: integ,
@@ -562,9 +533,6 @@ function assemble(manifests) {
         converged: c.converged === undefined ? null : c.converged,
         themeApplied: c.themeApplied === undefined ? null : c.themeApplied,
         error: c.error || null,
-        // Which source run banked this photograph. With one manifest it is constant; with
-        // several it is the only way a reader can trace a plate back to its run.
-        from: c.__from || null,
       })),
   };
 }
@@ -578,7 +546,7 @@ function contactSheet(atlas, sheetPath) {
     if (!byApp.has(p.app)) byApp.set(p.app, []);
     byApp.get(p.app).push(p);
   }
-  const rel = (f) => (f ? path.relative(dir, path.join(SHOTS_ROOT, f)).replace(/\\/g, '/') : null);
+  const rel = (f) => (f ? path.relative(dir, path.join(REPO, f)).replace(/\\/g, '/') : null);
   const sections = [...byApp.entries()].map(([app, plates]) => `
     <h2>${esc(app)} <small>${plates.filter((p) => p.ok).length}/${plates.length} captured</small></h2>
     <div class="grid">${plates.map((p) => `
@@ -629,16 +597,14 @@ ${sections}
 // ---------------------------------------------------------------------------------
 // Mutation controls. Each damages a deep copy and asserts the matching check reports it.
 // ---------------------------------------------------------------------------------
-function runControls(manifests, base) {
-  const clone = () => JSON.parse(JSON.stringify(manifests));
-  const allCells = manifests.flatMap((m) => m.cells || []);
+function runControls(manifest, base) {
+  const clone = () => JSON.parse(JSON.stringify(manifest));
   const out = {};
 
   // M1 — drop one cell.
   const m1src = clone();
-  const m1host = m1src.filter((m) => (m.cells || []).length).pop();
-  if (m1host) {
-    const dropped = m1host.cells.pop();
+  if (m1src.cells.length) {
+    const dropped = m1src.cells.pop();
     const a = assemble(m1src);
     out.m1 = {
       kind: 'drop-one-cell/coverage-must-report-a-gap',
@@ -655,7 +621,7 @@ function runControls(manifests, base) {
   const live = base.axisEffectiveness.find((a) => a.verdict === 'effective');
   if (live) {
     const m2src = clone();
-    for (const m of m2src) for (const c of m.cells || []) if (c.ok) c.sha256 = 'f'.repeat(64);
+    for (const c of m2src.cells) if (c.ok) c.sha256 = 'f'.repeat(64);
     const a = assemble(m2src);
     const after = a.axisEffectiveness.find((x) => x.axis === live.axis);
     out.m2 = {
@@ -668,10 +634,10 @@ function runControls(manifests, base) {
   } else out.m2 = { kind: 'flatten-images', pass: null, note: 'n/a — no axis was effective in the source run, so there is nothing to break' };
 
   // M3 — corrupt one indexed sha256. Only meaningful while the PNG is on disk.
-  const onDisk = allCells.find((c) => c.ok && c.file && fs.existsSync(path.join(SHOTS_ROOT, c.file)));
+  const onDisk = (manifest.cells || []).find((c) => c.ok && c.file && fs.existsSync(path.join(REPO, c.file)));
   if (onDisk) {
     const m3src = clone();
-    const target = m3src.flatMap((m) => m.cells || []).find((c) => c.file === onDisk.file);
+    const target = m3src.cells.find((c) => c.file === onDisk.file);
     target.sha256 = `0${target.sha256.slice(1)}`;
     const a = assemble(m3src);
     out.m3 = {
@@ -690,14 +656,14 @@ function runControls(manifests, base) {
   }
 
   // M4 — remove an entire app's cells.
-  const apps = [...new Set(allCells.map((c) => c.app))];
+  const apps = [...new Set((manifest.cells || []).map((c) => c.app))];
   if (apps.length > 1) {
     const victim = apps[0];
     const m4src = clone();
-    for (const m of m4src) m.cells = (m.cells || []).filter((c) => c.app !== victim);
+    m4src.cells = m4src.cells.filter((c) => c.app !== victim);
     const a = assemble(m4src);
     const lost = base.coverage.capturedCells - a.coverage.capturedCells;
-    const expected = allCells.filter((c) => c.app === victim && c.ok).length;
+    const expected = (manifest.cells || []).filter((c) => c.app === victim && c.ok).length;
     out.m4 = {
       kind: 'drop-one-app/coverage-must-fall-by-exactly-that-app',
       app: victim,
@@ -707,108 +673,37 @@ function runControls(manifests, base) {
     };
   } else out.m4 = { kind: 'drop-one-app', pass: null, note: `n/a — only ${apps.length} app in the run` };
 
-  /**
-   * M5 — THE MERGE ITSELF. Added with multi-manifest support, because that code path is the
-   * one thing here that can silently DROP evidence: if two runs claim the same cell, one
-   * photograph shadows the other and every downstream number is computed over a set the
-   * atlas never accounted for. The control copies a cell from the first run into the
-   * second and asserts the merge reports exactly one collision AND refuses to certify.
-   * Without this, the collision branch would be a plausible check that had never fired.
-   */
-  if (manifests.length > 1 && (manifests[0].cells || []).length) {
-    const m5src = clone();
-    const stowaway = JSON.parse(JSON.stringify(m5src[0].cells[0]));
-    m5src[1].cells.push(stowaway);
-    const a = assemble(m5src);
-    out.m5 = {
-      kind: 'duplicate-a-cell-across-runs/merge-must-report-a-collision',
-      cell: `${stowaway.app}/${stowaway.presentation}/${stowaway.theme}/${stowaway.state}`,
-      baseCollisions: base.coverage.mergeCollisions,
-      mutatedCollisions: a.coverage.mergeCollisions,
-      mutatedCertifiable: a.certifiable,
-      pass: a.coverage.mergeCollisions === base.coverage.mergeCollisions + 1 && a.certifiable === false,
-    };
-  } else {
-    out.m5 = {
-      kind: 'duplicate-a-cell-across-runs',
-      pass: null,
-      note: `n/a — ${manifests.length} source manifest(s), so there is no merge to falsify`,
-    };
-  }
-
-  /**
-   * M6 — THE UNAVAILABILITY RULE ITSELF. `unavailability()` decides which non-captured
-   * cells are a product gap rather than a failure, and a rule that only ever says
-   * "product gap" would hide every real capture failure behind a shrug. The control makes
-   * ONE cell of an all-unreached group succeed: the surface then demonstrably CAN reach
-   * that value, so its remaining cells must be reclassified `failed` and must block.
-   */
-  const gapRow = base.coverage.unavailableByAxis[0];
-  if (gapRow) {
-    const m6src = clone();
-    const field = gapRow.axis === 'state' ? 'stateReached' : 'presentationReached';
-    // The group is per MANIFEST — unavailability is derived per run — so the control must
-    // damage one run's group and expect the delta in that run alone.
-    const host = m6src.find((m) => (m.cells || [])
-      .filter((c) => c.app === gapRow.app && c[gapRow.axis] === gapRow.value && c[field] === false).length >= 2);
-    const victims = host.cells.filter((c) => c.app === gapRow.app && c[gapRow.axis] === gapRow.value && c[field] === false);
-    victims[0][field] = true;
-    const a = assemble(m6src);
-    /**
-     * EVERY cell of the group becomes a failure, not all-but-one: the flipped cell still
-     * has `ok: false`, so once the surface has demonstrably reached that axis value at
-     * least once, its whole group is capture failures. Getting this expectation wrong by
-     * one is how the control first ran — it read 13 against a predicted 12 and correctly
-     * reported itself failing rather than being rounded to a pass.
-     */
-    out.m6 = {
-      kind: 'one-cell-of-a-gap-group-reaches-the-axis/the-whole-group-must-become-failures',
-      group: `${gapRow.app}/${gapRow.axis}=${gapRow.value} in ${host.__file} (${victims.length} cells)`,
-      baseFailed: base.coverage.failedCells,
-      expectedFailed: base.coverage.failedCells + victims.length,
-      mutatedFailed: a.coverage.failedCells,
-      mutatedCertifiable: a.certifiable,
-      pass: a.coverage.failedCells === base.coverage.failedCells + victims.length && a.certifiable === false,
-    };
-  } else out.m6 = { kind: 'one-cell-of-a-gap-group-reaches-the-axis', pass: null, note: 'n/a — no surface/axis gap in these runs, so the rule has no subject' };
-
-  const total = Object.keys(out).length;
   const fired = Object.values(out).filter((c) => c.pass === true).length;
   const failed = Object.values(out).filter((c) => c.pass === false).length;
-  return { ...out, summary: { fired, failed, notApplicable: total - fired - failed } };
+  return { ...out, summary: { fired, failed, notApplicable: 4 - fired - failed } };
 }
 
 // ---------------------------------------------------------------------------------
 (() => {
-  const manifestPaths = arg('manifest', path.join('debug', 'l12-matrix-manifest.json'))
-    .split(',').map((s) => s.trim()).filter(Boolean)
-    .map((s) => path.resolve(REPO, s));
-  if (!manifestPaths.length) {
-    console.error('REFUSE - --manifest resolved to no files.');
-    process.exit(2);
-  }
-  if (!fs.existsSync(SHOTS_ROOT)) {
-    console.error(`REFUSE - --shots-root ${SHOTS_ROOT} does not exist.`);
-    process.exit(2);
-  }
-  const manifests = [];
-  for (const p of manifestPaths) {
-    if (!fs.existsSync(p)) {
-      console.error(`REFUSE - no matrix manifest at ${p}. Run l12-visual-matrix.cjs first.`);
+  // Comma-separated, and ORDER IS PRECEDENCE: a later manifest supersedes an earlier one
+  // on the same cell coordinate. One path behaves exactly as before.
+  const requested = arg('manifest', path.join('debug', 'l12-matrix-manifest.json'))
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const loaded = [];
+  for (const rel of requested) {
+    const manifestPath = path.resolve(REPO, rel);
+    if (!fs.existsSync(manifestPath)) {
+      console.error(`REFUSE - no matrix manifest at ${manifestPath}. Run l12-visual-matrix.cjs first.`);
       process.exit(2);
     }
-    const m = JSON.parse(fs.readFileSync(p, 'utf8'));
-    if (m.schema !== 'l12-visual-matrix/v1') {
-      console.error(`REFUSE - ${p} is schema '${m.schema}', not l12-visual-matrix/v1`);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest.schema !== 'l12-visual-matrix/v1') {
+      console.error(`REFUSE - ${manifestPath} is schema '${manifest.schema}', not l12-visual-matrix/v1`);
       process.exit(2);
     }
-    m.__file = path.relative(REPO, p).replace(/\\/g, '/');
-    manifests.push(m);
+    loaded.push({ file: path.relative(REPO, manifestPath).replace(/\\/g, '/'), manifest });
   }
 
-  const atlas = assemble(manifests);
-  atlas.sourceManifest = manifests.map((m) => m.__file).join(',');
-  if (has('control')) atlas.mutationControls = runControls(manifests, atlas);
+  const { manifest, provenance } = mergeManifests(loaded);
+  const atlas = assemble(manifest);
+  atlas.sourceManifest = loaded.map((l) => l.file).join(',');
+  atlas.multiRun = provenance;
+  if (has('control')) atlas.mutationControls = runControls(manifest, atlas);
   else atlas.mutationControls = null;
 
   const sheetPath = path.resolve(REPO, arg('sheet', path.join('debug', 'shots', 'l12-atlas.html')));
@@ -823,8 +718,6 @@ function runControls(manifests, base) {
   console.log(JSON.stringify({
     out: path.relative(REPO, outPath).replace(/\\/g, '/'),
     sheet: atlas.contactSheet,
-    sources: atlas.sources.map((s) => `${s.manifest} (${s.coverage.capturedCells}/${s.coverage.declaredCells}, certifiable ${s.certifiable})`),
-    shotsRoot: atlas.shotsRoot,
     plates: atlas.plates.length,
     coverage: atlas.coverage,
     axes: Object.fromEntries(atlas.axisEffectiveness.map((a) => [a.axis, a.verdict])),
