@@ -933,3 +933,37 @@ slice (`debug/_layout-BACKUP-20260901.json`), globalZTop included. The window wa
 
 TRAP: the restarted app took **60 s** to write `debug/bridge.json` and reused **the same port**
 (39273) with a new token, so a restart-wait keyed on the port never fires. Key on the pid.
+
+## 2026-09-01, late night — CORRECTION: clause 3 (multi-monitor) is NOT blocked, and never was here
+
+Bullet 4's tag says multi-monitor "needs a second display this machine does not have". **That is
+stale and it has been stale since 2026-08-17**, when the user approved a virtual display driver
+in chat and it was installed; `~\.claude-runs\needs-user.md:138` records the blocker CLEARED.
+Nobody re-read it, so a measurable clause has been carried as human-blocked for two weeks.
+
+Re-derived live tonight, not from that note:
+
+    [System.Windows.Forms.Screen]::AllScreens
+      \.\DISPLAY2  Primary=True   {X=0,    Y=0, W=1920, H=1080}
+      \.\DISPLAY6  Primary=False  {X=1920, Y=0, W=800,  H=600}    (Virtual Display Driver, OK)
+      \.\DISPLAY1  Primary=False  {X=2720, Y=0, W=1920, H=1080}
+
+and the app's own side, from `desktop-layout.json`: **three assignments are already
+`enabled: true`** — `display|1920x1080|1` -> desktop 0, `dell-up3017|2560x1600|1` -> desktop 3,
+`display|1920x1080|1#1` -> desktop 6. That matters because `DesktopShell.tsx:1267`
+`neighbourDesktop()` returns null below TWO enabled assignments, so the whole
+`os:move-to-monitor` path is live **with no persisted-setting patch required**. It was not
+measured tonight only because a monitor move commits to another desktop's layout and the return
+leg has to be driven from the OTHER desk window — that is a slice, not a tail-of-turn errand.
+
+WHAT THE NEXT TURN OPENS ON, with the trap already found by reading the code:
+`onMove` at `DesktopShell.tsx:1279` sends `{...winToSnapshot(top), x: 40, y: 40}`. `winToSnapshot`
+DOES carry `presentation` through, so a Liquid window should stay Liquid across monitors — but
+the forced `x:40,y:40` does NOT update `presentation.standardRect`, which still holds the
+geometry from the monitor it left. Return-to-standard on the far monitor therefore restores a
+rect authored for a different display, and DISPLAY6 is 800x600 against a `standardRect` of
+820x580 that was fine on a 1920x1080. Measure that first; it is the specific thing this clause
+exists to catch, and it is a prediction from source that has not yet been confirmed live.
+
+Only `deskwinFocusDesktop` opens a desk window on the other display; bridge `/health` currently
+lists exactly ONE window, so the return leg needs that window to exist first.
