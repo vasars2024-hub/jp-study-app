@@ -139,7 +139,13 @@ describe('extension server port resolution', () => {
       mod.stopExtensionServer();
       await new Promise<void>((resolve) => squatter.close(() => resolve()));
     }
-  });
+    // 60s on the two cases that bind a REAL socket and re-import `extensionServer`
+    // through Vite's transform. Alone they take ~220ms; under a full `vitest run` with
+    // eight workers contending they exceeded the 20s default and were reported as a
+    // product regression on 2026-09-02. The cost is external — a real listen and a real
+    // module transform — so unlike `mediaSurfaceImportGraph` there is no repeated work
+    // to remove. Every assertion above still fails on the assertion, not the clock.
+  }, 60_000);
 
   it('carries no reason once a listen succeeds', async () => {
     vi.resetModules();
@@ -166,5 +172,6 @@ describe('extension server port resolution', () => {
     } finally {
       mod.stopExtensionServer();
     }
-  });
+    // See the note on the collision case above — same cause, same reasoning.
+  }, 60_000);
 });

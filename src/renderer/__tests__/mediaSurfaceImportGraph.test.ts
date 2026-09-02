@@ -70,7 +70,11 @@ function resolveModule(specifier: string, fromFile: string): string | null {
  * they are erased at build time and carry no runtime weight, so counting them would fail
  * this surface for importing a `type { SeanimeConnection }`.
  */
+const importsCache = new Map<string, string[]>();
+
 function importsOf(file: string): string[] {
+  const cached = importsCache.get(file);
+  if (cached) return cached;
   const source = readFileSync(file, 'utf8');
   const found: string[] = [];
   const fromRe = /(?:^|\n)\s*(?:import|export)\s+([^;]*?)\s*from\s*['"]([^'"]+)['"]/g;
@@ -85,10 +89,32 @@ function importsOf(file: string): string[] {
   for (const match of source.matchAll(/(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g)) {
     if (match[1]) found.push(match[1]);
   }
+  importsCache.set(file, found);
   return found;
 }
 
+/**
+ * Both caches exist for one reason, and it is a measurement, not a preference.
+ *
+ * `reachableFrom` re-walked the whole graph on every call and `importsOf` re-read and
+ * re-regexed every file on every visit. The nine call sites below ask for
+ * `MediaPlayerSurface.tsx` six times and `MediaWorkspace.tsx` twice, so the suite did
+ * eight full graph walks to answer four questions — 1.1s to 2.4s per case run alone.
+ * Under a full `vitest run`, where eight workers contend for the same disk, that is
+ * exactly the shape that blows the 20s per-test timeout and gets reported as a product
+ * regression; this suite was one of four named that way on 2026-09-02, and
+ * `deletedPlayerDependents`/`sourceNulBytes` were repaired the same way at 084dcfea.
+ * Reading the tree once removes the cause instead of hiding it behind a bigger timeout.
+ *
+ * Caching is safe here because nothing under test mutates a source file mid-run: every
+ * case reads the same committed tree. The controls below still walk through these very
+ * functions, so a cache that returned nothing would fail them rather than pass emptily.
+ */
+const graphCache = new Map<string, Set<string>>();
+
 function reachableFrom(entry: string): Set<string> {
+  const cached = graphCache.get(entry);
+  if (cached) return cached;
   const seen = new Set<string>();
   const queue = [resolve(REPO, entry)];
   for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
@@ -99,6 +125,12 @@ function reachableFrom(entry: string): Set<string> {
       if (resolved && !seen.has(resolved)) queue.push(resolved);
     }
   }
+  // A walk that reached only its own entry means the resolver broke, not that the graph
+  // is small — and every `toEqual([])` below would then pass for the wrong reason.
+  if (seen.size < 2) {
+    throw new Error(`the import walk from ${entry} reached ${seen.size} file(s) — the walker is broken, not the graph`);
+  }
+  graphCache.set(entry, seen);
   return seen;
 }
 
