@@ -1819,6 +1819,146 @@
       "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 820x580 in both. `dirtiedField` is null here and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and the composer that holds this surface's six inputs is CLOSED at trip time, so there is none. The composer's own reversibility is scored by `eventComposer` instead."
+    },
+    {
+      "app": "games",
+      "feature": "Browse the whole game catalogue and switch to another game, with the switch actually taking effect",
+      "currentRoute": "Game Arena window > game rail (`.game-list-item`)",
+      "standardDestination": "at least ten catalogue entries, EVERY one of them a real `type=\"button\"` carrying both a name (`b`) and a one-line blurb (`small`), exactly one marked active, AND a switch driven live that the stage then agreed with — the row scores an arrival, not a list",
+      "liquidDestination": "the same rail on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`; the catalogue rail is navigation, which is what the plan nominates for Liquid treatment, while the stage beneath it stays a stable anchor",
+      "keyboardRoute": "every entry is a `<button>` in the window's focus order",
+      "dataStateOwner": "renderer Game Arena selection state; the drive switches away from whatever was active and the spec's undo clicks the original index back",
+      "automatedProof": "probes/l6-parity.js SPECS.games.gameCatalog, driven through step `begin` and read back in `startRound`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD games=15 named=15 buttons=15 active=1 selectionWorks=true || LIQUID games=15 named=15 buttons=15 active=1 selectionWorks=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "`selectionWorks` is the whole row and it is the reason this is a drive rather than a read. Undriven, the same predicate scores `games=15 named=15 buttons=15 active=1 selectionWorks=false` — a rail that renders perfectly and may switch nothing. The switch is read back in a LATER bridge call (`startRound`), because React has not re-rendered the stage head yet when the click returns."
+    },
+    {
+      "app": "games",
+      "feature": "Know which game you are looking at — the stage names the selected game and describes it in the catalogue's own words",
+      "currentRoute": "Game Arena window > `.game-stage-head` (h3 + p.muted)",
+      "standardDestination": "a non-empty stage title that EQUALS the active rail entry's name, and a non-empty description that equals that entry's blurb — agreement between the two surfaces, not presence of text on either",
+      "liquidDestination": "the same stage head on the liquid material, with the identity agreement unchanged",
+      "keyboardRoute": "the stage head is a heading in the window's reading order; it is reached by selecting its game in the rail",
+      "dataStateOwner": "renderer Game Arena selection state; read-only for this row",
+      "automatedProof": "probes/l6-parity.js SPECS.games.stageIdentity; the mutation detaches `.game-stage-head h3`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || LIQUID stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Scored as an EQUALITY against the rail rather than `title.length > 0`, because a stage that renders a stale title after a switch is exactly the defect a presence check passes. Read live at `stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true` after the drive moved the selection from index 0 to index 3."
+    },
+    {
+      "app": "games",
+      "feature": "See what word list the current level is drawing from, and how much of it the level covers",
+      "currentRoute": "Game Arena window > `.game-coverage` (the deck-coverage section, not the seen-words one)",
+      "standardDestination": "a labelled coverage section with a non-empty note AND a bar whose fill AGREES with the percentage the note states — and where there is no list at all, an empty bar, because a filled bar over \"no word list\" is the lie this row exists for",
+      "liquidDestination": "the same section on the liquid material; the coverage figures are dense read-only data and stay on a stable high-contrast anchor rather than becoming glass",
+      "keyboardRoute": "the section carries `aria-label` and sits in the window's reading order",
+      "dataStateOwner": "renderer level/deck state, derived from the uploaded word list for the active level",
+      "automatedProof": "probes/l6-parity.js SPECS.games.sourceMaterial; the mutation detaches the section's note",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || LIQUID label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "This profile has NO word list uploaded, so the row is scored on its honest-empty branch: `note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true`. That is a real pass of the agreement the row asserts, but it is NOT a measurement of the populated branch — a profile with a deck loaded should re-run this row before anyone quotes it as covering both."
+    },
+    {
+      "app": "games",
+      "feature": "See how many of the level's words you have actually been shown, as a fraction, a percentage and a bar that agree with each other",
+      "currentRoute": "Game Arena window > `.game-seen`",
+      "standardDestination": "a labelled section stating a seen/total fraction, a percentage DERIVED from that same fraction rather than stated independently, and a bar whose fill matches the percentage to within a point",
+      "liquidDestination": "the same section on the liquid material, with the three-way agreement unchanged",
+      "keyboardRoute": "the section carries `aria-label` and sits in the window's reading order",
+      "dataStateOwner": "persisted per-level exposure state in the renderer; read-only for this row — the drive types but never submits, so nothing is scored or recorded",
+      "automatedProof": "probes/l6-parity.js SPECS.games.exposureTracking; the mutation detaches the section",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || LIQUID seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Read live at `seen=0/10 statedPct=0 derivedPct=0 scaleX=0`. Zero is a genuinely weak discriminator for a three-way agreement — 0 = 0 = 0 holds for a broken derivation too — so the row's strength here comes from its mutation (detaching the section takes exactly this row and nothing else), not from the numbers. A profile with exposure history should re-run it."
+    },
+    {
+      "app": "games",
+      "feature": "Play a round — type an answer into the round's own field and have the submit control unlock because of what you typed",
+      "currentRoute": "Game Arena window > start control (`.game-launch-panel > .btn.primary`) > `.game-answer-box`",
+      "standardDestination": "a real enabled start control, a round that opens an answer box, submit DISABLED on the empty box, the typed characters genuinely present in the field, submit ENABLED after them, and the ready state returned after the round is discarded",
+      "liquidDestination": "the same round on the liquid material; the answer field is editing work and stays on a stable opaque anchor, per the plan's selectivity rule",
+      "keyboardRoute": "the start control is a `<button>` and the answer box is a focusable input, both in the window's focus order",
+      "dataStateOwner": "renderer round session state; the round is ABORTED (the active catalogue entry is clicked, which discards it) rather than submitted, so no score is written",
+      "automatedProof": "probes/l6-parity.js SPECS.games.typingInput, driven through steps `startRound` / `typeRound` / `abortRound` / `settle`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || LIQUID round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || CONTROL type stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Live: `value=\"ro\" submitDisabled true->false readyStateReturned=true`. The disabled->enabled TRANSITION is the claim; an enabled submit read once proves nothing, and a present `<input>` proves less. Undriven this row reads `round=not driven` and scores false, which is correct rather than a defect."
+    },
+    {
+      "app": "games",
+      "feature": "Read the round HUD while playing — progress, time, combo and best — with a timer bar that is a real labelled progressbar",
+      "currentRoute": "Game Arena window > in-round `.game-round-hud` and `.game-time-bar`",
+      "standardDestination": "four non-empty HUD spans, a `role=\"progressbar\"` timer carrying an `aria-label` and an `aria-valuenow` inside 0-100, AND the ready-state round count agreeing with the round total the HUD itself declares",
+      "liquidDestination": "the same HUD on the liquid material; it is transport-adjacent contextual chrome, which is what the plan nominates for Liquid",
+      "keyboardRoute": "the HUD is read-only status; the timer is exposed to assistive technology as a labelled progressbar rather than a bare bar",
+      "dataStateOwner": "renderer round session state; read during the aborted round and gone with it",
+      "automatedProof": "probes/l6-parity.js SPECS.games.scoreHud, driven through step `typeRound`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || LIQUID hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Live: HUD `[\"1/5\",\"60s\",\"Combo 0\",\"Best 0\"]`, `valuenow=99`, and the ready panel's declared `5` equals the HUD's own round total `5`. That cross-check is the point: a HUD counting to a different total than the panel promised is a mismatch presence scoring never sees. `valuenow=99` rather than 100 because the timer had already started ticking."
+    },
+    {
+      "app": "games",
+      "feature": "See your recent rounds for this game, or an honest statement that there are none",
+      "currentRoute": "Game Arena window > `.game-history`",
+      "standardDestination": "a labelled, headed history section where EITHER every listed row is complete (score, detail and timing all non-empty) OR, with no rows, a non-empty empty-state sentence — a headed section with neither is the failure",
+      "liquidDestination": "the same section on the liquid material; the history rows are a dense list and stay on a stable anchor",
+      "keyboardRoute": "the section carries `aria-label` and sits in the window's reading order",
+      "dataStateOwner": "persisted per-game round history; untouched by this drive, which aborts its round instead of submitting it",
+      "automatedProof": "probes/l6-parity.js SPECS.games.roundHistory; the mutation detaches the section heading",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || LIQUID heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Read live at `rows=0 emptyState=\"No rounds recorded for this game y[et]\"` — the honest-empty branch, and it is empty BECAUSE this drive deliberately never submits. The populated branch (complete === rows.length) is unmeasured on this profile and should not be quoted as covered."
+    },
+    {
+      "app": "games",
+      "feature": "Choose what material a kana game draws on — automatic, or a manual pick of scripts and kana groups",
+      "currentRoute": "Game Arena window > `.game-kana-picker` on a kana-typing game",
+      "standardDestination": "a picker offering exactly two modes with exactly one chosen, and then the shape that mode actually implies — in manual, at least two script buttons with one selected plus at least one group button; in automatic, a non-empty hint explaining what will be drawn",
+      "liquidDestination": "the same picker on the liquid material; it is a contextual tool surface, which is what the plan nominates for Liquid treatment",
+      "keyboardRoute": "the modes, scripts and groups are all `<button>`s in the window's focus order",
+      "dataStateOwner": "renderer per-game material scope; the drive only selects the game, never the scope, and the spec's undo returns the original selection",
+      "automatedProof": "probes/l6-parity.js SPECS.games.materialScope; the mutation adds `primary` to a mode button so two read as chosen",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || LIQUID picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || CONTROL primary added to 1 of 1: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "THE PICKER ONLY EXISTS ON A KANA GAME. Undriven, with `Sentence Builder` active, this row reads `probe threw: Cannot read properties of null` — a null picker, not a defect, and the spec's `begin` step REFUSES outright if the catalogue has no kana-typing game rather than scoring the absence. The mutation is deliberately additive (a second `primary`) rather than a detach, because `chosen === 1` must fail upward as well as downward."
+    },
+    {
+      "app": "games",
+      "feature": "Read the arena's level, language and best score, and reach the settings that change them — and have the level survive switching games",
+      "currentRoute": "Game Arena window > `.game-stage-meta` and the `.game-ready-options` disclosure > its settings entry",
+      "standardDestination": "all three meta fields filled, an OPEN options disclosure carrying a real named `type=\"button\"` entry, and the level string UNCHANGED across the game switch the drive performs",
+      "liquidDestination": "the same meta and disclosure on the liquid material",
+      "keyboardRoute": "the disclosure is a native `<details>` and its entry is a `<button>`, both in the window's focus order",
+      "dataStateOwner": "arena-wide level/language settings, shared across games; the drive opens the disclosure and the spec's undo returns its original open state",
+      "automatedProof": "probes/l6-parity.js SPECS.games.levelSettings, with `levelBefore` captured in step `begin` and compared after the switch",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || LIQUID meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "The level is ARENA-WIDE, not per game, so the row asserts stability across the switch: `Level 1` before, `Level 1` after (`meta=[Level 1 | English | No high score yet]`). A per-game decoration would drift here and nothing else in the suite would notice. `stable=false` on the undriven read is the absence of a captured baseline, not a drift."
+    },
+    {
+      "app": "games",
+      "feature": "Enter and leave Liquid from the window's own chrome, without losing geometry or state",
+      "currentRoute": "Game Arena `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+      "standardDestination": "a conventional `.fwin` with its full chrome cluster and the Liquid control reading `aria-pressed=false`",
+      "liquidDestination": "`.fwin-liquid`, `data-presentation=\"liquid\"`, the same control reading `aria-pressed=true`, and the same 980x660 box",
+      "keyboardRoute": "the chrome buttons are in the window's focus order",
+      "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
+      "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app games round trip",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "status": "both",
+      "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 980x660 in both. `dirtiedField` is null and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and this surface's only text field is the round answer box, which exists only inside a live round. The answer field's own reversibility is scored by `typingInput` instead."
     }
   ],
   "notWritten": {
@@ -1829,14 +1969,13 @@
       "specs with NO rows in this tree, re-derived live 2026-09-02 rather than asserted: notebook, calendar, games, immersion, novels, manga, vn, city, scraper, resources, settings, shell, blancShell (13 of 25; it was 19 before this turn)"
     ],
     "derived": {
-      "at": "2026-09-02 (primary), L12 b2",
+      "at": "2026-09-02 (backup), L12 b2",
       "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
       "harnessSpecs": 25,
-      "specsWithRows": 16,
-      "specsWithNoRows": 9,
+      "specsWithRows": 17,
+      "specsWithNoRows": 8,
       "noRows": [
         "notebook",
-        "games",
         "vn",
         "city",
         "scraper",
@@ -1845,7 +1984,7 @@
         "shell",
         "blancShell"
       ],
-      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (17) exceeds specs with rows (16). vn is the one spec left with a live window and NO subject: its library is empty on this profile (\"Add a local visual novel to begin capturing Japanese dialog\"), and adding one would write to the user's real library, which this spec's own safety note forbids."
+      "note": "Re-derived after games landed: window.__LQP.apps() = 25 specs against 18 distinct app keys in rows[]. city, scraper, resources, shell and blancShell are written in the concurrent worker tree and arrive here by merge, so this figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (18) exceeds specs with rows (17). vn is the one spec left with a live window and NO subject: its library is empty on this profile, and adding one would write to the user real library, which that spec own safety note forbids."
     }
   }
 }

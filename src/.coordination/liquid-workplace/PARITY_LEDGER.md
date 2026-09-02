@@ -934,3 +934,67 @@ scraper, resources, settings, shell, blancShell. Five (`city`, `scraper`, `resou
 `blancShell`) are the concurrent worker's and arrive by merge; `vn` has no subject on this
 profile. So the genuinely-open set for this tree is **notebook, games, settings** plus `vn` if
 the user ever adds a visual novel.
+
+## 2026-09-02 (backup) — L12 b2: Game Arena, and the two rows whose empty state is the only branch this profile can reach
+
+### games — 10 rows, and it passed on the first run
+
+`cat6-feature-parity.cjs --app games` returned **PASS 10/10** with no repair: parity
+standard **10/10** = liquid **10/10**, `na=0`, `rowsAgree=true`, round trip
+`standard → liquid → standard` with `shellHeld=true` and **0 diffs**, box **980x660** in both
+presentations, **0 drive refusals** across 5 legs. All **10** declared mutations flipped
+**exactly their own row** (10/10 → 9/10 each) and every one restored to 10/10 —
+`CONTROL FAILED AS REQUIRED`. Receipt: `debug/_pb1-games.json`.
+
+**The drive is load-bearing, and the undriven read proves it.** Read passively, the same ten
+predicates score **5 of 10**: `gameCatalog` `selectionWorks=false`, `typingInput`
+`round=not driven`, `scoreHud` `hud=not driven`, `levelSettings` `stable=false` (no captured
+baseline), and `materialScope` `probe threw: Cannot read properties of null` because the
+catalogue entry active on arrival was `Sentence Builder`, which renders no kana picker. Those
+five are not defects; they are the five rows that cannot be answered without driving. The drive
+switches to `Kana Sprint` (rail index 0 → 3), starts a round, types into it, aborts it and
+settles.
+
+What the rows ask that presence scoring would have accepted:
+
+- `gameCatalog` requires `selectionWorks=true` — the stage head read back in a LATER bridge call
+  agreeing with the entry that was clicked. 15 entries, all `type="button"`, all carrying both a
+  name and a blurb, exactly one active. A rail that renders perfectly and switches nothing
+  passes every presence check ever written.
+- `stageIdentity` is an EQUALITY against the rail, not `title.length > 0`: `stage="Kana Sprint"
+  listed="Kana Sprint" descMatches=true`. A stale title after a switch is the defect.
+- `typingInput` scores the disabled → enabled TRANSITION: `value="ro" submitDisabled true->false
+  readyStateReturned=true`. An enabled submit read once proves nothing.
+- `scoreHud` cross-checks two surfaces: the ready panel declares **5** rounds and the in-round
+  HUD's own total is **5**. HUD `["1/5","60s","Combo 0","Best 0"]`, timer
+  `role="progressbar"` `aria-valuenow=99`, labelled. A HUD counting to a different total than
+  the panel promised is invisible to presence scoring.
+- `levelSettings` asserts STABILITY across the switch — the level is arena-wide, not per game,
+  so `Level 1` before and `Level 1` after (`meta=[Level 1 | English | No high score yet]`). A
+  per-game decoration would drift here and nothing else in the suite would notice.
+- `materialScope`'s mutation is deliberately ADDITIVE (a second `primary` on a mode button)
+  rather than a detach, because `chosen === 1` has to fail upward as well as downward.
+
+**Two rows are scored on their honest-empty branch, and that is written into the rows rather
+than glossed.** This profile has no word list uploaded and no round history, so `sourceMaterial`
+reads `note="No word list uploaded for this level" pct=noList scaleX=0 agrees=true` and
+`roundHistory` reads `rows=0 emptyState="No rounds recorded for this game y[et]"`.
+`exposureTracking` reads `seen=0/10 statedPct=0 derivedPct=0 scaleX=0`, and **0 = 0 = 0 is a
+weak discriminator** — a broken derivation satisfies it too. Those three rows' strength here
+comes from their mutations taking exactly their own row, not from the numbers. The populated
+branches are UNMEASURED on this profile and must not be quoted as covered.
+
+Nothing was written to the user's data: the round is **aborted**, never submitted (the drive
+clicks the active catalogue entry, which discards the session), so no score and no history row
+was recorded. The spec's undo restored `games:selection+scroll+options` and the window was left
+in `standard`.
+
+### The gap, re-derived again
+
+`window.__LQP.apps()` = **25** specs against **18** distinct `app` keys in `rows[]` →
+**8 of 25 specs have no row in this tree**: notebook, vn, city, scraper, resources, settings,
+shell, blancShell. Five (`city`, `scraper`, `resources`, `shell`, `blancShell`) are the
+concurrent worker's and arrive by merge; `vn` has no subject on this profile; `notebook`'s
+subject was deleted by the files-app track. So the genuinely-open set for this tree is
+**settings** alone. Ledger: **134 → 144 rows / 17 → 18 apps**, 144 `both`, 0 `pending`,
+0 duplicate `app|feature` keys.
