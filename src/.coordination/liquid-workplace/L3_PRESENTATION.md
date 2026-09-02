@@ -322,3 +322,54 @@ window, never sample once.
 
 Leaving this turn: **scratch profile deleted, `debug/bridge.json` restored byte-identical to the
 loaded instance's (`sha256 06B60389…`), loaded instance untouched and alive.**
+
+## 2026-09-01 late (primary2) — L12 bullet 3 clause (a): the production bundle, booted
+
+`96a7b579`. First time the packaged-app clause was taken past the vite step.
+
+**Build.** `npx electron-forge package` — 8 targets green: `src/main.ts`, `src/preload.ts`,
+the five utility-process entries (`importWorker`, `apkgReadWorker`, `llamaHostWorker`,
+`flashcardTtsWorker`, `localDeckApkgWorker`), renderer `main_window`, plus the keep-alive,
+seanime-sidecar-staging and vite prePackage hooks. This exercises forge's injected
+`build.lib.entry`, which the standalone `vite build --config vite.main.config.ts` cannot
+(trap recorded last turn). Artifacts: `main-*.js` 2.5 MB, `preload.js` 56 KB, renderer 752
+files. The i18n split holds in production — `ja` 880 KB / `ru` 1.11 MB / `zh` 724 KB are
+separate chunks, not in the main bundle. All 38 html/css asset refs resolve.
+
+**Boot is a real production boot, not a claim.** `package.json` main is
+`.vite/build/main.js`; the built bundle has **0** `MAIN_WINDOW_VITE_DEV_SERVER_URL` refs
+against **6** `app://bundle/index.html`, so `electron .` loads the file bundle over `app://`.
+It boots and opens its window. The debug bridge is correctly absent — `main.ts:1623` gates
+`startDebugBridge()` on `isDevServer()`, on top of the `app.isPackaged` hard stop — so this
+instance is driven by log and process observation only, never the bridge.
+
+**The defect.** 12 identical bare `net::ERR_FILE_NOT_FOUND` stacks naming neither URL nor
+path. Identified mechanically, not guessed: `public/kuromoji/dict` holds exactly 12 files.
+`public/kuromoji/` is gitignored (`.gitignore:106`) with `models/ ort/ cedict/ tesseract/`,
+so this worktree's `public/` has **3** entries against the main tree's **7**, and git tracks
+exactly **2** paths under `public/`. A production build from a clean branch checkout lacks
+the bundled runtime blobs. Same class as this clause's earlier `studyWorkspace.css` find,
+and equally invisible from the main tree.
+
+**Three-run control, each on a fresh 0-entry scratch userData:**
+
+| run | fix | `public/kuromoji/` | anonymous stacks | named `missing-bundled-asset` |
+| --- | --- | --- | --- | --- |
+| A | no | absent | **12** | route did not exist |
+| B | yes | absent | **0** | **12**, one per dict file, each named |
+| C | yes | provisioned (17 MB, 12 files) | **0** | **0** — `main.log` never created |
+
+C is the discriminating one: it proves the 12 are the gitignored bundle, and that the new
+logging does not fire spuriously. The bundle was **removed again** afterwards so this
+worktree keeps reporting the branch honestly.
+
+**Residual, the only one.** electron-packager's file-copy stage: `node_modules` here is a
+ReparsePoint junction to the main tree and the packager reproduces it as a directory
+symlink. Control: `fs.symlinkSync(d,l,'dir')` → EPERM, `'junction'` → OK,
+`AllowDevelopmentWithoutDevLicense` unset, main tree's `node_modules` a plain Directory.
+Environment, not product; it compiles nothing. Recorded in `needs-user.md`.
+
+**Trap for the next worker.** Do not kill Electron by StartTime. Two independent trees were
+live here at once — root `53288` (a concurrent main-tree worker) and mine — and the
+worktree's junctioned `node_modules` makes *child* processes report a `jp-study-app` command
+line, so path matching mis-attributes them. Walk `ParentProcessId` from the root you started.

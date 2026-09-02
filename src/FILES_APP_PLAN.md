@@ -867,6 +867,23 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
          branch, so it reports the branch. The branch is red; the shared tree is green on someone
          else's uncommitted work. That is boss-audit Finding 1 verbatim, and it is why this gate
          must be read from a clean tree only.
+         RE-MEASURED 2026-09-01 late (primary2, after 96a7b579): **1,009 files: 4 failed /
+         1,004 passed / 1 skipped; 13,001 tests: 4 failed / 12,991 passed / 6 skipped**, 130.7 s.
+         FOUR is not a regression and the re-run proves it: the same four files run ALONE give
+         **1 failed / 62 passed of 63** -- flashcardAudio, extensionPopup and scraperSources all
+         PASS in isolation, leaving the identical single `i18n.test.ts > catalog hygiene` / 27
+         components. So gate 37 is UNCHANGED at exactly one real failure, still not files-app's;
+         none of the four names any file this turn touched. NEW SIGNAL, and it is boss-audit
+         Finding 4 widening: the three load-only failures carry durations of **24.4 s**
+         (flashcardAudio) and **41.9 s** (extensionPopup) inside the full run, i.e. past the 20 s
+         default, against ~1.5 s for scraperSources alone. Finding 4 named three whole-src sweep
+         cases; these are three DIFFERENT suites with the same signature, so the instrument noise
+         is broader than that finding recorded. TRAP for whoever measures this next:
+         `npx vitest run > log; echo $?; tail log` reports the exit code of **tail**, not vitest --
+         this run looked like exit 0 until the summary was read. Read the counts, never the code.
+         i18n-check exit 0 at 12,115 keys; architecture exit 0, "Nothing new", 9 pending, and the
+         new appProtocolResolve.ts module added ZERO findings; eslint exit 0 on all three touched
+         paths (12 pre-existing non-null-assertion warnings in main.ts, 0 errors).
          first full run showed **2** failed, and the new one was mine --
          mediaLibraryListRow.test.ts scans mediaLibrary.css as raw text from the
          `@container medialib (max-width: 420px)` block to EOF with an unbounded `[\s\S]*?`,
