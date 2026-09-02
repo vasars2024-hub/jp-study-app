@@ -71,3 +71,45 @@ a test-suite problem.
 `i18n.test.ts` is **CRLF** in this worktree while its neighbours are LF. Patch it preserving
 that or the diff becomes a whole-file rewrite that hides the real hunk. Git normalises the
 blob to LF on commit and warns; the warning is correct, not a mistake.
+
+## 2026-09-02 (primary) — the packaged-app clause: the copy stage runs, in the main tree
+
+**The blocker was the WORKTREE, not the machine, and its own needs-user entry named the way
+out.** `electron-packager`'s file-COPY stage died `EPERM: symlink ... node_modules` in
+`jp-wt-filesapp` because `node_modules` there is a ReparsePoint junction the packager tries to
+reproduce as a *directory symlink*. In this tree `node_modules` is a plain `Directory`
+(measured: `(Get-Item node_modules).Attributes` = `Directory`, `LinkType` empty), so the
+packager never reaches that branch. The two reasons the run was previously declined were both
+re-derived and both had moved: free space is **27.0 GB**, not the 18 GB that rationale assumed,
+and the main tree is quiet — the relay dispatches one main-tree worker at a time and primary2
+is in its own worktree.
+
+**`npx electron-forge package` EXIT 0.** Full log `debug/_pr-forge-package.log`. It ran every
+stage the worktree could only half-reach: 8 build targets green (main, preload, the five
+utility-process entries, renderer `main_window`), all three prePackage hooks including
+`[sidecar] staged ... seanime.exe (84409856 bytes)`, then `Copying files` -> `Preparing native
+dependencies` -> `Finalizing package` — the three lines that had never printed before.
+
+RECEIPT, measured on the artifact rather than on the log:
+- **40,254 files / 4.15 GB** at `out/jp-study-app-win32-x64`; `jp-study-app.exe` present.
+- **0 reparse points anywhere inside the package.** This is the discriminating number: the
+  worktree failure was precisely an attempt to *create* one, so a package containing none is
+  the copy stage completing rather than being skipped. `resources/app/node_modules` is a plain
+  `Directory`.
+- No asar: `resources/app/.vite/build/main.js` present, `resources/app/.vite/renderer` carries
+  **755** files, `resources/seanime/seanime.exe` staged.
+- **The bundled runtime blobs are all here.** `resources/public` carries all **7** entries —
+  cedict, kuromoji, models, ort, sounds, tesseract, tray-icon.png — identical to the main
+  tree's `public/`, and `resources/public/kuromoji/dict` holds the **12** files whose absence
+  produced primary2's 12 anonymous `ERR_FILE_NOT_FOUND` stacks (`96a7b579`). That is a SECOND,
+  INDEPENDENT confirmation of their finding from the opposite direction: they proved the 12 by
+  removing them, this proves the same 12 by having them. A package built from a clean branch
+  checkout is incomplete; one built here is not, and the difference is `.gitignore:106`.
+
+WHAT THIS DOES NOT CLAIM. The package was not BOOTED — primary2 already booted the production
+bundle at `96a7b579` and that is where the `appProtocolResolve.ts` fix came from; this run
+answers the one stage that had no measurement, and nothing more. `electron-forge make` (the
+installer targets) is still unrun and is not what the bullet's words ask for.
+
+`out/` was left in place: it is gitignored build output and the three hand-made
+`out/*.pre-*` snapshots were not touched.
