@@ -3136,6 +3136,54 @@
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        /*
+         * FIVE ROWS HAD NO SUBJECT UNTIL 2026-09-02. `playerSelection`, `transport`, `like`,
+         * `lyricsRecovery` and `queueMirror` all read the PLAYER, and the drive never put a
+         * track in it — so on a library with two real songs the surface scored 5/10 in both
+         * presentations and the five read as missing features. They are not missing; there
+         * was nothing selected. Measured on the same window one click later:
+         * `now="e2e-audio-ja"`, active 1, queue active 1, seek max 0 -> 90, like present and
+         * `aria-pressed=false`, hint with 2 recovery actions.
+         *
+         * This goes FIRST in the drive, because the search step narrows the list to nothing
+         * and a pick has to happen while there is still something to pick.
+         *
+         * Clicking a song is `play(s)` (MusicContent.tsx:404), so this STARTS PLAYBACK in
+         * the user's real profile. That is the product's own route and there is no
+         * select-without-playing affordance to use instead, so the step takes it and the
+         * undo pauses it again. What the undo cannot take back is the selection itself:
+         * "now playing" is ordinary product state, it is disclosed rather than pretended
+         * away, and the step refuses instead of picking a second time if one is already
+         * selected.
+         */
+        pick: (w) => {
+          const g = musicState();
+          const songs = qa(w, '.music-song');
+          // THE QUEUE IS THE ROUTE THE SEARCH CANNOT TAKE AWAY. The driver dirties the first
+          // visible text field before it drives — deliberately, so the round trip has real
+          // state to lose — and on this surface that field is the music search, which filters
+          // the library list to nothing. Measured: typing the mark leaves `.music-song` 0 and
+          // `.mc-track-queue > button` 2. So the first attempt at this step refused "no songs
+          // in the library to select" on a library holding two, and the five player rows
+          // stayed dark for the same reason as before, one layer down.
+          //
+          // The queue row is the same action, not a workaround: `MediaCenterView.tsx:1250`
+          // is `onClick={() => void state.play(item)}`, exactly what the library row calls.
+          const rows = songs.length ? songs : qa(w, '.mc-track-queue > button');
+          const via = songs.length ? 'library' : 'queue';
+          const titleOf = (el) => txt(q(el, '.music-song-title') || q(el, 'strong') || el);
+          if (!rows.length) return { refused: 'neither the library list nor the queue offers a track' };
+          if (g.picked == null) {
+            const was = rows.filter((s) => s.classList.contains('active') || s.classList.contains('is-active'))[0];
+            g.picked = was ? titleOf(was) : '';
+            g.wasSelected = !!was;
+          }
+          if (g.wasSelected) return { alreadySelected: g.picked, via };
+          const target = rows[0];
+          const title = titleOf(target);
+          target.click();
+          return { picked: title, via, wasSelected: false };
+        },
         searchNarrow: (w) => {
           const g = musicState(); const input = q(w, '.music-search input');
           if (!input) return { refused: 'no music search' };
@@ -3160,11 +3208,20 @@
           g.youtubeTest = 'https://youtu.be/aaaaaaaaaaa'; typeInto(input, g.youtubeTest); return { drafted: true };
         },
       },
-      drive: ['searchNarrow', 'searchRestore', 'sort', 'youtube'],
+      drive: ['pick', 'searchNarrow', 'searchRestore', 'sort', 'youtube'],
       undo: { music: (w) => {
         const g = window.__LQP_MUSIC_ORIG; if (!g) return null;
         const done = []; const search = q(w, '.music-search input'); const sort = q(w, '.mc-music-sort select');
         const youtube = q(w, '.music-yt-input');
+        // Silence what the pick started. The control reads its state from its own label,
+        // NOT from `aria-pressed` (absent here) and not from an `<audio>` element (this
+        // player has none — 0 media elements while the seek was advancing, so it is Web
+        // Audio). A label test is the only honest read available.
+        if (g.wasSelected === false) {
+          const play = q(w, '.mc-player-play');
+          const label = play ? (play.getAttribute('aria-label') || play.title || txt(play)) : '';
+          if (/paus/i.test(label)) { play.click(); done.push('paused'); }
+        }
         if (search && g.search != null && search.value !== g.search) { typeInto(search, g.search); done.push('search'); }
         if (sort && g.sort != null && sort.value !== g.sort) { pickSelect(sort, g.sort); done.push('sort'); }
         if (youtube && g.youtube != null && youtube.value !== g.youtube) { typeInto(youtube, g.youtube); done.push('youtube'); }

@@ -679,3 +679,47 @@ and none in the other satisfied. Live: `groups=2 sizes=[3,2] activePerGroup=[1,1
 its bar had never been falsified in either direction. The new one makes a second chip active
 inside the first group, the exact exclusivity loss the row exists to catch, and it flips
 **exactly** this row: 9/9 → 8/9, `unexpectedRows` empty, restored.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `music`, and five rows that had no subject
+
+**`music`: 10 rows, `both` 10.** `cat6 --app music` = **PASS 10/10** — parity **10/10 and
+10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row (10/10 → 9/10)
+and all restored, 0 refusals, box `1080x700`, round trip field held / shell held / 0 diffs.
+
+It did not start there. The first run scored **5/10 in BOTH presentations** on a library
+holding two real songs, and the five failures — `playerSelection`, `transport`, `like`,
+`lyricsRecovery`, `queueMirror` — share one cause: **the drive never selected a track**, so
+every row that reads the PLAYER was scoring an empty player. Five live features read as
+missing. Measured one click later on the same window:
+
+| | before | after |
+| --- | --- | --- |
+| now-playing | `Choose a track` | `e2e-audio-ja` |
+| `.music-song.active` | 0 | 1 |
+| `.mc-track-queue > .is-active` | 0 | 1 |
+| `.mc-player-seek` max | 1 | 90 |
+| `.mc-player-like` `aria-pressed` | absent | `false` |
+| `.music-hint` recovery actions | 0 | 2 |
+
+`seek.max` 1 → 90 is the discriminating one: an unloaded transport still renders, and only a
+real duration separates it from a loaded one.
+
+### The fix refused once, for a second reason, and the refusal was right
+
+A `pick` step was added FIRST in the drive — and refused: *"no songs in the library to
+select"*, on a library holding two. The driver dirties the first visible text field **before**
+it drives, deliberately, so the round trip has real state to lose; on this surface that field
+is the music search, which filters the list to nothing. Measured: with the mark typed,
+`.music-song` = **0** and `.mc-track-queue > button` = **2**.
+
+So the step falls back to the queue, which is the same action and not a workaround —
+`MediaCenterView.tsx:1250` is `onClick={() => void state.play(item)}`, exactly what the
+library row calls. The same run then proved the difference by itself: parity phase **5/10**
+with `pick` REFUSED, control phase baseline **10/10** after the search dirt had cleared.
+
+Selecting is `play(s)` (`MusicContent.tsx:404`) and there is **no select-without-playing
+affordance**, so this starts playback in the real profile. Disclosed rather than pretended
+away: the undo pauses it, and the pause is read off the control's own **label** — this player
+has no `<audio>` element at all (0 media elements while the seek advanced, so Web Audio) and
+the control carries no `aria-pressed`. Left paused at seek 68.1, `e2e-audio-ja` selected,
+search empty, sort back to `recent`.
