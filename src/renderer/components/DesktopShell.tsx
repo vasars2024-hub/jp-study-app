@@ -685,9 +685,9 @@ export default function DesktopShell({
   const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
   // Notes are the one window whose close is destructive, so it asks first — and every
-  // click asked again. Measured live: five clicks on a note's close button left FIVE
-  // stacked confirms plus the original, six identical "This cannot be undone" dialogs
-  // over one note. Answering one deletes it and the survivors then point at a note that
+  // click asked again. Measured live through the debug bridge: five clicks on a note's
+  // close button left FIVE stacked, identical "This cannot be undone" dialogs over one
+  // note. Answering one deletes it and the survivors then point at a note that
   // is gone. `closeMany` already serialises its confirmations for this reason
   // (see its comment below); a person clicking twice deserves the same guarantee.
   const noteConfirmPending = useRef<Set<string>>(new Set());

@@ -691,15 +691,29 @@ const GLOBAL_SEARCH_COMMIT_MS = 70;
  *
  * An external change to `value` — a clear, a tab switch — wins over in-flight text and cancels a
  * pending commit, so the field stays drivable from outside.
+ *
+ * `contextKey` is what makes the tab-switch half of that sentence true, and it is not decorative.
+ * `value` is read per tab (`music.query` / `discovery.query` / `media.query`, three independent
+ * stores at the call site), so switching between two tabs whose queries are BOTH empty hands this
+ * component the same `''` twice — React compares the dep with `Object.is`, sees no change, and
+ * skips the sync effect entirely. The pending 70 ms commit then survived the switch and landed on
+ * the NEW tab: type in Library, switch to Discover inside 70 ms, and `discovery.setQuery` fired
+ * with text meant for the library, which on Discover is a network search nobody asked for.
+ * Keying on the context makes the switch itself observable, so the effect runs even when the two
+ * values are indistinguishable. A `key={tab}` remount would also drop the timer, but it is wrong
+ * here: `commitSearch` calls `setTab('library')` on the first query typed from another tab, so a
+ * remount would tear the focused input out from under someone mid-word.
  */
 const GlobalSearchField = memo(function GlobalSearchField({
   value,
+  contextKey,
   placeholder,
   deferMs,
   onCommit,
   onEnter,
 }: {
   value: string;
+  contextKey: string;
   placeholder: string;
   deferMs: number;
   onCommit: (next: string) => void;
@@ -707,6 +721,7 @@ const GlobalSearchField = memo(function GlobalSearchField({
 }) {
   const [text, setText] = useState(value);
   const seen = useRef(value);
+  const context = useRef(contextKey);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cancel = useCallback(() => {
@@ -717,11 +732,15 @@ const GlobalSearchField = memo(function GlobalSearchField({
   }, []);
 
   useEffect(() => {
-    if (value === seen.current) return;
+    // A context switch counts as an external change even when the two values are equal —
+    // that equal case is precisely the one the `value` dep cannot see.
+    const switched = context.current !== contextKey;
+    context.current = contextKey;
+    if (!switched && value === seen.current) return;
     seen.current = value;
     cancel();
     setText(value);
-  }, [value, cancel]);
+  }, [value, contextKey, cancel]);
 
   useEffect(() => cancel, [cancel]);
 
@@ -2107,6 +2126,9 @@ export default function MediaCenterView({ initialTab = 'home' }: MediaCenterView
             </div>
             <GlobalSearchField
               value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}
+              // Which store owns `value` right now. Three tabs read three different queries, so
+              // this is the only thing that changes when the owner does but the text does not.
+              contextKey={tab === 'music' ? 'music' : tab === 'discover' ? 'discover' : 'media'}
               placeholder={searchPlaceholder}
               deferMs={tab === 'music' || tab === 'discover' ? 0 : GLOBAL_SEARCH_COMMIT_MS}
               onCommit={commitSearch}

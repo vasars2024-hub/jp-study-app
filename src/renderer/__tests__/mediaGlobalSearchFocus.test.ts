@@ -35,6 +35,64 @@ describe('Media Center global search focus', () => {
     expect(FIELD).toMatch(/event\.key !== 'Enter'[\s\S]*cancel\(\);\s*commit\(text\);\s*onEnter\(\)/);
   });
 
+  /*
+   * A deferred commit must not outlive the tab that scheduled it.
+   *
+   * `value` is read PER TAB at the call site — `music.query`, `discovery.query`, `media.query`
+   * are three independent stores. The sync effect used to depend on `[value, cancel]` alone, and
+   * that is exactly blind to the case that matters: switch between two tabs whose queries are
+   * both empty and React compares `''` with `''`, finds no change by `Object.is`, and never runs
+   * the effect. The pending 70 ms timer survived and committed into whichever tab was now
+   * current — type in Library, switch to Discover inside 70 ms, and `discovery.setQuery` fires
+   * with library text, which on Discover is a network search nobody asked for.
+   *
+   * Raised as an unpromoted hypothesis by the 2026-09-01 boss audit and left unreproduced there
+   * because it is a 70 ms race; it is settled from the dependency array instead, which is where
+   * it is decidable. These cases pin the two halves that make it decidable: a context identity
+   * that changes when the OWNER changes, and an effect that treats that change as external.
+   */
+  it('treats a context switch as an external change, not just a value change', () => {
+    expect(FIELD).not.toBe('');
+    // The switch must be observable independently of `value`, or the equal-value case is blind.
+    expect(FIELD).toMatch(/const switched = context\.current !== contextKey;/);
+    expect(FIELD).toMatch(/if \(!switched && value === seen\.current\) return;/);
+    // …and the effect must actually re-run on it.
+    expect(FIELD).toMatch(/\}, \[value, contextKey, cancel\]\);/);
+    // Cancelling is the whole point: the pending commit belongs to the previous owner.
+    const effect = FIELD.match(/const switched[\s\S]*?\}, \[value, contextKey, cancel\]\);/)?.[0] ?? '';
+    expect(effect).toContain('cancel();');
+    expect(effect).toContain('setText(value);');
+  });
+
+  it('keys the context on the STORE that owns the query, not on the tab', () => {
+    // Home and Library both read `media.query`, so keying on `tab` would cancel an in-flight
+    // commit on a switch that changes no owner at all. Keying on the store is what makes the
+    // cancel fire exactly when the query it would land in is a different one.
+    expect(SOURCE).toContain(
+      "contextKey={tab === 'music' ? 'music' : tab === 'discover' ? 'discover' : 'media'}",
+    );
+    // The value expression and the context expression must partition the tabs the same way,
+    // or the field can be handed one store's text while believing it belongs to another.
+    expect(SOURCE).toContain(
+      "value={tab === 'music' ? music.query : tab === 'discover' ? discovery.query : media.query}",
+    );
+  });
+
+  it('MUTATION CONTROL: the pre-fix effect fails the same assertions', () => {
+    // The real shipping block with only the context check removed — i.e. the code as it stood
+    // before this fix. If these assertions passed against that, they would be decorative.
+    const preFix = FIELD
+      .replace(/\s*const switched = context\.current !== contextKey;/, '')
+      .replace(/\s*context\.current = contextKey;/, '')
+      .replace('if (!switched && value === seen.current) return;', 'if (value === seen.current) return;')
+      .replace('}, [value, contextKey, cancel]);', '}, [value, cancel]);');
+    expect(preFix).not.toBe(FIELD);
+    expect(preFix).not.toMatch(/const switched = context\.current !== contextKey;/);
+    expect(preFix).not.toMatch(/\}, \[value, contextKey, cancel\]\);/);
+    // And the guard the fix relies on is genuinely absent from it.
+    expect(preFix).toMatch(/if \(value === seen\.current\) return;/);
+  });
+
   it('keeps shared Media actions at the 32px Liquid hit floor', () => {
     const rule = CSS.match(/\.mc-button \{([^}]*)\}/)?.[1] ?? '';
     expect(rule).toMatch(/min-height:\s*32px/);
