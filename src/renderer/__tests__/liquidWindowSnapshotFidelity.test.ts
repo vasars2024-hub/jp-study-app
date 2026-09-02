@@ -32,6 +32,30 @@ import { presentationToSnapshot, toggleWinPresentation } from '../liquidWindowPr
 
 const SHELL = readFileSync(resolve(__dirname, '..', 'components', 'DesktopShell.tsx'), 'utf8');
 
+/**
+ * The same file with its comments removed. Every assertion below that COUNTS or
+ * enumerates call sites reads this, never `SHELL`.
+ *
+ * Boss audit 2026-09-02, Finding 2: `02f3bdca` added the prose
+ * `` `canPresentLiquid('musicwidget')` is TRUE `` to the shell and this suite
+ * scored it as a fourth call site, shipping a deterministic red on the
+ * integration branch over a sentence. A regex over raw source cannot tell code
+ * from a comment about code; the repair is to stop asking it to. Shape borrowed
+ * from `deletedPlayerDependents.test.ts`'s `code()`, which solves the same
+ * problem for its whole-`src` sweep.
+ */
+const stripComments = (source: string): string =>
+  source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trimStart();
+      return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+    })
+    .join('\n');
+
+const SHELL_CODE = stripComments(SHELL);
+
 /** `DesktopShell`'s `Win`, as the shell actually holds one. */
 const WIN = {
   id: 'dictionary',
@@ -147,19 +171,38 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     expect(SHELL).toMatch(/function winFromSnapshot[\s\S]{0,700}?presentationFromSnapshot\(win\.presentation\)/);
   });
 
+  it('CONTROL: the counting assertions read code, and the stripper is what makes that true', () => {
+    // Without this, `SHELL_CODE` could quietly become `SHELL` — a no-op stripper
+    // passes every assertion above and re-opens Finding 2 in silence.
+    const fixture = [
+      'const a = winToSnapshot(win);',
+      '// const b = map(winToSnapshot) in a comment',
+      '/* canPresentLiquid(win.section) in a block */',
+      ' * canPresentLiquid(taskCtx.win.section) in a jsdoc continuation',
+    ].join('\n');
+    expect(fixture.match(/canPresentLiquid\([^)]*\)/g) ?? []).toHaveLength(2);
+    expect(stripComments(fixture).match(/canPresentLiquid\([^)]*\)/g) ?? []).toHaveLength(0);
+    expect(stripComments(fixture).match(/map\(winToSnapshot\)/g) ?? []).toHaveLength(0);
+    // …and the real shell is genuinely commented, so the stripper has subjects.
+    expect(SHELL_CODE.length).toBeLessThan(SHELL.length);
+    expect(stripComments(fixture)).toContain('winToSnapshot(win)');
+  });
+
   it('no rebuild site hand-builds a snapshot around the converter', () => {
     // Every `winToSnapshot(...)` outside its own definition must be spread or
     // passed whole. `{ id: w.id, section: w.section, ... }` written out by hand
     // beside a converter call is the exact shape that dropped `pinned` once and
     // `presentation` in main this turn.
-    const uses = [...SHELL.matchAll(/winToSnapshot\((\w+)\)/g)];
+    const uses = [...SHELL_CODE.matchAll(/winToSnapshot\((\w+)\)/g)];
     // Four called with an argument (desktop move, tear-off, drag payload, and the
     // zoom re-fit's fallback for a window that is not in the stored layout yet)
-    // and three passed bare to `.map` (the two commit paths and hydrate).
+    // and four passed bare to `.map` (the two commit paths, hydrate, and the zoom
+    // re-fit's read of the live windows on its way into `toAuthoredSpace`, added
+    // by c51e4232).
     expect(uses.length).toBe(4);
-    expect(SHELL.match(/map\(winToSnapshot\)/g) ?? []).toHaveLength(3);
+    expect(SHELL_CODE.match(/map\(winToSnapshot\)/g) ?? []).toHaveLength(4);
     for (const use of uses) {
-      const before = SHELL.slice(Math.max(0, use.index - 12), use.index);
+      const before = SHELL_CODE.slice(Math.max(0, use.index - 12), use.index);
       // `??` joins the zoom re-fit's two whole-window sources; it still passes the
       // window whole, which is the only thing this guard is protecting. A
       // hand-built `{ id: w.id, ... }` literal beside a call still fails it.
@@ -172,7 +215,7 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // which is decision (2) of `shared/liquidWindowState.ts`, the one that
     // loses the way home permanently and silently.
     expect(SHELL).not.toMatch(/presentation\s*:\s*\{/);
-    expect(SHELL.match(/toggleWinPresentation\(/g) ?? []).toHaveLength(1);
+    expect(SHELL_CODE.match(/toggleWinPresentation\(/g) ?? []).toHaveLength(1);
     // The shell must go through the seam, not reach past it into the schema's
     // own commands. (Matched as calls: `desktop.returnToStandard` is an i18n
     // key and appears in this file legitimately.)
@@ -194,7 +237,7 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     // added here deliberately and a hand-written section list still fails.
     expect(SHELL).toMatch(/const canGoLiquid = canPresentLiquid\(win\.section\);/);
     expect(SHELL).toMatch(/const liquid = isWinLiquid\(win\) && canGoLiquid;/);
-    const callSites = SHELL.match(/canPresentLiquid\([^)]*\)/g) ?? [];
+    const callSites = SHELL_CODE.match(/canPresentLiquid\([^)]*\)/g) ?? [];
     expect(new Set(callSites)).toEqual(
       new Set([
         'canPresentLiquid(win.section)', // the window chrome
