@@ -9,8 +9,9 @@
  *   - themes        <- `listThemes()` off the LIVE theme registry, not the source array
  *   - presentations <- the surface's own `.fwin-b-liquid` toggle, by cat3's ownership rule
  *   - states        <- the shell's own window controls
- * L12 bullet 4's "final visual atlas" is this same harness with `--atlas`, which is the
- * second caller that keeps it out of single-use territory.
+ * L12 bullet 4's "final visual atlas" is this same harness with `--atlas`: it writes an
+ * HTML contact sheet beside the PNGs, risk cells first. That second caller is what keeps
+ * this file out of single-use-probe territory.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-visual-matrix.cjs \
@@ -104,7 +105,7 @@
  *
  * ---------------------------------------------------------------------------------
  * THE CONTROLS, because 182 PNGs of the same picture is a matrix that proves nothing and
- * would look exactly like a successful run. `--control` runs five, in this order:
+ * would look exactly like a successful run. `--control` runs six, in this order:
  *
  *   C0  FLOOR / the instrument's own noise. Two captures of an unchanged, settled window,
  *       taken exactly the way the matrix takes them. Everything below is scored against
@@ -131,6 +132,13 @@
  *       renderer, so with several windows open every app returned the identical desktop
  *       image and the app axis was decorative. The fix was a `rect` on the bridge route
  *       plus a raise-then-crop; C4 is what keeps that fix honest. Failing it VOIDs the run.
+ *
+ *   C5  STATE / must DIFFER, scored on the RECT rather than the pixels. Maximizing changes
+ *       the capture's dimensions, so a pixel comparison has no common grid and would pass
+ *       trivially on "different sizes" — true, and silent about whether anything maximized.
+ *       The falsifiable claim is geometric: the maximized rect must be strictly larger in
+ *       area. This control exists because the state axis was DECORATIVE in the first draft
+ *       — `--states` was accepted, written into every filename, and never set anything.
  *
  * C2, C3 and C4 additionally require a MAGNITUDE, not just different bytes. With a floor of
  * zero, one changed pixel would have satisfied "differs" — so each of them could have passed
@@ -235,6 +243,9 @@ function sourceSections() {
   return m[1].split(',').map((s) => (s.match(/'([^']+)'/) || [])[1]).filter(Boolean);
 }
 
+/** Holds the in-flight manifest so the crash handler at the bottom can bank a partial. */
+const PARTIAL = { m: null, out: null };
+
 const cfgPath = path.join(REPO, 'debug', 'bridge.json');
 if (!fs.existsSync(cfgPath)) {
   console.error('REFUSE - no debug/bridge.json; the app is not running with the debug bridge');
@@ -244,11 +255,31 @@ const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
 const H = { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function post(route, body) {
-  const r = await fetch(`http://127.0.0.1:${cfg.port}${route}`, {
-    method: 'POST', headers: H, body: JSON.stringify(body || {}),
-  });
-  return r.json();
+/**
+ * A 650-cell run is roughly 4,000 short-lived HTTP connections, and ONE of them failing must
+ * not cost the whole sweep. Measured the expensive way: a full run died at cell 164 with a
+ * bare `TypeError: fetch failed` while `/health` answered normally seconds later — the app
+ * was fine, a single socket was not. Retried with backoff, and the cause is unwrapped when
+ * it finally gives up, because `fetch failed` on its own names nothing.
+ */
+let retries = 0;
+async function post(route, body, tries = 4) {
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${cfg.port}${route}`, {
+        method: 'POST', headers: H, body: JSON.stringify(body || {}),
+      });
+      return await r.json();
+    } catch (e) {
+      retries += 1;
+      if (i === tries - 1) {
+        const cause = e && e.cause ? ` (cause: ${e.cause.code || e.cause.message || e.cause})` : '';
+        throw new Error(`${route} failed after ${tries} attempts: ${e.message}${cause}`);
+      }
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  return null;
 }
 /** `/eval` takes ONE expression and never awaits a promise — banked trap. */
 async function ev(js) {
@@ -372,6 +403,49 @@ async function setPresentation(section, want) {
   await settle(3000);
   const after = await readPresentation(section);
   if ((want === 'liquid') !== after.liquid) return { ok: false, reason: `toggle did not reach ${want}`, ...after };
+  return { ok: true, changed: true, ...after };
+}
+
+/**
+ * Dimension 4 — window STATE, which was a label with no mechanism until this was written.
+ * The bullet's own words are "standard/Liquid/theme/state", and the first draft accepted a
+ * `--states` list, wrote it into every cell tag, and never actually maximized anything: the
+ * axis was decorative in exactly the way control C4 exists to catch on the app axis.
+ *
+ * The maximize control carries NO distinguishing class — `DesktopShell.tsx:3871` renders it
+ * as a bare `.fwin-b` whose only label is `t('desktop.maximize')`, which is localised and
+ * would rot the moment the harness ran in another language. Two language-independent
+ * handles are used together: the glyph is a literal `▢` in source (minimize is `─`), and
+ * the button sits immediately before `.fwin-close`. Both must agree, because clicking the
+ * wrong sibling MINIMIZES the window and the run would then photograph nothing.
+ * Note windows have no min/max pair at all (`isNote &&` guards the fragment), so they
+ * report `supported:false` rather than being scored as a failure.
+ */
+async function readState(title) {
+  return J(`JSON.stringify((()=>{var w=${winExpr(title)};if(!w) return {present:false};`
+    + `var close=w.querySelector('.fwin-close');`
+    + `var glyph=[...w.querySelectorAll('.fwin-b')].filter(b=>b.closest('.fwin')===w&&(b.textContent||'').trim()==='\\u25A2');`
+    + `var sib=close&&close.previousElementSibling;`
+    + `var btn=glyph.find(b=>b===sib)||null;`
+    + `return {present:true, maximized:w.classList.contains('fwin-max'), supported:!!btn,`
+    + ` glyphCount:glyph.length, siblingAgrees:!!(btn), rect:(r=>({x:r.x,y:r.y,width:r.width,height:r.height}))(w.getBoundingClientRect())};})())`);
+}
+
+async function setState(title, want) {
+  const cur = await readState(title);
+  if (!cur.present) return { ok: false, reason: 'no window' };
+  if (want === 'normal' && !cur.maximized) return { ok: true, changed: false, ...cur };
+  if (want === 'maximized' && cur.maximized) return { ok: true, changed: false, ...cur };
+  if (!cur.supported) {
+    return { ok: false, reason: cur.glyphCount === 0
+      ? 'surface has no maximize control of its own (note/frameless chrome)'
+      : 'maximize glyph is not the sibling before close — refusing to guess which button it is',
+    ...cur };
+  }
+  await ev(`(()=>{var w=${winExpr(title)};w.querySelector('.fwin-close').previousElementSibling.click();return 'x';})()`);
+  await settle(3000);
+  const after = await readState(title);
+  if (after.maximized !== (want === 'maximized')) return { ok: false, reason: `state did not reach ${want}`, ...after };
   return { ok: true, changed: true, ...after };
 }
 
@@ -518,6 +592,56 @@ async function capture(tag, rect) {
   };
 }
 
+/**
+ * `--atlas` — L12 bullet 4's contact sheet, and the second caller that keeps this file out
+ * of single-use-probe territory. It was an ACCEPTED-AND-ECHOED FLAG THAT DID NOTHING until
+ * this was written, which is the same defect the `--states` axis had: the docstring above
+ * claimed it, the console printed `atlas: true`, and no atlas existed.
+ *
+ * It writes HTML beside the PNGs in gitignored `debug/shots/l12-matrix/`, referencing them
+ * by relative filename rather than embedding them, so nothing binary is produced and the
+ * committed manifest stays the only durable artifact. The risk column is not decoration:
+ * cells that failed, never converged, or missed their theme are listed FIRST and by name,
+ * because an atlas whose only job is to look complete is the failure mode here.
+ */
+function writeAtlas(m) {
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const risk = m.cells.filter((c) => !c.ok || c.converged === false || c.themeApplied === false);
+  const byApp = {};
+  for (const c of m.cells) (byApp[c.app] = byApp[c.app] || []).push(c);
+  const rows = Object.keys(byApp).map((app) => {
+    const cells = byApp[app].map((c) => {
+      const name = c.file ? c.file.split('/').pop() : null;
+      const bad = !c.ok || c.converged === false;
+      return `<figure class="${bad ? 'bad' : ''}">${name ? `<img loading="lazy" src="${esc(name)}" alt="${esc(c.app)}">` : '<div class="miss"></div>'}`
+        + `<figcaption>${esc(c.presentation)} · ${esc(c.theme)} · ${esc(c.state)}`
+        + `${c.ok ? '' : `<br><b>${esc(c.error || 'no capture')}</b>`}`
+        + `${c.converged === false ? '<br><b>never converged</b>' : ''}</figcaption></figure>`;
+    }).join('');
+    const note = m.apps[app] && m.apps[app].note;
+    return `<section><h2>${esc(app)}${note ? ` <small>${esc(note)}</small>` : ''}</h2><div class="grid">${cells}</div></section>`;
+  }).join('\n');
+  const html = `<!doctype html><meta charset="utf-8"><title>L12 visual atlas</title>
+<style>body{font:13px/1.45 system-ui;background:#111;color:#ddd;margin:24px}
+h1{font-size:18px}h2{font-size:15px;margin:24px 0 8px}small{color:#999;font-weight:400}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+figure{margin:0;background:#1b1b1b;border:1px solid #2a2a2a;border-radius:8px;padding:6px}
+figure.bad{border-color:#a33}img{width:100%;height:auto;display:block;border-radius:4px}
+.miss{height:120px;background:#2a1414;border-radius:4px}
+figcaption{color:#aaa;font-size:11px;margin-top:5px;word-break:break-word}
+.risk{background:#2a1414;border:1px solid #a33;border-radius:8px;padding:10px 14px}
+.risk li{margin:2px 0}</style>
+<h1>L12 visual atlas — ${esc(m.dimensions.apps.length)} apps × ${esc(m.dimensions.themes.length)} themes × ${esc(m.dimensions.presentations.length)} presentations × ${esc(m.dimensions.states.length)} states</h1>
+<p>${esc(m.generatedAt)} · certifiable: <b>${m.certifiable}</b>${m.void ? ` · <b>VOID: ${esc(m.void)}</b>` : ''} · caret frozen: ${m.caretFrozen}</p>
+<div class="risk"><b>Remaining risk — ${risk.length} of ${m.cells.length} cells</b><ul>${
+  risk.length ? risk.map((c) => `<li>${esc(c.app)} / ${esc(c.presentation)} / ${esc(c.theme)} / ${esc(c.state)} — ${esc(c.error || (c.converged === false ? 'never converged' : 'theme not applied'))}</li>`).join('')
+    : '<li>none — every cell captured, converged, and carried the theme it claims</li>'}</ul></div>
+${rows}`;
+  const dest = path.join(SHOT_DIR, 'atlas.html');
+  fs.writeFileSync(dest, html);
+  return path.relative(REPO, dest).replace(/\\/g, '/');
+}
+
 (async () => {
   const health = await post('/health', {});
   if (!health || health.ok !== true) {
@@ -563,6 +687,11 @@ async function capture(tag, rect) {
     apps: {},
     totals: {},
   };
+  // A crash mid-sweep must still bank what it measured. Without this a run that dies at
+  // cell 164 of 650 leaves nothing at all, and the next worker cannot tell a hard product
+  // failure from a dropped socket.
+  PARTIAL.m = manifest;
+  PARTIAL.out = OUT || path.join(REPO, 'debug', 'l12-matrix-manifest.json');
 
   // ---- open every requested app once, and record which ones are presentable ----
   const live = [];
@@ -586,6 +715,8 @@ async function capture(tag, rect) {
   // ---- the matrix. Theme is a SHELL property, so it is the OUTER loop: 26 flips, not
   // one per cell. Presentation is per window and is set once per theme pass. ----
   for (const state of states) {
+    const stateOk = {};
+    for (const app of live) stateOk[app] = await setState(titleOf[app], state);
     for (const pres of presentations) {
       const presOk = {};
       for (const app of live) presOk[app] = await setPresentation(titleOf[app], pres);
@@ -594,19 +725,22 @@ async function capture(tag, rect) {
         for (const app of live) {
           const tag = `${app}__${pres}__${theme}__${state}`;
           const up = await raise(titleOf[app]);
-          const shot = presOk[app].ok && up.ok
-            ? await captureStable(tag, up.rect)
-            : { ok: false, error: presOk[app].ok ? 'window vanished before capture' : presOk[app].reason };
+          const blocked = !presOk[app].ok ? presOk[app].reason
+            : !stateOk[app].ok ? `state ${state}: ${stateOk[app].reason}`
+              : !up.ok ? 'window vanished before capture' : null;
+          const shot = blocked ? { ok: false, error: blocked } : await captureStable(tag, up.rect);
           manifest.cells.push({
             app, theme, presentation: pres, state,
             themeSettled: t.settled, themeSettledMs: t.settledMs, themeApplied: t.ok,
             presentationReached: presOk[app].ok,
+            stateReached: stateOk[app].ok,
             rect: up.rect || null,
             ...shot,
           });
         }
       }
     }
+    for (const app of live) await setState(titleOf[app], 'normal');
   }
 
   // ---- controls ----
@@ -689,9 +823,39 @@ async function capture(tag, rect) {
       };
     }
 
-    manifest.controls = { c0, c1, c2, c3, c4 };
+    /**
+     * C5 — STATE / must DIFFER, and it is scored on the RECT before the pixels. Maximizing
+     * changes the capture's dimensions, so a pixel comparison has no common grid and would
+     * pass trivially on "different sizes" — which is true but says nothing about whether
+     * the window actually maximized. So the falsifiable claim is geometric: the maximized
+     * rect must be strictly larger in area than the normal one, on the window's own
+     * measurement. A surface with no maximize control of its own reports `null`, never a
+     * pass, exactly as C4 does with only one app live.
+     */
+    let c5 = { kind: 'state/must-differ', pass: null, note: 'not attempted' };
+    {
+      const nrm = await setState(titleOf[app], 'normal');
+      const maxd = await setState(titleOf[app], 'maximized');
+      if (!maxd.ok) {
+        c5 = { kind: 'state/must-differ', app, pass: null, note: `maximize not reachable: ${maxd.reason}` };
+      } else {
+        const an = nrm.rect ? nrm.rect.width * nrm.rect.height : 0;
+        const am = maxd.rect ? maxd.rect.width * maxd.rect.height : 0;
+        const cm = await captureStable('__c5b', maxd.rect);
+        c5 = {
+          kind: 'state/must-differ', app,
+          normalRect: nrm.rect, maximizedRect: maxd.rect,
+          areaNormal: an, areaMaximized: am, areaRatio: an ? +(am / an).toFixed(2) : null,
+          b: cm.sha256,
+          pass: am > an && !!cm.sha256,
+        };
+        await setState(titleOf[app], 'normal');
+      }
+    }
+
+    manifest.controls = { c0, c1, c2, c3, c4, c5 };
     manifest.magnitudeGate = sharp ? { pctOver8AtLeast: DIFF_MIN_PCT } : null;
-    manifest.certifiable = c1.pass && c2.pass && c3.pass !== false && c4.pass !== false;
+    manifest.certifiable = c1.pass && c2.pass && c3.pass !== false && c4.pass !== false && c5.pass !== false;
     if (!c1.pass) manifest.void = 'C1 FAILED — the capture is not repeatable, so every difference below is unattributable';
     if (c4.pass === false) manifest.void = 'C4 FAILED — two different apps produced identical images, so the app axis measures nothing';
     // Last, so it OUTRANKS the C1 message: a non-zero floor explains a C1 failure and
@@ -723,6 +887,7 @@ async function capture(tag, rect) {
     failed: cells.filter((c) => !c.ok).length,
     distinctImages: new Set(cells.filter((c) => c.sha256).map((c) => c.sha256)).size,
     unsettled: cells.filter((c) => !c.themeSettled).length,
+    stateBlocked: cells.filter((c) => c.stateReached === false).length,
     unconverged: cells.filter((c) => c.ok && !c.converged).length,
     captureAttemptsTotal: cells.reduce((n, c) => n + (c.attempts || 0), 0),
     themeMisapplied: cells.filter((c) => !c.themeApplied).length,
@@ -733,24 +898,15 @@ async function capture(tag, rect) {
 
   const out = OUT || path.join(REPO, 'debug', 'l12-matrix-manifest.json');
   fs.writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`);
-  /**
-   * `--atlas` is a PASS-THROUGH to L12 bullet 4's assembler, not a second implementation.
-   * It lives in its own module because the atlas must be rebuildable from a banked
-   * manifest with no app running, and this file refuses without a live bridge.
-   */
-  if (ATLAS) {
-    const r = require('node:child_process').spawnSync(process.execPath,
-      [path.join(__dirname, 'l12-atlas.cjs'), '--manifest', out, ...(CONTROL ? ['--control'] : [])],
-      { encoding: 'utf8' });
-    console.log(r.stdout || '');
-    if (r.stderr) console.error(r.stderr);
-  }
+  if (ATLAS) manifest.atlasFile = writeAtlas(manifest);
   console.log(JSON.stringify({
     out: path.relative(REPO, out).replace(/\\/g, '/'),
     ...manifest.totals,
+    retries,
     controls: manifest.controls && {
-      c1: manifest.controls.c1.pass, c2: manifest.controls.c2.pass,
-      c3: manifest.controls.c3.pass, c4: manifest.controls.c4.pass,
+      c0: manifest.controls.c0.identical, c1: manifest.controls.c1.pass,
+      c2: manifest.controls.c2.pass, c3: manifest.controls.c3.pass,
+      c4: manifest.controls.c4.pass, c5: manifest.controls.c5.pass,
     },
     certifiable: manifest.certifiable,
     void: manifest.void || null,
@@ -758,4 +914,16 @@ async function capture(tag, rect) {
     atlas: ATLAS,
   }, null, 2));
   if (manifest.void) process.exit(1);
-})().catch((e) => { console.error(String((e && e.stack) || e)); process.exit(1); });
+})().catch((e) => {
+  console.error(String((e && e.stack) || e));
+  if (PARTIAL.m && PARTIAL.out) {
+    PARTIAL.m.aborted = { at: new Date().toISOString(), error: String((e && e.message) || e), cellsBanked: PARTIAL.m.cells.length, retries };
+    PARTIAL.m.certifiable = false;
+    try {
+      fs.writeFileSync(PARTIAL.out, `${JSON.stringify(PARTIAL.m, null, 2)}
+`);
+      console.error(`PARTIAL manifest written: ${path.relative(REPO, PARTIAL.out)} (${PARTIAL.m.cells.length} cells)`);
+    } catch (w) { console.error(`could not write partial manifest: ${w.message}`); }
+  }
+  process.exit(1);
+});
