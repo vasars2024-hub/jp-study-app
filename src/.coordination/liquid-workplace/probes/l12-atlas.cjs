@@ -334,7 +334,7 @@ function duplicates(cells) {
   };
 }
 
-const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join(' ');
+const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join('\u0000');
 
 /**
  * MULTI-MANIFEST ASSEMBLY — why the atlas takes a LIST and not a file.
@@ -412,6 +412,15 @@ function mergeManifests(loaded) {
       certifiable: !!manifest.certifiable,
       controlsRan: !!manifest.controls,
       caretFrozen: !!manifest.caretFrozen,
+      // HOW THE SOURCE RUN ADDRESSED ITS WINDOWS, because the app axis is only as real
+      // as that key. A run that resolved windows by TITLE collapsed every empty-title
+      // section onto one window (`visualizer`/`musicwidget`/`city` here), so its app rows
+      // are fabricated for those surfaces and no amount of re-hashing can tell. Manifests
+      // written before `addressing` existed report `unrecorded`, which is not the same as
+      // `section` and must not be treated as it.
+      addressing: (manifest.addressing && manifest.addressing.mode) || 'unrecorded',
+      titleCollisions: manifest.addressing && manifest.addressing.titleCollisions
+        ? manifest.addressing.titleCollisions.collisions : null,
     });
   }
 
@@ -443,6 +452,15 @@ function mergeManifests(loaded) {
     certifiable: notCertifiable.length === 0,
     void: notCertifiable.length ? `sources not certifiable on their own controls: ${notCertifiable.join(', ')}` : null,
     caretFrozen: loaded.every(({ manifest }) => manifest.caretFrozen),
+    // Weakest source wins: one title-addressed source makes the merged app axis suspect,
+    // exactly as one uncontrolled source voids the merged controls.
+    addressing: {
+      mode: loaded.every(({ manifest }) => (manifest.addressing || {}).mode === 'section')
+        ? 'section' : 'mixed-or-unrecorded',
+      sources: loaded.map(({ file, manifest }) => ({
+        file, mode: (manifest.addressing || {}).mode || 'unrecorded',
+      })),
+    },
   };
 
   return {
@@ -493,6 +511,26 @@ function assemble(manifest) {
       + ` (and geometry in ${a.groupsWhereGeometryMoved}) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything`);
   }
   if (integ.mismatch > 0) blockers.push(`${integ.mismatch} indexed images no longer hash to their recorded sha256`);
+  /**
+   * THE APP AXIS IS ONLY AS REAL AS THE KEY THE SOURCE RUN USED TO ADDRESS A WINDOW, and
+   * this atlas certified three runs that had no such key. `l12-visual-matrix.cjs` resolved
+   * a window by the text in its title bar; `visualizer`, `musicwidget` and the frameless
+   * `city` all render an EMPTY title, so a first-match resolve returned one window for all
+   * three and the atlas counted three app rows. Integrity cannot see it — the hashes are
+   * of real files that really were captured, just of the wrong window — and neither can
+   * axis effectiveness, which compares images and not their labels.
+   *
+   * So it is asserted from provenance rather than from pixels, and `unrecorded` is treated
+   * as failing. A manifest that predates `addressing` genuinely does not know.
+   */
+  const addr = manifest.addressing || {};
+  if (addr.mode !== 'section') {
+    const named = (addr.sources || []).filter((s) => s.mode !== 'section').map((s) => `${s.file} (${s.mode})`);
+    blockers.push('the app axis is unverifiable: '
+      + `${named.length ? named.join(', ') : 'this run'} addressed windows by title, and every `
+      + 'section that renders an empty title collapses onto one window under a first-match '
+      + 'resolve — re-capture with --address section');
+  }
 
   return {
     schema: 'l12-atlas/v1',
@@ -507,6 +545,7 @@ function assemble(manifest) {
         ? Object.fromEntries(Object.entries(manifest.controls).map(([k, v]) => [k, v.pass === undefined ? v.identical : v.pass]))
         : null,
       caretFrozen: manifest.caretFrozen,
+      addressing: manifest.addressing || { mode: 'unrecorded' },
     },
     dimensions: manifest.dimensions || {},
     coverage: cov,
