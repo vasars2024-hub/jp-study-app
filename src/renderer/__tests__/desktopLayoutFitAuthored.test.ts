@@ -17,6 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { DesktopLayout, WindowSnapshot } from '../../shared/desktop';
+import { parsePresentation } from '../../shared/liquidWindowState';
 import { clampLayoutToViewport } from '../desktopLayoutFit';
 
 function win(over: Partial<WindowSnapshot> = {}): WindowSnapshot {
@@ -138,5 +139,109 @@ describe('the fit invariant still holds', () => {
   it('returns the layout untouched for a zero viewport', () => {
     const src = layout({ authoredW: BIG.w, authoredH: BIG.h });
     expect(clampLayoutToViewport(src, { w: 0, h: 0 })).toBe(src);
+  });
+});
+
+/**
+ * L11 bullet 4, clause 3 — multi-monitor.
+ *
+ * The fit moved the live rect and nothing else, so a window arriving from a
+ * bigger display was on-screen right up until the user pressed one of the two
+ * controls that restore it. Measured on this profile's real desktop 4 (authored
+ * 880x393, opened in a 642x385 desk window, 2026-09-01): the maximized `scraper`
+ * clamped correctly to 642x385, then its own Maximize button restored the
+ * untouched `restoreRect` 820x580 at (94,54) — 272px past the right edge, 249px
+ * past the bottom, `overflow: hidden`, no scrollbar, resize grip unreachable.
+ *
+ * `presentation.standardRect` is the same field one level down: it is where
+ * Return to standard lands, and §2.1 makes that reversal non-negotiable.
+ */
+const DESK_4 = { w: 642, h: 385 };
+
+describe('restore targets are fitted too, not just the live rect', () => {
+  it('pulls restoreRect in — the exact desktop-4 case, with its real numbers', () => {
+    const src = layout({
+      authoredW: 880,
+      authoredH: 393,
+      windows: [
+        win({ x: 0, y: 0, w: 880, h: 393, maximized: true, restoreRect: { x: 94, y: 54, w: 820, h: 580 } }),
+      ],
+    });
+    const out = clampLayoutToViewport(src, DESK_4, 'clamp');
+    const r = out.windows[0].restoreRect!;
+
+    expect({ ...r }).toEqual({ x: 0, y: 0, w: 642, h: 385 });
+    expect(r.x + r.w).toBeLessThanOrEqual(DESK_4.w);
+    expect(r.y + r.h).toBeLessThanOrEqual(DESK_4.h);
+  });
+
+  it('pulls presentation.standardRect in, and it stays a valid way home', () => {
+    const src = layout({
+      windows: [
+        win({
+          x: 40,
+          y: 40,
+          w: 820,
+          h: 580,
+          presentation: { v: 1, mode: 'liquid', standardRect: { x: 60, y: 24, w: 820, h: 580 }, standardMaximized: false },
+        }),
+      ],
+    });
+    const out = clampLayoutToViewport(src, DESK_4, 'clamp');
+    const p = out.windows[0].presentation!;
+
+    expect(p.standardRect).toEqual({ x: 0, y: 0, w: 642, h: 385 });
+    // Still liquid, still reversible — a clamped way home beats no way home.
+    expect(p.mode).toBe('liquid');
+    expect(p.standardMaximized).toBe(false);
+    expect(parsePresentation(p)).toEqual(p);
+  });
+
+  it('scales both restore targets in proportional mode, like everything else', () => {
+    const src = layout({
+      authoredW: BIG.w,
+      authoredH: BIG.h,
+      windows: [
+        win({
+          restoreRect: { x: 200, y: 120, w: 600, h: 400 },
+          presentation: { v: 1, mode: 'liquid', standardRect: { x: 200, y: 120, w: 600, h: 400 } },
+        }),
+      ],
+    });
+    const out = clampLayoutToViewport(src, SMALL, 'proportional');
+
+    // 600 * (880/1264) = 417.7..., 400 * (507/821) = 246.9...
+    expect(out.windows[0].restoreRect).toEqual({ x: 139, y: 74, w: 418, h: 247 });
+    expect(out.windows[0].presentation!.standardRect).toEqual({ x: 139, y: 74, w: 418, h: 247 });
+  });
+
+  it('is byte-for-byte identity when both restore targets already fit', () => {
+    // The control against over-reach: this must be a no-op on every layout that
+    // was never cross-monitor, or the fit starts re-authoring desks that are fine.
+    const src = layout({
+      authoredW: BIG.w,
+      authoredH: BIG.h,
+      windows: [
+        win({
+          restoreRect: { x: 100, y: 60, w: 500, h: 300 },
+          presentation: { v: 1, mode: 'liquid', standardRect: { x: 100, y: 60, w: 500, h: 300 } },
+        }),
+      ],
+    });
+    const out = clampLayoutToViewport(src, SMALL, 'clamp');
+
+    expect(out.windows[0]).toBe(src.windows[0]);
+    expect(out.windows[0].presentation).toBe(src.windows[0].presentation);
+  });
+
+  it('adds neither key to a window that never had one', () => {
+    // Decision (1) of `shared/liquidWindowState.ts`: conventional IS the absence
+    // of the field. A fit that grows `presentation: undefined` onto every window
+    // makes every pre-L3 blob differ from itself on disk.
+    const src = layout({ windows: [win({ x: 900, y: 700, w: 1264, h: 773 })] });
+    const keys = Object.keys(clampLayoutToViewport(src, DESK_4, 'clamp').windows[0]);
+
+    expect(keys).not.toContain('presentation');
+    expect(keys).not.toContain('restoreRect');
   });
 });

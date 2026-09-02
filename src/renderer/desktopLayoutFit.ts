@@ -68,13 +68,63 @@ export function clampLayoutToViewport(
   const MIN_W = 240;
   const MIN_H = 140;
 
-  const windows = layout.windows.map((win) => {
-    const w = Math.max(MIN_W, Math.min(vw, Math.round(win.w * sx)));
-    const h = Math.max(MIN_H, Math.min(vh, Math.round(win.h * sy)));
+  /** One window-sized rect, pulled into this viewport. Identity-preserving. */
+  const fitRect = <T extends { x: number; y: number; w: number; h: number }>(rect: T): T => {
+    const w = Math.max(MIN_W, Math.min(vw, Math.round(rect.w * sx)));
+    const h = Math.max(MIN_H, Math.min(vh, Math.round(rect.h * sy)));
     // Keep at least a title bar's worth reachable, never a negative origin.
-    const x = Math.max(0, Math.min(Math.round(win.x * sx), Math.max(0, vw - w)));
-    const y = Math.max(0, Math.min(Math.round(win.y * sy), Math.max(0, vh - h)));
-    return win.x === x && win.y === y && win.w === w && win.h === h ? win : { ...win, x, y, w, h };
+    const x = Math.max(0, Math.min(Math.round(rect.x * sx), Math.max(0, vw - w)));
+    const y = Math.max(0, Math.min(Math.round(rect.y * sy), Math.max(0, vh - h)));
+    return rect.x === x && rect.y === y && rect.w === w && rect.h === h ? rect : { ...rect, x, y, w, h };
+  };
+
+  const windows = layout.windows.map((win) => {
+    const live = fitRect(win);
+    /*
+     * The rects a window is restored INTO have to fit too, and until 2026-09-01
+     * neither did. `restoreRect` is where un-maximizing lands and
+     * `presentation.standardRect` is where Return to standard lands, so a fit
+     * that moves only the live rect hands the user a window that is on-screen
+     * now and off-screen the moment they use either control. Measured on this
+     * profile's own desktop 4, authored 880x393 and hydrated into a 642x385 desk
+     * window: the maximized `scraper` clamped correctly to 642x385, then its
+     * Maximize button restored it to the untouched 820x580 at 94,54 — 272px past
+     * the right edge and 249px past the bottom, under `overflow: hidden` with no
+     * scrollbar, taking the resize grip with it. Same class as the zoom re-fit
+     * defect L11 bullet 2 closed; same omission, one map further down.
+     *
+     * They take the SAME bound as the live rect rather than a looser one: a
+     * restore target that only half-fits is the same unreachable window. In
+     * clamp mode (sx = sy = 1) a rect that already fits is returned by identity,
+     * so this is a no-op for every layout that was never cross-monitor.
+     *
+     * `standardRect` stays parseable by construction — `parsePresentation`
+     * rejects w/h <= 0 and the floor here is MIN_W/MIN_H — so a clamped window
+     * keeps its way back rather than being downgraded to conventional.
+     */
+    const restoreRect = win.restoreRect ? fitRect(win.restoreRect) : win.restoreRect;
+    const standardRect = win.presentation?.standardRect
+      ? fitRect(win.presentation.standardRect)
+      : win.presentation?.standardRect;
+    if (
+      live === win &&
+      restoreRect === win.restoreRect &&
+      standardRect === win.presentation?.standardRect
+    ) {
+      return win;
+    }
+    // Spread only what the window actually had. `restoreRect: undefined` on a
+    // window that never carried one still ADDS the key, and decision (1) of
+    // `shared/liquidWindowState.ts` is that the conventional window is the
+    // ABSENCE of these fields — a blob that grows them differs from itself on
+    // disk for every pre-L3 layout in existence.
+    return {
+      ...live,
+      ...(restoreRect ? { restoreRect } : {}),
+      ...(win.presentation
+        ? { presentation: { ...win.presentation, ...(standardRect ? { standardRect } : {}) } }
+        : {}),
+    };
   });
 
   const icons = layout.icons.map((icon) => {
