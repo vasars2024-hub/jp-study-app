@@ -725,13 +725,104 @@
       "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
       "observed": "standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 4/5 (baseline 5/5), fell=[windowLifecycle], restored 5/5",
       "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Category rail: the only route to 18 of the 19 settings pages",
+      "currentRoute": "Settings window > `.os-set-nav-item`, each carrying both a visible label and a `title` (the label is clipped below 420px of `.os-set-body`, so `title` is the narrow tier's only text)",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "real buttons; the current one publishes `aria-current=\"page\"`",
+      "dataStateOwner": "the item set is derived from settingsRegistry.ts; which one is current is component state (`page`, SettingsApp.tsx:131) and is not persisted",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: items=18 current=1 named=18 titled=18 || liquid: items=18 current=1 named=18 titled=18 || negative control `categoryRail` -> 6/7 (baseline 7/7), fell=[categoryRail], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Grouped navigation: labelled groups, each list wired to its own label",
+      "currentRoute": "Settings window > `.os-set-nav-group` > `.os-set-nav-group-label` + `.os-set-nav-list[aria-labelledby=\"set-nav-<group>\"]` (SettingsNav.tsx:65-72)",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "each list is a labelled region a screen reader can enumerate; the items inside are buttons",
+      "dataStateOwner": "group membership is declared per entry in settingsRegistry.ts",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: groups=4 labelled=4 lists=4 wired=4 || liquid: groups=4 labelled=4 lists=4 wired=4 || negative control `groupedNavigation` -> 6/7 (baseline 7/7), fell=[groupedNavigation], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Settings search — the second route in, and the one the command palette uses",
+      "currentRoute": "Settings window > `.os-set-search-input`, `aria-controls` naming its result panel and `aria-expanded` a real boolean",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "text input; Escape closes the panel synchronously",
+      "dataStateOwner": "`searchSettings()` over settingsRegistry.ts (SettingsSearch.tsx:12); the query itself is component state and is cleared on close",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: input=true controls=_r_b1_ expanded=false || liquid: input=true controls=_r_b1_ expanded=false || negative control `settingsSearch` -> 6/7 (baseline 7/7), fell=[settingsSearch], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Advanced mode: show or hide the advanced pages, with the rail agreeing with the claim",
+      "currentRoute": "Settings window > `.os-set-advanced-btn` (`aria-pressed`), advanced rail entries marked by `.os-set-adv-dot`",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "a real toggle button carrying `aria-pressed` and a `title`",
+      "dataStateOwner": "renderer/settingsAdvanced.ts — persisted in localStorage under `jp-settings-advanced-v1`; UI unlock only, background systems run either way",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: pressed=false advancedItemsInRail=0 agrees=true || liquid: pressed=false advancedItemsInRail=0 agrees=true || negative control `advancedDisclosure` -> 6/7 (baseline 7/7), fell=[advancedDisclosure], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "The page pane names itself after the destination the rail says is current",
+      "currentRoute": "Settings window > `.os-set-pane-v2[role=\"main\"]` with `aria-label` and `data-settings-page` (SettingsApp.tsx:596-600)",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "a `main` landmark, reachable by landmark navigation",
+      "dataStateOwner": "component state (`page`) in SettingsApp.tsx; the label is derived from the same value the rail renders, which is what makes a stale name detectable",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: role=main page=home label=Home rail=Home || liquid: role=main page=home label=Home rail=Home || negative control `pageRegion` -> 6/7 (baseline 7/7), fell=[pageRegion], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Home overview: status chips with real values, and quick cards that are working destinations",
+      "currentRoute": "Settings window > Home > `.os-set-status-chip` (value in `strong`, caption in `.muted`) + `.os-set-quick-card` (SettingsHome.tsx:69ff, :162)",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "quick cards are enabled buttons",
+      "dataStateOwner": "chips read live app state; the cards navigate through the same `page` state the rail uses",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: chips=5 valued=5 quickCards=10 live=10 || liquid: chips=5 valued=5 quickCards=10 live=10 || negative control `homeOverview` -> 6/7 (baseline 7/7), fell=[homeOverview], restored 7/7",
+      "status": "both"
+    },
+    {
+      "app": "settings",
+      "feature": "Window lifecycle: pop out, minimize, maximize, close",
+      "currentRoute": "Settings window > `.fwin-b` title-bar controls",
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "keyboardRoute": "four real buttons",
+      "dataStateOwner": "DesktopShell window state + main-process popOut",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app settings (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-settings-p2f)",
+      "observed": "standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 6/7 (baseline 7/7), fell=[windowLifecycle], restored 7/7",
+      "status": "both"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 18 root components — was 19; calendar left this list on 2026-09-02, five rows derived from a live cat6 PASS run rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. probes/l6-parity.js declares SPECS for 24 apps and parity-ledger.json now carries rows for 8, so the gap is the 16 specs with no metadata block plus the 2 ledger apps (mediaWorkspace, mediaCenter) that have no spec.",
+      "the other 17 root components — was 19 on 2026-09-01; calendar (5 rows) and settings (7 rows) left this list on 2026-09-02, derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. probes/l6-parity.js declares SPECS for 24 apps and parity-ledger.json now carries rows for 9, so the gap is the 15 specs with no metadata block plus the 2 ledger apps (mediaWorkspace, mediaCenter) that have no spec.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
   }

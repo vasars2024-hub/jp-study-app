@@ -4,7 +4,8 @@
   "howToAddAnApp": "Read the app.s SPECS block in probes/l6-parity.js for its row ids, then write one entry per id. The two destination strings and noLiquidReason are per-app, not per-row.",
   "provenance": {
     "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. CORRECTED 2026-09-02: this note used to claim the seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", had NO spec id and was \"deliberately absent\". That was false -- `l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for every app, and the live run refused BY NAME on it, which is the refusal working. Its four authored fields are now copied from that same ledger row. This block is a REGRESSION TEST -- a live cat6 dictionary run must re-derive these SEVEN features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys. Measured 2026-09-02 at 1ec440ab: 7 rows, statuses {both: 7}, added 0.",
-    "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403."
+    "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403.",
+    "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped."
   },
   "apps": {
     "dictionary": {
@@ -88,6 +89,55 @@
         "windowLifecycle": {
           "feature": "Window lifecycle: pop out, minimize, maximize, close",
           "currentRoute": "Calendar window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "settings": {
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "noLiquidReason": null,
+      "features": {
+        "categoryRail": {
+          "feature": "Category rail: the only route to 18 of the 19 settings pages",
+          "currentRoute": "Settings window > `.os-set-nav-item`, each carrying both a visible label and a `title` (the label is clipped below 420px of `.os-set-body`, so `title` is the narrow tier's only text)",
+          "keyboardRoute": "real buttons; the current one publishes `aria-current=\"page\"`",
+          "dataStateOwner": "the item set is derived from settingsRegistry.ts; which one is current is component state (`page`, SettingsApp.tsx:131) and is not persisted"
+        },
+        "groupedNavigation": {
+          "feature": "Grouped navigation: labelled groups, each list wired to its own label",
+          "currentRoute": "Settings window > `.os-set-nav-group` > `.os-set-nav-group-label` + `.os-set-nav-list[aria-labelledby=\"set-nav-<group>\"]` (SettingsNav.tsx:65-72)",
+          "keyboardRoute": "each list is a labelled region a screen reader can enumerate; the items inside are buttons",
+          "dataStateOwner": "group membership is declared per entry in settingsRegistry.ts"
+        },
+        "settingsSearch": {
+          "feature": "Settings search — the second route in, and the one the command palette uses",
+          "currentRoute": "Settings window > `.os-set-search-input`, `aria-controls` naming its result panel and `aria-expanded` a real boolean",
+          "keyboardRoute": "text input; Escape closes the panel synchronously",
+          "dataStateOwner": "`searchSettings()` over settingsRegistry.ts (SettingsSearch.tsx:12); the query itself is component state and is cleared on close"
+        },
+        "advancedDisclosure": {
+          "feature": "Advanced mode: show or hide the advanced pages, with the rail agreeing with the claim",
+          "currentRoute": "Settings window > `.os-set-advanced-btn` (`aria-pressed`), advanced rail entries marked by `.os-set-adv-dot`",
+          "keyboardRoute": "a real toggle button carrying `aria-pressed` and a `title`",
+          "dataStateOwner": "renderer/settingsAdvanced.ts — persisted in localStorage under `jp-settings-advanced-v1`; UI unlock only, background systems run either way"
+        },
+        "pageRegion": {
+          "feature": "The page pane names itself after the destination the rail says is current",
+          "currentRoute": "Settings window > `.os-set-pane-v2[role=\"main\"]` with `aria-label` and `data-settings-page` (SettingsApp.tsx:596-600)",
+          "keyboardRoute": "a `main` landmark, reachable by landmark navigation",
+          "dataStateOwner": "component state (`page`) in SettingsApp.tsx; the label is derived from the same value the rail renders, which is what makes a stale name detectable"
+        },
+        "homeOverview": {
+          "feature": "Home overview: status chips with real values, and quick cards that are working destinations",
+          "currentRoute": "Settings window > Home > `.os-set-status-chip` (value in `strong`, caption in `.muted`) + `.os-set-quick-card` (SettingsHome.tsx:69ff, :162)",
+          "keyboardRoute": "quick cards are enabled buttons",
+          "dataStateOwner": "chips read live app state; the cards navigate through the same `page` state the rail uses"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Settings window > `.fwin-b` title-bar controls",
           "keyboardRoute": "four real buttons",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
         }
