@@ -3,7 +3,8 @@
   "why": "The AUTHORED half of a feature-ledger row. l6-parity-rows.cjs derives every MEASURED field from a cat6 run artifact and refuses to invent any of these; a spec row id with no entry here refuses BY NAME rather than being written with a guessed route. One block per app, keyed by the row ids in probes/l6-parity.js.",
   "howToAddAnApp": "Read the app.s SPECS block in probes/l6-parity.js for its row ids, then write one entry per id. The two destination strings and noLiquidReason are per-app, not per-row.",
   "provenance": {
-    "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. The ledger.s seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", has NO spec id and is deliberately absent: it was authored outside l6-parity.js and the writer must not claim it. This block therefore doubles as a REGRESSION TEST -- the first live cat6 dictionary run must re-derive these six features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys."
+    "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. CORRECTED 2026-09-02: this note used to claim the seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", had NO spec id and was \"deliberately absent\". That was false -- `l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for every app, and the live run refused BY NAME on it, which is the refusal working. Its four authored fields are now copied from that same ledger row. This block is a REGRESSION TEST -- a live cat6 dictionary run must re-derive these SEVEN features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys. Measured 2026-09-02 at 1ec440ab: 7 rows, statuses {both: 7}, added 0.",
+    "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403."
   },
   "apps": {
     "dictionary": {
@@ -50,6 +51,43 @@
         "windowLifecycle": {
           "feature": "Window lifecycle: pop out, minimize, maximize, close",
           "currentRoute": "Dictionary window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "calendar": {
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "noLiquidReason": null,
+      "features": {
+        "viewModes": {
+          "feature": "Switch view mode: Month / Week / Day / Agenda",
+          "currentRoute": "Calendar window > `.cal-mode-btn` x4 in the `.cal-context-toolbar` mode row",
+          "keyboardRoute": "four real buttons, focusable",
+          "dataStateOwner": "component state (`mode`) in CalendarContent.tsx — not persisted, so a reopen returns to Month"
+        },
+        "monthGrid": {
+          "feature": "Month grid: seven day-of-week headers over a full 42-cell numbered month",
+          "currentRoute": "Calendar window > `.cal-month-grid` > `.cal-month-dow` x7 + `.cal-month-cell` x42, each carrying a `.cal-month-daynum`",
+          "keyboardRoute": "cells are click targets; no keyboard grid navigation is claimed here",
+          "dataStateOwner": "derived from the cursor date; occurrences come from `expandOccurrences` over renderer/calendar.ts events"
+        },
+        "dateTransport": {
+          "feature": "Move through time: previous / today / next, plus a direct date jump",
+          "currentRoute": "Calendar window > `.cal-nav` > three buttons + `input[type=\"date\"]`, with the period named in `.cal-header-label`",
+          "keyboardRoute": "three real buttons and a native date input",
+          "dataStateOwner": "component state (the cursor date) in CalendarContent.tsx"
+        },
+        "eventComposer": {
+          "feature": "Create an event: the new-event composer and its cancel recovery",
+          "currentRoute": "Calendar window > `.calendar-context-head > .btn` opens `.cal-modal`; `.cal-modal-actions` carries save and cancel",
+          "keyboardRoute": "trigger is a real `type=\"button\"`; the modal is a form of native inputs, selects and a textarea",
+          "dataStateOwner": "renderer/calendar.ts — `addEvent` writes `LS_KEYS.calendarEvents` in localStorage and mirrors to `IDB_KEYS.calendarEvents`; the open composer itself is component state (`modal`)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Calendar window > `.fwin-b` title-bar controls",
           "keyboardRoute": "four real buttons",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
         }

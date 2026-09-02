@@ -1,7 +1,7 @@
 {
   "schema": "app | feature | currentRoute | standardDestination | liquidDestination | keyboardRoute | dataStateOwner | automatedProof | visualProof | status",
   "authority": "src/LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md §5.3",
-  "milestone": "L6-reading-and-immersion",
+  "milestone": "L12-parity-ledger",
   "rule": "A row closes on an observed side effect, never on a control's presence. `observed` carries the literal before/after measurement; a row with no `observed` is explicitly not proven.",
   "statusVocabulary": {
     "pending": "no Liquid destination yet",
@@ -660,13 +660,78 @@
       "visualProof": "live bridge drive, 2026-08-25 (L6 bullet 1, §5.3)",
       "observed": "standard -> liquid -> standard. Round trip identical on every field: rect 94/54/820x580, maximized=false, focused=true, zIndex=264, chars 843 = 843, nodes 284 = 284, controls 58 = 58 || negative control `windowLifecycle` -> 5/6, this row alone false, restored 6/6",
       "status": "both"
+    },
+    {
+      "app": "calendar",
+      "feature": "Switch view mode: Month / Week / Day / Agenda",
+      "currentRoute": "Calendar window > `.cal-mode-btn` x4 in the `.cal-context-toolbar` mode row",
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "keyboardRoute": "four real buttons, focusable",
+      "dataStateOwner": "component state (`mode`) in CalendarContent.tsx — not persisted, so a reopen returns to Month",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app calendar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
+      "observed": "standard: buttons=4 active=1 visited=4/4 || liquid: buttons=4 active=1 visited=4/4 || negative control `viewModes` -> 4/5 (baseline 5/5), fell=[viewModes], restored 5/5",
+      "status": "both"
+    },
+    {
+      "app": "calendar",
+      "feature": "Month grid: seven day-of-week headers over a full 42-cell numbered month",
+      "currentRoute": "Calendar window > `.cal-month-grid` > `.cal-month-dow` x7 + `.cal-month-cell` x42, each carrying a `.cal-month-daynum`",
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "keyboardRoute": "cells are click targets; no keyboard grid navigation is claimed here",
+      "dataStateOwner": "derived from the cursor date; occurrences come from `expandOccurrences` over renderer/calendar.ts events",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app calendar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
+      "observed": "standard: dows=7 cells=42 numbered=42 || liquid: dows=7 cells=42 numbered=42 || negative control `monthGrid` -> 4/5 (baseline 5/5), fell=[monthGrid], restored 5/5",
+      "status": "both"
+    },
+    {
+      "app": "calendar",
+      "feature": "Move through time: previous / today / next, plus a direct date jump",
+      "currentRoute": "Calendar window > `.cal-nav` > three buttons + `input[type=\"date\"]`, with the period named in `.cal-header-label`",
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "keyboardRoute": "three real buttons and a native date input",
+      "dataStateOwner": "component state (the cursor date) in CalendarContent.tsx",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app calendar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
+      "observed": "standard: buttons=3 named=3 jump=true shiftedAndReturned=true || liquid: buttons=3 named=3 jump=true shiftedAndReturned=true || negative control `dateTransport` -> 4/5 (baseline 5/5), fell=[dateTransport], restored 5/5",
+      "status": "both"
+    },
+    {
+      "app": "calendar",
+      "feature": "Create an event: the new-event composer and its cancel recovery",
+      "currentRoute": "Calendar window > `.calendar-context-head > .btn` opens `.cal-modal`; `.cal-modal-actions` carries save and cancel",
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "keyboardRoute": "trigger is a real `type=\"button\"`; the modal is a form of native inputs, selects and a textarea",
+      "dataStateOwner": "renderer/calendar.ts — `addEvent` writes `LS_KEYS.calendarEvents` in localStorage and mirrors to `IDB_KEYS.calendarEvents`; the open composer itself is component state (`modal`)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app calendar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
+      "observed": "standard: trigger=true complete=true closed=true || liquid: trigger=true complete=true closed=true || negative control `eventComposer` -> 4/5 (baseline 5/5), fell=[eventComposer], restored 5/5",
+      "status": "both"
+    },
+    {
+      "app": "calendar",
+      "feature": "Window lifecycle: pop out, minimize, maximize, close",
+      "currentRoute": "Calendar window > `.fwin-b` title-bar controls",
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "keyboardRoute": "four real buttons",
+      "dataStateOwner": "DesktopShell window state + main-process popOut",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app calendar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-calendar-p2f)",
+      "observed": "standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 4/5 (baseline 5/5), fell=[windowLifecycle], restored 5/5",
+      "status": "both"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
+      "the other 18 root components — was 19; calendar left this list on 2026-09-02, five rows derived from a live cat6 PASS run rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. probes/l6-parity.js declares SPECS for 24 apps and parity-ledger.json now carries rows for 8, so the gap is the 16 specs with no metadata block plus the 2 ledger apps (mediaWorkspace, mediaCenter) that have no spec.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
   }
