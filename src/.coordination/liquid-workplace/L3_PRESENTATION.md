@@ -303,3 +303,22 @@ so standalone it builds the default root with none of the renderer's aliases and
 one, and it fails identically for the preload config. (b) A real kill-and-relaunch persistence leg
 on the fresh profile was not run; the loaded-profile equivalent is `282f53fb`. (c) The gate results
 are still not recorded against L12's own words.
+
+**RESTART PERSISTENCE ON THE FRESH PROFILE — the clause's (b) is now CLOSED.** Entered Liquid,
+copied the layout blob (`sha256 D3BE3778…`), then **`Stop-Process -Force`** on the Electron main
+and its forge parent — not a graceful quit, so it cannot pass on shutdown-flushed state, and the
+blob was **already byte-identical before the kill**. Relaunched on the same scratch dir: the
+Dictionary window came back at `data-presentation="liquid"` with `.fwin-liquid` applied, and the
+18-property snapshot is **byte-identical to the pre-restart Liquid one by `-ceq`**. DISCRIMINATING
+CONTROL: the same post-restart snapshot compared against the STANDARD one returns **False**, so the
+True above is state, not a comparison that always passes. Layout blob unchanged across the whole
+cycle. The first-run consent modal and tour did **not** reappear — the fresh profile remembered
+its own dismissal.
+
+TRAP, cost two readings: the bridge answers `/health` and `/eval` **before the desktop hydrates**.
+At ~6 s after `bridge.json` appeared the renderer reported `fwin: 0` and `pres: []` — which reads
+exactly like "the restore path is broken". At ~21 s it reported `fwin: 1`, `liquid`. Poll for the
+window, never sample once.
+
+Leaving this turn: **scratch profile deleted, `debug/bridge.json` restored byte-identical to the
+loaded instance's (`sha256 06B60389…`), loaded instance untouched and alive.**
