@@ -166,7 +166,7 @@ Recovery turn: `primary` died at 16:50:42 EDT, 16 s after committing `c51e4232`.
 verified-but-uncommitted edit (landed as `b037607c`) and one red it never re-ran.
 
 **The branch was red at its own tip, and not for the reason anyone recorded.**
-`liquidWindowSnapshotFidelity` fails at `c51e4232` with `expected 5 to be 4`— no, with
+`liquidWindowSnapshotFidelity` fails at `c51e4232` with
 `expected [ 'map(winToSnapshot)', …(3) ] to have a length of 3 but got 4`: the zoom re-fit added
 a real fourth `.map(winToSnapshot)` (`toAuthoredSpace(winsRef.current.map(winToSnapshot))`,
 DesktopShell.tsx:947) against a count pinned at 3. This is the SECOND time this one suite has
