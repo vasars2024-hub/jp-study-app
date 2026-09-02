@@ -15,7 +15,7 @@
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-visual-matrix.cjs \
  *     [--apps all|a,b,c] [--themes all|+hidden|a,b] [--presentations standard,liquid] \
- *     [--states normal,maximized] [--out file] [--control] [--keep] [--atlas]
+ *     [--states normal,maximized] [--out file] [--control] [--keep] [--atlas] [--no-freeze]
  *
  * ---------------------------------------------------------------------------------
  * THE TRAP THIS HARNESS EXISTS TO NOT FALL INTO, and it has burned this repo twice.
@@ -56,6 +56,46 @@
  *     that never converges is `converged:false` — a genuine finding about live content,
  *     not something to average away.
  *
+ * (2b) A BLINKING CARET IS ONE OSCILLATOR, AND IT IS REAL, BUT IT WAS NOT WHY C1 FAILED.
+ *     Measured, not reasoned about: 14 captures of one unchanged Dictionary window, 250 ms
+ *     apart, came back `ABBCDEEDEEDDEE` — 5 distinct images whose byte lengths spanned all
+ *     of 27 bytes (23,193–23,220). The tail oscillates D/E/D/E, a two-state PERIOD rather
+ *     than a transition. `document.activeElement` is an INPUT inside the window and
+ *     Chromium blinks a caret at ~530 ms, longer than the convergence gap, so two
+ *     consecutive shots land in the same phase and the gate converges on a RANDOM phase.
+ *     A `caret-color: transparent` freeze removes exactly those pixels and nothing else:
+ *     same window, same cadence, freeze on -> `AAABCCCCCC`, one image six times running.
+ *     `--no-freeze` is its falsifier.
+ *
+ *     AND C1 STILL FAILED WITH THE FREEZE ON. Recorded because a plausible fix that does
+ *     not move the number is the cheapest kind of false credit available here.
+ *
+ * (2c) WHAT ACTUALLY FAILED C1 IS A LATE PLATEAU, AND THE CAPTURE IS NOT NOISY AT ALL.
+ *     The two frames C1 compared differed in 171 pixels out of 475,600, scattered over the
+ *     whole frame, at a maximum channel delta of ONE. That reads like compositor noise, and
+ *     if it were, byte-identity would be an impossible gate on this platform and the whole
+ *     control would have to be rewritten around a tolerance. So it was measured directly:
+ *
+ *       floor  — same window, settled, two captures back to back:      0 pixels differ
+ *       floor  — same window, after a theme round trip away and back:  0 pixels differ
+ *       signal — study-os vs classic-light:      99.591% of pixels, mean delta 249.6
+ *       signal — standard vs liquid:             92.728% of pixels, mean delta  21.75
+ *
+ *     The floor is exactly zero. `capturePage` IS byte-deterministic once the content has
+ *     stopped moving, so byte-identity is the right equality after all and no tolerance is
+ *     needed for C1. What defeats it is that this surface settles in STEPS: the repeat trace
+ *     `AAAABBBBBB` holds one image for four consecutive captures — about 1.3 s — and then
+ *     changes for good. Two-in-a-row converges inside that plateau, one call lands on A and
+ *     the next on B, and C1 correctly reports them as different. The gate was too weak, not
+ *     the platform too noisy. Convergence now requires `--run` (default 3) consecutive
+ *     identical frames 300 ms apart, which is longer than the observed plateau.
+ *
+ *     The same measurement condemns the must-differ controls as they were first written.
+ *     With a floor of zero, ANY byte difference passed them — one stray pixel would have
+ *     satisfied C2, C3 and C4 while the theme, the toggle or the crop did nothing. They now
+ *     assert a MAGNITUDE (>=1% of pixels differing by more than 8), which sits four orders
+ *     above the measured floor and two below the weakest real signal.
+ *
  * (3) `study-os` IS THE DEFAULT AND CARRIES NO `data-theme` ATTRIBUTE AT ALL —
  *     `applyTheme` REMOVES it for the default id (engine.ts:147). A verifier that reads
  *     the attribute back to confirm the flip therefore scores the default theme as a
@@ -64,7 +104,13 @@
  *
  * ---------------------------------------------------------------------------------
  * THE CONTROLS, because 182 PNGs of the same picture is a matrix that proves nothing and
- * would look exactly like a successful run. `--control` runs four, in this order:
+ * would look exactly like a successful run. `--control` runs five, in this order:
+ *
+ *   C0  FLOOR / the instrument's own noise. Two captures of an unchanged, settled window,
+ *       taken exactly the way the matrix takes them. Everything below is scored against
+ *       this number, and a run where the floor is NOT zero VOIDs with that stated first —
+ *       because it would mean byte-identity is the wrong equality here and every other
+ *       verdict needs a tolerance before it means anything.
  *
  *   C1  REPEAT / must be IDENTICAL. The same cell captured twice with nothing changed
  *       between must produce a byte-identical PNG. If it does not, the instrument itself
@@ -85,6 +131,12 @@
  *       renderer, so with several windows open every app returned the identical desktop
  *       image and the app axis was decorative. The fix was a `rect` on the bridge route
  *       plus a raise-then-crop; C4 is what keeps that fix honest. Failing it VOIDs the run.
+ *
+ * C2, C3 and C4 additionally require a MAGNITUDE, not just different bytes. With a floor of
+ * zero, one changed pixel would have satisfied "differs" — so each of them could have passed
+ * while the theme flip, the toggle or the crop did nothing at all. The gate is >=1% of
+ * pixels differing by more than 8, which is four orders above the measured floor and two
+ * below the weakest real signal on this desktop.
  *
  * A run without `--control` reports `controls: null` and is explicitly NOT certification
  * evidence. The manifest says so in its own `certifiable` field rather than leaving a
@@ -113,6 +165,65 @@ const has = (name) => process.argv.indexOf(`--${name}`) >= 0;
 const CONTROL = has('control');
 const KEEP = has('keep');
 const ATLAS = has('atlas');
+const FREEZE = !has('no-freeze');
+/** Consecutive byte-identical frames a cell must produce before it is banked. See trap (2c). */
+const RUN = Math.max(2, Number(arg('run', '3')) || 3);
+
+/**
+ * Optional pixel arithmetic. `sharp` is present in node_modules but is a TRANSITIVE
+ * dependency, not one this repo declares, so a harness that hard-required it would break
+ * on the first clean install. When it is missing the must-differ controls fall back to
+ * byte-inequality and say so in `magnitude: null` — they do not silently claim a
+ * magnitude they could not compute.
+ */
+let sharp = null;
+try { sharp = require('sharp'); } catch { sharp = null; }
+
+/** Per-pixel max-channel difference between two PNGs, as a fraction of the frame. */
+async function pixelDelta(pathA, pathB) {
+  if (!sharp) return null;
+  const a = await sharp(pathA).raw().toBuffer({ resolveWithObject: true });
+  const b = await sharp(pathB).raw().toBuffer({ resolveWithObject: true });
+  if (a.info.width !== b.info.width || a.info.height !== b.info.height) {
+    return { incomparable: 'different dimensions', a: a.info, b: b.info };
+  }
+  const { width, height, channels } = a.info;
+  const n = width * height;
+  let diff = 0; let max = 0; let over8 = 0;
+  for (let i = 0; i < n; i += 1) {
+    const o = i * channels;
+    let d = 0;
+    for (let c = 0; c < Math.min(3, channels); c += 1) {
+      const v = Math.abs(a.data[o + c] - b.data[o + c]);
+      if (v > d) d = v;
+    }
+    if (d) { diff += 1; if (d > max) max = d; if (d > 8) over8 += 1; }
+  }
+  return {
+    pixels: n,
+    pctDiff: +((100 * diff) / n).toFixed(3),
+    pctOver8: +((100 * over8) / n).toFixed(3),
+    maxDelta: max,
+  };
+}
+
+/**
+ * A must-differ control passes only ABOVE THE MEASURED FLOOR. Byte-inequality alone is not
+ * enough: a single changed pixel would satisfy it, so the control could pass on a paint
+ * artifact while the thing it interrogates did nothing. Measured on this desktop, the gap
+ * is not close — floor 0.000%, theme flip 99.591% of pixels at mean delta 249.6,
+ * presentation toggle 92.728% at mean 21.75. 1% over a delta of 8 sits four orders above
+ * the floor and two below the weakest real signal.
+ */
+const DIFF_MIN_PCT = 1.0;
+function magnitudeVerdict(m) {
+  if (!m) return { enough: null, why: 'sharp unavailable — byte-inequality only' };
+  // Two surfaces that are not even the same size are differing in the strongest way there
+  // is; there is no common pixel grid to score, and demanding one would fail C4 on exactly
+  // the windows that differ most.
+  if (m.incomparable) return { enough: true, why: `${m.incomparable} — ${m.a.width}x${m.a.height} vs ${m.b.width}x${m.b.height}` };
+  return { enough: m.pctOver8 >= DIFF_MIN_PCT, why: `${m.pctOver8}% of pixels differ by >8 (floor 0, gate ${DIFF_MIN_PCT}%)` };
+}
 const OUT = arg('out', '');
 const SHOT_DIR = path.join(REPO, 'debug', 'shots', 'l12-matrix');
 
@@ -161,6 +272,24 @@ async function loadEngine() {
     await sleep(250);
   }
   throw new Error('REFUSE - theme engine module never resolved');
+}
+
+/**
+ * Trap (2b): hide the text caret for the duration of the run. This is the ONE pixel source
+ * on this desktop that is periodic rather than transient, so it defeats a convergence gate
+ * instead of tripping it. Injected as a single stylesheet the harness owns by id, and
+ * removed at restore — a run that leaves it behind has changed the app it measured.
+ */
+async function freezeCaret(on) {
+  if (!FREEZE) return false;
+  if (on) {
+    await ev("(()=>{var s=document.getElementById('__l12freeze');if(!s){s=document.createElement('style');"
+      + "s.id='__l12freeze';s.textContent='*,*::before,*::after{caret-color:transparent !important}';"
+      + "document.head.appendChild(s);}return 'on';})()");
+    return true;
+  }
+  await ev("(()=>{var s=document.getElementById('__l12freeze');if(s)s.remove();return 'off';})()");
+  return false;
 }
 
 /**
@@ -270,11 +399,32 @@ async function openSection(section) {
   return { present: false, reason: 'no new .fwin appeared' };
 }
 
-/** `.fwin-close`, measured off the live title bar — there is no `.fwin-b-close`. */
+/**
+ * `.fwin-close`, measured off the live title bar — there is no `.fwin-b-close`.
+ *
+ * ON SOME SURFACES CLOSE IS DESTRUCTIVE AND ASKS FIRST. Measured, not assumed: the
+ * sticky note's `.fwin-close` is titled "Delete note" and raises a `.ui-dialog` reading
+ * "Delete this note? This cannot be undone." A close that stops at the modal leaves BOTH
+ * the window and the dialog on the desk — which is exactly the residue the aborted first
+ * run left behind, one empty note on desktop 1 that was not in the pre-run layout.
+ *
+ * Confirming is safe HERE and only here, by construction: `live` contains only windows
+ * this run itself opened, so the thing being deleted is the harness's own creation. The
+ * confirm is found by `.ui-btn--danger`, which is the product's own destructive-action
+ * class and does not move when the UI is localised. A dialog that is NOT the harness's is
+ * left strictly alone.
+ */
 async function closeSection(title) {
   await ev(`(()=>{var w=${winExpr(title)};`
     + `if(w){var b=w.querySelector('.fwin-close');if(b)b.click();}return 'closed';})()`);
-  await sleep(150);
+  await sleep(220);
+  const pending = await ev("[...document.querySelectorAll('.ui-dialog')].filter(d=>d.checkVisibility()).length");
+  if (pending > 0) {
+    await ev("(()=>{var d=[...document.querySelectorAll('.ui-dialog')].filter(x=>x.checkVisibility())[0];"
+      + "var b=d&&d.querySelector('.ui-btn--danger');if(b)b.click();return 'confirmed';})()");
+    await sleep(220);
+  }
+  return { confirmed: pending > 0 };
 }
 
 /**
@@ -312,23 +462,29 @@ async function raise(title) {
  * `converged: false` and is a genuine finding (live/animated content behind a translucent
  * material), not silently averaged away.
  */
-async function captureStable(tag, rect, tries = 8, gapMs = 220) {
+async function captureStable(tag, rect, tries = 12, gapMs = 300, run = RUN) {
   let prev = null;
   let prevPath = null;
+  let streak = 1;
   for (let i = 0; i < tries; i += 1) {
     const r = await post('/screenshot', rect ? { rect } : {});
     if (!r || r.ok !== true) return { ok: false, error: (r && r.error) || 'screenshot failed' };
     const sha = crypto.createHash('sha256').update(fs.readFileSync(r.path)).digest('hex');
     if (prev === sha) {
-      fs.rmSync(prevPath, { force: true });
-      return { ...(await file(tag, r)), converged: true, attempts: i + 1 };
+      streak += 1;
+      if (streak >= run) {
+        fs.rmSync(prevPath, { force: true });
+        return { ...(await file(tag, r)), converged: true, attempts: i + 1, streak };
+      }
+    } else {
+      streak = 1;
     }
     if (prevPath) fs.rmSync(prevPath, { force: true });
     prev = sha; prevPath = r.path;
     await sleep(gapMs);
   }
   const last = { ok: true, path: prevPath, size: null };
-  return { ...(await file(tag, last)), converged: false, attempts: tries };
+  return { ...(await file(tag, last)), converged: false, attempts: tries, streak };
 }
 
 /** Move a captured PNG into the matrix directory and hash it. */
@@ -368,6 +524,7 @@ async function capture(tag, rect) {
     console.error('REFUSE - bridge is not healthy'); process.exit(2);
   }
   await loadEngine();
+  await freezeCaret(true);
 
   const allThemes = await J('JSON.stringify(window.__l12Mod.listThemes().map(t=>({id:t.id,label:t.label,light:!!t.light,swatch:t.swatch})))');
   const hiddenThemes = await J('JSON.stringify(window.__l12Mod.listThemes({includeHidden:true}).map(t=>t.id))');
@@ -399,6 +556,7 @@ async function capture(tag, rect) {
       canonicalSections: sections.length,
     },
     sampledOut: sections.filter((s) => !requested.includes(s)),
+    caretFrozen: FREEZE,
     controls: null,
     certifiable: false,
     cells: [],
@@ -457,26 +615,51 @@ async function capture(tag, rect) {
     const dark = allThemes.find((t) => !t.light) || allThemes[0];
     const lightT = allThemes.find((t) => t.light) || allThemes[1];
 
+    const abs = (c) => (c && c.file ? path.join(REPO, c.file) : null);
+
     await setPresentation(titleOf[app], 'standard');
     await applyTheme(dark.id);
     const r1 = await raise(titleOf[app]);
     const c1a = await captureStable('__c1a', r1.rect);
     const c1b = await captureStable('__c1b', r1.rect);
+    const c1delta = await pixelDelta(abs(c1a), abs(c1b));
     const c1 = { kind: 'repeat/must-be-identical', app, theme: dark.id, a: c1a.sha256, b: c1b.sha256,
       converged: [c1a.converged, c1b.converged], attempts: [c1a.attempts, c1b.attempts],
+      run: RUN, delta: c1delta,
       pass: !!c1a.sha256 && c1a.sha256 === c1b.sha256 };
 
+    /**
+     * C0 — THE FLOOR, and it is what makes every must-differ control below mean anything.
+     * A pair of captures of an UNCHANGED settled window, taken exactly as the matrix takes
+     * them. Whatever difference survives here is the instrument's own, and any control that
+     * claims a difference smaller than this is claiming noise. Measured 0.000% on this
+     * desktop, which is why C1 can demand byte-identity at all.
+     */
+    const c0a = await captureStable('__c0a', r1.rect);
+    const c0b = await captureStable('__c0b', r1.rect);
+    const c0delta = await pixelDelta(abs(c0a), abs(c0b));
+    const c0 = { kind: 'floor/instrument-noise', app, theme: dark.id, delta: c0delta,
+      identical: !!c0a.sha256 && c0a.sha256 === c0b.sha256 };
+
     await applyTheme(lightT.id);
-    const c2b = await captureStable('__c2b', (await raise(titleOf[app])).rect);
-    const c2 = { kind: 'theme/must-differ', app, themes: [dark.id, lightT.id], a: c1a.sha256, b: c2b.sha256, pass: !!c2b.sha256 && c1a.sha256 !== c2b.sha256 };
+    const c2bShot = await captureStable('__c2b', (await raise(titleOf[app])).rect);
+    const c2delta = await pixelDelta(abs(c1a), abs(c2bShot));
+    const c2mag = magnitudeVerdict(c2delta);
+    const c2 = { kind: 'theme/must-differ', app, themes: [dark.id, lightT.id], a: c1a.sha256, b: c2bShot.sha256,
+      delta: c2delta, magnitude: c2mag,
+      pass: !!c2bShot.sha256 && c1a.sha256 !== c2bShot.sha256 && c2mag.enough !== false };
+    const c2b = c2bShot;
 
     await applyTheme(dark.id);
     const presRes = await setPresentation(titleOf[app], 'liquid');
     const c3b = presRes.ok ? await captureStable('__c3b', (await raise(titleOf[app])).rect) : { sha256: null };
+    const c3delta = presRes.ok ? await pixelDelta(abs(c1a), abs(c3b)) : null;
+    const c3mag = presRes.ok ? magnitudeVerdict(c3delta) : { enough: null, why: 'liquid not reached' };
     const c3 = {
       kind: 'presentation/must-differ', app, theme: dark.id,
       a: c1a.sha256, b: c3b.sha256, reached: presRes.ok,
-      pass: presRes.ok ? (!!c3b.sha256 && c1a.sha256 !== c3b.sha256) : null,
+      delta: c3delta, magnitude: c3mag,
+      pass: presRes.ok ? (!!c3b.sha256 && c1a.sha256 !== c3b.sha256 && c3mag.enough !== false) : null,
       note: presRes.ok ? null : `could not reach liquid: ${presRes.reason}`,
     };
     await setPresentation(titleOf[app], 'standard');
@@ -497,25 +680,41 @@ async function capture(tag, rect) {
       const ca = await captureStable('__c4a', ra.rect);
       const rb = await raise(titleOf[other]);
       const cb = await captureStable('__c4b', rb.rect);
+      const c4delta = await pixelDelta(abs(ca), abs(cb));
+      const c4mag = magnitudeVerdict(c4delta);
       c4 = {
         kind: 'app/must-differ', theme: dark.id, apps: [app, other],
-        a: ca.sha256, b: cb.sha256,
-        pass: !!ca.sha256 && !!cb.sha256 && ca.sha256 !== cb.sha256,
+        a: ca.sha256, b: cb.sha256, delta: c4delta, magnitude: c4mag,
+        pass: !!ca.sha256 && !!cb.sha256 && ca.sha256 !== cb.sha256 && c4mag.enough !== false,
       };
     }
 
-    manifest.controls = { c1, c2, c3, c4 };
+    manifest.controls = { c0, c1, c2, c3, c4 };
+    manifest.magnitudeGate = sharp ? { pctOver8AtLeast: DIFF_MIN_PCT } : null;
     manifest.certifiable = c1.pass && c2.pass && c3.pass !== false && c4.pass !== false;
     if (!c1.pass) manifest.void = 'C1 FAILED — the capture is not repeatable, so every difference below is unattributable';
     if (c4.pass === false) manifest.void = 'C4 FAILED — two different apps produced identical images, so the app axis measures nothing';
+    // Last, so it OUTRANKS the C1 message: a non-zero floor explains a C1 failure and
+    // changes what the right gate even is, which the reader must be told first.
+    if (c0.delta && c0.delta.pctDiff > 0) {
+      manifest.void = `FLOOR IS NOT ZERO — C0 measured ${c0.delta.pctDiff}% of pixels moving on an unchanged window (max channel delta ${c0.delta.maxDelta}), so byte-identity is the wrong C1 gate on this machine and every verdict here needs a tolerance first`;
+    }
   }
 
   // ---- restore: theme is persisted state; a harness that drives it and exits owes it back ----
   await applyTheme(originalTheme || 'study-os');
   const restored = await themeApplied(originalTheme || 'study-os');
   manifest.restore = { theme: originalTheme, ok: restored.ok, stored: restored.stored };
-  if (!KEEP) for (const app of live) await closeSection(titleOf[app]);
+  await freezeCaret(false);
+  manifest.restore.caretFreezeRemoved = await ev("!document.getElementById('__l12freeze')");
+  let confirms = 0;
+  if (!KEEP) for (const app of live) confirms += (await closeSection(titleOf[app])).confirmed ? 1 : 0;
   manifest.restore.windowsClosed = !KEEP;
+  manifest.restore.destructiveConfirms = confirms;
+  // The desk this run owes back, stated as numbers rather than "restored": anything left
+  // here is residue, and the previous aborted run's residue is why this is recorded at all.
+  manifest.restore.windowsLeft = await ev("document.querySelectorAll('.fwin').length");
+  manifest.restore.dialogsLeft = await ev("[...document.querySelectorAll('.ui-dialog')].filter(d=>d.checkVisibility()).length");
 
   const cells = manifest.cells;
   manifest.totals = {
@@ -543,6 +742,7 @@ async function capture(tag, rect) {
     },
     certifiable: manifest.certifiable,
     void: manifest.void || null,
+    caretFrozen: FREEZE,
     atlas: ATLAS,
   }, null, 2));
   if (manifest.void) process.exit(1);
