@@ -967,3 +967,59 @@ exists to catch, and it is a prediction from source that has not yet been confir
 
 Only `deskwinFocusDesktop` opens a desk window on the other display; bridge `/health` currently
 lists exactly ONE window, so the return leg needs that window to exist first.
+
+## 2026-09-01, late night — L11 bullet 4 CLAUSE 3, MULTI-MONITOR. Measured; two defects; both fixed.
+
+THE HANDED-DOWN PREDICTION WAS HALF RIGHT, AND ACTING ON IT LITERALLY WOULD HAVE BEEN WRONG.
+It said `onMove`'s forced `x:40,y:40` never updates `presentation.standardRect`, so the way home
+is authored for the display the window left. True — and deliberate:
+`liquidWindowSnapshotFidelity.test.ts:97` already asserts that move-to-another-desktop must carry
+`standardRect` through UNCHANGED, "so Return to standard does not strand it at the drop point".
+Patching `onMove` would have broken a guard on purpose. The hole is one layer down, in the fit
+that runs when the layout ARRIVES, and fixing it there also repairs `restoreRect`, a much older
+field, on every path into a smaller desk rather than only this one.
+
+**Defect A — a09a4527. `clampLayoutToViewport` fitted the live rect and neither restore target.**
+Not a fixture: this profile's own desktop 4 (authored 880x393) opened in a 642x385 desk window via
+`deskwinOpenDesktop`. The maximized `scraper` clamped correctly to 642x385; its own Maximize
+button then restored the untouched `restoreRect` 820x580 at (94,54) — **272px past the right edge,
+249px past the bottom**, `overflow:hidden`, scrollWidth 914 vs clientWidth 642, no scrollbar,
+resize grip gone. And it PERSISTS: the desk committed that 820x580 window into a desk it
+re-authored as 642x385, so the restore target was permanently wider than its own desktop.
+AFTER, same window, same desk, product path only: **642x385 at (0,0), overflow 272/249 -> 0/0.**
+One `fitRect` now bounds the live rect, `restoreRect` and `presentation.standardRect` identically —
+a target that only half-fits is the same unreachable window. Identity-preserving, so it is a
+byte-for-byte no-op on any layout that was never cross-monitor, and asserted as one.
+MUTATION CONTROLS, disjoint: reverting only the restoreRect line fails exactly 2 of 13 and both
+name restoreRect; reverting only the standardRect line fails exactly 2 and both name standardRect;
+the identity and adds-no-key controls stay green under both. Source restored sha256-identical.
+
+**Defect B — 9d66ddf5. The neighbour ring contained monitors that are not plugged in.**
+`syncDesktopWindows` KEEPS an assignment when its monitor is unplugged and only stops giving it a
+window (`main/desktopWindows.ts:303`); nothing downstream re-checked. Measured: `displayList()` = 3
+attached, the store held **8 assignments, 3 enabled, exactly 1 of them attached** — and that one is
+this display. So "next monitor" from the primary was desktop 0, on a display that is not there.
+`deskwinFocusDesktop` answered `{ok:false}` for all three enabled targets (0, 3, 6) and **true for
+4 and 1**, which really were on screen — a positive control on the exact call. `onMove` `void`ed
+that answer AFTER removing the window from the desk.
+OBSERVED END TO END on the pre-fix binary: desk **1 window -> 0**, browser windows stayed at 2 so
+nothing opened, window committed to desktop 0. Gone, silently.
+AFTER-A: **1 before, 1 after** — the ring collapses to one key and the command correctly does
+nothing. AFTER-B, with a real neighbour (enabling `display|1920x1080|1#2`, desktop 7, which made
+`syncDesktopWindows` create its desk window at x=2720): source desk `[]`, target desk
+`[Dictionary]`; re-run after the extraction with Grammar -> target desk `[Dictionary, Grammar]`.
+The ring moved to `monitorRing.ts` because inside the shell it is unimportable under vitest, which
+is why only a machine with the wrong monitors attached ever noticed. `showDesktop` now OPENS the
+target when nothing shows it (`deskwin:openDesktop`, the tear-off's own path) instead of
+focus-or-silence. 9 cases, fixtured on the real assignments and the real attached keys, with the
+BEFORE ring pinned as a case so the two are told apart rather than asserted apart.
+
+RESTORED: desktop-layout.json sha256 byte-identical to the pre-turn copy (9DFB6E2F…), assignments
+byte-identical after re-disabling `#2`, main window back to 1264x821 content / 1280x860 bounds.
+App SIGKILLed and restarted for the restore — new pid 40756, port 39273, NEW token.
+
+CLAUSE 5, LONG-SESSION MEMORY, is now the ONLY thing keeping bullet 4 open. The instrument exists
+and is sanctioned: `/mem` (main's own pools, gc-forcible, `detachedContexts` for leak-vs-highwater)
+plus `cat7-perf.cjs`, which already samples it. Under RULE 1 that is a MODE on cat7-perf, never a
+new probe. Read §12.1's D1 first — it is FIXED, and its recorded remainder (913.9 MB settling
+~484 MB above a 430.3 MB boot baseline) is the open question a long-session run should answer.
