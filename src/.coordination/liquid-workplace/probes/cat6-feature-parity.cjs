@@ -801,6 +801,23 @@ async function runDuplication() {
         .filter((r, i) => r.reachable !== inOther.rows[i].reachable)
         .map((r, i) => `${r.id}: ${startPres}=${r.reachable} ${other}=${inOther.rows[i].reachable}`),
     };
+    // PER-ROW EVIDENCE, IN BOTH PRESENTATIONS, kept rather than summarised. `out.parity`
+    // above answers the rubric's question ("are the counts equal") and throws the evidence
+    // away, which is fine for a score and useless for §5.3's feature ledger: a ledger row's
+    // `observed` field is required to be a literal copy of the measurement, and until this
+    // existed the only way to get one was to hand-transcribe it out of a console log. That
+    // is how 19 apps ended up with a driven harness and no rows. `l6-parity-rows.cjs` reads
+    // this array and copies the strings mechanically, so `observed` cannot drift from what
+    // the instrument actually saw. Indices are the spec's own row order in both halves —
+    // `check()` walks `features` in order, which is the same assumption `rowsAgree` and
+    // `onlyInOne` already make three lines up.
+    out.rowEvidence = asFound.rows.map((r, i) => ({
+      id: r.id,
+      [startPres]: { reachable: r.reachable, evidence: r.evidence },
+      [other]: noLiquid
+        ? null
+        : { reachable: inOther.rows[i].reachable, evidence: inOther.rows[i].evidence },
+    }));
     out.roundTrip = {
       trip: noLiquid ? 'minimize -> restore' : `${startPres} -> ${other} -> ${startPres}`,
       dirtiedField: dirty.field === undefined ? null : dirty.field,

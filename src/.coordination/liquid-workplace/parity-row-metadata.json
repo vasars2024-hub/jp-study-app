@@ -1,0 +1,53 @@
+{
+  "schema": "l6-parity-row-metadata/v1",
+  "why": "The AUTHORED half of a feature-ledger row. l6-parity-rows.cjs derives every MEASURED field from a cat6 run artifact and refuses to invent any of these; a spec row id with no entry here refuses BY NAME rather than being written with a guessed route. One block per app, keyed by the row ids in probes/l6-parity.js.",
+  "howToAddAnApp": "Read the app.s SPECS block in probes/l6-parity.js for its row ids, then write one entry per id. The two destination strings and noLiquidReason are per-app, not per-row.",
+  "provenance": {
+    "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. The ledger.s seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", has NO spec id and is deliberately absent: it was authored outside l6-parity.js and the writer must not claim it. This block therefore doubles as a REGRESSION TEST -- the first live cat6 dictionary run must re-derive these six features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys."
+  },
+  "apps": {
+    "dictionary": {
+      "standardDestination": "DictionaryView result list, in-window",
+      "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
+      "noLiquidReason": null,
+      "features": {
+        "lookup": {
+          "feature": "Look up a word against the active dictionary source",
+          "currentRoute": "Dictionary window > search input + `Search` (button.btn.primary)",
+          "keyboardRoute": "input is focusable and accepts real keystrokes; a synthetic Enter keydown did NOT trigger a search, so the keyboard route is UNPROVEN, not absent",
+          "dataStateOwner": "local JMdict via the main-process dictionary DB"
+        },
+        "sourceSwitch": {
+          "feature": "Switch dictionary source by language (JA / ZH)",
+          "currentRoute": "Dictionary window > `日本語` / `中文` (button.gram-level-btn)",
+          "keyboardRoute": "both are real buttons, focusable",
+          "dataStateOwner": "JMdict (JA) / CC-CEDICT (ZH)"
+        },
+        "presentationMode": {
+          "feature": "Result presentation mode (Automatic / Dictionary / Interlinear)",
+          "currentRoute": "Dictionary window > `Automatic` | `Dictionary` | `Interlinear`",
+          "keyboardRoute": "three real buttons, focusable",
+          "dataStateOwner": "view state, local to DictionaryView"
+        },
+        "resultActions": {
+          "feature": "Per-result actions: play audio, copy to clipboard history, save to Flashcards, mark New, add to Anki",
+          "currentRoute": "Dictionary window > per-result controls (`Play 食べる`, `Copy to clipboard history`, `Save to Flashcards`, `食べる: New. Click to mark…`, `+ Add to Anki`)",
+          "keyboardRoute": "all rendered as buttons",
+          "dataStateOwner": "flashcards store, AnkiConnect, clipboard history"
+        },
+        "savedSearches": {
+          "feature": "Saved searches",
+          "currentRoute": "Dictionary window > `Save search` (appears in the Saved searches header)",
+          "keyboardRoute": "button",
+          "dataStateOwner": "persisted search list"
+        },
+        "notesFilter": {
+          "feature": "Notes pane and its filter",
+          "currentRoute": "Dictionary window > `Your notes` + `Filter notes` (input.lexicon-notes-filter)",
+          "keyboardRoute": "text input",
+          "dataStateOwner": "lexicon notes store"
+        }
+      }
+    }
+  }
+}
