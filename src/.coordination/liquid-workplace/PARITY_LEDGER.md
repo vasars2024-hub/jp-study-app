@@ -350,3 +350,41 @@ byte-identical with the trailing `;` stripped; the loader strips it now. That is
 category's own probe kept going un-re-driven. (2) `ContextMenu` closes on **mousedown** captured
 on `window`, not on `pointerdown` or `.click()`; the first pass reported the menu as never closing
 and the count accumulating 4 → 8 across the two windows. Product was fine; the probe was not.
+
+## 2026-09-01 — the Media workspace was the fourth host, and 6 rows were stuck on that alone
+
+`parity-ledger.json`: **44 `both` / 6 `pending` → 45 / 5.** Every one of the six was
+`mediaWorkspace`, and every one recorded the SAME blocker in its `liquidDestination`, measured
+2026-08-25: *"NONE … the Media workspace is a full-screen overlay mounted at
+`body > div > .seanime-host`, outside every `.fwin`. It has no window chrome, no `Make Liquid`
+control and no `data-presentation`, so per-window presentation state (L3) cannot reach it at
+all."* Six of fifty rows, one cause — an enable flow whose destination does not exist, which is
+the same defect the pop-out and the reader each fixed one host earlier.
+
+**`f2619b91` gives it one.** `renderer/workspacePresentation.ts` is host four. The overlay adopts
+the INTERIOR and never the frame, for the reader's reason plus one of its own: `.seanime-host` is
+`inset: 0` and opaque ON PURPOSE — its own rule in `styles.css` records that everything numbered
+below it must be HIDDEN rather than merely behind — so a translucent root would not read as
+material, it would put the desktop grid back on screen underneath an `aria-modal` dialog.
+
+**Row 8 (segment navigation) CLOSES, driven live in Liquid**, through the product's own controls:
+Library → Readiness hid the library pane (computed `display` block → none, `hidden` set, box
+**1264x774 → 0x0**) with `#media-workspace` **and** `.study-player-slice` still MOUNTED, and
+Readiness → Library restored **1264x774 exactly**. The presentation round trip is byte-identical
+over 18 measured properties by `-ceq`, storage included — bar background `rgba(0,0,0,0)` →
+`color(srgb 0.101961 0.0941176 0.137255 / 0.72)` → `rgba(0,0,0,0)`, padding `6px 10px` → `4px 8px`
+→ `6px 10px`, height 51 → 47 → 51px, `lq.workspace.presentation` null → the blob → null. The root
+stayed opaque `rgb(13,12,18)` with `backdrop-filter: none` in BOTH presentations, which is
+decision 1 holding rather than an omission.
+
+**Rows 7, 9, 10, 11 and 12 stay `pending`, and the reason changed from CODE to DATA.** Their
+Liquid destination now exists; what is missing is a subject. `window.api.seanimeStudyLibrary()`
+returned `{ok: true, files: []}` — the media server has scanned **0 files** on this machine,
+against the **77** the standard halves were driven on in 2026-08-17. The readiness pane says so
+itself and says it honestly ("The media server has no files yet. Set a library folder in the media
+server and run a scan."), so this is the product behaving correctly on an empty library, not a
+regression. A row measured only on an empty harness is capped, not skipped — so none of the five
+is claimed. **Re-drive all five on a scanned library; that is the whole of what is left here.**
+
+The false sentence was REMOVED from all six rows rather than left standing beneath a newer one. A
+superseded measurement that still reads as current is how a ledger starts lying.
