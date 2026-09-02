@@ -334,7 +334,7 @@ function duplicates(cells) {
   };
 }
 
-const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join(' ');
+const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join('\u0000');
 
 /**
  * MULTI-MANIFEST ASSEMBLY — why the atlas takes a LIST and not a file.
