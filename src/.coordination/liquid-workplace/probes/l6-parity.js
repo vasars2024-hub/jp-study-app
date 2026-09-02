@@ -3783,15 +3783,56 @@
           return { ok: actions.length >= 3 && ready.length === actions.length,
             ev: `actions=${actions.length} enabledAndNamed=${ready.length}` };
         } },
+        // FALSE POSITIVE REPAIRED 2026-09-02. This read `.scr-topbar-actions
+        // button[aria-pressed="true"]`, but that div holds exactly ONE `aria-pressed`
+        // (ScraperTopBar.tsx:91) and it is the ADVANCED-MODE toggle, not the drawer.
+        // The drawer's opener at :78-86 was deliberately moved to `aria-expanded` +
+        // `aria-controls` (APG disclosure), with a source comment saying why. So with
+        // the drawer SHUT and advanced ON, the row scored a reversal affordance that
+        // was not on screen. It now scores the disclosure itself, expanded, which is
+        // the control that actually reverses the drawer.
         { id: 'reverseControls', f: (w) => {
           const close = q(w, '.scr-drawer-head .ui-icon-btn');
-          const opener = qa(w, '.scr-topbar-actions button[aria-pressed="true"]');
-          return { ok: !!close && !close.disabled && opener.length > 0,
-            ev: `drawerClose=${!!close && !close.disabled} pressedOpeners=${opener.length}` };
+          const disclosure = qa(w, '.scr-topbar-actions button[aria-controls]');
+          const expanded = disclosure.filter((b) => b.getAttribute('aria-expanded') === 'true');
+          return { ok: !!close && !close.disabled && disclosure.length > 0 && expanded.length > 0,
+            ev: `drawerClose=${!!close && !close.disabled} disclosures=${disclosure.length} expanded=${expanded.length}` };
         } },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        // FIRST step of the drive, added 2026-09-02. On a fresh profile the settings
+        // drawer is SHUT, so four of this spec's seven rows measured a region that is
+        // not rendered at all (`drawerCategories`, `settingsFields`, `reverseControls`)
+        // and `switchDrawer` refused, which VOIDed the whole run at 4/7. Opening it is
+        // local navigation state, exactly what this spec's own header licenses. It
+        // records whether the drawer was ALREADY open so `undo` closes it only if this
+        // drive is what opened it — a user who left it open keeps it open.
+        openDrawer: (w) => {
+          const g = scraperState();
+          const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+          if (!disclosure) return { refused: 'no settings disclosure in the top bar' };
+          const wasOpen = disclosure.getAttribute('aria-expanded') === 'true';
+          if (g.drawerWasOpen == null) g.drawerWasOpen = wasOpen;
+          if (!wasOpen) disclosure.click();
+          return { wasOpen, opened: !wasOpen };
+        },
+        // A WAIT, and it is a step rather than a sleep because /eval is synchronous —
+        // busy-waiting in the renderer would block the very import it is waiting for.
+        // `ScraperSettingsDrawer` is `lazy()` (ScraperApp.tsx:68), so the first open in a
+        // renderer session has to fetch and transform a chunk before `.scr-drawer-cat`
+        // exists. MEASURED, not assumed: 403 ms cold after a reload, 113 ms warm — but on
+        // the run where the dev server had never transformed the chunk it was still absent
+        // 1,400 ms after the click, and `switchDrawer` + `restoreDrawer` both refused.
+        // RATE: 2 refusals on that cold run, 0 on the warm re-run. This step spends one
+        // more step-interval on it and reports the count instead of guessing.
+        drawerReady: (w) => {
+          const cats = qa(w, '.scr-drawer-cat').length;
+          const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+          const expanded = !!disclosure && disclosure.getAttribute('aria-expanded') === 'true';
+          if (!expanded) return { refused: 'drawer is not expanded — openDrawer did not land' };
+          return { cats, mounted: cats > 0, note: cats > 0 ? null : 'lazy chunk still loading' };
+        },
         switchDrawer: (w) => {
           const g = scraperState();
           const current = q(w, '.scr-drawer-cat[aria-current="true"]');
@@ -3830,7 +3871,7 @@
           return { expanded: input.getAttribute('aria-expanded') };
         },
       },
-      drive: ['switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch'],
+      drive: ['openDrawer', 'drawerReady', 'switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch'],
       undo: { scraper: (w) => {
         const g = window.__LQP_SCRAPER_ORIG; if (!g) return null;
         const done = [];
@@ -3841,6 +3882,11 @@
             && shell.classList.contains('is-rail-collapsed') !== g.railCollapsed) { rail.click(); done.push('rail'); }
         const input = q(w, '.scr-search > .scr-search-input');
         if (input) input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+        // Drawer LAST: closing it unmounts `.scr-drawer-cat`, so restoring the category
+        // above has to happen while the drawer is still rendered.
+        const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+        if (disclosure && g.drawerWasOpen === false
+            && disclosure.getAttribute('aria-expanded') === 'true') { disclosure.click(); done.push('drawerClosed'); }
         window.__LQP_SCRAPER_ORIG = null;
         return done.length ? `scraper:${done.join('+')}` : null;
       } },
