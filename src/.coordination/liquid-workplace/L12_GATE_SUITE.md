@@ -195,3 +195,19 @@ they are the SHARED TREE's, and no action by those owners would have closed the 
 **Trap for the next worker, stated once:** a shared-tree number for these two gates is not a
 statement about the branch, in either direction. Run them in a detached worktree or do not
 report them.
+
+### Full suite, same turn — and it found a regression the interrupted turn could not have seen
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000`, shared tree: **3 failed files /
+7 tests of 1,030 / 13,290**, exit 1. Two are the shared-tree-only identities above. The third
+was **new and deterministic**: `dictionaryNotes.test.ts`, 5 cases,
+`SqliteError: unable to open database file`, caused by `4f946a34` — which landed at 16:48:38
+and whose turn died at 16:50:42, so it never ran one. Attributed by bisect in a detached
+worktree: green at `0c0cd38a`, red at `495ddb89`. Fixed at `775838c8` (`skipMigrations` split
+out of `readonly`), with a 7-case mutation control. Clean checkout of `775838c8`: dictionaryNotes
++ dictionaryDb + architectureBaseline + i18n + liquidWindowSnapshotFidelity +
+mediaGlobalSearchRace + deletedPlayerDependents = **139 passed / 139**.
+
+**The lesson, and it is the fourth time this file records a version of it:** a commit landed
+minutes before a quota exit is the one most likely to be red. Bisect before believing a
+full-suite failure is inherited — 3 of this turn's 7 failures were, and 5 were not.
