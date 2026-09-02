@@ -22,6 +22,7 @@ import type {
 } from '../../shared/desktop';
 import { DESKTOP_STUDY } from '../../shared/desktop';
 import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
+import { neighbourDisplayKey } from '../monitorRing';
 import { fitNewWindowRect } from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
 import { createRenderIdentityCache } from '../renderIdentityCache';
@@ -1250,6 +1251,26 @@ export default function DesktopShell({
   const taskbarMode: TaskbarMode = myAssignment?.taskbar ?? 'full';
 
   /**
+   * Which displays are physically attached right now (L11 b4 clause 3).
+   *
+   * `syncDesktopWindows` keeps an assignment when its monitor is unplugged and
+   * only stops giving it a window (`main/desktopWindows.ts:303`) — deliberately,
+   * so plugging the monitor back in restores the arrangement. The consequence is
+   * that `enabled` alone does NOT mean "there is a monitor over there", which is
+   * the whole question the neighbour ring is asking.
+   */
+  const attachedKeysRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const refresh = (): void => {
+      void window.api.displayList().then((list) => {
+        attachedKeysRef.current = new Set(list.map((d) => d.key));
+      });
+    };
+    refresh();
+    return window.api.onDisplaysChanged(refresh);
+  }, []);
+
+  /**
    * Keyboard: move the focused window to the desktop on the neighbouring
    * monitor, and raise a neighbouring monitor.
    *
@@ -1259,18 +1280,27 @@ export default function DesktopShell({
    * the target window re-hydrates from the broadcast.
    */
   useEffect(() => {
-    const enabledKeys = (): string[] =>
-      getAssignments()
-        .filter((a) => a.enabled)
-        .map((a) => a.displayKey);
-
+    // A monitor that is not plugged in is not a neighbour — `monitorRing.ts`
+    // carries the rule, the measurement that produced it, and its own suite.
     const neighbourDesktop = (dir: number): DesktopIndex | null => {
-      const keys = enabledKeys();
-      if (keys.length < 2 || !myDisplayKey) return null;
-      const here = keys.indexOf(myDisplayKey);
-      if (here < 0) return null;
-      const next = (here + dir + keys.length) % keys.length;
-      return getAssignment(keys[next])?.desktopIndex ?? null;
+      const key = neighbourDisplayKey(getAssignments(), attachedKeysRef.current, myDisplayKey, dir);
+      return key == null ? null : getAssignment(key)?.desktopIndex ?? null;
+    };
+
+    /*
+     * Raise the window showing a desktop, and OPEN one when nothing does.
+     *
+     * `deskwin:focusDesktop` only raises what already exists, and
+     * `syncDesktopWindows` never gives the main display a second shell
+     * (`desktopWindows.ts:301`), so focus alone has a real hole even with the
+     * ring filtered. `deskwin:openDesktop` is the tear-off's own path and
+     * already focuses an existing spawned window before creating one, so this
+     * is the same two handlers the shell has always had — no new IPC, and the
+     * result is answered rather than discarded.
+     */
+    const showDesktop = async (target: DesktopIndex): Promise<boolean> => {
+      if ((await window.api.deskwinFocusDesktop(target)).ok) return true;
+      return (await window.api.deskwinOpenDesktop(target)).ok;
     };
 
     const onMove = (e: Event): void => {
@@ -1288,13 +1318,13 @@ export default function DesktopShell({
         ],
       });
       setWins((prev) => prev.filter((w) => w.id !== top.id));
-      void window.api.deskwinFocusDesktop(target);
+      void showDesktop(target);
     };
 
     const onFocusMonitor = (e: Event): void => {
       const target = neighbourDesktop((e as CustomEvent<number>).detail ?? 1);
       if (target == null) return;
-      void window.api.deskwinFocusDesktop(target);
+      void showDesktop(target);
     };
 
     window.addEventListener('os:move-to-monitor', onMove);
