@@ -177,3 +177,148 @@ sections. Positive: **79/79** across `liquidWindowPresentation` (33), `liquidWin
 does NOT restore it — the live renderer writes its in-memory windows back over the commit. Close the
 probe windows through their real `.fwin-close` controls and let the renderer persist; only that came
 back identical.
+
+## 2026-09-01 — L3.2 host FOUR: the Media workspace overlay (`f2619b91`)
+
+Three hosts became four. `.fwin` (desktop window) · `.popout-root` (`?popout=<section>`) ·
+`.reader` (full-screen reader) · **`.seanime-host` (the Media workspace overlay)**. The fourth was
+found the way the third was: not by looking for surfaces without a toggle, but because
+`parity-ledger.json` had **six rows stuck on one recorded blocker** — no window chrome, no
+`Make Liquid` control, no `data-presentation`, so per-window presentation state could not reach it
+at all. Six of fifty rows, one cause.
+
+**Decision 1, and it has a second reason the reader's does not.** The overlay adopts the INTERIOR
+and never the frame. The reader's reason applies — it fills the OS window edge to edge, so a
+`backdrop-filter` would sample the desktop compositor and paint nothing, the inert glass rule 2
+forbids on `.fwin-bar`. The extra one is in `styles.css`'s own comment on `.seanime-host`: it is
+opaque **on purpose**, so that everything numbered below it is HIDDEN rather than merely behind.
+A translucent root would not read as material; it would put the desktop grid back on screen
+underneath an `aria-modal` dialog. So the root keeps its opaque stage, the bar takes
+`ContextualSurface as="header"` (no extra DOM node, landmark preserved), and the body — player,
+readiness table, mined review list — stays dense work on its anchor.
+
+**Live, through the product's own controls, `data-presentation` standard → liquid → standard:**
+
+| | conventional | liquid |
+| --- | --- | --- |
+| overlay class | `seanime-host` | `seanime-host workspace-liquid` |
+| root background | `rgb(13, 12, 18)` | `rgb(13, 12, 18)` — unchanged, decision 1 |
+| root `backdrop-filter` | `none` | `none` — unchanged, decision 1 |
+| bar background | `rgba(0, 0, 0, 0)` | `color(srgb 0.101961 0.0941176 0.137255 / 0.72)` |
+| bar border colour | `rgb(45, 43, 55)` | `color(srgb 0.960784 0.956863 0.968627 / 0.14)` |
+| bar border width | `0px 0px 1px` | `0px 0px 1px` — the flush-strip exception |
+| bar radius / shadow | `0px` / `none` | `0px` / `none` — same exception |
+| bar padding | `6px 10px` | `4px 8px` |
+| bar height | 51px | 47px |
+| toggle `aria-pressed` | `false` | `true` |
+| toggle label | `Make Liquid` | `Return to standard window` |
+| toggle fill | `rgba(0, 0, 0, 0)` | `color(srgb 1 0.180392 0.301961 / 0.16)` + inset ring at 0.4 |
+| `lq.workspace.presentation` | absent | `{v:1,mode:liquid,standardRect:{x:0,y:0,w:1264,h:821}}` |
+
+**ROUND TRIP: byte-identical over all 18 measured properties by `-ceq`, storage included.** The key
+is REMOVED on return, not written as `{mode:'standard'}`, so never-toggled and toggled-back are
+indistinguishable. `standardRect` is a real 1264x821 and not the clamped `1x1` that `parseRect`
+would have accepted.
+
+**RESTART PERSISTENCE, measured in the same run:** entered Liquid, `/reload`ed the renderer, polled
+for `.os-taskbar`, reopened the overlay — it came back `seanime-host workspace-liquid`, same tint,
+same `4px 8px`, `aria-pressed` still `true`, blob byte-identical. Then returned to standard and
+confirmed `'lq.workspace.presentation' in localStorage === false`. **Nothing persisted from this
+run.**
+
+**Parity drive in Liquid (row 8):** Library → Readiness hid the library pane (computed `display`
+block → none, `hidden` set, box **1264x774 → 0x0**) with `#media-workspace` **and**
+`.study-player-slice` still MOUNTED; Readiness → Library restored **1264x774 exactly**. Same
+reversibility as the standard half.
+
+**THREE MUTATION CONTROLS, each naming exactly the right case, both files restored byte-identical:**
+drop the workspace from every `:is()` → 2 failed (interior paint + flush-strip exception); revert
+the bar to a bare `<header>` → 1 (primitive/landmark); drop the opt-in class join → 1
+(`data-presentation`).
+
+**A NUMBER AGAINST THIS WORK:** rows 7, 9, 10, 11 and 12 are **not** claimed.
+`window.api.seanimeStudyLibrary()` returned `{ok:true, files:[]}` — the media server has scanned
+**0 files** here, against the **77** the standard halves were driven on in 2026-08-17. The
+readiness pane states it honestly itself. A row measured only on an empty harness is capped, not
+skipped. **Re-drive those five on a scanned library; that is all that is left of them.**
+
+## 2026-09-01 (primary2) — L12 bullet 3, the fresh-profile clause. It could not be measured, and why.
+
+`JP_USER_DATA_DIR` (main.ts:140) is the repo's only fresh-profile instrument, and it was
+**broken for the one file this clause is about**. `src/main/desktop.ts` built its store at
+module scope; the constructor resolves `app.getPath('userData')`, and an ES import is evaluated
+before `main.ts:142` applies the redirect. So it READ the real profile and WROTE the scratch one.
+
+MEASURED, not inferred. A userData dir created empty (0 entries; `[main] JP_USER_DATA_DIR ->
+userData = …\Temp\jp-freshprofile-20260901` in the log) came up holding the real profile's
+**8 desktops**, widget id `wgt-mrmkpxj7-tpja`, `aurora` City wallpaper, authored viewports
+1904x985 / 944x453 / 642x385, `globalZTop 10802` — all identical to `%APPDATA%\jp-study-app`.
+WHAT NAMED THIS MODULE AS THE SINGLE CAUSE: `profiles.json` beside it was correctly seeded
+(fresh `activeProfileId=p1-ja-focus` and the code's own labels vs the real profile's renamed
+"English → Japanese" / `seed-zh-ja`), so the redirect itself worked. A module-scope scan of
+`src/main` finds three other eager instantiations — RateLimiter x2, AsyncLocalStorage — none
+touching userData. Fixed in `fab72cac`, lazily through the existing `desktopStore()` accessor.
+
+AFTER, same procedure on the same wiped dir: **3 desktops, all seed** — Study / City / Desktop 3,
+`windows 0`, `widgets 0`, `icons 0`, `crimsonveil`, `layoutEpoch 1`, `globalZTop 10`. The
+3 `assignments` are filled live by `syncAssignments()` from the 3 attached displays, not read
+from disk. MUTATION CONTROL on the new test: restoring the eager `const store = new DesktopStore()`
+fails 2 of its 3 cases while the third — reads the real profile when NO redirect is applied —
+keeps passing, so the test is specific rather than vacuous.
+
+WHY IT MATTERED BEYOND THE READING: `load()` calls `atomicWriteJson(filePath, next)` on any schema
+migration, and at import time `filePath` was the real profile. A scratch-profile run could have
+rewritten the 8.6 GB profile that has no restore point. It did not fire only because the file was
+already at v3.
+
+FIRST-RUN, now visible for the first time: the fresh desktop comes up behind **two overlays at
+once** — a `.consent` country-sharing modal and an 8-step `.tour-root` — over a desktop with
+**zero icons**. Both dismissed through their own controls (`No thanks`, then Esc). Not a Liquid
+defect and not repaired here; recorded because no loaded-profile probe can see it.
+
+FRESH-PROFILE LIQUID ROUND TRIP, driven through the product's own title-bar control on a profile
+that did not exist before this turn. Default is CONVENTIONAL: `data-presentation=standard`,
+`lq.*` storage keys **0 of 11**, `data-window-chrome=standard`.
+
+| property | standard | liquid |
+| --- | --- | --- |
+| `.fwin` background | `rgb(13, 12, 18)` | `color(srgb 0.101961 0.0941176 0.137255 / 0.72)` |
+| `.fwin` backdrop-filter | `none` | `blur(8px) saturate(1.25)` |
+| `.fwin` border-radius | `12px` | `16px` |
+| `.fwin-bar` background | `rgb(10, 9, 16)` | `rgba(0, 0, 0, 0)` |
+| `.fwin-body` background | `rgba(0, 0, 0, 0)` | `rgb(26, 24, 35)` — opaque anchor, decision 1 holding |
+| rect | 60,24 820x580 | 60,24 820x580 — the shell does not move a window that goes Liquid |
+| persisted | key absent | `{v:1,mode:liquid,standardRect:{60,24,820,580},standardMaximized:false}` |
+
+**ROUND TRIP byte-identical over the whole 18-property snapshot by `-ceq`, and the `presentation`
+key is REMOVED from the fresh profile's own `desktop-layout.json` — not written as `standard`.**
+DISCRIMINATING CONTROL, and it came free: the first return attempt used the label
+`Return to standard` where the product says `Return to standard window`, so no click landed —
+the same comparison returned **False** with the key still present. The True is a real transition.
+
+STILL OPEN in bullet 3, said plainly. (a) `electron-forge package` has NOT been run. Do not try to
+substitute `npx vite build --config vite.main.config.ts`: forge's VitePlugin injects `build.lib.entry`,
+so standalone it builds the default root with none of the renderer's aliases and dies on
+`@/app/(main)/_features/…` from `src/media/MediaWorkspace.tsx` — a **harness** error, not a product
+one, and it fails identically for the preload config. (b) A real kill-and-relaunch persistence leg
+on the fresh profile was not run; the loaded-profile equivalent is `282f53fb`. (c) The gate results
+are still not recorded against L12's own words.
+
+**RESTART PERSISTENCE ON THE FRESH PROFILE — the clause's (b) is now CLOSED.** Entered Liquid,
+copied the layout blob (`sha256 D3BE3778…`), then **`Stop-Process -Force`** on the Electron main
+and its forge parent — not a graceful quit, so it cannot pass on shutdown-flushed state, and the
+blob was **already byte-identical before the kill**. Relaunched on the same scratch dir: the
+Dictionary window came back at `data-presentation="liquid"` with `.fwin-liquid` applied, and the
+18-property snapshot is **byte-identical to the pre-restart Liquid one by `-ceq`**. DISCRIMINATING
+CONTROL: the same post-restart snapshot compared against the STANDARD one returns **False**, so the
+True above is state, not a comparison that always passes. Layout blob unchanged across the whole
+cycle. The first-run consent modal and tour did **not** reappear — the fresh profile remembered
+its own dismissal.
+
+TRAP, cost two readings: the bridge answers `/health` and `/eval` **before the desktop hydrates**.
+At ~6 s after `bridge.json` appeared the renderer reported `fwin: 0` and `pres: []` — which reads
+exactly like "the restore path is broken". At ~21 s it reported `fwin: 1`, `liquid`. Poll for the
+window, never sample once.
+
+Leaving this turn: **scratch profile deleted, `debug/bridge.json` restored byte-identical to the
+loaded instance's (`sha256 06B60389…`), loaded instance untouched and alive.**

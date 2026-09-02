@@ -23,6 +23,8 @@ import {
 } from '../shared/mediaWorkspace';
 import { SIDECAR_STATUS_KEY } from '../shared/mediaWorkspaceLabels';
 import { useT } from '../renderer/i18n';
+import { ContextualSurface } from '../renderer/components/liquid/LiquidSurface';
+import { useWorkspacePresentation } from '../renderer/workspacePresentation';
 // The readiness loader, shared with the Media Center's sidebar. It keeps the orchestrator
 // behind an `await import()`, so the boot bundle is unchanged — the invariant this file's
 // header states.
@@ -67,6 +69,11 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   // sidecar up. The bootstrap still resolves BEFORE React.lazy pulls the adopted bundle,
   // which is the ordering `seanimeBootstrap.ts` exists to guarantee.
   const { status, conn } = useSeanimeConnection(open);
+  // L3.2 — the fourth presentation host. See `renderer/workspacePresentation.ts`
+  // for why the overlay adopts the interior and never the frame: it is `inset: 0`
+  // and opaque ON PURPOSE, so a translucent root would put the desktop grid back
+  // on screen underneath an `aria-modal` dialog rather than reading as material.
+  const presentation = useWorkspacePresentation();
 
   useEffect(() => {
     // Presence is published from inside the listener effect, never from a render or a
@@ -191,6 +198,11 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
   if (!status || status.kind === 'disabled') return null;
 
   const statusLabel = sidecarStatusLabel(status.kind, t);
+  // The other three hosts' own strings, reused verbatim so one enable flow reads
+  // the same wherever it is met. No new catalog key, in any of the four languages.
+  const liquidLabel = presentation.liquid
+    ? t('desktop.returnToStandard')
+    : t('desktop.makeLiquid');
 
   if (!open) {
     return (
@@ -213,12 +225,17 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
 
   return (
     <div
-      className="seanime-host"
+      className={`seanime-host${presentation.liquid ? ' workspace-liquid' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={t('mediaWorkspace.launcher')}
+      data-presentation={presentation.dataPresentation}
     >
-      <header className="seanime-host-bar">
+      {/* The bar is navigation and transport by §2.3, so it is the region that
+          takes the material. `as="header"` keeps the landmark and adds no node:
+          the primitive is inert in conventional presentation, and
+          `theme/liquid-window.css` paints it only under `.workspace-liquid`. */}
+      <ContextualSurface as="header" className="seanime-host-bar">
         <strong className="seanime-host-title">{t('mediaWorkspace.launcher')}</strong>
         <span
           className="seanime-host-status"
@@ -274,6 +291,13 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             {t('mediaWorkspace.viewReview')}
           </button>
         </div>
+        {/* `seanime-host-close` carries the `margin-left: auto` that pushes the
+            right-hand group off the segment switch, so the Liquid toggle sits
+            AFTER it rather than before — otherwise the toggle takes the gap and
+            Close moves to the middle of the bar. Reuses the other three hosts'
+            strings and their `aria-pressed` contract, and is inlined for the
+            same reason `.fwin-b-liquid` and `.popout-btn-liquid` are: one call
+            site. `ReaderLiquidToggle` exists only because the reader has two. */}
         <button
           ref={closeRef}
           type="button"
@@ -282,7 +306,21 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
         >
           {t('common.close')}
         </button>
-      </header>
+        {presentation.presentable ? (
+          <button
+            type="button"
+            className={`seanime-host-btn seanime-host-liquid${
+              presentation.liquid ? ' is-liquid' : ''
+            }`}
+            title={liquidLabel}
+            aria-label={liquidLabel}
+            aria-pressed={presentation.liquid}
+            onClick={presentation.toggle}
+          >
+            {presentation.liquid ? '◆' : '◇'}
+          </button>
+        ) : null}
+      </ContextualSurface>
       <div className="seanime-host-body">
         {/*
           Review sits OUTSIDE the sidecar gate, and that is a correctness fix rather than a

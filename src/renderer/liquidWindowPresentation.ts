@@ -67,7 +67,7 @@ export interface PresentableWin {
  * section drops the key on load instead of re-persisting a blob nothing can
  * act on.
  */
-export type LiquidPresentationHost = 'desktop' | 'popout' | 'reader';
+export type LiquidPresentationHost = 'desktop' | 'popout' | 'reader' | 'workspace';
 
 export function canPresentLiquid(
   section?: string,

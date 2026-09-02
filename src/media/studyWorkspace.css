@@ -1,0 +1,924 @@
+/*
+ * Liquid Study Workspace — the layer the workspace paints into.
+ *
+ * Loaded after `mediaWorkspace.css`, and deliberately additive: the retired dock's and
+ * rail's rules are left where they are because nothing carries those class names any
+ * more, and deleting 200 lines of stylesheet to prove it would put the panels' own
+ * typography at risk for no behavioural gain. The one rule that WOULD still misfire —
+ * the grammar panel's absolute corner — is overridden below, by name.
+ *
+ * Design intent: dark graphite, one border weight, soft elevation, no nested cards. The
+ * hierarchy is carried by size, opacity and space rather than by boxes, which is why
+ * almost nothing here has a second border inside a first.
+ */
+
+/* ── The stage ──────────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-player-slice {
+  /* Bar height, measured and republished by the overlay. The docks and the subtitle
+     band both sit above it, so it is declared once here and never guessed at. */
+  --study-bar-gap: 0.75rem;
+  --study-block-radius: 0.8rem;
+  --study-block-border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  --study-block-bg: rgb(14 13 19 / 0.93);
+  --study-block-shadow: 0 18px 44px rgb(0 0 0 / 0.46);
+  --study-motion: 220ms cubic-bezier(0.22, 0.68, 0.32, 1);
+}
+
+/* ── Docks ──────────────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-dock {
+  position: absolute;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  /* The dock is a placement, not a surface: it must not intercept clicks on the
+     picture between its blocks. Each block turns pointer events back on. */
+  pointer-events: none;
+}
+
+#media-workspace .study-dock[data-dock='left'],
+#media-workspace .study-dock[data-dock='right'] {
+  top: 1rem;
+  bottom: calc(var(--study-dock-height) + var(--study-bar-gap) + 0.6rem);
+  width: min(var(--study-column), calc(100% - 2rem));
+}
+
+#media-workspace .study-dock[data-dock='left'] { left: 1rem; }
+#media-workspace .study-dock[data-dock='right'] { right: 1rem; }
+
+/*
+ * The bottom dock is where a narrow window folds the side docks to. It stacks ABOVE the
+ * bar rather than over it, so a folded transcript never covers the transport — the
+ * failure mode the old expanded dock had against the subtitle.
+ */
+#media-workspace .study-dock[data-dock='bottom'] {
+  right: 1rem;
+  bottom: calc(var(--study-dock-height) + var(--study-bar-gap));
+  left: 1rem;
+  flex-direction: row;
+  align-items: flex-end;
+  max-height: min(52%, 20rem);
+}
+
+#media-workspace .study-dock[data-dock='bottom'] > .study-block {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Floating: over the picture, out of everyone's dock. The universal fallback the
+   contextual resolver reaches for when both docks are pinned. */
+#media-workspace .study-dock[data-dock='floating'] {
+  top: 1rem;
+  right: 1rem;
+  z-index: 94;
+  width: min(22rem, calc(100% - 2rem));
+}
+
+/* Overlay: the narrow-window answer. It admits it is covering the picture. */
+#media-workspace .study-dock[data-dock='overlay'] {
+  top: 0;
+  right: 0;
+  bottom: calc(var(--study-dock-height) + var(--study-bar-gap));
+  left: 0;
+  z-index: 93;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 1rem;
+}
+
+#media-workspace .study-dock[data-dock='overlay'] > .study-block {
+  width: min(30rem, 100%);
+  max-height: 100%;
+}
+
+/* ── Blocks ─────────────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: auto;
+  transition: opacity var(--study-motion), transform var(--study-motion);
+}
+
+#media-workspace .study-block > .study-block-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+#media-workspace .study-block > .study-block-body > * {
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/*
+ * Semantic sizes. They are a share of the dock, never a pixel count — a layout saved on
+ * an ultrawide has to mean the same thing on a laptop, which is why the workspace model
+ * stores `l` and not `384px`.
+ */
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='xs'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='xs'] { flex: 0 0 auto; max-height: 14%; }
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='s'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='s'] { flex: 0 1 auto; max-height: 26%; }
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='m'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='m'] { flex: 0 1 auto; max-height: 46%; }
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='l'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='l'] { flex: 1 1 auto; max-height: 70%; }
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='xl'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='xl'] { flex: 1 1 auto; max-height: 100%; }
+#media-workspace .study-dock[data-dock='left'] > .study-block[data-size='auto'],
+#media-workspace .study-dock[data-dock='right'] > .study-block[data-size='auto'] { flex: 1 1 auto; min-height: min(8rem, 100%); }
+
+/* Collapsed keeps the block present and readable as a title, never as an empty card. */
+#media-workspace .study-block[data-presence='collapsed'] {
+  flex: 0 0 auto;
+  max-height: 2.6rem;
+  overflow: hidden;
+  opacity: 0.72;
+}
+
+#media-workspace .study-block[data-presence='compact'] {
+  flex: 0 1 auto;
+  max-height: 30%;
+}
+
+/*
+ * A contextual block is temporary and says so: slightly forward, slightly brighter, and
+ * it animates in from the edge it docked to. That motion is the whole "spatial
+ * continuity" requirement — the panel came from somewhere.
+ */
+#media-workspace .study-block[data-presence='contextual'] {
+  animation: study-block-in var(--study-motion) both;
+}
+
+@keyframes study-block-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The dominant block of the workspace reads as dominant. Nothing else is dimmed to
+   achieve it — dimming peers is how you get a screen that looks broken. */
+#media-workspace .study-block[data-dominant='true'] {
+  --study-block-border: 1px solid rgb(var(--color-gray-600) / 0.95);
+}
+
+/* The grammar panel used to place itself in the top-left corner. It is placed by a
+   dock now, so its own positioning has to go — see this file's header. */
+#media-workspace .study-block .study-grammar-panel {
+  position: static;
+  top: auto;
+  left: auto;
+  width: 100%;
+  max-height: 100%;
+}
+
+#media-workspace .study-block .study-transcript-panel,
+#media-workspace .study-block .study-mining-panel {
+  max-height: 100%;
+}
+
+/* ── The bar ────────────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-bar-layer {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.8rem;
+  left: 1rem;
+  z-index: 92;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  pointer-events: none;
+}
+
+/*
+ * Watch Mode's fade. `visibility` as well as opacity so a faded bar is not a keyboard
+ * trap sitting invisibly over the picture — an invisible focusable control is worse
+ * than a visible one.
+ */
+#media-workspace .study-bar-layer[data-study-bar-hidden='true'] {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--study-motion), visibility 0s linear var(--study-motion);
+}
+
+#media-workspace .study-bar-layer[data-study-bar-hidden='false'] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--study-motion);
+}
+
+#media-workspace .study-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.5rem;
+  border: var(--study-block-border);
+  border-radius: 0.72rem;
+  background: var(--study-block-bg);
+  box-shadow: var(--study-block-shadow);
+  pointer-events: auto;
+}
+
+#media-workspace .study-bar-cluster,
+#media-workspace .study-bar-categories {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+/* The cue loop reads as one segmented control, not three buttons. */
+#media-workspace .study-bar-loop {
+  gap: 0;
+  border: 1px solid rgb(var(--color-gray-700) / 0.8);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+#media-workspace .study-bar-loop button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+#media-workspace .study-bar-loop button + button {
+  border-left: 1px solid rgb(var(--color-gray-700) / 0.8);
+}
+
+#media-workspace .study-bar button {
+  padding: 0.32rem 0.62rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: rgb(var(--color-gray-200));
+  font-size: 0.78rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--study-motion), color var(--study-motion);
+}
+
+#media-workspace .study-bar button:hover:not(:disabled) {
+  background: rgb(var(--color-gray-800) / 0.85);
+}
+
+#media-workspace .study-bar button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+#media-workspace .study-bar button[aria-expanded='true'],
+#media-workspace .study-bar button[aria-pressed='true'] {
+  background: rgb(var(--color-gray-800));
+  border-color: rgb(var(--color-gray-600) / 0.9);
+  color: rgb(var(--color-gray-50));
+}
+
+#media-workspace .study-bar-workspace {
+  padding: 0.28rem 0.4rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.5rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+/* Focus is never hover-dependent, and never removed. */
+#media-workspace .study-bar button:focus-visible,
+#media-workspace .study-tool-sheet button:focus-visible,
+#media-workspace .study-block-menu button:focus-visible,
+#media-workspace .study-customizer button:focus-visible {
+  outline: 2px solid rgb(var(--color-brand-400, 220 60 70));
+  outline-offset: 2px;
+}
+
+/* Narrow windows: the categories keep their labels, the loop goes to icons-width. */
+@media (max-width: 720px) {
+  #media-workspace .study-bar {
+    justify-content: center;
+  }
+  #media-workspace .study-bar button {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.72rem;
+  }
+}
+
+/* ── Tool sheets ────────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-tool-sheet {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: min(56vh, 26rem);
+  overflow-y: auto;
+  padding: 0.75rem 0.85rem;
+  border: var(--study-block-border);
+  border-radius: var(--study-block-radius);
+  background: var(--study-block-bg);
+  box-shadow: var(--study-block-shadow);
+  animation: study-block-in var(--study-motion) both;
+}
+
+#media-workspace .study-tool-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: rgb(var(--color-gray-100));
+}
+
+#media-workspace .study-tool-sheet-close {
+  padding: 0 0.4rem;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--color-gray-400));
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#media-workspace .study-tool-sheet-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.7rem;
+}
+
+#media-workspace .study-tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+#media-workspace .study-tool-group-legend {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--color-gray-500));
+}
+
+#media-workspace .study-tool-group-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+}
+
+#media-workspace .study-tool-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#media-workspace .study-tool-group label,
+#media-workspace .study-tool-group-body > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: rgb(var(--color-gray-300));
+}
+
+#media-workspace .study-tool-slider {
+  flex: 1 1 12rem;
+}
+
+#media-workspace .study-tool-group button,
+#media-workspace .study-tool-group select,
+#media-workspace .study-tool-group input[type='text'] {
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.45rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+#media-workspace .study-tool-group button:hover:not(:disabled) {
+  background: rgb(var(--color-gray-800));
+}
+
+#media-workspace .study-tool-group button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Customize mode ─────────────────────────────────────────────────────────────── */
+
+/*
+ * The edit chrome, and it exists only while customizing — the whole component returns
+ * null otherwise, so there is nothing to "turn off" and no chance of a stray outline
+ * surviving into normal playback.
+ */
+#media-workspace .study-customizer {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  z-index: 96;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(46rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+  border: var(--study-block-border);
+  border-radius: var(--study-block-radius);
+  background: rgb(11 10 15 / 0.97);
+  box-shadow: var(--study-block-shadow);
+}
+
+#media-workspace .study-customizer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+#media-workspace .study-customizer-history,
+#media-workspace .study-customizer-workspaces,
+#media-workspace .study-customizer-workspace-actions,
+#media-workspace .study-customizer-library,
+#media-workspace .study-customizer-transfer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#media-workspace .study-customizer button,
+#media-workspace .study-customizer input,
+#media-workspace .study-customizer textarea {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.45rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+#media-workspace .study-customizer textarea {
+  flex: 1 1 100%;
+  min-height: 5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  cursor: text;
+}
+
+#media-workspace .study-customizer button[aria-pressed='true'] {
+  border-color: rgb(var(--color-gray-500));
+  background: rgb(var(--color-gray-800));
+}
+
+/* An app-owned block says so before it is added, not after. */
+#media-workspace .study-customizer-library button[data-availability='app-owned']::after {
+  content: '↗';
+  margin-left: 0.3rem;
+  opacity: 0.6;
+}
+
+#media-workspace .study-customizer-legend {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--color-gray-500));
+}
+
+#media-workspace .study-customizer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+#media-workspace .study-customizer-blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#media-workspace .study-customizer-blocks li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: rgb(var(--color-gray-200));
+}
+
+#media-workspace .study-customizer-blocks li small {
+  flex: 1 1 auto;
+  color: rgb(var(--color-gray-500));
+  font-size: 0.68rem;
+}
+
+/* Block outlines and names — only while customizing. */
+#media-workspace .study-player-slice:has(.study-customizer) .study-block {
+  outline: 1px dashed rgb(var(--color-gray-500) / 0.75);
+  outline-offset: 3px;
+}
+
+#media-workspace .study-block-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.68rem;
+  color: rgb(var(--color-gray-400));
+}
+
+#media-workspace .study-block-menu-toggle {
+  padding: 0 0.4rem;
+  border: 1px solid rgb(var(--color-gray-700));
+  border-radius: 0.35rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-200));
+  cursor: pointer;
+}
+
+#media-workspace .study-block-menu {
+  position: absolute;
+  top: 1.9rem;
+  right: 0.2rem;
+  z-index: 97;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: min(16rem, 90vw);
+  padding: 0.6rem;
+  border: var(--study-block-border);
+  border-radius: 0.6rem;
+  background: rgb(11 10 15 / 0.98);
+  box-shadow: var(--study-block-shadow);
+}
+
+#media-workspace .study-block-menu-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#media-workspace .study-block-menu-group > span {
+  flex: 1 1 100%;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--color-gray-500));
+}
+
+#media-workspace .study-block-menu button {
+  padding: 0.24rem 0.5rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.4rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+#media-workspace .study-block-menu button[aria-checked='true'] {
+  border-color: rgb(var(--color-gray-500));
+  background: rgb(var(--color-gray-800));
+}
+
+#media-workspace .study-block-menu-note {
+  margin: 0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+  color: rgb(var(--color-gray-500));
+}
+
+/* ── Transcript hierarchy ───────────────────────────────────────────────────────── */
+
+/*
+ * A synchronized reading surface, not a chat log.
+ *
+ * The bands come from `rowDistance()` in the panel, because CSS cannot express "two
+ * rows either side of a moving index". What CSS does is turn a band into emphasis:
+ * size and opacity only. No row gains a border, a chip or a background — those are
+ * what made the old list read as a feed.
+ */
+#media-workspace .study-transcript-row {
+  transition: opacity var(--study-motion), font-size var(--study-motion);
+}
+
+#media-workspace .study-transcript-row[data-distance='active'] {
+  opacity: 1;
+  font-size: 1.06rem;
+}
+
+#media-workspace .study-transcript-row[data-distance='near'] {
+  opacity: 0.86;
+}
+
+#media-workspace .study-transcript-row[data-distance='mid'] {
+  opacity: 0.62;
+}
+
+#media-workspace .study-transcript-row[data-distance='far'] {
+  opacity: 0.34;
+  font-size: 0.86rem;
+}
+
+/* Lines already spoken recede further than lines still to come: the ones ahead are
+   what a reader is scanning towards. */
+#media-workspace .study-transcript-row[data-distance='past'] {
+  opacity: 0.26;
+  font-size: 0.84rem;
+}
+
+/*
+ * Row actions appear on the active row, on hover and on keyboard focus.
+ *
+ * `:focus-within` is not optional politeness — without it this is a hover-only control,
+ * which the accessibility rule forbids outright.
+ */
+#media-workspace .study-transcript-row .study-transcript-translate {
+  opacity: 0;
+  transition: opacity var(--study-motion);
+}
+
+#media-workspace .study-transcript-row[data-distance='active'] .study-transcript-translate,
+#media-workspace .study-transcript-row:hover .study-transcript-translate,
+#media-workspace .study-transcript-row:focus-within .study-transcript-translate {
+  opacity: 1;
+}
+
+#media-workspace .study-transcript-jump {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgb(var(--color-gray-600) / 0.9);
+  border-radius: 0.4rem;
+  background: rgb(var(--color-gray-800));
+  color: rgb(var(--color-gray-100));
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+/* ── Small blocks ───────────────────────────────────────────────────────────────── */
+
+#media-workspace .study-mini-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.7rem 0.8rem;
+  border: var(--study-block-border);
+  border-radius: var(--study-block-radius);
+  background: var(--study-block-bg);
+  box-shadow: var(--study-block-shadow);
+  color: rgb(var(--color-gray-200));
+  font-size: 0.78rem;
+}
+
+#media-workspace .study-mini-block h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgb(var(--color-gray-100));
+}
+
+#media-workspace .study-mini-block p {
+  margin: 0;
+  color: rgb(var(--color-gray-400));
+  line-height: 1.4;
+}
+
+#media-workspace .study-mini-block dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.7rem;
+  margin: 0;
+}
+
+#media-workspace .study-mini-block dl > div {
+  display: contents;
+}
+
+#media-workspace .study-mini-block dt {
+  color: rgb(var(--color-gray-500));
+  font-size: 0.7rem;
+}
+
+#media-workspace .study-mini-block dd {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-gray-100));
+  font-size: 0.74rem;
+}
+
+#media-workspace .study-mini-block button,
+#media-workspace .study-mini-block select {
+  align-self: flex-start;
+  padding: 0.26rem 0.6rem;
+  border: 1px solid rgb(var(--color-gray-700) / 0.9);
+  border-radius: 0.45rem;
+  background: rgb(var(--color-gray-900) / 0.9);
+  color: rgb(var(--color-gray-100));
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+#media-workspace .study-mini-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#media-workspace .study-mini-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: rgb(var(--color-gray-400));
+}
+
+#media-workspace .study-mini-note {
+  font-size: 0.7rem;
+}
+
+#media-workspace .study-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#media-workspace .study-queue-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+#media-workspace .study-queue-list li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-gray-100));
+}
+
+#media-workspace .study-queue-list li small {
+  color: rgb(var(--color-gray-500));
+  font-size: 0.68rem;
+}
+
+#media-workspace .study-queue-list li[data-history-status='undone'] > span {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+#media-workspace .study-ai-modes {
+  display: flex;
+  gap: 0.25rem;
+}
+
+#media-workspace .study-ai-modes button[aria-selected='true'] {
+  border-color: rgb(var(--color-gray-500));
+  background: rgb(var(--color-gray-800));
+}
+
+#media-workspace .study-ai-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The AI block hosts the grammar panel, which brings its own frame. One frame, not
+   two — the "rectangle inside a rectangle" the brief rules out. */
+#media-workspace .study-ai-body .study-grammar-panel {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Motion preference ──────────────────────────────────────────────────────────── */
+
+/*
+ * Motion here explains the layout, so removing it must not remove the layout. Every
+ * animated property above also has a resting state that is correct on its own; this
+ * block only takes away the travel.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #media-workspace .study-player-slice {
+    --study-motion: 1ms linear;
+  }
+
+  #media-workspace .study-block[data-presence='contextual'],
+  #media-workspace .study-tool-sheet {
+    animation: none;
+  }
+}
+
+/* ── Detached blocks ────────────────────────────────────────────────────────────── */
+
+/*
+ * One block, alone in an OS window. It carries `#media-workspace` so every panel rule
+ * above applies unchanged; what is added here is only the window's own frame — a title
+ * strip and a body that fills the sash.
+ *
+ * Deliberately no card, no border and no inner padding around the block: this window
+ * IS the card. Wrapping the panel in another one is the "rectangle inside a rectangle"
+ * the visual rules rule out, and on a 460px-wide transcript column it would cost real
+ * reading width.
+ */
+#media-workspace.detached-study-block {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgb(var(--color-gray-950));
+  color: rgb(var(--color-gray-100));
+}
+
+#media-workspace.detached-study-block .detached-study-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid rgb(var(--color-gray-800));
+  background: rgb(var(--color-gray-900));
+}
+
+#media-workspace.detached-study-block .detached-study-header h1 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The media name is context, not the heading — quiet, and the first thing to give way
+   when the window is narrow. */
+#media-workspace.detached-study-block .detached-study-media {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: rgb(var(--color-gray-400));
+}
+
+#media-workspace.detached-study-block .detached-study-header button {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid rgb(var(--color-gray-700));
+  border-radius: 0.35rem;
+  background: rgb(var(--color-gray-800));
+  color: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+#media-workspace.detached-study-block .detached-study-header button:hover {
+  border-color: rgb(var(--color-gray-500));
+}
+
+#media-workspace.detached-study-block .detached-study-waiting {
+  margin: 0;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.74rem;
+  color: rgb(var(--color-gray-400));
+}
+
+#media-workspace.detached-study-block .detached-study-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* The panels size themselves to a dock. In a window there is no dock — they take it. */
+#media-workspace.detached-study-block .detached-study-body > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  width: auto;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}

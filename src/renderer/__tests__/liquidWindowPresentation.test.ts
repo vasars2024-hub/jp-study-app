@@ -30,14 +30,18 @@ const SHEET = resolve(__dirname, '..', 'theme', 'liquid-window.css');
  * `.fwin` is the floating desktop window; `.popout-root` is the same app in its
  * own borderless OS window (`?popout=<section>`), which is not a `.fwin` at all;
  * `.reader` is the full-screen reader, which `App.tsx` returns as the whole app
- * render and which is therefore inside neither. Only the INTERIOR rules name all
- * three — a pop-out's frame is the OS window and the reader fills that window
- * edge to edge, so neither takes material (`popoutPresentation.ts` and
- * `readerPresentation.ts`, decision 1 in each) — so `FRAME_HOST` and
+ * render and which is therefore inside neither; `.seanime-host` is the Media
+ * workspace overlay, `position: fixed; inset: 0` at `body > div` and inside none
+ * of the other three. Only the INTERIOR rules name all
+ * four — a pop-out's frame is the OS window, and the reader and the workspace
+ * both fill that window edge to edge, so none of them takes material
+ * (`popoutPresentation.ts`, `readerPresentation.ts` and
+ * `workspacePresentation.ts`, decision 1 in each) — so `FRAME_HOST` and
  * `INTERIOR_HOST` are deliberately different constants rather than one.
  */
 const FRAME_HOST = '.fwin.fwin-liquid';
-const INTERIOR_HOST = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';
+const INTERIOR_HOST =
+  ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid)';
 
 /**
  * Whether a selector is anchored on `host`.

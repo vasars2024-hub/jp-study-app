@@ -177,7 +177,8 @@ describe('the captured rect is measured, never clamped into existence', () => {
 
 describe('the reader host is wired to the sheet', () => {
   const src = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
-  const HOSTS = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';
+  const HOSTS =
+    ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid)';
 
   it.each(['NovelReader', 'MangaReader'])(
     '%s renders the opt-in class and data-presentation on .reader',
@@ -280,7 +281,7 @@ describe('the reader host is wired to the sheet', () => {
     // disagree with the first.
     const sheet = src('src/renderer/theme/liquid-window.css').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(sheet).toMatch(
-      /\.fwin-b-liquid\.is-liquid,\s*\.popout-btn-liquid\.is-liquid,\s*\.reader-btn-liquid\.is-liquid\s*\{/,
+      /\.fwin-b-liquid\.is-liquid,\s*\.popout-btn-liquid\.is-liquid,\s*\.reader-btn-liquid\.is-liquid,\s*\.seanime-host-liquid\.is-liquid\s*\{/,
     );
     expect(sheet.match(/\.reader-btn-liquid/g)?.length).toBe(2);
   });

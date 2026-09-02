@@ -856,6 +856,17 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
          substitution, 3 on the popup's pre-click status call. i18n exit 0 at 12,115 keys.
          architecture exit 0, "Nothing new", 9 pending. eslint 0 on all 13 touched .ts/.tsx.)
          This run took TWO passes and the first one is the honest part of the record: the
+         RE-MEASURED 2026-09-01 21:30 (primary2, after fab72cac): **1,005 files passed / 1 failed /
+         1 skipped; 12,973 tests passed / 1 failed / 6 skipped**, exit 1 -- still exactly the one
+         `i18n.test.ts > catalog hygiene` suite, still the same 27 components, and my three new
+         desktop cases pass. i18n-check exit 0 at 12,115 keys; architecture exit 0, "Nothing new",
+         9 pending; eslint exit 0 on both touched paths. WORTH NAMING because two concurrent
+         workers now report this gate differently and BOTH readings are correct: a liquid turn
+         reported i18n.test.ts absent from its failures, measured in the SHARED main tree, which
+         still holds the 27 conversions uncommitted. This worktree is a clean checkout of the
+         branch, so it reports the branch. The branch is red; the shared tree is green on someone
+         else's uncommitted work. That is boss-audit Finding 1 verbatim, and it is why this gate
+         must be read from a clean tree only.
          first full run showed **2** failed, and the new one was mine --
          mediaLibraryListRow.test.ts scans mediaLibrary.css as raw text from the
          `@container medialib (max-width: 420px)` block to EOF with an unbounded `[\s\S]*?`,

@@ -25,23 +25,33 @@
  * restores the conventional rules below it in cascade order with no geometry,
  * focus, drag, resize or taskbar behavior touched.
  *
- * THREE HOSTS, ONE INTERIOR. A study surface is mounted in a floating `.fwin`,
- * in its own borderless pop-out window (`?popout=<section>`), or — when a
+ * FOUR HOSTS, ONE INTERIOR. A study surface is mounted in a floating `.fwin`,
+ * in its own borderless pop-out window (`?popout=<section>`), — when a
  * library item is open — in the full-screen reader, which `App.tsx` returns as
- * the whole app render and which is therefore inside neither of the other two.
+ * the whole app render and which is therefore inside neither of the other two,
+ * or in the Media workspace overlay `.seanime-host`, which is `position: fixed;
+ * inset: 0` at `body > div` and inside none of the other three.
  * Until L5's Gate ran only the first was a Liquid destination, so Dictionary,
  * Grammar, Translate and Agent had their region language permanently inert once
  * popped out (`L5_CORE_STUDY_TOOLS.md:211`); the reader was the same hole one
- * host later, which is why L1 category 3 could not score Novels or manga at all.
- * The INTERIOR rules below therefore name all three hosts through `:is()`, whose
+ * host later, which is why L1 category 3 could not score Novels or manga at all;
+ * the workspace was the same hole one host later still, and it is why all six
+ * `mediaWorkspace` rows in `parity-ledger.json` — the only rows of fifty that
+ * are not `both` — sat at "no Liquid destination yet" with their standard halves
+ * fully driven (L12, `renderer/workspacePresentation.ts`).
+ * The INTERIOR rules below therefore name all four hosts through `:is()`, whose
  * specificity is the maximum of its branches, so every one of them still scores
  * (0,2,0) and the cascade order that rule 2 above depends on is unchanged. The
  * FRAME rules deliberately do NOT: a pop-out's frame is the OS window, opaque
- * with the desktop compositor behind it, and the reader fills that same window
- * edge to edge with no box of its own, so a `backdrop-filter` on either would
- * sample nothing this process paints — the same inert glass rule 2 forbids on
- * `.fwin-bar`. See `renderer/popoutPresentation.ts` and
- * `renderer/readerPresentation.ts`, decision 1 in each.
+ * with the desktop compositor behind it, and the reader and the workspace both
+ * fill that same window edge to edge with no box of their own, so a
+ * `backdrop-filter` on any of them would sample nothing this process paints —
+ * the same inert glass rule 2 forbids on `.fwin-bar`. The workspace has a second
+ * reason recorded at its own root rule in `styles.css`: it is opaque so that
+ * everything numbered below it is HIDDEN rather than merely behind, and a
+ * translucent `aria-modal` dialog would put the desktop grid back on screen.
+ * See `renderer/popoutPresentation.ts`, `renderer/readerPresentation.ts` and
+ * `renderer/workspacePresentation.ts`, decision 1 in each.
  */
 
 .fwin.fwin-liquid {
@@ -141,7 +151,7 @@
  * material comes from the frame behind it; this layer contributes tint, edge and
  * depth over it, all from `--lq-*` tokens so a shell remap still owns the palette.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .lq-contextual {
   background: var(--lq-liquid-bg);
   border: 1px solid var(--lq-liquid-border);
   border-radius: var(--lq-liquid-radius);
@@ -166,7 +176,29 @@
  * The right border stays: it is the only thing separating the rail from the browser
  * once both are translucent over the same frame.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .medialib-rail.lq-contextual {
+/*
+ * L12 — the Media workspace's host bar is a FLUSH STRIP, not a floating card,
+ * and it takes `.medialib-rail`'s exception for `.medialib-rail`'s reason.
+ *
+ * `.seanime-host` is `inset: 0`, so its header meets three of the overlay's four
+ * edges. The shared card geometry above would round it against all four, drop a
+ * shadow into a seam nothing can see, and re-pad a strip that already sets its
+ * own `6px 10px` — measured 1264px wide at the default window, i.e. the full
+ * viewport. It keeps the MATERIAL, which is the whole point of adopting the
+ * primitive and what makes the region read as Liquid at all, and its own box.
+ *
+ * The bottom border stays and is deliberately NOT the conventional `--border`:
+ * once the strip is translucent over the body, that seam is the only thing
+ * separating it from the player, the readiness table or the review list below.
+ */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .seanime-host-bar.lq-contextual {
+  border-radius: 0;
+  border-width: 0 0 1px 0;
+  padding: var(--lq-space-2) var(--lq-space-3);
+  box-shadow: none;
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .medialib-rail.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: var(--lq-space-4) var(--lq-space-3);
@@ -188,7 +220,7 @@
  * reason: the primitive is adopted for what it MEANS, and the geometry is the
  * region's own.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .reader-seek-wrap.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .reader-seek-wrap.lq-contextual {
   background: none;
   border: 0;
   border-radius: 0;
@@ -210,7 +242,7 @@
  * same reason `agent.css` gives — this surface also runs inside a floating window,
  * whose width has nothing to do with the viewport.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .agent-rail.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .agent-rail.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: var(--agent-gap);
@@ -218,7 +250,7 @@
 }
 
 @container (max-width: 640px) {
-  :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .agent-rail.lq-contextual {
+  :is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .agent-rail.lq-contextual {
     border-width: 0 0 1px;
   }
 }
@@ -241,37 +273,37 @@
  * contextual role only so a classifier stops calling a 17-item nav list dense work. A
  * second tint inside the rail's own would read as a darker slab down the middle of it.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-topbar.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-topbar.lq-contextual {
   border-radius: 0;
   border-width: 0 0 1px;
   padding: var(--space-sm) var(--space-md);
   box-shadow: none;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-rail.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: 0;
   box-shadow: none;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-statusbar.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-statusbar.lq-contextual {
   border-radius: 0;
   border-width: 1px 0 0;
   padding: var(--space-xs) var(--space-md);
   box-shadow: none;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-drawer.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-drawer.lq-contextual {
   border-radius: 0;
   border-width: 0 0 0 1px;
   padding: 0;
   box-shadow: none;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-scroll.lq-contextual,
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-group.lq-contextual,
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-list.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-rail-scroll.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-rail-group.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-rail-list.lq-contextual {
   background: none;
   border: 0;
   border-radius: 0;
@@ -280,7 +312,7 @@
 }
 
 /* The scroller keeps its own inset; only its box goes. */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .scr-rail-scroll.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .scr-rail-scroll.lq-contextual {
   padding: var(--space-md) var(--space-sm);
 }
 
@@ -297,14 +329,14 @@
  * the flush `.scr-topbar` treatment rather than a floating card: a bottom rule and the
  * material, no radius and no shadow. It keeps `styles.css`'s 4px bottom margin.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-v2.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .os-set-nav-v2.lq-contextual {
   border-radius: 0;
   border-width: 0 1px 0 0;
   padding: 0 14px 0 0;
   box-shadow: none;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-page-head.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .os-set-page-head.lq-contextual {
   border-radius: 0;
   border-width: 0 0 1px;
   padding: 0 0 var(--lq-space-2);
@@ -317,9 +349,9 @@
  * case. A second tint inside the rail's own would read as a darker slab down the middle of
  * it, so they take the role and no material at all, and keep their `styles.css` spacing.
  */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-scroll.lq-contextual,
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-group.lq-contextual,
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .os-set-nav-list.lq-contextual {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .os-set-nav-scroll.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .os-set-nav-group.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .os-set-nav-list.lq-contextual {
   background: none;
   border: 0;
   border-radius: 0;
@@ -354,23 +386,29 @@
  * ring carries the extra weight instead, because a 1px edge at 40% costs the glyph's
  * ground nothing.
  *
- * `.popout-btn-liquid` is the same control in the pop-out's own bar and
- * `.reader-btn-liquid` the same control in the reader's; both share the rule
- * rather than restating it — the 16% sweep above is a property of the accent
- * against a chrome ground, and `.popout-bar` and `.reader-bar` both use
- * `var(--sidebar)`, the same family of ground `.fwin-bar` uses. One rule, so the
- * three hosts cannot drift into three different measurements.
+ * `.popout-btn-liquid` is the same control in the pop-out's own bar,
+ * `.reader-btn-liquid` the same control in the reader's, and
+ * `.seanime-host-liquid` the same control in the Media workspace's; all share
+ * the rule rather than restating it — the 16% sweep above is a property of the
+ * accent against a chrome ground, and `.popout-bar` and `.reader-bar` both use
+ * `var(--sidebar)`, the same family of ground `.fwin-bar` uses. The workspace
+ * bar is the one that does NOT: it is transparent over `.seanime-host`'s
+ * `var(--bg)` conventionally, and `--lq-liquid-bg` once the region below paints
+ * it. Both are chrome grounds of the same family, so it joins rather than
+ * forking — one rule, so four hosts cannot drift into four measurements.
  */
 .fwin-b-liquid.is-liquid,
 .popout-btn-liquid.is-liquid,
-.reader-btn-liquid.is-liquid {
+.reader-btn-liquid.is-liquid,
+.seanime-host-liquid.is-liquid {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .fwin-b-liquid:focus-visible,
 .popout-btn-liquid:focus-visible,
-.reader-btn-liquid:focus-visible {
+.reader-btn-liquid:focus-visible,
+.seanime-host-liquid:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -406,7 +444,7 @@
  * scrollbar to reach it. `MIN_W` here is 260. `min(…, 100%)` clamps the floor to the
  * container and the row simply gets narrower, which is what a floor was ever for.
  * ------------------------------------------------------------------------------ */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .dict-view {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .dict-view {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr));
   align-items: start;
@@ -416,12 +454,12 @@
 /* Everything else keeps the full measure. Reading and dense results never get halved:
  * §2.3 keeps work on a stable full-width anchor, and a two-column result list is a
  * different feature, not a spacing fix. */
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .dict-view > * {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .dict-view > * {
   grid-column: 1 / -1;
   min-width: 0;
 }
 
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .dict-view > .dict-saved-searches,
-:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid) .dict-view > .lexicon-notes-browser {
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .dict-view > .dict-saved-searches,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .dict-view > .lexicon-notes-browser {
   grid-column: auto;
 }

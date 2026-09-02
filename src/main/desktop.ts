@@ -89,7 +89,7 @@ function seedStore(): DesktopLayoutStoreSchema {
     activeDesktopIndex: DESKTOP_STUDY,
     desktops: Array.from({ length: DESKTOP_COUNT }, (_, i) => seedLayout(i)),
     // Deliberately empty. Seeding it needs `screen`, which is unavailable until
-    // `app.whenReady()`, and this store is constructed at module eval.
+    // `app.whenReady()`, and this store can be constructed before that.
     // `syncAssignments()` fills it once the display service is live.
     assignments: [],
     globalZTop: 10,
@@ -795,25 +795,51 @@ class DesktopStore {
   }
 }
 
-const store = new DesktopStore();
+/**
+ * Constructed on FIRST USE, never at module scope.
+ *
+ * The constructor calls `load()`, which resolves `desktopStorePath()` against
+ * `app.getPath('userData')`. `main.ts` redirects that path for
+ * `JP_USER_DATA_DIR` at line 142 — but an ES import is evaluated before any
+ * statement in the importing module, so an eager `new DesktopStore()` read the
+ * REAL profile while every later `persist()` wrote the redirected one.
+ *
+ * Measured live 2026-09-01: a genuinely empty userData (0 entries before
+ * launch, `[main] JP_USER_DATA_DIR -> userData = …` in the log) came up
+ * holding the real profile's eight desktops, its `aurora` City wallpaper and
+ * its `wgt-mrmkpxj7-tpja` mini-player — while `profiles.json` beside it was
+ * correctly seeded, which is what named this module as the single cause.
+ *
+ * The read half is the visible symptom; the write half is the reason this is
+ * worth a comment. `load()` calls `atomicWriteJson(filePath, next)` whenever
+ * the file needs a schema migration, and at import time `filePath` is the real
+ * profile — so a scratch-profile run could rewrite the 8.6 GB profile that has
+ * no restore point. Never make this eager again.
+ */
+let store: DesktopStore | null = null;
 
 /** The layout store, for `desktopWindows.ts` and `deskDrag.ts`. */
 export function desktopStore(): DesktopStore {
+  if (!store) store = new DesktopStore();
   return store;
 }
 
 export function registerDesktopIpc(): void {
-  ipcMain.handle('desktop:getLayout', () => store.snapshot());
-  ipcMain.handle('desktop:commitLayout', (_e, payload: CommitLayoutPayload) => store.commitLayout(payload));
-  ipcMain.handle('desktop:switch', (_e, payload: { targetIndex: DesktopIndex }) =>
-    store.switchDesktop(payload?.targetIndex ?? DESKTOP_STUDY),
+  ipcMain.handle('desktop:getLayout', () => desktopStore().snapshot());
+  ipcMain.handle('desktop:commitLayout', (_e, payload: CommitLayoutPayload) =>
+    desktopStore().commitLayout(payload),
   );
-  ipcMain.handle('desktop:migrateLegacy', (_e, payload: LegacyDesktopPayload) => store.migrateLegacy(payload ?? {}));
+  ipcMain.handle('desktop:switch', (_e, payload: { targetIndex: DesktopIndex }) =>
+    desktopStore().switchDesktop(payload?.targetIndex ?? DESKTOP_STUDY),
+  );
+  ipcMain.handle('desktop:migrateLegacy', (_e, payload: LegacyDesktopPayload) =>
+    desktopStore().migrateLegacy(payload ?? {}),
+  );
   ipcMain.handle('desktop:setAssignment', (_e, patch: Partial<DisplayAssignment> & { displayKey: string }) =>
-    store.setAssignment(patch),
+    desktopStore().setAssignment(patch),
   );
   ipcMain.handle('desktop:renameDesktop', (_e, payload: { index: DesktopIndex; name: string }) =>
-    store.renameDesktop(payload?.index ?? DESKTOP_STUDY, payload?.name ?? ''),
+    desktopStore().renameDesktop(payload?.index ?? DESKTOP_STUDY, payload?.name ?? ''),
   );
-  ipcMain.handle('desktop:resetAssignments', () => store.resetAssignments());
+  ipcMain.handle('desktop:resetAssignments', () => desktopStore().resetAssignments());
 }
