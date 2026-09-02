@@ -723,3 +723,32 @@ away: the undo pauses it, and the pause is read off the control's own **label** 
 has no `<audio>` element at all (0 media elements while the seek advanced, so Web Audio) and
 the control carries no `aria-pressed`. Left paused at seek 68.1, `e2e-audio-ja` selected,
 search empty, sort back to `recent`.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `video`
+
+**`video`: 10 rows, `both` 10.** `cat6 --app video` = **PASS 10/10** — parity **10/10 and
+10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row (`stageHonesty`
+taking its declared cascade with it and nothing beyond) and all restored, 0 refusals, box
+`1080x700`, round trip field held / shell held / 0 diffs.
+
+Three of these rows are category-8 questions asked inside category 6, and all three read
+honest on a stage with nothing loaded: `stageHonesty` — 2 empty states, both **titled**, 2
+enabled entry actions, `video=0`; `topbarActions` — `explained=2` equals `disabled=2`, every
+disabled action carrying its own reason; `inspectorHonesty` — `coherent=blank`, no score row,
+no meta, no MAL link, and empty copy that says so. A blank inspector is fine; one showing a
+MAL link for nothing is the state that row exists to catch.
+
+`upNextShelf` is one of the rows the concurrent worker's empty profile would have scored on
+an empty harness and had capped: **7 cards** off this profile's 80-file library.
+
+Un-driven on purpose, each with its reason: `watchFolder` opens a native OS folder dialog the
+bridge cannot see or dismiss; the YouTube import reaches the network and writes the library.
+Both are scored for reachability and say so.
+
+### Trap: `os:open` does not choose the Media Center's tab
+
+Opening section `video` gave a window titled **Video** whose body was the Media Center on the
+**Library** tab, and `.mc-video-page` did not exist. cat6 refused — *"no video surface"* —
+rather than scoring the wrong page, which is the right failure. The rail's own `Video` entry
+has to be clicked first. After that: `navReach` reads 9 rail items, 1 active, label `Video`,
+page `mc-page mc-video-page`, window title `Video` — all three agreeing.
