@@ -1010,3 +1010,39 @@ what `shellIdentity`'s `osDesktopPresent=false` half is checking from the other 
 `notWritten` re-derived: **11** declared specs still have no row at all (was 14 at the start of
 this turn) — notebook, statistics, games, library, immersion, novels, manga, vn, music, video,
 youtube. `controlCoverage`: **63 named / 1 NONE DECLARED / 45 silent of 110**.
+
+## 2026-09-02 (primary2) — `games`, and an empty profile that still scores 10/10
+
+**120 rows / 16 apps.** `games` contributes **10**, all `both`, from a `PASS 10/10` run: 10/10
+reachable in BOTH presentations, round trip 0 diffs, 10 of 10 mutations armed and each flipping
+exactly its own row, **0 driven refusals**. It was driven end to end rather than inspected — a
+round was STARTED, `"ro"` was typed, submit moved `disabled true -> false`, and the round was
+ABORTED back to a ready state the harness then re-read.
+
+### The empty-harness warning does not apply here, and that is worth stating
+
+The standing warning is real: a surface whose rows need content scores an empty harness as
+CAPPED rather than skipped. Games is not one of those, because four of its rows are written to
+score **honest empty state** rather than content:
+
+| row | reading on this empty profile |
+| --- | --- |
+| `sourceMaterial` | `pct=noList scaleX=0 agrees=true`, with "No word list uploaded for this level" |
+| `exposureTracking` | `seen=0/59`, stated pct 0, derived pct 0, bar scale 0 |
+| `roundHistory` | `rows=0 complete=0`, against "No rounds recorded for this game yet" |
+| `materialScope` | `mode=auto scripts=0 groups=0 shapeHeld=true` |
+
+A bar that agrees with a zero is as real a reading as one that agrees with a 60. What an empty
+profile costs here is not the row, it is the *range* — `exposureTracking` cannot show the bar
+moving, only that all three statements of it are the same number.
+
+`dataStateOwner` names FIVE stores for this one app and they are not interchangeable:
+`jp-game-arena-settings-v1` (length, language, kana scope), `jp-game-arena-seen-v1` (exposure),
+`jp-game-progress-v1` (last 30 results and the high scores), `jp-level-lists` (the word lists
+coverage is computed against) and `renderer/levelService.ts` (the level). The round session
+itself is deliberately unpersisted, which is exactly what makes the abort recovery safe for a
+harness to drive against a real profile.
+
+`notWritten` re-derived: **10** declared specs still have no row — notebook, statistics,
+library, immersion, novels, manga, vn, music, video, youtube. It was **14** at the start of
+this turn. `controlCoverage`: **73 named / 1 NONE DECLARED / 45 silent of 120**.
