@@ -222,3 +222,14 @@ src/renderer/assets/reading-garden/audio/*.webm
 # (`node tools/grammar-audit.cjs --compare` rewrites it), and the committed copy
 # still carries pre-de-branding source-module identifiers that the 2026-07-28
 # scrub removed everywhere else — see F21 in AUDIT_2026-08.md.
+
+# --- 2026-09-02: generated measurement artifacts are build products, not source ---
+# Overnight 09-01->09-02 the relay committed 44,588 lines of probe OUTPUT
+# (l12-matrix-normal.json 18,065; l12-atlas-final.json 14,777; ...) against 291
+# lines of product. Bank the NUMBER and the method in prose; never the dump.
+# Handoffs, plans and PARITY_LEDGER.md under .coordination/ stay tracked -- only
+# the generated baselines are excluded.
+src/.coordination/**/baselines/*.json
+src/.coordination/**/runs/*.json
+src/.coordination/**/*-atlas*.json
+src/.coordination/**/*-matrix*.json
