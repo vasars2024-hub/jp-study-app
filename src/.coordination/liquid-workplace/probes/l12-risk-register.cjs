@@ -40,6 +40,13 @@
  *       which needs Developer Mode. Environment, not product — but a release risk, because
  *       it means the packaging stage has never completed in this tree.
  *
+ *   R9  BANKED EVIDENCE OVERWRITES ITSELF. Added 2026-09-02, the day the atlas's integrity
+ *       check made its first live catch: 21 of the 650-cell run's plates no longer hashed
+ *       to their recorded sha256, and all 21 on-disk hashes turned out to equal the tries40
+ *       control run's own recorded values. Plate paths carry no run identity, so overlapping
+ *       runs write the same file. The class: a JSON index over gitignored binaries that any
+ *       later run may silently rewrite.
+ *
  * ---------------------------------------------------------------------------------
  * THE CONTROL, `--control`, and why R2 gets the real one.
  *
@@ -269,6 +276,55 @@ function packagerEnvironment() {
   };
 }
 
+/**
+ * R9. BANKED VISUAL EVIDENCE HAS NO PER-RUN NAMESPACE.
+ *
+ * Found 2026-09-02 by the atlas's own integrity check, on its first live catch: 21 of run
+ * A's plates no longer hashed to their recorded sha256. Not guessed — all 21 were
+ * `oled-black`, and all 21 on-disk hashes equalled the tries40 control run's OWN recorded
+ * hashes. A plate is named `app__presentation__theme__state.png`, so two runs that overlap
+ * on those four coordinates write the same path and the later one destroys the earlier
+ * one's image. The manifest keeps asserting a hash for bytes that are gone.
+ *
+ * The class, and why it is a release risk rather than a tidiness one: every certification
+ * artifact this plan produces is a JSON index over gitignored binaries. If a re-run can
+ * silently overwrite them, the wall of pictures a reader is shown is not the wall the
+ * verdict was computed from, and nothing in the JSON says so.
+ *
+ * Measured WITHOUT touching the images: read every committed matrix manifest, group the
+ * declared plate paths, and count paths claimed by more than one run. That is the hazard
+ * itself; whether a given tree currently shows the damage depends on which run happened to
+ * go last, which is exactly what makes it silent.
+ */
+function plateNamespace() {
+  const dir = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'baselines');
+  if (!fs.existsSync(dir)) return { available: false };
+  const files = fs.readdirSync(dir).filter((f) => /^l12-matrix-.*\.json$/.test(f));
+  const owners = new Map();
+  for (const f of files) {
+    let m;
+    try { m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { continue; }
+    if (m.schema !== 'l12-visual-matrix/v1') continue;
+    for (const c of m.cells || []) {
+      if (!c.file) continue;
+      if (!owners.has(c.file)) owners.set(c.file, []);
+      owners.get(c.file).push({ run: f, sha256: c.sha256 || null });
+    }
+  }
+  const shared = [...owners.entries()].filter(([, l]) => l.length > 1);
+  // A shared path where the runs recorded DIFFERENT hashes is proof one image was lost;
+  // a shared path with equal hashes is the same hazard that happened not to bite.
+  const destructive = shared.filter(([, l]) => new Set(l.map((x) => x.sha256)).size > 1);
+  return {
+    available: true,
+    manifests: files.length,
+    declaredPlatePaths: owners.size,
+    pathsClaimedByMoreThanOneRun: shared.length,
+    pathsWhereRunsRecordDifferentBytes: destructive.length,
+    examples: destructive.slice(0, 4).map(([f, l]) => ({ file: f, runs: l.map((x) => x.run) })),
+  };
+}
+
 /** R6. */
 function atlasVerdict(p) {
   if (!p || !fs.existsSync(p)) return { available: false };
@@ -298,6 +354,7 @@ function build(atlasPath, vitestLog) {
   const r6 = atlasVerdict(atlasPath);
   const r7 = packagerEnvironment();
   const r8 = repoGates(vitestLog);
+  const r9 = plateNamespace();
 
   const risks = [
     {
@@ -385,6 +442,17 @@ function build(atlasPath, vitestLog) {
       whatWouldCloseIt: 'Each red identity fixed or hunk-scope committed by its owner, then a re-run that shows no NEW identity — never a smaller count.',
       falsified: false,
     },
+    {
+      id: 'R9',
+      title: 'Banked visual evidence has no per-run namespace, so a re-run overwrites it',
+      severity: 'high',
+      state: !r9.available ? 'unmeasured'
+        : r9.pathsClaimedByMoreThanOneRun ? 'open' : 'closed',
+      measurement: r9,
+      whyItMatters: "Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.",
+      whatWouldCloseIt: "l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.",
+      falsified: false,
+    },
   ];
 
   const open = risks.filter((r) => r.state === 'open');
@@ -465,9 +533,42 @@ function controls(base) {
     };
   } else out.r3 = { kind: 'force-one-row-pending', pass: null, note: 'n/a — no parity-ledger.json' };
 
+  // --- R9: plant a manifest that claims a plate path an existing run already claims, with
+  // different bytes. The collision count must rise by exactly one and fall back on teardown.
+  // A real file plant, not an in-memory one, because the check reads the directory itself.
+  const bdir = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'baselines');
+  const plant = path.join(bdir, 'l12-matrix-__r9control.json');
+  const b9 = base.risks.find((r) => r.id === 'R9').measurement;
+  if (b9.available && b9.declaredPlatePaths) {
+    let mutated = null;
+    try {
+      const donor = fs.readdirSync(bdir).filter((f) => /^l12-matrix-.*\.json$/.test(f) && f !== path.basename(plant))[0];
+      const dm = JSON.parse(fs.readFileSync(path.join(bdir, donor), 'utf8'));
+      const cell = (dm.cells || []).find((c) => c.file && c.sha256);
+      fs.writeFileSync(plant, `${JSON.stringify({
+        schema: 'l12-visual-matrix/v1',
+        cells: [{ ...cell, sha256: `0${cell.sha256.slice(1)}` }],
+      })}\n`);
+      mutated = plateNamespace();
+    } finally {
+      fs.rmSync(plant, { force: true });
+    }
+    const restored = plateNamespace();
+    out.r9 = {
+      kind: 'plant-a-colliding-plate-path/R9-must-report-one-more-destructive-collision',
+      base: b9.pathsWhereRunsRecordDifferentBytes,
+      mutated: mutated && mutated.pathsWhereRunsRecordDifferentBytes,
+      restored: restored.pathsWhereRunsRecordDifferentBytes,
+      teardownVerified: !fs.existsSync(plant),
+      pass: !!mutated && mutated.pathsWhereRunsRecordDifferentBytes === b9.pathsWhereRunsRecordDifferentBytes + 1
+        && restored.pathsWhereRunsRecordDifferentBytes === b9.pathsWhereRunsRecordDifferentBytes
+        && !fs.existsSync(plant),
+    };
+  } else out.r9 = { kind: 'plant-a-colliding-plate-path', pass: null, note: 'n/a — no matrix manifests to collide with' };
+
   out.unfalsified = ['R1', 'R5', 'R6', 'R7', 'R8'];
   out.unfalsifiedWhy = 'R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.';
-  const vals = ['r2', 'r3', 'r4'].map((k) => out[k] && out[k].pass);
+  const vals = ['r2', 'r3', 'r4', 'r9'].map((k) => out[k] && out[k].pass);
   out.summary = { fired: vals.filter((v) => v === true).length, failed: vals.filter((v) => v === false).length };
   return out;
 }

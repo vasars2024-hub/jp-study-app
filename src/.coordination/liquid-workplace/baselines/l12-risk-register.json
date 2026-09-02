@@ -1,15 +1,15 @@
 {
   "schema": "l12-risk-register/v1",
   "bullet": "L12 bullet 4 — remaining-risk report",
-  "generatedAt": "2026-09-02T02:54:21.604Z",
-  "head": "17b3d833",
+  "generatedAt": "2026-09-02T05:35:36.556Z",
+  "head": "32aae369",
   "branch": "wt/files-app",
   "totals": {
-    "risks": 8,
-    "open": 5,
-    "closed": 3,
+    "risks": 9,
+    "open": 7,
+    "closed": 2,
     "unmeasured": 0,
-    "highOpen": 2
+    "highOpen": 4
   },
   "risks": [
     {
@@ -127,8 +127,8 @@
       "severity": "medium",
       "state": "open",
       "measurement": {
-        "closed": 34,
-        "open": 12,
+        "closed": 35,
+        "open": 11,
         "unknown": 0,
         "total": 46,
         "openTitles": [
@@ -140,7 +140,6 @@
           "Validate every player feature in standard and Liquid modes.",
           "Keep review/input surfaces spatially fixed during active tasks.",
           "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-          "Run every app’s standard/Liquid/theme/state screenshot matrix.",
           "Close every feature-ledger row.",
           "Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.",
           "Produce a final visual atlas and remaining-risk report."
@@ -170,19 +169,21 @@
       "id": "R6",
       "title": "The visual atlas is not certification evidence",
       "severity": "high",
-      "state": "closed",
+      "state": "open",
       "measurement": {
         "available": true,
         "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
-        "generatedAt": "2026-09-02T02:52:01.735Z",
-        "certifiable": true,
-        "blockers": [],
-        "completeness": 94,
+        "generatedAt": "2026-09-02T05:32:48.937Z",
+        "certifiable": false,
+        "blockers": [
+          "21 indexed images no longer hash to their recorded sha256"
+        ],
+        "completeness": 93.47,
         "axes": {
           "app": "effective",
           "theme": "effective",
           "presentation": "effective",
-          "state": "not-swept"
+          "state": "effective"
         }
       },
       "whyItMatters": "L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.",
@@ -219,23 +220,58 @@
           "lastLine": "If a file is genuinely exempt, run with --update-baseline and say why in the commit."
         },
         "vitest": {
-          "available": true,
-          "log": "debug/_p2d-vitest.log",
-          "filesFailed": 5,
-          "filesPassed": 997,
-          "testsFailed": 5,
-          "testsPassed": 12906,
-          "failingFiles": [
-            "src/renderer/__tests__/readingLensI18n.test.tsx",
-            "src/shared/__tests__/i18n.test.ts",
-            "src/renderer/__tests__/mediaSurfaceImportGraph.test.ts",
-            "src/main/__tests__/extensionServerPort.test.ts",
-            "src/main/__tests__/flashcardAudio.test.ts"
-          ]
+          "available": false,
+          "why": "no --vitest-log given; the full suite is not run from inside this generator"
         }
       },
       "whyItMatters": "L12's own third bullet is the gate run. A branch that is red alone and green only because of another track's uncommitted files has no clean release gate at all — that is boss-audit Finding 1, carried across audits.",
       "whatWouldCloseIt": "Each red identity fixed or hunk-scope committed by its owner, then a re-run that shows no NEW identity — never a smaller count.",
+      "falsified": false
+    },
+    {
+      "id": "R9",
+      "title": "Banked visual evidence has no per-run namespace, so a re-run overwrites it",
+      "severity": "high",
+      "state": "open",
+      "measurement": {
+        "available": true,
+        "manifests": 3,
+        "declaredPlatePaths": 701,
+        "pathsClaimedByMoreThanOneRun": 22,
+        "pathsWhereRunsRecordDifferentBytes": 21,
+        "examples": [
+          {
+            "file": "debug/shots/l12-matrix/agent__liquid__oled-black__normal.png",
+            "runs": [
+              "l12-matrix-normal.json",
+              "l12-matrix-tries40.json"
+            ]
+          },
+          {
+            "file": "debug/shots/l12-matrix/library__liquid__oled-black__normal.png",
+            "runs": [
+              "l12-matrix-normal.json",
+              "l12-matrix-tries40.json"
+            ]
+          },
+          {
+            "file": "debug/shots/l12-matrix/novels__liquid__oled-black__normal.png",
+            "runs": [
+              "l12-matrix-normal.json",
+              "l12-matrix-tries40.json"
+            ]
+          },
+          {
+            "file": "debug/shots/l12-matrix/dictionary__liquid__oled-black__normal.png",
+            "runs": [
+              "l12-matrix-normal.json",
+              "l12-matrix-tries40.json"
+            ]
+          }
+        ]
+      },
+      "whyItMatters": "Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.",
+      "whatWouldCloseIt": "l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.",
       "falsified": false
     }
   ],
@@ -250,14 +286,22 @@
     },
     "r4": {
       "kind": "append-one-open-bullet/R4-count-must-rise-by-one",
-      "base": 12,
-      "mutated": 13,
+      "base": 11,
+      "mutated": 12,
       "pass": true
     },
     "r3": {
       "kind": "force-one-row-pending/R3-count-must-rise-or-hold-if-already-pending",
       "base": 5,
       "mutated": 6,
+      "pass": true
+    },
+    "r9": {
+      "kind": "plant-a-colliding-plate-path/R9-must-report-one-more-destructive-collision",
+      "base": 21,
+      "mutated": 22,
+      "restored": 21,
+      "teardownVerified": true,
       "pass": true
     },
     "unfalsified": [
@@ -269,7 +313,7 @@
     ],
     "unfalsifiedWhy": "R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.",
     "summary": {
-      "fired": 3,
+      "fired": 4,
       "failed": 0
     }
   }
