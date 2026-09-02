@@ -169,6 +169,73 @@ export function clampLayoutToViewport(
   };
 }
 
+/** One window-sized rect, the only geometry a zoom re-fit ever moves. */
+export interface FitRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * What a zoom re-fit did to one window: where it PUT the window (`fit`) and the
+ * rect the user had actually authored before the fit touched it (`authored`).
+ */
+export interface ZoomFit {
+  fit: FitRect;
+  authored: FitRect;
+}
+
+const sameRect = (a: FitRect, b: FitRect): boolean =>
+  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+/**
+ * The commit-side inverse of the zoom re-fit (boss audit 2026-09-02, Finding 3).
+ *
+ * `DesktopShell`'s `onZoomChanged` re-fits the STORED layout into the zoomed
+ * viewport and applies the result to the live windows. Its header promised
+ * "nothing is committed", but the `hydrating` guard it relied on is cleared in
+ * a microtask — before React runs the debounced commit effect — so the clamp
+ * WAS committed, and a window that hit the `MIN_W`/`MIN_H` floor lost its size
+ * for good: a desktop note authored 260x220 was floored to 240x140 at 200% zoom,
+ * then re-expanded proportionally to 480x302 on the way back, and 480x302 was
+ * what reached disk. Measured live, survives restart.
+ *
+ * The fix is not to block the commit (other state in the same burst is real)
+ * but to commit the AUTHORED rect for every window that is still sitting
+ * exactly where the fit put it. The stored layout then keeps holding what the
+ * user authored, so zooming back out re-fits from the true origin and restores
+ * it byte-for-byte — the round trip is exact instead of approximately scaled.
+ *
+ * A window whose live rect no longer matches its `fit` has been moved or
+ * resized by the user since the zoom change; those coordinates are theirs and
+ * are committed as they are. Its id comes back in `stale` so the caller drops
+ * the record — a stale record that outlived a user edit would later overwrite
+ * that edit with the pre-zoom rect.
+ *
+ * Identity-preserving: a list with nothing to substitute is returned as-is.
+ */
+export function unfitZoomedWindows<T extends FitRect & { id: string }>(
+  wins: T[],
+  fits: ReadonlyMap<string, ZoomFit>,
+): { wins: T[]; stale: string[] } {
+  if (fits.size === 0) return { wins, stale: [] };
+  const stale: string[] = [];
+  let changed = false;
+  const next = wins.map((win) => {
+    const rec = fits.get(win.id);
+    if (!rec) return win;
+    if (!sameRect(win, rec.fit)) {
+      stale.push(win.id);
+      return win;
+    }
+    if (sameRect(win, rec.authored)) return win;
+    changed = true;
+    return { ...win, x: rec.authored.x, y: rec.authored.y, w: rec.authored.w, h: rec.authored.h };
+  });
+  return { wins: changed ? next : wins, stale };
+}
+
 /** The subset of a layout whose numbers `authoredW/H` is a claim about. */
 export interface LayoutGeometry {
   windows: WindowSnapshot[];
