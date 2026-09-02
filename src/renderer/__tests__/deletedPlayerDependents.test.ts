@@ -295,7 +295,13 @@ describe("Media Center's Study tab hands the episode to the adopted player", () 
     expect(panel).toContain('<MediaStudyMode');
     expect(panel).not.toContain('state.videoRef.current.currentTime');
     expect(panel).not.toMatch(/\bisPlayerVisible\b/);
-  });
+    // 60s. A whole-src sweep: its cost is the tree, and under a full `vitest run` with eight
+    // workers contending for one disk it exceeded the 20s default and was reported as a product
+    // regression. Measured in that run at 31,113ms. Same class as the suites repaired at 084dcfea
+    // and 23a30362; where the cause was removable it was removed instead (see
+    // mediaSurfaceImportGraph). Here the sweep is already single-pass, so the honest answer is a
+    // budget that matches the work. An assertion failure still fails on the assertion.
+  }, 60_000);
 
   it('the study hand-off goes through the workspace request, not a parked seek', () => {
     const source = code(readFileSync(STUDY_MODE, 'utf8'));

@@ -33,7 +33,7 @@
  * The `walker can actually see` block is the control. Without it a broken resolver would
  * report "reaches nothing" for every input and pass forever.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
 
@@ -154,6 +154,22 @@ function libraryHits(entry: string): string[] {
   return asRepoPaths(reachableFrom(entry))
     .filter((p) => LIBRARY_SCREENS.some((h) => p.includes(h)));
 }
+
+/*
+ * Warm both graphs ONCE, in a hook, before any case runs.
+ *
+ * Memoising the walk removed eight redundant passes, but it also concentrated the whole
+ * remaining cost into whichever case ran first — and under a full `vitest run` that case then
+ * blew the 20s per-test timeout at 31,065ms, which is the exact failure mode this repair exists
+ * to remove. Cost that belongs to the whole file belongs in a hook, where it is charged once and
+ * named, rather than billed to an arbitrary case that then reads as a product regression.
+ * 120s, generous on purpose: a hook that times out fails the FILE and prints no per-case line,
+ * so it is the one budget that must not be tight.
+ */
+beforeAll(() => {
+  reachableFrom('src/media/MediaPlayerSurface.tsx');
+  reachableFrom('src/media/MediaWorkspace.tsx');
+}, 120_000);
 
 describe('MediaPlayerSurface — the pure capability', () => {
   it('reaches StudyPlayerSlice through the shared shell', () => {
