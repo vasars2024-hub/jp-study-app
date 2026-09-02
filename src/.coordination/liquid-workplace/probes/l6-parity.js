@@ -38,11 +38,16 @@
  *  8. A CHROMELESS HOST HAS NO LIQUID DESTINATION — but a POP-OUT is no longer
  *     one. As of `6c16653f` `.popout-root` carries `data-presentation` and its
  *     own `.popout-btn-liquid`, so the engine scores it as `host: 'popout'` and
- *     runs the full lifecycle row against the pop-out bar's THREE controls. What
- *     is still `chromeless` — the seanime workspace, full-screen overlays — has
- *     genuinely no destination, and that stays a fact about the surface rather
- *     than a false absence. Do not collapse the two: the distinction is what
- *     turned a footnote into a fixed defect.
+ *     runs the full lifecycle row against the pop-out bar's THREE controls. The
+ *     reader is the third such host and, as of 2026-09-02, the media workspace
+ *     overlay is the FOURTH: `f2619b91` gave `.seanime-host` its own
+ *     `data-presentation` and `.seanime-host-liquid`, so `host: 'workspace'`.
+ *     This clause used to cite "the seanime workspace" as the canonical thing
+ *     that is genuinely chromeless — a claim the product had already outgrown,
+ *     restated here as fact. `chromeless` still means *has no destination*, and
+ *     the distinction still matters; what it no longer names is any of these
+ *     four. Do not collapse the two, and do not let this list rot again: check
+ *     the host before quoting it.
  *
  * Run:
  *   node debug/evfile.cjs src/.coordination/liquid-workplace/probes/l6-parity.js
@@ -92,6 +97,12 @@
     fwin: '.fwin-b-liquid',
     popout: '.popout-btn-liquid',
     reader: '.reader-btn-liquid',
+    // The FOURTH host, added 2026-09-02. `f2619b91` gave the media workspace overlay its
+    // own `data-presentation` and a toggle in `.seanime-host-bar` carrying the same
+    // `aria-pressed` contract as the other three. Until this line the resolver called it
+    // `chromeless` — and, worse, said so in a comment as though it were a fact about the
+    // surface. It was a fact about this file.
+    workspace: '.seanime-host-liquid',
   };
   // One factory rather than one function per spec. These were two identical four-line
   // copies and captures would have made a third; the global name stays per-spec so an
@@ -3132,6 +3143,81 @@
      * property that `04e51992` established, and `inspectorHonesty` guards the half-loaded
      * inspector).
      */
+    /**
+     * The media workspace overlay — `host: 'workspace'`, the FOURTH Liquid host, added
+     * 2026-09-02 together with the resolver branch that finds it. It exists as a spec for
+     * one reason: a resolver arm with no spec is a route with no consumer, and this repo
+     * has already shipped one of those.
+     *
+     * `rootSel` is `.seanime-host-body` rather than `.study-lib` deliberately. The
+     * readiness pane is one of three views and unmounts when the segment moves to Library,
+     * so keying identity on it would make the host itself vanish from the harness whenever
+     * the user is watching something — a refusal that describes the probe, not the surface.
+     * The body is always mounted; the rows below refuse for themselves when their own view
+     * is not up, which is the honest split.
+     *
+     * BOTH ROWS ARE CROSS-CHECKS between two independently rendered places, because the
+     * failure this pane can actually have is not a missing button — it is a count that
+     * disagrees with the list it labels. On an 80-file library that is the difference
+     * between "Ready 1" meaning something and being decoration.
+     */
+    mediaWorkspace: {
+      titleRe: /Media workspace|メディア|媒体|Медиа/i,
+      rootSel: '.seanime-host-body',
+      features: [
+        {
+          // The six category filters, scored against the list they claim to describe.
+          // The pressed filter's own trailing number must equal the rendered row count —
+          // a filter that says 79 over a list of 3 is the dishonest state, and it is
+          // reachable here because the count and the list come from different renders.
+          id: 'readinessFilters',
+          f: (w) => {
+            const bar = q(w, '.study-lib-filters');
+            if (!bar) return { ok: null, na: 'readiness view is not the mounted view', ev: 'no .study-lib-filters' };
+            const btns = qa(bar, 'button');
+            const pressed = btns.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const rows = qa(w, '.study-lib-row').length;
+            const claimed = pressed.length === 1
+              ? Number((txt(pressed[0]).match(/(\d+)\s*$/) || [])[1])
+              : NaN;
+            return {
+              ok: btns.length >= 6 && pressed.length === 1 && claimed === rows,
+              ev: `filters=${btns.length} pressed=${pressed.length} claims=${claimed} rows=${rows}`,
+            };
+          },
+        },
+        {
+          // Every listed file offers its own way in, and none of them is a dead control.
+          // `opens >= rows` rather than `===` is measured, not sloppy: a row can carry
+          // more than one entry action (79 rows rendered 123 on 2026-09-02), so equality
+          // would score a richer row as a defect.
+          id: 'readyOpen',
+          f: (w) => {
+            const rows = qa(w, '.study-lib-row');
+            if (!rows.length) return { ok: null, na: 'readiness view is not the mounted view', ev: 'no .study-lib-row' };
+            const opens = qa(w, '.study-lib-open');
+            const covered = rows.filter((r) => q(r, '.study-lib-open')).length;
+            const live = opens.filter((b) => !b.disabled).length;
+            return {
+              ok: covered === rows.length && opens.length >= rows.length && live === opens.length,
+              ev: `rows=${rows.length} covered=${covered} opens=${opens.length} enabled=${live}`,
+            };
+          },
+        },
+      ],
+      mutations: {
+        // Each detaches exactly one node and must drop exactly its own row. Both undo
+        // through the shared `restore()` placeholder, so nothing is left changed.
+        filterCount: (w) => detach(
+          qa(w, '.study-lib-filters button').find((b) => b.getAttribute('aria-pressed') === 'true'),
+          'no pressed filter to detach — readiness view is not up',
+        ),
+        openAction: (w) => detach(
+          q(w, '.study-lib-row .study-lib-open'),
+          'no open action to detach — readiness view is not up',
+        ),
+      },
+    },
     video: {
       titleRe: /Video|ビデオ|视频|Виде/i,
       rootSel: '.mc-video-page',
@@ -5281,10 +5367,19 @@
     // the host separately, so this row does not double-count it.
     const popout = w.classList.contains('popout-root');
     const reader = w.classList.contains('reader');
+    // The workspace overlay is the reader's case exactly: `inset: 0`, so it owns no
+    // minimize/maximize/restore of its own and counting `.fwin-b` here would score a
+    // complete host 0. Its honest chrome is the pair this row exists for — one route OUT
+    // (`.seanime-host-close`) and one presentation toggle whose declared state is real.
+    const workspace = w.classList.contains('seanime-host');
     const chrome = reader
       ? qa(w, '.reader-bar .btn').filter((b) => /Library|ライブラリ|书库|图书|Библиотек/i.test(txt(b)))
-      : qa(w, popout ? '.popout-btn' : '.fwin-b');
-    const btn = q(w, LIQUID_BTN[reader ? 'reader' : popout ? 'popout' : 'fwin']);
+      : workspace
+        ? qa(w, '.seanime-host-bar .seanime-host-close')
+        : qa(w, popout ? '.popout-btn' : '.fwin-b');
+    const btn = q(w, LIQUID_BTN[
+      reader ? 'reader' : workspace ? 'workspace' : popout ? 'popout' : 'fwin'
+    ]);
     const pressed = btn ? btn.getAttribute('aria-pressed') : null;
     // Correction 24. A `.fwin` whose section `canPresentLiquid` refuses renders no toggle
     // at all, and for THAT host the honest contract is the exact inverse: the affordance
@@ -5300,7 +5395,7 @@
         ev: `chromeButtons=${chrome.length}/3 liquidToggle=absent presentation=${pres} liquidClass=${w.classList.contains('fwin-liquid')}`,
       };
     }
-    const need = reader ? 1 : popout ? 3 : 4;
+    const need = reader || workspace ? 1 : popout ? 3 : 4;
     return {
       ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
       ev: `chromeButtons=${chrome.length}/${need} liquidAriaPressed=${pressed}`,
@@ -5498,7 +5593,19 @@
       if (rd && (!pres || rd.getAttribute('data-presentation') === pres)) {
         return { win: rd, matchedBy: 'root-selector', host: 'reader' };
       }
-      if (!pop && !rd) return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
+      // Trap 8, EXTENDED AGAIN 2026-09-02 — and this one is the reason the trap keeps
+      // needing extending. The comment above USED to name "the seanime workspace" as the
+      // canonical example of a host that genuinely has no destination. `f2619b91` gave it
+      // one: `.seanime-host` carries `data-presentation`, `.workspace-liquid` is the opt-in
+      // class, and `.seanime-host-liquid` is a real toggle with `aria-pressed`. So the
+      // example the comment used to prove the distinction had itself crossed the line, and
+      // the file kept asserting the old fact. Chromeless still has to mean *has no
+      // destination* — which is now true of neither the pop-out, the reader, nor this.
+      const ws = bare.closest('.seanime-host[data-presentation]');
+      if (ws && (!pres || ws.getAttribute('data-presentation') === pres)) {
+        return { win: ws, matchedBy: 'root-selector', host: 'workspace' };
+      }
+      if (!pop && !rd && !ws) return { win: bare, matchedBy: 'root-selector', host: 'chromeless' };
     }
     return { win: null, matchedBy: null, host: null };
   };
@@ -5586,6 +5693,18 @@
       // is inapplicable. Scoring it false would invent a regression.
       if (host === 'chromeless' && feat.id === 'windowLifecycle') {
         return { id: feat.id, reachable: null, na: 'chromeless host — no window chrome', evidence: out.ev };
+      }
+      // The same reasoning, generalised 2026-09-02 so the ONE host that needed it is not
+      // the only one that gets it. A row may know for itself that it is inapplicable —
+      // `mediaWorkspace` has three views and only one mounts the readiness pane — and
+      // until this branch existed `ok: null` fell through `!!out.ok` and was scored FALSE.
+      // That is the trap-8 mistake with a different subject: a row reporting "my subject
+      // is not on screen" would have been published as "the feature is unreachable", and
+      // in BOTH presentations, so the parity comparison would still have looked equal
+      // while both halves were wrong. `na` must be declared, never inferred from a falsy
+      // `ok`, or a genuinely broken row hides itself by returning nothing.
+      if (out.ok === null && out.na) {
+        return { id: feat.id, reachable: null, na: out.na, evidence: out.ev };
       }
       return { id: feat.id, reachable: !!out.ok, evidence: out.ev };
     });

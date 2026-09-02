@@ -414,6 +414,63 @@ no PATCH), so no agent can scan one. Logged in `needs-user.md` 2026-09-01 22:55.
 The Liquid destination itself is **not** the blocker: `f2619b91` built the overlay's own
 presentation host and the row text has said so since. These five are one scan away from `both`.
 
+## 2026-09-02 (primary) — 45 -> 47 `both`, and a fourth Liquid host the harness could not see
+
+**The blocker was cleared by re-checking it, not by anyone doing anything.** All five remaining
+`pending` rows were `mediaWorkspace`, parked since 2026-09-01 on an empty media library.
+Re-measured live this turn: `seanimeStudyLibrary()` returns `ok:true` with **80 files** against
+the `{ok:true, files:[]}` recorded a day earlier, and the sidecar's own log names the cause —
+status `ready`, three watched directories, `Library size updated: 48 GiB`. The needs-user entry
+was DELETED rather than amended. Standing instruction to re-check parked blockers each turn:
+this is what it is for.
+
+### The instrument was wrong first, and that is the durable half
+
+`l6-parity.js` resolved this surface as `host: 'chromeless'` — and said so in a docstring, as
+though it were a fact about the product. It had not been true since `f2619b91`: `.seanime-host`
+carries `data-presentation`, `.workspace-liquid` is the opt-in class, and `.seanime-host-liquid`
+is a real toggle with `aria-pressed`. So `toggleLiquid` REFUSED on a host that has a working
+toggle, exactly the defect trap 8 was written for twice already (pop-out `6c16653f`, reader
+`2026-08-26`) — using this very surface as its counter-example each time. Fixed as the FOURTH
+host, `workspace`, with the same shape as the other three, plus its chrome analogue
+(`.seanime-host-close`, `need = 1`, the reader's case: `inset: 0` owns no minimize/maximize).
+
+Second, smaller instrument fix found by the first: `check()` coerced a feature's own `ok: null`
+through `!!out.ok` and published it as **false**. A row that knows it is inapplicable — this
+surface has three views and only one mounts the readiness pane — would have been reported as
+"unreachable", **in both presentations**, so the parity comparison would still have read equal
+while both halves were wrong. `na` is now honoured when DECLARED, never inferred from a falsy
+`ok`, or a genuinely broken row could hide by returning nothing.
+
+### The numbers
+
+`check('mediaWorkspace')` — **2 reachable / 2 total / 0 na in BOTH presentations**, identical
+evidence strings: `filters=6 pressed=1 claims=79 rows=79` and `rows=79 covered=79 opens=123
+enabled=123`. Host resolves `workspace`, matched by root-selector. Round trip standard ->
+liquid -> standard **byte-identical** on the full snapshot: chars 31515, nodes 4639, controls
+700, same rect and fields. Driven by hand as well, and agreeing: view segment Readiness ->
+Library, `.study-player-slice` **0x0 -> 1264x821**, `<video>` 0 -> 1; `Ready` narrows
+`.study-lib-row` **79 -> 1** onto the same Big O row the standard half found in 2026-08-17, and
+79 + 1 = 80 reconciles with the library call.
+
+NEGATIVE CONTROLS, both firing on **exactly their own row and nothing else**: detach the pressed
+filter -> `readinessFilters` false (`filters=5 pressed=0 claims=NaN`), `readyOpen` still true;
+detach one open action -> `readyOpen` false (`covered=78 opens=122`), `readinessFilters` still
+true. Both restore to baseline, 0 detached nodes left.
+
+`opens >= rows` rather than `===` is measured, not sloppy: 79 rows render 123 open actions.
+
+### What is NOT claimed
+
+Three rows stay `pending` and their reason CHANGED — recorded in the rows themselves so the old
+empty-library sentence is not left standing as current state. The transcript rail needs a loaded
+subtitle track (panel honestly empty, "No subtitle track is loaded.", with the video mounted);
+the two detach rows need the Study Block menu driven. Neither was driven this turn.
+
+App restored and measured: presentation back to `standard`, overlay closed, 0 windows /
+0 dialogs, `desktop-layout.json` sha256 **9DFB6E2F2361...**, byte-identical to the banked
+baseline before and after.
+
 ## 2026-09-02 (primary2) — the ledger stops being hand-transcribed
 
 `33b3a10b`. 19 of the 24 apps `l6-parity.js` declares SPECS for have a driven, controlled
