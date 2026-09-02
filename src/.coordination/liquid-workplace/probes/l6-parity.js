@@ -926,6 +926,24 @@
      * All drive steps change local view/filter/scroll state only; capture start,
      * clear, refresh and cross-app navigation are inventoried but never pressed.
      */
+    // THIS SPEC HAS NO SUBJECT ON `wt/files-app`, and that is a product decision rather than a
+    // gap. FILES_APP_PLAN gate 7b deletes the Notebook section and the Files app absorbs it:
+    // `AppSection.tsx` has no `case 'notebook'`, and `LEGACY_WIN_SECTION_ALIASES`
+    // (shared/desktop.ts:76) maps `notebook -> files` deliberately, because a persisted layout
+    // carries `section: 'notebook'` windows on every existing install and userData has no
+    // restore point. `NotebookContent.tsx` survives only as a Blanc import.
+    //
+    // Measured live on this branch 2026-09-02, one instant, one DOM, with both controls:
+    //   os:open 'notebook'         -> window "Files",            body `DIV.lq-scaffold.fa-shell`, 52 buttons, unavailable=false
+    //   os:open 'dictionary'  CTRL -> window "Dictionary",       body `DIV.dict-view`             (so os:open is not always Files)
+    //   os:open 'notAKnownSection' CTRL -> window "notAKnownSection", body `DIV.app-section-unavailable`, unavailable=TRUE
+    // and `.gx-notebook` = 0 across the WHOLE document, not merely inside one window.
+    //
+    // So do not spend a run authoring rows here: `cat6 --app notebook` cannot find its subject
+    // and is right not to. The ledger records it under
+    // `notWritten.derived.noRowsByCause.noSubjectOnThisBranch`, separately from the four specs
+    // that genuinely await authoring. On a tree where the Notebook section still exists this
+    // spec is still correct, which is why it is annotated rather than deleted.
     notebook: {
       titleRe: /Notebook|ノート|笔记|Блокнот/i,
       rootSel: '.gx-notebook',

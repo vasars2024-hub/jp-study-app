@@ -1250,3 +1250,46 @@ control with another's transcription.
 **Ledger after this turn: 168 rows / 21 apps, 0 duplicate `app|feature` keys, 126 named
 controls / 4 none-declared / 37 silent.** `notWritten` re-derived: **5 of 25 specs still have
 no row at all** — notebook, immersion, novels, manga, vn.
+
+## 2026-09-02 (primary2) — `notebook` is not an unwritten spec, it is a spec whose subject this branch deleted
+
+`notWritten` counted **5** specs with no rows — notebook, immersion, novels, manga, vn — as
+one bucket. That bucket was hiding two different things. Four of them genuinely await
+authoring. `notebook` cannot be authored at all here, because `wt/files-app` **deletes the
+section the spec measures**, on purpose, at `FILES_APP_PLAN` gate 7b.
+
+Read from source first: `AppSection.tsx` has no `case 'notebook'`;
+`LEGACY_WIN_SECTION_ALIASES` (`shared/desktop.ts:76`) maps `notebook -> files`; and
+`NotebookContent.tsx` is imported by exactly one file on this branch,
+`components/blanc/BlancStudyPanels.tsx` — the Blanc shell, not the Study OS desktop.
+
+### Driven live, one instant, one DOM — with both controls
+
+Desk found at **0 windows / 0 dialogs** and returned to **0 / 0**.
+
+| dispatched `os:open` | window title | body root | `app-section-unavailable` |
+| --- | --- | --- | --- |
+| `notebook` | **Files** | `DIV.lq-scaffold.fa-shell`, 52 buttons, 1,704 chars, "Everything 34" | false |
+| `dictionary` — **control: a section that exists and is not aliased** | Dictionary | `DIV.dict-view` | false |
+| `notAKnownSection` — **control: must fail** | notAKnownSection | `DIV.app-section-unavailable` | **true** |
+
+`.gx-notebook` — the spec's own `rootSel` — is **0 across the whole document**, searched over
+`document` rather than one window so a miss cannot be an artifact of looking in the wrong
+place.
+
+The two controls are what make this a measurement rather than an observation. Without the
+`dictionary` row, "notebook opened Files" is equally consistent with *`os:open` always opens
+Files*; without the unknown-id row it is equally consistent with *every unrecognised id falls
+through to Files*. Dictionary opening its own distinct surface kills the first, and an unknown
+id honestly reaching `unavailable` kills the second. The alias is doing real work.
+
+### What changed, and what deliberately did not
+
+`notWritten.derived.noRowsByCause` now splits the five: `noSubjectOnThisBranch: [notebook]`
+with the measurement inline, and `awaitingAuthoring: [immersion, novels, manga, vn]`. **The
+denominator did not move** — it is still 5 of 25, because reclassifying work is not doing it.
+
+The spec is **annotated, not deleted**. On a tree where the Notebook section still exists it is
+still a correct spec, and this branch is the one that is unusual. The annotation carries the
+three-row control table so the next worker does not spend a run discovering that
+`cat6 --app notebook` refuses — it refuses correctly, and now says why.

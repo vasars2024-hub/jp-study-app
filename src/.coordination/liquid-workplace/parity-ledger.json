@@ -2255,6 +2255,18 @@
         "manga",
         "vn"
       ],
+      "noRowsByCause": {
+        "noSubjectOnThisBranch": [
+          "notebook"
+        ],
+        "noSubjectEvidence": "notebook: FILES_APP_PLAN gate 7b deletes the Notebook section. `AppSection.tsx` has no `case 'notebook'`, `LEGACY_WIN_SECTION_ALIASES` (shared/desktop.ts:76) maps notebook -> files, and `NotebookContent.tsx` survives only as a Blanc import. Driven live on this branch: os:open `notebook` opens a window titled \"Files\" whose body root is `DIV.lq-scaffold.fa-shell`, 52 buttons, 0 `.gx-notebook` in the whole document.",
+        "awaitingAuthoring": [
+          "immersion",
+          "novels",
+          "manga",
+          "vn"
+        ]
+      },
       "ledgerAppsWithNoSpec": [
         "mediaCenter"
       ],
