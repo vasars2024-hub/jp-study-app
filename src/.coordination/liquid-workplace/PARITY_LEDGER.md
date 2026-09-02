@@ -542,3 +542,60 @@ file that will not open.
 App and profile restored: overlay closed, presentation `standard` with the storage key removed,
 1 window, `study-block-windows.json` deleted (it was absent before), `desktop-layout.json`
 sha256 **9DFB6E2F2361...** unchanged across the whole turn including the restart.
+
+## 2026-09-02 (primary) — 49 → **50 `both` of 50, 0 pending**
+
+Every written row in this ledger is now closed. The bullet L12 b2 does **not** close with it:
+its words are "every feature-ledger row", and `notWritten` still names 19 root components that
+have no rows at all. What changed is the *kind* of work left — b2 is now purely a coverage
+problem, with nothing written-but-unproven behind it.
+
+### The last pending row closed by fixing something else first
+
+`Transcript rail: cue list, active-cue follow, per-cue translate, card preview` had been
+pending for three turns under three different reasons, the last being "the one file the
+readiness pane classifies `Ready` does not play". **That is not reproducible on this build.**
+THE Big O - 01 (mediaId 567), opened through `seanime:media-workspace-open` with an explicit
+`localFilePath`, renders 1 `<video>` and plays.
+
+What *does* reproduce is a different file's failure, and its report was a fabrication —
+`0a3418b5`. 47 of this profile's 80 library files carry `mediaId: 0`; the sidecar refuses them
+with `abort-open local file has not been matched to a media: <path>`, and `StudyPlayerSlice`
+threw that payload away, leaving the racing POST's `status >= 500` sentence on screen: *"It is
+usually a codec or container it cannot read — try another episode to confirm the file is the
+problem."* Advice that fails identically for all 47. That sentence is very likely why the
+previous turn stopped looking for a playable file.
+
+### The four clauses, standard then Liquid, same seek
+
+Paused at exactly **396,000 ms** both times, driven with `debug/_pr3-transcript.js`:
+
+| | standard | liquid |
+| --- | --- | --- |
+| cue rows / with text / seek buttons | 267 / 267 / 267 | 267 / 267 / 267 |
+| active cue (`[data-active="true"]`) | 71, `aria-current="true"`, 20 chars | 71, `aria-current="true"`, 20 chars |
+| card preview (`[data-study-mining]`) | `Cue 72 · track 0 · 395,617–398,083 ms` | identical |
+| panel box | 384x517 | 384x517 |
+| translations present | 1 | 1 (survived the switch) |
+| Translate buttons | 267 | 266 |
+
+`translateBtns` 267 → 266 is arithmetic, not a gap: the one cue translated in standard no longer
+offers the button, and 266 + 1 translation = 267.
+
+**Active-cue follow has its own discriminating control**, and it is the checkbox rather than the
+seek: from the identical 396,000 ms position, Follow **off** leaves `activeInView` **false** at
+`listScrollTop` 4488; Follow **on** makes it **true** at 3693. **Per-cue translate** was driven,
+not counted: clicking Translate on cue 71 took `.study-transcript-translation` 0 → 1 and the row
+read back its Japanese, its furigana, and *"Without past history, culture can still be
+manifested."* The card-preview string is the 2026-08-17 observation **re-derived**, not quoted.
+
+Round trip: `Return to standard window` reproduces every field above and **removes**
+`lq.workspace.presentation` (null, not the string `"standard"`).
+
+### Recorded, not repaired — it is not this row's words
+
+The presentation switch reflows the transcript list, the panel's own *"scrolling away suspends
+following"* rule sees that scroll, and **Follow silently turns itself off** (`listScrollTop`
+3693 → 4552, `followChecked` true → false). A layout change is not a user scrolling away.
+Re-enabling it in Liquid restores every number, so today it costs one click rather than a
+feature.
