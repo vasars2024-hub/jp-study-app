@@ -839,3 +839,55 @@ the tint converted per surface, which is a slice of its own, not a tail-of-turn 
 machine does not have; `f5b664ff` and L4's 2026-08-22 detach/reopen run are prior art to
 re-derive against, not inherit), restart persistence, long-session memory. RULE C: 0 of 16
 cells banked for this bullet — no rubric surface was scored, and none is claimed.
+
+## 2026-09-01, late night — L11 bullet 4, clause 1: the hardcoded half of the blur fallback
+
+`b3b1cc07`. The previous entry ended by naming its own biggest finding: every one of the six
+"stop painting translucent material" triggers grades TOKENS, so a rule that writes literal
+pixels answers none of them. That number is now re-derived mechanically rather than by grep
+(`debug/_bf-count.cjs`, RULES not declarations, `-webkit-` twins not double-counted): **35
+token-driven, 61 hardcoded, 17 `none` resets — 64%**, not the 66/88/57% the last entry
+estimated from a declaration grep. The correction goes against nobody; it is the same defect,
+counted properly.
+
+`theme/flatten.ts` ORs the six states into one derived `data-lq-flat` attribute. A
+MutationObserver on the six root attributes, not six change events: they are written by
+`theme.ts`, `perf.ts`, `displayPrefs.ts`, `gpuFallback.ts` and the Aero safe-mode settings,
+several during their own boot, and no two share an event. `theme/flatten.css` carries the 60
+product conversions (the 61st is a dev-only harness sheet, named and exempted in the test).
+
+**Four treatments, because the wrong one manufactures the defect clause 1 exists to prevent.**
+MATERIAL composites the authored tint over an opaque base; SCRIM drops only the blur where
+seeing through is the point; OPAQUE TINT takes the surface's own colours to alpha 1 where the
+backdrop is app-drawn imagery (a poster, a video frame, the garden canvas) and no theme colour
+exists to composite against; BLUR-ONLY where the stack already ends opaque or the tint is the
+token ladder.
+
+**Why not the catch-all, measured rather than argued.** `perf.css:46` already IS
+`{ backdrop-filter: none !important }` over 18 enumerated selectors, touching no tint. With
+`data-perf='battery'` set and flatten.css disabled, `.widget-frame` paints `none` over
+`color(srgb …/0.72)` — blur gone, transparency kept: the sharply see-through panel
+`mediaCenter.css:6812` names, shipped, in the tree. It was the mutation control that found it.
+
+LIVE, running renderer, 16 probe surfaces built with their real ancestor chains (`--mini-surface`
+on `.mini-shell`, `--lock-surface` on `.lockscreen`, `--lens-bg` on `.lens-root` are inherited —
+a flat probe measures `rgba(0,0,0,0)` and lies). `data-perf` performance -> battery flipped
+`data-lq-flat` false -> true; all 14 glass surfaces went blur(4..22px) over a translucent tint
+-> `none` over an OPAQUE base (`--panel` rgb(26,24,35) / `--bg` rgb(13,12,18)) with the authored
+tint intact as a gradient layer. The 2 SCRIMs kept their authored alpha byte-identical and lost
+only the blur. Both negative controls (`.fwin`, which has no hardcoded blur; a class with no
+rules) unchanged. MUTATION CONTROL: disabling exactly the one sheet carrying `[data-lq-flat]`
+rules, attribute still set, returned 12 of 14 to byte-identical pre-flatten values — the 2 that
+did not are the two `perf.css` half-handles, which is how the above was found. Re-enable +
+restore `data-perf`: **16/16 byte-identical**, probe host removed, nothing persisted.
+
+`flattenCoverage.test.ts` (17 cases) re-derives the census FROM the sheets every run, so a new
+hardcoded rule fails the suite. Positive control (>40 rules, `.dict-popup` present) and mutation
+control (deleting one conversion is detected, and only that one).
+
+TRAP for the next worker: `stripComments(css)` inside a `while (re.exec(...))` condition
+re-allocates the whole sheet per rule — 6 GB across styles.css, and vitest dies with a V8 heap
+OOM that reads like a runner fault, not a test bug.
+
+**Bullet 4 still OPEN.** Clause 1 (blur fallback) and clause 2 (GPU-loss recovery) are closed
+with controls. Clauses 3-5 untouched: multi-monitor, restart persistence, long-session memory.

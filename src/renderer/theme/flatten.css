@@ -1,0 +1,671 @@
+/* =============================================================================
+   Liquid Workplace — L11 "Blur fallback", the hardcoded half.
+   -----------------------------------------------------------------------------
+   `theme/flatten.ts` ORs the app's six "stop painting translucent material"
+   states — high contrast, the battery tier, transparency `off`, the OS
+   `prefers-reduced-transparency` preference, GPU software/loss, Aero safe mode —
+   into a single `data-lq-flat` attribute on the root. Everything below hangs off
+   that one attribute.
+
+   WHY THIS FILE EXISTS AT ALL. All six of those states are implemented by
+   re-declaring `--lq-*-blur` / `--glass-blur` / `--blur-*` on `:root`, which
+   grades TOKENS and therefore only reaches a surface that reads one. Measured
+   over every tracked `.css` file by `debug/_bf-count.cjs`, counting
+   `backdrop-filter` RULES and not their `-webkit-` twins: **35 token-driven, 61
+   hardcoded pixels**, plus 17 `none` resets. 64% of the painted glass in this
+   app answered none of the six. (The first draft of this header said 36
+   token-driven; the mechanical re-count says 35.)
+
+   60 of the 61 are product; the 61st is `__devharness__/readingGardenPhaseGallery.css`,
+   a dev-only harness that ships in no build and is deliberately left alone.
+   `renderer/__tests__/flattenCoverage.test.ts` re-derives that census from source
+   on every run and fails if a new hardcoded rule appears without a conversion
+   here, so this file cannot silently fall behind the sheets it mirrors.
+
+   FOUR TREATMENTS, and picking the wrong one is the defect this file is careful
+   about:
+
+     MATERIAL   A panel, flyout, window chrome, toast, card that floats over a
+                THEME surface. Its translucency is decoration over a backdrop we
+                can name. Dropping only its blur turns it into a SHARPLY
+                see-through panel — strictly worse than either end state, and
+                `views/mediaCenter.css:6812` names exactly this. So the tint is
+                composited over an opaque base as well.
+
+     SCRIM      A full-viewport dimmer behind a modal (`.palette-backdrop`,
+                `.cbh-backdrop`, `.widget-gallery-backdrop`). Seeing through it is
+                the whole point and there is no "worst of both" to manufacture,
+                so the blur goes and the tint is left exactly as authored.
+
+     OPAQUE     A badge, chip, dock or toast floating over APP-DRAWN IMAGERY — a
+     TINT       poster, a video frame, the Reading Garden canvas. There is no
+                theme colour to composite against, so the surface's OWN colours
+                are taken to alpha 1 instead. Same hue, same order, nothing
+                invented; it simply cannot manufacture the worst-of-both state
+                because the result is opaque.
+
+     BLUR-ONLY  The authored stack already ends in an opaque layer, or its tint
+                is the `--glass-tint` token ladder that all six triggers already
+                flatten. Only the blur is left to remove.
+
+   THE MATERIAL TRANSFORM IS MECHANICAL, on purpose — no per-surface colour
+   arithmetic, which is where a conversion pass like this normally goes wrong.
+   Given an authored `background: <image…>, <colour>`, the flattened form is the
+   same layers with the trailing colour re-expressed as its own gradient layer
+   and `--lq-flat-base` appended underneath:
+
+       background:
+         <image…>,
+         linear-gradient(<colour>, <colour>),
+         var(--lq-flat-base);
+
+   That paints precisely what the blurred surface would have painted if its
+   backdrop were the shell base — same colours, same order, same alpha
+   compositing — minus the blur. No value is invented and no surface loses its
+   identity, which is the plan's "replace blur/refraction with stable tint; no
+   feature or layout loss".
+
+   `-webkit-backdrop-filter` is reset alongside every `backdrop-filter`, because
+   several of these rules declare both and resetting only the unprefixed one
+   leaves the prefixed declaration painting on Chromium.
+   ============================================================================= */
+
+:root {
+  /* What sits behind a floating material when we can no longer see through it.
+     `--bg` is the desktop/app background, which is what most of these surfaces
+     actually float over. A rule whose surface lives INSIDE a window overrides
+     this locally with `--panel`; see `.wired-found-panel` below. */
+  --lq-flat-base: var(--bg);
+}
+
+/* Aero and Wired both repaint `--bg`, so the default follows them without an
+   override. Blanc is a light shell whose panels sit on white cards rather than
+   on the desktop. */
+:root[data-shell='blanc'] {
+  --lq-flat-base: var(--panel);
+}
+
+/* =============================================================================
+   theme/aero-shell.css — 7 rules
+   ============================================================================= */
+
+/* SCRIMS. Modal dimmers over the desktop: blur off, tint untouched. */
+:root[data-lq-flat][data-materials='aero'] .palette-backdrop,
+:root[data-lq-flat][data-materials='aero'] .cbh-backdrop,
+:root[data-lq-flat][data-materials='aero'] .widget-gallery-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — command palette, clipboard history, shell flyouts. */
+:root[data-lq-flat][data-materials='aero'] .palette,
+:root[data-lq-flat][data-materials='aero'] .cbh-panel,
+:root[data-lq-flat][data-materials='aero'] .os-flyout {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.16) 72%, rgba(185, 217, 226, 0.18)),
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 88%, #ffffff),
+      color-mix(in srgb, var(--panel) 88%, #ffffff)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — desktop widget frame. */
+:root[data-lq-flat][data-materials='aero'] .widget-frame {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(228, 246, 255, 0.58)),
+    linear-gradient(rgba(210, 239, 255, 0.78), rgba(210, 239, 255, 0.78)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — transient toast. */
+:root[data-lq-flat][data-materials='aero'] .os-toast {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(226, 241, 246, 0.6)),
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 82%, #ffffff),
+      color-mix(in srgb, var(--panel) 82%, #ffffff)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the Aero glass window frame itself. The one surface here where a
+   user can still see their own desktop through the chrome of every window. */
+:root[data-lq-flat][data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(214, 247, 255, 0.76) 0%,
+      rgba(94, 189, 245, 0.56) 18%,
+      rgba(16, 123, 219, 0.42) 54%,
+      rgba(9, 70, 159, 0.56) 100%
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--shell-glass-strong) 76%, rgba(19, 113, 210, 0.48)),
+      color-mix(in srgb, var(--shell-glass-strong) 76%, rgba(19, 113, 210, 0.48))
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   theme/wired-shell.css — 2 rules
+   ============================================================================= */
+
+/* MATERIAL — the Wired router menu. */
+:root[data-lq-flat][data-materials='wired'] .os-start-aero-menu {
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.12), transparent 30%),
+    linear-gradient(rgba(1, 14, 22, 0.96), rgba(1, 14, 22, 0.96)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the Wired "found" panel. It floats inside a window rather than over
+   the desktop, so its base is the panel colour, not the desktop. */
+:root[data-lq-flat] .wired-found-panel {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(180deg, rgba(109, 241, 255, 0.08), transparent 28%),
+    linear-gradient(rgba(1, 12, 20, 0.88), rgba(1, 12, 20, 0.88)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   theme/blanc.css — 1 rule
+   ============================================================================= */
+
+/* SCRIM — the Blanc master-search dimmer. */
+:root[data-lq-flat] .blanc-master-search-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   SPECIFICITY DISCIPLINE for everything below.
+
+   Six of the sheets converted here — `views/mediaCenter.css`,
+   `media/mediaWorkspace.css`, `components/scraper/scraper.css`,
+   `components/lens/readingLens.css`, `components/reading-garden/readingGarden.css`,
+   `components/media/library/mediaLibrary.css` — are NOT imported by `main.tsx`.
+   Their components import them, so they are appended to the document AFTER this
+   file whenever that component first mounts, and a rule here that merely TIED on
+   specificity would lose the moment the user opened that surface.
+
+   So every rule below is the authored selector with `:root[data-lq-flat]`
+   prefixed onto it, which is strictly more specific by construction. Ordering
+   never decides anything. The one place two flatten rules could still collide is
+   `.widget-frame`, where the Aero override above and the generic rule below would
+   tie at (0,4,0); that is resolved by making them disjoint with `:not()`, not by
+   moving either one.
+   ============================================================================= */
+
+/* =============================================================================
+   styles.css — 25 rules
+   ============================================================================= */
+
+/* BLUR-ONLY — `data-chrome='frosted'` adds a blur ON TOP of the Start panel and
+   taskbar, whose tint is the `--glass-tint` ladder every trigger already
+   flattens. Only the add-on is left. */
+:root[data-lq-flat][data-chrome='frosted'] .os-start,
+:root[data-lq-flat][data-chrome='frosted'] .os-taskbar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* BLUR-ONLY — the in-product `reduced` middle state, same token-graded tint.
+   `!important` here is not decoration: `styles.css:1319` declares ITS blur
+   `!important`, so a normal declaration loses however specific it is. */
+:root[data-lq-flat][data-display-transparency='reduced'] .os-start,
+:root[data-lq-flat][data-display-transparency='reduced'] .os-taskbar,
+:root[data-lq-flat][data-display-transparency='reduced'] .fwin {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* MATERIAL — reader link status, inside a reader window. */
+:root[data-lq-flat] .reader-link-status {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 94%, transparent),
+      color-mix(in srgb, var(--panel) 94%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the dictionary popup and its sticky head. */
+:root[data-lq-flat] .dict-popup {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 92%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .dict-head {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel-2) 94%, transparent),
+      color-mix(in srgb, var(--panel-2) 94%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the visualizer widget window and its bar. Deliberately smoked
+   glass in the source; flattened it keeps the same smoke over the desktop. */
+:root[data-lq-flat] .fwin-viz {
+  background:
+    linear-gradient(rgba(16, 15, 21, 0.35), rgba(16, 15, 21, 0.35)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .fwin-viz .fwin-bar {
+  background:
+    linear-gradient(rgba(16, 15, 21, 0.5), rgba(16, 15, 21, 0.5)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — frameless window chrome and its floating control cluster. */
+:root[data-lq-flat] .fwin-frameless {
+  background:
+    linear-gradient(rgba(8, 10, 18, 0.92), rgba(8, 10, 18, 0.92)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .fwin-frameless-controls {
+  background:
+    linear-gradient(rgba(16, 15, 21, 0.72), rgba(16, 15, 21, 0.72)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the Mooncap pop-out's window controls. */
+:root[data-lq-flat] .popout-root-mooncap .popout-controls {
+  background:
+    linear-gradient(rgba(4, 7, 17, 0.48), rgba(4, 7, 17, 0.48)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — Settings' sticky nav footer, inside the settings window. */
+:root[data-lq-flat] .os-set-nav-footer {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 92%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the opt-in blurred Home widget frame. `:not()` rather than a
+   specificity bump: the Aero rule at the top of this file is the one that must
+   win under Aero, and the two would otherwise tie at (0,4,0). */
+:root[data-lq-flat]:not([data-materials='aero']) .widget-frame.blur {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 72%, transparent),
+      color-mix(in srgb, var(--panel) 72%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the reader's collection rail, inside a reader window. */
+:root[data-lq-flat] .reader-collection {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 97%, #000 3%),
+      color-mix(in srgb, var(--panel) 97%, #000 3%)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — command palette, toast and clipboard history over the desktop. */
+:root[data-lq-flat] .palette {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 88%, transparent),
+      color-mix(in srgb, var(--panel) 88%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .os-toast {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 96%, transparent),
+      color-mix(in srgb, var(--panel) 96%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .cbh-panel {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 92%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — mini/focus mode. `--mini-surface` is re-declared seven times for
+   the theme variants, so the gradient reads the token rather than any one of
+   its values and every variant flattens correctly without being enumerated. */
+:root[data-lq-flat] .mini-frame {
+  background:
+    linear-gradient(var(--mini-surface), var(--mini-surface)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .mini-panel {
+  background:
+    linear-gradient(rgba(23, 22, 29, 0.88), rgba(23, 22, 29, 0.88)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .mini-toast {
+  background:
+    linear-gradient(rgba(23, 22, 29, 0.92), rgba(23, 22, 29, 0.92)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* SCRIM — the lock screen's own dimmer. Its widgets carry their own surfaces
+   (`--lock-surface`, below), so this layer exists only to knock the wallpaper
+   back; compositing it opaque would delete the wallpaper from the lock screen
+   entirely, which is a feature loss rather than a fallback. */
+:root[data-lq-flat] .lockscreen {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* SCRIM — the Win11 lock style's acrylic wallpaper layers, same reasoning.
+   `.lockscreen-win11-bg-vignette` still supplies the legibility dimming and is
+   not a backdrop-filter, so it survives untouched. */
+:root[data-lq-flat] .lockscreen-win11-bg,
+:root[data-lq-flat] .lockscreen-win11-bg-clouds {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* MATERIAL — lock-screen widget and the Win11 passcode keys. */
+:root[data-lq-flat] .lockscreen-widget {
+  background:
+    linear-gradient(var(--lock-surface), var(--lock-surface)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .lockscreen-win11-key {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.06)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL — the consent sheet. */
+:root[data-lq-flat] .consent {
+  background:
+    linear-gradient(rgba(6, 6, 8, 0.92), rgba(6, 6, 8, 0.92)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* SCRIM — the reading-source picker's dimmer. */
+:root[data-lq-flat] .reading-source-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   views/mediaCenter.css — 4 rules. Every one of these floats over ARTWORK or a
+   video frame, so they take the OPAQUE TINT treatment: their own colours at
+   alpha 1, no theme base to composite against.
+   ============================================================================= */
+
+:root[data-lq-flat] .mc-tile-play {
+  background: rgb(12, 14, 21);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .mc-tile-level,
+:root[data-lq-flat] .mc-tile-episode {
+  background: rgb(7, 9, 14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .mc-discover-poster em,
+:root[data-lq-flat] .mc-discover-poster i {
+  background: rgb(7, 9, 14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* The three study toasts share one blur rule but declare their tints
+   separately, so the alpha-1 form is written per class. */
+:root[data-lq-flat] .study-global-status,
+:root[data-lq-flat] .study-global-error,
+:root[data-lq-flat] .study-global-undo {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .study-global-status {
+  background: rgb(35, 23, 27);
+}
+:root[data-lq-flat] .study-global-error {
+  background: rgb(78, 22, 32);
+}
+:root[data-lq-flat] .study-global-undo {
+  background: rgb(35, 23, 27);
+}
+
+/* =============================================================================
+   media/mediaWorkspace.css — 4 rules. The study docks sit over the video
+   surface, so OPAQUE TINT again; at 0.94 authored alpha the change is small and
+   it is the only treatment that cannot leave a see-through dock over a moving
+   picture.
+   ============================================================================= */
+
+:root[data-lq-flat] #media-workspace .study-control-dock,
+:root[data-lq-flat] #media-workspace .study-grammar-panel,
+:root[data-lq-flat] #media-workspace .study-transcript-panel,
+:root[data-lq-flat] #media-workspace .study-mining-panel {
+  background: rgb(13 12 18);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   theme/aero-apps.css — 3 rules
+   ============================================================================= */
+
+/* SCRIMS — Aero modal dimmers. */
+:root[data-lq-flat][data-materials='aero'] .lib-import-backdrop,
+:root[data-lq-flat][data-materials='aero'] .cal-modal-backdrop,
+:root[data-lq-flat][data-materials='aero'] .nov-modal-backdrop,
+:root[data-lq-flat][data-materials='aero'] .csv-editor-modal-backdrop,
+:root[data-lq-flat][data-materials='aero'] .deck-action-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* BLUR-ONLY — the Aero dictionary/translate popup already ends its stack on an
+   opaque `#ffffff`, so nothing can show through it. The background is restated
+   only so this rule out-specifies the generic `.dict-popup` MATERIAL rule above,
+   which would otherwise repaint Aero's white popup in the dark panel colour. */
+:root[data-lq-flat][data-materials='aero'] .dict-popup,
+:root[data-lq-flat][data-materials='aero'] .tr-popup {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.72) 0,
+      rgba(217, 241, 252, 0.82) 30px,
+      rgba(247, 253, 255, 0.96) 31px
+    ),
+    #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   components/scraper/scraper.css — 3 rules
+   ============================================================================= */
+
+/* MATERIAL — the Discover hero's action buttons. */
+:root[data-lq-flat] .scr-discover-featured-actions button {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--bg) 82%, transparent),
+      color-mix(in srgb, var(--bg) 82%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* MATERIAL, and the clearest case in the file for why the blur is never removed
+   on its own: `.scr-results-toolbar` is `position: sticky` with NO authored
+   background — the blur IS its separation from the rows scrolling underneath.
+   Dropping only the blur leaves result rows sliding visibly through the toolbar.
+   So the flattened form supplies the tint the blur was standing in for. */
+:root[data-lq-flat] .scr-results-toolbar {
+  --lq-flat-base: var(--panel);
+  background: var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* SCRIM — the pair-editor dimmer. */
+:root[data-lq-flat] .scr-pair-editor-backdrop {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   components/reading-garden/readingGarden.css — 3 rules. These float over the
+   garden's own drawn scene, not over a theme surface: OPAQUE TINT, taking each
+   authored stop to alpha 1 and keeping the gradient's direction and hues.
+   ============================================================================= */
+
+:root[data-lq-flat] .reading-garden-sky-console-toggle {
+  background: rgb(6, 14, 22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .reading-garden-sky-console-body {
+  background: linear-gradient(145deg, rgb(10, 22, 34), rgb(4, 10, 18));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+:root[data-lq-flat] .reading-garden-info {
+  background: linear-gradient(145deg, rgb(10, 22, 34), rgb(4, 10, 18));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   components/lens/readingLens.css + lensClipboardPassage.css — 4 rules.
+   All four paint `var(--lens-bg)`, so the gradient layer reads the token and any
+   future re-tint of the lens follows automatically. The lens floats inside a
+   reading window, so its base is the panel.
+   ============================================================================= */
+
+:root[data-lq-flat] .lens-line,
+:root[data-lq-flat] .lens-reader,
+:root[data-lq-flat] .lens-analysis,
+:root[data-lq-flat] .lens-clipboard-passage {
+  --lq-flat-base: var(--panel);
+  background:
+    linear-gradient(var(--lens-bg), var(--lens-bg)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   multiMonitor.css — 2 rules
+   ============================================================================= */
+
+/* MATERIAL — the cross-monitor drop affordance, drawn over the desktop. */
+:root[data-lq-flat] .dropr-affordance {
+  background:
+    linear-gradient(rgb(6 5 9 / 42%), rgb(6 5 9 / 42%)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* MATERIAL — the `reduced` middle state's toast. Out-specifies the generic
+   `.os-toast` rule above, exactly as the source pair does. */
+:root[data-lq-flat][data-display-transparency='reduced'] .os-toast {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--panel) 98%, transparent),
+      color-mix(in srgb, var(--panel) 98%, transparent)
+    ),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   components/shell/shell.css — 1 rule
+   ============================================================================= */
+
+/* MATERIAL — the Aero boot splash panel. */
+:root[data-lq-flat] .os-aero-boot-inner {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(226, 248, 248, 0.2)),
+    linear-gradient(rgba(214, 246, 248, 0.18), rgba(214, 246, 248, 0.18)),
+    var(--lq-flat-base);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* =============================================================================
+   components/media/library/mediaLibrary.css — 1 rule
+   ============================================================================= */
+
+/* OPAQUE TINT — a badge over cover art. */
+:root[data-lq-flat] .medialib-card__badge {
+  background: rgb(0 0 0);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
