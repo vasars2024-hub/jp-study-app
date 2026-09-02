@@ -228,3 +228,39 @@ The atlas correctly refuses `certifiable` on it while classifying the 3 toggle-l
 reason to flip bullet 1: the run happened, its controls passed, and only re-verification of those
 21 hashes is lost. Restore measured, not asserted: theme `study-os`, 0 windows / 0 dialogs,
 `desktop-layout.json` **9DFB6E2F2361…**, byte-identical to `debug/_bk-layout-pre.json`.
+
+## 2026-09-02 — the floor is not always zero, and only the equality gates assumed it was (`backup`, checkpointed by `primary`)
+
+Recovered from `backup`'s interrupted 13:05–13:12 EDT turn (session limit mid-verification; the
+edit and both verification runs were on disk, nothing committed, no handoff). Re-derived here
+from the manifests, not from prose.
+
+**What the section-addressed re-capture found.** Two full sweeps on the real-profile instance
+(pid 47004, port 39273), both `--address section`, 650 cells each, `--control`:
+`l12-matrix-maximized-v2.json` (sha256 `b553bf79…`) C0 floor **0.000% / Δ0**, C1 identical,
+**certifiable:true**, 40 unconverged. `l12-matrix-normal-v2.json` (sha256 `d61f103d…`) C0 floor
+**0.008% of pixels at max channel delta 4**, C1 **0.009% / Δ8 with 0% over 8** — VOIDed by the
+`pctDiff > 0` rule, **228 of 624** cells `converged:false`, run exit 1. Same instance, 50 minutes
+apart. So `capturePage` is not byte-deterministic here; it usually is, which is a weaker claim
+than the 2026-09-02 closure text ("byte-identity is the right gate, not a tolerance") made.
+
+**The repair, in `probes/l12-visual-matrix.cjs`.** Equality is scored against the threshold the
+file already used for its must-differ controls: `withinNoise` = `pctOver8 === 0 && maxDelta <= 8
+&& pctDiff <= 0.1%`. The extent bound (`NOISE_MAX_PCT = DIFF_MIN_PCT / 10`) is not decoration —
+the first verification run had **5 of 12** cells needing the tolerance, four at 0.007–0.027% and
+one, `stats/oled-black/liquid`, at **1.917% at Δ8**: a low-amplitude animation on a translucent
+material, which an amplitude-only bound would have banked as settled. Cells bank `settledBy`
+('bytes' | 'tolerance') and `residual`; totals bank `settledByTolerance` and `worstResidualDelta`;
+C0/C1 bank `identical` (raw byte fact) beside `withinNoise` (verdict); the void fires only when
+C0 exceeds the bound, and a sub-threshold nonzero floor is a `floorNote`, never silent.
+
+**Verification, 12 cells (dictionary, stats × 3 themes × standard/liquid), extent bound in force:**
+`l12-matrix-tolcheck2.json` (sha256 `6af9ed05…`, gitignored per e7fb4071): controls C0–C5 all
+pass, `certifiable:true`, `void:null`, C0 0.000%/Δ0, C1 identical, C2 98.835% over 8, C3 86.959%,
+C4 87.28%; `floorNote`: "C0 floor read 0.000%, but **4 of 12** cells still needed the noise
+tolerance to settle". `node --check` clean; eslint ignores the path by default.
+
+**Consequence for bullet 1 / b4.** `normal-v2` would pass C0 and C1 under the corrected gate
+(0.008%/Δ4 and 0.009%/Δ8, both 0% over 8) but its 228 unconverged cells were measured under
+byte-identity and cannot be re-scored from disk — the run is re-captured under this harness
+before any atlas is assembled from it. `maximized-v2` stands.

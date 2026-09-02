@@ -83,9 +83,17 @@
  *       signal — study-os vs classic-light:      99.591% of pixels, mean delta 249.6
  *       signal — standard vs liquid:             92.728% of pixels, mean delta  21.75
  *
- *     The floor is exactly zero. `capturePage` IS byte-deterministic once the content has
- *     stopped moving, so byte-identity is the right equality after all and no tolerance is
- *     needed for C1. What defeats it is that this surface settles in STEPS: the repeat trace
+ *     The floor was zero in that sitting, and the conclusion drawn from it — `capturePage` IS
+ *     byte-deterministic, so byte-identity is the right equality and no tolerance is needed —
+ *     WAS WRONG, and it took a month to catch. **CORRECTED 2026-09-02.** Two floors measured
+ *     on the same instance 50 minutes apart: 0.000% (maximized) and 0.008% at max channel
+ *     delta 4 (normal). One observation of a zero floor does not establish determinism; it
+ *     establishes that the floor is usually zero, which is a different and much weaker claim.
+ *     Equality is now scored against the floor MEASURED BY THE RUN ITSELF (NOISE_MAX_DELTA,
+ *     and the C0 block below). The plateau finding in the rest of this note stands and is
+ *     independent of it — both were real, and only the tolerance conclusion changed. What
+ *     defeats byte-identity here in ADDITION to the floor is that this surface settles in
+ *     STEPS: the repeat trace
  *     `AAAABBBBBB` holds one image for four consecutive captures — about 1.3 s — and then
  *     changes for good. Two-in-a-row converges inside that plateau, one call lands on A and
  *     the next on B, and C1 correctly reports them as different. The gate was too weak, not
@@ -235,13 +243,73 @@ async function pixelDelta(pathA, pathB) {
  * the floor and two below the weakest real signal.
  */
 const DIFF_MIN_PCT = 1.0;
-function magnitudeVerdict(m) {
+
+/**
+ * THE FLOOR IS NOT ALWAYS ZERO, AND THE EQUALITY GATES WERE THE ONLY ONES THAT ASSUMED IT WAS.
+ *
+ * Measured 2026-09-02, same harness, same instance, two runs 50 minutes apart:
+ *
+ *   maximized  C0 floor  0.000% of pixels moved, max channel delta 0   → C1 byte-identical, passed
+ *   normal     C0 floor  0.008% of pixels moved, max channel delta 4   → C1 differed, run VOIDed
+ *
+ * So `capturePage` is NOT byte-deterministic on this machine — it merely usually is. The
+ * comment above `captureStable` claiming settling on bytes is "strictly stronger than any
+ * proxy" is where this went wrong: it is strictly stronger, and that is the defect. A gate
+ * strictly stronger than the instrument can resolve does not measure the subject, it
+ * measures the noise, and it fails whenever the noise happens to show up.
+ *
+ * What makes this safe to fix rather than a loosening: the probe ALREADY decided what a
+ * difference is. `pixelDelta` counts `pctOver8` — pixels differing by more than 8 — and
+ * every must-differ control (C2/C3/C4) is scored on it, because byte-inequality alone would
+ * let a single stray pixel satisfy a control. That reasoning was applied to one half of the
+ * controls and not the other. The must-be-IDENTICAL half was left on raw byte equality, so
+ * the probe held two incompatible definitions of "the same image" at once.
+ *
+ * Reusing 8 here is therefore not a new tolerance invented to make a red run green. It is
+ * the SAME threshold this file already uses, applied to the equality side as well, and the
+ * measured separation is not close: floor 0.000% over 8, weakest real signal (C3, the
+ * presentation toggle) 30.758% over 8.
+ *
+ * The run still voids on a genuinely noisy machine — see the C0 verdict below. What changed
+ * is that "noisy" now means noise ABOVE the threshold that defines a difference, instead of
+ * any nonzero byte at all.
+ */
+const NOISE_MAX_DELTA = 8;
+/**
+ * THE TOLERANCE BOUNDS EXTENT AS WELL AS AMPLITUDE, and the first version of it did not.
+ *
+ * `pctOver8 === 0 && maxDelta <= 8` bounds only how HARD a pixel may move, not how MANY may
+ * move. A surface where every pixel in the frame breathes by 8 levels satisfies it perfectly
+ * and would be banked `converged: true` — the exact over-permissive failure this repair
+ * exists to prevent, reintroduced on the other side.
+ *
+ * That is not hypothetical either: the verification run caught it immediately. Of 5 cells
+ * that needed the tolerance, four settled at 0.007%–0.027% of pixels moving (scattered
+ * compositor noise, the shape C0 measures), and one — `stats` / `oled-black` / liquid —
+ * settled at **1.917% of pixels at max delta 8**. Two orders above the others and 240x the
+ * measured floor's extent: that is a low-amplitude ANIMATION on a translucent material, not
+ * instrument noise, and calling it settled would have hidden a real finding.
+ *
+ * So extent is capped at a tenth of DIFF_MIN_PCT — an order of magnitude below the extent at
+ * which this file calls something a difference. Measured noise (≤0.027%) clears it with ~4x
+ * headroom; the animating cell (1.917%) does not, and is correctly reported as still moving.
+ */
+const NOISE_MAX_PCT = DIFF_MIN_PCT / 10;
+function withinNoise(m) {
+  if (!m) return null; // sharp unavailable — caller falls back to byte equality and says so
+  if (m.incomparable) return false; // different dimensions are a real difference, not noise
+  return m.pctOver8 === 0 && m.maxDelta <= NOISE_MAX_DELTA && m.pctDiff <= NOISE_MAX_PCT;
+}
+
+function magnitudeVerdict(m, floor) {
   if (!m) return { enough: null, why: 'sharp unavailable — byte-inequality only' };
   // Two surfaces that are not even the same size are differing in the strongest way there
   // is; there is no common pixel grid to score, and demanding one would fail C4 on exactly
   // the windows that differ most.
   if (m.incomparable) return { enough: true, why: `${m.incomparable} — ${m.a.width}x${m.a.height} vs ${m.b.width}x${m.b.height}` };
-  return { enough: m.pctOver8 >= DIFF_MIN_PCT, why: `${m.pctOver8}% of pixels differ by >8 (floor 0, gate ${DIFF_MIN_PCT}%)` };
+  // The floor is quoted from THIS run's C0 rather than the 0 a previous run happened to see.
+  const f = floor && !floor.incomparable ? `${floor.pctOver8}%/Δ${floor.maxDelta}` : 'unmeasured';
+  return { enough: m.pctOver8 >= DIFF_MIN_PCT, why: `${m.pctOver8}% of pixels differ by >8 (floor ${f}, gate ${DIFF_MIN_PCT}%)` };
 }
 const OUT = arg('out', '');
 
@@ -653,24 +721,54 @@ async function raise(title) {
  * transition. Six repeat captures 400 ms apart on three separate windows were 1/6 distinct
  * each, which is what ruled out per-app animation and pointed at the gate instead.
  *
- * Settling on the captured BYTES is strictly stronger than any proxy: it is exactly the
- * artifact being banked. A cell that never converges inside the budget is recorded
- * `converged: false` and is a genuine finding (live/animated content behind a translucent
- * material), not silently averaged away.
+ * Settling on the captured BYTES is exactly the artifact being banked, so it was taken to be
+ * "strictly stronger than any proxy". IT IS STRICTLY STRONGER, AND THAT TURNED OUT TO BE THE
+ * DEFECT. On a machine whose capture floor is not zero (see NOISE_MAX_DELTA above — measured
+ * 0.008% of pixels at max delta 4 on the `normal` run of 2026-09-02), two frames of a
+ * perfectly static window never go byte-identical, so the cell burns all 12 attempts and is
+ * banked `converged: false`.
+ *
+ * That mattered because of what `converged: false` is documented to MEAN: "a genuine finding
+ * (live/animated content behind a translucent material)". The normal run recorded 228 of 624
+ * such cells against the maximized run's 40 — and nothing in the manifest could tell an
+ * oscillating surface from a static one photographed through a noisy instrument. The label
+ * was reporting the instrument as a product defect.
+ *
+ * So a frame now matches when it is byte-identical OR differs only within the noise floor.
+ * Byte-identity stays the fast path and costs nothing; the pixel comparison runs only when
+ * the bytes actually differ, which on a quiet machine is never. Cells record `settledBy`
+ * ('bytes' | 'tolerance') and the residual delta they settled at, so a reader can always see
+ * which cells needed the tolerance and how much of it they used — the number is banked, not
+ * absorbed. `converged: false` now means what it always claimed to: the surface kept moving
+ * by MORE than the instrument's own noise.
  */
 async function captureStable(tag, rect, tries = TRIES, gapMs = 300, run = RUN) {
   let prev = null;
   let prevPath = null;
   let streak = 1;
+  let settledBy = 'bytes';
+  let residual = null;
   for (let i = 0; i < tries; i += 1) {
     const r = await post('/screenshot', rect ? { rect } : {});
     if (!r || r.ok !== true) return { ok: false, error: (r && r.error) || 'screenshot failed' };
     const sha = crypto.createHash('sha256').update(fs.readFileSync(r.path)).digest('hex');
-    if (prev === sha) {
+    let match = prev === sha;
+    if (!match && prevPath) {
+      // Only reached when the bytes differ, so the quiet path pays nothing for this.
+      const d = await pixelDelta(prevPath, r.path);
+      if (withinNoise(d)) {
+        match = true;
+        settledBy = 'tolerance';
+        if (!residual || d.maxDelta > residual.maxDelta) residual = d;
+      }
+    }
+    if (match) {
       streak += 1;
       if (streak >= run) {
         fs.rmSync(prevPath, { force: true });
-        return { ...(await file(tag, r)), converged: true, attempts: i + 1, streak };
+        return {
+          ...(await file(tag, r)), converged: true, attempts: i + 1, streak, settledBy, residual,
+        };
       }
     } else {
       streak = 1;
@@ -680,7 +778,9 @@ async function captureStable(tag, rect, tries = TRIES, gapMs = 300, run = RUN) {
     await sleep(gapMs);
   }
   const last = { ok: true, path: prevPath, size: null };
-  return { ...(await file(tag, last)), converged: false, attempts: tries, streak };
+  return {
+    ...(await file(tag, last)), converged: false, attempts: tries, streak, settledBy: null, residual,
+  };
 }
 
 /** Move a captured PNG into the matrix directory and hash it. */
@@ -913,28 +1013,45 @@ ${rows}`;
     const c1a = await captureStable('__c1a', r1.rect);
     const c1b = await captureStable('__c1b', r1.rect);
     const c1delta = await pixelDelta(abs(c1a), abs(c1b));
-    const c1 = { kind: 'repeat/must-be-identical', app, theme: dark.id, a: c1a.sha256, b: c1b.sha256,
-      converged: [c1a.converged, c1b.converged], attempts: [c1a.attempts, c1b.attempts],
-      run: RUN, delta: c1delta,
-      pass: !!c1a.sha256 && c1a.sha256 === c1b.sha256 };
 
     /**
-     * C0 — THE FLOOR, and it is what makes every must-differ control below mean anything.
-     * A pair of captures of an UNCHANGED settled window, taken exactly as the matrix takes
-     * them. Whatever difference survives here is the instrument's own, and any control that
-     * claims a difference smaller than this is claiming noise. Measured 0.000% on this
-     * desktop, which is why C1 can demand byte-identity at all.
+     * C0 — THE FLOOR, and it is what makes every other control here mean anything. A pair of
+     * captures of an UNCHANGED settled window, taken exactly as the matrix takes them.
+     * Whatever difference survives is the instrument's own, and any control claiming a
+     * difference smaller than this is claiming noise.
+     *
+     * It is now measured BEFORE C1 is scored rather than after. C1 asks "did an unchanged
+     * window come back the same?", which is unanswerable until you know what "the same" costs
+     * on this machine tonight — and the answer is not stable across runs on this one (0.000%
+     * maximized, 0.008% normal, same instance, 50 minutes apart). Scoring C1 against a floor
+     * a previous run happened to see is how the normal run VOIDed on noise it had itself
+     * measured as sub-threshold.
      */
     const c0a = await captureStable('__c0a', r1.rect);
     const c0b = await captureStable('__c0b', r1.rect);
     const c0delta = await pixelDelta(abs(c0a), abs(c0b));
+    const c0quiet = withinNoise(c0delta);
     const c0 = { kind: 'floor/instrument-noise', app, theme: dark.id, delta: c0delta,
-      identical: !!c0a.sha256 && c0a.sha256 === c0b.sha256 };
+      identical: !!c0a.sha256 && c0a.sha256 === c0b.sha256,
+      // `identical` is kept as the raw byte fact; `withinNoise` is the verdict.
+      withinNoise: c0quiet, gate: { pctOver8: 0, maxDelta: NOISE_MAX_DELTA, pctDiff: NOISE_MAX_PCT } };
+
+    // C1 passes on byte-identity OR on a difference that stays inside the floor. Both facts
+    // are banked separately so a reader can see which one carried it.
+    const c1identical = !!c1a.sha256 && c1a.sha256 === c1b.sha256;
+    const c1quiet = withinNoise(c1delta);
+    const c1 = { kind: 'repeat/must-be-identical', app, theme: dark.id, a: c1a.sha256, b: c1b.sha256,
+      converged: [c1a.converged, c1b.converged], attempts: [c1a.attempts, c1b.attempts],
+      settledBy: [c1a.settledBy, c1b.settledBy],
+      run: RUN, delta: c1delta,
+      identical: c1identical, withinNoise: c1quiet,
+      gate: { pctOver8: 0, maxDelta: NOISE_MAX_DELTA, pctDiff: NOISE_MAX_PCT },
+      pass: !!c1a.sha256 && (c1identical || c1quiet === true) };
 
     await applyTheme(lightT.id);
     const c2bShot = await captureStable('__c2b', (await raise(titleOf[app])).rect);
     const c2delta = await pixelDelta(abs(c1a), abs(c2bShot));
-    const c2mag = magnitudeVerdict(c2delta);
+    const c2mag = magnitudeVerdict(c2delta, c0delta);
     const c2 = { kind: 'theme/must-differ', app, themes: [dark.id, lightT.id], a: c1a.sha256, b: c2bShot.sha256,
       delta: c2delta, magnitude: c2mag,
       pass: !!c2bShot.sha256 && c1a.sha256 !== c2bShot.sha256 && c2mag.enough !== false };
@@ -944,7 +1061,7 @@ ${rows}`;
     const presRes = await setPresentation(titleOf[app], 'liquid');
     const c3b = presRes.ok ? await captureStable('__c3b', (await raise(titleOf[app])).rect) : { sha256: null };
     const c3delta = presRes.ok ? await pixelDelta(abs(c1a), abs(c3b)) : null;
-    const c3mag = presRes.ok ? magnitudeVerdict(c3delta) : { enough: null, why: 'liquid not reached' };
+    const c3mag = presRes.ok ? magnitudeVerdict(c3delta, c0delta) : { enough: null, why: 'liquid not reached' };
     const c3 = {
       kind: 'presentation/must-differ', app, theme: dark.id,
       a: c1a.sha256, b: c3b.sha256, reached: presRes.ok,
@@ -971,7 +1088,7 @@ ${rows}`;
       const rb = await raise(titleOf[other]);
       const cb = await captureStable('__c4b', rb.rect);
       const c4delta = await pixelDelta(abs(ca), abs(cb));
-      const c4mag = magnitudeVerdict(c4delta);
+      const c4mag = magnitudeVerdict(c4delta, c0delta);
       c4 = {
         kind: 'app/must-differ', theme: dark.id, apps: [app, other],
         a: ca.sha256, b: cb.sha256, delta: c4delta, magnitude: c4mag,
@@ -1010,14 +1127,53 @@ ${rows}`;
     }
 
     manifest.controls = { c0, c1, c2, c3, c4, c5 };
-    manifest.magnitudeGate = sharp ? { pctOver8AtLeast: DIFF_MIN_PCT } : null;
+    manifest.magnitudeGate = sharp ? {
+      pctOver8AtLeast: DIFF_MIN_PCT,
+      noiseMaxDelta: NOISE_MAX_DELTA,
+      noiseMaxPct: NOISE_MAX_PCT,
+      // The separation the whole run rests on, stated as two numbers a reader can divide.
+      floor: c0.delta && !c0.delta.incomparable
+        ? { pctOver8: c0.delta.pctOver8, pctDiff: c0.delta.pctDiff, maxDelta: c0.delta.maxDelta }
+        : null,
+    } : null;
     manifest.certifiable = c1.pass && c2.pass && c3.pass !== false && c4.pass !== false && c5.pass !== false;
-    if (!c1.pass) manifest.void = 'C1 FAILED — the capture is not repeatable, so every difference below is unattributable';
+    if (!c1.pass) manifest.void = 'C1 FAILED — an unchanged window came back differing by MORE than the measured floor, so the capture is not repeatable and every difference below is unattributable';
     if (c4.pass === false) manifest.void = 'C4 FAILED — two different apps produced identical images, so the app axis measures nothing';
-    // Last, so it OUTRANKS the C1 message: a non-zero floor explains a C1 failure and
-    // changes what the right gate even is, which the reader must be told first.
-    if (c0.delta && c0.delta.pctDiff > 0) {
-      manifest.void = `FLOOR IS NOT ZERO — C0 measured ${c0.delta.pctDiff}% of pixels moving on an unchanged window (max channel delta ${c0.delta.maxDelta}), so byte-identity is the wrong C1 gate on this machine and every verdict here needs a tolerance first`;
+    /**
+     * Last, so it OUTRANKS the C1 message: a floor that is not merely nonzero but ABOVE the
+     * threshold defining a difference changes what the right gate even is, and the reader
+     * must be told that before any verdict.
+     *
+     * This used to void on `pctDiff > 0` — ANY moving byte. That was too strict by exactly
+     * the distinction this file draws everywhere else: it voided the 2026-09-02 normal run
+     * over 0.008% of pixels moving by at most 4 levels, when the run's own weakest real
+     * signal was 30.758% of pixels moving by more than 8. The instrument was working; the
+     * gate was reading noise as failure. It now voids when the noise reaches the size of a
+     * difference — which is the condition that actually makes the matrix unreadable.
+     */
+    if (c0quiet === false) {
+      const d = c0.delta || {};
+      manifest.void = d.incomparable
+        ? `FLOOR IS UNMEASURABLE — C0's two captures of one unchanged window were not even the same size (${d.incomparable}), so nothing below has a common pixel grid`
+        : `FLOOR EXCEEDS THE NOISE BOUND — C0 measured ${d.pctDiff}% of pixels moving on an unchanged window (${d.pctOver8}% by more than ${NOISE_MAX_DELTA}, max channel delta ${d.maxDelta}) against a bound of ${NOISE_MAX_PCT}% at delta ${NOISE_MAX_DELTA}, so the instrument's own noise is the size of a difference and no verdict here separates signal from instrument`;
+    }
+    // A sub-threshold floor is NOT a void, but it is never silent either: it is the number
+    // that says how much of the tolerance the machine actually used tonight.
+    if (c0quiet === true && c0.delta && c0.delta.pctDiff > 0) {
+      manifest.floorNote = `Floor nonzero but sub-threshold — ${c0.delta.pctDiff}% of pixels moved by at most ${c0.delta.maxDelta} (bound ${NOISE_MAX_PCT}% at delta ${NOISE_MAX_DELTA}). Equality scored on the tolerance, not on bytes.`;
+    }
+    /**
+     * C0 IS ONE SAMPLE AND THE CELLS ARE HUNDREDS, so the floor it reports is a lower bound
+     * on the machine's noise, not the whole of it. The verification run made that concrete:
+     * C0 measured a floor of exactly 0.000% while 5 of that run's 12 cells still needed the
+     * tolerance to settle. A reader who saw only C0 would have concluded the tolerance was
+     * inert. This surfaces the disagreement instead of leaving it to be inferred.
+     */
+    if (c0quiet === true && (!c0.delta || c0.delta.pctDiff === 0)) {
+      const usedTol = manifest.cells.filter((c) => c.settledBy === 'tolerance').length;
+      if (usedTol > 0) {
+        manifest.floorNote = `C0 floor read 0.000%, but ${usedTol} of ${manifest.cells.length} cells still needed the noise tolerance to settle — C0 samples one window at one moment and understates the run's real noise. Per-cell residuals are banked in each cell's \`residual\`.`;
+      }
     }
   }
 
@@ -1045,6 +1201,11 @@ ${rows}`;
     unsettled: cells.filter((c) => !c.themeSettled).length,
     stateBlocked: cells.filter((c) => c.stateReached === false).length,
     unconverged: cells.filter((c) => c.ok && !c.converged).length,
+    // How many cells needed the noise tolerance to settle at all, and the worst residual any
+    // of them settled at. On a machine with a zero floor both are 0 and the tolerance is
+    // provably inert; anything else is the size of the correction, banked rather than hidden.
+    settledByTolerance: cells.filter((c) => c.settledBy === 'tolerance').length,
+    worstResidualDelta: cells.reduce((m, c) => (c.residual && c.residual.maxDelta > m ? c.residual.maxDelta : m), 0),
     captureAttemptsTotal: cells.reduce((n, c) => n + (c.attempts || 0), 0),
     themeMisapplied: cells.filter((c) => !c.themeApplied).length,
     appsOpened: live.length,
