@@ -1070,3 +1070,38 @@ own safety note forbids.
 
 **So the remainder is not work this tree can do.** Ledger: **144 → 151 rows / 18 → 19 apps**,
 151 `both`, 0 `pending`, 0 duplicate `app|feature` keys.
+
+### Two live checks that found nothing, recorded as the negative results they are
+
+**The Media Center "Back" candidate is WITHDRAWN.** The 2026-09-02 primary2 handoff filed it
+as one reading, deliberately not as a defect, and asked for a repeat: *"Back stays `disabled`
+after the FIRST in-window navigation (Home → Library) and enables only after the second."*
+Repeated here on the main tree's profile with **every read in its own bridge leg**, and the
+control run in the same script:
+
+| leg | back `disabled` | tab |
+| --- | --- | --- |
+| as found | `true` (title: "This is the first section you opened…") | Library |
+| nav 1, read in the SAME expression (**CONTROL**) | `true` | — |
+| nav 1, read one leg later | **`false`**, title "Back" | Home |
+| nav 2 | `false` | Music |
+| Back | `false`, forward now `false` too | Home |
+| Back again | `true`, honest reason text | Library |
+
+The same-expression read **reproduces the reported symptom exactly**, and the separated read
+contradicts it. `MediaCenterView.tsx:1738-1750` keeps a real trail with `at`, and it walks
+Music → Home → Library correctly with both ends disabling and both tooltips carrying the
+reason rather than the label. So the candidate was an off-by-one in the instrument, not a
+control that claims an effect it does not have — and the trap is now written into
+`cat6-feature-parity.cjs`'s trap list, because the settings spec's `closeSearch` had the
+identical bug in the same turn. Receipt: `debug/_bk3-mc.cjs`.
+
+**Game Arena's Settings entry lands, cold and warm.** `openArenaSettings`
+(`GameArenaContent.tsx:113`) opens the Settings section and then fires `settings:navigate` on
+an **80 ms `setTimeout`** — a race against the Settings window mounting its own listener,
+which is the shape that leaves a user on Settings Home wondering where the setting went. Both
+cases measured, with the warm case parked on Home first so "already there" could not pass for
+a hit: **cold** (nothing open, Settings mounts from scratch) → `page=study`, pane
+`Profile & dictionary`, `[data-setting-id="game-arena"]` present and highlighted; **warm**
+(Settings already up, parked on Home, `gameArenaOnPage=0`) → the same landing. No defect.
+Receipt: `debug/_bk6-arena-settings.cjs`.

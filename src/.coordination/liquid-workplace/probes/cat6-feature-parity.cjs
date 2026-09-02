@@ -39,6 +39,13 @@
  *    this); dirtying after the drive scored a live row dead.
  *  - `document.hasFocus()` gates React's select synthesis, so `/focus` is POSTed before any
  *    step runs (`l6-parity.js` trap 6 refuses instead of lying, and this is how it is fed).
+ *  - A STEP MAY NOT READ THE STATE IT JUST CHANGED. React commits after the dispatching
+ *    task, so anything a step reads in the same expression as its own click/keydown is the
+ *    PRE-change value. Twice on 2026-09-02 this produced a confident wrong answer: the
+ *    settings spec's `closeSearch` reported the search panel still open on every run it had
+ *    ever made, and a Media Center reading had "Back stays disabled after the first
+ *    navigation" — both false, both off by exactly one leg. If a step changes something,
+ *    it returns what it SENT; a following step reads the result and refuses if it is wrong.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat6-feature-parity.cjs \
