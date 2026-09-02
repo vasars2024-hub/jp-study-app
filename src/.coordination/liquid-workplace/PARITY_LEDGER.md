@@ -1841,3 +1841,46 @@ purely by absorbing the other track's rows, which is the merge, not a regression
 turn on `chars=0`, one reading, not re-driven), `agent` (drive residue: 7 empty
 conversations, needs an undo before it is driven again), `novels`/`manga`/`immersion`
 (receipts banked in the main tree), `vn` (empty library), `notebook` (subject deleted here).
+
+## 2026-09-02 (primary2) — 21 of the 28 untranscribed controls recovered; `files` is a spec-less section
+
+### The receipts were `_pr5-`, and the transcriber only knew `_pr4-`
+
+`debug/_p2i-transcribe.cjs` derives its app list from rows with no control clause that have a
+`_pr4-meta-*` block in the main tree, then picks the receipt BY CONTENT (unique `PASS 10/10`,
+`CONTROL FAILED AS REQUIRED`, every mutation `exactlyOwnRow` and `returned`). It globbed
+receipts as `_pr4-<app>*.json`; the second wave banked them as `_pr5-<app>*.json` — same writer,
+same shape, only the label prefix moved. Widened to `_pr[0-9]+-`, read-only against the main
+tree's `debug/`, and applied:
+
+| | before | after |
+| --- | --- | --- |
+| rows / apps | 213 / 24 | 213 / 24 |
+| duplicate `app\|feature` keys | 0 | 0 |
+| statuses | 204 both / 9 pending | 204 both / 9 pending |
+| withNamedControl | 135 | **150** |
+| declaredNone | 13 | **19** |
+| silent | 64 | **43** |
+| silentByCause.b2WaveNotTranscribed | 28 | **7** (all manga) |
+
+21 rows touched — novels 9, immersion 7, calendar 5 — each clause ending "TRANSCRIBED 2026-09-02
+(primary2) from the banked cat6 receipt `<file>` (`<mtime>`), not re-run here".
+
+**Skipped by name, not silently:** `manga` has THREE qualifying PASS receipts (`_pr5-manga`,
+`manga3`, `manga4` — the drive was repaired between them, per the 2026-09-02 (primary) section
+above) and the chain refuses on anything but exactly one; `--skip manga` was added so one app's
+refusal does not block the others, and manga's 7 stay silent. `games` and `settings` have no
+banked receipt in the main tree. The coverage block was RE-DERIVED by `debug/_p2g-notwritten.cjs`.
+
+### `files` — the 25th desktop section, no spec, no rows
+
+Since `df751d60` the branch carries `files` in `DESKTOP_WIN_SECTIONS` (the Notebook's
+replacement). `probes/l6-parity.js` has no `files` spec and this ledger has no `files` row, so
+`notWritten.derived`'s "2 specs with no rows of 26" undercounts by one section it cannot see.
+The DOM is already L2-shaped and was read from source this turn (selectors in the plan's b2 tag);
+authoring the spec and running `cat6 --app files` live is the next slice, not this one.
+
+### City stays `pending`, on purpose
+
+The plan's per-app table (line 328) assigns City a Liquid design. `standard-only` would
+contradict it; `pending` is the vocabulary's own word for "no Liquid destination yet".
