@@ -1762,15 +1762,12 @@
       "at": "2026-09-02 (primary), L12 b2",
       "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
       "harnessSpecs": 25,
-      "specsWithRows": 12,
-      "specsWithNoRows": 13,
+      "specsWithRows": 15,
+      "specsWithNoRows": 10,
       "noRows": [
         "notebook",
         "calendar",
         "games",
-        "immersion",
-        "novels",
-        "manga",
         "vn",
         "city",
         "scraper",
@@ -1779,7 +1776,7 @@
         "shell",
         "blancShell"
       ],
-      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (13) exceeds specs with rows (12)."
+      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (16) exceeds specs with rows (15). vn is the one spec left with a live window and NO subject: its library is empty on this profile (\"Add a local visual novel to begin capturing Japanese dialog\"), and adding one would write to the user's real library, which this spec's own safety note forbids."
     }
   }
 }

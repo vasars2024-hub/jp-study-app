@@ -782,3 +782,119 @@ entry, which is why ledger apps (13) exceeds specs-with-rows (12).
 
 **Ledger this turn: 50 → 106 rows, 7 → 13 apps, 106 `both` / 0 `pending`, 0 duplicate
 `app|feature` keys — validated after every write, not asserted.**
+
+## 2026-09-02 (primary) — L12 b2: the two readers and the browser, and three instrument defects
+
+Commits: `62097cc9` (novels chapter row), `8663391e` (novels rows), `0e618fe0` (manga drive +
+row + undo), `a442b6ec` (manga rows), `24abb4a4` (immersion rows).
+
+**Ledger 106 → 129 rows, 13 → 16 apps, 129 `both` / 0 `pending`, 0 duplicate `app|feature`
+keys** — validated after every write, not asserted. Every app PASS 10/10 on
+`cat6-feature-parity.cjs`, parity equal in both presentations, every mutation flipping exactly
+its own row and restoring, 0 drive refusals.
+
+### novels — 9 rows. Recovered from an interrupted turn, and its control ran by accident
+
+The previous run died on its session limit with the work measured and uncommitted.
+`chapterNavigation` had asked whether the current page's first 240 characters contained one of
+the TOC labels — true only on a chapter's opening page. The TOC has **9** entries at part
+indices 5/30/50/81/149/160/161/163/165 over a book of ~166 parts, and the reader sat at
+`p:7:0.0000`, between the first two. A working chapter select therefore scored dead on ~157 of
+166 parts.
+
+There is nothing passive left to read: `.chapter-select` is an ACTION select
+(`NovelReader.tsx:3308-3311` pins `value=""`, `onChange` calls `goTo`), so its own value never
+names the chapter you are in. The row is now DRIVEN in three legs, because `/eval` is
+synchronous. The jump WRITES the user's reading position (`goTo` → `saveNow` →
+`window.api.setProgress`, `NovelReader.tsx:731`), so `chapterPrep` captures
+`p:<part>:<fraction>` off `listLibrary()` first and the undo writes it back through the same
+call; the seek is permille and restoring 18 → 18 returned a different page.
+
+**THE NEGATIVE CONTROL WAS THE DEAD TURN'S OWN PLANT.** It had rewritten TOC option 165's
+label to `lqp-never-in-this-book` and never reverted it. The first authoring run read
+`landedOnIt=false moved=true` and scored the row PENDING **in both presentations**. Reverted by
+a renderer reload (React owns that option; a DOM patch would not have held), book reopened from
+the Library at the same `p:7:0.0000`, and the identical run reads
+`jumpedTo="蓮実聖司を愛する者として" landedOnIt=true`, seek 18 → 986 → 18. So the repaired row
+demonstrably fails when the landing does not match.
+
+Measured: content 1516x712 / 1946 chars; seek 0..1000 with the trip returning its exact page
+signature; three reading tools all `docked`; canvas 1264 = doc 384 + 3 docked + gutters,
+covered=false; lifecycle 1/1 (a reader owns no minimize/maximize — counting `.fwin-b` would
+score a complete host 0). Five mutations, all `exactlyOwnRow`, every undo carrying
+`progress=p:7:0.0000`.
+
+### manga — 7 rows. The drive reported its own write back to itself
+
+Three defects, all in the instrument, and the reader was right every time.
+
+1. **The step never committed the jump.** `.reader-seek` is a SCRUBBER: `onChange` only sets
+   `scrub`, a preview, and the page changes on `onPointerUp` / `onKeyUp`
+   (`MangaReader.tsx:2069-2086`). The step wrote `.value = 3` plus `input`/`change` into a
+   controlled input, React ignored it, and the step returned that same number as `page`.
+   Measured live: seek reading **12** while the stage rendered `pages/0001.png` with `alt`
+   "Page 1" and `First page` still DISABLED. Clicking the product's own `Next page` DID move
+   it. Now `typeInto` (the native-setter route) plus the product's own `keyup`, exactly as
+   `novels.chapterSettle` does it.
+2. **`pageRender` passed the defect its own comment names.** The comment promised the rendered
+   page was "cross-checked against the seek's declared position"; the predicate asked
+   `declared >= 1`, comparing the seek to the number 1. The page is now read from the image's
+   own identity — `alt` is `t('manga.pageAlt',{n})`, so the numeral survives all four locales,
+   and `pages/000N` is the fallback — as a MEMBERSHIP test, because the spread layout renders
+   two pages at once.
+3. **The undo's baseline was rewritten by another mutation.** It captured the page off the
+   seek, and `pageTransport` sets `max="1"`, which clamps that value to 1; the cycle's undo
+   then compared 1 to 1 and left the reader where the drive had put it. Capture and comparison
+   now read the STAGE.
+
+Three receipts discriminate, same window / volume / profile, 17 pages: PASS 10/10 on the
+broken drive → **VOID** once the row cross-checked (`pageTransport` fell `pageRender` too,
+undeclared) → PASS 10/10 with the cascade DECLARED. Clamping the transport genuinely stops it
+declaring the page on screen, so the cascade is true and is written down rather than engineered
+away — a row nothing can falsify is the other way this instrument goes wrong. `page` now reads
+`from:"1" renderedBefore:[1]` → page 3, and `page=3->1` appears on **every** undo cycle where
+before it appeared on **zero**.
+
+Measured: `seekPage=3 of 17 rendered=[3] agree=true`; painted 502x714; 5 OCR segments with
+exactly 1 active; the OCR tool `lq-liquid` over a page ROLED `lq-anchor`; canvas 1264 = doc 952
++ 1 docked + gutter. `first=1 last=1` is read from `aria-label`/`title` — both are icon buttons
+with no text node, and reading `textContent` scored a live transport dead.
+
+### immersion — 7 rows. The VOID was a live page still loading
+
+At cat6's **default `--step-ms 700`** this surface scored **VOID, 5/7 both**, with
+`readerExtraction` reading `readerChars=0` and `modeSwitch` reading `composed=false` — because
+a REAL public page (NHK Easy) had not finished loading, exactly as the `open` step's own note
+warns. The receipt heals mid-run: the first mutation's pre-baseline is 5/7 and the second's
+afterRestore is 7/7. Same window, same profile, `--step-ms 3500`: **PASS 10/10, 7/7, 0
+refusals**, all five mutations `exactlyOwnRow`. **A slow live page is not a dead control**, and
+this is the one surface in b2 where the default step budget is not enough.
+
+Measured: bar == webviewSrc on `https://news.web.nhk/news/easy/`; mode `reader` composed
+`webview=true reader=true`; 322 extracted characters with no starter state; 20 rendered rail
+rows, 20 complete (a `VirtualList`, so never `rendered === total`); canvas 782 = doc 550 + 1
+docked + gutter; 5/4 chrome; round trip standard → liquid → standard with `.immersion-url`
+dirtied first held with 0 diffs at 820x580 in both.
+
+### vn — NOT written, and the reason is a data gap, not a defect
+
+The panel mounts and its whole workspace renders, but the library is **empty** on this profile:
+"Add a local visual novel to begin capturing Japanese dialog". A row measured only on an empty
+harness is capped rather than skipped, and adding an entry would write to the user's real
+library, which that spec's own safety note forbids. Recorded here so the absence is a decision
+rather than a silence.
+
+### The gap, re-derived again
+
+`window.__LQP.apps()` = **25** specs against the distinct `app` keys in `rows[]`, both read
+live, re-banked as `notWritten.derived`.
+
+**10 of 25 specs have no row in this tree** — notebook, calendar, games, vn, city, scraper,
+resources, settings, shell, blancShell — of which five (`city`, `scraper`, `resources`,
+`shell`, `blancShell`) are the concurrent worker's and arrive by merge. `mediaCenter` still
+carries 8 rows from the pre-spec `__L6M` instrument and has no `SPECS` entry, which is why
+ledger apps (16) exceeds specs-with-rows (15).
+
+**sampled-out:** `vn` (no subject on this profile, above); `city`, `scraper`, `resources`,
+`shell`, `blancShell` (owned by the concurrent worker); `notebook`, `calendar`, `games`,
+`settings` (not reached this turn — they are the next turn's opening slice).
