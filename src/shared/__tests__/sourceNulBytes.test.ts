@@ -92,7 +92,16 @@ describe('source files carry no raw NUL byte', () => {
       .map((hit) => `${relative(SRC, hit.file).split(sep).join('/')} (byte ${hit.at})`);
 
     expect(offenders).toEqual([]);
-  });
+    // The walk fix above was necessary and NOT sufficient, measured 2026-09-01:
+    // with the memoised stat-free walk already in place, this case still took
+    // **27,242 ms** in a full `vitest run` and failed on the 20 s default — and
+    // it passes in isolation, so it is a deadline, not a defect. What remains is
+    // irreducible: `readFileSync` over ~2,500 files, eight workers deep on one
+    // disk. Raising the deadline is the honest move because the ASSERTION is
+    // untouched — a real NUL still fails at any timeout — while a red that is
+    // only ever instrument noise trains workers to stop reading the suite.
+    // Boss audit 2026-09-01 Finding 4 names exactly this remedy.
+  }, 120_000);
 
   it('scans a meaningful number of files, so a broken walk cannot pass empty', () => {
     // A walk that silently returns nothing would satisfy the assertion above.
