@@ -4884,12 +4884,43 @@
           f: (w) => {
             // The Wired/Aero identity is a real material stamp plus real shell-owned
             // furniture, read from the document rather than from a class this file invented.
+            //
+            // REPAIRED 2026-09-02 (primary2). The old expression was
+            // `!!mat && theme.indexOf(mat) === 0 && owned > 0` and it was WIRED-ONLY on two
+            // independent counts, both measured live on this profile rather than reasoned:
+            //   1. `theme.indexOf(mat) === 0` -- the Aero theme's id is `frutiger-aero` and
+            //      its materialSet is `aero`, so indexOf is 9, not 0. A correctly stamped
+            //      Aero shell scored FALSE on the stamp half.
+            //   2. `.${mat}-wall-atmosphere, .${mat}-tray-lamps` -- those two elements are
+            //      rendered only under `wired` (DesktopShell.tsx:2748 and :3502). Measured on
+            //      `frutiger-aero`: **0** `aero-`prefixed classes anywhere in the shell
+            //      outside `.fwin`, against 178 inside the hosted Resources window. Aero's
+            //      identity is CSS scoped to `[data-materials='aero']` restyling the same
+            //      `.os-*` furniture; it adds no DOM of its own. So there is nothing to
+            //      "widen the selector" to, and widening it to any `aero-` class would have
+            //      scored the shell from a window's contents.
+            // What BOTH material sets do own is the secret start surface: DesktopShell.tsx:683
+            // renders `.os-start-aero-menu` for `aero` OR `wired` and the base menu otherwise,
+            // so it discriminates a material shell from the default one. `readStartOpen`
+            // records it while the menu is open, which is the only moment it exists.
+            // On the base theme there is no material identity to verify at all -- that is `na`
+            // (excluded from the denominator), never a failure.
+            const s = shellState();
             const mat = document.documentElement.getAttribute('data-materials');
             const theme = document.documentElement.getAttribute('data-theme') || '';
+            if (!mat) {
+              return {
+                ok: null,
+                na: 'shell is on the base theme — no material set is stamped, so there is no material identity to verify',
+                ev: `materials=null theme=${JSON.stringify(theme)}`,
+              };
+            }
             const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`).length;
+            const matMenu = s.startMaterialMenu;
+            const furniture = owned > 0 || matMenu === 1;
             return {
-              ok: !!mat && theme.indexOf(mat) === 0 && owned > 0,
-              ev: `materials=${mat} theme=${theme} identityElements=${owned}`,
+              ok: theme.indexOf(mat) >= 0 && furniture,
+              ev: `materials=${mat} theme=${theme} stampBelongsToTheme=${theme.indexOf(mat) >= 0} identityElements=${owned} materialStartMenu=${matMenu === undefined ? 'not driven' : matMenu}`,
             };
           },
         },
@@ -4937,7 +4968,12 @@
         readStartOpen: (w) => {
           const s = shellState();
           s.startOpened = shq(w, '.os-start').length;
-          return { opened: s.startOpened };
+          // The material start surface exists only while the menu is open, and it is the one
+          // piece of shell-owned furniture BOTH `aero` and `wired` render (DesktopShell.tsx:683).
+          // `shellIdentity` reads it back later; recording it here is what lets that row be
+          // material-agnostic instead of wired-only. See that row for the measurement.
+          s.startMaterialMenu = shq(w, '.os-start-aero-menu').length;
+          return { opened: s.startOpened, materialMenu: s.startMaterialMenu };
         },
         closeStart: (w) => {
           const back = q(w, '.os-start-backdrop');
@@ -5035,11 +5071,19 @@
         // `data-materials`: that attribute lives on `documentElement`, which is outside the
         // shell root that `restore()` sweeps, so the lie would never be undone.
         shellIdentity: (w) => {
+          // Falsifies BOTH legs the row now accepts, or it would arm on wired and refuse on
+          // aero (where the always-on furniture does not exist) — the same shape that made the
+          // row itself wired-only. The recorded `startMaterialMenu` is spec state, falsified
+          // the way `startEntryPoint` / `trayFlyout` / `taskbarRaises` already are; the DOM
+          // half is a real detach and is swept by `restore()`.
+          const s = shellState();
           const mat = document.documentElement.getAttribute('data-materials');
+          if (!mat) return { refused: 'shell is on the base theme — the row is `na`, so there is nothing to falsify' };
           const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`);
-          if (!owned.length) return { refused: 'shell renders no identity furniture' };
           owned.forEach((n) => detach(n, ''));
-          return { mutated: `${owned.length} identity element(s) detached` };
+          const had = s.startMaterialMenu;
+          s.startMaterialMenu = 0;
+          return { mutated: `${owned.length} identity element(s) detached; startMaterialMenu ${had === undefined ? 'not driven' : had} -> 0` };
         },
         // Falsify the DRIVEN rows by breaking the side effect itself, not the control: the
         // start menu is re-opened and left open, so `closeStart`'s recorded 0 becomes 1.
