@@ -1519,3 +1519,58 @@ row: `notebook`** (its subject is deleted on this branch — see the 2026-09-02 
 which that spec's safety note forbids).
 
 **sampled-out:** none — this section covers one app and drove all eight of its rows.
+
+## 2026-09-02 (primary2) — `--refresh` applied: `dictionary` and `grammar` re-proved, and two apps could not be
+
+`--refresh` exists to un-strand rows written by an instrument that no longer runs. Applied to
+the three apps whose specs live in this tree and whose rows predate the control clause.
+
+**`dictionary` PASS 10/10, parity 7/7 == 7/7, 0 `na`** — 7 rows re-driven.
+**`grammar` PASS 10/10, parity 8/8 == 8/8, 0 `na`** — 8 rows re-driven.
+Plus `mediaCenter`'s 6. **21 rows now carry a `RE-DRIVEN` clause.**
+
+**Ledger: 191 rows / 24 apps / 0 duplicate keys, 182 `both` / 9 `pending`. `silent` 60 -> 42,
+`withNamedControl` 132 -> 135, `declaredNone` 4 -> 13.** The rise in `declaredNone` is the
+point, not a regression: a row whose spec declares no mutation now SAYS so in its own text,
+where before it was indistinguishable from a row that simply had not been written up.
+
+### The mapping was verified, not assumed
+
+`grammar`, `agent` and `captures` had no `parity-row-metadata.json` block; their rows were
+hand-written by `l6-parity-write-rows.cjs` in spec-declaration order. Rather than trusting
+that order, each app's spec ids were matched against its ledger rows BY INDEX and every row
+that already carried a control clause had to name the id at its own index. **9 independent
+matches across the three apps, 0 mismatches** (`grammar[0] modeSwitch`, `[5] presets`,
+`[7] windowLifecycle`; `agent[0] conversationRail`, `[4] contextShelf`, `[5] viewToggle`;
+`captures[0] captureList`, `[4] listReversibility`, `[5] windowLifecycle`). A single mismatch
+would have refused that app rather than writing a block.
+
+### Two apps did NOT refresh, and both reasons are on the record
+
+**`translate` VOID — "negative control did not falsify", parity 4/7 in BOTH presentations.**
+Three rows failed: `input (chars=0)`, `output (outputChars=6 before="猫が好きです"
+after="猫が好きです")` and `agentHandoff (before="Ask the Agent" after="Ask the Agent"
+disabled=true)`. The drive types `猫が好きです` and the input read back **0 characters**, so
+the two downstream rows had nothing to act on. Only a PASS run may write, so it wrote nothing
+— which is the writer behaving correctly. **Not filed as a product defect on one reading**:
+the same shape (a drive that reports its own write back to itself) was the manga instrument
+defect two sections above, and this has not been repeated yet.
+
+**`agent` FAIL 4/8 in both presentations**, on `conversationRail (conversations=0 selected=0)`,
+`railCount (headCount="1 conversation" rows=0)`, `composer (chars=0)` and `contextShelf
+(removeControls=0)`. A head saying "1 conversation" over a rail of 0 rows is exactly the
+disagreement that row exists to catch — but read again four seconds later, the SAME window
+reported **7 `.agent-rail-item` against a head of "7 conversations"**, i.e. consistent. The
+FAIL is a read of a surface still hydrating, not a proven defect.
+
+**DISCLOSED, because it is a real write and it is not undone.** The `agent` spec's drive
+includes a `newConversation` step that clicks the product's own New conversation button, and
+nothing in the run deletes it. The rail now holds **7 conversations, every one "0 messages"** —
+drive residue accumulated across turns, two of them from this turn's single FAILed run. The
+agent surface was NOT re-driven after that was noticed. Whoever takes `agent`'s 5 silent rows
+should give that step an undo first, or drive an existing conversation instead of making one.
+
+**sampled-out:** `agent` and `captures` (see above — `captures` was not reached; it is the
+next turn's cheapest remaining app), `mediaWorkspace` (5 silent rows, blocked on a scanned
+media library — 0 files on this profile), `novels`/`manga`/`immersion` (23 rows, the main
+tree's b2 wave; their receipts are banked in the main tree's `debug/`, not here).

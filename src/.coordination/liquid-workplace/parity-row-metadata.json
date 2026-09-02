@@ -547,6 +547,156 @@
           "dataStateOwner": "DesktopShell window state"
         }
       }
+    },
+    "grammar": {
+      "standardDestination": "GrammarContent in-window (`.gram-view`)",
+      "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "modeSwitch": {
+          "feature": "Switch between the four sections (Grammar points / Practice / Guides & hacks / Review)",
+          "currentRoute": "Grammar window > `.gram-mode-btn` segmented control",
+          "keyboardRoute": "buttons are real `<button>`s in tab order; exclusivity is carried by the `active` class, not by focus",
+          "dataStateOwner": "renderer-local view state (GrammarView)"
+        },
+        "patternList": {
+          "feature": "Browse the grammar catalogue with level badges",
+          "currentRoute": "Grammar window > `.gram-x-list` rows",
+          "keyboardRoute": "each row is a focusable `.gram-x-row-main` button",
+          "dataStateOwner": "bundled grammar dataset (renderer)"
+        },
+        "search": {
+          "feature": "Search/filter the catalogue",
+          "currentRoute": "Grammar window > `.gram-search` input",
+          "keyboardRoute": "text input, real keystrokes via the native value setter + `input` event",
+          "dataStateOwner": "renderer-local filter state"
+        },
+        "detail": {
+          "feature": "Open a pattern's detail (structure, gloss, examples)",
+          "currentRoute": "Grammar window > click a `.gram-x-row-main`",
+          "keyboardRoute": "row is a button; the detail pane renders below it in the same window",
+          "dataStateOwner": "bundled grammar dataset (renderer)"
+        },
+        "bandControl": {
+          "feature": "Grade a pattern (the study-state band control)",
+          "currentRoute": "Grammar window > `.gram-x-band .wk-grade-btn`",
+          "keyboardRoute": "four buttons in tab order",
+          "dataStateOwner": "persisted study state (grammar band store)"
+        },
+        "presets": {
+          "feature": "Filter presets (select + save)",
+          "currentRoute": "Grammar window > `.gram-x-preset-select` + `Save`",
+          "keyboardRoute": "select and button, both focusable",
+          "dataStateOwner": "persisted preset store"
+        },
+        "agentHandoff": {
+          "feature": "Hand the focused pattern to the Agent (L5 bullet 1)",
+          "currentRoute": "Grammar window > `.gram-ask-agent` in `GrammarDetail` (Blanc composes the same component)",
+          "keyboardRoute": "button, 209x31, contrast 7.9:1 (measured 2026-08-25, `d49d53cf`)",
+          "dataStateOwner": "agent conversation context store (session + persisted split by sensitivity)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Grammar window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
+    },
+    "agent": {
+      "standardDestination": "AgentWorkspaceShell in-window (`.agent-root`)",
+      "liquidDestination": "Same in-window `.agent-root`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "conversationRail": {
+          "feature": "Browse and select a conversation",
+          "currentRoute": "Agent window > `.agent-rail-entry` rows",
+          "keyboardRoute": "rail entries are real buttons",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "railCount": {
+          "feature": "The rail head count tracks the store",
+          "currentRoute": "Agent window > `.agent-rail-count`",
+          "keyboardRoute": "text, not interactive",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "conversation": {
+          "feature": "Read the selected conversation",
+          "currentRoute": "Agent window > `.agent-conversation` canvas",
+          "keyboardRoute": "scrollable region; messages are static content on an opaque anchor, deliberately not glass",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "composer": {
+          "feature": "Compose a message",
+          "currentRoute": "Agent window > the composer textarea",
+          "keyboardRoute": "textarea; Send is a button beside it",
+          "dataStateOwner": "renderer-local draft state"
+        },
+        "contextShelf": {
+          "feature": "Remove a context item (the reverse of every surface's \"Ask the Agent\")",
+          "currentRoute": "Agent window > `Remove <name> from context` controls on the context shelf",
+          "keyboardRoute": "each item carries its own remove button, so every add has an intentional reverse (CLAUDE.md's enable/disable rule)",
+          "dataStateOwner": "agent conversation context store"
+        },
+        "viewToggle": {
+          "feature": "Switch the conversation view (Simple / Full)",
+          "currentRoute": "Agent window > `.agent-view-toggle-button`",
+          "keyboardRoute": "two buttons in tab order",
+          "dataStateOwner": "renderer-local view state"
+        },
+        "panels": {
+          "feature": "Reach the four side panels (Reusable prompts, Capabilities, Permissions and profile, Pipeline)",
+          "currentRoute": "Agent window > the workspace's docked panel controls",
+          "keyboardRoute": "all four are real buttons",
+          "dataStateOwner": "mixed: prompt library and capability registry are persisted; pipeline is main-process state"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Agent window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
+    },
+    "captures": {
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "captureList": {
+          "feature": "Browse the persisted capture history with its source badge",
+          "currentRoute": "Reading window > Captures tab > the capture list tool",
+          "keyboardRoute": "each row is a real `<button>`; the list is reachable whether docked or a sheet",
+          "dataStateOwner": "main-process lens history (`lens:history:list`)"
+        },
+        "selection": {
+          "feature": "Select a capture and read it in the passage pane",
+          "currentRoute": "Reading window > Captures tab > click a row",
+          "keyboardRoute": "row buttons carry `aria-current`; the heading is an `<h2>` in the reader landmark",
+          "dataStateOwner": "main-process lens history + renderer selection state"
+        },
+        "canvasPlacement": {
+          "feature": "The capture list never partially covers the passage",
+          "currentRoute": "Reading window > Captures tab > `.lq-reading` resolves placement from its own width",
+          "keyboardRoute": "placement changes nothing about tab order — DOM order is document then tool at every width",
+          "dataStateOwner": "pure geometry (`shared/liquidReadingCanvas.ts`); no persisted state"
+        },
+        "measureClamp": {
+          "feature": "The passage stays at a legible measure at any pane width",
+          "currentRoute": "Reading window > Captures tab > `--lq-reading-measure` on the document region",
+          "keyboardRoute": "not a control; a rendered constraint",
+          "dataStateOwner": "pure geometry (`READING_CANVAS_POLICY.maxContentWidth` = 760)"
+        },
+        "listReversibility": {
+          "feature": "Hide and restore the capture list",
+          "currentRoute": "Reading window > Captures tab > `.reading-captures-list-toggle`",
+          "keyboardRoute": "`aria-pressed` is a real boolean and agrees with whether the tool is mounted",
+          "dataStateOwner": "renderer-local view state (ReadingCapturesView)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Reading window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
     }
   }
 }

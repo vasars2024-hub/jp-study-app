@@ -18,9 +18,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "input is focusable and accepts real keystrokes; a synthetic Enter keydown did NOT trigger a search, so the keyboard route is UNPROVEN, not absent",
       "dataStateOwner": "local JMdict via the main-process dictionary DB",
-      "automatedProof": "baselines/L0-baseline-1/dictionary-default.json; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "typed 食べる, clicked Search: window went 38 -> 340 DOM nodes and 251 -> 2,926 chars; rendered 食べる/たべる, COMMON, #16403, PITCH, EN + RU glosses, 'JMdict (Japanese–English)' || Liquid drive 2026-08-17: same search 食べる in both presentations — 3,767 chars / 341 nodes / 66 controls, identical in standard and liquid",
+      "observed": "typed 食べる, clicked Search: window went 38 -> 340 DOM nodes and 251 -> 2,926 chars; rendered 食べる/たべる, COMMON, #16403, PITCH, EN + RU glosses, 'JMdict (Japanese–English)' || Liquid drive 2026-08-17: same search 食べる in both presentations — 3,767 chars / 341 nodes / 66 controls, identical in standard and liquid || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: chars=2345 nodes=262 || liquid: chars=2345 nodes=262 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -31,9 +31,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "both are real buttons, focusable",
       "dataStateOwner": "JMdict (JA) / CC-CEDICT (ZH)",
-      "automatedProof": "; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "attribution text changed 'powered by Jisho (JMdict)' -> 'powered by CC-CEDICT'; content 2,926 -> 514 chars, rendering 食 shí and 食 sì; toggling back returned to 2,926 chars and the JMdict attribution EXACTLY — a verified reversible round trip || clicked 中文 WHILE liquid: JMdict → CC-CEDICT, 3,834 → 1,533 chars, 341 → 115 nodes; ja.active=true/zh.active=false restored",
+      "observed": "attribution text changed 'powered by Jisho (JMdict)' -> 'powered by CC-CEDICT'; content 2,926 -> 514 chars, rendering 食 shí and 食 sì; toggling back returned to 2,926 chars and the JMdict attribution EXACTLY — a verified reversible round trip || clicked 中文 WHILE liquid: JMdict → CC-CEDICT, 3,834 → 1,533 chars, 341 → 115 nodes; ja.active=true/zh.active=false restored || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: ja=true zh=false || liquid: ja=true zh=false || negative control `sourceSwitch` -> 6/7 (baseline 7/7), fell=[sourceSwitch], restored 7/7",
       "status": "both"
     },
     {
@@ -44,9 +44,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "three real buttons, focusable",
       "dataStateOwner": "view state, local to DictionaryView",
-      "automatedProof": "; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "Interlinear: 2,926 -> 1,428 chars, adds 'Detected scale: word', 'Explain in Agent', and the provenance line 'The interlinear above is sourced from your dictionaries. The Agent explanation is AI-generated and uses its current provider, privacy, language…'. Returning to Dictionary mode restored 2,926 chars exactly || clicked Interlinear WHILE liquid: active moved Automatic → Interlinear, 1,533 → 1,474 chars, 115 → 101 nodes",
+      "observed": "Interlinear: 2,926 -> 1,428 chars, adds 'Detected scale: word', 'Explain in Agent', and the provenance line 'The interlinear above is sourced from your dictionaries. The Agent explanation is AI-generated and uses its current provider, privacy, language…'. Returning to Dictionary mode restored 2,926 chars exactly || clicked Interlinear WHILE liquid: active moved Automatic → Interlinear, 1,533 → 1,474 chars, 115 → 101 nodes || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: modeButtons=3 active=1 || liquid: modeButtons=3 active=1 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -57,9 +57,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "all rendered as buttons",
       "dataStateOwner": "flashcards store, AnkiConnect, clipboard history",
-      "automatedProof": "; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "the save control is stateful and reflects real stored state: two of three results render 'Saved to Flashcards' and the third renders 'Save to Flashcards'. NOT DRIVEN — these write to the user's collections; the wave that owns Dictionary must drive them with a reversible target || 32 action controls (word-audio/dict-star/lexicon-knowledge/dict-add) present and enumerated identically in both presentations",
+      "observed": "the save control is stateful and reflects real stored state: two of three results render 'Saved to Flashcards' and the third renders 'Save to Flashcards'. NOT DRIVEN — these write to the user's collections; the wave that owns Dictionary must drive them with a reversible target || 32 action controls (word-audio/dict-star/lexicon-knowledge/dict-add) present and enumerated identically in both presentations || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: actions=20 || liquid: actions=20 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -70,9 +70,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "button",
       "dataStateOwner": "persisted search list",
-      "automatedProof": "; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "`Save search` is ABSENT from the empty surface and PRESENT after a query completes — the control is query-conditional, not static chrome. Not driven: it persists user state || 1 Save search control in both presentations; the saved-searches list rendered in the liquid pass",
+      "observed": "`Save search` is ABSENT from the empty surface and PRESENT after a query completes — the control is query-conditional, not static chrome. Not driven: it persists user state || 1 Save search control in both presentations; the saved-searches list rendered in the liquid pass || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: saveSearchControls=1 || liquid: saveSearchControls=1 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -83,9 +83,9 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "text input",
       "dataStateOwner": "lexicon notes store",
-      "automatedProof": "baselines/L0-baseline-1/dictionary-default.json (input present at empty state); probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
-      "observed": "pane and filter render on the empty surface; the list was empty on this profile so filtering has no observable effect to measure here || filter typed 食 in standard, survived Standard → Liquid → Standard with value=\"食\" unchanged",
+      "observed": "pane and filter render on the empty surface; the list was empty on this profile so filtering has no observable effect to measure here || filter typed 食 in standard, survived Standard → Liquid → Standard with value=\"食\" unchanged || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: value=\"\" || liquid: value=\"\" || negative control `notesFilter` -> 6/7 (baseline 7/7), fell=[notesFilter], restored 7/7",
       "status": "both"
     },
     {
@@ -96,10 +96,10 @@
       "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "four real buttons",
       "dataStateOwner": "DesktopShell window state + main-process popOut",
-      "automatedProof": "/health window list; probes/l6-parity-dictionary.js (`check()`, 7/7 both presentations)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app dictionary (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-17 (L6 category 6)",
       "_note": "pending here still means no Liquid destination; the standard half of every dictionary row above is driven and observed.",
-      "observed": "pop out created a SECOND real BrowserWindow at 900×640 (`/health` went 1 -> 2 windows, url `?popout=dictionary`) and removed the in-desk `.fwin`. The popped window rendered the app's INITIAL state — the active 食べる search did not carry across. Closing the popped window left NEITHER window: the desk returned to Scraper+Anki with no Dictionary. L3's reversibility requirement has to decide whether that last part is intended || 5 chrome buttons in both; the liquid toggle carries a real aria-pressed that flips false → true → false, so the enable flow has its disable path",
+      "observed": "pop out created a SECOND real BrowserWindow at 900×640 (`/health` went 1 -> 2 windows, url `?popout=dictionary`) and removed the in-desk `.fwin`. The popped window rendered the app's INITIAL state — the active 食べる search did not carry across. Closing the popped window left NEITHER window: the desk returned to Scraper+Anki with no Dictionary. L3's reversibility requirement has to decide whether that last part is intended || 5 chrome buttons in both; the liquid toggle carries a real aria-pressed that flips false → true → false, so the enable flow has its disable path || RE-DRIVEN from _p2j-dictionary.json (2026-09-02): standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 6/7 (baseline 7/7), fell=[windowLifecycle], restored 7/7",
       "status": "both"
     },
     {
@@ -292,9 +292,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "buttons are real `<button>`s in tab order; exclusivity is carried by the `active` class, not by focus",
       "dataStateOwner": "renderer-local view state (GrammarView)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: modeButtons=4 active=1 || liquid: modeButtons=4 active=1 || negative control `modeSwitch` (active added to 3 of 4) -> 7/8, this row alone false at active=4, restored 8/8",
+      "observed": "standard: modeButtons=4 active=1 || liquid: modeButtons=4 active=1 || negative control `modeSwitch` (active added to 3 of 4) -> 7/8, this row alone false at active=4, restored 8/8 || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: modeButtons=4 active=1 || liquid: modeButtons=4 active=1 || negative control `modeSwitch` -> 6/8 (baseline 7/8), fell=[modeSwitch], restored 7/8",
       "status": "both"
     },
     {
@@ -305,9 +305,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "each row is a focusable `.gram-x-row-main` button",
       "dataStateOwner": "bundled grammar dataset (renderer)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: rows=2410 badged=2410 || liquid: rows=1 badged=1 after the search step; every rendered row carried a `.gram-badge`, both presentations",
+      "observed": "standard: rows=2410 badged=2410 || liquid: rows=1 badged=1 after the search step; every rendered row carried a `.gram-badge`, both presentations || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: rows=1 badged=1 || liquid: rows=1 badged=1 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -318,9 +318,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "text input, real keystrokes via the native value setter + `input` event",
       "dataStateOwner": "renderer-local filter state",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "typed あとで: rows 2410 -> 1 and the head count moved \"2,410 points\" -> \"1 point\"; count and rendered rows agree in both presentations",
+      "observed": "typed あとで: rows 2410 -> 1 and the head count moved \"2,410 points\" -> \"1 point\"; count and rendered rows agree in both presentations || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: query=\"あとで\" renderedRows=1 count=\"1 point\" countBefore=\"0 points\" || liquid: query=\"あとで\" renderedRows=1 count=\"1 point\" countBefore=\"0 points\" || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -331,9 +331,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "row is a button; the detail pane renders below it in the same window",
       "dataStateOwner": "bundled grammar dataset (renderer)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: detailChars=339 focusedTitle=\"〜あとで\" and the detail pane contains that exact title || liquid: identical",
+      "observed": "standard: detailChars=339 focusedTitle=\"〜あとで\" and the detail pane contains that exact title || liquid: identical || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: detailChars=339 focusedTitle=\"〜あとで\" || liquid: detailChars=339 focusedTitle=\"〜あとで\" || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -344,9 +344,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "four buttons in tab order",
       "dataStateOwner": "persisted study state (grammar band store)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: bandButtons=4 active=1 || liquid: bandButtons=4 active=1 — exactly one grade active in both",
+      "observed": "standard: bandButtons=4 active=1 || liquid: bandButtons=4 active=1 — exactly one grade active in both || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: bandButtons=4 active=1 || liquid: bandButtons=4 active=1 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -357,9 +357,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "select and button, both focusable",
       "dataStateOwner": "persisted preset store",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: presetOptions=1 saveControl=true || liquid: same || negative control `presets` (select detached) -> 7/8 with presetOptions=0, restored 8/8",
+      "observed": "standard: presetOptions=1 saveControl=true || liquid: same || negative control `presets` (select detached) -> 7/8 with presetOptions=0, restored 8/8 || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: presetOptions=1 saveControl=true || liquid: presetOptions=1 saveControl=true || negative control `presets` -> 6/8 (baseline 7/8), fell=[presets], restored 7/8",
       "status": "both"
     },
     {
@@ -370,9 +370,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "button, 209x31, contrast 7.9:1 (measured 2026-08-25, `d49d53cf`)",
       "dataStateOwner": "agent conversation context store (session + persisted split by sensitivity)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard: label=\"Ask the Agent about this pattern\" enabled || liquid: identical. Retention proven separately the same day: `dictionary-entry:grammar/pattern/n5-ato-de` retained true in one conversation alongside two other apps' items",
+      "observed": "standard: label=\"Ask the Agent about this pattern\" enabled || liquid: identical. Retention proven separately the same day: `dictionary-entry:grammar/pattern/n5-ato-de` retained true in one conversation alongside two other apps' items || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: label=\"Ask the Agent about this pattern\" namesPattern=false || liquid: label=\"Ask the Agent about this pattern\" namesPattern=false || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
       "status": "both"
     },
     {
@@ -383,9 +383,9 @@
       "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
       "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
       "dataStateOwner": "per-window presentation state (L3)",
-      "automatedProof": "probes/l6-parity.js (`__LQP.check(app)`), the surface-parameterised category-6 harness; calibrated against `probes/l6-parity-dictionary.js` — both instruments returned dictionary 7/7 with identical per-row evidence",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app grammar (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
       "visualProof": "live bridge drive, 2026-08-25 (L5 gate, §5.3)",
-      "observed": "standard aria-pressed=false -> liquid aria-pressed=true -> standard. Round trip: rect identical, all four field values identical (`gram-search`=\"あとで\" preserved), chars/nodes/controls unchanged, diff {} || negative control `windowLifecycle` (aria-pressed stripped) -> 7/8, restored 8/8",
+      "observed": "standard aria-pressed=false -> liquid aria-pressed=true -> standard. Round trip: rect identical, all four field values identical (`gram-search`=\"あとで\" preserved), chars/nodes/controls unchanged, diff {} || negative control `windowLifecycle` (aria-pressed stripped) -> 7/8, restored 8/8 || RE-DRIVEN from _p2j-grammar.json (2026-09-02): standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 6/8 (baseline 7/8), fell=[windowLifecycle], restored 7/8",
       "status": "both"
     },
     {
@@ -2590,14 +2590,12 @@
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
     "rows": 191,
-    "withNamedControl": 132,
-    "declaredNone": 4,
-    "silent": 54,
+    "withNamedControl": 135,
+    "declaredNone": 13,
+    "silent": 42,
     "silentByApp": {
-      "dictionary": 7,
       "mediaWorkspace": 5,
       "mediaCenter": 2,
-      "grammar": 5,
       "translate": 4,
       "agent": 5,
       "captures": 3,
@@ -2606,7 +2604,7 @@
       "immersion": 7
     },
     "silentByCause": {
-      "predatingTheClause": 31,
+      "predatingTheClause": 19,
       "b2WaveNotTranscribed": 23,
       "b2WaveApps": [
         "novels",
