@@ -735,3 +735,42 @@ file that will not open.
 App and profile restored: overlay closed, presentation `standard` with the storage key removed,
 1 window, `study-block-windows.json` deleted (it was absent before), `desktop-layout.json`
 sha256 **9DFB6E2F2361...** unchanged across the whole turn including the restart.
+
+## 2026-09-02 (primary2) — `resources` joins, and one row is deliberately NOT written
+
+**69 rows / 10 apps -> 76 rows / 11 apps**, `both` 68 -> **75**, `pending` **1** unchanged;
+0 duplicate `app|feature` keys. `resources` declares EIGHT rows and **seven** were written.
+
+### The eighth row, and why the ledger does not claim it
+
+`collectedSections` guards the two optional landing strips. Its mutation detaches
+`.mytool-card .mytool-remove` — and **nothing is collected on this profile**, so the mutation
+did not run. It REFUSED.
+
+cat6 scored that identically to a mutation that ran and flipped the wrong row, so the run came
+back **VOID** with 8/8 in both presentations, all three bars passing and 7 of 8 mutations
+flipping exactly their own row. That is an instrument defect in the opposite direction from
+the usual one: it *discards* seven proved rows over a data gap. But quietly passing it would be
+worse — the row would enter the ledger with nothing having falsified it, and "verified by side
+effect" is the only thing a ledger row claims.
+
+So the two cases are now separated. cat6 reports `armed: false` with the refusal text,
+the run stays scorable, and `l6-parity-rows.cjs` skips **that row by name**:
+
+    "skipped": ["collectedSections (control unarmable: no collected tools)"]
+
+**DISCRIMINATING CONTROL on the relaxation itself, live and on the same window.**
+`catalogueCount`'s mutation was re-pointed at `.res-group .res-card .res-name` — an element
+that EXISTS, so the mutation arms, but whose removal flips `resourceCards` instead:
+
+| run | control verdict | run verdict |
+| --- | --- | --- |
+| unarmable mutation only | `7 of 8 armed, every one exact; UNARMABLE: collectedSections` | **PASS 10/10** |
+| armed-but-wrong mutation planted | `VOID - a mutation did not flip exactly its own row` | **VOID** |
+
+An armed mutation that misbehaves still voids the run, with an unarmable one present. The
+plant was reverted and the file verified byte-identical (sha256 equal, `git status` empty).
+
+`resources` itself: **8/8 reachable in both presentations**, rowsAgree, 0 onlyInOne, round trip
+`standard -> liquid -> standard` with 0 diffs, drive 8 steps / 0 refusals. Writer self-control
+3 armed / 3 fired.

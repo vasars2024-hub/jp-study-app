@@ -6,7 +6,8 @@
     "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. CORRECTED 2026-09-02: this note used to claim the seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", had NO spec id and was \"deliberately absent\". That was false -- `l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for every app, and the live run refused BY NAME on it, which is the refusal working. Its four authored fields are now copied from that same ledger row. This block is a REGRESSION TEST -- a live cat6 dictionary run must re-derive these SEVEN features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys. Measured 2026-09-02 at 1ec440ab: 7 rows, statuses {both: 7}, added 0.",
     "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403.",
     "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped.",
-    "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319."
+    "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319.",
+    "resources": "AUTHORED 2026-09-02 from source, fourth app with no prior ledger row. SEVEN of its eight rows were written; `collectedSections` was DELIBERATELY NOT WRITTEN and its metadata entry is kept anyway so a later profile with collected tools writes it without re-authoring. The reason is a repair in the same commit: its mutation targets `.mytool-card .mytool-remove` and nothing is collected on this profile, so the mutation REFUSED rather than ran. cat6 used to score that identically to a mutation that ran and flipped the wrong row, which VOIDed a run whose other 7 mutations were exact; it now reports `armed: false` and `l6-parity-rows.cjs` skips exactly that row by name. Discriminating control, live: an ARMED-but-wrong mutation (catalogueCount re-pointed at `.res-name`, which flips `resourceCards` instead) still VOIDs the whole run, so the relaxation cannot wave a broken control through. dataStateOwner is three different owners here and they are not interchangeable: the catalogue is a STATIC module (renderer/data/resources.ts), the bundle checklists are localStorage under `resources.checklist.<id>`, and the collected tools are a MAIN-PROCESS store reached through window.api.toolsList (shared/collectedTools.ts), shared with Blanc. Liquid destination read from resourcesLiquid.css, whose `:is(.fwin.fwin-liquid, .popout-root.popout-liquid)` rules touch only `.res-command-surface` and its children."
   },
   "apps": {
     "dictionary": {
@@ -188,6 +189,61 @@
         "windowLifecycle": {
           "feature": "Window lifecycle: pop out, minimize, maximize, close",
           "currentRoute": "Scraper window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "resources": {
+      "standardDestination": "ResourcesContent in-window: the `.res-command-surface` command strip on top (heading, catalogue search, filter chips, visible-count line), then the landing sections (learner heat map, bundles, New, My tools) and the per-category `.res-group` catalogue below",
+      "liquidDestination": "Same in-window Resources view on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: `resourcesLiquid.css` puts the material on the `.res-command-surface` only (the view head, the filter controls and the refresh hint), and the catalogue below it — groups, cards, bundles, the heat map and the My-tools strip — stays a plain opaque body, because a grid of link cards is a list to read rather than chrome to look through",
+      "noLiquidReason": null,
+      "features": {
+        "categoryRail": {
+          "feature": "Filter the catalogue by category, with every rendered group offered as a chip",
+          "currentRoute": "Resources window > `.res-filter .gram-level-btn` chips, exactly one carrying `active`, over the `.res-group .res-group-head h2` headings they filter to",
+          "keyboardRoute": "real buttons in the command strip",
+          "dataStateOwner": "component state (`filter`) in ResourcesContent.tsx over the static `renderer/data/resources.ts` catalogue — not persisted, so a reopen returns to All"
+        },
+        "catalogueCount": {
+          "feature": "The visible-count line equals what is actually painted",
+          "currentRoute": "Resources window > `.gram-count` line, counted against `.res-group .res-card` (group cards only — the New and My-tools strips also render `.res-card`)",
+          "keyboardRoute": "not a control; it is the surface's own claim about the filtered catalogue",
+          "dataStateOwner": "derived from `filter` + `query` over `renderer/data/resources.ts`, with `renderer/data/catalogFallback.ts` behind it"
+        },
+        "resourceCards": {
+          "feature": "Every catalogue card names itself, says which of free/paid/freemium it is, names the host it opens, and marks itself external",
+          "currentRoute": "Resources window > `.res-group .res-card` > `.res-name` + `.res-cost` + `.res-host` + `.res-open` (ResourcesContent.tsx:456-464)",
+          "keyboardRoute": "each card is a real `button`; activating it opens the external URL through the shell",
+          "dataStateOwner": "static `renderer/data/resources.ts` — name, cost and host are authored fields, not fetched"
+        },
+        "bundleGrid": {
+          "feature": "Curated bundles, each with its gem, title, link count and a checklist that cannot claim more ticks than it holds",
+          "currentRoute": "Resources window > `.bundles-section .bundle-card` > `.bundle-card-gem` + `.bundle-card-title` + `.bundle-card-foot span` + `.bundle-card-checkmark`",
+          "keyboardRoute": "bundle cards are real buttons; the detail view is reachable and reversible",
+          "dataStateOwner": "bundle definitions are static; the per-bundle checklist is localStorage under the `resources.checklist.<bundleId>` prefix (ResourcesContent.tsx:49-63), which is why a stale list is the fabricated-progress case this row guards"
+        },
+        "collectedSections": {
+          "feature": "The two OPTIONAL landing strips — My tools and New — render nothing rather than an empty heading, and a collected tool always carries its remove control",
+          "currentRoute": "Resources window > `.mytools-section .mytool-card` (`.mytool-name` + `.mytool-remove`) and `.new-section .new-card` (`.res-name` + `.res-host`); both return `null` when empty",
+          "keyboardRoute": "remove is a real `IconButton`; the New strip is a native `<details>` disclosure",
+          "dataStateOwner": "main-process collected-tools store through `window.api.toolsList/toolsAdd/toolsRemove` (shared/collectedTools.ts) — NOT localStorage, and shared with Blanc's app drawer"
+        },
+        "learnerHeatMap": {
+          "feature": "Learners-by-country greeting whose caption count equals the countries actually painted",
+          "currentRoute": "Resources window > `.heatmap-section` > `.heatmap-caption` over either `.heatmap-svg path` (choropleth) or `.heatmap-bar-row` (bars, each `.heatmap-bar-fill` width being its share of the largest)",
+          "keyboardRoute": "not a control; it is a read-only figure with an `aria-label` on the `role=\"img\"` svg",
+          "dataStateOwner": "main-process `window.api.statsCounts()` (WorldHeatMap.tsx:82) — anonymous aggregate counts, fetched, so the section is correctly absent when there are none"
+        },
+        "landingAgreement": {
+          "feature": "The landing sections and the command surface agree: the bundles strip is mounted exactly when the catalogue is unfiltered and unsearched",
+          "currentRoute": "Resources window > `.gram-search` value + the first `.res-filter .gram-level-btn` chip, witnessed against `.bundles-section` being mounted",
+          "keyboardRoute": "a native search input and a real chip button; both are what the user changes to leave the landing state",
+          "dataStateOwner": "component state (`query`, `filter`) in ResourcesContent.tsx — `showLanding` is `filter === \"All\" && !query.trim()`, derived rather than stored"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Resources window > `.fwin-b` title-bar controls",
           "keyboardRoute": "four real buttons",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
         }

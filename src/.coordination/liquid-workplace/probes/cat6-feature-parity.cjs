@@ -953,11 +953,24 @@ async function runDuplication() {
         // control, so this cannot be used to wave a real over-broad mutation through.
         const allowed = cascades[which] || [];
         const unexpected = fell.filter((r) => r.id !== which && !allowed.includes(r.id));
+        // UNARMABLE IS NOT BROKEN, and conflating the two VOIDed a run that had nothing
+        // wrong with it. Measured 2026-09-02 on `resources`: 8/8 in both presentations,
+        // all three bars pass, 7 of 8 mutations flip exactly their own row — and the run
+        // read VOID because `collectedSections`'s mutation targets `.mytool-card
+        // .mytool-remove`, which does not exist because nothing is collected on this
+        // profile. The mutation REFUSED; it never ran. That is a data gap, not an
+        // instrument defect, and the difference matters in both directions: a VOID here
+        // discards seven proved rows, while quietly passing it would let a row into the
+        // ledger with no control behind it at all. So it is named, the run stays scorable,
+        // and `l6-parity-rows.cjs` REFUSES to write the specific row it could not prove.
+        const unarmable = !!applied.refused;
         results.push({
           mutation: which,
           declaredCascade: allowed,
           preBaseline: pre.refused ? null : `${pre.reachable}/${pre.total}`,
           applied: applied.refused || applied.mutated || A(applied),
+          armed: !unarmable,
+          unarmableReason: unarmable ? applied.refused : null,
           reachable: dirtyCheck.refused ? null : `${dirtyCheck.reachable}/${dirtyCheck.total}`,
           fellRows: fell.map((r) => r.id),
           exactlyOwnRow: fell.some((r) => r.id === which) && unexpected.length === 0,
@@ -967,13 +980,24 @@ async function runDuplication() {
           returned: !after.refused && !pre.refused && after.reachable === pre.reachable,
         });
       }
-      const allProved = results.length > 0
-        && results.every((r) => r.exactlyOwnRow && r.returned);
+      const armedResults = results.filter((r) => r.armed);
+      const unarmableRows = results.filter((r) => !r.armed).map((r) => r.mutation);
+      // At least one mutation must ARM, or nothing was controlled and the run is VOID —
+      // an all-unarmable control is exactly the empty-harness case the rubric caps at 0.
+      const allProved = armedResults.length > 0
+        && armedResults.every((r) => r.exactlyOwnRow && r.returned);
       out.control = {
         mutations: results,
-        verdict: allProved
-          ? 'CONTROL FAILED AS REQUIRED - category 6 instrument is proven'
-          : 'VOID - a mutation did not flip exactly its own row, or did not restore',
+        armed: armedResults.length,
+        declared: results.length,
+        unarmable: unarmableRows,
+        verdict: (() => {
+          if (!allProved) return 'VOID - a mutation did not flip exactly its own row, or did not restore';
+          if (unarmableRows.length === 0) return 'CONTROL FAILED AS REQUIRED - category 6 instrument is proven';
+          return `CONTROL FAILED AS REQUIRED - ${armedResults.length} of ${results.length} mutations armed and`
+            + ` every one flipped exactly its own row; UNARMABLE on this profile, so their rows are NOT`
+            + ` control-proved and must not be written: ${unarmableRows.join(', ')}`;
+        })(),
       };
     }
 

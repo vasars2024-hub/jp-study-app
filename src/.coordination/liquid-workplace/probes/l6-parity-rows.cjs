@@ -27,6 +27,11 @@
  *   - a run with no `rowEvidence` is from before that field existed — refuse rather than
  *     silently write rows with an empty `observed`.
  *   - an app with no metadata block, or a row id with no metadata entry, refuses BY NAME.
+ *   - a row whose own mutation could not be ARMED is SKIPPED by name (added 2026-09-02).
+ *     cat6 reports `armed: false` when a mutation refused because its subject is absent on
+ *     this profile — `resources` > `collectedSections` targets `.mytool-card
+ *     .mytool-remove` and nothing is collected. Nothing falsified that row, so the ledger
+ *     must not claim it; the run's other rows are unaffected and still write.
  *   - `--dry` prints exactly what would be added and writes nothing.
  *
  * Status is derived, never assumed: `both` when the row is reachable in both presentations,
@@ -89,10 +94,22 @@ function rowsFromRun(run, meta, sourceName) {
   }
 
   const out = [];
+  const skipped = [];
   for (const ev of run.rowEvidence) {
     const fm = m.features && m.features[ev.id];
     if (!fm) {
       return { refused: `${sourceName}: no metadata entry for row "${ev.id}" of app "${app}" — add it to parity-row-metadata.json rather than writing an invented route` };
+    }
+    // A ROW WHOSE CONTROL NEVER ARMED IS NOT VERIFIED BY SIDE EFFECT, which is the only
+    // thing a ledger row claims. cat6 now reports `armed: false` when a mutation refused
+    // because its subject is genuinely absent on this profile (`resources` >
+    // `collectedSections`: nothing is collected, so `.mytool-card .mytool-remove` does not
+    // exist). Skipping it BY NAME is the difference between a smaller honest ledger and a
+    // larger one carrying a row nothing ever falsified.
+    const ctl = controlBy.get(ev.id);
+    if (ctl && ctl.armed === false) {
+      skipped.push(`${ev.id} (control unarmable: ${ctl.unarmableReason || ctl.applied})`);
+      continue;
     }
     const std = ev.standard;
     const lq = ev.liquid;
@@ -120,7 +137,7 @@ function rowsFromRun(run, meta, sourceName) {
       status,
     });
   }
-  return { rows: out, app, roundTrip: run.roundTrip, verdict: run.verdict };
+  return { rows: out, skipped, app, roundTrip: run.roundTrip, verdict: run.verdict };
 }
 
 function loadRuns() {
@@ -207,6 +224,8 @@ for (const { name, run } of runs) {
     verdict: r.verdict,
     rows: r.rows.length,
     added: add.length,
+    // Named, never silent: a skipped row is a row the ledger deliberately does NOT claim.
+    skipped: r.skipped,
     statuses: r.rows.reduce((a, row) => ((a[row.status] = (a[row.status] || 0) + 1), a), {}),
   });
 }
