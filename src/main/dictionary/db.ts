@@ -98,7 +98,19 @@ export function migrateDictionaryDb(db: SqliteDb): number {
 export interface OpenDictionaryOptions {
   /** Overrides `userData/dictionary`. Tests pass a temp dir; the app never does. */
   dir?: string;
-  /** Skips the migration ladder. Only for inspecting a file you must not change. */
+  /**
+   * Opens a connection that CANNOT write: SQLite's own `SQLITE_OPEN_READONLY`,
+   * no migration ladder, and none of the pragmas that persist.
+   *
+   * Until 2026-09-02 this flag did only the middle one, so "readonly" was a
+   * naming convention the driver knew nothing about — the handle was
+   * `new Database(path)` with default read-write flags and still ran
+   * `journal_mode = WAL`, which stamps the file header. The invariant the read
+   * worker's comment claims ("this role must never change the file") held only
+   * because the dispatch table happened to expose read functions exclusively;
+   * an eighth entry that wrote would have been undefended. Now the driver
+   * enforces it and a write throws (boss audit 2026-09-02, Finding 5).
+   */
   readonly?: boolean;
 }
 
@@ -116,11 +128,19 @@ export function openDictionaryDb(options: OpenDictionaryOptions = {}): SqliteDb 
   const dir = options.dir ?? dictionaryDir();
   fs.mkdirSync(dir, { recursive: true });
   const Database = loadDriver();
-  const db = new Database(path.join(dir, 'dict.db'));
+  const db = new Database(path.join(dir, 'dict.db'), options.readonly ? { readonly: true } : undefined);
 
-  db.pragma('journal_mode = WAL');
+  // `journal_mode` and `synchronous` are the two that reach the FILE: the first
+  // rewrites its header to switch journalling modes, the second is stored for the
+  // writes this connection makes. A readonly handle may not run either — SQLite
+  // rejects the first outright — and needs neither, because it inherits whatever
+  // mode the writer already put the file in. The remaining three are per-connection
+  // memory and locking settings, valid and useful in both roles.
+  if (!options.readonly) {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+  }
   db.pragma('foreign_keys = ON');
-  db.pragma('synchronous = NORMAL');
   db.pragma('mmap_size = 268435456'); // 256 MB
   db.pragma('busy_timeout = 5000');
 
