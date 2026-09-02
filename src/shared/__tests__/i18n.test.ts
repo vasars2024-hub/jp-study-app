@@ -262,13 +262,27 @@ describe('catalog hygiene', () => {
      */
     // eslint-disable-next-line @typescript-eslint/no-var-requires -- CJS tool, intentionally shared
     const { scan } = require('../../../tools/i18n-hardcoded-check.cjs') as {
-      scan: () => { fresh: { file: string; count: number }[] };
+      scan: () => {
+        fresh: { file: string; count: number }[];
+        grown: { file: string; count: number; was: number }[];
+      };
     };
-    const { fresh } = scan();
+    const { fresh, grown } = scan();
     expect(
       fresh.map((o) => `${o.file} (${o.count} strings)`),
       'route these through useT()/t() per CLAUDE.md "i18n workflow", or baseline them ' +
         'with `node tools/i18n-hardcoded-check.cjs --update-baseline` and say why',
+    ).toEqual([]);
+    /*
+     * The baseline records a COUNT per file, not just a path, so being listed is
+     * not a licence to add more. A bare path list made baselining a pure
+     * loosening — thirty more hardcoded strings could go into a listed file and
+     * nothing would notice.
+     */
+    expect(
+      grown.map((o) => `${o.file} (${o.was} -> ${o.count} strings)`),
+      'these files are on the hardcoded baseline as EXISTING debt; new UI text in them ' +
+        'still has to go through useT()/t()',
     ).toEqual([]);
     // 60s. A whole-src sweep: its cost is the tree, and under a full `vitest run` with eight
     // workers contending for one disk it exceeded the 20s default and was reported as a product

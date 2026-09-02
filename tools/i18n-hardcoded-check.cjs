@@ -157,6 +157,23 @@ function adoptsI18n(src) {
 }
 
 /**
+ * Read the baseline as `{ path: recordedCount }`.
+ *
+ * The file used to be a bare array of paths, and a bare array makes baselining a
+ * pure loosening: once a file is listed, thirty more hardcoded strings can be
+ * added to it and no gate notices. Recording the COUNT makes the list a ratchet
+ * in both directions — a baselined file may shrink or hold, never grow.
+ *
+ * The array form is still accepted (count `null` = unknown, no growth check), so
+ * an older checkout or a hand-edited list does not hard-fail.
+ */
+function readBaseline() {
+  const raw = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+  if (Array.isArray(raw)) return new Map(raw.map((f) => [f, null]));
+  return new Map(Object.entries(raw));
+}
+
+/**
  * A baseline written from a dirty tree is not a claim about the branch.
  *
  * Measured 2026-09-02: the committed baseline held 6 files, and a clean checkout
@@ -229,21 +246,31 @@ function main() {
       process.exitCode = 1;
       return;
     }
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(offenders.map((o) => o.file).sort(), null, 2) + '\n');
-    console.log(`baseline updated: ${offenders.length} file(s)`);
+    const record = {};
+    for (const o of [...offenders].sort((a, b) => a.file.localeCompare(b.file))) record[o.file] = o.count;
+    fs.writeFileSync(BASELINE_PATH, JSON.stringify(record, null, 2) + '\n');
+    console.log(
+      `baseline updated: ${offenders.length} file(s), ` +
+        `${offenders.reduce((n, o) => n + o.count, 0)} string(s)`,
+    );
     return;
   }
 
-  const baseline = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  const baseline = readBaseline();
   const fresh = offenders.filter((o) => !baseline.has(o.file));
-  const fixed = [...baseline].filter((f) => !offenders.some((o) => o.file === f));
+  const grown = offenders.filter((o) => {
+    const was = baseline.get(o.file);
+    return typeof was === 'number' && o.count > was;
+  });
+  const fixed = [...baseline.keys()].filter((f) => !offenders.some((o) => o.file === f));
 
   if (asJson) {
-    console.log(JSON.stringify({ offenders, fresh, fixed }, null, 2));
-  } else if (fresh.length === 0) {
+    console.log(JSON.stringify({ offenders, fresh, grown, fixed }, null, 2));
+  } else if (fresh.length === 0 && grown.length === 0) {
     console.log(
-      `i18n-hardcoded: no new component renders UI text without adopting i18n. ` +
-        `${baseline.size} file(s) baselined.`,
+      `i18n-hardcoded: no new component renders UI text without adopting i18n, and no ` +
+        `baselined one grew. ${baseline.size} file(s) baselined, ` +
+        `${[...baseline.values()].reduce((n, v) => n + (v || 0), 0)} string(s).`,
     );
     if (fixed.length > 0) {
       console.log(
@@ -251,6 +278,10 @@ function main() {
           `tools/i18n-hardcoded-baseline.json:\n  ${fixed.join('\n  ')}`,
       );
     }
+  } else if (fresh.length === 0) {
+    console.log('These baselined components GREW more hardcoded UI text. Being on the\n' +
+      'baseline records existing debt; it does not license adding to it:\n');
+    for (const o of grown) console.log(`  ${o.file} — ${baseline.get(o.file)} -> ${o.count} string(s)`);
   } else {
     console.log(
       'These components render user-facing text and never adopted i18n. The catalog\n' +
@@ -267,7 +298,7 @@ function main() {
     );
   }
 
-  process.exitCode = fresh.length > 0 ? 1 : 0;
+  process.exitCode = fresh.length > 0 || grown.length > 0 ? 1 : 0;
 }
 
 /**
@@ -287,14 +318,17 @@ function scan() {
     if (hits.length < MIN_STRINGS) continue;
     offenders.push({ file: path.relative(ROOT, file).replace(/\\/g, '/'), count: hits.length });
   }
-  const baseline = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  const baseline = readBaseline();
   return {
     offenders,
     fresh: offenders.filter((o) => !baseline.has(o.file)),
-    fixed: [...baseline].filter((f) => !offenders.some((o) => o.file === f)),
+    grown: offenders
+      .filter((o) => typeof baseline.get(o.file) === 'number' && o.count > baseline.get(o.file))
+      .map((o) => ({ ...o, was: baseline.get(o.file) })),
+    fixed: [...baseline.keys()].filter((f) => !offenders.some((o) => o.file === f)),
   };
 }
 
-module.exports = { scan, strip, countUiStrings, adoptsI18n, MIN_STRINGS };
+module.exports = { scan, readBaseline, strip, countUiStrings, adoptsI18n, MIN_STRINGS };
 
 if (require.main === module) main();
