@@ -388,3 +388,28 @@ is claimed. **Re-drive all five on a scanned library; that is the whole of what 
 
 The false sentence was REMOVED from all six rows rather than left standing beneath a newer one. A
 superseded measurement that still reads as current is how a ledger starts lying.
+
+## 2026-09-01 late (primary2) — the 5 pending rows re-derived: the blocker is data, and it is real
+
+Still **45 both / 5 pending / 0 REGRESSION of 50**. No row moved, and the reason is now proven
+rather than reported.
+
+All five are `mediaWorkspace` and all five need a file in the player.
+`window.api.seanimeStudyLibrary()` returned `{ok:true, files:[]}` again this turn, measured live
+through the bridge. The previous turn recorded that number; what was missing was whether an
+empty list meant an empty library or a swallowed failure — the exact ambiguity
+`main/seanime/studyLibrary.ts`'s own header warns about for a different endpoint.
+
+It is honest. `src/main/seanime/index.ts:139-145` returns `{ok:false, error}` whenever
+`readSeanimeStudyLibrary()` throws, and `seanimeApi` (`main/seanime/client.ts:50`) throws
+`SeanimeUnavailableError` unless sidecar status is exactly `ready`. Its comment states the rule
+in as many words: "a stopped sidecar has to reach the renderer as an explicit reason, because an
+empty list is indistinguishable from an empty library". So `ok:true` means the sidecar answered
+and has **0** local files.
+
+Not a missing install either — the 84 MB sidecar is staged at `build/seanime.exe`. Seanime has
+no media directory scanned on this machine. Our boundary is read-only by construction (two GETs,
+no PATCH), so no agent can scan one. Logged in `needs-user.md` 2026-09-01 22:55.
+
+The Liquid destination itself is **not** the blocker: `f2619b91` built the overlay's own
+presentation host and the row text has said so since. These five are one scan away from `both`.
