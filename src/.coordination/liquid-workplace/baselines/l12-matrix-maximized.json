@@ -1,0 +1,3133 @@
+{
+  "schema": "l12-visual-matrix/v1",
+  "bullet": "L12 bullet 1 — every app standard/Liquid/theme/state screenshot matrix",
+  "generatedAt": "2026-09-02T03:19:02.593Z",
+  "bridge": {
+    "pid": 53288,
+    "port": 39273
+  },
+  "dimensions": {
+    "apps": [
+      "agent",
+      "library",
+      "novels",
+      "dictionary",
+      "grammar",
+      "translate",
+      "player",
+      "video",
+      "music",
+      "anki",
+      "flashcards",
+      "games",
+      "stats",
+      "resources",
+      "settings",
+      "note",
+      "visualizer",
+      "musicwidget",
+      "city",
+      "immersion",
+      "calendar",
+      "reading",
+      "youtube",
+      "scraper",
+      "files"
+    ],
+    "themes": [
+      "oled-black",
+      "paper"
+    ],
+    "presentations": [
+      "standard",
+      "liquid"
+    ],
+    "states": [
+      "maximized"
+    ],
+    "themeCatalog": [
+      {
+        "id": "study-os",
+        "light": false
+      },
+      {
+        "id": "classic-light",
+        "light": true
+      },
+      {
+        "id": "dark-nebula",
+        "light": false
+      },
+      {
+        "id": "soft-sepia",
+        "light": true
+      },
+      {
+        "id": "ocean-blue",
+        "light": true
+      },
+      {
+        "id": "high-contrast",
+        "light": false
+      },
+      {
+        "id": "mint-green",
+        "light": true
+      },
+      {
+        "id": "rose-pine",
+        "light": true
+      },
+      {
+        "id": "oled-black",
+        "light": false
+      },
+      {
+        "id": "midnight-ink",
+        "light": false
+      },
+      {
+        "id": "paper",
+        "light": true
+      },
+      {
+        "id": "cyberpunk",
+        "light": false
+      },
+      {
+        "id": "forest-night",
+        "light": false
+      }
+    ],
+    "canonicalSections": 25
+  },
+  "sampledOut": [],
+  "caretFrozen": true,
+  "controls": {
+    "c0": {
+      "kind": "floor/instrument-noise",
+      "app": "agent",
+      "theme": "study-os",
+      "delta": {
+        "pixels": 966960,
+        "pctDiff": 0,
+        "pctOver8": 0,
+        "maxDelta": 0
+      },
+      "identical": true
+    },
+    "c1": {
+      "kind": "repeat/must-be-identical",
+      "app": "agent",
+      "theme": "study-os",
+      "a": "e4f8416589157d9b7d07823de2f5e124009f561035590b5ed3890adadfc19642",
+      "b": "e4f8416589157d9b7d07823de2f5e124009f561035590b5ed3890adadfc19642",
+      "converged": [
+        true,
+        true
+      ],
+      "attempts": [
+        8,
+        3
+      ],
+      "run": 3,
+      "delta": {
+        "pixels": 966960,
+        "pctDiff": 0,
+        "pctOver8": 0,
+        "maxDelta": 0
+      },
+      "pass": true
+    },
+    "c2": {
+      "kind": "theme/must-differ",
+      "app": "agent",
+      "themes": [
+        "study-os",
+        "classic-light"
+      ],
+      "a": "e4f8416589157d9b7d07823de2f5e124009f561035590b5ed3890adadfc19642",
+      "b": "801e24a7a3121ea21abce139e8b6a93869f1f3fcf4ca8bc347ab6fcd183a270e",
+      "delta": {
+        "pixels": 966960,
+        "pctDiff": 99.044,
+        "pctOver8": 98.937,
+        "maxDelta": 243
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "98.937% of pixels differ by >8 (floor 0, gate 1%)"
+      },
+      "pass": true
+    },
+    "c3": {
+      "kind": "presentation/must-differ",
+      "app": "agent",
+      "theme": "study-os",
+      "a": "e4f8416589157d9b7d07823de2f5e124009f561035590b5ed3890adadfc19642",
+      "b": "21a39bbb2dadea50a2f69d6b6f59fc34651351190f53667af5dd0a07f8592cac",
+      "reached": true,
+      "delta": {
+        "pixels": 966960,
+        "pctDiff": 51.213,
+        "pctOver8": 30.751,
+        "maxDelta": 234
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "30.751% of pixels differ by >8 (floor 0, gate 1%)"
+      },
+      "pass": true,
+      "note": null
+    },
+    "c4": {
+      "kind": "app/must-differ",
+      "theme": "study-os",
+      "apps": [
+        "agent",
+        "library"
+      ],
+      "a": "7e4e8aba542bb807e7f75c42f5cba46c859c7e8e7a9824f1a68c642644f66575",
+      "b": "a324315d8f945a652c6cbb26419d8a43604381dc1c717a00046e82e327497002",
+      "delta": {
+        "incomparable": "different dimensions",
+        "a": {
+          "format": "raw",
+          "width": 1264,
+          "height": 765,
+          "channels": 3,
+          "depth": "uchar",
+          "premultiplied": false,
+          "size": 2900880
+        },
+        "b": {
+          "format": "raw",
+          "width": 820,
+          "height": 580,
+          "channels": 3,
+          "depth": "uchar",
+          "premultiplied": false,
+          "size": 1426800
+        }
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "different dimensions — 1264x765 vs 820x580"
+      },
+      "pass": true
+    },
+    "c5": {
+      "kind": "state/must-differ",
+      "app": "agent",
+      "normalRect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "maximizedRect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "areaNormal": 475600,
+      "areaMaximized": 966960,
+      "areaRatio": 2.03,
+      "b": "e4f8416589157d9b7d07823de2f5e124009f561035590b5ed3890adadfc19642",
+      "pass": true
+    }
+  },
+  "certifiable": true,
+  "cells": [
+    {
+      "app": "agent",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__standard__oled-black__maximized.png",
+      "bytes": 141034,
+      "sha256": "8fd9b887a17731a13f0e623a74e45752f94a9902d2baa1d0c68b3e0993f56a66",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "library",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__standard__oled-black__maximized.png",
+      "bytes": 514265,
+      "sha256": "d9fbcc5eb58c0e7f7a605ced176d6baba437942bde7785226453aae21cf95e97",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__standard__oled-black__maximized.png",
+      "bytes": 89007,
+      "sha256": "b9fe2ea2c10dee16219a22b6e997d251e3b24d736569cf0450e5b7e90ef2e03d",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "dictionary",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__oled-black__maximized.png",
+      "bytes": 26123,
+      "sha256": "00ad0af565dfae2d4e564e0afcbe3b18c87825549375b210b2f83a3efeae866d",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__standard__oled-black__maximized.png",
+      "bytes": 81051,
+      "sha256": "28a86649c179f71ed88170381fe9ebd6f89e01d5d3d3402ae7b6c6e994b17987",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__standard__oled-black__maximized.png",
+      "bytes": 30267,
+      "sha256": "0820f23fbd71894610dbefe034a98c3353c02e36408af90581775500b6986c88",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__standard__oled-black__maximized.png",
+      "bytes": 428291,
+      "sha256": "a9f80f87a058c46bd1a85f48f678a0edb4cb7ec4bd6c93f43d5a02b4f834528f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "video",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__standard__oled-black__maximized.png",
+      "bytes": 378539,
+      "sha256": "b394db526971a87d438db5d68cd156c9d3d3b413806b85c3ad18693369a05aee",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "music",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__standard__oled-black__maximized.png",
+      "bytes": 157275,
+      "sha256": "2977bf3f300006e43cffe14037723158e38d47e01b739caca618c86037a1c3a1",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "anki",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__standard__oled-black__maximized.png",
+      "bytes": 50699,
+      "sha256": "0ffb6fecb576c2b34e6b2147a7e65b4e648fe67db3b630a957132437d96a9410",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__oled-black__maximized.png",
+      "bytes": 57825,
+      "sha256": "c9bc2015e7a13cc4f6111a73a95e333c13b43f8f0c78534bd276255b09e9c3ef",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__standard__oled-black__maximized.png",
+      "bytes": 105509,
+      "sha256": "a6e389419f43eeb80c2d7b840fa1fd56ef621044e294c9b936ae536282cafd25",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__standard__oled-black__maximized.png",
+      "bytes": 53437,
+      "sha256": "b7faebfd7844e688d2d2d04d174e68fd7344cd344361eff7c9381a5b5822e56c",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__standard__oled-black__maximized.png",
+      "bytes": 123158,
+      "sha256": "1019eeb6f059a4fa66621b873d91f017ef98e3bd8d8abbb0fddc3a7724cad2e4",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__standard__oled-black__maximized.png",
+      "bytes": 188137,
+      "sha256": "37d5ab7097201a3d724d50df2945b351871b97f9b95ce16f9eeed1bc187c8bff",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": false,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": false,
+      "error": "state maximized: surface has no maximize control of its own (note/frameless chrome)"
+    },
+    {
+      "app": "visualizer",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/visualizer__standard__oled-black__maximized.png",
+      "bytes": 8206,
+      "sha256": "8b409b38d2a41cdbb1bc48415958b3beb42540a9b1468a91bcf68a887800af09",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "musicwidget",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/musicwidget__standard__oled-black__maximized.png",
+      "bytes": 8206,
+      "sha256": "8b409b38d2a41cdbb1bc48415958b3beb42540a9b1468a91bcf68a887800af09",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "city",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/city__standard__oled-black__maximized.png",
+      "bytes": 8206,
+      "sha256": "8b409b38d2a41cdbb1bc48415958b3beb42540a9b1468a91bcf68a887800af09",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "immersion",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__standard__oled-black__maximized.png",
+      "bytes": 47624,
+      "sha256": "a5b9e3bdd2b3c78672576531a1bad6d397295e0c51b9f1612f98eb1f9fd01878",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__standard__oled-black__maximized.png",
+      "bytes": 33268,
+      "sha256": "bdefa72ffa6dbd830f6c2fc17aea71add79e28821ed2d4c1e5f6a8ed4bd27fad",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__standard__oled-black__maximized.png",
+      "bytes": 82298,
+      "sha256": "7fd3ea3a340707744ecddbf9e4280702ae84252a3a0f6397b848074ec25a44a2",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__standard__oled-black__maximized.png",
+      "bytes": 28548,
+      "sha256": "ca6b3846e7c0b10fd66b938af72377111bad2dc20cf98744268aed6c19499a31",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__standard__oled-black__maximized.png",
+      "bytes": 65606,
+      "sha256": "91900d274fa40f9cb69bf1085707b384db7e60210dcea6f64de8bffef2a2cb22",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1108,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__standard__oled-black__maximized.png",
+      "bytes": 95153,
+      "sha256": "8eabf2fdc3d66b135947402a3e37730ad7c93875cdeef681c1d587a15cd4e8be",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "agent",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__standard__paper__maximized.png",
+      "bytes": 161565,
+      "sha256": "0a851b4a341886ddddd9ec6e8afe4858d49882f0c5d2cd1c8ca2d7c93991a998",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "library",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__standard__paper__maximized.png",
+      "bytes": 519037,
+      "sha256": "4b7c0fd4f07521c67590609d8482541c26973c93bc818897d083562e189c2452",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__standard__paper__maximized.png",
+      "bytes": 92692,
+      "sha256": "3885957aac0062cccc23d9fe2a89548e550e513062a828c7ab95d27f81b48679",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "dictionary",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__paper__maximized.png",
+      "bytes": 27920,
+      "sha256": "3799d263975ca885ce577e6e54f844a2a43eed620789318970d65c8005899760",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__standard__paper__maximized.png",
+      "bytes": 87935,
+      "sha256": "85fb496c03f5a35fb11ab03e00e66258ebfa6386cc1ff3f93d37ba0c562b0b78",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__standard__paper__maximized.png",
+      "bytes": 33182,
+      "sha256": "f660bf0ba4b851d140bba3c77eeb98344134ab9688d8b0d76a98314c99dcd20f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__standard__paper__maximized.png",
+      "bytes": 436131,
+      "sha256": "61d9b9538c9e3cdd79aebe16782b8b32412239c27562619356087697395b5ace",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "video",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__standard__paper__maximized.png",
+      "bytes": 430204,
+      "sha256": "d7d72a2baba58d0bd6a3d4f2ca6d2fc4584b41e2bb1c880e46b9a091a4aed572",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "music",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__standard__paper__maximized.png",
+      "bytes": 169137,
+      "sha256": "c8fdcad3bb2cda21346ff5f6848257cea747e92f32a575f82174f53bc0345511",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "anki",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__standard__paper__maximized.png",
+      "bytes": 54462,
+      "sha256": "928b1646e1ec6228d2666de2fd16b19bac98fdc2ab04f361b58dfbfffe59e5dc",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__paper__maximized.png",
+      "bytes": 62440,
+      "sha256": "d08ecdcab7fda0fe6c4fb0e956788f46b6cf2732f3a2691e0fd8c94211e9d766",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__standard__paper__maximized.png",
+      "bytes": 117717,
+      "sha256": "7e792843ffc00f8c50342cf8deaaa4445e796fc93d1c1ecd1146e7f1a2d3efee",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__standard__paper__maximized.png",
+      "bytes": 57360,
+      "sha256": "fa75fa8604e48bc40316f4d2256a9e7a3d392ae4cd9900e06ab2bcf7a4bfae1e",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__standard__paper__maximized.png",
+      "bytes": 166947,
+      "sha256": "811272c8304763309113528360f671bb5317e0bb72e919421bb08b547f88977d",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__standard__paper__maximized.png",
+      "bytes": 179516,
+      "sha256": "fa10dc7cb04602e3afa5e8e292d5b10665983c8010e85137d9702cf8035e7ac6",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": false,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": false,
+      "error": "state maximized: surface has no maximize control of its own (note/frameless chrome)"
+    },
+    {
+      "app": "visualizer",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/visualizer__standard__paper__maximized.png",
+      "bytes": 8872,
+      "sha256": "e4975e0ff638cc85c9e765b04ba5daad4799bcebfc18ab8f31e485d6ab0ef59f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "musicwidget",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/musicwidget__standard__paper__maximized.png",
+      "bytes": 8872,
+      "sha256": "e4975e0ff638cc85c9e765b04ba5daad4799bcebfc18ab8f31e485d6ab0ef59f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "city",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/city__standard__paper__maximized.png",
+      "bytes": 8872,
+      "sha256": "e4975e0ff638cc85c9e765b04ba5daad4799bcebfc18ab8f31e485d6ab0ef59f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "immersion",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__standard__paper__maximized.png",
+      "bytes": 54596,
+      "sha256": "9fdf3cc99053a736ae122df0c812a42fb15ac95aa2d89272fd551ab3dcff3650",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__standard__paper__maximized.png",
+      "bytes": 35679,
+      "sha256": "9de26db6a63666f3d1afa8cb2ae2203195541bb48583380fdd738e6791be1e7c",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__standard__paper__maximized.png",
+      "bytes": 87679,
+      "sha256": "d5a0a4659219b3234d5309c75f5d860c4d068540ed840ea030afdb73342535c5",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__standard__paper__maximized.png",
+      "bytes": 29895,
+      "sha256": "e5fc34aa6be4a8104634a03c10f37573dacb93769e43fa0b2d4e8b4f3be1f5d0",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__standard__paper__maximized.png",
+      "bytes": 71117,
+      "sha256": "04066d0f3d3b60c09b707a0eacd3ebf376b56dbf5881b26491468bb33bf9b796",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "paper",
+      "presentation": "standard",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1210,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__standard__paper__maximized.png",
+      "bytes": 113574,
+      "sha256": "9ad1383575b339177a99f5ba45ea49994c099a75dc0589e610639da81d422987",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "agent",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__liquid__oled-black__maximized.png",
+      "bytes": 71117,
+      "sha256": "04066d0f3d3b60c09b707a0eacd3ebf376b56dbf5881b26491468bb33bf9b796",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "library",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__liquid__oled-black__maximized.png",
+      "bytes": 477736,
+      "sha256": "63e540e8bfd2e7583eff44b255e6b8ba83a2b3c292bad70e6521ab3e3436146f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__liquid__oled-black__maximized.png",
+      "bytes": 91283,
+      "sha256": "db7e970ad6501a78a4978930d9ddb798a763d77bd7e0f1c00eb2c01bb11d7ebb",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "dictionary",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__oled-black__maximized.png",
+      "bytes": 91283,
+      "sha256": "db7e970ad6501a78a4978930d9ddb798a763d77bd7e0f1c00eb2c01bb11d7ebb",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__liquid__oled-black__maximized.png",
+      "bytes": 28195,
+      "sha256": "21e184703345349bc9affdf6acce67287da6ab89b9b785353ef84d7d743ca30e",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__liquid__oled-black__maximized.png",
+      "bytes": 32712,
+      "sha256": "8d1cd02fb5f7bf48efd1da3ff56f8475ded44e0f31cbfb51b7f910062e9ee013",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__liquid__oled-black__maximized.png",
+      "bytes": 32712,
+      "sha256": "8d1cd02fb5f7bf48efd1da3ff56f8475ded44e0f31cbfb51b7f910062e9ee013",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "video",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__liquid__oled-black__maximized.png",
+      "bytes": 374775,
+      "sha256": "434945aef798b7eaa141a3bccc989cdea84bc3e86899c2c2a3a5456ff9d96b10",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "music",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__liquid__oled-black__maximized.png",
+      "bytes": 168147,
+      "sha256": "0467be32d7643ff8f1f011549b723c3cd067dbcc700519e5c311472db6e26785",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "anki",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__liquid__oled-black__maximized.png",
+      "bytes": 52623,
+      "sha256": "eeb5c45a212eaaf0dd0ca1bf3bbfdfe807853e5dc1062de2394a4399c38de184",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__oled-black__maximized.png",
+      "bytes": 58966,
+      "sha256": "50ac5333b08ef09c11daea41940c275b6ce42ce99bd7c32dedd948a44640ddd8",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__liquid__oled-black__maximized.png",
+      "bytes": 98890,
+      "sha256": "4a0a4f8e03dd8b03a03aabb5be40f0d98d3ee02f1a731f585ca229baae777564",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__liquid__oled-black__maximized.png",
+      "bytes": 57046,
+      "sha256": "5d07b18665603c35dd3e5502d4a1c06087a063043a1c26b7b1405d3cad174f73",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__liquid__oled-black__maximized.png",
+      "bytes": 126485,
+      "sha256": "29ed5efd0308c669b7e719a21cce817ba83317c1f0265739ad371c5d1e7b9553",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__liquid__oled-black__maximized.png",
+      "bytes": 166240,
+      "sha256": "eadc043f9d150d0399016c75ce1a2cdd14a7e7b78ab60170e06013100cca5694",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": false,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": false,
+      "error": "state maximized: surface has no maximize control of its own (note/frameless chrome)"
+    },
+    {
+      "app": "visualizer",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "immersion",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__liquid__oled-black__maximized.png",
+      "bytes": 48550,
+      "sha256": "ef3435d7ccb2ee49946ce5523ebe2db1a12c507f59fccda8f3916da60ca6add5",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__liquid__oled-black__maximized.png",
+      "bytes": 35367,
+      "sha256": "ce11ed3bd633892f2beb858d3157909f1c269d659f964b0cbc1eab9e507fc677",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__liquid__oled-black__maximized.png",
+      "bytes": 84822,
+      "sha256": "150890d32479f09afb5ac5feec2e72e37ed38773f6be70fa5938e9ecfdcb1549",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__liquid__oled-black__maximized.png",
+      "bytes": 32146,
+      "sha256": "cc7853c00b2f7b18ec0d4bdb1f49196c219233d3e9805691d72b47fdd55b562c",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__liquid__oled-black__maximized.png",
+      "bytes": 67490,
+      "sha256": "546355e41f94ba4f5f2fa2f9aec0d72980f230b2f5632d547a88c507e96bc354",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 856,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__liquid__oled-black__maximized.png",
+      "bytes": 49008,
+      "sha256": "07f064bcd72d004ef0cdbebdb7fb781d95077983a96d9988940cb7b91b6c7342",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "agent",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__liquid__paper__maximized.png",
+      "bytes": 83495,
+      "sha256": "7cec5c3ac7c1d9d4f8bcb3b66791aa8c8015e74d2c65f2ef473762c9fc61f466",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "library",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__liquid__paper__maximized.png",
+      "bytes": 83495,
+      "sha256": "7cec5c3ac7c1d9d4f8bcb3b66791aa8c8015e74d2c65f2ef473762c9fc61f466",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__liquid__paper__maximized.png",
+      "bytes": 99027,
+      "sha256": "536331fd42919b1d5d049e75404bfa52ad5742b04edd730bed79a60230b0481f",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "dictionary",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__paper__maximized.png",
+      "bytes": 36737,
+      "sha256": "5fbaf3707ee3f40a4c98a824402065bd0b51a6e3ffbebc486014ed05c6858551",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__liquid__paper__maximized.png",
+      "bytes": 92028,
+      "sha256": "463404ef0833e533b6c08020451f4b2a424dd7806bbbc25f8cce978843125118",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__liquid__paper__maximized.png",
+      "bytes": 38334,
+      "sha256": "1fd436640a645aa124c522104f39e529759942e6d25b686bdc724745607111d3",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__liquid__paper__maximized.png",
+      "bytes": 426733,
+      "sha256": "c271e72c4aa3b7d635522f229cfadac00664a695e14e5a8dbe6a63f586c6735a",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "video",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__liquid__paper__maximized.png",
+      "bytes": 431383,
+      "sha256": "beb3fa8065eeca7d36d69d3ae72b981f9b15301dc59757cca30b6faf35aa4037",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "music",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__liquid__paper__maximized.png",
+      "bytes": 190232,
+      "sha256": "0931eccf12cb5dea4736ff9d5ed43c79387c969eaeea29797c6a406ec42cf8a7",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "anki",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__liquid__paper__maximized.png",
+      "bytes": 59162,
+      "sha256": "c6300a1dea2f874d1b676101c1a3ec068049f214420cfe7a6f7fa69c6728ac73",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__paper__maximized.png",
+      "bytes": 67470,
+      "sha256": "7736dc76c12e1acf29eb515dc72b228032b954aa396941bcf5b15215b6fbb361",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__liquid__paper__maximized.png",
+      "bytes": 67470,
+      "sha256": "7736dc76c12e1acf29eb515dc72b228032b954aa396941bcf5b15215b6fbb361",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__liquid__paper__maximized.png",
+      "bytes": 62910,
+      "sha256": "65059911a12f9ac1bb3ea5d47191bc9a777a5356c8ce610da7e7d3be9e14a974",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__liquid__paper__maximized.png",
+      "bytes": 62910,
+      "sha256": "65059911a12f9ac1bb3ea5d47191bc9a777a5356c8ce610da7e7d3be9e14a974",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__liquid__paper__maximized.png",
+      "bytes": 155647,
+      "sha256": "68ce6f96bec21e3b5acaff6731dc897c2a22436568335ef2235388cf9b345f0b",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": false,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": false,
+      "error": "state maximized: surface has no maximize control of its own (note/frameless chrome)"
+    },
+    {
+      "app": "visualizer",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "immersion",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__liquid__paper__maximized.png",
+      "bytes": 55303,
+      "sha256": "c4c88c654f47b77107f861809d71a15ee06ab6a1d78379978626a87b6d1512bf",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__liquid__paper__maximized.png",
+      "bytes": 42848,
+      "sha256": "ed7e207bc30493db90b61afb207aaa3db32c498d3e04e4a37879a10e22eecf0b",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__liquid__paper__maximized.png",
+      "bytes": 44130,
+      "sha256": "c595f2aadf0f921703b9619986b48b73581fe5c84a0feb4431e5a14f1a655674",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__liquid__paper__maximized.png",
+      "bytes": 39841,
+      "sha256": "3a053dcb68e518b25df7312ca4e5a3c75e11b8baade9578f4c83e7afade1780c",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__liquid__paper__maximized.png",
+      "bytes": 40782,
+      "sha256": "0382380151b312c6916ba5d9d07e8eb59c6100badb295094edc62238cd8f4ca8",
+      "size": {
+        "width": 1264,
+        "height": 765
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "paper",
+      "presentation": "liquid",
+      "state": "maximized",
+      "themeSettled": true,
+      "themeSettledMs": 1119,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__liquid__paper__maximized.png",
+      "bytes": 60192,
+      "sha256": "78159fef32de65bccb0c986260e7cb1e4ef2bae563523bd27e14433eb3b0a094",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    }
+  ],
+  "apps": {
+    "agent": {
+      "opened": true,
+      "title": "Agent",
+      "presentable": true,
+      "note": null
+    },
+    "library": {
+      "opened": true,
+      "title": "Library",
+      "presentable": true,
+      "note": null
+    },
+    "novels": {
+      "opened": true,
+      "title": "Novels",
+      "presentable": true,
+      "note": null
+    },
+    "dictionary": {
+      "opened": true,
+      "title": "Dictionary",
+      "presentable": true,
+      "note": null
+    },
+    "grammar": {
+      "opened": true,
+      "title": "Grammar",
+      "presentable": true,
+      "note": null
+    },
+    "translate": {
+      "opened": true,
+      "title": "Translate",
+      "presentable": true,
+      "note": null
+    },
+    "player": {
+      "opened": true,
+      "title": "Media",
+      "presentable": true,
+      "note": null
+    },
+    "video": {
+      "opened": true,
+      "title": "Video",
+      "presentable": true,
+      "note": null
+    },
+    "music": {
+      "opened": true,
+      "title": "Music",
+      "presentable": true,
+      "note": null
+    },
+    "anki": {
+      "opened": true,
+      "title": "Anki",
+      "presentable": true,
+      "note": null
+    },
+    "flashcards": {
+      "opened": true,
+      "title": "Flashcards",
+      "presentable": true,
+      "note": null
+    },
+    "games": {
+      "opened": true,
+      "title": "Game Arena",
+      "presentable": true,
+      "note": null
+    },
+    "stats": {
+      "opened": true,
+      "title": "Statistics",
+      "presentable": true,
+      "note": null
+    },
+    "resources": {
+      "opened": true,
+      "title": "Resources",
+      "presentable": true,
+      "note": null
+    },
+    "settings": {
+      "opened": true,
+      "title": "Settings",
+      "presentable": true,
+      "note": null
+    },
+    "note": {
+      "opened": true,
+      "title": "Sticky note",
+      "presentable": true,
+      "note": null
+    },
+    "visualizer": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "musicwidget": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "city": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "immersion": {
+      "opened": true,
+      "title": "Immersion",
+      "presentable": true,
+      "note": null
+    },
+    "calendar": {
+      "opened": true,
+      "title": "Calendar",
+      "presentable": true,
+      "note": null
+    },
+    "reading": {
+      "opened": true,
+      "title": "Reading Finder",
+      "presentable": true,
+      "note": null
+    },
+    "youtube": {
+      "opened": true,
+      "title": "YouTube",
+      "presentable": true,
+      "note": null
+    },
+    "scraper": {
+      "opened": true,
+      "title": "Scraper",
+      "presentable": true,
+      "note": null
+    },
+    "files": {
+      "opened": true,
+      "title": "Files",
+      "presentable": true,
+      "note": null
+    }
+  },
+  "totals": {
+    "cells": 100,
+    "captured": 90,
+    "failed": 10,
+    "distinctImages": 80,
+    "unsettled": 0,
+    "stateBlocked": 4,
+    "unconverged": 0,
+    "captureAttemptsTotal": 425,
+    "themeMisapplied": 0,
+    "appsOpened": 25,
+    "appsPresentable": 22,
+    "bytes": 10302855
+  },
+  "magnitudeGate": {
+    "pctOver8AtLeast": 1
+  },
+  "restore": {
+    "theme": "study-os",
+    "ok": true,
+    "stored": "study-os",
+    "caretFreezeRemoved": true,
+    "windowsClosed": true,
+    "destructiveConfirms": 1,
+    "windowsLeft": 0,
+    "dialogsLeft": 0
+  }
+}

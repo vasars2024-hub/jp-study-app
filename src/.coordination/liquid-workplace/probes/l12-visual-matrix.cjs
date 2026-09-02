@@ -176,6 +176,16 @@ const ATLAS = has('atlas');
 const FREEZE = !has('no-freeze');
 /** Consecutive byte-identical frames a cell must produce before it is banked. See trap (2c). */
 const RUN = Math.max(2, Number(arg('run', '3')) || 3);
+/**
+ * How many frames a cell may spend trying to converge. It is a CLI knob and not a constant
+ * because `converged:false` has two completely different causes and 12 attempts cannot tell
+ * them apart: a surface that genuinely oscillates, and a surface that is merely slower than
+ * the budget on a loaded desk. The full 650-cell run reported 68 unconverged cells; the same
+ * `stats` surface driven alone settled in 7 frames (`ABBBCCCCCCCC`). Re-running the failing
+ * subset at a higher `--tries` on the SAME 25-window scene is the control that separates the
+ * two, and without it "never converged" is an adjective, not a measurement.
+ */
+const TRIES = Math.max(3, Number(arg('tries', '12')) || 12);
 
 /**
  * Optional pixel arithmetic. `sharp` is present in node_modules but is a TRANSITIVE
@@ -536,7 +546,7 @@ async function raise(title) {
  * `converged: false` and is a genuine finding (live/animated content behind a translucent
  * material), not silently averaged away.
  */
-async function captureStable(tag, rect, tries = 12, gapMs = 300, run = RUN) {
+async function captureStable(tag, rect, tries = TRIES, gapMs = 300, run = RUN) {
   let prev = null;
   let prevPath = null;
   let streak = 1;
@@ -681,6 +691,7 @@ ${rows}`;
     },
     sampledOut: sections.filter((s) => !requested.includes(s)),
     caretFrozen: FREEZE,
+    convergence: { run: RUN, tries: TRIES, gapMs: 300 },
     controls: null,
     certifiable: false,
     cells: [],
@@ -897,8 +908,10 @@ ${rows}`;
   };
 
   const out = OUT || path.join(REPO, 'debug', 'l12-matrix-manifest.json');
-  fs.writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`);
+  // Atlas BEFORE the manifest is written, or `atlasFile` is set on an object already
+  // serialised and the JSON never mentions the artifact it produced.
   if (ATLAS) manifest.atlasFile = writeAtlas(manifest);
+  fs.writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(JSON.stringify({
     out: path.relative(REPO, out).replace(/\\/g, '/'),
     ...manifest.totals,
