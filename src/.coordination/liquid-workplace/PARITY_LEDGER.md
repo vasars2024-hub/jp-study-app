@@ -1781,3 +1781,63 @@ should give that step an undo first, or drive an existing conversation instead o
 next turn's cheapest remaining app), `mediaWorkspace` (5 silent rows, blocked on a scanned
 media library — 0 files on this profile), `novels`/`manga`/`immersion` (23 rows, the main
 tree's b2 wave; their receipts are banked in the main tree's `debug/`, not here).
+
+## 2026-09-02 (primary2) — `captures` has no subject on this profile, and the merge moved four ledger numbers
+
+### The slice the last handoff named, and why it wrote no row
+
+`captures` was called "the cheapest remaining app, ~5 min" because its metadata block was
+already written and index-verified. It is not cheap; it is empty.
+
+Driven through the product's own path, one window, desk at 0 `.fwin` before and after:
+`os:open` detail `reading` → window **Reading Finder**, root `.reading-workspace`, an
+8-button `.reading-workspace-tab` rail (Home, Reading Finder, Library, Captures, Continue
+reading, Plan, Import, Sources). Clicking **Captures** mounts `.reading-captures`. It then
+reads **`rows=0`, `passage=false`, `head=null`, `listToggle=true`**, with the surface's own
+words: *"Nothing captured yet. Scan a passage with the Reading Lens and send it here."*
+
+`cat6 --app captures` had already REFUSED, before the tab was clicked — *"the captures
+surface is not open. Open it and re-run; a surface that is not on screen measures as perfect
+because every count is zero."* That refusal is the instrument working, and it is the same
+sentence that would be the right verdict one step later: three of the six rows have no
+subject at all here (`captureList` needs `rows>0`, `selection` needs an `aria-current` row,
+`measureClamp` needs a rendered passage). A run would be capped, not a PASS, so none was
+banked.
+
+**NOT written and said plainly:** a capture can be manufactured by driving the Reading Lens
+over a passage, but that PERSISTS user data on the profile and takes a multi-step drive. It
+was not done. `captures` is data-blocked exactly the way `mediaWorkspace` is.
+
+So every remaining b2 app on THIS tree is blocked, and by four different causes:
+`captures` and `mediaWorkspace` by an empty profile, `novels`/`manga`/`immersion` by their
+cat6 receipts living in the main tree's `debug/`, `vn` by an empty library, `notebook`
+because this branch deleted its subject.
+
+### The sync-down merge, `a175e657` — five conflicts, and one taken wholly theirs
+
+Recorded because it moved this ledger's own numbers, not as housekeeping.
+
+- **The plan bullet** was spliced by SEGMENT, not by hand: 18 of the other side's 93
+  sentence-segments were absent here and went in before the closing arrow. Invariants
+  checked both sides of the edit — 46 tagged / 35 closed / 11 open, unchanged.
+- **PARITY_LEDGER.md** unioned **THEIRS FIRST**. Their region opens on `### calendar`, which
+  belongs to a `##` heading in the common context above; ours-first would have orphaned it
+  under our own `##`.
+- **The ledger's derived block** was taken by SHAPE and then RE-DERIVED with
+  `debug/_p2g-notwritten.cjs`. HEAD claimed 24 specs-with-rows, theirs 18, and neither was
+  true after the rows merged. Never hand-merge a computed block.
+- **`l12-atlas.cjs` was taken WHOLLY THEIRS**, and this tree's own `32aae369` is superseded
+  by it. b4 is the main tree's track; their `9c6474f9` + `6a1e48a5` reach integrity
+  `all-present` on the very 21 plates `32aae369` could only report as CORRUPT, and carry the
+  raw-NUL repair that `sourceNulBytes.test.ts` gates on. The finding this tree contributed
+  survived; the implementation did not need to.
+
+**Ledger after the union, validated:** 213 rows / 24 apps, 204 `both` / 9 `pending`, 0
+duplicate `app|feature` keys. Derived re-run: **2 specs with no row of 26** (notebook, vn).
+`controlCoverage` **135 named / 13 none-declared / 64 silent of 213** — silent rose 42 → 64
+purely by absorbing the other track's rows, which is the merge, not a regression.
+
+**sampled-out:** `mediaWorkspace` (0 scanned media on this profile), `translate` (VOID last
+turn on `chars=0`, one reading, not re-driven), `agent` (drive residue: 7 empty
+conversations, needs an undo before it is driven again), `novels`/`manga`/`immersion`
+(receipts banked in the main tree), `vn` (empty library), `notebook` (subject deleted here).
