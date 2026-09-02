@@ -1023,3 +1023,46 @@ and is sanctioned: `/mem` (main's own pools, gc-forcible, `detachedContexts` for
 plus `cat7-perf.cjs`, which already samples it. Under RULE 1 that is a MODE on cat7-perf, never a
 new probe. Read §12.1's D1 first — it is FIXED, and its recorded remainder (913.9 MB settling
 ~484 MB above a 430.3 MB boot baseline) is the open question a long-session run should answer.
+
+## 2026-09-01, late night — L11 b4 CLAUSE 5, LONG-SESSION MEMORY. Advanced, NOT closed. Bullet 4 stays open.
+
+Recorded because an unmeasured clause and a half-measured one are not the same thing, and because
+the half that is missing is the half the clause is actually about.
+
+CADENCE, all through the product's own commands, on a REAL restart (pid 40756, uptime 344 s at the
+POST sample, so past the rubric's two-minute settling refusal): 12 cycles of open dictionary +
+grammar + notes, then per window `os:window`/`togglePresentation` there and back, `os:cycle-window`,
+then `os:window`/`closeAll`.
+
+PROGRESS RECEIPT, because a leg with no receipt VOIDs by construction (L11 b3's own lesson):
+**36 units of real work** — 12 x 3 windows observed at `[data-presentation="liquid"]` AFTER the
+toggle, not toggles counted. SCENE STABLE and this is the anti-empty-harness control: peak
+**3 .fwin / 391 elements on every one of the 12 cycles**, idle **108 on every one**. The DOM
+returns to exactly its starting size 12 times running, so there is no node ratchet.
+
+MAIN PROCESS, `/mem` with `gc:true` on BOTH sides:
+  privateMb        427.8 -> **427.4**  (-0.4)
+  heapUsedMb       288.7 -> **288.7**  (byte-identical)
+  detachedContexts     0 -> **0**       (the leak-vs-high-water signature; flat)
+  nativeContexts       2 -> 3
+Boot baseline this session was 425.0 MB at uptime 135 s, consistent with §12.1's 430.3 MB.
+
+CONTROL — the instrument CAN see retention: retaining 12 detached subtrees plus 200 MB of
+Uint8Array in the renderer moved `usedJSHeapSize` **233.6 -> 433.6 MB, exactly +200.0**.
+
+WHY THIS IS NOT A CLOSURE, said plainly. The release leg did NOT come back (421.6 MB after
+`delete window.__bkLeak` plus a forced gc). That is not a leak finding — it is an INSTRUMENT
+limit: `/mem`'s gc runs in MAIN's V8 isolate and cannot collect a renderer heap. So there is no
+gc-comparable renderer-heap before/after across the cadence, and the Liquid machinery lives in the
+renderer. What IS established is main (flat under a real gc both sides), detached contexts (0), and
+DOM nodes (108 x 12). What is NOT is renderer JS heap. Scoring the clause on main alone would be
+crediting the process the code is not in.
+
+EXACT NEXT SLICE, and it is small: get a RENDERER-side forced GC, then re-run this same cadence.
+Either CDP `HeapProfiler.collectGarbage` through the bridge (the `/emulate` route already proves
+this bridge can reach CDP), or `--js-flags=--expose-gc` on the renderer. Then, under RULE 1, the
+whole thing becomes a `--long-session` MODE on `cat7-perf.cjs`, which already samples `/mem` and
+already carries the restart/uptime refusal — never a new probe file.
+
+desktop-layout.json is sha256 byte-identical to the pre-turn copy after all of this, cadence
+included.
