@@ -224,14 +224,14 @@ function coverage(manifest) {
   const declared = apps.length * themes.length * pres.length * states.length;
   const seen = new Set();
   for (const c of manifest.cells || []) {
-    seen.add([c.app, c.theme, c.presentation, c.state].join(' '));
+    seen.add([c.app, c.theme, c.presentation, c.state].join('\u0000'));
   }
   const absent = [];
   for (const a of apps) {
     for (const t of themes) {
       for (const p of pres) {
         for (const s of states) {
-          if (!seen.has([a, t, p, s].join(' '))) absent.push({ app: a, theme: t, presentation: p, state: s });
+          if (!seen.has([a, t, p, s].join('\u0000'))) absent.push({ app: a, theme: t, presentation: p, state: s });
         }
       }
     }
