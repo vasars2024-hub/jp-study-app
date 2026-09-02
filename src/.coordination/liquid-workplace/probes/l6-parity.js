@@ -2225,15 +2225,35 @@
           },
         },
         {
+          /*
+           * DRIVEN — and the passive version this replaces was an accident of where the
+           * bookmark happened to sit. It asked whether the CURRENT page's first 240
+           * characters contain one of the TOC labels, which is only true on a chapter's
+           * opening page. Measured live on `悪の教典 02`: the TOC has **9** entries, at part
+           * indices 5/30/50/81/149/160/161/163/165, over a book of ~166 parts, and the
+           * reader sat at `p:7:0.0000` — between the first two. So the row could pass on 9
+           * parts and failed on the other ~157: a working chapter select scored dead across
+           * 95% of the book, and only a profile parked on a chapter head would ever see it
+           * pass.
+           *
+           * There is nothing passive left to read, either, because `.chapter-select` is an
+           * ACTION select rather than a state one: `NovelReader.tsx:3308-3311` pins
+           * `value=""` and its `onChange` calls `goTo(Number(value), 0)`. Its own value
+           * therefore never names the chapter you are in. So the drive jumps and this reads
+           * the recorded landing. `.novel-content` is still read LIVE so `documentRender`'s
+           * declared cascade still reaches this row.
+           */
           id: 'chapterNavigation',
           f: (w) => {
             const select = q(w, '.chapter-select');
             const labels = select ? qa(select, 'option').slice(1).map(txt).filter(Boolean) : [];
-            const head = txt(q(w, '.novel-content')).slice(0, 240);
-            const matched = labels.find((label) => head.includes(label));
+            const content = q(w, '.novel-content');
+            const j = (window.__LQP_NOVEL_ORIG || {}).chapter || {};
             return {
-              ok: labels.length > 0 && !!matched,
-              ev: `chapters=${labels.length} renderedHeading=${JSON.stringify(matched || head.slice(0, 32))}`,
+              ok: labels.length > 0 && !!content && j.landed === true && j.moved === true,
+              ev: `chapters=${labels.length} jumpedTo=${JSON.stringify(j.jumpedTo || null)}`
+                + ` landedOnIt=${j.landed} moved=${j.moved}`
+                + ` seek=${j.seekBefore}->${j.seekAfterJump}->${j.seekAfterRestore}`,
             };
           },
         },
@@ -2306,8 +2326,78 @@
           if (btn.getAttribute('aria-pressed') !== 'true') btn.click();
           return { tool: id, wasOpen: g.tools[id] };
         },
+        /*
+         * The chapter jump, in three legs because `/eval` is synchronous and each leg needs
+         * a React render before the next can read it.
+         *
+         * `chapterPrep` exists for one reason and it is not pacing: the jump WRITES the
+         * user's reading position — `goTo` ends in `saveNow`, which calls
+         * `window.api.setProgress(item.id, 'p:<part>:<fraction>')` (`NovelReader.tsx:731`).
+         * So the pre-jump position has to be in hand BEFORE the jump or there is nothing to
+         * restore to, and `listLibrary()` is a promise, which `/eval` cannot await.
+         */
+        chapterPrep: (w) => {
+          const title = txt(q(w, '.reader-title'));
+          if (!title) return { refused: 'no reader title to identify the open book' };
+          const c = novelState().chapter || (novelState().chapter = {});
+          c.title = title;
+          if (c.progressWas === undefined) {
+            c.lib = null;
+            window.api.listLibrary().then(
+              (rows) => { c.lib = rows; },
+              (e) => { c.lib = { err: String(e) }; },
+            );
+          }
+          return { title, alreadyCaptured: c.progressWas !== undefined };
+        },
+        chapter: (w) => {
+          const select = q(w, '.chapter-select');
+          const seek = q(w, '.reader-seek');
+          if (!select || !seek) return { refused: 'no chapter select or seek' };
+          const opts = qa(select, 'option').filter((o) => o.value !== '');
+          if (!opts.length) return { refused: 'the book has no table of contents' };
+          const c = novelState().chapter || (novelState().chapter = {});
+          if (c.progressWas === undefined) {
+            if (!Array.isArray(c.lib)) return { refused: 'library read has not resolved yet' };
+            const hits = c.lib.filter((r) => r && r.title === c.title);
+            if (hits.length !== 1) return { refused: `title matches ${hits.length} library rows, not 1` };
+            c.itemId = hits[0].id;
+            c.progressWas = hits[0].progress || null;
+          }
+          c.seekBefore = seek.value;
+          c.sigBefore = novelPageSignature(w);
+          // The option FARTHEST from where the reader sits. Taking option 0 blindly is a
+          // no-op on a reader already parked at chapter one, and a no-op jump would score
+          // `moved` false on a control that works perfectly.
+          const nearStart = Number(seek.value) / Math.max(1, Number(seek.max)) < 0.5;
+          const pick = nearStart ? opts[opts.length - 1] : opts[0];
+          c.jumpedTo = txt(pick);
+          pickSelect(select, pick.value);
+          return { jumpedTo: c.jumpedTo, chapterIndex: pick.value, from: c.seekBefore };
+        },
+        chapterSettle: (w) => {
+          const seek = q(w, '.reader-seek');
+          const c = novelState().chapter;
+          if (!seek || !c || !c.jumpedTo) return { refused: 'chapter step did not run' };
+          const head = txt(q(w, '.novel-content')).slice(0, 240);
+          c.landedHead = head.slice(0, 48);
+          c.landed = head.includes(c.jumpedTo);
+          c.seekAfterJump = seek.value;
+          c.moved = novelPageSignature(w) !== c.sigBefore;
+          // Put the VISIBLE reader back before anything else runs. This is the seek, which
+          // is permille (`max=1000`) and measured coarser than a page — restoring 18 -> 18
+          // returned a different page. The exact `p:<part>:<fraction>` restore is the undo's
+          // job; this only stops the rest of the drive running from the wrong chapter.
+          typeInto(seek, c.seekBefore);
+          seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+          c.seekAfterRestore = seek.value;
+          return {
+            landed: c.landed, moved: c.moved, head: c.landedHead, seekBack: c.seekAfterRestore,
+          };
+        },
       },
-      drive: ['openSection', 'next', 'back', 'settle', ['tool', 'bookmarks'], ['tool', 'translate'], ['tool', 'reader-settings']],
+      drive: ['openSection', 'next', 'back', 'settle', 'chapterPrep', 'chapter', 'chapterSettle',
+        ['tool', 'bookmarks'], ['tool', 'translate'], ['tool', 'reader-settings']],
       undo: {
         novels: (w) => {
           const g = window.__LQP_NOVEL_ORIG;
@@ -2318,6 +2408,16 @@
             const open = btn && btn.getAttribute('aria-pressed') === 'true';
             if (btn && open !== g.tools[id]) { btn.click(); done.push(id); }
           });
+          // THE ONLY EXACT RESTORE THIS SURFACE HAS. Everything else here is a click that
+          // can be un-clicked; reading position is a number in the user's library row, the
+          // jump overwrote it, and the seek slider cannot put it back — it is permille and
+          // one permille of this book is more than one page. So write the captured
+          // `p:<part>:<fraction>` back through the same call the reader itself uses.
+          const c = g.chapter;
+          if (c && c.itemId && c.progressWas) {
+            window.api.setProgress(c.itemId, c.progressWas);
+            done.push(`progress=${c.progressWas.location || JSON.stringify(c.progressWas)}`);
+          }
           window.__LQP_NOVEL_ORIG = null;
           return done.length ? `novels:${done.join('+')}` : null;
         },
@@ -2325,6 +2425,7 @@
       mutations: {
         documentRender: (w) => detach(q(w, '.novel-content'), 'no rendered book content'),
         pageTransport: (w) => setAttr(q(w, '.reader-seek'), 'max', '1', 'no book seek'),
+        chapterNavigation: (w) => detach(q(w, '.chapter-select'), 'no chapter select'),
         bookmarksTool: (w) => detach(q(w, '[data-reading-tool="bookmarks"] .lq-reading-tool-body'), 'no bookmark tool'),
         presentationHonest: (w) => setAttr(
           q(w, LIQUID_BTN.reader),
@@ -2366,21 +2467,41 @@
       rootSel: '.manga-canvas',
       features: [
         {
-          // The page actually rendered, cross-checked against the seek's declared
-          // position. A stage that renders page 1 while the seek says 7 is the
-          // stale-detail defect in its manga form, and a count of images would
-          // miss it entirely — there is exactly one `<img>` either way.
+          /*
+           * The page actually rendered, cross-checked against the seek's declared
+           * position. A stage that renders page 1 while the seek says 7 is the
+           * stale-detail defect in its manga form, and a count of images would miss it
+           * entirely — there is exactly one `<img>` either way.
+           *
+           * THE COMMENT ABOVE IS OLDER THAN THE CROSS-CHECK, and for a while it was a
+           * fact about this file rather than about the surface: the predicate asked only
+           * `declared >= 1`, so it compared the seek to the number 1 and never to the
+           * page on screen. It therefore passed the exact defect it names. Measured live
+           * 2026-09-02 on a 17-page volume: seek reading `12`, stage rendering
+           * `pages/0001.png` with `alt` "Page 1", `First page` still DISABLED — and the
+           * row scored 7/7 in both presentations.
+           *
+           * The rendered page is read from the image's OWN identity: `alt` is
+           * `t('manga.pageAlt', { n })` (MangaReader.tsx:1982/2010), so the numeral
+           * survives all four locales, and the `pages/000N` basename is the fallback.
+           * It is a MEMBERSHIP test, not equality, because the spread layout renders two
+           * pages at once and the declared one only has to be among them.
+           */
           id: 'pageRender',
           f: (w) => {
             const stage = q(w, '.manga-stage');
             const seek = q(w, '.reader-seek');
-            const img = stage ? q(stage, 'img') : null;
-            const box = img ? img.getBoundingClientRect() : null;
-            const painted = !!box && box.width > 40 && box.height > 40;
+            const imgs = stage ? qa(stage, 'img') : [];
+            const boxes = imgs.map((i) => i.getBoundingClientRect());
+            const painted = boxes.filter((b) => b.width > 40 && b.height > 40);
+            const rendered = mangaRenderedPages(w);
             const declared = seek ? Number(seek.value) : NaN;
+            const agree = rendered.includes(declared);
             return {
-              ok: painted && Number.isFinite(declared) && declared >= 1,
-              ev: `img=${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : 'none'} seekPage=${declared} of ${seek ? seek.max : '?'}`,
+              ok: painted.length > 0 && Number.isFinite(declared) && declared >= 1 && agree,
+              ev: `img=${boxes[0] ? `${Math.round(boxes[0].width)}x${Math.round(boxes[0].height)}` : 'none'}`
+                + ` painted=${painted.length}/${imgs.length} seekPage=${declared} of ${seek ? seek.max : '?'}`
+                + ` rendered=[${rendered.join(',')}] agree=${agree}`,
             };
           },
         },
@@ -2479,18 +2600,34 @@
         // The round trip's real content. Captures and Library drive SCROLL because
         // they have no text field; a manga reader has no meaningful scroll either
         // (one page fills the stage), so page position is the state a bad trip loses.
+        /*
+         * COMMITS the jump, and the version this replaces did not. `.reader-seek` is a
+         * SCRUBBER: `onChange` only sets `scrub`, a preview, and the page changes on
+         * `onPointerUp` / `onKeyUp` (MangaReader.tsx:2069-2086). So `.value = n` plus
+         * `input`/`change` wrote a number into a controlled input that React then ignored,
+         * and this step returned that same number as `page` — the drive reporting its own
+         * write back to itself. `typeInto` is the native-value-setter route (Trap 2) and
+         * the `keyup` is the product's own commit, exactly as `novels.chapterSettle` does
+         * it. Proven by the product's other route: clicking `Next page` DOES move the
+         * stage, so the reader was never broken — the instrument was.
+         */
         page: (w, n) => {
           const seek = q(w, '.reader-seek');
           if (!seek) return { refused: 'no page seek' };
           const g = mangaState();
-          if (g.page == null) g.page = seek.value;
+          // Captured from the STAGE, not from the seek. `pageTransport`'s mutation sets
+          // `max="1"`, which clamps the seek's value to 1 — so a baseline read off the
+          // seek is silently rewritten by another mutation, and that cycle's undo then
+          // compares 1 against 1, finds nothing to do, and leaves the reader where the
+          // drive put it. The rendered page is immune to the clamp.
+          if (g.page == null) g.page = String(mangaRenderedPages(w)[0] || seek.value);
           const max = Number(seek.max) || 1;
           // Clamped to the volume, so a shorter book refuses nothing and lands somewhere real.
           const want = String(Math.min(Math.max(Number(n) || 3, 1), max));
-          seek.value = want;
-          seek.dispatchEvent(new Event('input', { bubbles: true }));
-          seek.dispatchEvent(new Event('change', { bubbles: true }));
-          return { page: seek.value, of: seek.max };
+          const renderedBefore = mangaRenderedPages(w);
+          typeInto(seek, want);
+          seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+          return { page: seek.value, of: seek.max, from: g.page, renderedBefore };
         },
         // Idempotent by construction — it SETS a named mode rather than cycling, so
         // the driver re-running the drive once per mutation cannot walk the surface
@@ -2522,11 +2659,16 @@
           }
           if (g.page != null) {
             const seek = q(w, '.reader-seek');
-            if (seek && seek.value !== g.page) {
-              seek.value = g.page;
-              seek.dispatchEvent(new Event('input', { bubbles: true }));
-              seek.dispatchEvent(new Event('change', { bubbles: true }));
-              done.push('page');
+            // Compared against the STAGE for the same reason the capture reads it.
+            const now = String(mangaRenderedPages(w)[0] || (seek ? seek.value : ''));
+            if (seek && now !== g.page) {
+              // The step's commit route, for the same reason. Writing the value alone
+              // restored nothing, and the old undo could report `page` as restored while
+              // the reader stayed exactly where the drive had left it. It never showed,
+              // because the old step had not moved it either.
+              typeInto(seek, g.page);
+              seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+              done.push(`page=${now}->${g.page}`);
             }
           }
           window.__LQP_MANGA_ORIG = null;
@@ -2553,6 +2695,15 @@
           q(w, LIQUID_BTN.reader) && q(w, LIQUID_BTN.reader).getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
           'no liquid control',
         ),
+      },
+      cascades: {
+        // TRUE, and only visible once `pageRender` started cross-checking. Clamping the
+        // seek to `max="1"` clamps its VALUE to 1 as well, so the transport stops
+        // declaring the page the stage is showing — the disagreement `pageRender` exists
+        // to catch is a real consequence of breaking the transport, not collateral. It is
+        // declared here rather than engineered away: a row that cannot be made to fall by
+        // any mutation is the other way this instrument goes wrong.
+        pageTransport: ['pageRender'],
       },
     },
 
@@ -5694,6 +5845,26 @@
    * `--lq-reading-measure` is `none` BY DESIGN (a grid of covers and a live browser guest
    * are not passages). A spec that wants the clamp scores it as its own row.
    */
+  /**
+   * The page numbers the manga stage is ACTUALLY showing, read off each image's own
+   * identity rather than off the control that claims to have moved it.
+   *
+   * `alt` is `t('manga.pageAlt', { n: pageIdx + 1 })` (MangaReader.tsx:1982/2010), so the
+   * numeral is present in all four locales even though the surrounding word is not; the
+   * `pages/000N.<ext>` basename is the fallback for a build that ever drops the alt.
+   * Returns an array because the spread layout renders two pages at once.
+   */
+  function mangaRenderedPages(w) {
+    const stage = q(w, '.manga-stage');
+    if (!stage) return [];
+    return qa(stage, 'img').map((img) => {
+      const nums = String(img.alt || '').match(/\d+/g);
+      if (nums && nums.length) return Number(nums[nums.length - 1]);
+      const m = String(img.currentSrc || img.src).match(/(\d+)\.[a-z0-9]+(?:\?.*)?$/i);
+      return m ? Number(m[1]) : NaN;
+    }).filter((n) => Number.isFinite(n));
+  }
+
   function canvasPlacement(w) {
     const c = q(w, '.lq-reading');
     if (!c) return { ok: false, ev: 'no reading canvas' };
