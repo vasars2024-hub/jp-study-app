@@ -296,6 +296,60 @@ describe('readonly — the flag the read worker’s invariant rests on', () => {
   });
 });
 
+// The other half of Finding 5's repair. `readonly` carried TWO meanings, and making
+// the first one real broke the only caller that wanted just the second: the schema-6
+// suite's `openV5()`, which drives `MIGRATIONS` by hand to build a v5 file and then
+// stamps `user_version` itself. It failed with `unable to open database file`,
+// because SQLITE_OPEN_READONLY does not create one.
+describe('skipMigrations — an old-schema file a test still has to write', () => {
+  it('creates the file and leaves it unmigrated, while staying writable', () => {
+    const own = path.join(tempRoot, 'skip');
+    const handle = openDictionaryDb({ dir: own, skipMigrations: true });
+    try {
+      // Created, not refused: this is the exact failure the flag exists to avoid.
+      expect(fs.existsSync(path.join(own, 'dict.db'))).toBe(true);
+      expect(Number(handle.pragma('user_version', { simple: true }))).toBe(0);
+      // …and writable, which is the whole difference from `readonly`. A readonly
+      // handle throws on both of these (see the describe above).
+      expect(() => handle.exec('create table probe (id integer primary key)')).not.toThrow();
+      expect(() => handle.prepare('insert into probe (id) values (1)').run()).not.toThrow();
+      expect(handle.prepare('select count(*) c from probe').get()).toEqual({ c: 1 });
+    } finally {
+      handle.close();
+    }
+  });
+
+  it('NEGATIVE CONTROL: the same directory without the flag DOES migrate', () => {
+    // Without this, "user_version is 0" above could just mean the ladder is broken
+    // or the directory is somewhere nothing ever runs.
+    const own = path.join(tempRoot, 'skip-control');
+    const skipped = openDictionaryDb({ dir: own, skipMigrations: true });
+    expect(Number(skipped.pragma('user_version', { simple: true }))).toBe(0);
+    skipped.close();
+
+    const migrated = openDictionaryDb({ dir: own });
+    try {
+      expect(Number(migrated.pragma('user_version', { simple: true }))).toBe(DICT_SCHEMA_VERSION);
+    } finally {
+      migrated.close();
+    }
+  });
+
+  it('readonly still implies it, so the two flags cannot disagree', () => {
+    const own = path.join(tempRoot, 'skip-implied');
+    const seeded = openDictionaryDb({ dir: own });
+    seeded.pragma('user_version = 0');
+    seeded.close();
+
+    const ro = openDictionaryDb({ dir: own, readonly: true, skipMigrations: false });
+    try {
+      expect(Number(ro.pragma('user_version', { simple: true }))).toBe(0);
+    } finally {
+      ro.close();
+    }
+  });
+});
+
 describe('FTS5 — the index that silently returns nothing if the triggers are wrong', () => {
   it('matches a headword inserted after the index was created', () => {
     seedEntry(db, { text: '食べる', gloss: 'to eat' });

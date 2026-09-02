@@ -112,6 +112,22 @@ export interface OpenDictionaryOptions {
    * enforces it and a write throws (boss audit 2026-09-02, Finding 5).
    */
   readonly?: boolean;
+  /**
+   * Opens a normal READ-WRITE handle but does not run the migration ladder.
+   *
+   * This is the OTHER half of what `readonly` used to mean, and separating them
+   * is the rest of Finding 5's repair: one caller — the schema-6 migration
+   * suite's `openV5()` — passed `readonly: true` purely to stop the ladder and
+   * then drove `MIGRATIONS` by hand and set `user_version` itself. Once
+   * `readonly` reached the driver, that caller broke with
+   * `SqliteError: unable to open database file` (SQLITE_OPEN_READONLY will not
+   * create a file), which is the flag doing its job against a caller that never
+   * wanted it. A test that must build a database at an OLD schema version is a
+   * legitimate need; asking for it by name is the fix.
+   *
+   * `readonly` implies this — a connection that cannot write cannot migrate.
+   */
+  skipMigrations?: boolean;
 }
 
 /**
@@ -144,7 +160,7 @@ export function openDictionaryDb(options: OpenDictionaryOptions = {}): SqliteDb 
   db.pragma('mmap_size = 268435456'); // 256 MB
   db.pragma('busy_timeout = 5000');
 
-  if (!options.readonly) migrateDictionaryDb(db);
+  if (!options.readonly && !options.skipMigrations) migrateDictionaryDb(db);
   return db;
 }
 
