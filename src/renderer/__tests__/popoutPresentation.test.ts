@@ -169,7 +169,8 @@ describe('the pop-out host is wired to the sheet', () => {
     // WHOLE `:is()` list rather than a `.popout-root…)` suffix: the reader joined
     // that list as the third host, and a suffix match would have read "the
     // pop-out host is gone" the moment anything was appended after it.
-    const hosts = ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid)';
+    const hosts =
+      ':is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid)';
     for (const region of ['.lq-contextual', '.agent-rail.lq-contextual', '.dict-view']) {
       expect(sheet, region).toContain(`${hosts} ${region}`);
     }
