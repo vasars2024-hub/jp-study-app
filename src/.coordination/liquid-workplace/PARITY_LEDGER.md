@@ -898,3 +898,39 @@ ledger apps (16) exceeds specs-with-rows (15).
 **sampled-out:** `vn` (no subject on this profile, above); `city`, `scraper`, `resources`,
 `shell`, `blancShell` (owned by the concurrent worker); `notebook`, `calendar`, `games`,
 `settings` (not reached this turn — they are the next turn's opening slice).
+
+### calendar — 5 rows, added later the same turn. It passed on the first run
+
+`129 → 134 rows, 16 → 17 apps, 134 `both` / 0 `pending`, 0 duplicate keys.` PASS 10/10, 5/5 in
+both presentations, 0 drive refusals, 18 driven steps, box 820x580 in both, all five mutations
+`exactlyOwnRow` and restored. **No instrument repair was needed**, which is worth recording
+because three of the previous four apps did need one — a spec written carefully enough that the
+first live run is the measurement.
+
+What the rows actually ask, as opposed to what presence scoring would have accepted:
+
+- `viewModes` requires `visited=4/4` — four ARRIVALS, walked week → day → agenda → month and
+  recorded in spec state. Read without the walk it would score `buttons=4 active=1` on a
+  segment whose other three modes render nothing.
+- `monthGrid` asserts exactly 42 cells, not `>= 28`: a six-week grid is the layout, and a month
+  rendered with fewer cells silently drops the leading and trailing days that make the previous
+  and next month reachable by click. Measured `dows=7 cells=42 numbered=42`.
+- `dateTransport` requires `shiftedAndReturned=true`, both halves. A transport that moves and
+  cannot return is the reversibility defect this ledger keeps finding on other surfaces. Its
+  three buttons must also be NAMED — an unlabelled arrow is not a control a screen reader can
+  use — and it must carry a real `input[type="date"]` to jump with.
+- `eventComposer` requires the composer complete when open (6 inputs, 3 selects, 1 textarea, 2
+  actions) AND `.cal-modal` absent at read time, so an open flow that cannot be reversed fails.
+  `type="button"` is asserted because a default-type button inside that form would submit it and
+  create an event in the user's calendar. **The drive opens and closes and never submits.**
+
+`dirtiedField` is `null` on this surface and the reason is written into the row rather than
+glossed: the driver dirties the first VISIBLE text field, and the composer holding this
+surface's six inputs is CLOSED at round-trip time. The composer's own reversibility is scored by
+`eventComposer` instead, so nothing is lost by that.
+
+**Gap after this slice: 9 of 25 specs have no row in this tree** — notebook, games, vn, city,
+scraper, resources, settings, shell, blancShell. Five (`city`, `scraper`, `resources`, `shell`,
+`blancShell`) are the concurrent worker's and arrive by merge; `vn` has no subject on this
+profile. So the genuinely-open set for this tree is **notebook, games, settings** plus `vn` if
+the user ever adds a visual novel.

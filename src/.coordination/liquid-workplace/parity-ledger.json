@@ -1749,6 +1749,76 @@
       "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard with `.immersion-url` dirtied first: fieldsHeld true, shellHeld true, 0 diffs, 820x580 in both. This is the surface where that matters most, because the typed field IS the address of a live page."
+    },
+    {
+      "app": "calendar",
+      "feature": "Reach all four calendar views — Month, Week, Day and Agenda — and have each of them actually render",
+      "currentRoute": "Calendar window > view segment (`.cal-mode-btn`)",
+      "standardDestination": "four modes with exactly one active, AND every one of the four VISITED and found to render its own body during the drive — the row scores four arrivals, not four buttons",
+      "liquidDestination": "the same segment on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`; the view switch is navigation chrome, which is what the plan nominates for Liquid, while the grid beneath stays a dense anchor",
+      "keyboardRoute": "the modes are `<button>`s in the window's focus order",
+      "dataStateOwner": "renderer calendar view state; the drive walks week -> day -> agenda -> month and the spec's undo returns the view it found",
+      "automatedProof": "probes/l6-parity.js SPECS.calendar.viewModes, driven through steps `begin` / `visitWeek` / `visitDay` / `visitAgenda` / `visitMonth`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD buttons=4 active=1 visited=4/4 || LIQUID buttons=4 active=1 visited=4/4",
+      "status": "both",
+      "_note": "`visited=4/4` is the whole row. Read without the walk it would score `buttons=4 active=1` on a segment whose other three modes render nothing — presence scoring passes that every time, which is why the visit is recorded in spec state rather than inferred from the active class."
+    },
+    {
+      "app": "calendar",
+      "feature": "Read a complete month grid — seven day-of-week headers and forty-two numbered cells",
+      "currentRoute": "Calendar window > Month view > `.cal-month-grid`",
+      "standardDestination": "exactly 7 `.cal-month-dow` and exactly 42 `.cal-month-cell`, and all 42 carrying a day number — a grid with blank leading or trailing cells is a month you cannot navigate out of",
+      "liquidDestination": "the same grid on the liquid material; the grid itself is DENSE WORK and stays a stable high-contrast anchor rather than becoming glass",
+      "keyboardRoute": "the cells are in the window's focus order and the view is reachable from the mode segment",
+      "dataStateOwner": "renderer calendar state, derived from the visible month",
+      "automatedProof": "probes/l6-parity.js SPECS.calendar.monthGrid; the mutation detaches the grid",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD dows=7 cells=42 numbered=42 || LIQUID dows=7 cells=42 numbered=42",
+      "status": "both",
+      "_note": "42 is asserted rather than `>= 28` on purpose: a six-week grid is the layout, and a month rendered with fewer cells silently drops the leading and trailing days that make the previous and next month reachable by click."
+    },
+    {
+      "app": "calendar",
+      "feature": "Move to another date and come back — prev, Today, next, plus a date field to jump with",
+      "currentRoute": "Calendar window > `.cal-nav`",
+      "standardDestination": "three NAMED transport buttons (an unlabelled arrow is not a control a screen reader can use), a real `input[type=\"date\"]` to jump with, a non-empty period label, AND a shift that actually moved the label and then returned it",
+      "liquidDestination": "the same transport on the liquid material",
+      "keyboardRoute": "the three are `<button>`s and the jump is a native date input, all in the focus order",
+      "dataStateOwner": "renderer calendar cursor; the drive's shift is returned within its own step sequence, so nothing persists",
+      "automatedProof": "probes/l6-parity.js SPECS.calendar.dateTransport, driven through step `returnDate`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD buttons=3 named=3 jump=true shiftedAndReturned=true || LIQUID buttons=3 named=3 jump=true shiftedAndReturned=true",
+      "status": "both",
+      "_note": "`shiftedAndReturned` is the part that cannot be faked by presence: the drive moves the period off `September 2026` and back, and the row fails unless BOTH halves happened. A transport that moves and cannot return is the reversibility defect this ledger keeps finding elsewhere."
+    },
+    {
+      "app": "calendar",
+      "feature": "Open the new-event composer, find a complete form in it, and close it again",
+      "currentRoute": "Calendar window > `New event` in the context head",
+      "standardDestination": "a real `type=\"button\"` trigger opening a composer that carries its whole form — measured 6 inputs, 3 selects, 1 textarea and 2 actions — and a close that leaves NO `.cal-modal` behind",
+      "liquidDestination": "the same composer on the liquid material; the FORM inside stays a dense anchor, which is the plan's explicit carve-out, while the sheet around it may be Liquid",
+      "keyboardRoute": "the trigger is a `<button>`; the composer's fields and its two actions are in the focus order",
+      "dataStateOwner": "renderer composer state only — the drive opens and closes it and NEVER submits, so no event is written to the user's calendar",
+      "automatedProof": "probes/l6-parity.js SPECS.calendar.eventComposer, driven through steps `openComposer` / `closeComposer` / `finish`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD trigger=true complete=true closed=true || LIQUID trigger=true complete=true closed=true",
+      "status": "both",
+      "_note": "The row requires the composer CLOSED at read time as well as complete when open, so an open flow that cannot be reversed fails it. `type=\"button\"` is asserted because a default-type button inside a form submits it, which on this surface would create an event."
+    },
+    {
+      "app": "calendar",
+      "feature": "Enter and leave Liquid from the window's own chrome, without losing geometry or state",
+      "currentRoute": "Calendar `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+      "standardDestination": "a conventional `.fwin` with its full chrome cluster and the Liquid control reading `aria-pressed=false`",
+      "liquidDestination": "`.fwin-liquid`, `data-presentation=\"liquid\"`, the same control reading `aria-pressed=true`, and the same 820x580 box",
+      "keyboardRoute": "the chrome buttons are in the window's focus order",
+      "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
+      "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app calendar round trip",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "status": "both",
+      "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 820x580 in both. `dirtiedField` is null here and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and the composer that holds this surface's six inputs is CLOSED at trip time, so there is none. The composer's own reversibility is scored by `eventComposer` instead."
     }
   ],
   "notWritten": {
@@ -1762,11 +1832,10 @@
       "at": "2026-09-02 (primary), L12 b2",
       "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
       "harnessSpecs": 25,
-      "specsWithRows": 15,
-      "specsWithNoRows": 10,
+      "specsWithRows": 16,
+      "specsWithNoRows": 9,
       "noRows": [
         "notebook",
-        "calendar",
         "games",
         "vn",
         "city",
@@ -1776,7 +1845,7 @@
         "shell",
         "blancShell"
       ],
-      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (16) exceeds specs with rows (15). vn is the one spec left with a live window and NO subject: its library is empty on this profile (\"Add a local visual novel to begin capturing Japanese dialog\"), and adding one would write to the user's real library, which this spec's own safety note forbids."
+      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (17) exceeds specs with rows (16). vn is the one spec left with a live window and NO subject: its library is empty on this profile (\"Add a local visual novel to begin capturing Japanese dialog\"), and adding one would write to the user's real library, which this spec's own safety note forbids."
     }
   }
 }
