@@ -90,17 +90,17 @@
    ============================================================================= */
 
 /* SCRIMS. Modal dimmers over the desktop: blur off, tint untouched. */
-:root[data-lq-flat][data-materials='aero'] .palette-backdrop,
-:root[data-lq-flat][data-materials='aero'] .cbh-backdrop,
-:root[data-lq-flat][data-materials='aero'] .widget-gallery-backdrop {
+:root[data-materials='aero'][data-lq-flat] .palette-backdrop,
+:root[data-materials='aero'][data-lq-flat] .cbh-backdrop,
+:root[data-materials='aero'][data-lq-flat] .widget-gallery-backdrop {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
 /* MATERIAL — command palette, clipboard history, shell flyouts. */
-:root[data-lq-flat][data-materials='aero'] .palette,
-:root[data-lq-flat][data-materials='aero'] .cbh-panel,
-:root[data-lq-flat][data-materials='aero'] .os-flyout {
+:root[data-materials='aero'][data-lq-flat] .palette,
+:root[data-materials='aero'][data-lq-flat] .cbh-panel,
+:root[data-materials='aero'][data-lq-flat] .os-flyout {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.16) 72%, rgba(185, 217, 226, 0.18)),
     linear-gradient(
@@ -113,7 +113,7 @@
 }
 
 /* MATERIAL — desktop widget frame. */
-:root[data-lq-flat][data-materials='aero'] .widget-frame {
+:root[data-materials='aero'][data-lq-flat] .widget-frame {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(228, 246, 255, 0.58)),
     linear-gradient(rgba(210, 239, 255, 0.78), rgba(210, 239, 255, 0.78)),
@@ -123,7 +123,7 @@
 }
 
 /* MATERIAL — transient toast. */
-:root[data-lq-flat][data-materials='aero'] .os-toast {
+:root[data-materials='aero'][data-lq-flat] .os-toast {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(226, 241, 246, 0.6)),
     linear-gradient(
@@ -137,7 +137,7 @@
 
 /* MATERIAL — the Aero glass window frame itself. The one surface here where a
    user can still see their own desktop through the chrome of every window. */
-:root[data-lq-flat][data-materials='aero'][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
+:root[data-materials='aero'][data-lq-flat][data-app-border='aero-glass'] .fwin:not(.fwin-note) {
   background:
     linear-gradient(
       180deg,
@@ -160,7 +160,7 @@
    ============================================================================= */
 
 /* MATERIAL — the Wired router menu. */
-:root[data-lq-flat][data-materials='wired'] .os-start-aero-menu {
+:root[data-materials='wired'][data-lq-flat] .os-start-aero-menu {
   background:
     linear-gradient(180deg, rgba(109, 241, 255, 0.12), transparent 30%),
     linear-gradient(rgba(1, 14, 22, 0.96), rgba(1, 14, 22, 0.96)),
@@ -518,11 +518,11 @@
    ============================================================================= */
 
 /* SCRIMS — Aero modal dimmers. */
-:root[data-lq-flat][data-materials='aero'] .lib-import-backdrop,
-:root[data-lq-flat][data-materials='aero'] .cal-modal-backdrop,
-:root[data-lq-flat][data-materials='aero'] .nov-modal-backdrop,
-:root[data-lq-flat][data-materials='aero'] .csv-editor-modal-backdrop,
-:root[data-lq-flat][data-materials='aero'] .deck-action-backdrop {
+:root[data-materials='aero'][data-lq-flat] .lib-import-backdrop,
+:root[data-materials='aero'][data-lq-flat] .cal-modal-backdrop,
+:root[data-materials='aero'][data-lq-flat] .nov-modal-backdrop,
+:root[data-materials='aero'][data-lq-flat] .csv-editor-modal-backdrop,
+:root[data-materials='aero'][data-lq-flat] .deck-action-backdrop {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -531,8 +531,8 @@
    opaque `#ffffff`, so nothing can show through it. The background is restated
    only so this rule out-specifies the generic `.dict-popup` MATERIAL rule above,
    which would otherwise repaint Aero's white popup in the dark panel colour. */
-:root[data-lq-flat][data-materials='aero'] .dict-popup,
-:root[data-lq-flat][data-materials='aero'] .tr-popup {
+:root[data-materials='aero'][data-lq-flat] .dict-popup,
+:root[data-materials='aero'][data-lq-flat] .tr-popup {
   background:
     linear-gradient(
       180deg,
