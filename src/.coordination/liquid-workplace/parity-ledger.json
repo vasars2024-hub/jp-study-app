@@ -2457,24 +2457,121 @@
       "observed": "STANDARD chromeButtons=1/1 liquidAriaPressed=false || LIQUID chromeButtons=1/1 liquidAriaPressed=true",
       "status": "both",
       "_note": "Manga and Novels are the two readers that share `ReaderLiquidToggle`, which is why `LIQUID_BTN` exists as a table: before it the reader's control name was absent from `toggleLiquid`, `lifecycle` and every spec, and the whole host scored as chromeless."
+    },
+    {
+      "app": "immersion",
+      "feature": "See which page is actually loaded, in an address bar that agrees with the browser",
+      "currentRoute": "Immersion window > address bar (`.immersion-url`)",
+      "standardDestination": "an enabled `http(s)` address whose value EQUALS the webview's `src` — a bar showing one page while another is loaded is the stale-detail defect, and presence scoring passes it every time",
+      "liquidDestination": "the same bar on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`; the address bar is transport chrome, which is what the plan nominates for Liquid",
+      "keyboardRoute": "a text input in the window's focus order",
+      "dataStateOwner": "renderer browsing state; the round trip dirties THIS field, so it is also the surface's proof that a presentation change loses no typed text",
+      "automatedProof": "probes/l6-parity.js SPECS.immersion.urlBar; probes/cat6-feature-parity.cjs --app immersion --step-ms 3500",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\" || LIQUID bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\"",
+      "status": "both",
+      "_note": "This is the field cat6's round trip dirties: `dirtiedField=immersion-url`, `fieldsHeld=true`, 0 diffs, box 820x580 in both presentations. The `open` step resyncs it to the loaded page rather than renavigating, which is what undoes that dirtying."
+    },
+    {
+      "app": "immersion",
+      "feature": "Switch between Live, Live·Reader and Focus and have the stage actually compose that way",
+      "currentRoute": "Immersion window > mode segment (`.immersion-mode-btn`)",
+      "standardDestination": "three modes with exactly one active, AND the stage composed to match — `live` is webview only, `reader` is webview plus reader, `focus` is reader only; the row scores the composition, not the button",
+      "liquidDestination": "the same segment on the liquid material",
+      "keyboardRoute": "the modes are `<button>`s in the window's focus order",
+      "dataStateOwner": "renderer immersion mode; the drive SETS a named mode rather than cycling, and the spec's undo restores the one it found",
+      "automatedProof": "probes/l6-parity.js SPECS.immersion.modeSwitch; the mutation marks EVERY mode active at once",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD modes=3 active=1 mode=reader webview=true reader=true composed=true || LIQUID modes=3 active=1 mode=reader webview=true reader=true composed=true",
+      "status": "both",
+      "_note": "The `want` table is the whole row: without it, `active.length === 1` would pass on a reader mode that renders no reader. Measured `modes=3 active=1 mode=reader webview=true reader=true composed=true`."
+    },
+    {
+      "app": "immersion",
+      "feature": "Read the page's text extracted into the reader, not the pane that would hold it",
+      "currentRoute": "Immersion window > Live·Reader or Focus mode > `.immersion-reader`",
+      "standardDestination": "more than 100 real characters extracted AND no starter/empty state anywhere on the stage — a reader pane holding the empty state's own sentence is the false pass this row exists for",
+      "liquidDestination": "the same extraction on the liquid material; the extracted TEXT stays a reading anchor while the chrome around it is Liquid",
+      "keyboardRoute": "the reader pane is scrollable and in the window's focus order",
+      "dataStateOwner": "renderer extraction state, derived from the loaded page — this row cannot pass on an empty browser, which is the honest reading of a stage with nothing loaded",
+      "automatedProof": "probes/l6-parity.js SPECS.immersion.readerExtraction, driven through steps `open` / `mode`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary) — NHK Easy, https://news.web.nhk/news/easy/",
+      "observed": "STANDARD readerChars=322 starterStateShowing=false || LIQUID readerChars=322 starterStateShowing=false",
+      "status": "both",
+      "_note": "PACING, and it produced a VOID that looked like a defect. At cat6's default `--step-ms 700` this row and `modeSwitch` read `readerChars=0` / `composed=false` and the run scored 5/7 — because a REAL public page was still loading, exactly as the `open` step's own note warns. The same surface, same window, same profile at `--step-ms 3500` reads 7/7 with 0 refusals. `_pr5-immersion.json` and `_pr5-immersion2.json` are the pair. A slow live page is not a dead control."
+    },
+    {
+      "app": "immersion",
+      "feature": "Read the history rail, with every rendered row a complete row",
+      "currentRoute": "Immersion window > sites rail (`.immersion-site-row`)",
+      "standardDestination": "each rendered row carries its title, its meta and its remove control; the row scores COMPLETENESS of what is rendered, never `rendered === total`",
+      "liquidDestination": "the same rail on the liquid material; it is a reading tool and is placed by the canvas, never over the page",
+      "keyboardRoute": "each row's controls are `<button>`s in the window's focus order",
+      "dataStateOwner": "renderer browsing history; nothing here is removed by the drive",
+      "automatedProof": "probes/l6-parity.js SPECS.immersion.siteRail; the mutation detaches ONE row's meta, not the list",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD renderedRows=20 complete=20 || LIQUID renderedRows=20 complete=20",
+      "status": "both",
+      "_note": "The rail is a `VirtualList` (ImmersionContent.tsx:1041), so rendered rows are a WINDOW of the history and never all of it — the grammar spec already paid for encoding `rendered === total` as a pass condition. The mutation detaches one row's meta rather than the list, because detaching the list would take `railReversibility` down with it and prove neither."
+    },
+    {
+      "app": "immersion",
+      "feature": "Close the history rail and have its trigger say so",
+      "currentRoute": "Immersion window > `.immersion-sites-toggle`",
+      "standardDestination": "a real boolean on the trigger that AGREES with whether `[data-reading-tool=\"sites\"]` is mounted — every open flow owing an intentional close is the plan's own rule, and a trigger that lies about it is the same defect as a lying presentation toggle",
+      "liquidDestination": "the same agreement on the liquid material",
+      "keyboardRoute": "the toggle is a `<button>` carrying `aria-pressed`",
+      "dataStateOwner": "renderer reading-tool state",
+      "automatedProof": "probes/l6-parity.js SPECS.immersion.railReversibility; the mutation STRIPS `aria-pressed`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD toggle=true ariaPressed=true railMounted=true || LIQUID toggle=true ariaPressed=true railMounted=true",
+      "status": "both",
+      "_note": "Measured `toggle=true ariaPressed=true railMounted=true`. The row accepts either boolean — what it refuses is a trigger with no boolean at all, or one that disagrees with the tool."
+    },
+    {
+      "app": "immersion",
+      "feature": "Have no reading tool obscure the page while it is open",
+      "currentRoute": "Immersion window > `.lq-reading` canvas with the sites rail open",
+      "standardDestination": "every open tool `docked` beside the document or a `sheet` over the whole of it; docked widths plus gutters must add back up to the canvas",
+      "liquidDestination": "the same arithmetic on the liquid material",
+      "keyboardRoute": "not a control — a layout invariant over the controls above",
+      "dataStateOwner": "the canvas's own `data-measured` / `data-covered`",
+      "automatedProof": "probes/l6-parity.js shared `canvasPlacement()`, L6's gate as one row",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false || LIQUID canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false",
+      "status": "both",
+      "_note": "Immersion runs the FILL policy, so `--lq-reading-measure` is `none` here BY DESIGN — a live browser guest is not a passage. The measure clamp is therefore deliberately not scored by this shared row; a spec that wants it scores it separately."
+    },
+    {
+      "app": "immersion",
+      "feature": "Enter and leave Liquid from the window's own chrome, without losing geometry or typed text",
+      "currentRoute": "Immersion `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+      "standardDestination": "a conventional `.fwin` with its full chrome cluster and the Liquid control reading `aria-pressed=false`",
+      "liquidDestination": "`.fwin-liquid`, `data-presentation=\"liquid\"`, the same control reading `aria-pressed=true`, and the same 820x580 box",
+      "keyboardRoute": "the chrome buttons are in the window's focus order",
+      "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
+      "automatedProof": "probes/l6-parity.js shared `lifecycle()`; the mutation strips `aria-pressed` from `.fwin-b-liquid`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "status": "both",
+      "_note": "Round trip standard -> liquid -> standard with `.immersion-url` dirtied first: fieldsHeld true, shellHeld true, 0 diffs, 820x580 in both. This is the surface where that matters most, because the typed field IS the address of a live page."
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 3 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 3 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 23, and 3 declared specs still have NO row at all — notebook, immersion, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 2 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 2 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 24, and 2 declared specs still have NO row at all — notebook, vn. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
       "at": "2026-09-02 (re-derived by debug/_p2g-notwritten.cjs)",
       "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
       "harnessSpecs": 25,
-      "specsWithRows": 22,
-      "specsWithNoRows": 3,
+      "specsWithRows": 23,
+      "specsWithNoRows": 2,
       "noRows": [
         "notebook",
-        "immersion",
         "vn"
       ],
       "noRowsByCause": {
@@ -2483,7 +2580,6 @@
         ],
         "noSubjectEvidence": "notebook: FILES_APP_PLAN gate 7b deletes the Notebook section. `AppSection.tsx` has no `case 'notebook'`, `LEGACY_WIN_SECTION_ALIASES` (shared/desktop.ts:76) maps notebook -> files, and `NotebookContent.tsx` survives only as a Blanc import. Driven live on this branch: os:open `notebook` opens a window titled \"Files\" whose body root is `DIV.lq-scaffold.fa-shell`, 52 buttons, 0 `.gx-notebook` in the whole document.",
         "awaitingAuthoring": [
-          "immersion",
           "vn"
         ]
       },
@@ -2495,10 +2591,10 @@
   },
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
-    "rows": 184,
+    "rows": 191,
     "withNamedControl": 126,
     "declaredNone": 4,
-    "silent": 53,
+    "silent": 60,
     "silentByApp": {
       "dictionary": 7,
       "mediaWorkspace": 5,
@@ -2508,14 +2604,16 @@
       "agent": 5,
       "captures": 3,
       "novels": 9,
-      "manga": 7
+      "manga": 7,
+      "immersion": 7
     },
     "silentByCause": {
       "predatingTheClause": 37,
-      "b2WaveNotTranscribed": 16,
+      "b2WaveNotTranscribed": 23,
       "b2WaveApps": [
         "novels",
-        "manga"
+        "manga",
+        "immersion"
       ]
     },
     "note": "`silent` means this ledger records no control clause for the row. It is a gap in the LEDGER, not a disproof of the row — but it is a real gap and it is not monotone. THIS BLOCK RETRACTS ITS OWN EARLIER CLAIM: it used to end \"New rows now say NONE DECLARED explicitly, so `silent` can only shrink\", and the 2026-09-02 merge of the two concurrent b2 waves falsified that — silent went 45/120 -> 93/168, because the main tree's row writer (debug/_pr4-rows.cjs) copies only `rowEvidence` into `observed` while this tree's (probes/l6-parity-rows.cjs) also copies `control.mutations`. See `silentByCause`: the `b2WaveNotTranscribed` rows DID have per-row mutations run by cat6 and their receipts survive, so those are recoverable by transcription; the `predatingTheClause` rows are the older ones written before any writer said anything about controls. Two writers, one ledger, one claim that only held for one of them."
