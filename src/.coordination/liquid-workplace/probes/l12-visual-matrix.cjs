@@ -243,7 +243,38 @@ function magnitudeVerdict(m) {
   return { enough: m.pctOver8 >= DIFF_MIN_PCT, why: `${m.pctOver8}% of pixels differ by >8 (floor 0, gate ${DIFF_MIN_PCT}%)` };
 }
 const OUT = arg('out', '');
-const SHOT_DIR = path.join(REPO, 'debug', 'shots', 'l12-matrix');
+
+/**
+ * PLATE PATHS CARRY A RUN IDENTITY, and they did not until 2026-09-02.
+ *
+ * A cell's plate was written to `debug/shots/l12-matrix/<app>__<pres>__<theme>__<state>.png`
+ * — four DIMENSION coordinates and nothing about which run produced it. Two runs that share
+ * a coordinate therefore write the same file, and the later one destroys the earlier image
+ * while the earlier MANIFEST goes on asserting a sha256 for it. The manifest stays green;
+ * the evidence underneath it is gone.
+ *
+ * That is not hypothetical. `l12-atlas.cjs`'s integrity check caught it on its first live
+ * run against the banked set: **21 indexed plates no longer hashed to their recorded
+ * sha256**, every one of them `oled-black`, and every on-disk hash equal to the `tries40`
+ * run's OWN recorded hash — so the clobber is identified, not merely suspected. A second
+ * instrument agrees at 21 from the manifests alone without opening a PNG.
+ *
+ * The fix is the run directory, not a longer filename. A filename that encodes the run is
+ * still one namespace, so a re-run with the same flags collides again; a directory makes
+ * the invariant structural — a plate path can only be written by the run that owns the
+ * directory. `--run-id` is offered so a caller can pin one deliberately, but the DEFAULT
+ * has to be unique without being asked, because every clobbered plate above came from a
+ * caller who never thought about it. Timestamp plus pid gives that even for two runs
+ * started in the same second by different processes.
+ *
+ * Old manifests keep resolving: their `file` values are repo-relative and still name the
+ * flat directory, which is left in place and never written to again.
+ */
+const SHOT_ROOT = path.join(REPO, 'debug', 'shots', 'l12-matrix');
+const RUN_ID = arg('run-id', '')
+  || `${path.basename(OUT || 'l12-matrix-manifest.json').replace(/\.json$/i, '')}__${
+    new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, 'Z')}__${process.pid}`;
+const SHOT_DIR = path.join(SHOT_ROOT, RUN_ID);
 
 /** Dimension 1 — apps, parsed out of the canonical list rather than restated here. */
 function sourceSections() {
@@ -683,6 +714,10 @@ ${rows}`;
     schema: 'l12-visual-matrix/v1',
     bullet: 'L12 bullet 1 — every app standard/Liquid/theme/state screenshot matrix',
     generatedAt: new Date().toISOString(),
+    // Named in the manifest, not just implied by the plate paths, so the atlas and any
+    // later integrity check can say WHICH run owns a directory without parsing filenames.
+    runId: RUN_ID,
+    shotDir: path.relative(REPO, SHOT_DIR).replace(/\\/g, '/'),
     bridge: { pid: cfg.pid, port: cfg.port },
     dimensions: {
       apps: requested, themes, presentations, states,

@@ -39,12 +39,28 @@ const SRC = join(fileURLToPath(new URL('../../', import.meta.url)));
 /** Text formats where a NUL is always an accident, never payload. */
 const SCANNED = new Set(['.ts', '.tsx', '.js', '.jsx', '.cjs', '.mjs', '.css']);
 
-/**
- * Measurement scaffolding under `src/.coordination/` is skipped along with
- * every other dot-directory: those are probe scripts and their JSON output,
- * not shipped source, and the point of the gate is what the app ships.
+/*
+ * THE DOT-DIRECTORY EXEMPTION WAS WRONG AND IT COST A FILE, 2026-09-02.
+ *
+ * This gate used to skip `src/.coordination/` on the reasoning that probe
+ * scripts "are not shipped source, and the point of the gate is what the app
+ * ships". But the harm this gate exists to prevent, spelled out above, is not
+ * a shipping harm — it is *searchability*, and the sentence that matters is
+ * "sweeps, audits and agents in this repo run on that search constantly".
+ * They run it over the probes exactly as much as over the product; the L12
+ * certification instruments ARE how the liquid track proves its own claims.
+ *
+ * Measured: `probes/l12-atlas.cjs` carried two raw NULs at bytes 11796 and
+ * 11990 (`join('\0')` in `coverage()`), landed by 17b3d833 and untouched by
+ * 583195d1. Both sit past git's 8000-byte binary window, so every diff of that
+ * file read as clean text and nothing ever flagged it — while ripgrep answered
+ * a search of its 566 lines with "Binary file ... matches" and zero content.
+ *
+ * `src/.coordination` is also the ONLY dot-directory under `src/`, so
+ * `startsWith('.')` was a general-looking rule with exactly one concrete
+ * effect. Dropping it moves the scan from 2,637 files to 2,750 (+4.3%).
  */
-const skipDirectory = (name: string): boolean => name.startsWith('.') || name === 'node_modules';
+const skipDirectory = (name: string): boolean => name === 'node_modules';
 
 /*
  * `withFileTypes` rather than a `statSync` per entry, and the result is memoised.
@@ -106,5 +122,17 @@ describe('source files carry no raw NUL byte', () => {
   it('scans a meaningful number of files, so a broken walk cannot pass empty', () => {
     // A walk that silently returns nothing would satisfy the assertion above.
     expect(scannedFiles().length).toBeGreaterThan(500);
+  });
+
+  it('reaches the measurement probes under src/.coordination/, not just shipped source', () => {
+    /*
+     * The scope half of the fix needs its own assertion, because widening
+     * `skipDirectory` is invisible to the case above whenever the tree happens
+     * to be clean — which is the state a repair leaves it in. Without this,
+     * re-adding the dot-directory skip would keep the suite green.
+     */
+    const probes = scannedFiles().filter((file) => relative(SRC, file).split(sep)[0] === '.coordination');
+    expect(probes.length).toBeGreaterThan(50);
+    expect(probes.some((file) => file.endsWith('l12-atlas.cjs'))).toBe(true);
   });
 });
