@@ -599,3 +599,40 @@ following"* rule sees that scroll, and **Follow silently turns itself off** (`li
 3693 → 4552, `followChecked` true → false). A layout change is not a user scrolling away.
 Re-enabling it in Liquid restores every number, so today it costs one click rather than a
 feature.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `flashcards`, the first data-dependent app
+
+`notWritten` names apps with **no rows at all**, and that is what b2's "every row" now turns
+on. The split with the concurrent worker is by DATA, not by alphabet: their profile has an
+empty media library and no Anki collection, so they take the data-independent apps and this
+tree — 3,235 cards, 80 media files, real statistics — takes the ones that would otherwise be
+scored on an empty harness and capped.
+
+**`flashcards`: 8 rows, `both` 8, `pending` 0.** `cat6-feature-parity.cjs --app flashcards`
+= **PASS 10/10**: parity **8/8 standard and 8/8 liquid**, `onlyInOne` empty, round trip
+`standard -> liquid -> standard` with `flash-search-input` dirtied first — fields held, shell
+held, **0 diffs**, box `820x580` in both. All **8 mutations** flipped exactly their own row
+(8/8 -> 7/8 each, `unexpectedRows` empty every time) and all 8 restored. 0 drive refusals.
+
+Every row's evidence is byte-identical across the two presentations except `windowLifecycle`,
+which correctly reads `liquidAriaPressed` false then true. Deck arithmetic held on the real
+collection: `all=3235` = `unfiled+folders=3235`, badge sum 3235 over 5 groups, 49 rendered
+rows all worded/meaninged/removable, 24 strip cards.
+
+### The instrument was wrong, and the surface was right
+
+`virtualizedList` read **false on a correct list**. Its term was
+`expect > clientHeight ? declared > rendered : true` — any group taller than its pane must
+render fewer rows than it declares. A 5-card group is 540px in a 420px pane, so it qualified,
+and `VirtualList` rendered all 5 — correctly, because its window is derived from the
+**viewport**, not from the collection. Measured live: rendered **5/5/7/16/16** against
+declared **5/5/7/144/3074**, which is `min(declared, cap)` exactly. A second read after a
+re-mount gave `cap=12` with the same identity holding, so the cap is not even a constant and
+hardcoding 16 would have been the next wrong answer.
+
+What virtualization actually promises is that the rendered count stops growing while the
+declared count does not. The row now reads the cap off the DOM and **requires it to be
+demonstrated**: some collection must exceed it. **CONTROL ON THE RELAXATION**, run live —
+detach the two groups larger than the cap and the row still FAILS
+(`cap=7 maxDeclared=7 ceilingProven=false`), so a desk where every group is small cannot buy
+a 10. Both bodies re-attached; 5 bodies, row true, `cap=16 maxDeclared=3074`.
