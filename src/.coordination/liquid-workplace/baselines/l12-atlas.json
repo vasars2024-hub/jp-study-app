@@ -1,0 +1,608 @@
+{
+  "schema": "l12-atlas/v1",
+  "bullet": "L12 bullet 4 — final visual atlas",
+  "generatedAt": "2026-09-02T02:42:16.810Z",
+  "source": {
+    "schema": "l12-visual-matrix/v1",
+    "generatedAt": "2026-09-02T02:40:33.151Z",
+    "certifiable": true,
+    "void": null,
+    "controls": {
+      "c0": true,
+      "c1": true,
+      "c2": true,
+      "c3": true,
+      "c4": true
+    },
+    "caretFrozen": true
+  },
+  "dimensions": {
+    "apps": [
+      "flashcards",
+      "dictionary"
+    ],
+    "themes": [
+      "study-os",
+      "classic-light"
+    ],
+    "presentations": [
+      "standard",
+      "liquid"
+    ],
+    "states": [
+      "normal",
+      "maximized"
+    ],
+    "themeCatalog": [
+      {
+        "id": "study-os",
+        "light": false
+      },
+      {
+        "id": "classic-light",
+        "light": true
+      },
+      {
+        "id": "dark-nebula",
+        "light": false
+      },
+      {
+        "id": "soft-sepia",
+        "light": true
+      },
+      {
+        "id": "ocean-blue",
+        "light": true
+      },
+      {
+        "id": "high-contrast",
+        "light": false
+      },
+      {
+        "id": "mint-green",
+        "light": true
+      },
+      {
+        "id": "rose-pine",
+        "light": true
+      },
+      {
+        "id": "oled-black",
+        "light": false
+      },
+      {
+        "id": "midnight-ink",
+        "light": false
+      },
+      {
+        "id": "paper",
+        "light": true
+      },
+      {
+        "id": "cyberpunk",
+        "light": false
+      },
+      {
+        "id": "forest-night",
+        "light": false
+      }
+    ],
+    "canonicalSections": 25
+  },
+  "coverage": {
+    "declaredCells": 16,
+    "presentCells": 16,
+    "capturedCells": 16,
+    "failedCells": 0,
+    "neverAttempted": 0,
+    "neverAttemptedExamples": [],
+    "completeness": 100,
+    "appsRequested": 2,
+    "appsOpened": 2,
+    "appsPresentable": 2,
+    "canonicalSections": 25,
+    "sampledOut": [
+      "agent",
+      "library",
+      "novels",
+      "grammar",
+      "translate",
+      "player",
+      "video",
+      "music",
+      "anki",
+      "games",
+      "stats",
+      "resources",
+      "settings",
+      "note",
+      "visualizer",
+      "musicwidget",
+      "city",
+      "immersion",
+      "calendar",
+      "reading",
+      "youtube",
+      "scraper",
+      "files"
+    ],
+    "universeCoverage": 8
+  },
+  "axisEffectiveness": [
+    {
+      "axis": "app",
+      "declaredValues": [
+        "flashcards",
+        "dictionary"
+      ],
+      "comparableGroups": 8,
+      "groupsWhereItMoved": 8,
+      "groupsWhereItMovedNothing": 0,
+      "groupsWhereGeometryMoved": 8,
+      "flatExamples": [],
+      "verdict": "effective"
+    },
+    {
+      "axis": "theme",
+      "declaredValues": [
+        "study-os",
+        "classic-light"
+      ],
+      "comparableGroups": 8,
+      "groupsWhereItMoved": 8,
+      "groupsWhereItMovedNothing": 0,
+      "groupsWhereGeometryMoved": 0,
+      "flatExamples": [],
+      "verdict": "effective"
+    },
+    {
+      "axis": "presentation",
+      "declaredValues": [
+        "standard",
+        "liquid"
+      ],
+      "comparableGroups": 8,
+      "groupsWhereItMoved": 8,
+      "groupsWhereItMovedNothing": 0,
+      "groupsWhereGeometryMoved": 0,
+      "flatExamples": [],
+      "verdict": "effective"
+    },
+    {
+      "axis": "state",
+      "declaredValues": [
+        "normal",
+        "maximized"
+      ],
+      "comparableGroups": 8,
+      "groupsWhereItMoved": 3,
+      "groupsWhereItMovedNothing": 5,
+      "groupsWhereGeometryMoved": 0,
+      "flatExamples": [
+        {
+          "group": "app=dictionary|theme=study-os|presentation=standard",
+          "values": [
+            "normal",
+            "maximized"
+          ],
+          "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952"
+        },
+        {
+          "group": "app=flashcards|theme=classic-light|presentation=standard",
+          "values": [
+            "normal",
+            "maximized"
+          ],
+          "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee"
+        },
+        {
+          "group": "app=dictionary|theme=classic-light|presentation=standard",
+          "values": [
+            "normal",
+            "maximized"
+          ],
+          "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58"
+        },
+        {
+          "group": "app=dictionary|theme=study-os|presentation=liquid",
+          "values": [
+            "normal",
+            "maximized"
+          ],
+          "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747"
+        }
+      ],
+      "verdict": "partial"
+    }
+  ],
+  "integrity": {
+    "verified": 16,
+    "missing": 0,
+    "mismatch": 0,
+    "mismatches": [],
+    "state": "all-present"
+  },
+  "duplication": {
+    "distinctImages": 11,
+    "duplicateGroups": 5,
+    "cellsInDuplicateGroups": 10,
+    "largestGroup": 2,
+    "examples": [
+      {
+        "sha256": "904f3eadb813",
+        "cells": [
+          "dictionary/standard/study-os/normal",
+          "dictionary/standard/study-os/maximized"
+        ]
+      },
+      {
+        "sha256": "da120231e6a2",
+        "cells": [
+          "flashcards/standard/classic-light/normal",
+          "flashcards/standard/classic-light/maximized"
+        ]
+      },
+      {
+        "sha256": "5cfe65d489ca",
+        "cells": [
+          "dictionary/standard/classic-light/normal",
+          "dictionary/standard/classic-light/maximized"
+        ]
+      },
+      {
+        "sha256": "997324cdf791",
+        "cells": [
+          "dictionary/liquid/study-os/normal",
+          "dictionary/liquid/study-os/maximized"
+        ]
+      }
+    ]
+  },
+  "certifiable": false,
+  "blockers": [
+    "axis 'state' moved pixels in only 3 of 8 comparable groups (and geometry in 0) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything"
+  ],
+  "plates": [
+    {
+      "app": "dictionary",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__classic-light__maximized.png",
+      "sha256": "3d1d3f3e9756c155d53856b28ea1e4d3bccda518e524db0fcf20bf654c118bf4",
+      "bytes": 27706,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__classic-light__normal.png",
+      "sha256": "5c0878f4e0ee8d08b8f70263cdc1a168478061139b1e63b76cf8781e55df6db2",
+      "bytes": 27666,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__study-os__maximized.png",
+      "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747",
+      "bytes": 27130,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__study-os__normal.png",
+      "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747",
+      "bytes": 27130,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__classic-light__maximized.png",
+      "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58",
+      "bytes": 22180,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__classic-light__normal.png",
+      "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58",
+      "bytes": 22180,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__study-os__maximized.png",
+      "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952",
+      "bytes": 22843,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "dictionary",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/dictionary__standard__study-os__normal.png",
+      "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952",
+      "bytes": 22843,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__classic-light__maximized.png",
+      "sha256": "1957200508de7956c214e115344ca48ca9d52fb6b9f564c321db5613512d4428",
+      "bytes": 39998,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__classic-light__normal.png",
+      "sha256": "1957200508de7956c214e115344ca48ca9d52fb6b9f564c321db5613512d4428",
+      "bytes": 39998,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__study-os__maximized.png",
+      "sha256": "18d5c0d573c9c43d4462944e5c99ad9ff0b0e20d46642529da05a29c86d61839",
+      "bytes": 40128,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__study-os__normal.png",
+      "sha256": "51b39f22efa383b6ebdbc9566a6497b3883db9426ffa43d4dca01946a214aa38",
+      "bytes": 40911,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__classic-light__maximized.png",
+      "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee",
+      "bytes": 41328,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__classic-light__normal.png",
+      "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee",
+      "bytes": 41328,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "maximized",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__study-os__maximized.png",
+      "sha256": "c65ddad5fcdf9377e1bacb36fbc37d79f06482df9179098dfb6dea9bdaaf5d8c",
+      "bytes": 43052,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "flashcards",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/flashcards__standard__study-os__normal.png",
+      "sha256": "7127880c7dc47cb90e1d30a0ade65acc92237e9db9849eb469f4624cc6a82203",
+      "bytes": 41733,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    }
+  ],
+  "sourceManifest": "debug/_p2d-l12-matrix.json",
+  "mutationControls": {
+    "m1": {
+      "kind": "drop-one-cell/coverage-must-report-a-gap",
+      "dropped": "dictionary/liquid/classic-light/maximized",
+      "baseNeverAttempted": 0,
+      "mutatedNeverAttempted": 1,
+      "pass": true
+    },
+    "m2": {
+      "kind": "flatten-images/axis-must-be-reported-decorative",
+      "axis": "app",
+      "baseVerdict": "effective",
+      "mutatedVerdict": "decorative",
+      "pass": true
+    },
+    "m3": {
+      "kind": "corrupt-one-sha/integrity-must-report-mismatch",
+      "file": "debug/shots/l12-matrix/flashcards__standard__study-os__normal.png",
+      "baseMismatch": 0,
+      "mutatedMismatch": 1,
+      "pass": true
+    },
+    "m4": {
+      "kind": "drop-one-app/coverage-must-fall-by-exactly-that-app",
+      "app": "flashcards",
+      "expectedLoss": 8,
+      "observedLoss": 8,
+      "pass": true
+    },
+    "summary": {
+      "fired": 4,
+      "failed": 0,
+      "notApplicable": 0
+    }
+  },
+  "contactSheet": "debug/shots/l12-atlas.html"
+}

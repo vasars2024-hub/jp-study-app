@@ -733,6 +733,18 @@ async function capture(tag, rect) {
 
   const out = OUT || path.join(REPO, 'debug', 'l12-matrix-manifest.json');
   fs.writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`);
+  /**
+   * `--atlas` is a PASS-THROUGH to L12 bullet 4's assembler, not a second implementation.
+   * It lives in its own module because the atlas must be rebuildable from a banked
+   * manifest with no app running, and this file refuses without a live bridge.
+   */
+  if (ATLAS) {
+    const r = require('node:child_process').spawnSync(process.execPath,
+      [path.join(__dirname, 'l12-atlas.cjs'), '--manifest', out, ...(CONTROL ? ['--control'] : [])],
+      { encoding: 'utf8' });
+    console.log(r.stdout || '');
+    if (r.stderr) console.error(r.stderr);
+  }
   console.log(JSON.stringify({
     out: path.relative(REPO, out).replace(/\\/g, '/'),
     ...manifest.totals,

@@ -1,0 +1,243 @@
+{
+  "schema": "l12-risk-register/v1",
+  "bullet": "L12 bullet 4 — remaining-risk report",
+  "generatedAt": "2026-09-02T02:42:30.623Z",
+  "head": "33bf9a0b",
+  "branch": "wt/files-app",
+  "totals": {
+    "risks": 7,
+    "open": 5,
+    "closed": 2,
+    "unmeasured": 0,
+    "highOpen": 2
+  },
+  "risks": [
+    {
+      "id": "R1",
+      "title": "Runtime blobs the app loads from public/ are not in git",
+      "severity": "high",
+      "state": "open",
+      "measurement": {
+        "entriesOnDisk": 3,
+        "entryNames": [
+          "ort",
+          "sounds",
+          "tray-icon.png"
+        ],
+        "pathsTrackedByGit": 2,
+        "trackedNames": [
+          "public/sounds/README.md",
+          "public/tray-icon.png"
+        ],
+        "gitignoreLines": [
+          {
+            "line": 103,
+            "text": "public/models/"
+          },
+          {
+            "line": 104,
+            "text": "public/ort/"
+          },
+          {
+            "line": 105,
+            "text": "public/cedict/"
+          },
+          {
+            "line": 106,
+            "text": "public/kuromoji/"
+          },
+          {
+            "line": 107,
+            "text": "public/tesseract/"
+          }
+        ],
+        "referenceTreeEntries": 7,
+        "referenceTreeOnly": [
+          "cedict",
+          "kuromoji",
+          "models",
+          "tesseract"
+        ]
+      },
+      "whyItMatters": "A production build from a clean clone lacks them and fails at runtime with no useful diagnostic. This is how 12 anonymous ERR_FILE_NOT_FOUND stacks got into a production boot.",
+      "whatWouldCloseIt": "Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. The named-diagnostic fix landed in 96a7b579 makes the failure legible; it does not make the blobs present.",
+      "falsified": false
+    },
+    {
+      "id": "R2",
+      "title": "A source file is imported by tracked code but is itself untracked",
+      "severity": "high",
+      "state": "closed",
+      "measurement": {
+        "specifiers": 7749,
+        "resolved": 7722,
+        "findings": []
+      },
+      "whyItMatters": "Dev resolves imports lazily, rollup resolves the whole graph, so this class of defect is invisible from a working tree and kills the production build on a clean checkout.",
+      "whatWouldCloseIt": "git add the resolved target, or delete the import.",
+      "falsified": null
+    },
+    {
+      "id": "R3",
+      "title": "Feature-parity rows are still pending",
+      "severity": "medium",
+      "state": "open",
+      "measurement": {
+        "available": true,
+        "rows": 50,
+        "tally": {
+          "both": 45,
+          "pending": 5
+        },
+        "pendingRows": [
+          {
+            "surface": "mediaWorkspace",
+            "feature": "Open a study-ready file into the player",
+            "blocker": null
+          },
+          {
+            "surface": "mediaWorkspace",
+            "feature": "Readiness category filters over the whole library",
+            "blocker": null
+          },
+          {
+            "surface": "mediaWorkspace",
+            "feature": "Transcript rail: cue list, active-cue follow, per-cue translate, card preview",
+            "blocker": null
+          },
+          {
+            "surface": "mediaWorkspace",
+            "feature": "Detach a Study Block into its own OS window, and return it",
+            "blocker": null
+          },
+          {
+            "surface": "mediaWorkspace",
+            "feature": "Send a detached block to another monitor, and restore its rectangle across close/reopen",
+            "blocker": null
+          }
+        ]
+      },
+      "whyItMatters": "The plan's reversibility promise is only as strong as the ledger behind it; a pending row is a feature nobody has shown survives the Liquid round trip.",
+      "whatWouldCloseIt": "Each pending row names its own blocker in the ledger.",
+      "falsified": null
+    },
+    {
+      "id": "R4",
+      "title": "Liquid plan bullets are still open",
+      "severity": "medium",
+      "state": "open",
+      "measurement": {
+        "closed": 34,
+        "open": 12,
+        "unknown": 0,
+        "total": 46,
+        "openTitles": [
+          "Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.",
+          "Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.",
+          "Confirm the four surface roles and orientation-spine behavior.",
+          "Approve standard/Liquid entry, exit, and recovery UX.",
+          "Produce static layout studies for compact, default, and maximized states.",
+          "Validate every player feature in standard and Liquid modes.",
+          "Keep review/input surfaces spatially fixed during active tasks.",
+          "Use Liquid only for context, preview, scheduling detail, and session summaries.",
+          "Run every app’s standard/Liquid/theme/state screenshot matrix.",
+          "Close every feature-ledger row.",
+          "Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.",
+          "Produce a final visual atlas and remaining-risk report."
+        ]
+      },
+      "whyItMatters": "The release gate is the plan’s own definition of done.",
+      "whatWouldCloseIt": "Close each remaining bullet against its own words with live evidence.",
+      "falsified": null
+    },
+    {
+      "id": "R5",
+      "title": "The architecture-audit gate is red",
+      "severity": "medium",
+      "state": "closed",
+      "measurement": {
+        "exit": 0,
+        "modules": 2515,
+        "stale": null,
+        "fresh": null,
+        "tail": "  duplicate-export        7  (0 pending)\n  duplicate-storage       3  (0 pending)\n  orphan-module           7  (3 pending)\n  test-only-module       13  (6 pending)\n\nNothing new. 9 known finding(s) still marked pending."
+      },
+      "whyItMatters": "It is one of the four repo gates; red on inherited state hides a genuinely new finding behind noise.",
+      "whatWouldCloseIt": "Reconcile the stale baseline entries it names.",
+      "falsified": false
+    },
+    {
+      "id": "R6",
+      "title": "The visual atlas is not certification evidence",
+      "severity": "high",
+      "state": "open",
+      "measurement": {
+        "available": true,
+        "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
+        "generatedAt": "2026-09-02T02:42:16.810Z",
+        "certifiable": false,
+        "blockers": [
+          "axis 'state' moved pixels in only 3 of 8 comparable groups (and geometry in 0) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything"
+        ],
+        "completeness": 100,
+        "axes": {
+          "app": "effective",
+          "theme": "effective",
+          "presentation": "effective",
+          "state": "partial"
+        }
+      },
+      "whyItMatters": "L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.",
+      "whatWouldCloseIt": "Every blocker the atlas lists, in its own words.",
+      "falsified": false
+    },
+    {
+      "id": "R7",
+      "title": "The packaging stage has never completed in this tree",
+      "severity": "low",
+      "state": "open",
+      "measurement": {
+        "nodeModules": "reparse-point",
+        "packagerCopyStageRunnable": false,
+        "outDirPresent": false,
+        "viteBuildPresent": true
+      },
+      "whyItMatters": "Compilation is proven (8 of 8 forge targets build), but the file-copy stage that produces a shippable app is unexercised here.",
+      "whatWouldCloseIt": "Windows Developer Mode, or running the packager in a tree whose node_modules is a real directory. Environment, not product: the copy stage compiles nothing.",
+      "falsified": false
+    }
+  ],
+  "controls": {
+    "r2": {
+      "kind": "plant-an-untracked-import/R2-must-find-it",
+      "plantFound": 1,
+      "baseFindings": 0,
+      "restoredFindings": 0,
+      "teardownVerified": true,
+      "pass": true
+    },
+    "r4": {
+      "kind": "append-one-open-bullet/R4-count-must-rise-by-one",
+      "base": 12,
+      "mutated": 13,
+      "pass": true
+    },
+    "r3": {
+      "kind": "force-one-row-pending/R3-count-must-rise-or-hold-if-already-pending",
+      "base": 5,
+      "mutated": 6,
+      "pass": true
+    },
+    "unfalsified": [
+      "R1",
+      "R5",
+      "R6",
+      "R7"
+    ],
+    "unfalsifiedWhy": "R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.",
+    "summary": {
+      "fired": 3,
+      "failed": 0
+    }
+  }
+}
