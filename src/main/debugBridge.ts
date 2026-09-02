@@ -408,6 +408,89 @@ async function handle(
       }
     }
 
+    /**
+     * The RENDERER's own memory, with a forced collection — the half `/mem` structurally cannot
+     * see.
+     *
+     * `/mem` runs `gc()` inside MAIN's isolate. That is the right instrument for defect D1, but
+     * a renderer is a different process with a different heap, so main's collection cannot free
+     * one byte of it. Measured 2026-09-01 on a 12-cycle Liquid cadence: main private 427.8 ->
+     * 427.4 MB and `heapUsed` byte-identical, while the renderer's `usedJSHeapSize` moved
+     * 233.6 -> 433.6 MB under a deliberate +200 MB plant that the same reading never released.
+     * That is not a leak finding, it is an instrument limit — and closing a long-session memory
+     * clause on main alone would credit the wrong process entirely.
+     *
+     * `performance.memory` is reachable from `/eval` already, so what is missing is only the
+     * COLLECTION: there is no page-side way to ask for one, `--expose-gc` would have to be a
+     * launch flag, and without a collection a rising heap cannot be told apart from a heap that
+     * simply has not been swept. CDP has the button (`HeapProfiler.collectGarbage`), and this
+     * bridge already proves it reaches CDP — `/emulate` drives `Emulation.setEmulatedMedia`
+     * through the same debugger session.
+     *
+     * Body: `{ window?, gc?: true }`. The DOM counters are reported alongside the heap because a
+     * heap number alone cannot name WHAT is retained: `documents` and `nodes` that stay high
+     * after a collection are the detached-subtree signature, and `jsEventListeners` is the
+     * listener-not-removed one. Before/after pairs are both returned when a collection ran, so a
+     * caller can prove the collector did something rather than assume it.
+     */
+    case '/rmem': {
+      const win = resolveWindow(body.window);
+      if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
+      const dbg = win.webContents.debugger;
+      // Whoever attached the session owns detaching it. Detaching one we did not open would
+      // silently clear a live `/emulate` override — the exact leak that route warns about.
+      const weAttached = !dbg.isAttached();
+      try {
+        if (weAttached) dbg.attach('1.3');
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: `debugger attach failed: ${String(err)}` } };
+      }
+      const sample = async () => {
+        const heap = (await dbg.sendCommand('Runtime.getHeapUsage')) as { usedSize: number; totalSize: number };
+        const dom = (await dbg.sendCommand('Memory.getDOMCounters')) as {
+          documents: number; nodes: number; jsEventListeners: number;
+        };
+        const mb = (n: number) => Math.round((n / (1024 * 1024)) * 10) / 10;
+        return {
+          usedMb: mb(heap.usedSize),
+          totalMb: mb(heap.totalSize),
+          documents: dom.documents,
+          nodes: dom.nodes,
+          jsEventListeners: dom.jsEventListeners,
+        };
+      };
+      try {
+        const before = await sample();
+        let gcRan = false;
+        if (body.gc === true) {
+          await dbg.sendCommand('HeapProfiler.collectGarbage');
+          gcRan = true;
+        }
+        const after = gcRan ? await sample() : before;
+        return {
+          code: 200,
+          body: {
+            ok: true,
+            webContentsId: win.webContents.id,
+            pid: win.webContents.getOSProcessId(),
+            gcRequested: body.gc === true,
+            gcRan,
+            // `after` is the number to compare across cycles; `before` exists so the collection
+            // itself is falsifiable — equal pairs on a heap that just grew mean the button did
+            // nothing, and that is a finding about the instrument, not about the product.
+            ...after,
+            beforeGc: before,
+          },
+        };
+      } catch (err) {
+        return { code: 200, body: { ok: false, error: String(err) } };
+      } finally {
+        if (weAttached && !emulatedMedia.has(win.webContents.id)) {
+          try { dbg.detach(); } catch { /* another owner took it mid-call; nothing to restore */ }
+        }
+      }
+    }
+
     case '/dom': {
       const win = resolveWindow(body.window ?? url.searchParams.get('window'));
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };

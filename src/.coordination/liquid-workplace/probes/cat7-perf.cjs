@@ -54,6 +54,14 @@
  * running, which is L11 bullet 3's actual question and which no other leg here asks — the
  * three gestures above run on an idle surface and `heavy` is measured beside them, not under
  * them. It implies --jank. See the LOAD_ARM block for the three things it refuses without.
+ *
+ *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface dictionary \
+ *     --long-session --cycles 12
+ *
+ * --long-session replaces the gesture legs entirely with L11 bullet 4's fifth clause: N round
+ * trips of the real Liquid cadence, sampling the RENDERER's heap and DOM counters after a
+ * forced collection on every cycle. It refuses without a collector control that both arms and
+ * fires. See correction 34.
  */
 'use strict';
 const fs = require('node:fs');
@@ -1088,6 +1096,10 @@ const arg = (n, d) => {
 const has = (n) => process.argv.includes(`--${n}`);
 const SURFACE = arg('surface', '');
 const UNDER_LOAD = has('under-load');
+// Correction 34. A MODE, not a probe: it reuses this file's refusals (settled main process,
+// resolved window, structural root present), its bridge client and its retry policy verbatim.
+const LONG_SESSION = has('long-session');
+const CYCLES = Math.max(1, Number(arg('cycles', '12')) || 12);
 const spec = SPECS[SURFACE];
 if (!spec) {
   console.error(`REFUSE - --surface must be one of: ${Object.keys(SPECS).join(', ')}`);
@@ -1212,6 +1224,310 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const legs = {};
   // Collected before the scoring block exists, and merged into `voided` there.
   const voidedEarly = [];
+
+  /**
+   * CORRECTION 34 — `--long-session`, L11 bullet 4's fifth clause, and the mode exists because
+   * the previous attempt measured the WRONG PROCESS.
+   *
+   * That attempt ran 12 cycles of the real Liquid cadence and reported main private
+   * 427.8 -> 427.4 MB with `heapUsed` byte-identical and `detachedContexts` 0 -> 0, which reads
+   * like a clean long session. It is not a reading about Liquid at all: `/mem` samples MAIN, and
+   * every line of Liquid presentation code — `liquidWindowPresentation.ts`, the four hosts, the
+   * observers and the listeners they add — runs in the RENDERER. Its own instrument said so:
+   * the renderer's `usedJSHeapSize` moved 233.6 -> 433.6 MB under a plant and never came back,
+   * because main's `gc()` runs in main's isolate and cannot collect a renderer heap.
+   *
+   * So this mode reads the renderer through `/rmem` (CDP `HeapProfiler.collectGarbage` plus
+   * `Runtime.getHeapUsage` and `Memory.getDOMCounters`), samples AFTER a forced collection on
+   * every cycle rather than only at the endpoints, and refuses on three things the previous
+   * attempt could not check:
+   *
+   *  1. THE COLLECTOR CONTROL, and it runs FIRST. A deliberate on-heap plant plus a detached
+   *     DOM subtree must be visible in the numbers, and must be GONE after release and one
+   *     collection. If the plant does not free, this instrument cannot tell a leak from an
+   *     unswept heap and every number below is VOID — which is exactly the state the previous
+   *     turn was in without being able to say so.
+   *  2. A PROGRESS RECEIPT. Windows observed at `[data-presentation="liquid"]` after each
+   *     liquid half and back at 0 after each standard half. A cadence that toggled nothing is
+   *     an empty harness, and an empty harness measures as a leak-free one.
+   *  3. A SCENE FLOOR. Peak `.fwin` count and element count per cycle, so a run against a bare
+   *     desktop cannot pass by having nothing to retain.
+   */
+  if (LONG_SESSION) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const rmem = async (gc) => {
+      const r = await http('/rmem', {
+        method: 'POST',
+        body: JSON.stringify({ ...(WIN ? { window: WIN } : {}), gc: gc === true }),
+      });
+      if (!r.ok) {
+        throw new Error(`REFUSE - /rmem did not answer (${JSON.stringify(r).slice(0, 200)}). The renderer heap is the whole point of this mode and main's /mem structurally cannot see it.`);
+      }
+      if (gc === true && r.gcRan !== true) {
+        throw new Error('REFUSE - /rmem reported gcRan false, so every sample below is an unswept heap.');
+      }
+      return r;
+    };
+    // The cadence is the product's own command, reduced exactly as keyboardShortcuts.ts:1541
+    // reduces the palette entry: one `os:window` event with an action tag.
+    const TOGGLE = "(window.dispatchEvent(new CustomEvent('os:window', { detail: 'togglePresentation' })), 'sent')";
+    const OBSERVE = `JSON.stringify({
+      liquid: document.querySelectorAll('[data-presentation="liquid"]').length,
+      fwins: document.querySelectorAll('.fwin').length,
+      elements: document.querySelectorAll('.fwin *').length,
+    })`;
+    /**
+     * `--churn` — and without it this leg answers a much weaker question than it looks like.
+     *
+     * The plain cadence toggles presentation on a window that stays open. Measured here first,
+     * that is CSS-only: the mean per-cycle difference between the two halves was **0 nodes and
+     * 0.0 MB**, so "nodes flat across 12 cycles" was true of a cadence that never allocated a
+     * node to prove it. The leak-bearing path in a long Liquid session is the one that MOUNTS
+     * and UNMOUNTS Liquid chrome — open a window, make it Liquid, put it back, close it — and
+     * the plain mode never walks it.
+     *
+     * `--churn` walks it, through the product's own title-bar controls rather than the global
+     * command, so the window under test is named rather than inferred from focus. It also gives
+     * this leg the sensitivity receipt the plain mode cannot have: the open+liquid sample minus
+     * the closed sample IS the allocation, so a flat growth number is only meaningful next to a
+     * non-zero one.
+     */
+    const CHURN = has('churn');
+    const SECTION = arg('section', SURFACE);
+    const findWin = `var wins = [].slice.call(document.querySelectorAll('.fwin'));
+      var tt = function (w) { var e = w.querySelector('.fwin-title-text, .fwin-title'); return e ? (e.textContent || '').trim() : ''; };
+      var w = wins.filter(function (x) { return tt(x).indexOf(${JSON.stringify(spec.title)}) >= 0; })[0];`;
+    const clickIn = (btnSel) => `(function () { ${findWin}
+      if (!w) return 'REFUSE: no window titled ${spec.title}';
+      var b = w.querySelector(${JSON.stringify(btnSel)});
+      if (!b) return 'REFUSE: ${btnSel} absent';
+      b.click();
+      return 'clicked';
+    })()`;
+    const OBSERVE_MINE = `(function () { ${findWin}
+      return JSON.stringify({
+        present: w ? (w.getAttribute('data-presentation') || 'standard') : 'absent',
+        liquid: document.querySelectorAll('[data-presentation="liquid"]').length,
+        fwins: wins.length,
+        elements: document.querySelectorAll('.fwin *').length,
+      });
+    })()`;
+
+    // --- control 1: can this collector free a renderer heap at all? -------------------
+    step('collector CONTROL — plant');
+    const controlBase = await rmem(true);
+    // On-heap objects, not an ArrayBuffer: a typed array's backing store is external and would
+    // move `usedSize` by an amount V8 does not own, which is not the pool the cadence fills.
+    // The detached subtree is the DOM half — `nodes` is what names a retained subtree, and a
+    // heap number alone never could.
+    await ev(`(window.__lqPlant = { objs: Array.from({ length: 1200000 }, function (_, i) { return { i: i, a: i * 2, b: 'lq' }; }), dom: (function () { var d = document.createElement('div'); for (var i = 0; i < 20000; i++) { var s = document.createElement('span'); s.textContent = 'x'; d.appendChild(s); } return d; })() }, 'planted')`);
+    await sleep(300);
+    const controlPlanted = await rmem(true);
+    step('collector CONTROL — release');
+    await ev("(delete window.__lqPlant, 'released')");
+    await sleep(300);
+    const controlReleased = await rmem(true);
+    const plantHeapMb = controlPlanted.usedMb - controlBase.usedMb;
+    const plantNodes = controlPlanted.nodes - controlBase.nodes;
+    // Freed against the RISE, not against an absolute figure: a machine that never made the
+    // allocation visible is a different failure from one that made it and kept it.
+    const freedHeadroom = controlPlanted.usedMb - controlReleased.usedMb;
+    const freedNodes = controlPlanted.nodes - controlReleased.nodes;
+    legs.collectorControl = {
+      base: controlBase, planted: controlPlanted, released: controlReleased,
+      plantHeapMb: Math.round(plantHeapMb * 10) / 10,
+      plantNodes,
+      freedHeapMb: Math.round(freedHeadroom * 10) / 10,
+      freedNodes,
+    };
+    if (plantHeapMb < 20) {
+      voidedEarly.push(`COLLECTOR CONTROL DID NOT ARM: a 1.2M-object plant moved the renderer heap only ${legs.collectorControl.plantHeapMb} MB, so this instrument cannot see an allocation it made itself and every number below is void.`);
+    } else if (freedHeadroom < plantHeapMb * 0.7) {
+      voidedEarly.push(`COLLECTOR CONTROL DID NOT FIRE: the plant rose ${legs.collectorControl.plantHeapMb} MB and only ${legs.collectorControl.freedHeapMb} MB came back after release + collection, so a rising heap here cannot be told apart from an unswept one. This is the exact state the 2026-09-01 main-only reading was in.`);
+    }
+    if (plantNodes < 15000) {
+      voidedEarly.push(`DOM CONTROL DID NOT ARM: a 20,000-node detached subtree moved the node counter by ${plantNodes}, so the DOM half of this reading is blind.`);
+    } else if (freedNodes < plantNodes * 0.7) {
+      voidedEarly.push(`DOM CONTROL DID NOT FIRE: ${plantNodes} planted nodes and only ${freedNodes} released, so a retained subtree cannot be told apart from a collected one.`);
+    }
+
+    // --- the cadence ------------------------------------------------------------------
+    const baseline = await rmem(true);
+    const mainBaseline = await http('/mem', { method: 'POST', body: JSON.stringify({ gc: true }) });
+    const cycles = [];
+    let liquidObserved = 0;
+    let standardObserved = 0;
+    let peakFwins = 0;
+    let peakElements = 0;
+    // Both halves are sampled, and both after a collection, for one reason: without the liquid
+    // half there is no way to tell a round trip from a no-op. "Nodes flat across 12 cycles" is
+    // worthless if the liquid presentation never allocated a node to begin with, and the
+    // attribute flip alone does not settle that — a CSS-only presentation and a mount/unmount
+    // one produce the same `[data-presentation]` receipt and completely different leak risk.
+    let liquidDeltaNodes = 0;
+    let liquidDeltaMb = 0;
+    const refusals = [];
+    for (let i = 0; i < CYCLES; i++) {
+      step(`cadence ${i + 1}/${CYCLES}${CHURN ? ' (churn)' : ''}`);
+      let onLiquid;
+      let onStandard;
+      let liquidSample;
+      let s;
+      if (CHURN) {
+        // Open through the product's own desktop command, then drive the window's own
+        // title-bar controls. `os:open` takes the section as the detail DIRECTLY.
+        await ev(`(window.dispatchEvent(new CustomEvent('os:open', { detail: ${JSON.stringify(SECTION)} })), 'opened')`);
+        await sleep(500);
+        const madeLiquid = await ev(clickIn('.fwin-b-liquid'));
+        if (String(madeLiquid).startsWith('REFUSE')) refusals.push(`cycle ${i + 1} make-liquid: ${madeLiquid}`);
+        await sleep(450);
+        onLiquid = JSON.parse(await ev(OBSERVE_MINE));
+        liquidSample = await rmem(true);
+        const backToStandard = await ev(clickIn('.fwin-b-liquid'));
+        if (String(backToStandard).startsWith('REFUSE')) refusals.push(`cycle ${i + 1} return-to-standard: ${backToStandard}`);
+        await sleep(450);
+        onStandard = JSON.parse(await ev(OBSERVE_MINE));
+        const closed = await ev(clickIn('.fwin-close'));
+        if (String(closed).startsWith('REFUSE')) refusals.push(`cycle ${i + 1} close: ${closed}`);
+        await sleep(500);
+        const afterClose = JSON.parse(await ev(OBSERVE_MINE));
+        if (afterClose.present !== 'absent') refusals.push(`cycle ${i + 1}: the window was still present after Close, so this cycle unmounted nothing`);
+        s = await rmem(true);
+      } else {
+        await ev(TOGGLE);
+        await sleep(450);
+        onLiquid = JSON.parse(await ev(OBSERVE));
+        liquidSample = await rmem(true);
+        await ev(TOGGLE);
+        await sleep(450);
+        onStandard = JSON.parse(await ev(OBSERVE));
+        s = await rmem(true);
+      }
+      liquidObserved += onLiquid.liquid;
+      standardObserved += onStandard.liquid;
+      peakFwins = Math.max(peakFwins, onLiquid.fwins, onStandard.fwins);
+      peakElements = Math.max(peakElements, onLiquid.elements, onStandard.elements);
+      liquidDeltaNodes += liquidSample.nodes - s.nodes;
+      liquidDeltaMb += liquidSample.usedMb - s.usedMb;
+      cycles.push({
+        cycle: i + 1,
+        liquidWindows: onLiquid.liquid,
+        standardWindows: onStandard.liquid,
+        fwins: onLiquid.fwins,
+        elements: onLiquid.elements,
+        usedMb: s.usedMb, nodes: s.nodes, documents: s.documents, listeners: s.jsEventListeners,
+        liquidUsedMb: liquidSample.usedMb, liquidNodes: liquidSample.nodes,
+        liquidListeners: liquidSample.jsEventListeners,
+      });
+    }
+    const after = await rmem(true);
+    const mainAfter = await http('/mem', { method: 'POST', body: JSON.stringify({ gc: true }) });
+
+    legs.longSession = {
+      cycles: CYCLES,
+      mode: CHURN ? `churn — open ${SECTION}, Make Liquid, Return to standard, Close, every cycle` : 'toggle only — the window stays open',
+      refusals,
+      baseline, after, cycleSamples: cycles,
+      main: {
+        privateMbBefore: mainBaseline.privateMb, privateMbAfter: mainAfter.privateMb,
+        heapUsedMbBefore: mainBaseline.heapUsedMb, heapUsedMbAfter: mainAfter.heapUsedMb,
+        detachedContextsBefore: mainBaseline.detachedContexts, detachedContextsAfter: mainAfter.detachedContexts,
+      },
+      receipt: {
+        liquidObserved, standardObserved, peakFwins, peakElements,
+        // Mean, not total: a per-cycle figure is what a reader compares against the growth
+        // allowance below, and a total would flatter or damn the run purely by cycle count.
+        liquidHalfNodeDelta: Math.round(liquidDeltaNodes / CYCLES),
+        liquidHalfHeapMb: Math.round((liquidDeltaMb / CYCLES) * 10) / 10,
+        note: 'liquidObserved counts windows found at [data-presentation="liquid"] after each liquid half; standardObserved is the same read after each standard half and must be 0. liquidHalfNodeDelta/liquidHalfHeapMb are the mean per-cycle difference between the two halves, both sampled after a forced collection — they say how much the presentation actually allocates, which is what makes a flat growth number mean something.',
+      },
+      growth: {
+        usedMb: Math.round((after.usedMb - baseline.usedMb) * 10) / 10,
+        nodes: after.nodes - baseline.nodes,
+        documents: after.documents - baseline.documents,
+        listeners: after.jsEventListeners - baseline.jsEventListeners,
+        mainPrivateMb: Math.round((mainAfter.privateMb - mainBaseline.privateMb) * 10) / 10,
+      },
+      // THE COMPARISON CHURN MODE ACTUALLY NEEDS, and `growth` above is not it. The baseline is
+      // taken with the surface OPEN and the run ends with it CLOSED, so `growth` straddles a
+      // whole window and comes out large and negative on a perfectly clean run — a number a
+      // reader would either dismiss or misread. Cycle 1's closed sample against the last one is
+      // like-for-like: same scene, same presentation, N mount/unmount round trips apart.
+      growthAcrossCycles: {
+        usedMb: Math.round((cycles[cycles.length - 1].usedMb - cycles[0].usedMb) * 10) / 10,
+        nodes: cycles[cycles.length - 1].nodes - cycles[0].nodes,
+        documents: cycles[cycles.length - 1].documents - cycles[0].documents,
+        listeners: cycles[cycles.length - 1].listeners - cycles[0].listeners,
+        from: 1, to: cycles.length,
+      },
+    };
+
+    const findings = [];
+    const voided = [...voidedEarly];
+    if (liquidObserved < CYCLES) {
+      voided.push(`EMPTY CADENCE: only ${liquidObserved} liquid window observations across ${CYCLES} cycles, so the toggle did not do the work this leg claims to measure.`);
+    }
+    if (standardObserved !== 0) {
+      voided.push(`CADENCE DID NOT REVERSE: ${standardObserved} window(s) still at data-presentation="liquid" after a standard half, so the cycles are not round trips and growth cannot be attributed to them.`);
+    }
+    if (peakFwins < 1 || peakElements < 50) {
+      voided.push(`EMPTY HARNESS: peak ${peakFwins} .fwin / ${peakElements} elements across the run — a desktop with nothing on it cannot retain anything, so a clean reading here means nothing.`);
+    }
+    if (refusals.length) {
+      voided.push(`CADENCE REFUSED ${refusals.length} time(s), so the cycles are not the round trips this leg claims: ${refusals.slice(0, 4).join(' | ')}`);
+    }
+    // The sensitivity check, and it only applies where an allocation is expected. In churn mode
+    // a whole window mounts and unmounts every cycle, so a zero delta means the samples are not
+    // straddling the mount at all and a flat growth number proves nothing. In toggle-only mode a
+    // zero delta is a real answer about the product (the presentation is CSS-driven), recorded
+    // in the receipt rather than scored.
+    if (CHURN && legs.longSession.receipt.liquidHalfNodeDelta < 50) {
+      voided.push(`CHURN DID NOT ALLOCATE: the open+liquid half differed from the closed half by only ${legs.longSession.receipt.liquidHalfNodeDelta} nodes on average, so these samples never straddled a mount and a flat growth number is not evidence.`);
+    }
+    // Churn scores the like-for-like series; toggle-only mode has no window to straddle, so its
+    // endpoints are already comparable and stay the scored pair.
+    const g = CHURN ? legs.longSession.growthAcrossCycles : legs.longSession.growth;
+    g.mainPrivateMb = legs.longSession.growth.mainPrivateMb;
+    // Documents is the sharpest of the four: one detached document surviving a forced
+    // collection is a leak by itself, so it is scored exactly, not proportionally.
+    // The pair the scored numbers came from, named so a finding quotes the same two samples it
+    // was computed from rather than whichever pair reads worse.
+    const from = CHURN
+      ? { nodes: cycles[0].nodes, documents: cycles[0].documents, listeners: cycles[0].listeners, usedMb: cycles[0].usedMb, label: 'cycle 1, closed' }
+      : { nodes: baseline.nodes, documents: baseline.documents, listeners: baseline.jsEventListeners, usedMb: baseline.usedMb, label: 'baseline' };
+    const to = CHURN
+      ? { nodes: cycles[cycles.length - 1].nodes, documents: cycles[cycles.length - 1].documents, listeners: cycles[cycles.length - 1].listeners, usedMb: cycles[cycles.length - 1].usedMb, label: `cycle ${cycles.length}, closed` }
+      : { nodes: after.nodes, documents: after.documents, listeners: after.jsEventListeners, usedMb: after.usedMb, label: 'after' };
+    if (g.documents > 0) findings.push(`renderer retained ${g.documents} extra document(s) after ${CYCLES} cycles and a forced collection (${from.label} ${from.documents} -> ${to.label} ${to.documents})`);
+    if (g.nodes > Math.max(500, from.nodes * 0.05)) findings.push(`renderer DOM nodes grew ${g.nodes} after a forced collection (${from.label} ${from.nodes} -> ${to.label} ${to.nodes}), over the ${Math.max(500, Math.round(from.nodes * 0.05))} allowance`);
+    if (g.listeners > Math.max(100, from.listeners * 0.05)) findings.push(`renderer JS event listeners grew ${g.listeners} after a forced collection (${from.label} ${from.listeners} -> ${to.label} ${to.listeners}), over the ${Math.max(100, Math.round(from.listeners * 0.05))} allowance`);
+    // The heap gets the loosest bar on purpose: JIT code, caches and V8's own growth all land
+    // here and none of them are the cadence. It is the DOM counters that name a Liquid leak.
+    if (g.usedMb > Math.max(15, from.usedMb * 0.25)) findings.push(`renderer JS heap grew ${g.usedMb} MB after a forced collection (${from.label} ${from.usedMb} -> ${to.label} ${to.usedMb} MB), over the ${Math.max(15, Math.round(from.usedMb * 0.25))} MB allowance`);
+    if (g.mainPrivateMb > 50) findings.push(`main private bytes grew ${g.mainPrivateMb} MB across the cadence (${mainBaseline.privateMb} -> ${mainAfter.privateMb} MB)`);
+    if (mainAfter.detachedContexts > mainBaseline.detachedContexts) findings.push(`main detached contexts ${mainBaseline.detachedContexts} -> ${mainAfter.detachedContexts}`);
+
+    const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
+    const out = {
+      surface: SURFACE, title: spec.title, root: spec.root, mode: 'long-session',
+      at: new Date().toISOString(),
+      process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, rendererPid: baseline.pid },
+      surfaceWindow: {
+        mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
+        matched: found.matched, deskWindows: found.windows, titles: found.titles,
+      },
+      legs, findings, voided, score,
+    };
+    console.log(JSON.stringify(out, null, 2));
+    const file = arg('out', path.join('src/.coordination/liquid-workplace/baselines', `cat7-${SURFACE}-long-session.json`));
+    fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
+    console.log('wrote', file);
+    console.log(`\nCATEGORY 7 — ${SURFACE} LONG SESSION: ${score === 10 ? 'PASS 10/10' : score === 'VOID' ? 'VOID' : `${findings.length} finding(s), NOT a 10`}`);
+    for (const f of findings) console.log(`  FINDING  ${f}`);
+    for (const v of voided) console.log(`  VOID     ${v}`);
+    return;
+  }
+
   // --- 1. the session's own frame ceiling, AND its own outlier rate -----------------
   /**
    * THREE READINGS, NOT ONE, AND THE THIRD NUMBER THEY PRODUCE IS THE POINT. The ceiling leg
