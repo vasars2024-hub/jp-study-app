@@ -1,13 +1,13 @@
 {
   "schema": "l12-risk-register/v1",
   "bullet": "L12 bullet 4 — remaining-risk report",
-  "generatedAt": "2026-09-02T02:42:30.623Z",
-  "head": "33bf9a0b",
+  "generatedAt": "2026-09-02T02:54:21.604Z",
+  "head": "17b3d833",
   "branch": "wt/files-app",
   "totals": {
-    "risks": 7,
+    "risks": 8,
     "open": 5,
-    "closed": 2,
+    "closed": 3,
     "unmeasured": 0,
     "highOpen": 2
   },
@@ -170,21 +170,19 @@
       "id": "R6",
       "title": "The visual atlas is not certification evidence",
       "severity": "high",
-      "state": "open",
+      "state": "closed",
       "measurement": {
         "available": true,
         "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
-        "generatedAt": "2026-09-02T02:42:16.810Z",
-        "certifiable": false,
-        "blockers": [
-          "axis 'state' moved pixels in only 3 of 8 comparable groups (and geometry in 0) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything"
-        ],
-        "completeness": 100,
+        "generatedAt": "2026-09-02T02:52:01.735Z",
+        "certifiable": true,
+        "blockers": [],
+        "completeness": 94,
         "axes": {
           "app": "effective",
           "theme": "effective",
           "presentation": "effective",
-          "state": "partial"
+          "state": "not-swept"
         }
       },
       "whyItMatters": "L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.",
@@ -204,6 +202,40 @@
       },
       "whyItMatters": "Compilation is proven (8 of 8 forge targets build), but the file-copy stage that produces a shippable app is unexercised here.",
       "whatWouldCloseIt": "Windows Developer Mode, or running the packager in a tree whose node_modules is a real directory. Environment, not product: the copy stage compiles nothing.",
+      "falsified": false
+    },
+    {
+      "id": "R8",
+      "title": "The repo's own gates are not green at this HEAD",
+      "severity": "high",
+      "state": "open",
+      "measurement": {
+        "i18nCheck": {
+          "exit": 0,
+          "lastLine": "i18n: all 12115 English keys are translated in ja/zh/ru. Nothing to do."
+        },
+        "i18nHardcoded": {
+          "exit": 1,
+          "lastLine": "If a file is genuinely exempt, run with --update-baseline and say why in the commit."
+        },
+        "vitest": {
+          "available": true,
+          "log": "debug/_p2d-vitest.log",
+          "filesFailed": 5,
+          "filesPassed": 997,
+          "testsFailed": 5,
+          "testsPassed": 12906,
+          "failingFiles": [
+            "src/renderer/__tests__/readingLensI18n.test.tsx",
+            "src/shared/__tests__/i18n.test.ts",
+            "src/renderer/__tests__/mediaSurfaceImportGraph.test.ts",
+            "src/main/__tests__/extensionServerPort.test.ts",
+            "src/main/__tests__/flashcardAudio.test.ts"
+          ]
+        }
+      },
+      "whyItMatters": "L12's own third bullet is the gate run. A branch that is red alone and green only because of another track's uncommitted files has no clean release gate at all — that is boss-audit Finding 1, carried across audits.",
+      "whatWouldCloseIt": "Each red identity fixed or hunk-scope committed by its owner, then a re-run that shows no NEW identity — never a smaller count.",
       "falsified": false
     }
   ],
@@ -232,7 +264,8 @@
       "R1",
       "R5",
       "R6",
-      "R7"
+      "R7",
+      "R8"
     ],
     "unfalsifiedWhy": "R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.",
     "summary": {

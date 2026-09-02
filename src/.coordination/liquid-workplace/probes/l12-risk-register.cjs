@@ -203,6 +203,53 @@ function architectureAudit() {
   };
 }
 
+/**
+ * R8 — THE REPO'S OWN GATES. L12's third bullet is literally "run focused tests, full
+ * suite, architecture/i18n gates", so a risk register for this bullet that carries no
+ * gate result is missing the one number the release turns on.
+ *
+ * The two i18n gates are source scans with no build step, so they are run here. The full
+ * vitest suite takes minutes and must NOT be run inside a generator that anything might
+ * call in a loop — instead it is PARSED from a log the turn already produced
+ * (`--vitest-log`). Parsing the artifact is the point: a hand-typed count is a claim, and
+ * this repo has already had a `vitest | tail` pipeline report tail's exit code as the
+ * suite's.
+ */
+function repoGates(vitestLog) {
+  const run = (script) => {
+    const r = cp.spawnSync(process.execPath, [path.join('tools', script)],
+      { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    const out = `${r.stdout || ''}${r.stderr || ''}`;
+    return { exit: r.status, lastLine: out.trim().split('\n').slice(-1)[0] || '' };
+  };
+  const i18n = run('i18n-check.cjs');
+  const hardcoded = fs.existsSync(path.join(REPO, 'tools', 'i18n-hardcoded-check.cjs'))
+    ? run('i18n-hardcoded-check.cjs') : { exit: null, lastLine: 'tools/i18n-hardcoded-check.cjs absent' };
+
+  let vitest = { available: false, why: 'no --vitest-log given; the full suite is not run from inside this generator' };
+  if (vitestLog && fs.existsSync(vitestLog)) {
+    const text = fs.readFileSync(vitestLog, 'utf8');
+    const files = text.match(/Test Files\s+(?:(\d+) failed \|\s*)?(\d+) passed/);
+    const tests = text.match(/Tests\s+(?:(\d+) failed \|\s*)?(\d+) passed/);
+    // `×` prefixes both a FAILING FILE and each failing test NAME beneath it, so an
+    // unfiltered sweep returns "does", "renders", "returns" alongside the paths — verified
+    // against a banked log. Only path-shaped entries are file identities.
+    const failedNames = [...new Set((text.match(/^\s*(?:FAIL|×)\s+(\S+)/gm) || [])
+      .map((l) => l.replace(/^\s*(?:FAIL|×)\s+/, '').split('>')[0].trim())
+      .filter((s) => s.includes('/') && /\.(test|spec)\./.test(s)))];
+    vitest = {
+      available: !!(files || tests),
+      log: path.relative(REPO, vitestLog).replace(/\\/g, '/'),
+      filesFailed: files ? Number(files[1] || 0) : null,
+      filesPassed: files ? Number(files[2]) : null,
+      testsFailed: tests ? Number(tests[1] || 0) : null,
+      testsPassed: tests ? Number(tests[2]) : null,
+      failingFiles: failedNames.slice(0, 12),
+    };
+  }
+  return { i18nCheck: i18n, i18nHardcoded: hardcoded, vitest };
+}
+
 /** R7. */
 function packagerEnvironment() {
   const nm = path.join(REPO, 'node_modules');
@@ -238,7 +285,7 @@ function atlasVerdict(p) {
 }
 
 // ---------------------------------------------------------------------------------
-function build(atlasPath) {
+function build(atlasPath, vitestLog) {
   const tracked = trackedSet();
   const planPath = path.join(REPO, 'src', 'LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md');
   const planText = fs.readFileSync(planPath, 'utf8');
@@ -250,6 +297,7 @@ function build(atlasPath) {
   const r5 = architectureAudit();
   const r6 = atlasVerdict(atlasPath);
   const r7 = packagerEnvironment();
+  const r8 = repoGates(vitestLog);
 
   const risks = [
     {
@@ -320,6 +368,21 @@ function build(atlasPath) {
       measurement: r7,
       whyItMatters: 'Compilation is proven (8 of 8 forge targets build), but the file-copy stage that produces a shippable app is unexercised here.',
       whatWouldCloseIt: 'Windows Developer Mode, or running the packager in a tree whose node_modules is a real directory. Environment, not product: the copy stage compiles nothing.',
+      falsified: false,
+    },
+    {
+      id: 'R8',
+      title: "The repo's own gates are not green at this HEAD",
+      severity: 'high',
+      state: (() => {
+        const bad = [r8.i18nCheck.exit, r8.i18nHardcoded.exit].some((e) => e !== null && e !== 0);
+        if (bad) return 'open';
+        if (!r8.vitest.available) return 'unmeasured';
+        return r8.vitest.testsFailed ? 'open' : 'closed';
+      })(),
+      measurement: r8,
+      whyItMatters: "L12's own third bullet is the gate run. A branch that is red alone and green only because of another track's uncommitted files has no clean release gate at all — that is boss-audit Finding 1, carried across audits.",
+      whatWouldCloseIt: 'Each red identity fixed or hunk-scope committed by its owner, then a re-run that shows no NEW identity — never a smaller count.',
       falsified: false,
     },
   ];
@@ -402,7 +465,7 @@ function controls(base) {
     };
   } else out.r3 = { kind: 'force-one-row-pending', pass: null, note: 'n/a — no parity-ledger.json' };
 
-  out.unfalsified = ['R1', 'R5', 'R6', 'R7'];
+  out.unfalsified = ['R1', 'R5', 'R6', 'R7', 'R8'];
   out.unfalsifiedWhy = 'R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.';
   const vals = ['r2', 'r3', 'r4'].map((k) => out[k] && out[k].pass);
   out.summary = { fired: vals.filter((v) => v === true).length, failed: vals.filter((v) => v === false).length };
@@ -431,7 +494,8 @@ function markdown(reg) {
 (() => {
   const atlasPath = path.resolve(REPO, arg('atlas',
     path.join('src', '.coordination', 'liquid-workplace', 'baselines', 'l12-atlas.json')));
-  const reg = build(atlasPath);
+  const vl = arg('vitest-log', '');
+  const reg = build(atlasPath, vl ? path.resolve(REPO, vl) : '');
   if (has('control')) reg.controls = controls(reg);
   else reg.controls = null;
 

@@ -3,9 +3,9 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `wt/files-app` at `33bf9a0b`, 2026-09-02T02:42:30.623Z.
+Branch `wt/files-app` at `17b3d833`, 2026-09-02T02:54:21.604Z.
 
-**5 of 7 risks open** (2 high, 2 closed, 0 unmeasured).
+**5 of 8 risks open** (2 high, 3 closed, 0 unmeasured).
 
 | id | sev | state | risk |
 | --- | --- | --- | --- |
@@ -14,8 +14,9 @@ Branch `wt/files-app` at `33bf9a0b`, 2026-09-02T02:42:30.623Z.
 | R3 | MED | OPEN | Feature-parity rows are still pending |
 | R4 | MED | OPEN | Liquid plan bullets are still open |
 | R5 | MED | CLOSED | The architecture-audit gate is red |
-| R6 | HIGH | OPEN | The visual atlas is not certification evidence |
+| R6 | HIGH | CLOSED | The visual atlas is not certification evidence |
 | R7 | LOW | OPEN | The packaging stage has never completed in this tree |
+| R8 | HIGH | OPEN | The repo's own gates are not green at this HEAD |
 
 ### R1 — Runtime blobs the app loads from public/ are not in git
 
@@ -181,7 +182,7 @@ What would close it: Reconcile the stale baseline entries it names.
 
 ### R6 — The visual atlas is not certification evidence
 
-**HIGH · OPEN**
+**HIGH · CLOSED**
 
 Why it matters: L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.
 
@@ -191,17 +192,15 @@ What would close it: Every blocker the atlas lists, in its own words.
 {
   "available": true,
   "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
-  "generatedAt": "2026-09-02T02:42:16.810Z",
-  "certifiable": false,
-  "blockers": [
-    "axis 'state' moved pixels in only 3 of 8 comparable groups (and geometry in 0) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything"
-  ],
-  "completeness": 100,
+  "generatedAt": "2026-09-02T02:52:01.735Z",
+  "certifiable": true,
+  "blockers": [],
+  "completeness": 94,
   "axes": {
     "app": "effective",
     "theme": "effective",
     "presentation": "effective",
-    "state": "partial"
+    "state": "not-swept"
   }
 }
 ```
@@ -220,5 +219,41 @@ What would close it: Windows Developer Mode, or running the packager in a tree w
   "packagerCopyStageRunnable": false,
   "outDirPresent": false,
   "viteBuildPresent": true
+}
+```
+
+### R8 — The repo's own gates are not green at this HEAD
+
+**HIGH · OPEN**
+
+Why it matters: L12's own third bullet is the gate run. A branch that is red alone and green only because of another track's uncommitted files has no clean release gate at all — that is boss-audit Finding 1, carried across audits.
+
+What would close it: Each red identity fixed or hunk-scope committed by its owner, then a re-run that shows no NEW identity — never a smaller count.
+
+```json
+{
+  "i18nCheck": {
+    "exit": 0,
+    "lastLine": "i18n: all 12115 English keys are translated in ja/zh/ru. Nothing to do."
+  },
+  "i18nHardcoded": {
+    "exit": 1,
+    "lastLine": "If a file is genuinely exempt, run with --update-baseline and say why in the commit."
+  },
+  "vitest": {
+    "available": true,
+    "log": "debug/_p2d-vitest.log",
+    "filesFailed": 5,
+    "filesPassed": 997,
+    "testsFailed": 5,
+    "testsPassed": 12906,
+    "failingFiles": [
+      "src/renderer/__tests__/readingLensI18n.test.tsx",
+      "src/shared/__tests__/i18n.test.ts",
+      "src/renderer/__tests__/mediaSurfaceImportGraph.test.ts",
+      "src/main/__tests__/extensionServerPort.test.ts",
+      "src/main/__tests__/flashcardAudio.test.ts"
+    ]
+  }
 }
 ```

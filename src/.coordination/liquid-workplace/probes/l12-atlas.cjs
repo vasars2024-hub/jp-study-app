@@ -189,6 +189,31 @@ function integrity(cells) {
   };
 }
 
+/**
+ * A CELL THAT COULD NOT EXIST IS NOT A CELL THAT FAILED, and conflating them cost this
+ * file its second false blocker. The full-universe run reported "9 cells failed to
+ * capture" and refused to certify; all nine are `city`, `musicwidget` and `visualizer` in
+ * the Liquid presentation, and the manifest already says why in its own words — those
+ * three windows offer no presentation toggle at all. Blocking certification on them is
+ * demanding a photograph of something the product does not have.
+ *
+ * So a non-captured cell is classified from the manifest's OWN record, never from a guess:
+ * the app is marked `presentable: false` and the cell asks for a non-default presentation
+ * => `unavailable`, a PRODUCT gap that is named by surface and does not block. Anything
+ * else is `failed`, an instrument or run problem, and does block.
+ *
+ * The product gap is not swept under the rug by that: it is reported as its own number
+ * with the surfaces listed, which is more visible than being one of nine anonymous
+ * failures.
+ */
+function classify(cell, manifest) {
+  if (cell.ok) return 'captured';
+  const app = (manifest.apps || {})[cell.app] || {};
+  const dflt = ((manifest.dimensions || {}).presentations || ['standard'])[0];
+  if (app.opened && app.presentable === false && cell.presentation !== dflt) return 'unavailable';
+  return 'failed';
+}
+
 /** Check (A). Cartesian product from the manifest's own declared dimensions. */
 function coverage(manifest) {
   const d = manifest.dimensions || {};
@@ -213,14 +238,23 @@ function coverage(manifest) {
   }
   const cells = manifest.cells || [];
   const captured = cells.filter((c) => c.ok).length;
+  const unavailable = cells.filter((c) => classify(c, manifest) === 'unavailable');
+  const failed = cells.filter((c) => classify(c, manifest) === 'failed');
   const openedApps = Object.entries(manifest.apps || {})
     .filter(([, v]) => v.opened).map(([k]) => k);
   const canonical = d.canonicalSections || null;
+  const attainable = declared - unavailable.length;
   return {
     declaredCells: declared,
     presentCells: cells.length,
     capturedCells: captured,
-    failedCells: cells.length - captured,
+    failedCells: failed.length,
+    unavailableCells: unavailable.length,
+    // The product gap, named. These surfaces have NO Liquid presentation to photograph.
+    unavailableSurfaces: [...new Set(unavailable.map((c) => c.app))],
+    unavailableReason: unavailable.length ? (unavailable[0].error || null) : null,
+    attainableCells: attainable,
+    attainableCompleteness: attainable ? +((100 * captured) / attainable).toFixed(2) : 0,
     neverAttempted: absent.length,
     neverAttemptedExamples: absent.slice(0, 6),
     // A cell can be "present" and still be a failure; an atlas that reports one number
@@ -233,6 +267,16 @@ function coverage(manifest) {
     // RULE C: never silently truncated. Named, always.
     sampledOut: manifest.sampledOut || [],
     universeCoverage: canonical ? +((100 * apps.length) / canonical).toFixed(2) : null,
+    /**
+     * The THEME axis has a universe too, and the matrix only records the skipped APPS.
+     * An atlas that names 23 sampled-out sections and stays silent about 10 sampled-out
+     * themes is truncating exactly as silently on the other axis — RULE C does not care
+     * which axis it is.
+     */
+    themeCatalog: (d.themeCatalog || []).length || null,
+    themesSampledOut: (d.themeCatalog || []).map((t) => t.id).filter((id) => !themes.includes(id)),
+    themeUniverseCoverage: (d.themeCatalog || []).length
+      ? +((100 * themes.length) / d.themeCatalog.length).toFixed(2) : null,
   };
 }
 
@@ -276,6 +320,17 @@ function assemble(manifest) {
   else if (!manifest.certifiable) blockers.push(`source run is not certifiable: ${manifest.void || 'a matrix control failed'}`);
   if (cov.neverAttempted > 0) blockers.push(`${cov.neverAttempted} declared cells were never attempted`);
   if (cov.failedCells > 0) blockers.push(`${cov.failedCells} cells failed to capture`);
+  /**
+   * NOT a blocker, and deliberately not silent either: a surface with no Liquid
+   * presentation is a product fact this atlas reports rather than a hole in the atlas.
+   * It is a genuine L12 finding and belongs in the risk register, not in a verdict that
+   * would be unfixable by any amount of photography.
+   */
+  const gaps = cov.unavailableCells
+    ? [`${cov.unavailableSurfaces.length} of ${cov.appsOpened} surfaces have no Liquid presentation at all `
+      + `(${cov.unavailableSurfaces.join(', ')}) — ${cov.unavailableCells} declared cells cannot exist. `
+      + `Reported as a product gap, not an atlas defect: ${cov.unavailableReason}`]
+    : [];
   for (const a of decorative) blockers.push(`axis '${a}' moved no pixels in any comparable group — it is decorative, so the atlas does not cover that dimension`);
   for (const a of axes.filter((x) => x.verdict === 'partial')) {
     blockers.push(`axis '${a.axis}' moved pixels in only ${a.groupsWhereItMoved} of ${a.comparableGroups} comparable groups`
@@ -304,6 +359,7 @@ function assemble(manifest) {
     duplication: dup,
     certifiable: blockers.length === 0,
     blockers,
+    productGaps: gaps,
     // The atlas index itself: one row per cell, sorted so a reader walks app by app.
     plates: cells
       .slice()
@@ -369,12 +425,15 @@ function contactSheet(atlas, sheetPath) {
   <b>${atlas.certifiable ? 'CERTIFIABLE' : 'NOT CERTIFICATION EVIDENCE'}</b>
   ${atlas.blockers.length ? `<ul>${atlas.blockers.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
 </div>
+${atlas.productGaps.length ? `<div class="verdict no"><b>PRODUCT GAP</b><ul>${atlas.productGaps.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></div>` : ''}
 <p>${atlas.coverage.capturedCells}/${atlas.coverage.declaredCells} declared cells captured
- (${atlas.coverage.completeness}%) · ${atlas.duplication.distinctImages} distinct images ·
+ (${atlas.coverage.completeness}%, ${atlas.coverage.attainableCompleteness}% of the
+ ${atlas.coverage.attainableCells} that can exist) · ${atlas.duplication.distinctImages} distinct images ·
  images on disk: ${esc(atlas.integrity.state)} (${atlas.integrity.verified} verified,
  ${atlas.integrity.missing} missing)</p>
 <p>axes: ${atlas.axisEffectiveness.map((a) => `${esc(a.axis)}=<b>${esc(a.verdict)}</b>`).join(' · ')}</p>
-<p>sampled out (${atlas.coverage.sampledOut.length}): ${esc(atlas.coverage.sampledOut.join(', ') || 'none')}</p>
+<p>apps sampled out (${atlas.coverage.sampledOut.length}): ${esc(atlas.coverage.sampledOut.join(', ') || 'none')}</p>
+<p>themes sampled out (${atlas.coverage.themesSampledOut.length}): ${esc(atlas.coverage.themesSampledOut.join(', ') || 'none')}</p>
 ${sections}
 `;
 }
@@ -500,6 +559,7 @@ function runControls(manifest, base) {
     distinctImages: atlas.duplication.distinctImages,
     certifiable: atlas.certifiable,
     blockers: atlas.blockers,
+    productGaps: atlas.productGaps,
     controls: atlas.mutationControls && atlas.mutationControls.summary,
   }, null, 2));
   process.exit(atlas.certifiable ? 0 : 1);

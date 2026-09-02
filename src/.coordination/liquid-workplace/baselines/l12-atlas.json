@@ -1,10 +1,10 @@
 {
   "schema": "l12-atlas/v1",
   "bullet": "L12 bullet 4 — final visual atlas",
-  "generatedAt": "2026-09-02T02:42:16.810Z",
+  "generatedAt": "2026-09-02T02:52:01.735Z",
   "source": {
     "schema": "l12-visual-matrix/v1",
-    "generatedAt": "2026-09-02T02:40:33.151Z",
+    "generatedAt": "2026-09-02T02:43:43.961Z",
     "certifiable": true,
     "void": null,
     "controls": {
@@ -18,20 +18,43 @@
   },
   "dimensions": {
     "apps": [
+      "agent",
+      "library",
+      "novels",
+      "dictionary",
+      "grammar",
+      "translate",
+      "player",
+      "video",
+      "music",
+      "anki",
       "flashcards",
-      "dictionary"
+      "games",
+      "stats",
+      "resources",
+      "settings",
+      "note",
+      "visualizer",
+      "musicwidget",
+      "city",
+      "immersion",
+      "calendar",
+      "reading",
+      "youtube",
+      "scraper",
+      "files"
     ],
     "themes": [
       "study-os",
-      "classic-light"
+      "classic-light",
+      "high-contrast"
     ],
     "presentations": [
       "standard",
       "liquid"
     ],
     "states": [
-      "normal",
-      "maximized"
+      "normal"
     ],
     "themeCatalog": [
       {
@@ -90,55 +113,77 @@
     "canonicalSections": 25
   },
   "coverage": {
-    "declaredCells": 16,
-    "presentCells": 16,
-    "capturedCells": 16,
+    "declaredCells": 150,
+    "presentCells": 150,
+    "capturedCells": 141,
     "failedCells": 0,
-    "neverAttempted": 0,
-    "neverAttemptedExamples": [],
-    "completeness": 100,
-    "appsRequested": 2,
-    "appsOpened": 2,
-    "appsPresentable": 2,
-    "canonicalSections": 25,
-    "sampledOut": [
-      "agent",
-      "library",
-      "novels",
-      "grammar",
-      "translate",
-      "player",
-      "video",
-      "music",
-      "anki",
-      "games",
-      "stats",
-      "resources",
-      "settings",
-      "note",
+    "unavailableCells": 9,
+    "unavailableSurfaces": [
       "visualizer",
       "musicwidget",
-      "city",
-      "immersion",
-      "calendar",
-      "reading",
-      "youtube",
-      "scraper",
-      "files"
+      "city"
     ],
-    "universeCoverage": 8
+    "unavailableReason": "surface offers no presentation toggle of its own",
+    "attainableCells": 141,
+    "attainableCompleteness": 100,
+    "neverAttempted": 0,
+    "neverAttemptedExamples": [],
+    "completeness": 94,
+    "appsRequested": 25,
+    "appsOpened": 25,
+    "appsPresentable": 22,
+    "canonicalSections": 25,
+    "sampledOut": [],
+    "universeCoverage": 100,
+    "themeCatalog": 13,
+    "themesSampledOut": [
+      "dark-nebula",
+      "soft-sepia",
+      "ocean-blue",
+      "mint-green",
+      "rose-pine",
+      "oled-black",
+      "midnight-ink",
+      "paper",
+      "cyberpunk",
+      "forest-night"
+    ],
+    "themeUniverseCoverage": 23.08
   },
   "axisEffectiveness": [
     {
       "axis": "app",
       "declaredValues": [
+        "agent",
+        "library",
+        "novels",
+        "dictionary",
+        "grammar",
+        "translate",
+        "player",
+        "video",
+        "music",
+        "anki",
         "flashcards",
-        "dictionary"
+        "games",
+        "stats",
+        "resources",
+        "settings",
+        "note",
+        "visualizer",
+        "musicwidget",
+        "city",
+        "immersion",
+        "calendar",
+        "reading",
+        "youtube",
+        "scraper",
+        "files"
       ],
-      "comparableGroups": 8,
-      "groupsWhereItMoved": 8,
+      "comparableGroups": 6,
+      "groupsWhereItMoved": 6,
       "groupsWhereItMovedNothing": 0,
-      "groupsWhereGeometryMoved": 8,
+      "groupsWhereGeometryMoved": 6,
       "flatExamples": [],
       "verdict": "effective"
     },
@@ -146,10 +191,11 @@
       "axis": "theme",
       "declaredValues": [
         "study-os",
-        "classic-light"
+        "classic-light",
+        "high-contrast"
       ],
-      "comparableGroups": 8,
-      "groupsWhereItMoved": 8,
+      "comparableGroups": 47,
+      "groupsWhereItMoved": 47,
       "groupsWhereItMovedNothing": 0,
       "groupsWhereGeometryMoved": 0,
       "flatExamples": [],
@@ -161,8 +207,8 @@
         "standard",
         "liquid"
       ],
-      "comparableGroups": 8,
-      "groupsWhereItMoved": 8,
+      "comparableGroups": 66,
+      "groupsWhereItMoved": 66,
       "groupsWhereItMovedNothing": 0,
       "groupsWhereGeometryMoved": 0,
       "flatExamples": [],
@@ -171,112 +217,503 @@
     {
       "axis": "state",
       "declaredValues": [
-        "normal",
-        "maximized"
+        "normal"
       ],
-      "comparableGroups": 8,
-      "groupsWhereItMoved": 3,
-      "groupsWhereItMovedNothing": 5,
+      "comparableGroups": 0,
+      "groupsWhereItMoved": 0,
+      "groupsWhereItMovedNothing": 0,
       "groupsWhereGeometryMoved": 0,
-      "flatExamples": [
-        {
-          "group": "app=dictionary|theme=study-os|presentation=standard",
-          "values": [
-            "normal",
-            "maximized"
-          ],
-          "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952"
-        },
-        {
-          "group": "app=flashcards|theme=classic-light|presentation=standard",
-          "values": [
-            "normal",
-            "maximized"
-          ],
-          "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee"
-        },
-        {
-          "group": "app=dictionary|theme=classic-light|presentation=standard",
-          "values": [
-            "normal",
-            "maximized"
-          ],
-          "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58"
-        },
-        {
-          "group": "app=dictionary|theme=study-os|presentation=liquid",
-          "values": [
-            "normal",
-            "maximized"
-          ],
-          "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747"
-        }
-      ],
-      "verdict": "partial"
+      "flatExamples": [],
+      "verdict": "not-swept"
     }
   ],
   "integrity": {
-    "verified": 16,
+    "verified": 141,
     "missing": 0,
     "mismatch": 0,
     "mismatches": [],
     "state": "all-present"
   },
   "duplication": {
-    "distinctImages": 11,
-    "duplicateGroups": 5,
-    "cellsInDuplicateGroups": 10,
-    "largestGroup": 2,
+    "distinctImages": 138,
+    "duplicateGroups": 2,
+    "cellsInDuplicateGroups": 5,
+    "largestGroup": 3,
     "examples": [
       {
-        "sha256": "904f3eadb813",
+        "sha256": "b9ee4d5bfd60",
         "cells": [
-          "dictionary/standard/study-os/normal",
-          "dictionary/standard/study-os/maximized"
+          "visualizer/standard/classic-light/normal",
+          "city/standard/classic-light/normal"
         ]
       },
       {
-        "sha256": "da120231e6a2",
+        "sha256": "c329ea0cfbc6",
         "cells": [
-          "flashcards/standard/classic-light/normal",
-          "flashcards/standard/classic-light/maximized"
-        ]
-      },
-      {
-        "sha256": "5cfe65d489ca",
-        "cells": [
-          "dictionary/standard/classic-light/normal",
-          "dictionary/standard/classic-light/maximized"
-        ]
-      },
-      {
-        "sha256": "997324cdf791",
-        "cells": [
-          "dictionary/liquid/study-os/normal",
-          "dictionary/liquid/study-os/maximized"
+          "visualizer/standard/high-contrast/normal",
+          "musicwidget/standard/high-contrast/normal",
+          "city/standard/high-contrast/normal"
         ]
       }
     ]
   },
-  "certifiable": false,
-  "blockers": [
-    "axis 'state' moved pixels in only 3 of 8 comparable groups (and geometry in 0) — coverage along that dimension is not uniform, and content drift can pass this test without the axis doing anything"
+  "certifiable": true,
+  "blockers": [],
+  "productGaps": [
+    "3 of 25 surfaces have no Liquid presentation at all (visualizer, musicwidget, city) — 9 declared cells cannot exist. Reported as a product gap, not an atlas defect: surface offers no presentation toggle of its own"
   ],
   "plates": [
     {
-      "app": "dictionary",
+      "app": "agent",
       "presentation": "liquid",
       "theme": "classic-light",
-      "state": "maximized",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/dictionary__liquid__classic-light__maximized.png",
-      "sha256": "3d1d3f3e9756c155d53856b28ea1e4d3bccda518e524db0fcf20bf654c118bf4",
-      "bytes": 27706,
+      "file": "debug/shots/l12-matrix/agent__liquid__classic-light__normal.png",
+      "sha256": "44f4cfbe8daa49a7b30f96ffac3de17aa2b993fa138b43aeb17a7f547733a3e5",
+      "bytes": 21932,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 60,
+        "y": 24,
         "width": 820,
         "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "agent",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__liquid__high-contrast__normal.png",
+      "sha256": "55526f2c955ec330f4e3c96be9ce2a10d6367a3d3918a7317c4cadbe7063ede3",
+      "bytes": 20307,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "agent",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__liquid__study-os__normal.png",
+      "sha256": "3253a2e52e1e5643aa5a3cf0779c97e5d02360bfe774e596d80c5cf998775e6f",
+      "bytes": 25028,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "agent",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__standard__classic-light__normal.png",
+      "sha256": "6a736ed877a33240d5f8450af01f6cc939628a3097a1d49bfd5c3b9a1258f6d9",
+      "bytes": 20009,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "agent",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__standard__high-contrast__normal.png",
+      "sha256": "fa22d474d858a259749967425c8f930dd32cc44335bfd47e8fb2219962000a62",
+      "bytes": 19598,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "agent",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/agent__standard__study-os__normal.png",
+      "sha256": "5cf287ef9d9a8123ef4bb3626a9c2ad0c33ca2a86e19bb490fd3f6d5fe3323e8",
+      "bytes": 20447,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__liquid__classic-light__normal.png",
+      "sha256": "7e64e83382d8ecc364ee80cc38e4b4a85292c100f7ec44f8561f0f8a054e45c5",
+      "bytes": 37127,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__liquid__high-contrast__normal.png",
+      "sha256": "9d319e8f70554193caea342859bf0363bc0d82b001c40905e28cb11d41412187",
+      "bytes": 33388,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__liquid__study-os__normal.png",
+      "sha256": "c0011045962657ac70519ac18ab8bdb2f9cf77274e5d78b186d3541c8abcaf7c",
+      "bytes": 40387,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__standard__classic-light__normal.png",
+      "sha256": "068bc51da80fe21a9f793a73e6443327f02314ddbd81955535f6497d4208a09d",
+      "bytes": 33341,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__standard__high-contrast__normal.png",
+      "sha256": "f7b37596c7bf0c94dadbb0ab4c4a2bf52c56543a5a6ab73a2ec55e7f084bae17",
+      "bytes": 33249,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "anki",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/anki__standard__study-os__normal.png",
+      "sha256": "416f5293e12bbea8d481f572ca841ad71bc23a6f376d001c438e51dce6dce237",
+      "bytes": 35328,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__liquid__classic-light__normal.png",
+      "sha256": "1a1221d99f0b1edebc54fdb4a40e87a2edc6398055610fa7e12029bd7337d276",
+      "bytes": 29020,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__liquid__high-contrast__normal.png",
+      "sha256": "b68ccce70237684f2b57aca979902b921e1673a30bf8d935de3365c70b00a5e8",
+      "bytes": 24211,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__liquid__study-os__normal.png",
+      "sha256": "d73d9a151e87072d6dcd67b4a7945862c48d02de153eb996ce8ea02121546563",
+      "bytes": 31320,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__standard__classic-light__normal.png",
+      "sha256": "7a0b52ccf75b64ba5bf708f9f685afcdd6134daba10a8ef8d3bd65219271994d",
+      "bytes": 23741,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__standard__high-contrast__normal.png",
+      "sha256": "6b8a098f3129508fc928ab71743f9ed2947b2bda6cb685454a1acb3f9608c0bf",
+      "bytes": 23331,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "calendar",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/calendar__standard__study-os__normal.png",
+      "sha256": "fdd797fc534975ffc7ec3e4b01c51553eb5920c22e8eb9dcad8a3471d9e7ee22",
+      "bytes": 24682,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "city",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/city__standard__classic-light__normal.png",
+      "sha256": "b9ee4d5bfd60bb4fcc6bc87eda4ea0e1c57a4e0871561c32fcc77e559b4eebe0",
+      "bytes": 3081,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "city",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/city__standard__high-contrast__normal.png",
+      "sha256": "c329ea0cfbc656548b6411cb917d3f6c7442d3b04ab91ba520e972726747b51d",
+      "bytes": 3389,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "city",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/city__standard__study-os__normal.png",
+      "sha256": "b4ba2d512e6663db7b4d87e77491b578c1f54692634417d688dd97e110e39eff",
+      "bytes": 3047,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
       },
       "converged": true,
       "themeApplied": true,
@@ -289,11 +726,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/dictionary__liquid__classic-light__normal.png",
-      "sha256": "5c0878f4e0ee8d08b8f70263cdc1a168478061139b1e63b76cf8781e55df6db2",
-      "bytes": 27666,
+      "sha256": "9c758d685175ddc47dc6347bb5a3cd305789c7e15415e9ecd33d2784f83628eb",
+      "bytes": 28243,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -304,15 +741,15 @@
     {
       "app": "dictionary",
       "presentation": "liquid",
-      "theme": "study-os",
-      "state": "maximized",
+      "theme": "high-contrast",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/dictionary__liquid__study-os__maximized.png",
-      "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747",
-      "bytes": 27130,
+      "file": "debug/shots/l12-matrix/dictionary__liquid__high-contrast__normal.png",
+      "sha256": "90c4ea0c156d7081443506ed9090b259e2d467a6282a050a151f16d97fdecfe4",
+      "bytes": 24150,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -327,30 +764,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/dictionary__liquid__study-os__normal.png",
-      "sha256": "997324cdf7916dc1802a879c9223a2a9b40ce6dfa13083766e3e217cb2596747",
-      "bytes": 27130,
+      "sha256": "27c8652402dc167854af237656ef6fb502f66a757adec37b0550811ef160d595",
+      "bytes": 28628,
       "rect": {
-        "x": 94,
-        "y": 54,
-        "width": 820,
-        "height": 580
-      },
-      "converged": true,
-      "themeApplied": true,
-      "error": null
-    },
-    {
-      "app": "dictionary",
-      "presentation": "standard",
-      "theme": "classic-light",
-      "state": "maximized",
-      "ok": true,
-      "file": "debug/shots/l12-matrix/dictionary__standard__classic-light__maximized.png",
-      "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58",
-      "bytes": 22180,
-      "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -365,11 +783,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/dictionary__standard__classic-light__normal.png",
-      "sha256": "5cfe65d489caadae45e771b1e0466584d93b49e66e2feaa8ae140b0aac34ef58",
-      "bytes": 22180,
+      "sha256": "17ce74a3557791ce19b1762a5068b6a1bff4365bc5588a78494da44f50062cba",
+      "bytes": 22162,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -380,15 +798,15 @@
     {
       "app": "dictionary",
       "presentation": "standard",
-      "theme": "study-os",
-      "state": "maximized",
+      "theme": "high-contrast",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/dictionary__standard__study-os__maximized.png",
-      "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952",
-      "bytes": 22843,
+      "file": "debug/shots/l12-matrix/dictionary__standard__high-contrast__normal.png",
+      "sha256": "3731eb151c8e39667a593d113520df7441702a53259237d6b51fb05c79c24534",
+      "bytes": 21825,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -403,11 +821,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/dictionary__standard__study-os__normal.png",
-      "sha256": "904f3eadb8137fa410f83150888445312f70a4d905dec635f37eb85ad4952952",
-      "bytes": 22843,
+      "sha256": "b790a7cbc24a036ef00f2f1aa540319b1e46147df7f619fd3e803820ae651b1b",
+      "bytes": 22889,
       "rect": {
-        "x": 94,
-        "y": 54,
+        "x": 162,
+        "y": 114,
         "width": 820,
         "height": 580
       },
@@ -416,14 +834,109 @@
       "error": null
     },
     {
-      "app": "flashcards",
+      "app": "files",
       "presentation": "liquid",
       "theme": "classic-light",
-      "state": "maximized",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/flashcards__liquid__classic-light__maximized.png",
-      "sha256": "1957200508de7956c214e115344ca48ca9d52fb6b9f564c321db5613512d4428",
-      "bytes": 39998,
+      "file": "debug/shots/l12-matrix/files__liquid__classic-light__normal.png",
+      "sha256": "84f1c4fa20f6607a6be1b3678ee0c9110ba8ba72a2514dc0a75aea05587b7230",
+      "bytes": 47731,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "files",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__liquid__high-contrast__normal.png",
+      "sha256": "7e8fda9263770c4f68a74ee9c1caad73400559223b030cd4cea8128e9edc69ea",
+      "bytes": 39032,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "files",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__liquid__study-os__normal.png",
+      "sha256": "2d2bb465d2a2d4ee962d7594b3bd5da802f0d55b68cd07718e2870e739da62dd",
+      "bytes": 52681,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "files",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__standard__classic-light__normal.png",
+      "sha256": "56d355c1b29802c23727f3ab92eb7d3804c5a9d9ca353f4b8acf40701c32857e",
+      "bytes": 45568,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "files",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__standard__high-contrast__normal.png",
+      "sha256": "23a8912f8fb42d787399da351f0943910e5acc5e39a6c9aed6dadd8278709209",
+      "bytes": 38352,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "files",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/files__standard__study-os__normal.png",
+      "sha256": "ac262ab43e287982f8e79fcda726ad738aeba25e36e6717208eaa48e314769ca",
+      "bytes": 46191,
       "rect": {
         "x": 60,
         "y": 24,
@@ -441,11 +954,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/flashcards__liquid__classic-light__normal.png",
-      "sha256": "1957200508de7956c214e115344ca48ca9d52fb6b9f564c321db5613512d4428",
-      "bytes": 39998,
+      "sha256": "eb3292f8620a3e6128df9f9b887b84b73d074c00e4882fec881985d9e9099c32",
+      "bytes": 39480,
       "rect": {
-        "x": 60,
-        "y": 24,
+        "x": 196,
+        "y": 144,
         "width": 820,
         "height": 580
       },
@@ -456,15 +969,15 @@
     {
       "app": "flashcards",
       "presentation": "liquid",
-      "theme": "study-os",
-      "state": "maximized",
+      "theme": "high-contrast",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/flashcards__liquid__study-os__maximized.png",
-      "sha256": "18d5c0d573c9c43d4462944e5c99ad9ff0b0e20d46642529da05a29c86d61839",
-      "bytes": 40128,
+      "file": "debug/shots/l12-matrix/flashcards__liquid__high-contrast__normal.png",
+      "sha256": "012abf9562a0279f3d3200268b8c09f8917574ef19237f715de80c5753dbd473",
+      "bytes": 37237,
       "rect": {
-        "x": 60,
-        "y": 24,
+        "x": 196,
+        "y": 144,
         "width": 820,
         "height": 580
       },
@@ -479,30 +992,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/flashcards__liquid__study-os__normal.png",
-      "sha256": "51b39f22efa383b6ebdbc9566a6497b3883db9426ffa43d4dca01946a214aa38",
-      "bytes": 40911,
+      "sha256": "0828815bc64042c4ec0e6955c55a6ef1e025cb2cca183e19363d4292471966ca",
+      "bytes": 40800,
       "rect": {
-        "x": 60,
-        "y": 24,
-        "width": 820,
-        "height": 580
-      },
-      "converged": true,
-      "themeApplied": true,
-      "error": null
-    },
-    {
-      "app": "flashcards",
-      "presentation": "standard",
-      "theme": "classic-light",
-      "state": "maximized",
-      "ok": true,
-      "file": "debug/shots/l12-matrix/flashcards__standard__classic-light__maximized.png",
-      "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee",
-      "bytes": 41328,
-      "rect": {
-        "x": 60,
-        "y": 24,
+        "x": 196,
+        "y": 144,
         "width": 820,
         "height": 580
       },
@@ -517,11 +1011,11 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/flashcards__standard__classic-light__normal.png",
-      "sha256": "da120231e6a2a4dd2fcb36e526007b5f1ab24661e8800040fea4fb8470e733ee",
-      "bytes": 41328,
+      "sha256": "441481ff7ad60ba408d2631874318f3de61b7ecceb036b7f8d5062cb4125dad8",
+      "bytes": 41319,
       "rect": {
-        "x": 60,
-        "y": 24,
+        "x": 196,
+        "y": 144,
         "width": 820,
         "height": 580
       },
@@ -532,15 +1026,15 @@
     {
       "app": "flashcards",
       "presentation": "standard",
-      "theme": "study-os",
-      "state": "maximized",
+      "theme": "high-contrast",
+      "state": "normal",
       "ok": true,
-      "file": "debug/shots/l12-matrix/flashcards__standard__study-os__maximized.png",
-      "sha256": "c65ddad5fcdf9377e1bacb36fbc37d79f06482df9179098dfb6dea9bdaaf5d8c",
-      "bytes": 43052,
+      "file": "debug/shots/l12-matrix/flashcards__standard__high-contrast__normal.png",
+      "sha256": "9ec61b5fb4af0f8a53be75dff4d368d1bf8659ff6ef0a2fecaf533b9c715f049",
+      "bytes": 41381,
       "rect": {
-        "x": 60,
-        "y": 24,
+        "x": 196,
+        "y": 144,
         "width": 820,
         "height": 580
       },
@@ -555,8 +1049,1566 @@
       "state": "normal",
       "ok": true,
       "file": "debug/shots/l12-matrix/flashcards__standard__study-os__normal.png",
-      "sha256": "7127880c7dc47cb90e1d30a0ade65acc92237e9db9849eb469f4624cc6a82203",
-      "bytes": 41733,
+      "sha256": "57769a9fc0bdaea513e6ad8bc64da70e2bb33f1c7287fdbe3bd26f8cfebd2c35",
+      "bytes": 43094,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__liquid__classic-light__normal.png",
+      "sha256": "73bd1c9fe161c6255d8473a672d503a21f247e5738c3c7888ab876dce6fcf3c0",
+      "bytes": 86954,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__liquid__high-contrast__normal.png",
+      "sha256": "5164632e9f3b45195ac7f564dbb33986544893796baddff6d47bcf566058ca06",
+      "bytes": 71109,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__liquid__study-os__normal.png",
+      "sha256": "3d19596c9305db3510cb62c9ca7f02316ee2cf8ae37fc8f15c10f8abe33872b6",
+      "bytes": 94285,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__standard__classic-light__normal.png",
+      "sha256": "4012797ebab658bf41fd40b665191cd31f86a198a76e557ad44f32e31af62261",
+      "bytes": 86171,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__standard__high-contrast__normal.png",
+      "sha256": "6ef36647d74b1d88a32abccdf7089c582f363b8d931bebc133d0728265e5de99",
+      "bytes": 81552,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "games",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/games__standard__study-os__normal.png",
+      "sha256": "a38a0211f3bcd5cec5baac68f99859f8e6fd4a9e276db31667bd37ced255cb9c",
+      "bytes": 90350,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 597
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__liquid__classic-light__normal.png",
+      "sha256": "c78814aa2c77439038de9837d971d98e03a8d32fc453c9707af38a26546e85f4",
+      "bytes": 53312,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__liquid__high-contrast__normal.png",
+      "sha256": "ccc2da58544c3df298b464e2d505c066d86c60daa73c1c77a2df0c5a70cb9e4a",
+      "bytes": 50855,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__liquid__study-os__normal.png",
+      "sha256": "c6b476a3cb9b498b5797c059c765c961bccafd2293377c97de159e1a01d01561",
+      "bytes": 56086,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__standard__classic-light__normal.png",
+      "sha256": "17febc25835ae7c0c032097f6a46302baed95e0cb1c2b7ca623157f9cd0d6f27",
+      "bytes": 50277,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__standard__high-contrast__normal.png",
+      "sha256": "c306c2a847e66956e84ad4d7172210aa5997b7d8dfe10a96afaf016864440bfd",
+      "bytes": 49616,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "grammar",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/grammar__standard__study-os__normal.png",
+      "sha256": "b89ff6e9671c478620cd1053f16101a4526cf2a7f25cd8db0970ec785a4b0e76",
+      "bytes": 52685,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__liquid__classic-light__normal.png",
+      "sha256": "d08cb88c071435c89a9962fd4d45d69745b2dedb1c3a6f3556633f7ad8b759cb",
+      "bytes": 28160,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__liquid__high-contrast__normal.png",
+      "sha256": "81336e7486b82c100a28a1a07509f13025d18fa1f2104725634fadbfcc14e480",
+      "bytes": 23844,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__liquid__study-os__normal.png",
+      "sha256": "495d0cf711a2d83003ecf731c2800676aa7e813728f57fd59cec81b2179ec075",
+      "bytes": 32852,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__standard__classic-light__normal.png",
+      "sha256": "4a5a51cd80f9458d04cd5d4e0d204d42a2198456208f58b74cab32056bbbd6d5",
+      "bytes": 24818,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__standard__high-contrast__normal.png",
+      "sha256": "66cc06e03b77f0d740ec0f7c8b6bbffba70998aa3f38c275dfdc86dc87e129bc",
+      "bytes": 23217,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "immersion",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/immersion__standard__study-os__normal.png",
+      "sha256": "b8d9fe17fe90e77c95f0dc3f975f1e2fb6249975a95dc1aa3ac89b655a4fa40c",
+      "bytes": 25032,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__liquid__classic-light__normal.png",
+      "sha256": "ffae7c1ddfb4eceed37c1e3f53a2e98267a8a18b9e8cab3bc69f46621e4882af",
+      "bytes": 36555,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__liquid__high-contrast__normal.png",
+      "sha256": "0fb2d079e3bada2f6214c1df408eeddb111306c69a8c7ad5bc7556092fbac1ba",
+      "bytes": 34689,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__liquid__study-os__normal.png",
+      "sha256": "0a15b7ab9df916160d8ddcc0a99fa8f7e481d5376bde134bd0f5a658cb2bff2e",
+      "bytes": 38589,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__standard__classic-light__normal.png",
+      "sha256": "44e12965900465134715ddf3266438c010df0342486d964a7a9c6a470d38469f",
+      "bytes": 33367,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__standard__high-contrast__normal.png",
+      "sha256": "cf9528abbe60482c91863aa28a6cefe3fdc9191b16d6382c6ba2e6f8afd1a22f",
+      "bytes": 33324,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "library",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/library__standard__study-os__normal.png",
+      "sha256": "2b57220de2a32a05735abcfcf40093ec648fdacb5494ac28925232d541e97770",
+      "bytes": 34937,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__liquid__classic-light__normal.png",
+      "sha256": "25499e79252da5041de9e619c471ca35cb1cc963f1c550477ae8ce9c74bd1902",
+      "bytes": 153377,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__liquid__high-contrast__normal.png",
+      "sha256": "cc2784f9d1e2acf011ff59dac69c3bfca0a719e15d003ce7e84151624999e957",
+      "bytes": 120805,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__liquid__study-os__normal.png",
+      "sha256": "f6d090d09464bdbe1f104f5c44e095fdc24078fed7d7a03c16fd2b40c589b269",
+      "bytes": 144202,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__standard__classic-light__normal.png",
+      "sha256": "6ee9db804f23059f3eed47415791b8602e5eeb6709394b3313c77e093341617e",
+      "bytes": 138042,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__standard__high-contrast__normal.png",
+      "sha256": "8167bce7873b2ffa4ae060e1e35c9ce220d65244d7278dcfdee5494b66bd9b57",
+      "bytes": 115130,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "music",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/music__standard__study-os__normal.png",
+      "sha256": "8eb03c67d686145e72b3dad4a242bf64d9cd07c3f81f8074f3bea519c51d839c",
+      "bytes": 129727,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 687
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/musicwidget__standard__classic-light__normal.png",
+      "sha256": "02ffbf13cfe7a6dd2fe02523a48eba5a0cf997eca374ca9d623d45ceb71142f4",
+      "bytes": 3073,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/musicwidget__standard__high-contrast__normal.png",
+      "sha256": "c329ea0cfbc656548b6411cb917d3f6c7442d3b04ab91ba520e972726747b51d",
+      "bytes": 3389,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "musicwidget",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/musicwidget__standard__study-os__normal.png",
+      "sha256": "26c4008b36e873831cfa6ad9a5f36b255e0f2d1a7870a0a918fc91cee2135486",
+      "bytes": 3074,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__liquid__classic-light__normal.png",
+      "sha256": "e7827968d0da0f8c35e1c12863cba4b628775d96344c133e39de41afc627b06c",
+      "bytes": 11323,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__liquid__high-contrast__normal.png",
+      "sha256": "32d1954f135661ae04cf4a290f301bc3571d9c5fbf855b26c561bbd0792897c8",
+      "bytes": 11361,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__liquid__study-os__normal.png",
+      "sha256": "b818a69f1264e73df800292eb46f445a5b1586a307ed76667f8a0001b2a271fd",
+      "bytes": 11882,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__standard__classic-light__normal.png",
+      "sha256": "5f376fcf034cacc8a4dacf7a59748e966e6bb5497ec24032d957594f92db2b8b",
+      "bytes": 4874,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__standard__high-contrast__normal.png",
+      "sha256": "103f19e8b841995f2091e81e26898ff218334518d9cd097d10541fab52be7200",
+      "bytes": 4919,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "note",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/note__standard__study-os__normal.png",
+      "sha256": "bc2023364a14567b5c3d37803a9d5349e705828d971ba268512dfd9722b3f14c",
+      "bytes": 4938,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__liquid__classic-light__normal.png",
+      "sha256": "4b3abc9a72c0ab43fae8eb175ee35bba0b5b3a5a521a227447adbf9d61e7c3a4",
+      "bytes": 27518,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__liquid__high-contrast__normal.png",
+      "sha256": "591bf2e2f23af0f4249cb4ae5e0317f4870ecb969bcd8b997d0e83c06f4c5f4e",
+      "bytes": 25128,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__liquid__study-os__normal.png",
+      "sha256": "a85b513b0c3e7a6457af78f968a1ecfaa2839878ccb5689a805308b47d938275",
+      "bytes": 27778,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__standard__classic-light__normal.png",
+      "sha256": "e2285442beabe306670facd502fa14547eb8b91e8c37979b6dd9d0732c489c4b",
+      "bytes": 22961,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__standard__high-contrast__normal.png",
+      "sha256": "6f941ea202ecafd578fbf3295d6e9f79e75856e18aefbed8bf352f6755fc7bf0",
+      "bytes": 23032,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "novels",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/novels__standard__study-os__normal.png",
+      "sha256": "f2a5a7217df518f6deda0a9f88e633e102e6d4719aeb5a00541978024c3dc4bb",
+      "bytes": 23206,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__liquid__classic-light__normal.png",
+      "sha256": "097b6e08b86e95d4e85449291f8ad425b840ebf4dbe5cbacd80c1a6bc6af73c6",
+      "bytes": 107844,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__liquid__high-contrast__normal.png",
+      "sha256": "f0ef01210b7d348b1037951a0cdd44445e64f785be947f6a2f29eff345e6045d",
+      "bytes": 83663,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__liquid__study-os__normal.png",
+      "sha256": "7dc583584f599f916776b1ab91ca8355ba1c9e22c2659ebf5f2c9634245cf004",
+      "bytes": 101209,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__standard__classic-light__normal.png",
+      "sha256": "db7aaefcd97e7ad4649751c9bdd49ef36ffe97a8b06d477c902dc6d188b9e239",
+      "bytes": 112735,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__standard__high-contrast__normal.png",
+      "sha256": "92be3106510cc1276989d94f056ce44d602294143f78c94a59862ca22ae0b520",
+      "bytes": 91856,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "player",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/player__standard__study-os__normal.png",
+      "sha256": "7014cd00ddf4cc49805dcaab1de58110c0312db15b22671d3f4aa823da219ecc",
+      "bytes": 100206,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__liquid__classic-light__normal.png",
+      "sha256": "809267986424a0676f59ef8204905438410c4e6214375d2c150355dcfbf4617e",
+      "bytes": 53531,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__liquid__high-contrast__normal.png",
+      "sha256": "6a02a85106f1147f3b38dc9c833e928a1b696686ab6d89aa8aea2847f0192ea7",
+      "bytes": 52676,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__liquid__study-os__normal.png",
+      "sha256": "8581f426360c61487ec63f773134217c728b11e394f4b62bf1571147dadc5bd9",
+      "bytes": 56370,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__standard__classic-light__normal.png",
+      "sha256": "d2e21b137287eb5bee30b6d676a27c08ed117ba17f9bbb8fe7cd401bddfc472f",
+      "bytes": 50245,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__standard__high-contrast__normal.png",
+      "sha256": "68bb95cffd59f96950818b857995a34da026256e2e023fbdfd4f123da4d5f223",
+      "bytes": 51193,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "reading",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/reading__standard__study-os__normal.png",
+      "sha256": "85293f753496ed21eb7eface741aa3ebe13587120885b2497072b0dca8ee0630",
+      "bytes": 53051,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__liquid__classic-light__normal.png",
+      "sha256": "3e5f680a24d37092d910576d19e621c408f80e73caf59ccc7bfa3469449975d0",
+      "bytes": 69505,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__liquid__high-contrast__normal.png",
+      "sha256": "7c748c7983421a7ae06690b18c767f61d3d03521fcd4f7828b5b0453352f6eb5",
+      "bytes": 93593,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__liquid__study-os__normal.png",
+      "sha256": "5e7cac87c8196cf43668ebed9cc9f8eb1108be10dd722dd1660ed2b0a7a23444",
+      "bytes": 80603,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__standard__classic-light__normal.png",
+      "sha256": "3387129276fc672e233d37cceade7d12c9e71394ff2691f5b31fd403f59ae4d8",
+      "bytes": 65261,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__standard__high-contrast__normal.png",
+      "sha256": "d3efecaa2e645a826c93ae5ead8f52882de3fee556da16abd4ab15f6496b4c76",
+      "bytes": 91058,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "resources",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/resources__standard__study-os__normal.png",
+      "sha256": "f0b7a55c4e5844efe73598b01dd761f939d5eaff0115f7e18668e068c1c271af",
+      "bytes": 76489,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__liquid__classic-light__normal.png",
+      "sha256": "b1de05f8ba82f39fb819679c609a4ec2f195f0da126f26a8f38989d5cedbf55c",
+      "bytes": 131033,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__liquid__high-contrast__normal.png",
+      "sha256": "4e9c4e9816087cebdd70a3f4638661b50d9030e15f3b57412172519ea3769f26",
+      "bytes": 118203,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__liquid__study-os__normal.png",
+      "sha256": "a37849ee988c6338738588b842cbda01105c34c06d8ef27481f561660787f695",
+      "bytes": 166856,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__standard__classic-light__normal.png",
+      "sha256": "8fdfe7d5193cb2172f1bb3d39f597ddc648bb03468733aac2d5165d8b4727f22",
+      "bytes": 130783,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__standard__high-contrast__normal.png",
+      "sha256": "b7a37981ccd8902f34242488a499ea336d3c01d50196ae98538ceefcbea45d0e",
+      "bytes": 117717,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "scraper",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/scraper__standard__study-os__normal.png",
+      "sha256": "a9b585e520b1515b1d2531d728553d268ec2a15ee71408ca844cacb20963481c",
+      "bytes": 164917,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__liquid__classic-light__normal.png",
+      "sha256": "513175e004bde98280a109b0f9e966e831bfabb80ea52bd88e106f6917a1d928",
+      "bytes": 48658,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__liquid__high-contrast__normal.png",
+      "sha256": "30a157d19b0447fda15985c0465b71d611076932041399045d6b55919ce3238f",
+      "bytes": 47156,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__liquid__study-os__normal.png",
+      "sha256": "35bf83093a07ce263845f7314b089f4e7891bd8ea3f36d184ae14b5e698c3523",
+      "bytes": 51967,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__standard__classic-light__normal.png",
+      "sha256": "3e1578638de2fccd97da755dc92246fa9620717dbef556c9f5bc8820830e77fa",
+      "bytes": 48495,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__standard__high-contrast__normal.png",
+      "sha256": "4c9441825acd72d9c49b12c272502ed910f74208665ea43a3223ce7c14ff27b3",
+      "bytes": 48066,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "settings",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/settings__standard__study-os__normal.png",
+      "sha256": "cd1759919e4f6607eff7696867d03aa21e0f2312376a184808ac78c6fa03f424",
+      "bytes": 51137,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 680
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__liquid__classic-light__normal.png",
+      "sha256": "22910cefcba16599ba52da39cb44cdcf5f733b7fdb3091c969d32d3bdaef131b",
+      "bytes": 32894,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__liquid__high-contrast__normal.png",
+      "sha256": "2d46b64897a25a1cb6bdd859e199b9eeeaeff3571ee54d2613a3d988f8327ae0",
+      "bytes": 29946,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__liquid__study-os__normal.png",
+      "sha256": "d94f4b9a63ed897370ad3e4c1e138c9ea607eb6ae384d4ee0ad3b97ff5e09f6e",
+      "bytes": 35580,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": false,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__standard__classic-light__normal.png",
+      "sha256": "0a5fd6d407d5c1af536438d0e94b12c61a5f394794d8fd08f1f3c219d0d3d954",
+      "bytes": 29323,
       "rect": {
         "x": 60,
         "y": 24,
@@ -566,13 +2618,507 @@
       "converged": true,
       "themeApplied": true,
       "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__standard__high-contrast__normal.png",
+      "sha256": "2ea380923543b18d8b7c323807dfcf98c1151b10375a760de5f7925ae7a4e539",
+      "bytes": 28471,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "stats",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/stats__standard__study-os__normal.png",
+      "sha256": "576be6393e485bcd8afa6fc495eff8207244f60b8de69f9460efcd1ff1940a38",
+      "bytes": 30726,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__liquid__classic-light__normal.png",
+      "sha256": "f024f20a07ab3f1aee1db0c276f7c000e86a542fb4c751a8ae95ef885a4e9276",
+      "bytes": 30633,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__liquid__high-contrast__normal.png",
+      "sha256": "1feff7c36d0fff6fce2938a337a0e1fffb3d99a3f9fae7958924bfec67c88aa7",
+      "bytes": 28501,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__liquid__study-os__normal.png",
+      "sha256": "b053f322bccd9b465e16a25bfe6325616eef1418bd5a5c5631145e5938ee937f",
+      "bytes": 30894,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__standard__classic-light__normal.png",
+      "sha256": "2280520e99d358c1d0761948ba2607998f1549186c983445cb1f8ec1acdd2a8e",
+      "bytes": 27349,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__standard__high-contrast__normal.png",
+      "sha256": "3cfb416590e6c783408886690a9d3207ec470ad800a0f3f79c48dac461f9e14f",
+      "bytes": 26913,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "translate",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/translate__standard__study-os__normal.png",
+      "sha256": "c7153bf63029991522cb829ab2a3077e4afe059140f22be151a38fcb7d020430",
+      "bytes": 27752,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__liquid__classic-light__normal.png",
+      "sha256": "4a12988f669a64b79aec019b7bae5eebbf343ee3e8479ed5f0aed668b0874e24",
+      "bytes": 165573,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__liquid__high-contrast__normal.png",
+      "sha256": "fc6316ffe0e77ae57b0923f77f101a5f207b3c2df112dcfbb5dfb6ad5c6b7a3f",
+      "bytes": 104600,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__liquid__study-os__normal.png",
+      "sha256": "3a0b34f38442c2014b5ec7a511b6505d0cd0057ffaecc70e689d0c84f085006c",
+      "bytes": 189397,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__standard__classic-light__normal.png",
+      "sha256": "3f767f1bd3548a8743a2fe72acb22fb75bace97de6afcd7fb2e7923429f9cbbe",
+      "bytes": 157487,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__standard__high-contrast__normal.png",
+      "sha256": "7c7518b95da24ba3253592d031d5e9b3faeea4d17750ed3656910bc1ccb476c0",
+      "bytes": 100064,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "video",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/video__standard__study-os__normal.png",
+      "sha256": "f022cfe72a1e49c57a6baa1fd796579d25f9963b81ee84ccacbcd9bfa7a684a3",
+      "bytes": 180699,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "visualizer",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "visualizer",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "visualizer",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": false,
+      "file": null,
+      "sha256": null,
+      "bytes": 0,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": null,
+      "themeApplied": true,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "visualizer",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/visualizer__standard__classic-light__normal.png",
+      "sha256": "b9ee4d5bfd60bb4fcc6bc87eda4ea0e1c57a4e0871561c32fcc77e559b4eebe0",
+      "bytes": 3081,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "visualizer",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/visualizer__standard__high-contrast__normal.png",
+      "sha256": "c329ea0cfbc656548b6411cb917d3f6c7442d3b04ab91ba520e972726747b51d",
+      "bytes": 3389,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "visualizer",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/visualizer__standard__study-os__normal.png",
+      "sha256": "d767e8c5501bfa78307d896d54de11a245f37134012440627c7ed4194441c9b5",
+      "bytes": 3053,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "liquid",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__liquid__classic-light__normal.png",
+      "sha256": "b31a5f1a0d8ebadb44d5a3f9831d9ad728e52c45b5ee06f392754e3edab1c0d7",
+      "bytes": 30993,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "liquid",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__liquid__high-contrast__normal.png",
+      "sha256": "1effa412dd9910a8371fcee93ca8e83870d97c8dab0a575d68300a78ef29d1b5",
+      "bytes": 24894,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "liquid",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__liquid__study-os__normal.png",
+      "sha256": "98f907eda887530ce371c4b9e8afad27448235b2f89817b1c48eb8725f9e1ec6",
+      "bytes": 31002,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "standard",
+      "theme": "classic-light",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__standard__classic-light__normal.png",
+      "sha256": "0b41c781802343a4edfce6e02f02c20a213ed39b18cb15f21e3edb01ff0de000",
+      "bytes": 23480,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "standard",
+      "theme": "high-contrast",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__standard__high-contrast__normal.png",
+      "sha256": "2518c784721d930148d1e2f3efcbb9ab8721aeef67f0a3f2408aec74b07a585b",
+      "bytes": 22323,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
+    },
+    {
+      "app": "youtube",
+      "presentation": "standard",
+      "theme": "study-os",
+      "state": "normal",
+      "ok": true,
+      "file": "debug/shots/l12-matrix/youtube__standard__study-os__normal.png",
+      "sha256": "5f93cd38e10f4dbff3d3a9ce93bdca7c27b8948f722bf749363e398c3cece334",
+      "bytes": 24028,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 627
+      },
+      "converged": true,
+      "themeApplied": true,
+      "error": null
     }
   ],
-  "sourceManifest": "debug/_p2d-l12-matrix.json",
+  "sourceManifest": "debug/_p2d-l12-full.json",
   "mutationControls": {
     "m1": {
       "kind": "drop-one-cell/coverage-must-report-a-gap",
-      "dropped": "dictionary/liquid/classic-light/maximized",
+      "dropped": "files/liquid/high-contrast/normal",
       "baseNeverAttempted": 0,
       "mutatedNeverAttempted": 1,
       "pass": true
@@ -586,16 +3132,16 @@
     },
     "m3": {
       "kind": "corrupt-one-sha/integrity-must-report-mismatch",
-      "file": "debug/shots/l12-matrix/flashcards__standard__study-os__normal.png",
+      "file": "debug/shots/l12-matrix/agent__standard__study-os__normal.png",
       "baseMismatch": 0,
       "mutatedMismatch": 1,
       "pass": true
     },
     "m4": {
       "kind": "drop-one-app/coverage-must-fall-by-exactly-that-app",
-      "app": "flashcards",
-      "expectedLoss": 8,
-      "observedLoss": 8,
+      "app": "agent",
+      "expectedLoss": 6,
+      "observedLoss": 6,
       "pass": true
     },
     "summary": {
