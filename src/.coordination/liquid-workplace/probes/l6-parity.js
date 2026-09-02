@@ -2192,15 +2192,35 @@
           },
         },
         {
+          /*
+           * DRIVEN — and the passive version this replaces was an accident of where the
+           * bookmark happened to sit. It asked whether the CURRENT page's first 240
+           * characters contain one of the TOC labels, which is only true on a chapter's
+           * opening page. Measured live on `悪の教典 02`: the TOC has **9** entries, at part
+           * indices 5/30/50/81/149/160/161/163/165, over a book of ~166 parts, and the
+           * reader sat at `p:7:0.0000` — between the first two. So the row could pass on 9
+           * parts and failed on the other ~157: a working chapter select scored dead across
+           * 95% of the book, and only a profile parked on a chapter head would ever see it
+           * pass.
+           *
+           * There is nothing passive left to read, either, because `.chapter-select` is an
+           * ACTION select rather than a state one: `NovelReader.tsx:3308-3311` pins
+           * `value=""` and its `onChange` calls `goTo(Number(value), 0)`. Its own value
+           * therefore never names the chapter you are in. So the drive jumps and this reads
+           * the recorded landing. `.novel-content` is still read LIVE so `documentRender`'s
+           * declared cascade still reaches this row.
+           */
           id: 'chapterNavigation',
           f: (w) => {
             const select = q(w, '.chapter-select');
             const labels = select ? qa(select, 'option').slice(1).map(txt).filter(Boolean) : [];
-            const head = txt(q(w, '.novel-content')).slice(0, 240);
-            const matched = labels.find((label) => head.includes(label));
+            const content = q(w, '.novel-content');
+            const j = (window.__LQP_NOVEL_ORIG || {}).chapter || {};
             return {
-              ok: labels.length > 0 && !!matched,
-              ev: `chapters=${labels.length} renderedHeading=${JSON.stringify(matched || head.slice(0, 32))}`,
+              ok: labels.length > 0 && !!content && j.landed === true && j.moved === true,
+              ev: `chapters=${labels.length} jumpedTo=${JSON.stringify(j.jumpedTo || null)}`
+                + ` landedOnIt=${j.landed} moved=${j.moved}`
+                + ` seek=${j.seekBefore}->${j.seekAfterJump}->${j.seekAfterRestore}`,
             };
           },
         },
@@ -2273,8 +2293,78 @@
           if (btn.getAttribute('aria-pressed') !== 'true') btn.click();
           return { tool: id, wasOpen: g.tools[id] };
         },
+        /*
+         * The chapter jump, in three legs because `/eval` is synchronous and each leg needs
+         * a React render before the next can read it.
+         *
+         * `chapterPrep` exists for one reason and it is not pacing: the jump WRITES the
+         * user's reading position — `goTo` ends in `saveNow`, which calls
+         * `window.api.setProgress(item.id, 'p:<part>:<fraction>')` (`NovelReader.tsx:731`).
+         * So the pre-jump position has to be in hand BEFORE the jump or there is nothing to
+         * restore to, and `listLibrary()` is a promise, which `/eval` cannot await.
+         */
+        chapterPrep: (w) => {
+          const title = txt(q(w, '.reader-title'));
+          if (!title) return { refused: 'no reader title to identify the open book' };
+          const c = novelState().chapter || (novelState().chapter = {});
+          c.title = title;
+          if (c.progressWas === undefined) {
+            c.lib = null;
+            window.api.listLibrary().then(
+              (rows) => { c.lib = rows; },
+              (e) => { c.lib = { err: String(e) }; },
+            );
+          }
+          return { title, alreadyCaptured: c.progressWas !== undefined };
+        },
+        chapter: (w) => {
+          const select = q(w, '.chapter-select');
+          const seek = q(w, '.reader-seek');
+          if (!select || !seek) return { refused: 'no chapter select or seek' };
+          const opts = qa(select, 'option').filter((o) => o.value !== '');
+          if (!opts.length) return { refused: 'the book has no table of contents' };
+          const c = novelState().chapter || (novelState().chapter = {});
+          if (c.progressWas === undefined) {
+            if (!Array.isArray(c.lib)) return { refused: 'library read has not resolved yet' };
+            const hits = c.lib.filter((r) => r && r.title === c.title);
+            if (hits.length !== 1) return { refused: `title matches ${hits.length} library rows, not 1` };
+            c.itemId = hits[0].id;
+            c.progressWas = hits[0].progress || null;
+          }
+          c.seekBefore = seek.value;
+          c.sigBefore = novelPageSignature(w);
+          // The option FARTHEST from where the reader sits. Taking option 0 blindly is a
+          // no-op on a reader already parked at chapter one, and a no-op jump would score
+          // `moved` false on a control that works perfectly.
+          const nearStart = Number(seek.value) / Math.max(1, Number(seek.max)) < 0.5;
+          const pick = nearStart ? opts[opts.length - 1] : opts[0];
+          c.jumpedTo = txt(pick);
+          pickSelect(select, pick.value);
+          return { jumpedTo: c.jumpedTo, chapterIndex: pick.value, from: c.seekBefore };
+        },
+        chapterSettle: (w) => {
+          const seek = q(w, '.reader-seek');
+          const c = novelState().chapter;
+          if (!seek || !c || !c.jumpedTo) return { refused: 'chapter step did not run' };
+          const head = txt(q(w, '.novel-content')).slice(0, 240);
+          c.landedHead = head.slice(0, 48);
+          c.landed = head.includes(c.jumpedTo);
+          c.seekAfterJump = seek.value;
+          c.moved = novelPageSignature(w) !== c.sigBefore;
+          // Put the VISIBLE reader back before anything else runs. This is the seek, which
+          // is permille (`max=1000`) and measured coarser than a page — restoring 18 -> 18
+          // returned a different page. The exact `p:<part>:<fraction>` restore is the undo's
+          // job; this only stops the rest of the drive running from the wrong chapter.
+          typeInto(seek, c.seekBefore);
+          seek.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'ArrowRight' }));
+          c.seekAfterRestore = seek.value;
+          return {
+            landed: c.landed, moved: c.moved, head: c.landedHead, seekBack: c.seekAfterRestore,
+          };
+        },
       },
-      drive: ['openSection', 'next', 'back', 'settle', ['tool', 'bookmarks'], ['tool', 'translate'], ['tool', 'reader-settings']],
+      drive: ['openSection', 'next', 'back', 'settle', 'chapterPrep', 'chapter', 'chapterSettle',
+        ['tool', 'bookmarks'], ['tool', 'translate'], ['tool', 'reader-settings']],
       undo: {
         novels: (w) => {
           const g = window.__LQP_NOVEL_ORIG;
@@ -2285,6 +2375,16 @@
             const open = btn && btn.getAttribute('aria-pressed') === 'true';
             if (btn && open !== g.tools[id]) { btn.click(); done.push(id); }
           });
+          // THE ONLY EXACT RESTORE THIS SURFACE HAS. Everything else here is a click that
+          // can be un-clicked; reading position is a number in the user's library row, the
+          // jump overwrote it, and the seek slider cannot put it back — it is permille and
+          // one permille of this book is more than one page. So write the captured
+          // `p:<part>:<fraction>` back through the same call the reader itself uses.
+          const c = g.chapter;
+          if (c && c.itemId && c.progressWas) {
+            window.api.setProgress(c.itemId, c.progressWas);
+            done.push(`progress=${c.progressWas.location || JSON.stringify(c.progressWas)}`);
+          }
           window.__LQP_NOVEL_ORIG = null;
           return done.length ? `novels:${done.join('+')}` : null;
         },
@@ -2292,6 +2392,7 @@
       mutations: {
         documentRender: (w) => detach(q(w, '.novel-content'), 'no rendered book content'),
         pageTransport: (w) => setAttr(q(w, '.reader-seek'), 'max', '1', 'no book seek'),
+        chapterNavigation: (w) => detach(q(w, '.chapter-select'), 'no chapter select'),
         bookmarksTool: (w) => detach(q(w, '[data-reading-tool="bookmarks"] .lq-reading-tool-body'), 'no bookmark tool'),
         presentationHonest: (w) => setAttr(
           q(w, LIQUID_BTN.reader),
