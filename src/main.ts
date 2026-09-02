@@ -115,6 +115,7 @@ import {
 import { registerLiveCaptionsIpc } from './main/liveCaptions';
 import { registerFlashcardAudioIpc } from './main/flashcardAudio';
 import { logDiagnostic, errorDetail } from './main/errorLog';
+import { resolveAppAsset } from './main/appProtocolResolve';
 
 if (started) {
   app.quit();
@@ -267,34 +268,48 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+/**
+ * Missing-asset paths already reported, so one broken bundle logs each path
+ * once rather than once per request. Capped because the key is attacker-shaped
+ * (any renderer navigation can mint a new `app://` path) and this set is
+ * process-lifetime.
+ */
+const reportedMissingAssets = new Set<string>();
+const MISSING_ASSET_LOG_LIMIT = 200;
+
 function registerAppProtocol(): void {
   const rendererRoot = path.resolve(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`);
   const publicRoot = app.isPackaged
     ? path.join(process.resourcesPath, 'public')
     : path.join(app.getAppPath(), 'public');
 
-  const isUnder = (root: string, target: string): boolean => {
-    const r = path.resolve(root);
-    const t = path.resolve(target);
-    return t === r || t.startsWith(r + path.sep);
-  };
-
   protocol.handle('app', (request) => {
     try {
       const url = new URL(request.url);
-      let rel = decodeURIComponent(url.pathname);
-      if (!rel || rel === '/') rel = '/index.html';
+      const decision = resolveAppAsset(
+        { rendererRoot, publicRoot },
+        decodeURIComponent(url.pathname),
+        (candidate) => fs.existsSync(candidate),
+      );
 
-      let resolved = path.join(rendererRoot, rel);
-      if (!fs.existsSync(resolved)) {
-        const pub = path.join(publicRoot, rel.replace(/^\//, ''));
-        if (fs.existsSync(pub)) resolved = pub;
+      if (decision.kind === 'forbidden') return new Response('Forbidden', { status: 403 });
+      if (decision.kind === 'missing') {
+        // Handing a known-missing path to `net.fetch` rejects with a bare
+        // `net::ERR_FILE_NOT_FOUND` whose stack names neither the URL nor the
+        // path, so a production boot missing a gitignored bundle — measured
+        // 2026-09-01: 12 identical anonymous stacks, all of them
+        // `/kuromoji/dict/*.dat.bin` — is undiagnosable from the log alone.
+        // Answer 404 ourselves and say which asset, once per path.
+        if (
+          !reportedMissingAssets.has(decision.rel)
+          && reportedMissingAssets.size < MISSING_ASSET_LOG_LIMIT
+        ) {
+          reportedMissingAssets.add(decision.rel);
+          logDiagnostic('warn', 'app-protocol', 'missing-bundled-asset', decision.rel);
+        }
+        return new Response('Not found', { status: 404 });
       }
-
-      if (!isUnder(rendererRoot, resolved) && !isUnder(publicRoot, resolved)) {
-        return new Response('Forbidden', { status: 403 });
-      }
-      return net.fetch(pathToFileURL(resolved).toString());
+      return net.fetch(pathToFileURL(decision.path).toString());
     } catch {
       return new Response('Not found', { status: 404 });
     }
