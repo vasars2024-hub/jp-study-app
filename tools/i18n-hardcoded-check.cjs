@@ -27,6 +27,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const SCAN_DIRS = [path.join('src', 'renderer'), path.join('src', 'media')];
@@ -155,6 +156,42 @@ function adoptsI18n(src) {
   return /\buseT\s*\(/.test(src) || /\bt\(\s*['"`]/.test(src) || /\bsx\(\s*['"`]/.test(src);
 }
 
+/**
+ * A baseline written from a dirty tree is not a claim about the branch.
+ *
+ * Measured 2026-09-02: the committed baseline held 6 files, and a clean checkout
+ * of the same commit reported 33 — 27 "fresh" offenders that failed the vitest
+ * gate for everyone whose tree was clean. All 27 were `M` in the tree the
+ * baseline was generated from, each carrying an uncommitted partial i18n
+ * conversion; `adoptsI18n()` needs only one `t(` to clear a file, so the working
+ * copies passed while the committed blobs did not. That is the same defect the
+ * 2026-08-12 boss audit recorded one gate over ("does not pass its own i18n gate
+ * when checked out clean"), and it cost this branch its gate for two days.
+ *
+ * So `--update-baseline` refuses while any scanned file is dirty. Commit the
+ * conversions first, then record what HEAD actually contains.
+ *
+ * Returns a list of dirty scanned paths, or null when git cannot answer (a
+ * tarball, a non-repo CI checkout) — in which case the caller warns and writes,
+ * because refusing on the absence of git would block the honest case too.
+ */
+function dirtyScannedPaths() {
+  let out;
+  try {
+    out = execFileSync('git', ['status', '--porcelain', '--', ...SCAN_DIRS], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return null;
+  }
+  return out
+    .split('\n')
+    .map((l) => l.slice(3).trim().replace(/^"|"$/g, ''))
+    .filter((p) => p.endsWith('.tsx'));
+}
+
 function main() {
   const asJson = process.argv.includes('--json');
   const updating = process.argv.includes('--update-baseline');
@@ -179,6 +216,19 @@ function main() {
   offenders.sort((a, b) => b.count - a.count);
 
   if (updating) {
+    const dirty = dirtyScannedPaths();
+    if (dirty === null) {
+      console.log('warning: git could not report working-tree state; writing the baseline anyway.');
+    } else if (dirty.length > 0) {
+      console.log(
+        `REFUSED: ${dirty.length} scanned .tsx file(s) are dirty, so this baseline would\n` +
+          'record uncommitted work rather than what the branch contains. Commit them first.\n',
+      );
+      for (const p of dirty.slice(0, 20)) console.log(`  ${p}`);
+      if (dirty.length > 20) console.log(`  … and ${dirty.length - 20} more`);
+      process.exitCode = 1;
+      return;
+    }
     fs.writeFileSync(BASELINE_PATH, JSON.stringify(offenders.map((o) => o.file).sort(), null, 2) + '\n');
     console.log(`baseline updated: ${offenders.length} file(s)`);
     return;
