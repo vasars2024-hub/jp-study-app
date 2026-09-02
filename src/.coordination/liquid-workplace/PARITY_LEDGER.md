@@ -1046,3 +1046,148 @@ harness to drive against a real profile.
 `notWritten` re-derived: **10** declared specs still have no row — notebook, statistics,
 library, immersion, novels, manga, vn, music, video, youtube. It was **14** at the start of
 this turn. `controlCoverage`: **73 named / 1 NONE DECLARED / 45 silent of 120**.
+## 2026-09-02 (primary) — L12 b2 coverage: `statistics` and `library`
+
+**`statistics`: 9 rows, `both` 9.** `cat6 --app statistics` = **PASS 10/10** — parity **9/9
+and 9/9**, `onlyInOne` empty, all **9 mutations** flipped exactly their own row and restored,
+0 drive refusals, box `820x580`. The round trip is the WEAKER kind and says so: this surface
+has **no editable text field**, so `dirtiedField` is `null`; shell held, 0 diffs.
+
+`resetRecovery` is scored for reachability and its default-closed `<details>`, and is
+deliberately **not driven** — it deletes study history in the user's real profile and this
+ledger has no undo for it. Same reasoning keeps `library.cardActions` un-driven.
+
+**The drive comes before the read, and it cost a row.** `recentActivity` claims the jump
+*works*, so it compares `scrollTop` before and after. Read without the spec's own step
+sequence, on a surface already scrolled, it reports `scrolled=false` and a live feature
+reads dead. Under the drive: **before 0 → after 814, moved true.** The authoring tool now
+runs `__LQP.__drive()` in each presentation before `check()` — and, after one run that did
+not, calls `__LQP.restore()` afterwards, because the drive is a mutation of view state and
+every spec with steps declares an `undo` for that reason.
+
+**`library`: 9 rows, `both` 9.** `cat6 --app library` = **PASS 10/10** — parity **9/9 and
+9/9**, **6 mutations** each flipping exactly its own row (9/9 → 8/9) and all restored, 0
+refusals. Drive: folder `Unfiled 21` (from 24 cards), sort `date-desc → title`, group
+`none → lang`, scroll 240 of 1547. Restored and read back: `date-desc`, `none`, `All 24`.
+
+### A second instrument that had one profile's data written into it — and a row with no control
+
+`inboxFilters` read **false on a correct rail**: `chips=5 active=2` against a bar of
+`chips.length >= 6 && active === 2`. The chip SETS are derived —
+`LibraryView.tsx:1165/1175` maps `filterOptions.langs` and `.levels` from what the library
+actually holds — so a library with three languages and **one** level renders 3 + 2 = 5 and
+can never reach 6. Live: `All | Japanese | Unknown | All | L7`.
+
+The rail is now split at its own `All` heads, matched against the **first chip's own text**
+rather than the English word (the label is translated — trap 4), and the invariant is stated
+per group: two groups, each offering `All` plus at least one real value, each with exactly
+one active. That is strictly **stronger** than `active === 2`, which two actives in one group
+and none in the other satisfied. Live: `groups=2 sizes=[3,2] activePerGroup=[1,1]`.
+
+**It had no mutation at all** — one of the four library rows the control set never named, so
+its bar had never been falsified in either direction. The new one makes a second chip active
+inside the first group, the exact exclusivity loss the row exists to catch, and it flips
+**exactly** this row: 9/9 → 8/9, `unexpectedRows` empty, restored.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `music`, and five rows that had no subject
+
+**`music`: 10 rows, `both` 10.** `cat6 --app music` = **PASS 10/10** — parity **10/10 and
+10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row (10/10 → 9/10)
+and all restored, 0 refusals, box `1080x700`, round trip field held / shell held / 0 diffs.
+
+It did not start there. The first run scored **5/10 in BOTH presentations** on a library
+holding two real songs, and the five failures — `playerSelection`, `transport`, `like`,
+`lyricsRecovery`, `queueMirror` — share one cause: **the drive never selected a track**, so
+every row that reads the PLAYER was scoring an empty player. Five live features read as
+missing. Measured one click later on the same window:
+
+| | before | after |
+| --- | --- | --- |
+| now-playing | `Choose a track` | `e2e-audio-ja` |
+| `.music-song.active` | 0 | 1 |
+| `.mc-track-queue > .is-active` | 0 | 1 |
+| `.mc-player-seek` max | 1 | 90 |
+| `.mc-player-like` `aria-pressed` | absent | `false` |
+| `.music-hint` recovery actions | 0 | 2 |
+
+`seek.max` 1 → 90 is the discriminating one: an unloaded transport still renders, and only a
+real duration separates it from a loaded one.
+
+### The fix refused once, for a second reason, and the refusal was right
+
+A `pick` step was added FIRST in the drive — and refused: *"no songs in the library to
+select"*, on a library holding two. The driver dirties the first visible text field **before**
+it drives, deliberately, so the round trip has real state to lose; on this surface that field
+is the music search, which filters the list to nothing. Measured: with the mark typed,
+`.music-song` = **0** and `.mc-track-queue > button` = **2**.
+
+So the step falls back to the queue, which is the same action and not a workaround —
+`MediaCenterView.tsx:1250` is `onClick={() => void state.play(item)}`, exactly what the
+library row calls. The same run then proved the difference by itself: parity phase **5/10**
+with `pick` REFUSED, control phase baseline **10/10** after the search dirt had cleared.
+
+Selecting is `play(s)` (`MusicContent.tsx:404`) and there is **no select-without-playing
+affordance**, so this starts playback in the real profile. Disclosed rather than pretended
+away: the undo pauses it, and the pause is read off the control's own **label** — this player
+has no `<audio>` element at all (0 media elements while the seek advanced, so Web Audio) and
+the control carries no `aria-pressed`. Left paused at seek 68.1, `e2e-audio-ja` selected,
+search empty, sort back to `recent`.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `video`
+
+**`video`: 10 rows, `both` 10.** `cat6 --app video` = **PASS 10/10** — parity **10/10 and
+10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row (`stageHonesty`
+taking its declared cascade with it and nothing beyond) and all restored, 0 refusals, box
+`1080x700`, round trip field held / shell held / 0 diffs.
+
+Three of these rows are category-8 questions asked inside category 6, and all three read
+honest on a stage with nothing loaded: `stageHonesty` — 2 empty states, both **titled**, 2
+enabled entry actions, `video=0`; `topbarActions` — `explained=2` equals `disabled=2`, every
+disabled action carrying its own reason; `inspectorHonesty` — `coherent=blank`, no score row,
+no meta, no MAL link, and empty copy that says so. A blank inspector is fine; one showing a
+MAL link for nothing is the state that row exists to catch.
+
+`upNextShelf` is one of the rows the concurrent worker's empty profile would have scored on
+an empty harness and had capped: **7 cards** off this profile's 80-file library.
+
+Un-driven on purpose, each with its reason: `watchFolder` opens a native OS folder dialog the
+bridge cannot see or dismiss; the YouTube import reaches the network and writes the library.
+Both are scored for reachability and say so.
+
+### Trap: `os:open` does not choose the Media Center's tab
+
+Opening section `video` gave a window titled **Video** whose body was the Media Center on the
+**Library** tab, and `.mc-video-page` did not exist. cat6 refused — *"no video surface"* —
+rather than scoring the wrong page, which is the right failure. The rail's own `Video` entry
+has to be clicked first. After that: `navReach` reads 9 rail items, 1 active, label `Video`,
+page `mc-page mc-video-page`, window title `Video` — all three agreeing.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `youtube`, and the gap re-derived
+
+**`youtube`: 10 rows, `both` 10.** `cat6 --app youtube` = **PASS 10/10** first run — parity
+**10/10 and 10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row
+(10/10 → 9/10) and all restored, 0 refusals, box `980x640`, round trip field held / shell
+held / 0 diffs. Driven: tools disclosure `false → true`, folder draft, News → Playlist, row
+selection `0 → 1`.
+
+Three of its rows score a REFUSAL rather than an action, which is the honest shape:
+`addPlaylist` requires the submit to be **disabled** while the field is empty
+(`field="" submitDisabled=true expected=true`); `selectionActions` requires both bulk actions
+disabled while nothing is selected; `rowActions` requires `openImpliesDownloaded` on every row
+— offering Open for a file that is not on disk is a control that cannot do what it says. None
+of the row or bulk actions is executed: they download, delete, or write the user's study data.
+
+### The gap, re-derived instead of quoted
+
+`notWritten` said "the other **19** root components". That number is now computed rather than
+carried: `window.__LQP.apps()` = **25** specs, against the distinct `app` keys in `rows[]`,
+both read live and banked into the ledger as `notWritten.derived`.
+
+**13 of 25 specs have no row in this tree** — notebook, calendar, games, immersion, novels,
+manga, vn, city, scraper, resources, settings, shell, blancShell — and three of those
+(`city`, `scraper`, `resources`) are written in the concurrent worker's tree and arrive by
+merge. `mediaCenter` carries 8 rows from the pre-spec `__L6M` instrument and has no `SPECS`
+entry, which is why ledger apps (13) exceeds specs-with-rows (12).
+
+**Ledger this turn: 50 → 106 rows, 7 → 13 apps, 106 `both` / 0 `pending`, 0 duplicate
+`app|feature` keys — validated after every write, not asserted.**

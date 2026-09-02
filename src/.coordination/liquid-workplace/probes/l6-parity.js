@@ -1808,13 +1808,39 @@
         {
           // Two chip groups — language and level — sharing one flat container, so exactly
           // TWO actives is the invariant, one per group.
+          //
+          // THE GROUPS ARE FOUND, NOT COUNTED — corrected 2026-09-02, after this row read
+          // false on a correct rail. The old bar was `chips.length >= 6 && active === 2`,
+          // and the 6 was one profile's data written into the instrument:
+          // `LibraryView.tsx:1165/1175` maps `filterOptions.langs` and `.levels`, both
+          // derived from what the library actually holds, so a library with three languages
+          // and ONE level renders 3 + 2 = 5 chips and can never reach 6. Measured live:
+          // `All | Japanese | Unknown | All | L7`.
+          //
+          // The structural fact is that each group is led by its own `All` chip, so the
+          // boundaries are read off the DOM by matching the FIRST chip's own text (never the
+          // English word — trap 4, the label is translated). Then the invariant is stated
+          // per group instead of in aggregate: two groups, each offering `All` plus at least
+          // one real value, each with exactly one active. That is strictly stronger than
+          // `active === 2`, which two actives in ONE group and none in the other satisfies.
           id: 'inboxFilters',
           f: (w) => {
             const box = q(w, '.lib-inbox-filters');
             if (!box) return { ok: false, ev: 'no inbox filter rail' };
             const chips = qa(box, '.lib-folder-chip');
             const active = activeOf(chips, 'active');
-            return { ok: chips.length >= 6 && active === 2, ev: `chips=${chips.length} active=${active}` };
+            if (!chips.length) return { ok: false, ev: 'filter rail rendered no chips' };
+            const allLabel = txt(chips[0]);
+            const heads = chips.map((c, i) => (txt(c) === allLabel ? i : -1)).filter((i) => i >= 0);
+            const groups = heads.map((start, n) => chips.slice(start, heads[n + 1] === undefined ? chips.length : heads[n + 1]));
+            const sized = groups.filter((g) => g.length >= 2).length;
+            const oneEach = groups.filter((g) => activeOf(g, 'active') === 1).length;
+            return {
+              ok: groups.length === 2 && sized === 2 && oneEach === 2 && active === 2,
+              ev: `chips=${chips.length} active=${active} groups=${groups.length} `
+                + `sizes=[${groups.map((g) => g.length).join(',')}] `
+                + `activePerGroup=[${groups.map((g) => activeOf(g, 'active')).join(',')}]`,
+            };
           },
         },
         {
@@ -1907,6 +1933,22 @@
         ),
         groupBy: (w) => detach(q(w, '.lib-group-head'), 'list is not grouped'),
         cardActions: (w) => detach(q(w, '.card-remove'), 'no cards rendered'),
+        // THIS ROW HAD NO CONTROL UNTIL 2026-09-02 — it was one of the four library rows the
+        // mutation set never named, so its bar had never been falsified. Added in the same
+        // commit that relaxed it, because a relaxed row with no control is a row that cannot
+        // fail. It falsifies by making a SECOND chip active inside the FIRST group, which is
+        // exactly the exclusivity loss the row exists to catch and is invisible to a bare
+        // `active === 2` count when the other group loses its own.
+        inboxFilters: (w) => {
+          const chips = qa(w, '.lib-inbox-filters .lib-folder-chip');
+          if (!chips.length) return { refused: 'no inbox filter rail' };
+          const head = txt(chips[0]);
+          const firstGroupEnd = chips.findIndex((c, i) => i > 0 && txt(c) === head);
+          const group = chips.slice(0, firstGroupEnd < 0 ? chips.length : firstGroupEnd);
+          const other = group.find((c) => !c.classList.contains('active'));
+          if (!other) return { refused: 'first filter group has no inactive chip to falsify with' };
+          return addClassAll([other], 'active');
+        },
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
       // Narrow FIRST so `folderFilter` records its before against the widest list, then
@@ -3109,6 +3151,54 @@
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        /*
+         * FIVE ROWS HAD NO SUBJECT UNTIL 2026-09-02. `playerSelection`, `transport`, `like`,
+         * `lyricsRecovery` and `queueMirror` all read the PLAYER, and the drive never put a
+         * track in it — so on a library with two real songs the surface scored 5/10 in both
+         * presentations and the five read as missing features. They are not missing; there
+         * was nothing selected. Measured on the same window one click later:
+         * `now="e2e-audio-ja"`, active 1, queue active 1, seek max 0 -> 90, like present and
+         * `aria-pressed=false`, hint with 2 recovery actions.
+         *
+         * This goes FIRST in the drive, because the search step narrows the list to nothing
+         * and a pick has to happen while there is still something to pick.
+         *
+         * Clicking a song is `play(s)` (MusicContent.tsx:404), so this STARTS PLAYBACK in
+         * the user's real profile. That is the product's own route and there is no
+         * select-without-playing affordance to use instead, so the step takes it and the
+         * undo pauses it again. What the undo cannot take back is the selection itself:
+         * "now playing" is ordinary product state, it is disclosed rather than pretended
+         * away, and the step refuses instead of picking a second time if one is already
+         * selected.
+         */
+        pick: (w) => {
+          const g = musicState();
+          const songs = qa(w, '.music-song');
+          // THE QUEUE IS THE ROUTE THE SEARCH CANNOT TAKE AWAY. The driver dirties the first
+          // visible text field before it drives — deliberately, so the round trip has real
+          // state to lose — and on this surface that field is the music search, which filters
+          // the library list to nothing. Measured: typing the mark leaves `.music-song` 0 and
+          // `.mc-track-queue > button` 2. So the first attempt at this step refused "no songs
+          // in the library to select" on a library holding two, and the five player rows
+          // stayed dark for the same reason as before, one layer down.
+          //
+          // The queue row is the same action, not a workaround: `MediaCenterView.tsx:1250`
+          // is `onClick={() => void state.play(item)}`, exactly what the library row calls.
+          const rows = songs.length ? songs : qa(w, '.mc-track-queue > button');
+          const via = songs.length ? 'library' : 'queue';
+          const titleOf = (el) => txt(q(el, '.music-song-title') || q(el, 'strong') || el);
+          if (!rows.length) return { refused: 'neither the library list nor the queue offers a track' };
+          if (g.picked == null) {
+            const was = rows.filter((s) => s.classList.contains('active') || s.classList.contains('is-active'))[0];
+            g.picked = was ? titleOf(was) : '';
+            g.wasSelected = !!was;
+          }
+          if (g.wasSelected) return { alreadySelected: g.picked, via };
+          const target = rows[0];
+          const title = titleOf(target);
+          target.click();
+          return { picked: title, via, wasSelected: false };
+        },
         searchNarrow: (w) => {
           const g = musicState(); const input = q(w, '.music-search input');
           if (!input) return { refused: 'no music search' };
@@ -3133,11 +3223,20 @@
           g.youtubeTest = 'https://youtu.be/aaaaaaaaaaa'; typeInto(input, g.youtubeTest); return { drafted: true };
         },
       },
-      drive: ['searchNarrow', 'searchRestore', 'sort', 'youtube'],
+      drive: ['pick', 'searchNarrow', 'searchRestore', 'sort', 'youtube'],
       undo: { music: (w) => {
         const g = window.__LQP_MUSIC_ORIG; if (!g) return null;
         const done = []; const search = q(w, '.music-search input'); const sort = q(w, '.mc-music-sort select');
         const youtube = q(w, '.music-yt-input');
+        // Silence what the pick started. The control reads its state from its own label,
+        // NOT from `aria-pressed` (absent here) and not from an `<audio>` element (this
+        // player has none — 0 media elements while the seek was advancing, so it is Web
+        // Audio). A label test is the only honest read available.
+        if (g.wasSelected === false) {
+          const play = q(w, '.mc-player-play');
+          const label = play ? (play.getAttribute('aria-label') || play.title || txt(play)) : '';
+          if (/paus/i.test(label)) { play.click(); done.push('paused'); }
+        }
         if (search && g.search != null && search.value !== g.search) { typeInto(search, g.search); done.push('search'); }
         if (sort && g.sort != null && sort.value !== g.sort) { pickSelect(sort, g.sort); done.push('sort'); }
         if (youtube && g.youtube != null && youtube.value !== g.youtube) { typeInto(youtube, g.youtube); done.push('youtube'); }
