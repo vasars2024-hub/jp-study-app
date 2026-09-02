@@ -250,6 +250,24 @@ export function openStudyBlockWindow(
   const remember = (): void => rememberBounds(key, win);
   win.on('moved', remember);
   win.on('resized', remember);
+  /*
+    Seed the cache with the rectangle we just opened at.
+
+    Without this, only a window the user DRAGGED was ever remembered: `moved`/`resized`
+    do not fire for the rectangle a window is constructed with, and
+    `rememberBoundsFromCacheOnClose` bails when the key has no cache entry — so nothing
+    was ever written. Measured live 2026-09-02: "Send to display" on a docked block
+    (which routes through `openStudyBlockWindow(..., displayKey)`, not through
+    `moveToDisplay`) placed the window on the second monitor at 2090,20 460x512, and
+    after close/reopen it came back primary-centred at 730,106 460x820 with
+    `study-block-windows.json` never created at all.
+
+    Recording the bounds we opened at is a measurement, not an invention: it is read
+    back off the window, so DPI or an OS clamp is captured as it actually landed. For a
+    default (no `displayKey`) open it stores the same rectangle `openingBounds` would
+    recompute, so the visible behaviour changes for exactly the placed case.
+  */
+  remember();
 
   win.on('closed', () => {
     rememberBoundsFromCacheOnClose(key);

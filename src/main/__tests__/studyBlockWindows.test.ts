@@ -320,6 +320,44 @@ describe('geometry is remembered and re-validated', () => {
     openStudyBlockWindow('transcript', 'workspace', h.displays[1].key);
     expect(h.created[1].bounds.x).toBeGreaterThanOrEqual(1920);
   });
+
+  it('remembers a monitor it was SENT to, never having been dragged', () => {
+    /*
+      The live defect, 2026-09-02. "Send to display" on a block that is not detached yet
+      means "detach it *there*" (`useStudyDetach.sendToDisplay`), so it routes through
+      `openStudyBlockWindow(..., displayKey)` and never through the `moveToDisplay`
+      handler that calls `rememberBounds`. Nothing else recorded the rectangle either:
+      `moved`/`resized` do not fire for the bounds a window is constructed with, and
+      `rememberBoundsFromCacheOnClose` bails on a key the cache has never seen. Measured
+      on the real three-monitor desk: placed at 2090,20 460x512 on the second monitor,
+      reopened primary-centred at 730,106 460x820, `study-block-windows.json` never
+      created at all.
+
+      The two assertions are deliberately different in kind: the rectangle proves the
+      in-memory cache, the file proves the write actually happened. The first alone
+      passed against a persistence layer that never wrote anything.
+    */
+    vi.useFakeTimers();
+    try {
+      openStudyBlockWindow('transcript', 'workspace', h.displays[1].key);
+      const placed = { ...h.created[0].bounds };
+      expect(placed.x).toBeGreaterThanOrEqual(1920);
+      h.created[0].destroy();
+      vi.advanceTimersByTime(700);
+
+      const file = [...h.files.keys()].find((k) => k.endsWith('study-block-windows.json'));
+      expect(file, 'a placed window was never persisted').toBeDefined();
+      expect(JSON.parse(h.files.get(file as string) as string)['workspace:transcript'])
+        .toMatchObject(placed);
+
+      // Reopened the way the block menu reopens it — no display named — so the saved
+      // rectangle is the only thing that can put it back on the second monitor.
+      openStudyBlockWindow('transcript', 'workspace');
+      expect(h.created[1].bounds).toMatchObject(placed);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('the relay', () => {
