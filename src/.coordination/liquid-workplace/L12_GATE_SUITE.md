@@ -113,3 +113,49 @@ installer targets) is still unrun and is not what the bullet's words ask for.
 
 `out/` was left in place: it is gitignored build output and the three hand-made
 `out/*.pre-*` snapshots were not touched.
+
+## 2026-09-02 (primary2) — b3 CLOSES: the branch's own suite at a clean checkout of its tip, every non-green identity named
+
+**Subject:** `df751d60`, which is the `feat/nyaa-subtitles` tip (files-app merged, `0 / 0`
+divergence), in the clean `jp-wt-filesapp` worktree — `git status --short` empty before the
+run. This is the checkout the bullet's own last clause asked for: the branch alone, no other
+track's uncommitted files.
+
+**Full `npx vitest run`: exit 1, 14 failed files / 27 failed tests of 1,006 / 12,982, 243.3 s**,
+with a concurrent main-tree worker running (`ClaudeRelay-primary-20260902-112215`), i.e.
+under contention. Every failure identified, not counted:
+
+- **13 of 14 are load flakes, proven by re-run alone.** Two batches of 7 files: **12 pass**
+  (batch 1: 6/7 files, 51/52 tests; batch 2: 6/7, 85/86). `extensionPopup` failed at 20 s in
+  its batch and passes **14/14 in 6.9 s** as a single file — the same finding the main tree
+  banked this morning. The thirteen: extensionServerPort, flashcardAudio,
+  mediaTranscriptionDependencyMatrix, scraperSources (`ENOTEMPTY rmdir`, the banked race),
+  commandPaletteFocus, mangaCanvas, mangaDisclosures, paletteSettingsReach,
+  readingCapturesHandoff, visualNovelRemoveReports (a `beforeAll` hook timeout, so it fails
+  at FILE level with no per-case line), extensionPopup, i18n — the **date/time OS-locale
+  sweep** case at 67.6 s against its 60 s budget, NOT the hardcoded-strings case, which
+  passed — and i18nSplit at 86 s.
+- **1 of 14 is REAL at HEAD and is fixed in this commit.** `liquidWindowSnapshotFidelity >
+  one predicate decides both rendering liquid and offering the way out`. `02f3bdca`
+  (08:26 EDT) added a COMMENT to `DesktopShell.tsx` that spells the predicate call out with
+  a literal section name; the ratchet names every call site by regex over the raw source and
+  reads comments too, so it scored a fourth caller. Reworded to say the same thing without
+  the call shape: **14/14**, call-site set back to exactly the three it names. Control that
+  cost one extra run: the first reword still mentioned the call shape in prose and failed the
+  same test in 5 ms — the regex is the instrument and it is right to be blunt.
+
+**The two identities this bullet was held open on are GREEN at this checkout.**
+`i18n.test.ts`' catalog-hygiene hardcoded-strings case passes, because
+`tools/i18n-hardcoded-baseline.json` was re-derived from HEAD with a per-file count ratchet
+(`b94dca35` + `9842c0d6`); `architectureBaseline.test.ts` passes, because the three
+`src/media/Study*.tsx` orphans have zero importers at HEAD, so the baseline's pending entries
+are accurate — they read "stale" only in the shared tree's uncommitted overlay.
+
+**Gates, same tree, same commit:** `i18n-check` exit 0 (12,115 keys); `architecture-audit`
+exit 0 ("Nothing new", 9 pending); `i18n-hardcoded-check` exit 0 (33 files / 815 strings
+baselined, none grew). Packaged-app: closed above (primary, 2026-09-02). Fresh-profile
+migration: closed 2026-09-01 (primary2), `L3_PRESENTATION.md`.
+
+**Not claimed:** no second full run was made. The 13 flake identities are proven by re-run
+alone, and a full run beside a concurrent worker will flake again; the number that is stable
+is *zero failures that are not load flakes*, and that is the number the bullet needed.

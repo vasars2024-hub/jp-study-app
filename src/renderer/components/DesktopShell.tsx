@@ -3693,8 +3693,11 @@ const FloatingWindow = memo(function FloatingWindow({
   // `city` cannot even be maximized (`isMaximized` above excludes it) yet was
   // recorded maximized. It also published a false product fact: the L12 atlas
   // reported "3 of 25 surfaces offer no Liquid presentation", but
-  // `canPresentLiquid('musicwidget')` is TRUE and the bar below renders its
-  // toggle — only `city` and `visualizer` genuinely refuse.
+  // `canPresentLiquid` is TRUE for `musicwidget` and the bar below renders its
+  // toggle — only `city` and `visualizer` genuinely refuse. (Written this way
+  // round on purpose: `liquidWindowSnapshotFidelity.test.ts` names every call
+  // site of that predicate in this file by regex, and the regex reads comments
+  // too — a comment spelling the call out was scored as a fourth caller.)
   // `data-section` is already the idiom here (`media/StudyBlocks.tsx:54`).
   // Liquid presentation is opt-in per window and reversible. The frameless
   // garden and visualizer have no conventional chrome to swap, so they do not

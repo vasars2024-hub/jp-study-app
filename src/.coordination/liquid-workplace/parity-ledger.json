@@ -2244,7 +2244,7 @@
       "dataStateOwner": "renderer reader state; the book's text comes from the library item, not from the probe",
       "automatedProof": "probes/l6-parity.js SPECS.novels.documentRender; probes/cat6-feature-parity.cjs --app novels",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD content=1516x712 chars=1946 || LIQUID content=1516x712 chars=1946",
+      "observed": "STANDARD content=1516x712 chars=1946 || LIQUID content=1516x712 chars=1946 || negative control `documentRender` -> 7/9 (baseline 9/9), fell=[documentRender, chapterNavigation], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-novels2.json` (2026-09-02 08:39), not re-run here",
       "status": "both",
       "_note": "This row declares a cascade onto `chapterNavigation`: detaching `.novel-content` must take both down and nothing else. Measured in the control — 9/9 -> 7/9, fellRows exactly `documentRender` + `chapterNavigation`, 0 unexpected."
     },
@@ -2258,7 +2258,7 @@
       "dataStateOwner": "renderer reader position; the drive's `next` and `back` restore themselves within the sequence",
       "automatedProof": "probes/l6-parity.js SPECS.novels.pageTransport, driven through steps `next` / `back` / `settle`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD range=0..1000 originalMax=1000 trip=\"2/2|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\"->\"|「おーい。そこまで行くと、さすがに無茶苦茶というか、付いてけないんだけど……」　大ガン麻ジャには、それほどの習慣性はないらしいが、ひょっとしたら、妄想を抱かせる作用があるのではないだろうか。雄一郎は、心配になった。「まあ、釣井の件は、ただの想像だけどな。でも、都立＊＊高の事件もある。あれから、情報を集めてみたんだが、や\"->\"2/2|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\" || LIQUID range=0..1000 originalMax=1000 trip=\"4/4|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\"->\"1/3|「おーい。そこまで行くと、さすがに無茶苦茶というか、付いてけないんだけど……」　大ガン麻ジャには、それほどの習慣性はないらしいが、ひょっとしたら、妄想を抱かせる作用があるのではないだろうか。雄一郎は、心配になった。「まあ、釣井の件は、ただの想像だけどな。でも、都立＊＊高の事件もある。あれから、情報を集めてみたんだが、や\"->\"4/4|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\"",
+      "observed": "STANDARD range=0..1000 originalMax=1000 trip=\"2/2|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\"->\"|「おーい。そこまで行くと、さすがに無茶苦茶というか、付いてけないんだけど……」　大ガン麻ジャには、それほどの習慣性はないらしいが、ひょっとしたら、妄想を抱かせる作用があるのではないだろうか。雄一郎は、心配になった。「まあ、釣井の件は、ただの想像だけどな。でも、都立＊＊高の事件もある。あれから、情報を集めてみたんだが、や\"->\"2/2|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\" || LIQUID range=0..1000 originalMax=1000 trip=\"4/4|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\"->\"1/3|「おーい。そこまで行くと、さすがに無茶苦茶というか、付いてけないんだけど……」　大ガン麻ジャには、それほどの習慣性はないらしいが、ひょっとしたら、妄想を抱かせる作用があるのではないだろうか。雄一郎は、心配になった。「まあ、釣井の件は、ただの想像だけどな。でも、都立＊＊高の事件もある。あれから、情報を集めてみたんだが、や\"->\"4/4|蓮実は、危険信号を感じたら、とりあえず立ち止まって考えることにしていた。虫バグから得られる情報は断片的で、ほとんどの場合、誰が喋っているのかすら特定できない。しかし、大勢の会話を分析すると、前回の失敗に懲りず、カンニングに再チャレンジしようとしている生徒がいるのは確実と思われた。それが誰かはわからないが、今までの経緯か\" || negative control `pageTransport` -> 8/9 (baseline 9/9), fell=[pageTransport], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-novels2.json` (2026-09-02 08:39), not re-run here",
       "status": "both",
       "_note": "`seek.max === trip.max` is in the predicate on purpose: the `pageTransport` mutation sets `max` to \"1\", and without that comparison a book clamped to a single page would still score the trip as working."
     },
@@ -2272,7 +2272,7 @@
       "dataStateOwner": "the user's reading position, which `goTo` WRITES through `window.api.setProgress` (NovelReader.tsx:731) — captured before the jump and written back by the spec's own undo",
       "automatedProof": "probes/l6-parity.js SPECS.novels.chapterNavigation, driven through steps `chapterPrep` / `chapter` / `chapterSettle`; mutation `chapterNavigation`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chapters=9 jumpedTo=\"蓮実聖司を愛する者として\" landedOnIt=true moved=true seek=18->986->18 || LIQUID chapters=9 jumpedTo=\"蓮実聖司を愛する者として\" landedOnIt=true moved=true seek=18->986->18",
+      "observed": "STANDARD chapters=9 jumpedTo=\"蓮実聖司を愛する者として\" landedOnIt=true moved=true seek=18->986->18 || LIQUID chapters=9 jumpedTo=\"蓮実聖司を愛する者として\" landedOnIt=true moved=true seek=18->986->18 || negative control `chapterNavigation` -> 8/9 (baseline 9/9), fell=[chapterNavigation], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-novels2.json` (2026-09-02 08:39), not re-run here",
       "status": "both",
       "_note": "REPAIRED at 62097cc9 and the surface was right. The passive version asked whether the current page's first 240 chars contained a TOC label — true only on a chapter's opening page, so a working control scored dead on ~157 of this book's ~166 parts. `.chapter-select` is an ACTION select (`value=\"\"` pinned, NovelReader.tsx:3308-3311), so there is nothing passive left to read. NEGATIVE CONTROL, and it ran by accident: the previous turn died with a plant still in the live DOM — option 165's label rewritten to `lqp-never-in-this-book` — and the first authoring run read `landedOnIt=false moved=true` and scored this row PENDING in BOTH presentations. Reverted by reload; the same run then reads `jumpedTo=\"蓮実聖司を愛する者として\" landedOnIt=true`, seek 18->986->18. So the row demonstrably fails when the landing does not match, and it is not passing on the drive alone."
     },
@@ -2286,7 +2286,7 @@
       "dataStateOwner": "renderer reading-tool state; the spec's undo returns every tool to the open/shut state it found",
       "automatedProof": "probes/l6-parity.js SPECS.novels.bookmarksTool, driven through step `tool`; mutation `bookmarksTool`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false",
+      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false || negative control `bookmarksTool` -> 8/9 (baseline 9/9), fell=[bookmarksTool], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-novels2.json` (2026-09-02 08:39), not re-run here",
       "status": "both",
       "_note": "Driven, not assumed: `wasOpen=false` on both presentations, so the row scores a tool this drive opened and the undo shut again."
     },
@@ -2300,7 +2300,7 @@
       "dataStateOwner": "renderer reading-tool state; restored by the spec's undo",
       "automatedProof": "probes/l6-parity.js SPECS.novels.translateTool, driven through step `tool`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false",
+      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-novels2.json`, 2026-09-02 08:39), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The three tool rows are generated from one factory over `['bookmarks','translate','reader-settings']`, so they cannot drift apart in the instrument — a defect in one would show in all three."
     },
@@ -2314,7 +2314,7 @@
       "dataStateOwner": "renderer reading-tool state; restored by the spec's undo",
       "automatedProof": "probes/l6-parity.js SPECS.novels.reader-settingsTool, driven through step `tool`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false",
+      "observed": "STANDARD trigger=true tool=true body=true placement=docked hidden=false || LIQUID trigger=true tool=true body=true placement=docked hidden=false || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-novels2.json`, 2026-09-02 08:39), this one is asserted from its own reading only",
       "status": "both",
       "_note": "This is the tool that changes how the document itself renders, so it is the one whose placement matters most — `canvasPlacement` scores that it never obscures the passage it is adjusting."
     },
@@ -2328,7 +2328,7 @@
       "dataStateOwner": "the canvas's own `data-measured` / `data-covered`, written by the reading layout",
       "automatedProof": "probes/l6-parity.js shared `canvasPlacement()` (l6-parity.js:5633), L6's gate as one row; four other specs score the identical row",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD canvas=1264 doc=384 docked=3 sheets=0 sum=1264 covered=false || LIQUID canvas=1264 doc=384 docked=3 sheets=0 sum=1264 covered=false",
+      "observed": "STANDARD canvas=1264 doc=384 docked=3 sheets=0 sum=1264 covered=false || LIQUID canvas=1264 doc=384 docked=3 sheets=0 sum=1264 covered=false || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-novels2.json`, 2026-09-02 08:39), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The measure clamp is deliberately NOT scored here — Library and Immersion run the fill policy where `--lq-reading-measure` is `none` by design. A spec that wants the clamp scores it as its own row."
     },
@@ -2342,7 +2342,7 @@
       "dataStateOwner": "`localStorage['lq.reader.presentation']`, keyed per reader host (`book` / `manga`); the key is REMOVED on return to standard rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js SPECS.novels.presentationHonest; mutation `presentationHonest` forces `aria-pressed` to disagree",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD ariaPressed=false dataPresentation=standard readerLiquidClass=false || LIQUID ariaPressed=true dataPresentation=liquid readerLiquidClass=true",
+      "observed": "STANDARD ariaPressed=false dataPresentation=standard readerLiquidClass=false || LIQUID ariaPressed=true dataPresentation=liquid readerLiquidClass=true || negative control `presentationHonest` -> 8/9 (baseline 9/9), fell=[presentationHonest], restored 9/9 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-novels2.json` (2026-09-02 08:39), not re-run here",
       "status": "both",
       "_note": "This is the row that makes the other eight trustworthy: without it a surface could report `liquid` while rendering standard and every parity comparison would be between a presentation and itself."
     },
@@ -2356,7 +2356,7 @@
       "dataStateOwner": "reader host state; the presentation half is the localStorage key above",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`, reader branch — counts the back-to-Library control, NOT `.fwin-b`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=1/1 liquidAriaPressed=false || LIQUID chromeButtons=1/1 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=1/1 liquidAriaPressed=false || LIQUID chromeButtons=1/1 liquidAriaPressed=true || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-novels2.json`, 2026-09-02 08:39), this one is asserted from its own reading only",
       "status": "both",
       "_note": "Counting `.fwin-b` here would score a complete host 0, which is a fact about the instrument and not about the reader. The reader branch is written down in `lifecycle()` alongside the pop-out and workspace branches for exactly that reason."
     },
@@ -2468,7 +2468,7 @@
       "dataStateOwner": "renderer browsing state; the round trip dirties THIS field, so it is also the surface's proof that a presentation change loses no typed text",
       "automatedProof": "probes/l6-parity.js SPECS.immersion.urlBar; probes/cat6-feature-parity.cjs --app immersion --step-ms 3500",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\" || LIQUID bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\"",
+      "observed": "STANDARD bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\" || LIQUID bar=\"https://news.web.nhk/news/easy/\" webviewSrc=\"https://news.web.nhk/news/easy/\" || negative control `urlBar` -> 6/7 (baseline 7/7), fell=[urlBar], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-immersion2.json` (2026-09-02 10:47), not re-run here",
       "status": "both",
       "_note": "This is the field cat6's round trip dirties: `dirtiedField=immersion-url`, `fieldsHeld=true`, 0 diffs, box 820x580 in both presentations. The `open` step resyncs it to the loaded page rather than renavigating, which is what undoes that dirtying."
     },
@@ -2482,7 +2482,7 @@
       "dataStateOwner": "renderer immersion mode; the drive SETS a named mode rather than cycling, and the spec's undo restores the one it found",
       "automatedProof": "probes/l6-parity.js SPECS.immersion.modeSwitch; the mutation marks EVERY mode active at once",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD modes=3 active=1 mode=reader webview=true reader=true composed=true || LIQUID modes=3 active=1 mode=reader webview=true reader=true composed=true",
+      "observed": "STANDARD modes=3 active=1 mode=reader webview=true reader=true composed=true || LIQUID modes=3 active=1 mode=reader webview=true reader=true composed=true || negative control `modeSwitch` -> 6/7 (baseline 7/7), fell=[modeSwitch], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-immersion2.json` (2026-09-02 10:47), not re-run here",
       "status": "both",
       "_note": "The `want` table is the whole row: without it, `active.length === 1` would pass on a reader mode that renders no reader. Measured `modes=3 active=1 mode=reader webview=true reader=true composed=true`."
     },
@@ -2496,7 +2496,7 @@
       "dataStateOwner": "renderer extraction state, derived from the loaded page — this row cannot pass on an empty browser, which is the honest reading of a stage with nothing loaded",
       "automatedProof": "probes/l6-parity.js SPECS.immersion.readerExtraction, driven through steps `open` / `mode`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary) — NHK Easy, https://news.web.nhk/news/easy/",
-      "observed": "STANDARD readerChars=322 starterStateShowing=false || LIQUID readerChars=322 starterStateShowing=false",
+      "observed": "STANDARD readerChars=322 starterStateShowing=false || LIQUID readerChars=322 starterStateShowing=false || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-immersion2.json`, 2026-09-02 10:47), this one is asserted from its own reading only",
       "status": "both",
       "_note": "PACING, and it produced a VOID that looked like a defect. At cat6's default `--step-ms 700` this row and `modeSwitch` read `readerChars=0` / `composed=false` and the run scored 5/7 — because a REAL public page was still loading, exactly as the `open` step's own note warns. The same surface, same window, same profile at `--step-ms 3500` reads 7/7 with 0 refusals. `_pr5-immersion.json` and `_pr5-immersion2.json` are the pair. A slow live page is not a dead control."
     },
@@ -2510,7 +2510,7 @@
       "dataStateOwner": "renderer browsing history; nothing here is removed by the drive",
       "automatedProof": "probes/l6-parity.js SPECS.immersion.siteRail; the mutation detaches ONE row's meta, not the list",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD renderedRows=20 complete=20 || LIQUID renderedRows=20 complete=20",
+      "observed": "STANDARD renderedRows=20 complete=20 || LIQUID renderedRows=20 complete=20 || negative control `siteRail` -> 6/7 (baseline 7/7), fell=[siteRail], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-immersion2.json` (2026-09-02 10:47), not re-run here",
       "status": "both",
       "_note": "The rail is a `VirtualList` (ImmersionContent.tsx:1041), so rendered rows are a WINDOW of the history and never all of it — the grammar spec already paid for encoding `rendered === total` as a pass condition. The mutation detaches one row's meta rather than the list, because detaching the list would take `railReversibility` down with it and prove neither."
     },
@@ -2524,7 +2524,7 @@
       "dataStateOwner": "renderer reading-tool state",
       "automatedProof": "probes/l6-parity.js SPECS.immersion.railReversibility; the mutation STRIPS `aria-pressed`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD toggle=true ariaPressed=true railMounted=true || LIQUID toggle=true ariaPressed=true railMounted=true",
+      "observed": "STANDARD toggle=true ariaPressed=true railMounted=true || LIQUID toggle=true ariaPressed=true railMounted=true || negative control `railReversibility` -> 6/7 (baseline 7/7), fell=[railReversibility], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-immersion2.json` (2026-09-02 10:47), not re-run here",
       "status": "both",
       "_note": "Measured `toggle=true ariaPressed=true railMounted=true`. The row accepts either boolean — what it refuses is a trigger with no boolean at all, or one that disagrees with the tool."
     },
@@ -2538,7 +2538,7 @@
       "dataStateOwner": "the canvas's own `data-measured` / `data-covered`",
       "automatedProof": "probes/l6-parity.js shared `canvasPlacement()`, L6's gate as one row",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false || LIQUID canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false",
+      "observed": "STANDARD canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false || LIQUID canvas=782 doc=550 docked=1 sheets=0 sum=782 covered=false || negative control: NONE DECLARED for this row -- the run's other 5 rows were controlled (cat6 receipt `debug/_pr5-immersion2.json`, 2026-09-02 10:47), this one is asserted from its own reading only",
       "status": "both",
       "_note": "Immersion runs the FILL policy, so `--lq-reading-measure` is `none` here BY DESIGN — a live browser guest is not a passage. The measure clamp is therefore deliberately not scored by this shared row; a spec that wants it scores it separately."
     },
@@ -2552,7 +2552,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`; the mutation strips `aria-pressed` from `.fwin-b-liquid`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 6/7 (baseline 7/7), fell=[windowLifecycle], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-immersion2.json` (2026-09-02 10:47), not re-run here",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard with `.immersion-url` dirtied first: fieldsHeld true, shellHeld true, 0 diffs, 820x580 in both. This is the surface where that matters most, because the typed field IS the address of a live page."
     },
@@ -2566,7 +2566,7 @@
       "dataStateOwner": "renderer calendar view state; the drive walks week -> day -> agenda -> month and the spec's undo returns the view it found",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.viewModes, driven through steps `begin` / `visitWeek` / `visitDay` / `visitAgenda` / `visitMonth`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD buttons=4 active=1 visited=4/4 || LIQUID buttons=4 active=1 visited=4/4 || CONTROL active added to 1 of 1: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
+      "observed": "STANDARD buttons=4 active=1 visited=4/4 || LIQUID buttons=4 active=1 visited=4/4 || CONTROL active added to 1 of 1: 5/5 -> 4/5, fell exactly its own row, restored 5/5 || negative control `viewModes` -> 4/5 (baseline 5/5), fell=[viewModes], restored 5/5 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-calendar.json` (2026-09-02 10:59), not re-run here",
       "status": "both",
       "_note": "`visited=4/4` is the whole row. Read without the walk it would score `buttons=4 active=1` on a segment whose other three modes render nothing — presence scoring passes that every time, which is why the visit is recorded in spec state rather than inferred from the active class."
     },
@@ -2580,7 +2580,7 @@
       "dataStateOwner": "renderer calendar state, derived from the visible month",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.monthGrid; the mutation detaches the grid",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD dows=7 cells=42 numbered=42 || LIQUID dows=7 cells=42 numbered=42 || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
+      "observed": "STANDARD dows=7 cells=42 numbered=42 || LIQUID dows=7 cells=42 numbered=42 || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5 || negative control `monthGrid` -> 4/5 (baseline 5/5), fell=[monthGrid], restored 5/5 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-calendar.json` (2026-09-02 10:59), not re-run here",
       "status": "both",
       "_note": "42 is asserted rather than `>= 28` on purpose: a six-week grid is the layout, and a month rendered with fewer cells silently drops the leading and trailing days that make the previous and next month reachable by click."
     },
@@ -2594,7 +2594,7 @@
       "dataStateOwner": "renderer calendar cursor; the drive's shift is returned within its own step sequence, so nothing persists",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.dateTransport, driven through step `returnDate`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD buttons=3 named=3 jump=true shiftedAndReturned=true || LIQUID buttons=3 named=3 jump=true shiftedAndReturned=true || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
+      "observed": "STANDARD buttons=3 named=3 jump=true shiftedAndReturned=true || LIQUID buttons=3 named=3 jump=true shiftedAndReturned=true || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5 || negative control `dateTransport` -> 4/5 (baseline 5/5), fell=[dateTransport], restored 5/5 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-calendar.json` (2026-09-02 10:59), not re-run here",
       "status": "both",
       "_note": "`shiftedAndReturned` is the part that cannot be faked by presence: the drive moves the period off `September 2026` and back, and the row fails unless BOTH halves happened. A transport that moves and cannot return is the reversibility defect this ledger keeps finding elsewhere."
     },
@@ -2608,7 +2608,7 @@
       "dataStateOwner": "renderer composer state only — the drive opens and closes it and NEVER submits, so no event is written to the user's calendar",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.eventComposer, driven through steps `openComposer` / `closeComposer` / `finish`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD trigger=true complete=true closed=true || LIQUID trigger=true complete=true closed=true || CONTROL type stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
+      "observed": "STANDARD trigger=true complete=true closed=true || LIQUID trigger=true complete=true closed=true || CONTROL type stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5 || negative control `eventComposer` -> 4/5 (baseline 5/5), fell=[eventComposer], restored 5/5 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-calendar.json` (2026-09-02 10:59), not re-run here",
       "status": "both",
       "_note": "The row requires the composer CLOSED at read time as well as complete when open, so an open flow that cannot be reversed fails it. `type=\"button\"` is asserted because a default-type button inside a form submits it, which on this surface would create an event."
     },
@@ -2622,7 +2622,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app calendar round trip",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5 || negative control `windowLifecycle` -> 4/5 (baseline 5/5), fell=[windowLifecycle], restored 5/5 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-calendar.json` (2026-09-02 10:59), not re-run here",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 820x580 in both. `dirtiedField` is null here and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and the composer that holds this surface's six inputs is CLOSED at trip time, so there is none. The composer's own reversibility is scored by `eventComposer` instead."
     },
@@ -2898,30 +2898,24 @@
   "controlCoverage": {
     "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
     "rows": 213,
-    "withNamedControl": 135,
-    "declaredNone": 13,
-    "silent": 64,
+    "withNamedControl": 150,
+    "declaredNone": 19,
+    "silent": 43,
     "silentByApp": {
       "mediaWorkspace": 5,
       "mediaCenter": 2,
       "translate": 4,
       "agent": 5,
       "captures": 3,
-      "novels": 9,
       "manga": 7,
-      "immersion": 7,
-      "calendar": 5,
       "games": 10,
       "settings": 7
     },
     "silentByCause": {
       "predatingTheClause": 36,
-      "b2WaveNotTranscribed": 28,
+      "b2WaveNotTranscribed": 7,
       "b2WaveApps": [
-        "novels",
-        "manga",
-        "immersion",
-        "calendar"
+        "manga"
       ]
     },
     "note": "`silent` means this ledger records no control clause for the row. It is a gap in the LEDGER, not a disproof of the row — but it is a real gap and it is not monotone. THIS BLOCK RETRACTS ITS OWN EARLIER CLAIM: it used to end \"New rows now say NONE DECLARED explicitly, so `silent` can only shrink\", and the 2026-09-02 merge of the two concurrent b2 waves falsified that — silent went 45/120 -> 93/168, because the main tree's row writer (debug/_pr4-rows.cjs) copies only `rowEvidence` into `observed` while this tree's (probes/l6-parity-rows.cjs) also copies `control.mutations`. See `silentByCause`: the `b2WaveNotTranscribed` rows DID have per-row mutations run by cat6 and their receipts survive, so those are recoverable by transcription; the `predatingTheClause` rows are the older ones written before any writer said anything about controls. Two writers, one ledger, one claim that only held for one of them."
