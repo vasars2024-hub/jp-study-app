@@ -620,3 +620,47 @@ step at the head of the scraper drive (click `.scr-topbar-actions [aria-controls
 `aria-expanded` is false) with a matching `undo` that closes it only if the drive opened it,
 and re-point `reverseControls` at `aria-expanded="true"` on the disclosure that actually
 owns the drawer. Artifact: gitignored `debug/_p2f-cat6-scraper.json`.
+
+## 2026-09-02 — the scraper finding is FIXED and MEASURED (primary2, `ddeb97f3`)
+
+The fix named above was taken, and the re-run it needed happened. Both halves landed in
+`probes/l6-parity.js`.
+
+**The false positive, proven at one instant on one DOM.** Drawer SHUT and advanced mode ON,
+both expressions read over the same window in the same `/eval`:
+
+| expression | reading | scores a reversal affordance? |
+| --- | --- | --- |
+| OLD `.scr-topbar-actions button[aria-pressed="true"]` | `pressedOpeners=1` | **yes — falsely** |
+| NEW `.scr-topbar-actions button[aria-controls]` + `aria-expanded="true"` | `disclosures=1 expanded=0` | no |
+
+The single element the OLD expression counted reports `aria-label` **"Advanced controls
+shown"**. Advanced mode was captured (`aria-pressed=false`), driven ON for the reading, and
+restored to `false`, verified after.
+
+**The drive, with a discriminating control.** HEAD's `l6-parity.js` was copied into
+`debug/_p2g-ctrl/` at the same directory depth and run through the *same* cat6 harness
+against the *same* window and profile — the only difference is the spec file:
+
+| spec | verdict | parity | drive refusals | failing rows |
+| --- | --- | --- | --- | --- |
+| pre-fix (HEAD) | **VOID** — negative control did not falsify | 4/7 both | 2 | `drawerCategories` (categories=0 fields=0), `settingsFields` (fields=0), `reverseControls` (drawerClose=false pressedOpeners=0) |
+| post-fix | **PASS 10/10** | **7/7 both**, rowsAgree, 0 onlyInOne | **0** | none |
+
+All seven mutations flip exactly their own row and restore (`exactlyOwnRow` true ×7); round
+trip `standard -> liquid -> standard` held with **0 diffs**, `fieldsHeld` and `shellHeld`
+true, dirtied field `scr-search-input` returned.
+
+**`drawerReady` is a wait, not a sleep, and the number is why it exists.**
+`ScraperSettingsDrawer` is `lazy()` (ScraperApp.tsx:68). Measured on this profile: **403 ms**
+cold after a renderer reload, **113 ms** warm — but on the run where the dev server had never
+transformed the chunk, `.scr-drawer-cat` was still absent 1,400 ms after the click and both
+drawer steps refused. RATE, not an adjective: **2 refusals on that cold run, 0 on both warm
+re-runs.** `/eval` is synchronous, so a busy-wait in the renderer would block the very import
+it waits for; a step that spends one more step-interval and reports `cats` is the honest shape.
+
+**Ledger.** `scraper` is the third app authored from source with no prior row, so all seven
+are new: **62 rows / 9 apps -> 69 rows / 10 apps**, `both` 63 -> **66**, `pending` **3**
+unchanged. Validated rather than trusted: **0 duplicate `app|feature` keys**. The writer's own
+negative control fired 3 of 3 on this artifact — a one-presentation row comes out
+`REGRESSION`, an unknown row id refuses by name, and a `VOID` verdict writes nothing.

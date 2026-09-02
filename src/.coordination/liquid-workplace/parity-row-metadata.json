@@ -5,7 +5,8 @@
   "provenance": {
     "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. CORRECTED 2026-09-02: this note used to claim the seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", had NO spec id and was \"deliberately absent\". That was false -- `l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for every app, and the live run refused BY NAME on it, which is the refusal working. Its four authored fields are now copied from that same ledger row. This block is a REGRESSION TEST -- a live cat6 dictionary run must re-derive these SEVEN features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys. Measured 2026-09-02 at 1ec440ab: 7 rows, statuses {both: 7}, added 0.",
     "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403.",
-    "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped."
+    "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped.",
+    "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319."
   },
   "apps": {
     "dictionary": {
@@ -138,6 +139,55 @@
         "windowLifecycle": {
           "feature": "Window lifecycle: pop out, minimize, maximize, close",
           "currentRoute": "Settings window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "scraper": {
+      "standardDestination": "Scraper window: `.scr-topbar` header, `.scr-rail` left navigation, the routed page body, `.scr-statusbar` footer, and the settings drawer that slides over the body when opened from the top bar",
+      "liquidDestination": "Same in-window Scraper shell on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the top bar (ScraperTopBar.tsx:18), the whole rail (ScraperNav.tsx:22/34/42/53) and the status bar (ScraperStatusBar.tsx:25) are `ContextualSurface` chrome, while the shell search (ScraperSearch.tsx:89) and the drawer's own search and field list (ScraperSettingsDrawer.tsx:261, :319) are `AnchorSurface bare` — a form of ~40 editable controls is work, and L2 keeps work on stable opaque anchors",
+      "noLiquidReason": null,
+      "features": {
+        "railNavigation": {
+          "feature": "Reach every Scraper page from the left rail, with the current page marked and every item named",
+          "currentRoute": "Scraper window > `.scr-rail-item` (17 buttons across grouped `.scr-rail-list`s), the active one carrying `aria-current=\"page\"`",
+          "keyboardRoute": "real `type=\"button\"` list items inside `ul`/`li` with `aria-labelledby` group headings; `title` carries the label when the rail is collapsed and the description when it is not (ScraperNav.tsx:63)",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `navigateScraperShell` writes `page` (and the MRU `recentPages`) into localStorage `jp-scraper-shell-v1`, so the page survives a reopen"
+        },
+        "drawerCategories": {
+          "feature": "Settings drawer: pick a settings category and see its fields",
+          "currentRoute": "Scraper window > top-bar settings disclosure opens `.scr-drawer`; `.scr-drawer-rail > .scr-drawer-cat` x19, the active one carrying `aria-current=\"true\"`, over `.scr-field` rows",
+          "keyboardRoute": "real `type=\"button\"` category buttons; category clicks are wrapped in `startTransition` so the click paints before the page behind the drawer re-renders (ScraperSettingsDrawer.tsx:289)",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `drawerOpen` and `drawerCategory` are fields of the same persisted `jp-scraper-shell-v1` document, so a reopened window comes back to the category you left"
+        },
+        "settingsFields": {
+          "feature": "Every settings field is a labelled control, never a bare input",
+          "currentRoute": "Scraper window > `.scr-drawer` > `.scr-fields` > `.scr-field`, each rendering `.scr-field-label` (FieldRow.tsx:312) and `.scr-field-control` (:327)",
+          "keyboardRoute": "native inputs, selects, toggles and range pairs inside a labelled row",
+          "dataStateOwner": "renderer/scraperSettingsStore.ts — localStorage `jp-scraper-settings-v1`, a per-site document with presets; `getActiveScraperSettings(site)` is what the rest of the app reads"
+        },
+        "shellSearch": {
+          "feature": "Shell search: a combobox over pages and recent queries, collapsed until used",
+          "currentRoute": "Scraper window > `.scr-search > .scr-search-input`, `role=\"combobox\"` with `aria-controls=\"scr-search-results\"` and `aria-expanded` reflecting the popover (ScraperSearch.tsx:104-113)",
+          "keyboardRoute": "native `type=\"search\"` input; the popover is a composite with the field, so focus moving to a result keeps it open and focus leaving it dismisses it (ScraperSearch.tsx:93-99)",
+          "dataStateOwner": "component state (`query`, `open`) in ScraperSearch.tsx; the recent-query list comes from renderer/components/scraper/scraperRecent.ts and is the only persisted part"
+        },
+        "statusActions": {
+          "feature": "Status bar: run state, selection, last scrape and next schedule, each a route into the page that explains it",
+          "currentRoute": "Scraper window > `.scr-statusbar button` — the run-state button plus the last-scrape and next-schedule fields (and a selection button when a selection exists), every one carrying a `title`",
+          "keyboardRoute": "real `type=\"button\"` elements, all enabled",
+          "dataStateOwner": "derived — job counts from ScraperApp state (`dashboardJobActive` / `transientJobActive`), last scrape and next schedule from the scraper history and schedule data the pages read"
+        },
+        "reverseControls": {
+          "feature": "Every drawer the shell opens can be closed again, from a control that says it is open",
+          "currentRoute": "Scraper window > `.scr-drawer-head .ui-icon-btn` (the drawer's own close) and the top-bar disclosure at ScraperTopBar.tsx:78-86, which carries `aria-expanded` + `aria-controls` rather than `aria-pressed`",
+          "keyboardRoute": "two real buttons; the disclosure is the APG pattern, so a screen reader announces the drawer as expanded rather than as a pressed toggle",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `drawerOpen` in `jp-scraper-shell-v1`; closing is a `patch({ drawerOpen: false })`, the exact inverse of opening"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Scraper window > `.fwin-b` title-bar controls",
           "keyboardRoute": "four real buttons",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
         }
