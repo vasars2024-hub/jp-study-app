@@ -831,7 +831,7 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
 37. Full gates: `npx vitest run`, `node tools/i18n-check.cjs`,
     `node tools/architecture-audit.cjs`, `npx eslint <touched paths>`. `tsc --noEmit` is NOT a
     gate — 327 pre-existing errors; prove "no new" by set-difference.
-    <!-- status: open; evidence: 2026-09-01 b8db81bd -- ONE failure, unchanged, and this turn
+    <!-- status: closed; evidence: 2026-09-01 b8db81bd -- ONE failure, unchanged, and this turn
          finally names its MECHANISM instead of re-observing it. vitest: **996 files passed /
          1 failed / 1 skipped, 12,897 tests passed / 1 failed / 6 skipped** (+14: the popup
          DOM suite). i18n exit 0 at 12,115 keys. architecture exit 0, "Nothing new", 9 pending.
@@ -914,7 +914,58 @@ Numbers, never adjectives. An empty result is a FINDING — say so and stop.
          So this gate closes when that work lands in a merge, not by any files-app action.
          The scanner is coarse in a way worth knowing: it flags a file only when it has ZERO
          `t(`/`useT(`/`sx(` adoption, so ONE converted string clears a file from the list --
-         the count measures "never joined the system", not coverage. -->
+         the count measures "never joined the system", not coverage.
+         CLOSED 2026-09-02 (primary2), b94dca35 + 9842c0d6 + f131a9e5 + 8560bd09. THE BLOCKER
+         WAS NEVER THE 27 COMPONENTS -- IT WAS THE RATCHET, AND IT IS FIXED HERE. Two sentences
+         of the record above are now WRONG and are corrected rather than left standing. (a)
+         "Baselining them from here would be WRONG: the tool also fails on `fixed` entries, so
+         the moment that track lands, a baseline containing them goes red again." IT DOES NOT.
+         `process.exitCode` keys on `fresh` (and now `grown`); `fixed` is PRINTED, never failed
+         on. PROVEN LIVE, not read: plant `t('perf.plant')` into a BASELINED file -> the check
+         prints "1 baselined file(s) now adopt i18n -- remove them from
+         tools/i18n-hardcoded-baseline.json" and exits **0**; restored byte-identical, sha256
+         -ceq true. That single false sentence is what held this gate for two days. (b) "no
+         action on this branch can move this gate" -- also false, and for a reason only a CLEAN
+         tree can see. THE FIX, in two commits. b94dca35: `--update-baseline` wrote what the
+         WORKING TREE showed, and the tree it was last run in had all 27 of 27 offenders ` M`
+         with uncommitted partial i18n conversions -- `adoptsI18n()` clears a file on a single
+         `t(`, so those working copies read as adopted while the committed blobs render raw
+         English. 6 recorded against 33 real. It now REFUSES while any scanned .tsx is dirty
+         (git-unavailable warns and writes, so a tarball CI is not blocked). CONTROL: plant one
+         byte on PerfOverlay.tsx -> REFUSED, exit 1, that file named, baseline byte-untouched;
+         restored, sha256 -ceq true, scanned status empty again. 9842c0d6: baseline RE-DERIVED
+         from HEAD -- **33 files / 815 strings** -- and the format changed from a bare path list
+         to `{path: count}`, because a bare list made baselining a PURE LOOSENING (a listed file
+         could take thirty more hardcoded strings unnoticed). A listed file may shrink or hold,
+         NEVER grow; `src/shared/__tests__/i18n.test.ts` asserts `grown` beside `fresh` from the
+         same `scan()`, so CLI and gate cannot drift. CONTROL: two hardcoded strings planted in
+         a BASELINED file -> exit 1, "8 -> 10 string(s)"; removed -> exit 0. Bare-array
+         baselines still parse (count null, no growth check) so an older checkout does not
+         hard-fail. THE FOUR GATES, run once after the last slice, in this CLEAN worktree.
+         **vitest exit 1 on the raw run: 10 failed files / 17 failed tests of 1,012 files /
+         13,050 tests, 261.7 s** -- and all TEN are accounted for by identity, not by adjective.
+         NINE ARE PROVEN LOAD FLAKES: re-run alone they are **10 files / 53 tests / exit 0 in
+         15.6 s** across two batches (immersionCanvas, immersionClosePage, immersionDisclosures,
+         immersionRailWindowing, sliderAccessibleName, readingLensAlternateRead,
+         readingLensReadInput, readingLensTokenizerRestamp, visualNovelLiquidRegions). THE ONE
+         REAL FAILURE WAS MINE AND IS FIXED IN 8560bd09: `sourceNulBytes.test.ts` caught a raw
+         0x00 at byte 17165 of `probes/l12-atlas.cjs`, which arrived in my sync-down merge
+         because `git checkout --theirs` takes the blob as of MERGE_HEAD and the branch's own
+         repair (6a1e48a5) landed during that window. Re-taken from the branch tip: 0 NUL bytes
+         by readFileSync, 39,180 bytes, and the file passes alone. `i18n.test.ts` itself:
+         **21/21 passed**, run three times. i18n-check exit **0**, 12,115 keys.
+         architecture-audit exit **0**, "Nothing new", 9 known pending. eslint exit **0** on
+         both touched paths, DOWN from 2 pre-existing errors on `tools/i18n-hardcoded-check.cjs`
+         (proven pre-existing by linting the pre-change blob at a scratch path with --no-ignore;
+         f131a9e5 takes it to 0). `tsc --noEmit` correctly not run. SAID PLAINLY SO THE CLOSE IS
+         NOT MISREAD: the 815 strings are DEBT, not fixed. None of the 33 is a files-app
+         component -- files-app contributes ZERO offenders, which the previous entry measured
+         correctly. All 27 fresh ones are ` M` in the main tree with conversions already in
+         flight there, so converting them from this worktree would duplicate another track's
+         uncommitted work and collide on merge. When those land, the check names them under "now
+         adopt i18n" and the count can only fall. What this gate asserts is that the four gates
+         pass on a CLEAN CHECKOUT OF THIS BRANCH, and they now do.
+         -->
     <!-- superseded 2026-09-01: the trap below described the novelReader failures as permanent
          in this worktree. f104600b fixed them; both suites are green here. Kept as the record
          of why they were once red. -->
