@@ -21,7 +21,14 @@ import type {
   WindowSnapshot,
 } from '../../shared/desktop';
 import { DESKTOP_STUDY } from '../../shared/desktop';
-import { clampLayoutToViewport, layoutGeometrySignature, resolveAuthoredViewport } from '../desktopLayoutFit';
+import {
+  clampLayoutToViewport,
+  layoutGeometrySignature,
+  rememberFit,
+  resolveAuthoredViewport,
+  toAuthoredSpace,
+  type FitMemory,
+} from '../desktopLayoutFit';
 import { neighbourDisplayKey } from '../monitorRing';
 import { fitNewWindowRect } from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
@@ -698,6 +705,12 @@ export default function DesktopShell({
   // for — from `applyDesktopLayout` to every `buildLayout` call site.
   const authoredOrigin = useRef<{ w: number; h: number } | null>(null);
   const hydratedGeometry = useRef<string | null>(null);
+  /**
+   * What the last fit (hydrate or zoom) did to each window, so the next zoom
+   * re-fit derives from the authored rects instead of the fitted ones. See
+   * `FitMemory` for why a fit cannot simply be run backwards.
+   */
+  const lastFit = useRef<FitMemory | null>(null);
   const winsRef = useRef<Win[]>([]);
   const notesRef = useRef<Record<string, NoteData>>({});
   const openRef = useRef<(section: WinSection) => void>(() => undefined);
@@ -834,10 +847,15 @@ export default function DesktopShell({
       h: (deskEl?.clientHeight || window.innerHeight) - taskbarH(loadDesktopPrefs()),
     };
     const stored = getDesktopLayout(desktopIndex);
+    const fitMode = loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp';
     const fitted =
       viewport.w > 0 && viewport.h > 0
-        ? clampLayoutToViewport(stored, viewport, loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp')
+        ? clampLayoutToViewport(stored, viewport, fitMode)
         : stored;
+    // Seeded here as well as by the zoom re-fit, so a desk hydrated while
+    // already zoomed still knows its authored rects when the zoom comes off.
+    lastFit.current =
+      viewport.w > 0 && viewport.h > 0 ? rememberFit(stored, fitted, viewport, fitMode) : null;
     const next = hydrateLayout(fitted);
     // Remember what the fit concluded, and the geometry it concluded it for.
     // The signature is built through the same snapshot mappers `buildLayout`
@@ -897,14 +915,20 @@ export default function DesktopShell({
    * reached from here, because zoom is not a `resize` and does not re-hydrate.
    *
    * Two choices worth stating, because the obvious implementations are both wrong:
-   *  - The fit is re-derived from the STORED layout, not from the live windows. A clamp applied
-   *    to live state is NOT reversible: zooming back out would leave every window at its
-   *    shrunken size forever. Stored geometry always holds what the user authored, so zoom-out
-   *    restores it.
-   *  - Nothing is committed. This re-expresses stored geometry in the current viewport exactly
-   *    as the hydrate does, so it goes under the same `hydrating` guard the commit effect
-   *    already honours. Persisting the clamp would overwrite the authored size with a value
-   *    that is only correct at one zoom level.
+   *  - The fit is re-derived from the AUTHORED rects, not from the live (or stored) windows. A
+   *    fit is not invertible: it floors a window at its minimum size and caps it at the desk,
+   *    and scaling the floored value back up is how a 260x220 note came back from a 200% round
+   *    trip as 480x302, on disk (boss audit 2026-09-02, Finding 3). The first version of this
+   *    effect fitted the STORED layout and called that reversible — but the commit below
+   *    stores the fitted rects, so the second fit was already reading the first fit's output.
+   *    `lastFit` keeps the rect each window was fitted FROM; a window the user has not touched
+   *    since is fed that rect, and one they have is carried back by the inverse scale.
+   *  - The fitted geometry IS committed, and that is deliberate. The commit effect writes it
+   *    stamped with the viewport it is expressed in (`resolveAuthoredViewport` sees the
+   *    geometry change and records the live desk), so a user who lives at 200% authors and
+   *    persists in that space like any other viewport. What must not happen is the commit
+   *    becoming the SOURCE of the next re-fit, and `lastFit` is what prevents that. (An
+   *    earlier version of this comment said "nothing is committed"; live, it always was.)
    */
   useEffect(() => onZoomChanged(() => {
     const deskEl = deskRef.current;
@@ -914,18 +938,29 @@ export default function DesktopShell({
     };
     if (viewport.w <= 0 || viewport.h <= 0) return;
     const stored = getDesktopLayout(activeDesktopRef.current);
-    const storedById = new Map(stored.windows.map((snap) => [snap.id, snap]));
-    // A window opened this session may not be in storage yet, and it has to fit too — so it
-    // enters the fit at its live geometry rather than being skipped.
-    const merged = {
-      ...stored,
-      windows: winsRef.current.map((win) => storedById.get(win.id) ?? winToSnapshot(win)),
-    };
-    const fitted = clampLayoutToViewport(
-      merged,
-      viewport,
-      loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp',
-    );
+    const fitMode = loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp';
+    const memory = lastFit.current;
+    let source: DesktopLayout;
+    if (memory) {
+      source = {
+        ...stored,
+        windows: toAuthoredSpace(winsRef.current.map(winToSnapshot), memory),
+        authoredW: memory.authoredW,
+        authoredH: memory.authoredH,
+      };
+    } else {
+      // No fit has been remembered (the hydrate ran against a zero-sized desk), so the
+      // stored layout is the best authored record there is. A window opened this session
+      // may not be in storage yet, and it has to fit too — so it enters the fit at its live
+      // geometry rather than being skipped.
+      const storedById = new Map(stored.windows.map((snap) => [snap.id, snap]));
+      source = {
+        ...stored,
+        windows: winsRef.current.map((win) => storedById.get(win.id) ?? winToSnapshot(win)),
+      };
+    }
+    const fitted = clampLayoutToViewport(source, viewport, fitMode);
+    lastFit.current = rememberFit(source, fitted, viewport, fitMode);
     const fittedById = new Map(fitted.windows.map((snap) => [snap.id, snap]));
     hydrating.current = true;
     setWins((prev) => prev.map((win) => {

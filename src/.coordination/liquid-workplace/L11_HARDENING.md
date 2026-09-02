@@ -1123,3 +1123,47 @@ is 20,000 spans + 20,000 text nodes + 1 div, and a probe expecting element count
 (2) The plant must be on-heap OBJECTS; a typed array's backing store is external and moves a pool
 V8 does not own. (3) `os:open <section>` on an already-open window RAISES it, it does not remount —
 churn only measures a mount because the previous cycle closed it.
+
+## 2026-09-02 — the zoom round trip persisted a wrong window size (boss audit Finding 3, `primary`)
+
+`audit-20260902-121014-bab1b330` Finding 3, re-derived live before anything was changed and
+re-verified live after: `82c2c252`'s re-fit read the STORED layout, but the commit effect stores
+the fitted rects, so the second fit was already reading the first fit's output — and a fit is not
+invertible. `fitRect` floors at 240x140 and caps at the desk; scaling the floored value back up is
+how a 260x220 note came home from 200% as **480x302, on disk**. The commit message's "nothing is
+committed" was false live in the same way (`authored=632x355` on disk while zoomed).
+
+**Repair.** `desktopLayoutFit.ts` gains `fitScale` (the scale computation, extracted),
+`FitMemory`, `rememberFit(source, fitted, viewport, mode)` and `toAuthoredSpace(live, memory)`.
+Every fit — the hydrate AND the zoom re-fit — remembers per window the rect it fitted FROM and
+the rect it fitted TO. The next zoom re-fit feeds each untouched window its base rect (size and
+position judged separately, so a floored note that was only dragged keeps its authored size) and
+carries a touched or newly opened window back by the inverse scale, which is the identity in
+clamp mode. The fitted geometry is still committed, deliberately and now documented as such: a
+user who lives at 200% authors in that space. What changed is that the commit is no longer the
+SOURCE of the next re-fit. Clamp mode had the same defect through the cap (a 960x680 window
+capped to 632x355 stayed 632x355 forever) and is covered by the same memory.
+
+**Tests.** `desktopLayoutFitZoom.test.ts`, 14 cases in node env: the audit's exact sequence
+(260x220 → 240x140 at 130,28 → 260x220 at 260,60), a second cycle, drag / resize / open-while-
+zoomed carried back, clamp-mode cap, the memory's recorded origin and scale, identity without a
+memory — plus TWO mutation controls that re-run the pre-fix algorithm and assert its measured
+wrong answers (**480x302** proportional, **632x355** clamp). 14/14; the neighbouring
+`desktopLayoutFitAuthored` (19) and `desktopAuthoredCommit` (13) still pass.
+
+**Live, real-profile instance pid 47004 / port 39273, driven through `setZoom` via
+`import('/src/renderer/appZoom.ts')`, after a `/reload` so the mount effect was the new one.**
+Note opened through the desk's own context menu ("New sticky note"), desk 1264x821 / zoom desk
+632x411, proportional remap on:
+
+  zoom 1  note 260,60 260x220    disk 260,60 260x220  authored 1264x765   sha 1F277BBEC242…
+  zoom 2  note 130,28 240x140    disk 130,28 240x140  authored 632x355    (the audit's forward numbers)
+  zoom 1  note 260,60 260x220    disk 260,60 260x220  authored 1264x765   sha **1F277BBEC242…**
+
+The post-trip layout file is byte-identical to the pre-zoom one. Restore measured, not asserted:
+note removed through its own dialog ("Remove"), 0 `.fwin` / 0 dialogs, `jp-app-zoom` `"1"`,
+`desktop-layout.json` sha256 **9DFB6E2F2361…** == `debug/_bk-layout-pre.json`.
+
+TRAP: `.fwin` inline `left/top/width/height` are layout px at every zoom; `getBoundingClientRect`
+is scaled by CSS `zoom` and comparing it with `clientWidth` fabricates an overflow (the audit's own
+first reading did exactly that).
