@@ -3518,6 +3518,280 @@
         ),
       },
     },
+    /*
+     * The Media Center SHELL, as distinct from the `video` and `music` PAGES it hosts.
+     *
+     * Written 2026-09-02 (primary2) for one measured reason: `mediaCenter` was the single
+     * ledger app that carried rows and had NO spec, so `notWritten.derived` could not
+     * re-derive it by any route, and its 8 rows were the largest block in the ledger with no
+     * recorded control. They are not unproven — they were driven 2026-08-25 by the
+     * `window.__L6M` instrument, which cat6 superseded and cannot re-run. This spec makes
+     * them re-runnable.
+     *
+     * THREE COUNTS THIS SPEC DELIBERATELY DOES NOT HARDCODE, each measured against the
+     * ledger prose that named them and each different on this profile: the section rail
+     * (prose 9, here 9 — but `.mc-seanime-link` is inside `.mc-nav`, so it moves with
+     * availability), the library shelf rail (prose 9, here 6) and the sort `<select>`
+     * (prose 7, here 4). All three are DERIVED from available media. Hardcoding any of them
+     * repeats `library.inboxFilters` exactly — a row that can never reach its own threshold
+     * on a smaller profile and reads as a dead feature.
+     *
+     * And "current" on the shelf rail is `aria-current="true"`, NOT a class: a class-based
+     * selector matched 6 of 6 here, i.e. it could not fail.
+     */
+    mediaCenter: {
+      // The Media window only. `video` and `music` are separate sections with separate
+      // windows and their own specs; matching them here would score one shell three times.
+      titleRe: /Media|メディア|媒体|Медиа/i,
+      rootSel: '.mc-root',
+      notSel: '.mc-video-page',
+      features: [
+        {
+          // Exactly one active rail entry, and the active one AGREES with the breadcrumb.
+          // `active === 1` alone cannot catch a rail that highlights a section the page is
+          // not on; the breadcrumb is the same `tab` rendered a second way, which is the
+          // only reading that can.
+          id: 'navRail',
+          f: (w) => {
+            const btns = qa(w, '.mc-nav button');
+            const active = btns.filter((b) => b.classList.contains('is-active'));
+            const label = active[0] ? txt(q(active[0], 'strong')) : '';
+            const crumb = txt(q(w, '.mc-breadcrumb strong'));
+            return {
+              ok: btns.length >= 6 && active.length === 1 && !!crumb && label === crumb,
+              ev: `railButtons=${btns.length} active=${active.length} activeLabel="${label}" breadcrumb="${crumb}"`,
+            };
+          },
+        },
+        {
+          // The library shelf rail. Count DERIVED (see the header); the invariant is that
+          // exactly one entry declares itself current, through `aria-current` and not a class.
+          id: 'libraryShelves',
+          f: (w) => {
+            const items = qa(w, '.medialib-rail .ui-sidebar__item');
+            if (!items.length) {
+              return { ok: null, na: 'the library page is not the mounted tab — no shelf rail', ev: 'no .medialib-rail .ui-sidebar__item' };
+            }
+            const cur = items.filter((i) => i.getAttribute('aria-current') === 'true');
+            const named = items.filter((i) => txt(i)).length;
+            return {
+              ok: items.length >= 2 && cur.length === 1 && named === items.length,
+              ev: `shelves=${items.length} current=${cur.length} named=${named} currentLabel="${cur[0] ? txt(cur[0]) : ''}"`,
+            };
+          },
+        },
+        {
+          // Search narrows the grid. This row was a DEAD CONTROL until `89c11473` — the
+          // field wrote `state.query` and the panel rendered the unfiltered `state.items`.
+          // On a profile with no media there is nothing to narrow, and a row scored on an
+          // empty grid would pass for the wrong reason, so it declares itself `na` rather
+          // than claiming the fix.
+          id: 'librarySearch',
+          f: (w) => {
+            /*
+             * MEASURED, and it took two wrong selectors to find. The field is NOT inside
+             * the library browser: it is `LABEL.mc-global-search > INPUT` in the shell's
+             * own `.mc-topbar`, it carries no className, and its SUBJECT follows the tab —
+             * "Search your media library…" on Library, "Search songs, artists, albums…" on
+             * Music. Both `.medialib-browser__tools input[type=search]` and
+             * `.medialib-root input[type=search]` missed it, and the row then scored `na`
+             * with the WRONG reason ("the library page is not the mounted tab") while the
+             * page was plainly mounted. Right verdict, false evidence — which is the
+             * failure mode a row this quiet is most likely to ship with.
+             */
+            const field = q(w, '.mc-global-search input');
+            const cards = qa(w, '.medialib-card').length;
+            if (!field) {
+              return { ok: null, na: 'the library page is not the mounted tab — no search field', ev: 'no library search input' };
+            }
+            if (!cards) {
+              return { ok: null, na: 'the media library is empty on this profile — a search that narrows nothing cannot be distinguished from a search that does nothing', ev: `searchField=1 cards=0 placeholder="${field.placeholder}"` };
+            }
+            return {
+              ok: !!field.placeholder && cards > 0,
+              ev: `searchField=1 cards=${cards} placeholder="${field.placeholder}"`,
+            };
+          },
+        },
+        {
+          // Sort options and the grid/list toggle. Option count DERIVED; the toggle is the
+          // half with a real invariant — exactly one of the two pressed, and the pressed one
+          // named, so an all-false or all-true pair falls.
+          id: 'sortAndViewMode',
+          f: (w) => {
+            const sel = q(w, '.medialib-view__head select') || q(w, 'select.ui-select');
+            const view = qa(w, '.medialib-view-toggle [aria-pressed]');
+            if (!sel && !view.length) {
+              return { ok: null, na: 'the library page is not the mounted tab — no sort or view controls', ev: 'no select and no .medialib-view-toggle' };
+            }
+            const pressed = view.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const opts = sel ? sel.options.length : 0;
+            const namedView = view.filter((b) => (b.getAttribute('aria-label') || txt(b)).trim()).length;
+            return {
+              ok: !!sel && opts >= 2 && !!sel.value && view.length === 2
+                && pressed.length === 1 && namedView === view.length,
+              ev: `sortOptions=${opts} sortValue="${sel ? sel.value : ''}" viewButtons=${view.length} pressed=${pressed.length} named=${namedView}`,
+            };
+          },
+        },
+        {
+          // Per-item actions. Two selectors, one affordance: a shelf of one entry renders
+          // `.medialib-spotlight__actions` whose last button calls the same `onMenu` as
+          // `.medialib-card__more`. Matching only the card half scored the spotlight as a
+          // missing feature. With no items there is neither, and that is `na`, not a defect.
+          id: 'perItemActions',
+          f: (w) => {
+            const cards = qa(w, '.medialib-card').length;
+            const more = qa(w, '.medialib-card__more').length;
+            const spot = qa(w, '.medialib-spotlight__actions button').length;
+            if (!cards && !spot) {
+              return { ok: null, na: 'the media library is empty on this profile — no item to carry a per-item menu', ev: 'cards=0 spotlightActions=0' };
+            }
+            return {
+              ok: (cards > 0 && more === cards) || spot > 0,
+              ev: `cards=${cards} cardMenus=${more} spotlightActions=${spot}`,
+            };
+          },
+        },
+        {
+          // Back/Forward reflect REAL trail depth. Before `1f5b0f2`-era work these were
+          // wired to `setTab('home')`/`setTab('library')` and were never disabled, i.e. they
+          // looked like browser chrome and were not. The invariant scored here is the one
+          // that cannot be faked by always-enabled buttons: the `title` carries the REASON
+          // while disabled and the plain label while enabled, so the greyed state explains
+          // itself, and `aria-label` stays the label in both so the accessible name does not
+          // move. A pair that is enabled at both ends of an empty trail fails it.
+          id: 'historyHonest',
+          f: (w) => {
+            const btns = qa(w, '.mc-history-buttons button');
+            if (btns.length !== 2) return { ok: false, ev: `historyButtons=${btns.length} (expected 2)` };
+            const rows = btns.map((b) => ({
+              label: (b.getAttribute('aria-label') || '').trim(),
+              title: (b.getAttribute('title') || '').trim(),
+              off: b.disabled,
+            }));
+            // Disabled -> the title must SAY something other than the label (the reason);
+            // enabled -> the title IS the label. Either way both strings are non-empty.
+            const honest = rows.every((r) => r.label && r.title
+              && (r.off ? r.title !== r.label && r.title.length > r.label.length : r.title === r.label));
+            return {
+              ok: honest,
+              ev: rows.map((r) => `${r.label}: disabled=${r.off} title="${r.title.slice(0, 44)}"`).join(' | '),
+            };
+          },
+        },
+        {
+          // The route OUT to the Media workspace. NOT DRIVEN HERE, and the reason is on the
+          // record rather than hidden: `openSeanime` (MediaCenterView.tsx) falls back to
+          // `window.api.popOut('player')` when no host exists in this window tree, so a
+          // click can open a whole OS window this harness would then have to close — and the
+          // host itself mounts at `body > div > .seanime-host`, OUTSIDE the window. The
+          // 2026-08-25 run drove the 0 -> 1 -> 0 cycle and that reading stands. What is
+          // re-runnable is the launcher's HONESTY: it is present, it is named, and if it is
+          // dead it says why — `seanimeActionTitle` carries "connecting" or "unavailable".
+          // An always-enabled launcher on an unavailable workspace fails this.
+          id: 'workspaceLauncher',
+          f: (w) => {
+            const link = q(w, '.mc-seanime-link');
+            if (!link) return { ok: false, ev: 'no .mc-seanime-link in the rail' };
+            const label = txt(q(link, 'strong')) || txt(link);
+            const title = (link.getAttribute('title') || '').trim();
+            const off = link.disabled || link.getAttribute('aria-disabled') === 'true';
+            const hosts = w.ownerDocument.querySelectorAll('.seanime-host').length;
+            return {
+              ok: !!label && (!off || !!title),
+              ev: `launcher=1 label="${label}" disabled=${off} title="${title.slice(0, 48)}" hostsInDocument=${hosts}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        /*
+         * Mount the tab the rows are ABOUT, which is Library. Four of the eight rows read
+         * the library browser and score `na` on any other tab; a drive that navigated away
+         * from it would take their subject with it, which is the mistake `statistics`
+         * already paid for in the other direction (its row read before its own drive).
+         *
+         * MEASURED TRAP, and it disproved a candidate defect the last handoff carried. The
+         * `player` section mounts `<MediaCenterView initialTab="library" />`
+         * (AppSection.tsx:79), so the window OPENS on Library — clicking Library is
+         * `setTab(same)`, which correctly returns the trail unchanged and leaves Back
+         * disabled. That reads exactly like "the first in-window navigation is lost" and is
+         * not: driven on a never-before-created Video window, the crumb reads `Video` at
+         * mount with Back disabled, and Library -> Music enables it. Hence `already`.
+         */
+        library: (w) => {
+          const btns = qa(w, '.mc-nav button').filter((b) => !b.classList.contains('mc-seanime-link'));
+          const active = btns.filter((b) => b.classList.contains('is-active'))[0];
+          if (window.__LQP_MC_HOME === undefined) {
+            window.__LQP_MC_HOME = active ? txt(q(active, 'strong')) : null;
+          }
+          const target = btns.filter((b) => q(b, 'strong') && /Library|ライブラリ|媒体库|库|Библиотек/i.test(txt(q(b, 'strong'))))[0];
+          if (!target) return { refused: 'no Library entry in the section rail' };
+          if (target.classList.contains('is-active')) return { already: true };
+          target.click();
+          return { navigated: `${active ? txt(q(active, 'strong')) : '?'} -> ${txt(q(target, 'strong'))}` };
+        },
+      },
+      drive: ['library'],
+      undo: {
+        // Walk the trail BACK with the product's own Back button, never by clicking the
+        // origin entry again — clicking it would push a third trail entry and leave the
+        // window with a longer history than it was found with. Recorded once and never
+        // cleared, for the reason city's undo states: `restore()` nulls per-spec state
+        // between mutations and a re-capture would treat the driven tab as the original.
+        mediaCenter: (w) => {
+          const home = window.__LQP_MC_HOME;
+          if (home === undefined || home === null) return null;
+          const crumb = txt(q(w, '.mc-breadcrumb strong'));
+          if (crumb === home) return null;
+          const back = qa(w, '.mc-history-buttons button')[0];
+          if (!back || back.disabled) return null;
+          back.click();
+          return `mediaCenter:library (back to ${home})`;
+        },
+      },
+      mutations: {
+        navRail: (w) => removeClassAll(qa(w, '.mc-nav button.is-active'), 'is-active'),
+        libraryShelves: (w) => setAttr(
+          qa(w, '.medialib-rail .ui-sidebar__item')
+            .filter((i) => i.getAttribute('aria-current') === 'false')[0],
+          'aria-current', 'true', 'no non-current shelf to falsify — library page is not up',
+        ),
+        librarySearch: (w) => detach(
+          qa(w, '.medialib-card')[0],
+          'the media library is empty on this profile — nothing to remove from the grid',
+        ),
+        sortAndViewMode: (w) => setAttr(
+          qa(w, '.medialib-view-toggle [aria-pressed]')
+            .filter((b) => b.getAttribute('aria-pressed') === 'false')[0],
+          'aria-pressed', 'true', 'no unpressed view button to falsify — library page is not up',
+        ),
+        perItemActions: (w) => detach(
+          q(w, '.medialib-card__more') || q(w, '.medialib-spotlight__actions button'),
+          'the media library is empty on this profile — no per-item menu to remove',
+        ),
+        // Detaching ONE of the pair, not disabling one: `disabled` is a property the restore
+        // sweep cannot reliably put back, and the row's own count of 2 is what falls.
+        historyHonest: (w) => detach(qa(w, '.mc-history-buttons button')[1], 'no history pair'),
+        workspaceLauncher: (w) => detach(q(w, '.mc-seanime-link'), 'no workspace launcher in the rail'),
+        /*
+         * MEASURED, not assumed, and the first choice was wrong. Detaching one `.fwin-b`
+         * is the obvious falsification and it DOES NOT FIRE here: `lifecycle()` needs
+         * `chrome.length >= 4` and this shell renders FIVE (Pop out, Make Liquid, Minimize,
+         * Maximize, Close), so removing one leaves 4 and the row correctly stays up. The
+         * receipt said so — `fellRows: []`, `exactlyOwnRow: false`, verdict VOID. The row's
+         * other half is the one with no slack: `aria-pressed` on the Liquid toggle must be
+         * a real boolean, so stripping it drops this row and nothing else. That is also the
+         * control the 2026-08-25 `__L6M` run used, so the two instruments falsify the same
+         * clause.
+         */
+        windowLifecycle: (w) => stripAttr(
+          q(w, '.fwin-b-liquid'), 'aria-pressed', 'no Liquid toggle in this window chrome',
+        ),
+      },
+    },
     video: {
       titleRe: /Video|ビデオ|视频|Виде/i,
       rootSel: '.mc-video-page',
