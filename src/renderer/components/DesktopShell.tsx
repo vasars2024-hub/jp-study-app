@@ -684,6 +684,13 @@ export default function DesktopShell({
   const deskRef = useRef<HTMLDivElement>(null);
   const taskbarRef = useRef<HTMLDivElement>(null);
   const hydrating = useRef(true);
+  // Notes are the one window whose close is destructive, so it asks first — and every
+  // click asked again. Measured live: five clicks on a note's close button left FIVE
+  // stacked confirms plus the original, six identical "This cannot be undone" dialogs
+  // over one note. Answering one deletes it and the survivors then point at a note that
+  // is gone. `closeMany` already serialises its confirmations for this reason
+  // (see its comment below); a person clicking twice deserves the same guarantee.
+  const noteConfirmPending = useRef<Set<string>>(new Set());
   // B4, second half: `clampLayoutToViewport` decides which viewport the fitted
   // coordinates are expressed in, and the commit path must not overwrite that
   // answer with the live viewport on an echo it did not author. These two carry
@@ -1551,13 +1558,20 @@ export default function DesktopShell({
   const close = async (id: string): Promise<void> => {
     const target = winsRef.current.find((w) => w.id === id);
     if (target?.section === 'note') {
-      const ok = await confirmDialog({
-        title: t('desktop.deleteNote'),
-        message: t('desktop.deleteNoteConfirm'),
-        confirmLabel: t('common.remove'),
-        cancelLabel: t('common.cancel'),
-        danger: true,
-      });
+      if (noteConfirmPending.current.has(id)) return;
+      noteConfirmPending.current.add(id);
+      let ok = false;
+      try {
+        ok = await confirmDialog({
+          title: t('desktop.deleteNote'),
+          message: t('desktop.deleteNoteConfirm'),
+          confirmLabel: t('common.remove'),
+          cancelLabel: t('common.cancel'),
+          danger: true,
+        });
+      } finally {
+        noteConfirmPending.current.delete(id);
+      }
       if (!ok) return;
     }
     const delay = winPhaseMs(false);
