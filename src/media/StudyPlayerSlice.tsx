@@ -39,7 +39,7 @@ import { WSEvents } from '@/lib/server/ws-events';
 import { __clientPlatform__ } from '@/types/constants';
 import type { SeanimeConnection } from '../shared/seanime';
 import type { MediaWorkspacePlaybackRequest } from '../shared/mediaWorkspace';
-import { describeLocalOpenFailure } from '../shared/playbackFailure';
+import { describeDirectstreamAbort, describeLocalOpenFailure } from '../shared/playbackFailure';
 import {
   DIRECTSTREAM_MEDIA_REPORT_ONLY,
   DIRECTSTREAM_MEDIA_SILENCE_MS,
@@ -652,6 +652,15 @@ function StudyPlayerSession({
     { requestId: number; progress: DirectstreamOpenProgress } | null
   >(null);
   /**
+   * The reason the sidecar last gave for abandoning an open, and the request it belonged to.
+   *
+   * One refused open reports itself TWICE and the two reports race: the websocket
+   * `abort-open` carries the sidecar's words, the POST's own `!ok` carries only a status
+   * code. Whichever lands second must not overwrite words with a guess, so the stated reason
+   * is parked here and the HTTP branch prefers it when the request ids agree.
+   */
+  const statedAbortRef = React.useRef<{ requestId: number; text: string } | null>(null);
+  /**
    * Stage 2, armed by the `watch` payload — where stage 1 disarms. Separate record because
    * the two stages measure different things: stage 1 watches the SIDECAR's silence, stage 2
    * watches the ELEMENT.
@@ -836,6 +845,10 @@ function StudyPlayerSession({
     // which is the equal-generation case `AcceptOpenGeneration` accepts on purpose.
     openGenerations = directstreamOpenGenerationFor(openGenerations, localRequest.requestId);
 
+    // Cleared before the POST goes out, never after: the sidecar's abort can only arrive
+    // once this request is on the wire, so a later clear would erase the reason it carries.
+    statedAbortRef.current = null;
+
     await postDirectstreamOpen(
       conn,
       clientId,
@@ -865,10 +878,15 @@ function StudyPlayerSession({
         settleDirectstreamOpen(ticket);
         // A refused open reports itself, so the silence watchdog has nothing left to do.
         openProgressRef.current = null;
+        // The status code is a guess about the cause; the sidecar's own abort reason is not.
+        // When both describe this same open, the words win.
+        const stated = statedAbortRef.current;
         setState({
           active: true,
           playbackInfo: null,
-          playbackError: error instanceof Error ? error.message : String(error),
+          playbackError: stated && stated.requestId === localRequest.requestId
+            ? stated.text
+            : error instanceof Error ? error.message : String(error),
           loadingState: null,
         });
       });
@@ -1141,11 +1159,25 @@ function StudyPlayerSession({
           }
           break;
         }
-        case 'abort-open':
+        case 'abort-open': {
           // The sidecar said so out loud, so there is nothing for the watchdog to find.
           openProgressRef.current = null;
-          setState(initialState);
+          const stated = describeDirectstreamAbort(message.payload);
+          if (!stated) {
+            // A reasonless abort is the sidecar retiring a stream a newer open replaced.
+            // Showing an error screen for it would invent a failure the viewer did not have.
+            setState(initialState);
+            break;
+          }
+          statedAbortRef.current = { requestId: playbackRequest?.requestId ?? -1, text: stated };
+          setState({
+            active: true,
+            playbackInfo: null,
+            playbackError: stated,
+            loadingState: null,
+          });
           break;
+        }
         case 'error':
           openProgressRef.current = null;
           setState({

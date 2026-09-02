@@ -38,3 +38,33 @@ export function describeLocalOpenFailure(status: number, body: string): string {
 
   return detail ? `${headline} (${status}: ${detail})` : `${headline} (${status})`;
 }
+
+/**
+ * The sidecar's own reason for abandoning an open, or `null` when it gave none.
+ *
+ * `abort-open` used to be thrown away — the handler reset the player and left whatever the
+ * HTTP path had already rendered. For an unmatched local file that is actively misleading:
+ * `POST /directstream/play/localfile` answers a bare `{"message":"Internal Server Error"}`,
+ * so {@link describeLocalOpenFailure} picks its `status >= 500` sentence and sends the
+ * viewer after a codec, while the sidecar has said in words that the file is simply not
+ * matched to a series. Measured 2026-09-02 against `seanime-2026-09-02_02-58-01.log`:
+ * `abort-open local file has not been matched to a media: <path>` on screen as "It is
+ * usually a codec or container it cannot read — try another episode", which is advice that
+ * fails identically for every unmatched file in the library.
+ *
+ * A silent abort stays silent. The sidecar also aborts an open when a new stream replaces
+ * it ("Signaling native player that a new stream is starting") and that carries no reason;
+ * turning it into an error screen would invent a failure the viewer did not have.
+ *
+ * The reason is kept verbatim after the headline, path and all: it is the only part that
+ * names WHICH file the sidecar refused, and this player opens files the viewer did not
+ * pick by hand.
+ */
+export function describeDirectstreamAbort(payload: unknown): string | null {
+  const reason = typeof payload === 'string' ? payload.replace(/\s+/g, ' ').trim() : '';
+  if (!reason) return null;
+  const headline = /not been matched to a media/i.test(reason)
+    ? 'The media server will not stream this file until it is matched to a series in your library. That is a metadata gap, not a codec problem.'
+    : 'The media server stopped preparing this file and gave a reason.';
+  return `${headline} (${reason.slice(0, 240)})`;
+}
