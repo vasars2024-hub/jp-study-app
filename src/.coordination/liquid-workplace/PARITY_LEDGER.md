@@ -902,3 +902,62 @@ demonstrated**: some collection must exceed it. **CONTROL ON THE RELAXATION**, r
 detach the two groups larger than the cap and the row still FAILS
 (`cap=7 maxDeclared=7 ceilingProven=false`), so a desk where every group is small cannot buy
 a 10. Both bodies re-attached; 5 bodies, row true, `cap=16 maxDeclared=3074`.
+
+## 2026-09-02 (primary2) — `shell` joins, and the row it needed first was wired-only
+
+**102 rows / 14 apps.** `shell` contributes **9**, all `both`, from a `PASS 10/10` run:
+9/9 reachable in BOTH presentations, round trip 0 diffs, 8 of 8 declared mutations armed and
+each flipped exactly its own row.
+
+The shell is the first subject that is the CONTAINER rather than a hosted window. `shq`
+excludes anything inside `.fwin`, so a taskbar of 2 buttons is never confused with a desktop
+of 300 controls, and the parity claim is the useful one: **a window going translucent must not
+cost the shell a capability**, since the taskbar is the only route back to a window that is
+behind another. The harness does not raise this host — there is nothing to raise — and POSTs
+`/focus` instead.
+
+### The `shellIdentity` row was wired-only on two counts, and aero proved both (`d9f1c213`)
+
+It scored `!!mat && theme.indexOf(mat) === 0 && owned > 0`. Measured live on `frutiger-aero`,
+not reasoned:
+
+1. the Aero theme's id is `frutiger-aero` and its materialSet is `aero`, so `indexOf` is
+   **9, not 0**. A correctly stamped Aero shell failed the stamp half outright.
+2. `.${mat}-wall-atmosphere, .${mat}-tray-lamps` are rendered only under `wired`
+   (DesktopShell.tsx:2748, :3502). On aero the shell renders **0** `aero-`prefixed elements
+   outside `.fwin`, against **178** inside the hosted Resources window — so there was nothing
+   to widen the selector to, and widening it would have scored the shell from a window's
+   contents.
+
+Aero's identity is CSS scoped to `[data-materials='aero']` restyling the same `.os-*`
+furniture. What both material sets own in the DOM is the secret start surface,
+`.os-start-aero-menu` (DesktopShell.tsx:683, `aero || wired`), which exists only while the
+menu is open — so `readStartOpen` records it and the row reads it back. On the base theme the
+row is now `na` (no material set stamped = no material identity to verify), never false.
+
+**CROSS-MATERIAL CONTROL, same harness / window / profile, three themes:**
+
+| theme | verdict | `shellIdentity` carried by |
+| --- | --- | --- |
+| `study-os` (before the fix) | **FAIL**, 8/9 reachable, mutation UNARMABLE | — |
+| `frutiger-aero` | **PASS 10/10**, 9/9 both | `materialStartMenu=1`, `identityElements=0` |
+| `wired-archive` | **PASS 10/10**, 9/9 both | `identityElements=2` AND `materialStartMenu=1` |
+
+Two materials, two different pieces of evidence, one row. The ledger rows were written from
+the `wired-archive` run deliberately: on `study-os` that row is `na` and eight rows would have
+been the whole ledger.
+
+### A second self-claim: 45 of 102 rows never named a control
+
+`controlCoverage` is new in `parity-ledger.json` and is derived from the rows themselves.
+**55 named / 1 NONE DECLARED / 45 silent of 102.** The 45 are older rows written before
+`l6-parity-rows.cjs` said anything when a spec declared no mutation for a row — dictionary 7,
+mediaCenter 8, flashcards 8, mediaWorkspace 5, grammar 5, agent 5, translate 4, captures 3.
+They are not disproved; the ledger simply never recorded a control for them, and that is a
+fact about the ledger rather than about the product. New rows now state
+`negative control: NONE DECLARED` explicitly, so `silent` can only shrink.
+
+`shell` > `desktopSurface` is the live NONE-DECLARED case and the reason is real: its subject
+is the shell ROOT, and `restore()` sweeps `qa(win, '*')`, which does not include `win` itself
+— a falsification there could not be guaranteed undone, and shrinking the desk risks the
+window-clamp path persisting geometry. That belongs in the row, not in a commit message.

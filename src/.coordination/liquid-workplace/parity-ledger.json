@@ -1223,14 +1223,149 @@
       "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
       "status": "both",
       "_note": "Round trip measured on this window: field held, shell held, 0 diffs, box 820x580 in both presentations."
+    },
+    {
+      "app": "shell",
+      "feature": "One taskbar button per hosted window, each still carrying its own window's identity",
+      "currentRoute": "Taskbar > `.os-task-wins` > `.os-task-win` (one per `.fwin` the desk hosts), each with a `title` naming its window",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "real `<button>`s in the taskbar's focus order; the close affordance is a child of the button, so the button itself stays the raise route",
+      "dataStateOwner": "DesktopShell's `wins` state, hydrated from the main-process desktop layout snapshot (renderer/desktopState.ts; the `jp-os-wins` localStorage key is the migrated-from legacy)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: taskButtons=2 hostedWindows=2 titled=2 [LINK / Uplink Directory | OPS / Schedule] || liquid: taskButtons=2 hostedWindows=2 titled=2 [LINK / Uplink Directory | OPS / Schedule] || negative control `taskbarIdentity` -> 8/9 (baseline 9/9), fell=[taskbarIdentity], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "The taskbar button raises its window to the top of the stack, from behind another window",
+      "currentRoute": "Taskbar > `.os-task-win` for a window that is NOT already on top; the row reads the z-order rank afterwards, never the click",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "the same buttons, activated by Enter/Space",
+      "dataStateOwner": "DesktopShell window z-order (`globalZTop` in the desktop layout snapshot) — persisted, so the stack survives a reopen. The button is a TOGGLE: one click raises or restores, a second minimises what the first brought up.",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: clicked=LINK / Uplink Directory rankAfter=1 of 2 || liquid: clicked=LINK / Uplink Directory rankAfter=1 of 2 || negative control `taskbarRaises` -> 8/9 (baseline 9/9), fell=[taskbarRaises], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "The start control opens the app menu, and closes it again",
+      "currentRoute": "Taskbar > `.os-start-btn` opens `.os-start`; dismissed by `.os-start-backdrop` or by the start control again",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "a real button that toggles a mounted surface, with a backdrop dismissal",
+      "dataStateOwner": "component state (`startOpen`) in DesktopShell.tsx — not persisted, so the menu is closed on every boot",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: menusWhileOpen=1 menusAfterClose=0 || liquid: menusWhileOpen=1 menusAfterClose=0 || negative control `startEntryPoint` -> 8/9 (baseline 9/9), fell=[startEntryPoint], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "A tray control opens its flyout, and the same control closes it",
+      "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (Quick settings) opens `.os-flyout`; the same button closes it — `.os-panel-backdrop` was MEASURED not to dismiss it and is deliberately not used",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "real buttons carrying `aria-haspopup=\"dialog\"`, each with `title` and `aria-label`",
+      "dataStateOwner": "quick settings is a shell-level surface driven by the `shell:toggleQuickSettings` window event; tray overflow is component state (`trayOverflowOpen`) with `aria-expanded` + `aria-controls`",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: flyoutsWhileOpen=1 flyoutsAfterClose=0 via=Quick settings || liquid: flyoutsWhileOpen=1 flyoutsAfterClose=0 via=Quick settings || negative control `trayFlyout` -> 8/9 (baseline 9/9), fell=[trayFlyout], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "Two virtual desktops, with exactly one marked current",
+      "currentRoute": "Taskbar > `.os-desktop-switches` > `.os-desktop-switch` x2, exactly one carrying `active` and `aria-pressed`",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "two real buttons; `aria-pressed` states which desktop you are on programmatically, not only in paint",
+      "dataStateOwner": "renderer/desktopState.ts — `activeDesktopIndex` in the main-process desktop layout snapshot; switching flushes the outgoing viewport's windows and icons before hydrating the incoming one, so each desktop keeps its own",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: switches=2 active=1 [LOCAL NODE | REMOTE FEED] || liquid: switches=2 active=1 [LOCAL NODE | REMOTE FEED] || negative control `virtualDesktops` -> 8/9 (baseline 9/9), fell=[virtualDesktops], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "Every tray control is NAMED — an icon-only button with no accessible name is a capability the user cannot find",
+      "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (search, hidden icons, quick settings, the notification bell, show desktop), each read for `title` or `aria-label`",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "the accessible name IS the keyboard route here: these are icon-only buttons and the name is the only thing that distinguishes them",
+      "dataStateOwner": "none — the naming is structural, from `t()` keys in DesktopShell.tsx; the show-desktop button additionally carries `aria-pressed` for its own toggled state",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: trayButtons=5 named=5 || liquid: trayButtons=5 named=5 || negative control `trayControls` -> 8/9 (baseline 9/9), fell=[trayControls], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "The taskbar clock reads a real time",
+      "currentRoute": "Taskbar > `.os-clock` (TaskbarClock), matched against `\\d{1,2}:\\d{2}` rather than asserted present",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "not a control; it is the shell stating the time",
+      "dataStateOwner": "renderer/desktopPrefs.ts — localStorage `jp-os-desktop-prefs-v1` carries `clockSeconds`, `clock24h` and `clockShowDate`; the time itself is live and stored nowhere",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: clock=\"04:11 AMSep 2\" || liquid: clock=\"04:11 AMSep 2\" || negative control `clock` -> 8/9 (baseline 9/9), fell=[clock], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "A material theme's identity is real: the stamp belongs to the active theme and the shell renders that material's own furniture",
+      "currentRoute": "`<html data-materials>` + `<html data-theme>`, against shell-owned furniture — `.wired-wall-atmosphere` / `.wired-tray-lamps` (wired only, DesktopShell.tsx:2748 and :3502) and `.os-start-aero-menu`, the secret start surface BOTH material sets render (DesktopShell.tsx:683), recorded while the menu is open",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "not a control; it is the shell's claim about which OS the user is in, checked against what it actually painted",
+      "dataStateOwner": "renderer/theme/engine.ts — localStorage `jp-os-theme` holds the theme id, and `applyThemeAttributes` is the single choke point that stamps `data-materials` from that theme's `materialSet`. On the base theme there is no material set, so the row is `na` rather than false.",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: materials=wired theme=wired-archive stampBelongsToTheme=true identityElements=2 materialStartMenu=1 || liquid: materials=wired theme=wired-archive stampBelongsToTheme=true identityElements=2 materialStartMenu=1 || negative control `shellIdentity` -> 8/9 (baseline 9/9), fell=[shellIdentity], restored 9/9",
+      "status": "both"
+    },
+    {
+      "app": "shell",
+      "feature": "The shell owns a real desk the user can drop onto, and its icon count is what the shell rendered",
+      "currentRoute": "`.os-desktop` rect, plus `.os-desk-icon` counted rather than asserted — an empty grid is honest state, not a failure",
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "keyboardRoute": "the icons are focusable desk entries; the desk itself is a drop target, not a control",
+      "dataStateOwner": "renderer/desktopState.ts — `icons` per viewport in the desktop layout snapshot (legacy key `jp-os-icons`), seeded per desktop (`SEED_CITY_ICONS` for the city viewport, empty for study)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app shell (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-shell-wired-p2h)",
+      "observed": "standard: desktop=1264x821 icons=0 || liquid: desktop=1264x821 icons=0 || negative control: NONE DECLARED for this row — the run's other rows were controlled, this one is asserted from its own reading only",
+      "status": "both"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 14 root components — was 19 on 2026-09-01 and 17 earlier on 2026-09-02. calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 12, and 14 declared specs still have NO row at all — notebook, statistics, games, library, immersion, novels, manga, vn, flashcards, music, video, youtube, shell, blancShell. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 12 root components — was 19 on 2026-09-01 and 17 earlier on 2026-09-02. calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 25 apps, parity-ledger.json carries rows for 14, and 12 declared specs still have NO row at all — notebook, statistics, games, library, immersion, novels, manga, vn, music, video, youtube, blancShell. 1 ledger app (mediaCenter) has rows but no spec, so it cannot be re-derived by this route at all. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ]
+  },
+  "controlCoverage": {
+    "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
+    "rows": 102,
+    "withNamedControl": 55,
+    "declaredNone": 1,
+    "silent": 45,
+    "silentByApp": {
+      "dictionary": 7,
+      "mediaWorkspace": 5,
+      "mediaCenter": 8,
+      "grammar": 5,
+      "translate": 4,
+      "agent": 5,
+      "captures": 3,
+      "flashcards": 8
+    },
+    "note": "`silent` rows are the older ones, written before l6-parity-rows.cjs said anything when a spec declared no mutation for a row. They are not disproved — most were driven live — but the ledger does not record a control for them, and that gap is a fact about the ledger rather than about the product. New rows now say NONE DECLARED explicitly, so `silent` can only shrink."
   }
 }

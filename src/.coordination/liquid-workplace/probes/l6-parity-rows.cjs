@@ -122,6 +122,16 @@ function rowsFromRun(run, meta, sourceName) {
     const c = controlBy.get(ev.id);
     if (c) {
       parts.push(`negative control \`${c.mutation}\` -> ${c.reachable} (baseline ${c.preBaseline}), fell=[${(c.fellRows || []).join(', ')}], restored ${c.afterRestore}`);
+    } else {
+      // SAY IT RATHER THAN OMIT IT (added 2026-09-02). A row whose spec declares no mutation
+      // used to write an `observed` that simply ended after the two presentations, and the
+      // absence of a control read exactly like a row that had one. Two different states — no
+      // mutation declared, versus one declared that could not arm (skipped above by name) —
+      // both looked like silence. `shell` > `desktopSurface` is the live case: its subject is
+      // the shell ROOT, and `restore()` sweeps `qa(win, '*')`, which does not include `win`
+      // itself, so a falsification there could not be guaranteed undone. That is a real
+      // reason and it belongs in the row, not in a commit message.
+      parts.push('negative control: NONE DECLARED for this row — the run\'s other rows were controlled, this one is asserted from its own reading only');
     }
     out.push({
       app,

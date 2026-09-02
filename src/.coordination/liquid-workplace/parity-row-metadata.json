@@ -8,7 +8,8 @@
     "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped.",
     "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319.",
     "resources": "AUTHORED 2026-09-02 from source, fourth app with no prior ledger row. SEVEN of its eight rows were written; `collectedSections` was DELIBERATELY NOT WRITTEN and its metadata entry is kept anyway so a later profile with collected tools writes it without re-authoring. The reason is a repair in the same commit: its mutation targets `.mytool-card .mytool-remove` and nothing is collected on this profile, so the mutation REFUSED rather than ran. cat6 used to score that identically to a mutation that ran and flipped the wrong row, which VOIDed a run whose other 7 mutations were exact; it now reports `armed: false` and `l6-parity-rows.cjs` skips exactly that row by name. Discriminating control, live: an ARMED-but-wrong mutation (catalogueCount re-pointed at `.res-name`, which flips `resourceCards` instead) still VOIDs the whole run, so the relaxation cannot wave a broken control through. dataStateOwner is three different owners here and they are not interchangeable: the catalogue is a STATIC module (renderer/data/resources.ts), the bundle checklists are localStorage under `resources.checklist.<id>`, and the collected tools are a MAIN-PROCESS store reached through window.api.toolsList (shared/collectedTools.ts), shared with Blanc. Liquid destination read from resourcesLiquid.css, whose `:is(.fwin.fwin-liquid, .popout-root.popout-liquid)` rules touch only `.res-command-surface` and its children.",
-    "city": "AUTHORED 2026-09-02 from source, fifth app with no prior ledger row, and the FIRST written through the harness's `noLiquid` branch -- so all nine rows are `pending` by derivation, not by omission: there is no Liquid half to compare, and `pending` is the vocabulary’s own word for that. `noLiquidReason` is a MEASUREMENT, not an excuse: `liquidAbsence` reports targetHasLiquidControl false with targetChromeButtons 3 and presentation `standard`, while Resources open beside it DOES render `.fwin-b-liquid` -- the same query over every open window at the same instant, which is what separates \"this window has no toggle\" from \"no window has one\". The round trip is minimize -> restore through the taskbar (the taskbar button is a toggle, so the harness drives it twice) and `rankHeld` was true. All NINE mutations armed and each flipped exactly its own row. dataStateOwner names two separate localStorage documents: `jp-reading-garden-v1` (renderer/readingGardenProgress.ts -- stage, pagesRead, bankedPages) and `jp-mooncap-music-v1` (components/reading-garden/mooncapMusic.ts -- the ambient music choice and volume). The dossier itself is component state and correctly does not survive a reopen."
+    "city": "AUTHORED 2026-09-02 from source, fifth app with no prior ledger row, and the FIRST written through the harness's `noLiquid` branch -- so all nine rows are `pending` by derivation, not by omission: there is no Liquid half to compare, and `pending` is the vocabulary’s own word for that. `noLiquidReason` is a MEASUREMENT, not an excuse: `liquidAbsence` reports targetHasLiquidControl false with targetChromeButtons 3 and presentation `standard`, while Resources open beside it DOES render `.fwin-b-liquid` -- the same query over every open window at the same instant, which is what separates \"this window has no toggle\" from \"no window has one\". The round trip is minimize -> restore through the taskbar (the taskbar button is a toggle, so the harness drives it twice) and `rankHeld` was true. All NINE mutations armed and each flipped exactly its own row. dataStateOwner names two separate localStorage documents: `jp-reading-garden-v1` (renderer/readingGardenProgress.ts -- stage, pagesRead, bankedPages) and `jp-mooncap-music-v1` (components/reading-garden/mooncapMusic.ts -- the ambient music choice and volume). The dossier itself is component state and correctly does not survive a reopen.",
+    "shell": "AUTHORED 2026-09-02 (primary2) from source, the SIXTH app with no prior ledger row and the first whose subject is the container rather than a hosted window: `shq` excludes everything inside `.fwin`, so a taskbar of 12 buttons is not confused with a desktop of 300 controls. The harness does NOT raise this host -- there is no window to raise -- and POSTs `/focus` instead. RUN ON `wired-archive`, DELIBERATELY: `shellIdentity` is a material row and the base theme stamps no material set, so on `study-os` that row is `na` and the other eight would have been the whole ledger. The run that wrote these rows scored 9/9 in BOTH presentations with all 8 mutations armed. THE ROW WAS REPAIRED FIRST (d9f1c213) and the repair has its own cross-material control: `frutiger-aero` also PASSes 10/10, carrying `shellIdentity` by `materialStartMenu=1` with `identityElements=0`, while `wired-archive` carries it by `identityElements=2` AND `materialStartMenu=1` -- two materials, two different pieces of evidence, one row. Before the repair the same spec on `frutiger-aero` failed that row outright (`indexOf` 9 not 0; zero `aero-`prefixed elements in the shell against 178 inside a hosted window) and its mutation was UNARMABLE. dataStateOwner names three separate stores and they are not interchangeable: the main-process desktop layout snapshot (renderer/desktopState.ts -- windows, icons, z-order, active desktop), localStorage `jp-os-desktop-prefs-v1` (renderer/desktopPrefs.ts -- clock format) and localStorage `jp-os-theme` (renderer/theme/engine.ts -- the material stamp)."
   },
   "apps": {
     "dictionary": {
@@ -308,6 +309,66 @@
           "currentRoute": "Mooncap window > `.fwin-frameless-controls` chrome cluster (frameless, so the buttons live outside the usual title bar)",
           "keyboardRoute": "real buttons in the frameless control cluster",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "shell": {
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "features": {
+        "taskbarIdentity": {
+          "feature": "One taskbar button per hosted window, each still carrying its own window's identity",
+          "currentRoute": "Taskbar > `.os-task-wins` > `.os-task-win` (one per `.fwin` the desk hosts), each with a `title` naming its window",
+          "keyboardRoute": "real `<button>`s in the taskbar's focus order; the close affordance is a child of the button, so the button itself stays the raise route",
+          "dataStateOwner": "DesktopShell's `wins` state, hydrated from the main-process desktop layout snapshot (renderer/desktopState.ts; the `jp-os-wins` localStorage key is the migrated-from legacy)"
+        },
+        "taskbarRaises": {
+          "feature": "The taskbar button raises its window to the top of the stack, from behind another window",
+          "currentRoute": "Taskbar > `.os-task-win` for a window that is NOT already on top; the row reads the z-order rank afterwards, never the click",
+          "keyboardRoute": "the same buttons, activated by Enter/Space",
+          "dataStateOwner": "DesktopShell window z-order (`globalZTop` in the desktop layout snapshot) — persisted, so the stack survives a reopen. The button is a TOGGLE: one click raises or restores, a second minimises what the first brought up."
+        },
+        "startEntryPoint": {
+          "feature": "The start control opens the app menu, and closes it again",
+          "currentRoute": "Taskbar > `.os-start-btn` opens `.os-start`; dismissed by `.os-start-backdrop` or by the start control again",
+          "keyboardRoute": "a real button that toggles a mounted surface, with a backdrop dismissal",
+          "dataStateOwner": "component state (`startOpen`) in DesktopShell.tsx — not persisted, so the menu is closed on every boot"
+        },
+        "trayFlyout": {
+          "feature": "A tray control opens its flyout, and the same control closes it",
+          "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (Quick settings) opens `.os-flyout`; the same button closes it — `.os-panel-backdrop` was MEASURED not to dismiss it and is deliberately not used",
+          "keyboardRoute": "real buttons carrying `aria-haspopup=\"dialog\"`, each with `title` and `aria-label`",
+          "dataStateOwner": "quick settings is a shell-level surface driven by the `shell:toggleQuickSettings` window event; tray overflow is component state (`trayOverflowOpen`) with `aria-expanded` + `aria-controls`"
+        },
+        "virtualDesktops": {
+          "feature": "Two virtual desktops, with exactly one marked current",
+          "currentRoute": "Taskbar > `.os-desktop-switches` > `.os-desktop-switch` x2, exactly one carrying `active` and `aria-pressed`",
+          "keyboardRoute": "two real buttons; `aria-pressed` states which desktop you are on programmatically, not only in paint",
+          "dataStateOwner": "renderer/desktopState.ts — `activeDesktopIndex` in the main-process desktop layout snapshot; switching flushes the outgoing viewport's windows and icons before hydrating the incoming one, so each desktop keeps its own"
+        },
+        "trayControls": {
+          "feature": "Every tray control is NAMED — an icon-only button with no accessible name is a capability the user cannot find",
+          "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (search, hidden icons, quick settings, the notification bell, show desktop), each read for `title` or `aria-label`",
+          "keyboardRoute": "the accessible name IS the keyboard route here: these are icon-only buttons and the name is the only thing that distinguishes them",
+          "dataStateOwner": "none — the naming is structural, from `t()` keys in DesktopShell.tsx; the show-desktop button additionally carries `aria-pressed` for its own toggled state"
+        },
+        "clock": {
+          "feature": "The taskbar clock reads a real time",
+          "currentRoute": "Taskbar > `.os-clock` (TaskbarClock), matched against `\\d{1,2}:\\d{2}` rather than asserted present",
+          "keyboardRoute": "not a control; it is the shell stating the time",
+          "dataStateOwner": "renderer/desktopPrefs.ts — localStorage `jp-os-desktop-prefs-v1` carries `clockSeconds`, `clock24h` and `clockShowDate`; the time itself is live and stored nowhere"
+        },
+        "shellIdentity": {
+          "feature": "A material theme's identity is real: the stamp belongs to the active theme and the shell renders that material's own furniture",
+          "currentRoute": "`<html data-materials>` + `<html data-theme>`, against shell-owned furniture — `.wired-wall-atmosphere` / `.wired-tray-lamps` (wired only, DesktopShell.tsx:2748 and :3502) and `.os-start-aero-menu`, the secret start surface BOTH material sets render (DesktopShell.tsx:683), recorded while the menu is open",
+          "keyboardRoute": "not a control; it is the shell's claim about which OS the user is in, checked against what it actually painted",
+          "dataStateOwner": "renderer/theme/engine.ts — localStorage `jp-os-theme` holds the theme id, and `applyThemeAttributes` is the single choke point that stamps `data-materials` from that theme's `materialSet`. On the base theme there is no material set, so the row is `na` rather than false."
+        },
+        "desktopSurface": {
+          "feature": "The shell owns a real desk the user can drop onto, and its icon count is what the shell rendered",
+          "currentRoute": "`.os-desktop` rect, plus `.os-desk-icon` counted rather than asserted — an empty grid is honest state, not a failure",
+          "keyboardRoute": "the icons are focusable desk entries; the desk itself is a drop target, not a control",
+          "dataStateOwner": "renderer/desktopState.ts — `icons` per viewport in the desktop layout snapshot (legacy key `jp-os-icons`), seeded per desktop (`SEED_CITY_ICONS` for the city viewport, empty for study)"
         }
       }
     }
