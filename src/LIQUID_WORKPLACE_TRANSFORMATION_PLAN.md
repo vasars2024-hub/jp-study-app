@@ -506,6 +506,33 @@ Video has never been scored at all (`L1_ACCESSIBILITY.md:631`: *"Only Dictionary
 scored"*). So L1's 4 bullets stay OPEN and units-left stays **29 of 46**. Do not adopt 21 without
 a completed scorecard entry for each of the two named surfaces.
 
+**CORRECTION 2026-09-02 (backup) — the paragraph above is stale in three checkable ways, and the
+VERDICT it reaches is nevertheless still right, for a different reason. Read this before acting on
+it.** It was written 2026-08-25 and the scorecard moved the same day, later.
+
+1. *"contains zero completed entries — no line matches its own `## <date> — <surface> — <n>/80`
+   header"*: that grep returns **1**, not 0 — `LIQUID_SCORECARD.md:707`, Game Arena 80/80, commit
+   `b6e55253`, 2026-08-28. It is neither of the two surfaces gate 495 names, so it does not close
+   L1; but the sentence as written is false and must not be re-quoted.
+2. *"Video has never been scored at all"*: **false.** Video was driven across all eight categories
+   on 2026-08-25 — scorecard `:347` (cat 6), `:397` (cat 5), `:439` (cat 2), `:469`+`:503` (cat 7,
+   which cost a product fix), `:540` (cat 8, commit `e801c683`) — and `:656` records the result as
+   a per-category table: **Video 8 of 8, Dictionary 8 of 8, "GATE 461 CLOSES"**, off one fresh boot
+   at `6eefff6c` with an A/B control (chunked 30.9 ms vs the shipped statement's 963.2 ms) and two
+   categories scored honestly DOWNWARD so later drift stays visible.
+3. *"units-left stays 29 of 46"*: it is **9 of 46** open (37 closed, 0 unknown).
+
+**Why L1's four bullets stay OPEN anyway, and this is the reason to carry forward.** Not because
+the measurement is missing — it exists, in full, with controls — but because it is STALE by the
+rubric's own rule that a score inherited across a change is stale by definition. `6eefff6c` is
+**925 commits** behind this HEAD (`git rev-list --count 6eefff6c..HEAD`). So the remaining work is
+a RE-DRIVE on the current tree, not a first measurement, and that is a materially cheaper and
+better-specified slice than the paragraph above implies: the protocols, instruments and baselines
+for all sixteen cells already exist and are cited per category in the scorecard sections named in
+(2). RULE C's shape falls out for free — 2 surfaces x 8 categories = 16 cells, nothing sampled out.
+Bank each re-driven category as a formatted entry matching the template at `LIQUID_SCORECARD.md:27`,
+because the header grep in (1) is what any later audit will count.
+
 **Progress (2026-08-17, L0's gate having closed the same day).** Two of the eight rubric
 categories are now driven live on both reference apps, each with a control that failed:
 `.coordination/liquid-workplace/L1_SURFACE_ROLES.md` (category 3 — the four roles are
