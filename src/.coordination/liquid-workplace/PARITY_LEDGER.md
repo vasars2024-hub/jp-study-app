@@ -413,3 +413,39 @@ no PATCH), so no agent can scan one. Logged in `needs-user.md` 2026-09-01 22:55.
 
 The Liquid destination itself is **not** the blocker: `f2619b91` built the overlay's own
 presentation host and the row text has said so since. These five are one scan away from `both`.
+
+## 2026-09-02 (primary2) — the ledger stops being hand-transcribed
+
+`33b3a10b`. 19 of the 24 apps `l6-parity.js` declares SPECS for have a driven, controlled
+cat6 harness and no ledger row, because the only writer was `l6-parity-write-rows.cjs` —
+hand-written, one `observed` string copied out of a console log at a time. Transcription was
+also the one step of the chain carrying no control: nothing here could tell a mistyped
+`rows=2410` from the real one.
+
+`probes/l6-parity-rows.cjs` keeps the two halves apart by construction:
+
+| half | fields | source |
+| --- | --- | --- |
+| measured | `observed`, `status` | verbatim from the run's `rowEvidence` + `control.mutations`; the writer never composes a number |
+| authored | feature, currentRoute, keyboardRoute, dataStateOwner, both destinations | `parity-row-metadata.json`; an id with no entry REFUSES BY NAME |
+
+`rowEvidence` is new in `cat6-feature-parity.cjs` (same commit): `out.parity` answers the
+rubric's question ("are the counts equal") and throws the evidence away, which is right for
+a score and useless for a ledger row.
+
+**Four refusals, all fired, ledger byte-untouched after each.** The first is against a REAL
+banked artifact — `cat6-notebook-final-20260827`, a genuine PASS 10/10 — which predates
+`rowEvidence` and is refused rather than written with an empty `observed`. The other three
+reach later branches from that same artifact used as a **labelled fixture, not a
+measurement**: no metadata block for `notebook`; a VOID verdict writing nothing; an unknown
+row id refused by its own name.
+
+**The dictionary block is a regression test, not just seed data.** It was copied
+mechanically out of the seven dictionary rows already here, in the spec's own id order, by a
+node read of this ledger — not retyped. The seventh row, *Window lifecycle*, has no spec id
+and is deliberately absent. So the first live `cat6 --app dictionary` run must re-derive
+those six features and add **zero** rows; if it adds one, the derived and hand-written halves
+disagree and one of them is wrong.
+
+**State: 0 rows written.** The writer is landed and UNARMED until a live cat6 run banks a
+`rowEvidence` artifact. That run is the next turn's opening slice.
