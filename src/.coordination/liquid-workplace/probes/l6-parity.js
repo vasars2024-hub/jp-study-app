@@ -125,6 +125,21 @@
    * `qa(w, '.fwin')` is how it counts what it hosts, which is the taskbar-identity row.
    */
   const shq = (root, sel) => qa(root, sel).filter((e) => !e.closest('.fwin'));
+  /**
+   * Blanc's fullscreen-workspace control, recorded WHERE IT EXISTS rather than where the
+   * check happens. It is route-scoped (`canExpandWorkspace`, BlancShell.tsx:430) and the
+   * drive restores the user's own route before `check()` runs, so reading it at check time
+   * scored a deliberate product decision as a lying label. Sets `wsLabel` to `null` — not
+   * `undefined` — when the route genuinely does not offer it, so the row can tell "looked and
+   * it was not there" from "never driven".
+   */
+  function readWorkspaceControl(w, s, route) {
+    const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
+    s.wsRoute = route;
+    s.wsLabel = btn ? (btn.getAttribute('title') || '').trim() : null;
+    s.wsFull = w.classList.contains('is-workspace-full');
+    s.wsExit = !!q(w, '.blanc-fullscreen-exit');
+  }
   const shellState = specState('__LQP_SHELL_ORIG');
   const blancState = specState('__LQP_BLANC_ORIG');
   const libState = specState('__LQP_LIB_ORIG');
@@ -911,6 +926,24 @@
      * All drive steps change local view/filter/scroll state only; capture start,
      * clear, refresh and cross-app navigation are inventoried but never pressed.
      */
+    // THIS SPEC HAS NO SUBJECT ON `wt/files-app`, and that is a product decision rather than a
+    // gap. FILES_APP_PLAN gate 7b deletes the Notebook section and the Files app absorbs it:
+    // `AppSection.tsx` has no `case 'notebook'`, and `LEGACY_WIN_SECTION_ALIASES`
+    // (shared/desktop.ts:76) maps `notebook -> files` deliberately, because a persisted layout
+    // carries `section: 'notebook'` windows on every existing install and userData has no
+    // restore point. `NotebookContent.tsx` survives only as a Blanc import.
+    //
+    // Measured live on this branch 2026-09-02, one instant, one DOM, with both controls:
+    //   os:open 'notebook'         -> window "Files",            body `DIV.lq-scaffold.fa-shell`, 52 buttons, unavailable=false
+    //   os:open 'dictionary'  CTRL -> window "Dictionary",       body `DIV.dict-view`             (so os:open is not always Files)
+    //   os:open 'notAKnownSection' CTRL -> window "notAKnownSection", body `DIV.app-section-unavailable`, unavailable=TRUE
+    // and `.gx-notebook` = 0 across the WHOLE document, not merely inside one window.
+    //
+    // So do not spend a run authoring rows here: `cat6 --app notebook` cannot find its subject
+    // and is right not to. The ledger records it under
+    // `notWritten.derived.noRowsByCause.noSubjectOnThisBranch`, separately from the four specs
+    // that genuinely await authoring. On a tree where the Notebook section still exists this
+    // spec is still correct, which is why it is annotated rather than deleted.
     notebook: {
       titleRe: /Notebook|ノート|笔记|Блокнот/i,
       rootSel: '.gx-notebook',
@@ -3485,6 +3518,280 @@
         ),
       },
     },
+    /*
+     * The Media Center SHELL, as distinct from the `video` and `music` PAGES it hosts.
+     *
+     * Written 2026-09-02 (primary2) for one measured reason: `mediaCenter` was the single
+     * ledger app that carried rows and had NO spec, so `notWritten.derived` could not
+     * re-derive it by any route, and its 8 rows were the largest block in the ledger with no
+     * recorded control. They are not unproven — they were driven 2026-08-25 by the
+     * `window.__L6M` instrument, which cat6 superseded and cannot re-run. This spec makes
+     * them re-runnable.
+     *
+     * THREE COUNTS THIS SPEC DELIBERATELY DOES NOT HARDCODE, each measured against the
+     * ledger prose that named them and each different on this profile: the section rail
+     * (prose 9, here 9 — but `.mc-seanime-link` is inside `.mc-nav`, so it moves with
+     * availability), the library shelf rail (prose 9, here 6) and the sort `<select>`
+     * (prose 7, here 4). All three are DERIVED from available media. Hardcoding any of them
+     * repeats `library.inboxFilters` exactly — a row that can never reach its own threshold
+     * on a smaller profile and reads as a dead feature.
+     *
+     * And "current" on the shelf rail is `aria-current="true"`, NOT a class: a class-based
+     * selector matched 6 of 6 here, i.e. it could not fail.
+     */
+    mediaCenter: {
+      // The Media window only. `video` and `music` are separate sections with separate
+      // windows and their own specs; matching them here would score one shell three times.
+      titleRe: /Media|メディア|媒体|Медиа/i,
+      rootSel: '.mc-root',
+      notSel: '.mc-video-page',
+      features: [
+        {
+          // Exactly one active rail entry, and the active one AGREES with the breadcrumb.
+          // `active === 1` alone cannot catch a rail that highlights a section the page is
+          // not on; the breadcrumb is the same `tab` rendered a second way, which is the
+          // only reading that can.
+          id: 'navRail',
+          f: (w) => {
+            const btns = qa(w, '.mc-nav button');
+            const active = btns.filter((b) => b.classList.contains('is-active'));
+            const label = active[0] ? txt(q(active[0], 'strong')) : '';
+            const crumb = txt(q(w, '.mc-breadcrumb strong'));
+            return {
+              ok: btns.length >= 6 && active.length === 1 && !!crumb && label === crumb,
+              ev: `railButtons=${btns.length} active=${active.length} activeLabel="${label}" breadcrumb="${crumb}"`,
+            };
+          },
+        },
+        {
+          // The library shelf rail. Count DERIVED (see the header); the invariant is that
+          // exactly one entry declares itself current, through `aria-current` and not a class.
+          id: 'libraryShelves',
+          f: (w) => {
+            const items = qa(w, '.medialib-rail .ui-sidebar__item');
+            if (!items.length) {
+              return { ok: null, na: 'the library page is not the mounted tab — no shelf rail', ev: 'no .medialib-rail .ui-sidebar__item' };
+            }
+            const cur = items.filter((i) => i.getAttribute('aria-current') === 'true');
+            const named = items.filter((i) => txt(i)).length;
+            return {
+              ok: items.length >= 2 && cur.length === 1 && named === items.length,
+              ev: `shelves=${items.length} current=${cur.length} named=${named} currentLabel="${cur[0] ? txt(cur[0]) : ''}"`,
+            };
+          },
+        },
+        {
+          // Search narrows the grid. This row was a DEAD CONTROL until `89c11473` — the
+          // field wrote `state.query` and the panel rendered the unfiltered `state.items`.
+          // On a profile with no media there is nothing to narrow, and a row scored on an
+          // empty grid would pass for the wrong reason, so it declares itself `na` rather
+          // than claiming the fix.
+          id: 'librarySearch',
+          f: (w) => {
+            /*
+             * MEASURED, and it took two wrong selectors to find. The field is NOT inside
+             * the library browser: it is `LABEL.mc-global-search > INPUT` in the shell's
+             * own `.mc-topbar`, it carries no className, and its SUBJECT follows the tab —
+             * "Search your media library…" on Library, "Search songs, artists, albums…" on
+             * Music. Both `.medialib-browser__tools input[type=search]` and
+             * `.medialib-root input[type=search]` missed it, and the row then scored `na`
+             * with the WRONG reason ("the library page is not the mounted tab") while the
+             * page was plainly mounted. Right verdict, false evidence — which is the
+             * failure mode a row this quiet is most likely to ship with.
+             */
+            const field = q(w, '.mc-global-search input');
+            const cards = qa(w, '.medialib-card').length;
+            if (!field) {
+              return { ok: null, na: 'the library page is not the mounted tab — no search field', ev: 'no library search input' };
+            }
+            if (!cards) {
+              return { ok: null, na: 'the media library is empty on this profile — a search that narrows nothing cannot be distinguished from a search that does nothing', ev: `searchField=1 cards=0 placeholder="${field.placeholder}"` };
+            }
+            return {
+              ok: !!field.placeholder && cards > 0,
+              ev: `searchField=1 cards=${cards} placeholder="${field.placeholder}"`,
+            };
+          },
+        },
+        {
+          // Sort options and the grid/list toggle. Option count DERIVED; the toggle is the
+          // half with a real invariant — exactly one of the two pressed, and the pressed one
+          // named, so an all-false or all-true pair falls.
+          id: 'sortAndViewMode',
+          f: (w) => {
+            const sel = q(w, '.medialib-view__head select') || q(w, 'select.ui-select');
+            const view = qa(w, '.medialib-view-toggle [aria-pressed]');
+            if (!sel && !view.length) {
+              return { ok: null, na: 'the library page is not the mounted tab — no sort or view controls', ev: 'no select and no .medialib-view-toggle' };
+            }
+            const pressed = view.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const opts = sel ? sel.options.length : 0;
+            const namedView = view.filter((b) => (b.getAttribute('aria-label') || txt(b)).trim()).length;
+            return {
+              ok: !!sel && opts >= 2 && !!sel.value && view.length === 2
+                && pressed.length === 1 && namedView === view.length,
+              ev: `sortOptions=${opts} sortValue="${sel ? sel.value : ''}" viewButtons=${view.length} pressed=${pressed.length} named=${namedView}`,
+            };
+          },
+        },
+        {
+          // Per-item actions. Two selectors, one affordance: a shelf of one entry renders
+          // `.medialib-spotlight__actions` whose last button calls the same `onMenu` as
+          // `.medialib-card__more`. Matching only the card half scored the spotlight as a
+          // missing feature. With no items there is neither, and that is `na`, not a defect.
+          id: 'perItemActions',
+          f: (w) => {
+            const cards = qa(w, '.medialib-card').length;
+            const more = qa(w, '.medialib-card__more').length;
+            const spot = qa(w, '.medialib-spotlight__actions button').length;
+            if (!cards && !spot) {
+              return { ok: null, na: 'the media library is empty on this profile — no item to carry a per-item menu', ev: 'cards=0 spotlightActions=0' };
+            }
+            return {
+              ok: (cards > 0 && more === cards) || spot > 0,
+              ev: `cards=${cards} cardMenus=${more} spotlightActions=${spot}`,
+            };
+          },
+        },
+        {
+          // Back/Forward reflect REAL trail depth. Before `1f5b0f2`-era work these were
+          // wired to `setTab('home')`/`setTab('library')` and were never disabled, i.e. they
+          // looked like browser chrome and were not. The invariant scored here is the one
+          // that cannot be faked by always-enabled buttons: the `title` carries the REASON
+          // while disabled and the plain label while enabled, so the greyed state explains
+          // itself, and `aria-label` stays the label in both so the accessible name does not
+          // move. A pair that is enabled at both ends of an empty trail fails it.
+          id: 'historyHonest',
+          f: (w) => {
+            const btns = qa(w, '.mc-history-buttons button');
+            if (btns.length !== 2) return { ok: false, ev: `historyButtons=${btns.length} (expected 2)` };
+            const rows = btns.map((b) => ({
+              label: (b.getAttribute('aria-label') || '').trim(),
+              title: (b.getAttribute('title') || '').trim(),
+              off: b.disabled,
+            }));
+            // Disabled -> the title must SAY something other than the label (the reason);
+            // enabled -> the title IS the label. Either way both strings are non-empty.
+            const honest = rows.every((r) => r.label && r.title
+              && (r.off ? r.title !== r.label && r.title.length > r.label.length : r.title === r.label));
+            return {
+              ok: honest,
+              ev: rows.map((r) => `${r.label}: disabled=${r.off} title="${r.title.slice(0, 44)}"`).join(' | '),
+            };
+          },
+        },
+        {
+          // The route OUT to the Media workspace. NOT DRIVEN HERE, and the reason is on the
+          // record rather than hidden: `openSeanime` (MediaCenterView.tsx) falls back to
+          // `window.api.popOut('player')` when no host exists in this window tree, so a
+          // click can open a whole OS window this harness would then have to close — and the
+          // host itself mounts at `body > div > .seanime-host`, OUTSIDE the window. The
+          // 2026-08-25 run drove the 0 -> 1 -> 0 cycle and that reading stands. What is
+          // re-runnable is the launcher's HONESTY: it is present, it is named, and if it is
+          // dead it says why — `seanimeActionTitle` carries "connecting" or "unavailable".
+          // An always-enabled launcher on an unavailable workspace fails this.
+          id: 'workspaceLauncher',
+          f: (w) => {
+            const link = q(w, '.mc-seanime-link');
+            if (!link) return { ok: false, ev: 'no .mc-seanime-link in the rail' };
+            const label = txt(q(link, 'strong')) || txt(link);
+            const title = (link.getAttribute('title') || '').trim();
+            const off = link.disabled || link.getAttribute('aria-disabled') === 'true';
+            const hosts = w.ownerDocument.querySelectorAll('.seanime-host').length;
+            return {
+              ok: !!label && (!off || !!title),
+              ev: `launcher=1 label="${label}" disabled=${off} title="${title.slice(0, 48)}" hostsInDocument=${hosts}`,
+            };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        /*
+         * Mount the tab the rows are ABOUT, which is Library. Four of the eight rows read
+         * the library browser and score `na` on any other tab; a drive that navigated away
+         * from it would take their subject with it, which is the mistake `statistics`
+         * already paid for in the other direction (its row read before its own drive).
+         *
+         * MEASURED TRAP, and it disproved a candidate defect the last handoff carried. The
+         * `player` section mounts `<MediaCenterView initialTab="library" />`
+         * (AppSection.tsx:79), so the window OPENS on Library — clicking Library is
+         * `setTab(same)`, which correctly returns the trail unchanged and leaves Back
+         * disabled. That reads exactly like "the first in-window navigation is lost" and is
+         * not: driven on a never-before-created Video window, the crumb reads `Video` at
+         * mount with Back disabled, and Library -> Music enables it. Hence `already`.
+         */
+        library: (w) => {
+          const btns = qa(w, '.mc-nav button').filter((b) => !b.classList.contains('mc-seanime-link'));
+          const active = btns.filter((b) => b.classList.contains('is-active'))[0];
+          if (window.__LQP_MC_HOME === undefined) {
+            window.__LQP_MC_HOME = active ? txt(q(active, 'strong')) : null;
+          }
+          const target = btns.filter((b) => q(b, 'strong') && /Library|ライブラリ|媒体库|库|Библиотек/i.test(txt(q(b, 'strong'))))[0];
+          if (!target) return { refused: 'no Library entry in the section rail' };
+          if (target.classList.contains('is-active')) return { already: true };
+          target.click();
+          return { navigated: `${active ? txt(q(active, 'strong')) : '?'} -> ${txt(q(target, 'strong'))}` };
+        },
+      },
+      drive: ['library'],
+      undo: {
+        // Walk the trail BACK with the product's own Back button, never by clicking the
+        // origin entry again — clicking it would push a third trail entry and leave the
+        // window with a longer history than it was found with. Recorded once and never
+        // cleared, for the reason city's undo states: `restore()` nulls per-spec state
+        // between mutations and a re-capture would treat the driven tab as the original.
+        mediaCenter: (w) => {
+          const home = window.__LQP_MC_HOME;
+          if (home === undefined || home === null) return null;
+          const crumb = txt(q(w, '.mc-breadcrumb strong'));
+          if (crumb === home) return null;
+          const back = qa(w, '.mc-history-buttons button')[0];
+          if (!back || back.disabled) return null;
+          back.click();
+          return `mediaCenter:library (back to ${home})`;
+        },
+      },
+      mutations: {
+        navRail: (w) => removeClassAll(qa(w, '.mc-nav button.is-active'), 'is-active'),
+        libraryShelves: (w) => setAttr(
+          qa(w, '.medialib-rail .ui-sidebar__item')
+            .filter((i) => i.getAttribute('aria-current') === 'false')[0],
+          'aria-current', 'true', 'no non-current shelf to falsify — library page is not up',
+        ),
+        librarySearch: (w) => detach(
+          qa(w, '.medialib-card')[0],
+          'the media library is empty on this profile — nothing to remove from the grid',
+        ),
+        sortAndViewMode: (w) => setAttr(
+          qa(w, '.medialib-view-toggle [aria-pressed]')
+            .filter((b) => b.getAttribute('aria-pressed') === 'false')[0],
+          'aria-pressed', 'true', 'no unpressed view button to falsify — library page is not up',
+        ),
+        perItemActions: (w) => detach(
+          q(w, '.medialib-card__more') || q(w, '.medialib-spotlight__actions button'),
+          'the media library is empty on this profile — no per-item menu to remove',
+        ),
+        // Detaching ONE of the pair, not disabling one: `disabled` is a property the restore
+        // sweep cannot reliably put back, and the row's own count of 2 is what falls.
+        historyHonest: (w) => detach(qa(w, '.mc-history-buttons button')[1], 'no history pair'),
+        workspaceLauncher: (w) => detach(q(w, '.mc-seanime-link'), 'no workspace launcher in the rail'),
+        /*
+         * MEASURED, not assumed, and the first choice was wrong. Detaching one `.fwin-b`
+         * is the obvious falsification and it DOES NOT FIRE here: `lifecycle()` needs
+         * `chrome.length >= 4` and this shell renders FIVE (Pop out, Make Liquid, Minimize,
+         * Maximize, Close), so removing one leaves 4 and the row correctly stays up. The
+         * receipt said so — `fellRows: []`, `exactlyOwnRow: false`, verdict VOID. The row's
+         * other half is the one with no slack: `aria-pressed` on the Liquid toggle must be
+         * a real boolean, so stripping it drops this row and nothing else. That is also the
+         * control the 2026-08-25 `__L6M` run used, so the two instruments falsify the same
+         * clause.
+         */
+        windowLifecycle: (w) => stripAttr(
+          q(w, '.fwin-b-liquid'), 'aria-pressed', 'no Liquid toggle in this window chrome',
+        ),
+      },
+    },
     video: {
       titleRe: /Video|ビデオ|视频|Виде/i,
       rootSel: '.mc-video-page',
@@ -4050,15 +4357,56 @@
           return { ok: actions.length >= 3 && ready.length === actions.length,
             ev: `actions=${actions.length} enabledAndNamed=${ready.length}` };
         } },
+        // FALSE POSITIVE REPAIRED 2026-09-02. This read `.scr-topbar-actions
+        // button[aria-pressed="true"]`, but that div holds exactly ONE `aria-pressed`
+        // (ScraperTopBar.tsx:91) and it is the ADVANCED-MODE toggle, not the drawer.
+        // The drawer's opener at :78-86 was deliberately moved to `aria-expanded` +
+        // `aria-controls` (APG disclosure), with a source comment saying why. So with
+        // the drawer SHUT and advanced ON, the row scored a reversal affordance that
+        // was not on screen. It now scores the disclosure itself, expanded, which is
+        // the control that actually reverses the drawer.
         { id: 'reverseControls', f: (w) => {
           const close = q(w, '.scr-drawer-head .ui-icon-btn');
-          const opener = qa(w, '.scr-topbar-actions button[aria-pressed="true"]');
-          return { ok: !!close && !close.disabled && opener.length > 0,
-            ev: `drawerClose=${!!close && !close.disabled} pressedOpeners=${opener.length}` };
+          const disclosure = qa(w, '.scr-topbar-actions button[aria-controls]');
+          const expanded = disclosure.filter((b) => b.getAttribute('aria-expanded') === 'true');
+          return { ok: !!close && !close.disabled && disclosure.length > 0 && expanded.length > 0,
+            ev: `drawerClose=${!!close && !close.disabled} disclosures=${disclosure.length} expanded=${expanded.length}` };
         } },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        // FIRST step of the drive, added 2026-09-02. On a fresh profile the settings
+        // drawer is SHUT, so four of this spec's seven rows measured a region that is
+        // not rendered at all (`drawerCategories`, `settingsFields`, `reverseControls`)
+        // and `switchDrawer` refused, which VOIDed the whole run at 4/7. Opening it is
+        // local navigation state, exactly what this spec's own header licenses. It
+        // records whether the drawer was ALREADY open so `undo` closes it only if this
+        // drive is what opened it — a user who left it open keeps it open.
+        openDrawer: (w) => {
+          const g = scraperState();
+          const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+          if (!disclosure) return { refused: 'no settings disclosure in the top bar' };
+          const wasOpen = disclosure.getAttribute('aria-expanded') === 'true';
+          if (g.drawerWasOpen == null) g.drawerWasOpen = wasOpen;
+          if (!wasOpen) disclosure.click();
+          return { wasOpen, opened: !wasOpen };
+        },
+        // A WAIT, and it is a step rather than a sleep because /eval is synchronous —
+        // busy-waiting in the renderer would block the very import it is waiting for.
+        // `ScraperSettingsDrawer` is `lazy()` (ScraperApp.tsx:68), so the first open in a
+        // renderer session has to fetch and transform a chunk before `.scr-drawer-cat`
+        // exists. MEASURED, not assumed: 403 ms cold after a reload, 113 ms warm — but on
+        // the run where the dev server had never transformed the chunk it was still absent
+        // 1,400 ms after the click, and `switchDrawer` + `restoreDrawer` both refused.
+        // RATE: 2 refusals on that cold run, 0 on the warm re-run. This step spends one
+        // more step-interval on it and reports the count instead of guessing.
+        drawerReady: (w) => {
+          const cats = qa(w, '.scr-drawer-cat').length;
+          const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+          const expanded = !!disclosure && disclosure.getAttribute('aria-expanded') === 'true';
+          if (!expanded) return { refused: 'drawer is not expanded — openDrawer did not land' };
+          return { cats, mounted: cats > 0, note: cats > 0 ? null : 'lazy chunk still loading' };
+        },
         switchDrawer: (w) => {
           const g = scraperState();
           const current = q(w, '.scr-drawer-cat[aria-current="true"]');
@@ -4097,7 +4445,7 @@
           return { expanded: input.getAttribute('aria-expanded') };
         },
       },
-      drive: ['switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch'],
+      drive: ['openDrawer', 'drawerReady', 'switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch'],
       undo: { scraper: (w) => {
         const g = window.__LQP_SCRAPER_ORIG; if (!g) return null;
         const done = [];
@@ -4108,6 +4456,11 @@
             && shell.classList.contains('is-rail-collapsed') !== g.railCollapsed) { rail.click(); done.push('rail'); }
         const input = q(w, '.scr-search > .scr-search-input');
         if (input) input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+        // Drawer LAST: closing it unmounts `.scr-drawer-cat`, so restoring the category
+        // above has to happen while the drawer is still rendered.
+        const disclosure = q(w, '.scr-topbar-actions button[aria-controls]');
+        if (disclosure && g.drawerWasOpen === false
+            && disclosure.getAttribute('aria-expanded') === 'true') { disclosure.click(); done.push('drawerClosed'); }
         window.__LQP_SCRAPER_ORIG = null;
         return done.length ? `scraper:${done.join('+')}` : null;
       } },
@@ -5117,12 +5470,43 @@
           f: (w) => {
             // The Wired/Aero identity is a real material stamp plus real shell-owned
             // furniture, read from the document rather than from a class this file invented.
+            //
+            // REPAIRED 2026-09-02 (primary2). The old expression was
+            // `!!mat && theme.indexOf(mat) === 0 && owned > 0` and it was WIRED-ONLY on two
+            // independent counts, both measured live on this profile rather than reasoned:
+            //   1. `theme.indexOf(mat) === 0` -- the Aero theme's id is `frutiger-aero` and
+            //      its materialSet is `aero`, so indexOf is 9, not 0. A correctly stamped
+            //      Aero shell scored FALSE on the stamp half.
+            //   2. `.${mat}-wall-atmosphere, .${mat}-tray-lamps` -- those two elements are
+            //      rendered only under `wired` (DesktopShell.tsx:2748 and :3502). Measured on
+            //      `frutiger-aero`: **0** `aero-`prefixed classes anywhere in the shell
+            //      outside `.fwin`, against 178 inside the hosted Resources window. Aero's
+            //      identity is CSS scoped to `[data-materials='aero']` restyling the same
+            //      `.os-*` furniture; it adds no DOM of its own. So there is nothing to
+            //      "widen the selector" to, and widening it to any `aero-` class would have
+            //      scored the shell from a window's contents.
+            // What BOTH material sets do own is the secret start surface: DesktopShell.tsx:683
+            // renders `.os-start-aero-menu` for `aero` OR `wired` and the base menu otherwise,
+            // so it discriminates a material shell from the default one. `readStartOpen`
+            // records it while the menu is open, which is the only moment it exists.
+            // On the base theme there is no material identity to verify at all -- that is `na`
+            // (excluded from the denominator), never a failure.
+            const s = shellState();
             const mat = document.documentElement.getAttribute('data-materials');
             const theme = document.documentElement.getAttribute('data-theme') || '';
+            if (!mat) {
+              return {
+                ok: null,
+                na: 'shell is on the base theme — no material set is stamped, so there is no material identity to verify',
+                ev: `materials=null theme=${JSON.stringify(theme)}`,
+              };
+            }
             const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`).length;
+            const matMenu = s.startMaterialMenu;
+            const furniture = owned > 0 || matMenu === 1;
             return {
-              ok: !!mat && theme.indexOf(mat) === 0 && owned > 0,
-              ev: `materials=${mat} theme=${theme} identityElements=${owned}`,
+              ok: theme.indexOf(mat) >= 0 && furniture,
+              ev: `materials=${mat} theme=${theme} stampBelongsToTheme=${theme.indexOf(mat) >= 0} identityElements=${owned} materialStartMenu=${matMenu === undefined ? 'not driven' : matMenu}`,
             };
           },
         },
@@ -5170,7 +5554,12 @@
         readStartOpen: (w) => {
           const s = shellState();
           s.startOpened = shq(w, '.os-start').length;
-          return { opened: s.startOpened };
+          // The material start surface exists only while the menu is open, and it is the one
+          // piece of shell-owned furniture BOTH `aero` and `wired` render (DesktopShell.tsx:683).
+          // `shellIdentity` reads it back later; recording it here is what lets that row be
+          // material-agnostic instead of wired-only. See that row for the measurement.
+          s.startMaterialMenu = shq(w, '.os-start-aero-menu').length;
+          return { opened: s.startOpened, materialMenu: s.startMaterialMenu };
         },
         closeStart: (w) => {
           const back = q(w, '.os-start-backdrop');
@@ -5268,11 +5657,19 @@
         // `data-materials`: that attribute lives on `documentElement`, which is outside the
         // shell root that `restore()` sweeps, so the lie would never be undone.
         shellIdentity: (w) => {
+          // Falsifies BOTH legs the row now accepts, or it would arm on wired and refuse on
+          // aero (where the always-on furniture does not exist) — the same shape that made the
+          // row itself wired-only. The recorded `startMaterialMenu` is spec state, falsified
+          // the way `startEntryPoint` / `trayFlyout` / `taskbarRaises` already are; the DOM
+          // half is a real detach and is swept by `restore()`.
+          const s = shellState();
           const mat = document.documentElement.getAttribute('data-materials');
+          if (!mat) return { refused: 'shell is on the base theme — the row is `na`, so there is nothing to falsify' };
           const owned = shq(w, `.${mat}-wall-atmosphere, .${mat}-tray-lamps`);
-          if (!owned.length) return { refused: 'shell renders no identity furniture' };
           owned.forEach((n) => detach(n, ''));
-          return { mutated: `${owned.length} identity element(s) detached` };
+          const had = s.startMaterialMenu;
+          s.startMaterialMenu = 0;
+          return { mutated: `${owned.length} identity element(s) detached; startMaterialMenu ${had === undefined ? 'not driven' : had} -> 0` };
         },
         // Falsify the DRIVEN rows by breaking the side effect itself, not the control: the
         // start menu is re-opened and left open, so `closeStart`'s recorded 0 becomes 1.
@@ -5442,17 +5839,37 @@
         },
         {
           id: 'workspaceToggleHonest',
-          f: (w) => {
+          f: () => {
             // `presentationHonest`'s analogue for the one presentation control this spec
             // deliberately does NOT drive (decision 1). Its label must describe the state it
             // would move to, or the user cannot tell which way it goes.
-            const full = w.classList.contains('is-workspace-full');
-            const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
-            const label = btn ? (btn.getAttribute('title') || '').trim() : null;
-            const exit = !!q(w, '.blanc-fullscreen-exit');
+            //
+            // REPAIRED 2026-09-02 (primary2). This used to read the control at CHECK time and
+            // scored `control=null` -> FALSE. Measured live: the Blanc window renders exactly
+            // ONE `.blanc-icon-btn` ("Search Blanc") on the `Read` route, because the
+            // fullscreen control is ROUTE-SCOPED — `canExpandWorkspace` (BlancShell.tsx:430)
+            // is `book || tab is one of mine/flashcards/media/stats/tools`. The drive visits
+            // such a route and then correctly RESTORES the user's own route, so by check time
+            // the control is legitimately gone. Scoring its absence as a lying label made a
+            // deliberate product decision read as a broken control.
+            // So the reading is RECORDED while the control exists (`readNav`, on the visited
+            // route) and read back here — the same act-then-read shape the driven rows use.
+            // If neither route this run touched offers it, the row is `na` and NAMES both
+            // routes, rather than failing the shell for a capability it never claimed there.
+            const s = blancState();
+            if (s.wsLabel === undefined) {
+              return { ok: null, na: 'readNav did not run, so nothing was recorded', ev: 'not driven' };
+            }
+            if (s.wsLabel === null) {
+              return {
+                ok: null,
+                na: `the fullscreen-workspace control is route-scoped (BlancShell.tsx:430 \`canExpandWorkspace\`) and neither route this run visited renders it`,
+                ev: `routesTried=[${JSON.stringify(s.navTo)}, ${JSON.stringify(s.navFrom)}] control=null`,
+              };
+            }
             return {
-              ok: !!btn && /^exit /i.test(label) === full && exit === full,
-              ev: `workspaceFull=${full} control=${JSON.stringify(label)} exitAffordance=${exit}`,
+              ok: /^exit /i.test(s.wsLabel) === s.wsFull && s.wsExit === s.wsFull,
+              ev: `readOnRoute=${JSON.stringify(s.wsRoute)} workspaceFull=${s.wsFull} control=${JSON.stringify(s.wsLabel)} exitAffordance=${s.wsExit}`,
             };
           },
         },
@@ -5474,7 +5891,7 @@
         },
       ],
       drive: [
-        'navClick', 'readNav', 'navRestore',
+        'navClick', 'readNav', 'navRestore', 'readWorkspaceOnRestored',
         'hideChrome', 'readChromeHidden', 'revealChrome', 'readChromeRevealed',
         'openSearch', 'readSearchOpen', 'closeSearch', 'readSearchClosed',
         'openTools', 'readToolsOpen', 'closeTools', 'readToolsClosed',
@@ -5499,7 +5916,11 @@
           const s = blancState();
           s.navPainted = txt(q(w, '.blanc-title'));
           s.navMoved = !!s.navTo && s.navPainted.indexOf(s.navTo) >= 0 && s.navTo !== s.navFrom;
-          return { painted: s.navPainted, moved: s.navMoved };
+          // The fullscreen-workspace control is route-scoped (BlancShell.tsx:430) and the
+          // drive restores the user's route before `check()` runs, so this is the only moment
+          // it may exist. Recorded here, read back by `workspaceToggleHonest`; see that row.
+          readWorkspaceControl(w, s, s.navTo);
+          return { painted: s.navPainted, moved: s.navMoved, workspaceControl: s.wsLabel };
         },
         navRestore: (w) => {
           // PRESENTED STATE IS THE USER'S. Whatever route was open when this ran goes back.
@@ -5508,6 +5929,15 @@
           s.navFromEl.click();
           s.navBack = s.navFrom;
           return { restored: s.navFrom };
+        },
+        readWorkspaceOnRestored: (w) => {
+          // Second chance for the route-scoped workspace control, on the route the user was
+          // actually on. Only fills a reading the visited route did not provide — it never
+          // overwrites one, so the row keeps the FIRST route that offered the control.
+          const s = blancState();
+          if (s.wsLabel) return { skipped: `already read on ${JSON.stringify(s.wsRoute)}` };
+          readWorkspaceControl(w, s, s.navFrom);
+          return { readOnRoute: s.navFrom, workspaceControl: s.wsLabel };
         },
         hideChrome: (w) => {
           const s = blancState();
@@ -5605,10 +6035,19 @@
         clock: (w) => detach(q(w, '.blanc-clock'), 'no clock'),
         // LIE rather than delete for the declared-state rows: a control that exists and
         // misdescribes itself is precisely the defect each of those rows is for.
-        workspaceToggleHonest: (w) => {
-          const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
-          if (!btn) return { refused: 'no workspace control' };
-          return setAttr(btn, 'title', 'Exit fullscreen workspace');
+        // Falsified through the RECORDED reading, for the same reason the row now reads one:
+        // the live control is route-scoped and is legitimately absent at check time, so a
+        // mutation that needs the element refuses on exactly the runs the row can still score.
+        // The lie is well-formed — "Exit …" while `workspaceFull` is false is precisely the
+        // label-does-not-describe-the-state defect this row exists for.
+        workspaceToggleHonest: () => {
+          const s = blancState();
+          if (s.wsLabel === undefined || s.wsLabel === null) {
+            return { refused: `no workspace control was found on either route this run visited (${JSON.stringify(s.navTo)}, ${JSON.stringify(s.navFrom)}) — the row is \`na\`, so there is nothing to falsify` };
+          }
+          const had = s.wsLabel;
+          s.wsLabel = s.wsFull ? 'Fullscreen workspace' : 'Exit fullscreen workspace';
+          return { mutated: `recorded control label ${JSON.stringify(had)} -> ${JSON.stringify(s.wsLabel)} against workspaceFull=${s.wsFull}` };
         },
         shellIdentity: (w) => {
           const owned = shq(w, '[data-lq-role="liquid"]');

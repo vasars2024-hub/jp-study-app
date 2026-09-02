@@ -1,0 +1,702 @@
+{
+  "schema": "l6-parity-row-metadata/v1",
+  "why": "The AUTHORED half of a feature-ledger row. l6-parity-rows.cjs derives every MEASURED field from a cat6 run artifact and refuses to invent any of these; a spec row id with no entry here refuses BY NAME rather than being written with a guessed route. One block per app, keyed by the row ids in probes/l6-parity.js.",
+  "howToAddAnApp": "Read the app.s SPECS block in probes/l6-parity.js for its row ids, then write one entry per id. The two destination strings and noLiquidReason are per-app, not per-row.",
+  "provenance": {
+    "dictionary": "Copied MECHANICALLY out of the seven dictionary rows already in parity-ledger.json (written by hand on 2026-08-17), in the spec.s own id order, by a one-off node read of the ledger -- not retyped. CORRECTED 2026-09-02: this note used to claim the seventh row, \"Window lifecycle: pop out, minimize, maximize, close\", had NO spec id and was \"deliberately absent\". That was false -- `l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for every app, and the live run refused BY NAME on it, which is the refusal working. Its four authored fields are now copied from that same ledger row. This block is a REGRESSION TEST -- a live cat6 dictionary run must re-derive these SEVEN features and add ZERO new rows, because the ledger already holds them under the same app-plus-feature keys. Measured 2026-09-02 at 1ec440ab: 7 rows, statuses {both: 7}, added 0.",
+    "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403.",
+    "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped.",
+    "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319.",
+    "resources": "AUTHORED 2026-09-02 from source, fourth app with no prior ledger row. SEVEN of its eight rows were written; `collectedSections` was DELIBERATELY NOT WRITTEN and its metadata entry is kept anyway so a later profile with collected tools writes it without re-authoring. The reason is a repair in the same commit: its mutation targets `.mytool-card .mytool-remove` and nothing is collected on this profile, so the mutation REFUSED rather than ran. cat6 used to score that identically to a mutation that ran and flipped the wrong row, which VOIDed a run whose other 7 mutations were exact; it now reports `armed: false` and `l6-parity-rows.cjs` skips exactly that row by name. Discriminating control, live: an ARMED-but-wrong mutation (catalogueCount re-pointed at `.res-name`, which flips `resourceCards` instead) still VOIDs the whole run, so the relaxation cannot wave a broken control through. dataStateOwner is three different owners here and they are not interchangeable: the catalogue is a STATIC module (renderer/data/resources.ts), the bundle checklists are localStorage under `resources.checklist.<id>`, and the collected tools are a MAIN-PROCESS store reached through window.api.toolsList (shared/collectedTools.ts), shared with Blanc. Liquid destination read from resourcesLiquid.css, whose `:is(.fwin.fwin-liquid, .popout-root.popout-liquid)` rules touch only `.res-command-surface` and its children.",
+    "city": "AUTHORED 2026-09-02 from source, fifth app with no prior ledger row, and the FIRST written through the harness's `noLiquid` branch -- so all nine rows are `pending` by derivation, not by omission: there is no Liquid half to compare, and `pending` is the vocabulary’s own word for that. `noLiquidReason` is a MEASUREMENT, not an excuse: `liquidAbsence` reports targetHasLiquidControl false with targetChromeButtons 3 and presentation `standard`, while Resources open beside it DOES render `.fwin-b-liquid` -- the same query over every open window at the same instant, which is what separates \"this window has no toggle\" from \"no window has one\". The round trip is minimize -> restore through the taskbar (the taskbar button is a toggle, so the harness drives it twice) and `rankHeld` was true. All NINE mutations armed and each flipped exactly its own row. dataStateOwner names two separate localStorage documents: `jp-reading-garden-v1` (renderer/readingGardenProgress.ts -- stage, pagesRead, bankedPages) and `jp-mooncap-music-v1` (components/reading-garden/mooncapMusic.ts -- the ambient music choice and volume). The dossier itself is component state and correctly does not survive a reopen.",
+    "shell": "AUTHORED 2026-09-02 (primary2) from source, the SIXTH app with no prior ledger row and the first whose subject is the container rather than a hosted window: `shq` excludes everything inside `.fwin`, so a taskbar of 12 buttons is not confused with a desktop of 300 controls. The harness does NOT raise this host -- there is no window to raise -- and POSTs `/focus` instead. RUN ON `wired-archive`, DELIBERATELY: `shellIdentity` is a material row and the base theme stamps no material set, so on `study-os` that row is `na` and the other eight would have been the whole ledger. The run that wrote these rows scored 9/9 in BOTH presentations with all 8 mutations armed. THE ROW WAS REPAIRED FIRST (d9f1c213) and the repair has its own cross-material control: `frutiger-aero` also PASSes 10/10, carrying `shellIdentity` by `materialStartMenu=1` with `identityElements=0`, while `wired-archive` carries it by `identityElements=2` AND `materialStartMenu=1` -- two materials, two different pieces of evidence, one row. Before the repair the same spec on `frutiger-aero` failed that row outright (`indexOf` 9 not 0; zero `aero-`prefixed elements in the shell against 178 inside a hosted window) and its mutation was UNARMABLE. dataStateOwner names three separate stores and they are not interchangeable: the main-process desktop layout snapshot (renderer/desktopState.ts -- windows, icons, z-order, active desktop), localStorage `jp-os-desktop-prefs-v1` (renderer/desktopPrefs.ts -- clock format) and localStorage `jp-os-theme` (renderer/theme/engine.ts -- the material stamp).",
+    "blancShell": "AUTHORED 2026-09-02 (primary2) from source, the SEVENTH app with no prior ledger row and the SECOND shell — a separate BrowserWindow (`blanc.html?blanc=1`) hosting 0 `.fwin`, reached with `--win blanc`. Its presentation axis is chrome reduction (`is-taskbar-hidden`), not a palette and not native fullscreen; the spec records both rejected candidates and the reasons stand. RUN: PASS 10/10, 8/8 reachable in BOTH presentations, round trip 0 diffs with an INPUT dirtied first, 8 of 8 mutations armed and each flipping exactly its own row. ONE ROW HAD TO BE REPAIRED FIRST and the defect was in the instrument, not the shell: `workspaceToggleHonest` read the fullscreen control at CHECK time and scored `control=null` -> FALSE. Measured live: the Blanc window renders exactly ONE `.blanc-icon-btn` (\"Search Blanc\") on the `Read` route, because the control is route-scoped by `canExpandWorkspace` (BlancShell.tsx:430). The drive visits a qualifying route and then correctly RESTORES the user's own route, so by check time the control is legitimately gone -- a deliberate product decision was reading as a lying label. The reading is now recorded where the control exists (`readNav`, route \"Mine\") with a second chance on the restored route, and the row is `na` naming BOTH routes if neither offers it. Its mutation falsifies the recorded label instead of the element, so it arms on exactly the runs the row can score. dataStateOwner is mostly COMPONENT state here and that is the finding worth keeping: `taskbarHidden`, `compactToolsOpen`, `masterSearchOpen` and `workspaceFull` are all unpersisted, so a reduced or fullscreen Blanc cannot be inherited by the next launch; only the route survives, and only when the user has asked Blanc to remember it (`jp-blanc-mode-v1` / `jp-blanc-memory-v1`, renderer/blancMode.ts).",
+    "games": "AUTHORED 2026-09-02 (primary2) from source, the EIGHTH app with no prior ledger row. RUN: PASS 10/10, 10/10 reachable in BOTH presentations, round trip 0 diffs, 10 of 10 mutations armed and each flipping exactly its own row, 0 driven refusals -- and it was driven end to end, not merely inspected: a round was STARTED, \"ro\" was typed, submit moved disabled true -> false, and the round was ABORTED back to a ready state the harness then re-read. THE PROFILE IS EMPTY AND THE RUN STILL SCORES 10/10, which is the point worth recording: the previous handoff warned that an empty harness is CAPPED rather than skipped, and that is true of surfaces whose rows need rows to exist. Games is not one of them, because four of its rows are written to score HONEST EMPTY STATE rather than content -- `sourceMaterial` reads `pct=noList scaleX=0 agrees=true` with the words \"No word list uploaded for this level\", `exposureTracking` reads `seen=0/59` with stated and derived pct both 0 and the bar at 0, `roundHistory` reads `rows=0 complete=0` against the empty-state sentence, and `materialScope` reads `mode=auto scripts=0 groups=0 shapeHeld=true`. A bar that agrees with a zero is as real a reading as one that agrees with a 60. dataStateOwner names FIVE separate stores and they are not interchangeable: `jp-game-arena-settings-v1` (length, language, kana scope), `jp-game-arena-seen-v1` (exposure), `jp-game-progress-v1` (last 30 results + high scores), `jp-level-lists` (the word lists coverage is computed against) and renderer/levelService.ts (the level). The round session itself is deliberately unpersisted, which is what makes the abort recovery safe for a harness to drive against a real profile."
+  },
+  "apps": {
+    "dictionary": {
+      "standardDestination": "DictionaryView result list, in-window",
+      "liquidDestination": "Same in-window DictionaryView, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, body kept on an opaque anchor (L3.2, `20462e3a`)",
+      "noLiquidReason": null,
+      "features": {
+        "lookup": {
+          "feature": "Look up a word against the active dictionary source",
+          "currentRoute": "Dictionary window > search input + `Search` (button.btn.primary)",
+          "keyboardRoute": "input is focusable and accepts real keystrokes; a synthetic Enter keydown did NOT trigger a search, so the keyboard route is UNPROVEN, not absent",
+          "dataStateOwner": "local JMdict via the main-process dictionary DB"
+        },
+        "sourceSwitch": {
+          "feature": "Switch dictionary source by language (JA / ZH)",
+          "currentRoute": "Dictionary window > `日本語` / `中文` (button.gram-level-btn)",
+          "keyboardRoute": "both are real buttons, focusable",
+          "dataStateOwner": "JMdict (JA) / CC-CEDICT (ZH)"
+        },
+        "presentationMode": {
+          "feature": "Result presentation mode (Automatic / Dictionary / Interlinear)",
+          "currentRoute": "Dictionary window > `Automatic` | `Dictionary` | `Interlinear`",
+          "keyboardRoute": "three real buttons, focusable",
+          "dataStateOwner": "view state, local to DictionaryView"
+        },
+        "resultActions": {
+          "feature": "Per-result actions: play audio, copy to clipboard history, save to Flashcards, mark New, add to Anki",
+          "currentRoute": "Dictionary window > per-result controls (`Play 食べる`, `Copy to clipboard history`, `Save to Flashcards`, `食べる: New. Click to mark…`, `+ Add to Anki`)",
+          "keyboardRoute": "all rendered as buttons",
+          "dataStateOwner": "flashcards store, AnkiConnect, clipboard history"
+        },
+        "savedSearches": {
+          "feature": "Saved searches",
+          "currentRoute": "Dictionary window > `Save search` (appears in the Saved searches header)",
+          "keyboardRoute": "button",
+          "dataStateOwner": "persisted search list"
+        },
+        "notesFilter": {
+          "feature": "Notes pane and its filter",
+          "currentRoute": "Dictionary window > `Your notes` + `Filter notes` (input.lexicon-notes-filter)",
+          "keyboardRoute": "text input",
+          "dataStateOwner": "lexicon notes store"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Dictionary window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "calendar": {
+      "standardDestination": "CalendarContent in-window: the mode row and date transport above, the month grid / week columns / day list / agenda body below",
+      "liquidDestination": "Same in-window CalendarContent on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the mode switch and date transport are a `ContextualSurface` (CalendarContent.tsx:391) with the arrows on a bare `AnchorSurface` (:403), while the month grid, week columns, day list and agenda stay plain opaque bodies — a grid of dates is a table, and L2 keeps tables on stable anchors",
+      "noLiquidReason": null,
+      "features": {
+        "viewModes": {
+          "feature": "Switch view mode: Month / Week / Day / Agenda",
+          "currentRoute": "Calendar window > `.cal-mode-btn` x4 in the `.cal-context-toolbar` mode row",
+          "keyboardRoute": "four real buttons, focusable",
+          "dataStateOwner": "component state (`mode`) in CalendarContent.tsx — not persisted, so a reopen returns to Month"
+        },
+        "monthGrid": {
+          "feature": "Month grid: seven day-of-week headers over a full 42-cell numbered month",
+          "currentRoute": "Calendar window > `.cal-month-grid` > `.cal-month-dow` x7 + `.cal-month-cell` x42, each carrying a `.cal-month-daynum`",
+          "keyboardRoute": "cells are click targets; no keyboard grid navigation is claimed here",
+          "dataStateOwner": "derived from the cursor date; occurrences come from `expandOccurrences` over renderer/calendar.ts events"
+        },
+        "dateTransport": {
+          "feature": "Move through time: previous / today / next, plus a direct date jump",
+          "currentRoute": "Calendar window > `.cal-nav` > three buttons + `input[type=\"date\"]`, with the period named in `.cal-header-label`",
+          "keyboardRoute": "three real buttons and a native date input",
+          "dataStateOwner": "component state (the cursor date) in CalendarContent.tsx"
+        },
+        "eventComposer": {
+          "feature": "Create an event: the new-event composer and its cancel recovery",
+          "currentRoute": "Calendar window > `.calendar-context-head > .btn` opens `.cal-modal`; `.cal-modal-actions` carries save and cancel",
+          "keyboardRoute": "trigger is a real `type=\"button\"`; the modal is a form of native inputs, selects and a textarea",
+          "dataStateOwner": "renderer/calendar.ts — `addEvent` writes `LS_KEYS.calendarEvents` in localStorage and mirrors to `IDB_KEYS.calendarEvents`; the open composer itself is component state (`modal`)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Calendar window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "settings": {
+      "standardDestination": "SettingsApp in-window: the category rail on the left, the page pane (`role=\"main\"`) on the right",
+      "liquidDestination": "Same in-window SettingsApp on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE: the whole category rail is `ContextualSurface` (SettingsNav.tsx:45, :46, :65, :69) and so is the page header (SettingsApp.tsx:604), while `.os-set-pane-v2` itself stays a plain opaque body — a settings page is a form, and L2 keeps forms on stable anchors",
+      "noLiquidReason": null,
+      "features": {
+        "categoryRail": {
+          "feature": "Category rail: the only route to 18 of the 19 settings pages",
+          "currentRoute": "Settings window > `.os-set-nav-item`, each carrying both a visible label and a `title` (the label is clipped below 420px of `.os-set-body`, so `title` is the narrow tier's only text)",
+          "keyboardRoute": "real buttons; the current one publishes `aria-current=\"page\"`",
+          "dataStateOwner": "the item set is derived from settingsRegistry.ts; which one is current is component state (`page`, SettingsApp.tsx:131) and is not persisted"
+        },
+        "groupedNavigation": {
+          "feature": "Grouped navigation: labelled groups, each list wired to its own label",
+          "currentRoute": "Settings window > `.os-set-nav-group` > `.os-set-nav-group-label` + `.os-set-nav-list[aria-labelledby=\"set-nav-<group>\"]` (SettingsNav.tsx:65-72)",
+          "keyboardRoute": "each list is a labelled region a screen reader can enumerate; the items inside are buttons",
+          "dataStateOwner": "group membership is declared per entry in settingsRegistry.ts"
+        },
+        "settingsSearch": {
+          "feature": "Settings search — the second route in, and the one the command palette uses",
+          "currentRoute": "Settings window > `.os-set-search-input`, `aria-controls` naming its result panel and `aria-expanded` a real boolean",
+          "keyboardRoute": "text input; Escape closes the panel synchronously",
+          "dataStateOwner": "`searchSettings()` over settingsRegistry.ts (SettingsSearch.tsx:12); the query itself is component state and is cleared on close"
+        },
+        "advancedDisclosure": {
+          "feature": "Advanced mode: show or hide the advanced pages, with the rail agreeing with the claim",
+          "currentRoute": "Settings window > `.os-set-advanced-btn` (`aria-pressed`), advanced rail entries marked by `.os-set-adv-dot`",
+          "keyboardRoute": "a real toggle button carrying `aria-pressed` and a `title`",
+          "dataStateOwner": "renderer/settingsAdvanced.ts — persisted in localStorage under `jp-settings-advanced-v1`; UI unlock only, background systems run either way"
+        },
+        "pageRegion": {
+          "feature": "The page pane names itself after the destination the rail says is current",
+          "currentRoute": "Settings window > `.os-set-pane-v2[role=\"main\"]` with `aria-label` and `data-settings-page` (SettingsApp.tsx:596-600)",
+          "keyboardRoute": "a `main` landmark, reachable by landmark navigation",
+          "dataStateOwner": "component state (`page`) in SettingsApp.tsx; the label is derived from the same value the rail renders, which is what makes a stale name detectable"
+        },
+        "homeOverview": {
+          "feature": "Home overview: status chips with real values, and quick cards that are working destinations",
+          "currentRoute": "Settings window > Home > `.os-set-status-chip` (value in `strong`, caption in `.muted`) + `.os-set-quick-card` (SettingsHome.tsx:69ff, :162)",
+          "keyboardRoute": "quick cards are enabled buttons",
+          "dataStateOwner": "chips read live app state; the cards navigate through the same `page` state the rail uses"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Settings window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "scraper": {
+      "standardDestination": "Scraper window: `.scr-topbar` header, `.scr-rail` left navigation, the routed page body, `.scr-statusbar` footer, and the settings drawer that slides over the body when opened from the top bar",
+      "liquidDestination": "Same in-window Scraper shell on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: the top bar (ScraperTopBar.tsx:18), the whole rail (ScraperNav.tsx:22/34/42/53) and the status bar (ScraperStatusBar.tsx:25) are `ContextualSurface` chrome, while the shell search (ScraperSearch.tsx:89) and the drawer's own search and field list (ScraperSettingsDrawer.tsx:261, :319) are `AnchorSurface bare` — a form of ~40 editable controls is work, and L2 keeps work on stable opaque anchors",
+      "noLiquidReason": null,
+      "features": {
+        "railNavigation": {
+          "feature": "Reach every Scraper page from the left rail, with the current page marked and every item named",
+          "currentRoute": "Scraper window > `.scr-rail-item` (17 buttons across grouped `.scr-rail-list`s), the active one carrying `aria-current=\"page\"`",
+          "keyboardRoute": "real `type=\"button\"` list items inside `ul`/`li` with `aria-labelledby` group headings; `title` carries the label when the rail is collapsed and the description when it is not (ScraperNav.tsx:63)",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `navigateScraperShell` writes `page` (and the MRU `recentPages`) into localStorage `jp-scraper-shell-v1`, so the page survives a reopen"
+        },
+        "drawerCategories": {
+          "feature": "Settings drawer: pick a settings category and see its fields",
+          "currentRoute": "Scraper window > top-bar settings disclosure opens `.scr-drawer`; `.scr-drawer-rail > .scr-drawer-cat` x19, the active one carrying `aria-current=\"true\"`, over `.scr-field` rows",
+          "keyboardRoute": "real `type=\"button\"` category buttons; category clicks are wrapped in `startTransition` so the click paints before the page behind the drawer re-renders (ScraperSettingsDrawer.tsx:289)",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `drawerOpen` and `drawerCategory` are fields of the same persisted `jp-scraper-shell-v1` document, so a reopened window comes back to the category you left"
+        },
+        "settingsFields": {
+          "feature": "Every settings field is a labelled control, never a bare input",
+          "currentRoute": "Scraper window > `.scr-drawer` > `.scr-fields` > `.scr-field`, each rendering `.scr-field-label` (FieldRow.tsx:312) and `.scr-field-control` (:327)",
+          "keyboardRoute": "native inputs, selects, toggles and range pairs inside a labelled row",
+          "dataStateOwner": "renderer/scraperSettingsStore.ts — localStorage `jp-scraper-settings-v1`, a per-site document with presets; `getActiveScraperSettings(site)` is what the rest of the app reads"
+        },
+        "shellSearch": {
+          "feature": "Shell search: a combobox over pages and recent queries, collapsed until used",
+          "currentRoute": "Scraper window > `.scr-search > .scr-search-input`, `role=\"combobox\"` with `aria-controls=\"scr-search-results\"` and `aria-expanded` reflecting the popover (ScraperSearch.tsx:104-113)",
+          "keyboardRoute": "native `type=\"search\"` input; the popover is a composite with the field, so focus moving to a result keeps it open and focus leaving it dismisses it (ScraperSearch.tsx:93-99)",
+          "dataStateOwner": "component state (`query`, `open`) in ScraperSearch.tsx; the recent-query list comes from renderer/components/scraper/scraperRecent.ts and is the only persisted part"
+        },
+        "statusActions": {
+          "feature": "Status bar: run state, selection, last scrape and next schedule, each a route into the page that explains it",
+          "currentRoute": "Scraper window > `.scr-statusbar button` — the run-state button plus the last-scrape and next-schedule fields (and a selection button when a selection exists), every one carrying a `title`",
+          "keyboardRoute": "real `type=\"button\"` elements, all enabled",
+          "dataStateOwner": "derived — job counts from ScraperApp state (`dashboardJobActive` / `transientJobActive`), last scrape and next schedule from the scraper history and schedule data the pages read"
+        },
+        "reverseControls": {
+          "feature": "Every drawer the shell opens can be closed again, from a control that says it is open",
+          "currentRoute": "Scraper window > `.scr-drawer-head .ui-icon-btn` (the drawer's own close) and the top-bar disclosure at ScraperTopBar.tsx:78-86, which carries `aria-expanded` + `aria-controls` rather than `aria-pressed`",
+          "keyboardRoute": "two real buttons; the disclosure is the APG pattern, so a screen reader announces the drawer as expanded rather than as a pressed toggle",
+          "dataStateOwner": "renderer/scraperShellStore.ts — `drawerOpen` in `jp-scraper-shell-v1`; closing is a `patch({ drawerOpen: false })`, the exact inverse of opening"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Scraper window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "resources": {
+      "standardDestination": "ResourcesContent in-window: the `.res-command-surface` command strip on top (heading, catalogue search, filter chips, visible-count line), then the landing sections (learner heat map, bundles, New, My tools) and the per-category `.res-group` catalogue below",
+      "liquidDestination": "Same in-window Resources view on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE, not universal: `resourcesLiquid.css` puts the material on the `.res-command-surface` only (the view head, the filter controls and the refresh hint), and the catalogue below it — groups, cards, bundles, the heat map and the My-tools strip — stays a plain opaque body, because a grid of link cards is a list to read rather than chrome to look through",
+      "noLiquidReason": null,
+      "features": {
+        "categoryRail": {
+          "feature": "Filter the catalogue by category, with every rendered group offered as a chip",
+          "currentRoute": "Resources window > `.res-filter .gram-level-btn` chips, exactly one carrying `active`, over the `.res-group .res-group-head h2` headings they filter to",
+          "keyboardRoute": "real buttons in the command strip",
+          "dataStateOwner": "component state (`filter`) in ResourcesContent.tsx over the static `renderer/data/resources.ts` catalogue — not persisted, so a reopen returns to All"
+        },
+        "catalogueCount": {
+          "feature": "The visible-count line equals what is actually painted",
+          "currentRoute": "Resources window > `.gram-count` line, counted against `.res-group .res-card` (group cards only — the New and My-tools strips also render `.res-card`)",
+          "keyboardRoute": "not a control; it is the surface's own claim about the filtered catalogue",
+          "dataStateOwner": "derived from `filter` + `query` over `renderer/data/resources.ts`, with `renderer/data/catalogFallback.ts` behind it"
+        },
+        "resourceCards": {
+          "feature": "Every catalogue card names itself, says which of free/paid/freemium it is, names the host it opens, and marks itself external",
+          "currentRoute": "Resources window > `.res-group .res-card` > `.res-name` + `.res-cost` + `.res-host` + `.res-open` (ResourcesContent.tsx:456-464)",
+          "keyboardRoute": "each card is a real `button`; activating it opens the external URL through the shell",
+          "dataStateOwner": "static `renderer/data/resources.ts` — name, cost and host are authored fields, not fetched"
+        },
+        "bundleGrid": {
+          "feature": "Curated bundles, each with its gem, title, link count and a checklist that cannot claim more ticks than it holds",
+          "currentRoute": "Resources window > `.bundles-section .bundle-card` > `.bundle-card-gem` + `.bundle-card-title` + `.bundle-card-foot span` + `.bundle-card-checkmark`",
+          "keyboardRoute": "bundle cards are real buttons; the detail view is reachable and reversible",
+          "dataStateOwner": "bundle definitions are static; the per-bundle checklist is localStorage under the `resources.checklist.<bundleId>` prefix (ResourcesContent.tsx:49-63), which is why a stale list is the fabricated-progress case this row guards"
+        },
+        "collectedSections": {
+          "feature": "The two OPTIONAL landing strips — My tools and New — render nothing rather than an empty heading, and a collected tool always carries its remove control",
+          "currentRoute": "Resources window > `.mytools-section .mytool-card` (`.mytool-name` + `.mytool-remove`) and `.new-section .new-card` (`.res-name` + `.res-host`); both return `null` when empty",
+          "keyboardRoute": "remove is a real `IconButton`; the New strip is a native `<details>` disclosure",
+          "dataStateOwner": "main-process collected-tools store through `window.api.toolsList/toolsAdd/toolsRemove` (shared/collectedTools.ts) — NOT localStorage, and shared with Blanc's app drawer"
+        },
+        "learnerHeatMap": {
+          "feature": "Learners-by-country greeting whose caption count equals the countries actually painted",
+          "currentRoute": "Resources window > `.heatmap-section` > `.heatmap-caption` over either `.heatmap-svg path` (choropleth) or `.heatmap-bar-row` (bars, each `.heatmap-bar-fill` width being its share of the largest)",
+          "keyboardRoute": "not a control; it is a read-only figure with an `aria-label` on the `role=\"img\"` svg",
+          "dataStateOwner": "main-process `window.api.statsCounts()` (WorldHeatMap.tsx:82) — anonymous aggregate counts, fetched, so the section is correctly absent when there are none"
+        },
+        "landingAgreement": {
+          "feature": "The landing sections and the command surface agree: the bundles strip is mounted exactly when the catalogue is unfiltered and unsearched",
+          "currentRoute": "Resources window > `.gram-search` value + the first `.res-filter .gram-level-btn` chip, witnessed against `.bundles-section` being mounted",
+          "keyboardRoute": "a native search input and a real chip button; both are what the user changes to leave the landing state",
+          "dataStateOwner": "component state (`query`, `filter`) in ResourcesContent.tsx — `showLanding` is `filter === \"All\" && !query.trim()`, derived rather than stored"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Resources window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "city": {
+      "standardDestination": "Mooncap window (frameless): the `.reading-garden` scene itself — parallax world layers, cloud sprites and the life canvases — with the mushroom hitbox as the only hero affordance, and the `.reading-garden-info` dossier dialog it discloses on top",
+      "liquidDestination": null,
+      "noLiquidReason": "NONE, and it is a product fact this run measured rather than assumed. Mooncap is a frameless window: `liquidAbsence` reports `targetHasLiquidControl: false` with `targetChromeButtons: 3` (a real chrome cluster, so the absence is not a missing title bar) and `targetPresentation: \"standard\"`, while Resources open beside it DOES render `.fwin-b-liquid` — a discriminating control taken at the same instant over every open window. The surface is a painted scene, not a document over a material, so there is nothing for a translucent layer to sit in front of; L12 bullet 1 records the same three sections (city / musicwidget / visualizer) as having no presentation toggle. The round trip that stands in for the presentation flip is therefore minimize -> restore through the taskbar, and it held.",
+      "features": {
+        "dossierDisclosure": {
+          "feature": "Open the dossier from the hero, and get back out of it",
+          "currentRoute": "Mooncap window > `.reading-garden-mushroom-hitbox` (`aria-expanded` + `aria-controls`) opens `.reading-garden-info` (`role=\"dialog\"` with an `aria-label`), closed again by `.reading-garden-info-close`",
+          "keyboardRoute": "the hitbox is a real focusable disclosure and the panel is a labelled dialog with an enabled close — the APG pattern, ratcheted by `renderer/__tests__/readingGardenDossierKeyboard.test.tsx`",
+          "dataStateOwner": "component state in ReadingGarden.tsx — the dossier is not persisted, so a reopen comes back closed"
+        },
+        "stageReadout": {
+          "feature": "The stage the badge claims is the stage the scene paints",
+          "currentRoute": "Mooncap window > `.reading-garden-info-stage strong` badge against the `stage-band-N` class on `.reading-garden` itself",
+          "keyboardRoute": "not a control; it is the surface stating its own state in two places",
+          "dataStateOwner": "renderer/readingGardenProgress.ts — localStorage `jp-reading-garden-v1`; the band is computed from the same stage by `floor((stage-1)/10)+1`, so a disagreement is the surface lying to itself"
+        },
+        "dossierFacts": {
+          "feature": "Three dossier facts, all filled, with the banked-pages sentence agreeing with the progress bar it sits above",
+          "currentRoute": "Mooncap window > `.reading-garden-info-dossier > div` (`dt`/`dd` pairs), `.reading-garden-info-copy strong` and the inline width of `.reading-garden-info-track i`",
+          "keyboardRoute": "not controls; a definition list and a progress bar",
+          "dataStateOwner": "renderer/readingGardenProgress.ts — `pagesRead` and `bankedPages` in localStorage `jp-reading-garden-v1`; the sentence and the bar are the SAME fraction rendered twice, which is what makes a bar that stopped tracking detectable"
+        },
+        "musicControls": {
+          "feature": "Ambient music on/off, with the volume slider disabled exactly when music is off",
+          "currentRoute": "Mooncap window > `.reading-garden-info-music-toggle button` x2 in a `role=\"group\"`, exactly one `aria-pressed`, gating `.reading-garden-info-music-volume input`",
+          "keyboardRoute": "two real buttons and a native range input",
+          "dataStateOwner": "renderer/components/reading-garden/mooncapMusic.ts — localStorage `jp-mooncap-music-v1`, so the choice survives a reopen"
+        },
+        "musicVolumeReadout": {
+          "feature": "The volume number shown is the volume the slider holds",
+          "currentRoute": "Mooncap window > `.reading-garden-info-music-volume input[type=range]` against the `strong` readout beside it",
+          "keyboardRoute": "a native range input, arrow-key operable",
+          "dataStateOwner": "same `jp-mooncap-music-v1` document; the readout is derived from the input value, never stored separately"
+        },
+        "scenePainted": {
+          "feature": "The scene is actually painted: every canvas has pixels and the parallax layers are all present",
+          "currentRoute": "Mooncap window > `.reading-garden canvas` elements, plus `.reading-garden-world` / `.reading-garden-cloud-sprite` parallax layers",
+          "keyboardRoute": "not a control; it is the decorative half, scored so an empty scene cannot pass as a working one",
+          "dataStateOwner": "drawn at runtime by ReadingGardenLifeCanvas.tsx and the mushroom-bed/sprite modules from the same stage value — no stored bitmap"
+        },
+        "heroPlacement": {
+          "feature": "The hero affordance is inside the window and big enough to hit",
+          "currentRoute": "Mooncap window > `.reading-garden-mushroom-hitbox` rect, compared against the window rect",
+          "keyboardRoute": "the hitbox is the keyboard route to the dossier as well as the pointer one",
+          "dataStateOwner": "derived from stage geometry (`cellForStage`, `cameraStyleForStage`) — no stored position"
+        },
+        "devOnlyIsolated": {
+          "feature": "Development-only affordances are marked as such and never mixed into the user controls",
+          "currentRoute": "Mooncap window > `[data-dev-only=\"true\"]` nodes, each of whose class names must say console/debug/dev, alongside the real `button, input, select, textarea` controls",
+          "keyboardRoute": "not a route; it is the guarantee that the surface a user reaches contains no developer instrumentation",
+          "dataStateOwner": "none — the marking is structural, from the sky-console harness in ReadingGardenSkyEvents.tsx"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Mooncap window > `.fwin-frameless-controls` chrome cluster (frameless, so the buttons live outside the usual title bar)",
+          "keyboardRoute": "real buttons in the frameless control cluster",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "shell": {
+      "standardDestination": "The Study OS shell itself — `.os-desktop`: the desk surface and its icon grid, the `.os-taskbar` (start control, virtual-desktop switches, one button per hosted window, the tray and its clock) and the surfaces the taskbar discloses (`.os-start`, `.os-flyout`)",
+      "liquidDestination": "The SAME shell, unchanged, while a window it hosts is in Liquid. The shell is the container, not the content: the presentation axis flips a hosted `.fwin`, and every row here is scored on the desk and the taskbar OUTSIDE that window (`shq` excludes anything inside `.fwin`). That is the parity claim — a window going translucent must not cost the shell a capability, and the L2 rule that keeps dense work on stable anchors applies to the shell most of all, since the taskbar is the only route back to a window that is behind another.",
+      "features": {
+        "taskbarIdentity": {
+          "feature": "One taskbar button per hosted window, each still carrying its own window's identity",
+          "currentRoute": "Taskbar > `.os-task-wins` > `.os-task-win` (one per `.fwin` the desk hosts), each with a `title` naming its window",
+          "keyboardRoute": "real `<button>`s in the taskbar's focus order; the close affordance is a child of the button, so the button itself stays the raise route",
+          "dataStateOwner": "DesktopShell's `wins` state, hydrated from the main-process desktop layout snapshot (renderer/desktopState.ts; the `jp-os-wins` localStorage key is the migrated-from legacy)"
+        },
+        "taskbarRaises": {
+          "feature": "The taskbar button raises its window to the top of the stack, from behind another window",
+          "currentRoute": "Taskbar > `.os-task-win` for a window that is NOT already on top; the row reads the z-order rank afterwards, never the click",
+          "keyboardRoute": "the same buttons, activated by Enter/Space",
+          "dataStateOwner": "DesktopShell window z-order (`globalZTop` in the desktop layout snapshot) — persisted, so the stack survives a reopen. The button is a TOGGLE: one click raises or restores, a second minimises what the first brought up."
+        },
+        "startEntryPoint": {
+          "feature": "The start control opens the app menu, and closes it again",
+          "currentRoute": "Taskbar > `.os-start-btn` opens `.os-start`; dismissed by `.os-start-backdrop` or by the start control again",
+          "keyboardRoute": "a real button that toggles a mounted surface, with a backdrop dismissal",
+          "dataStateOwner": "component state (`startOpen`) in DesktopShell.tsx — not persisted, so the menu is closed on every boot"
+        },
+        "trayFlyout": {
+          "feature": "A tray control opens its flyout, and the same control closes it",
+          "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (Quick settings) opens `.os-flyout`; the same button closes it — `.os-panel-backdrop` was MEASURED not to dismiss it and is deliberately not used",
+          "keyboardRoute": "real buttons carrying `aria-haspopup=\"dialog\"`, each with `title` and `aria-label`",
+          "dataStateOwner": "quick settings is a shell-level surface driven by the `shell:toggleQuickSettings` window event; tray overflow is component state (`trayOverflowOpen`) with `aria-expanded` + `aria-controls`"
+        },
+        "virtualDesktops": {
+          "feature": "Two virtual desktops, with exactly one marked current",
+          "currentRoute": "Taskbar > `.os-desktop-switches` > `.os-desktop-switch` x2, exactly one carrying `active` and `aria-pressed`",
+          "keyboardRoute": "two real buttons; `aria-pressed` states which desktop you are on programmatically, not only in paint",
+          "dataStateOwner": "renderer/desktopState.ts — `activeDesktopIndex` in the main-process desktop layout snapshot; switching flushes the outgoing viewport's windows and icons before hydrating the incoming one, so each desktop keeps its own"
+        },
+        "trayControls": {
+          "feature": "Every tray control is NAMED — an icon-only button with no accessible name is a capability the user cannot find",
+          "currentRoute": "Taskbar > `.os-tray` > `.os-tray-btn` (search, hidden icons, quick settings, the notification bell, show desktop), each read for `title` or `aria-label`",
+          "keyboardRoute": "the accessible name IS the keyboard route here: these are icon-only buttons and the name is the only thing that distinguishes them",
+          "dataStateOwner": "none — the naming is structural, from `t()` keys in DesktopShell.tsx; the show-desktop button additionally carries `aria-pressed` for its own toggled state"
+        },
+        "clock": {
+          "feature": "The taskbar clock reads a real time",
+          "currentRoute": "Taskbar > `.os-clock` (TaskbarClock), matched against `\\d{1,2}:\\d{2}` rather than asserted present",
+          "keyboardRoute": "not a control; it is the shell stating the time",
+          "dataStateOwner": "renderer/desktopPrefs.ts — localStorage `jp-os-desktop-prefs-v1` carries `clockSeconds`, `clock24h` and `clockShowDate`; the time itself is live and stored nowhere"
+        },
+        "shellIdentity": {
+          "feature": "A material theme's identity is real: the stamp belongs to the active theme and the shell renders that material's own furniture",
+          "currentRoute": "`<html data-materials>` + `<html data-theme>`, against shell-owned furniture — `.wired-wall-atmosphere` / `.wired-tray-lamps` (wired only, DesktopShell.tsx:2748 and :3502) and `.os-start-aero-menu`, the secret start surface BOTH material sets render (DesktopShell.tsx:683), recorded while the menu is open",
+          "keyboardRoute": "not a control; it is the shell's claim about which OS the user is in, checked against what it actually painted",
+          "dataStateOwner": "renderer/theme/engine.ts — localStorage `jp-os-theme` holds the theme id, and `applyThemeAttributes` is the single choke point that stamps `data-materials` from that theme's `materialSet`. On the base theme there is no material set, so the row is `na` rather than false."
+        },
+        "desktopSurface": {
+          "feature": "The shell owns a real desk the user can drop onto, and its icon count is what the shell rendered",
+          "currentRoute": "`.os-desktop` rect, plus `.os-desk-icon` counted rather than asserted — an empty grid is honest state, not a failure",
+          "keyboardRoute": "the icons are focusable desk entries; the desk itself is a drop target, not a control",
+          "dataStateOwner": "renderer/desktopState.ts — `icons` per viewport in the desktop layout snapshot (legacy key `jp-os-icons`), seeded per desktop (`SEED_CITY_ICONS` for the city viewport, empty for study)"
+        }
+      }
+    },
+    "blancShell": {
+      "standardDestination": "The Blanc shell in its own BrowserWindow (`blanc.html?blanc=1`, BlancShell.tsx): the `.blanc-taskbar` route rail down the left, the `.blanc-top` bar with the title, clock, master search and the Context tools disclosure, and the 42 tools rendering inside `.blanc-content`. It hosts **0** `.fwin` — this is a second, separate shell, not a window on the Study OS desk.",
+      "liquidDestination": "The SAME shell with its chrome REDUCED: `.blanc-root.is-taskbar-hidden`, reached by `.blanc-taskbar-toggle` and reversed by `.blanc-taskbar-reveal`. That is this host's presentation axis and the choice is recorded rather than assumed — NOT `workspaceFull` (its handler calls `window.api.blancSetFullScreen()`, a persisted native mutation the category never asked for) and NOT dark mode (a palette swap leaves every capability where it was, so parity would be equal by construction). Hiding the taskbar removes nine routes and the exit from the screen while leaving `.blanc-content` untouched, so \"is any capability lost when the chrome is reduced?\" is a real question with a real reveal affordance as its answer.",
+      "features": {
+        "taskbarIdentity": {
+          "feature": "One titled route per section, exactly one current, and the current one agreeing with the title the shell painted",
+          "currentRoute": "Blanc window > `.blanc-taskbar` > `.blanc-nav` > `.blanc-nav-btn` x9 (Read, Mine, Deck, Cards, Media, Stats, Toolbox, Blocks, Settings), each with a `title`, cross-checked against `.blanc-title` in the top bar",
+          "keyboardRoute": "real `<button>`s in the rail's focus order; `active` marks the current one and the painted title is the second, independent statement of the same fact",
+          "dataStateOwner": "BlancShell `tab` state, seeded from `loadBlancMode().lastTab` when `rememberLastTab` is set — localStorage `jp-blanc-mode-v1` / `jp-blanc-memory-v1` (renderer/blancMode.ts)"
+        },
+        "navRoutes": {
+          "feature": "Clicking a route actually changes the surface, and the shell paints the route it was asked for",
+          "currentRoute": "Blanc window > `.blanc-nav-btn` for a route that is NOT current, read back off `.blanc-title`; the run then restores whichever route the user had open",
+          "keyboardRoute": "the same rail buttons, activated by Enter/Space",
+          "dataStateOwner": "BlancShell `tab` state; persisted through renderer/blancMode.ts only when the user has asked Blanc to remember the last tab, so a fresh window opens on Read"
+        },
+        "chromeRecoverable": {
+          "feature": "The chrome can be reduced and brought back, with the SAME routes returning — an enable with a real disable path",
+          "currentRoute": "Blanc window > `.blanc-taskbar-toggle` hides `.blanc-taskbar`; `.blanc-taskbar-reveal` (rendered only while hidden and not fullscreen) brings it back with all nine routes",
+          "keyboardRoute": "two real buttons; the reveal control is the only route back, which is why its presence is scored rather than assumed",
+          "dataStateOwner": "BlancShell `taskbarHidden` component state — deliberately NOT persisted, so a reduced shell cannot be inherited by the next launch"
+        },
+        "clock": {
+          "feature": "The Blanc top bar reads a real time",
+          "currentRoute": "Blanc window > `.blanc-clock`, matched against `\\d{1,2}:\\d{2}` rather than asserted present",
+          "keyboardRoute": "not a control; it is the shell stating the time",
+          "dataStateOwner": "none — live, stored nowhere. Blanc does not share the Study OS taskbar's `jp-os-desktop-prefs-v1` clock format."
+        },
+        "masterSearch": {
+          "feature": "Master search: Blanc's one cross-tool capability, opened by its own control and dismissed by Escape",
+          "currentRoute": "Blanc window > `.blanc-icon-btn` (aria-label \"Search Blanc\", Ctrl+F) opens `.blanc-master-search`, whose results are `#blanc-master-search-results [role=\"option\"]`",
+          "keyboardRoute": "a labelled icon button plus Ctrl+F, and Escape closes it — the dialog is a sibling of the shell chrome, not inside it",
+          "dataStateOwner": "BlancShell `masterSearchOpen` component state; the RESULTS are read live across the collected-tools store, saved words, deck cards, dictionary history, grammar points and the library — nothing about the search itself is persisted"
+        },
+        "contextTools": {
+          "feature": "The Context tools disclosure's declared state and its rendered state move together",
+          "currentRoute": "Blanc window > `.blanc-compact-tools-toggle` (`aria-expanded` + `aria-controls=\"blanc-top-context\"`) against `#blanc-top-context.is-open`",
+          "keyboardRoute": "a real disclosure button carrying `aria-expanded` and `aria-controls` — an `aria-expanded` that lies is a capability a screen-reader user is told about and cannot reach",
+          "dataStateOwner": "BlancShell `compactToolsOpen` component state — not persisted, so the disclosure is shut on every open"
+        },
+        "workspaceToggleHonest": {
+          "feature": "The fullscreen-workspace control's label describes the state it would move to, and its exit affordance agrees",
+          "currentRoute": "Blanc window > `#blanc-top-context` > `.blanc-icon-btn` titled \"Fullscreen workspace\" / \"Exit fullscreen workspace\", against `.blanc-root.is-workspace-full` and the `.blanc-fullscreen-exit` affordance. It is ROUTE-SCOPED: `canExpandWorkspace` (BlancShell.tsx:430) is `book || tab is one of mine/flashcards/media/stats/tools`, so on Read with no book open the control is deliberately absent and the row reads it on the route the drive visited instead.",
+          "keyboardRoute": "a titled icon button inside the Context tools disclosure; the title is the only thing that says which way the toggle goes",
+          "dataStateOwner": "BlancShell `workspaceFull` component state, whose effect calls `window.api.blancSetFullScreen()` — so the real OS window's fullscreen is downstream of it. That native, persisted side effect is exactly why this row is READ and never DRIVEN."
+        },
+        "shellIdentity": {
+          "feature": "Blanc's own material identity is real, and the Study OS desktop is not painting underneath it",
+          "currentRoute": "Blanc window > `[data-lq-role=\"liquid\"]` regions — `.blanc-taskbar` and `.blanc-top`, the two the shell owns — with `.os-desktop` required ABSENT from the same document",
+          "keyboardRoute": "not a control; it is the shell's claim about which of the two shells the user is in",
+          "dataStateOwner": "structural, from BlancShell.tsx. `blancMain.tsx` additionally strips `data-materials` on boot and keeps a MutationObserver on it, so a Study OS material pack cannot leak into this window."
+        }
+      }
+    },
+    "games": {
+      "standardDestination": "Game Arena window, in-window `.game-arena`: the game list down the left, the stage head and its level/language/high-score chips, the two coverage bars, the ready panel with its length note and settings disclosure, the recent-rounds history, and the round shell that replaces the ready panel once a round starts",
+      "liquidDestination": "The same in-window `.game-arena` on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`. SELECTIVE and already built that way: §11's Games split puts the post-round detail and the coverage read-outs on `ContextualSurface` seams (GameArenaContent.tsx:455 and the coverage sections) while the gameplay canvas, the answer box and the history list stay plain opaque bodies — a list of your own last rounds is a table, and L2 keeps tables on stable anchors.",
+      "features": {
+        "gameCatalog": {
+          "feature": "Browse the game catalogue and select one, with exactly one selected and every entry named and blurbed",
+          "currentRoute": "Game Arena window > `.game-list-item` (one per available game), each with its own `small` blurb; `active` marks the selection",
+          "keyboardRoute": "real `<button>`s in the window's focus order",
+          "dataStateOwner": "component state (`selected`) in GameArenaContent.tsx over `GAME_DEFINITIONS`; the arcade entries are filtered in only once the Aero or Wired theme has been discovered (renderer/aeroDiscovery.ts, renderer/wiredDiscovery.ts), so the catalogue length is a fact about this profile, not a constant"
+        },
+        "stageIdentity": {
+          "feature": "The stage names the game the list says is selected, and its description is that game's own",
+          "currentRoute": "Game Arena window > `.game-stage-head h3` and `.game-stage-head p.muted`, cross-checked against the `active` `.game-list-item`",
+          "keyboardRoute": "not a control; it is the surface stating its selection in two places, which is what makes a stale stage detectable",
+          "dataStateOwner": "derived from the same `selected` state — nothing separate is stored, so a disagreement is the surface lying to itself"
+        },
+        "sourceMaterial": {
+          "feature": "Deck coverage for this level: a labelled bar whose fill agrees with the number beside it, and which says so plainly when there is no word list at all",
+          "currentRoute": "Game Arena window > the `.game-coverage` section that is NOT `.game-seen` > its label, note and `.game-coverage-bar i` inline scale",
+          "keyboardRoute": "not a control; a labelled progress read-out",
+          "dataStateOwner": "renderer/games/contentStore.ts `levelCoverage(level)` over the level word lists (renderer/levelLists.ts, localStorage `jp-level-lists` as the synchronous startup cache). An empty profile is HONEST STATE here — \"No word list uploaded for this level\" with a zero-width bar, not a hidden section."
+        },
+        "exposureTracking": {
+          "feature": "Items seen: the stated percentage, the derived percentage and the bar fill are the same number three times",
+          "currentRoute": "Game Arena window > `.game-seen` > its stated `pct`, its `seen/total` counts and the `.game-coverage-bar i` inline scale",
+          "keyboardRoute": "not a control; a progress read-out that cross-checks itself",
+          "dataStateOwner": "renderer/games/seenProgress.ts — localStorage `jp-game-arena-seen-v1`, updated by `markItemSeen` as rounds are played"
+        },
+        "typingInput": {
+          "feature": "Start a round, type an answer, and have submit unlock — then abort back to a ready state that is really ready",
+          "currentRoute": "Game Arena window > `.game-launch-panel > .btn.primary` starts; `.game-answer-box` takes the answer; `.game-round .btn.primary` is the submit whose `disabled` must move; abort returns to `.game-launch-panel` with no `.game-round-shell`",
+          "keyboardRoute": "a real text input and real buttons; submit's `disabled` is the declared state of \"you have not answered yet\"",
+          "dataStateOwner": "the round session lives in component state built by `buildGameRound` (renderer/games/engine.ts) and is deliberately NOT persisted — an aborted round leaves nothing behind, which is what makes the abort recovery safe to drive"
+        },
+        "scoreHud": {
+          "feature": "The round HUD is labelled and its round total equals the session length the ready panel promised",
+          "currentRoute": "Game Arena window > `.game-round-hud > span` (labelled, with a `.game-time-bar` carrying `aria-valuenow`), cross-checked against the `.game-launch-panel > .muted` session-length note",
+          "keyboardRoute": "not controls; the HUD is the round stating its own progress, and `aria-valuenow` is how a screen reader gets the timer",
+          "dataStateOwner": "renderer/games/settings.ts `gameLength` — localStorage `jp-game-arena-settings-v1`; the round list is built to that length, so the HUD total and the note are the same setting rendered twice"
+        },
+        "roundHistory": {
+          "feature": "Recent rounds are shown back to the player, with an honest empty state when there are none",
+          "currentRoute": "Game Arena window > `.game-history` > `h4` heading, `.game-history-row` entries or the `.game-history-empty` note",
+          "keyboardRoute": "not controls; an ordered list read in the ready state, which is the one moment the stage has nothing else to say",
+          "dataStateOwner": "renderer/stats.ts — localStorage `jp-game-progress-v1` keeps the last 30 results; the panel filters them to the selected game and shows at most 12. Every finished round was already persisted here and nothing had ever shown it back to the player."
+        },
+        "materialScope": {
+          "feature": "The kana material picker: choose a scope, and the shape of the selection holds across the choice",
+          "currentRoute": "Game Arena window > `.game-kana-picker` > its mode row and script/group buttons; the chosen mode and the counts it implies are read back together",
+          "keyboardRoute": "real buttons in rows; the picker is the only route to narrowing what a round draws from",
+          "dataStateOwner": "renderer/games/settings.ts `KanaSelection` — localStorage `jp-game-arena-settings-v1`, so the scope survives a reopen; `auto` is the mode that defers to the level lists instead of a fixed script"
+        },
+        "levelSettings": {
+          "feature": "The stage meta chips (level, language, high score) stay stable across a game switch, and the settings disclosure is a real route into them",
+          "currentRoute": "Game Arena window > `.game-stage-meta > span` chips, plus `.game-ready-options` and its `.game-ready-options-body > button` entry into Settings",
+          "keyboardRoute": "a `<details>` disclosure with a real button inside — the chips are read-outs, the entry is the route",
+          "dataStateOwner": "level from renderer/levelService.ts (`getUserLevel`), language and length from `jp-game-arena-settings-v1`, high score from `jp-game-progress-v1` keyed by game+level+sourceLang. Switching the GAME must not move any of them, which is what this row checks."
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Game Arena `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+          "keyboardRoute": "the chrome buttons are in the window's focus order",
+          "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\""
+        }
+      }
+    },
+    "mediaCenter": {
+      "standardDestination": "the named page replaces `.mc-content` in-window",
+      "liquidDestination": "Same in-window Media Center (`.mc-root`) on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense library rows kept on an opaque anchor; the nav rail is the ContextualSurface (`bde1b435`)",
+      "features": {
+        "navRail": {
+          "feature": "Section rail: Home / Library / Video / Music / Study Mode / Readiness / Review / Discover",
+          "currentRoute": "Media Center window > `.mc-nav`: Home / Library / Video / Music / Study Mode always visible; Readiness / Review / Discover behind `details.mc-nav-group` (collapsed by default, forced open while one of them is the active tab), plus `Ctrl+1..8` on `.mc-root` regardless of the disclosure",
+          "keyboardRoute": "all eight are real buttons, focusable",
+          "dataStateOwner": "view state, local to MediaCenterView"
+        },
+        "libraryShelves": {
+          "feature": "Library shelves: Home / Recently added / Continue watching / Study queue / Favorites / Tracking / media type",
+          "currentRoute": "Media Center > Library > `.ui-sidebar__item` rail",
+          "keyboardRoute": "nine real buttons carrying `aria-current`",
+          "dataStateOwner": "MediaLibraryShell scope, persisted under its own key"
+        },
+        "librarySearch": {
+          "feature": "Library search narrows the grid",
+          "currentRoute": "Media Center > top bar > `.mc-global-search input`",
+          "keyboardRoute": "a real `type=search` input, focusable",
+          "dataStateOwner": "MediaState.query -> debouncedQuery -> searchMediaHub"
+        },
+        "sortAndViewMode": {
+          "feature": "Sort and view mode (grid / list)",
+          "currentRoute": "Media Center > Library > `.medialib-browser__tools > details.medialib-view` — one disclosure holding the sort `<select>` and the grid/list group; the active sort is printed on the closed summary",
+          "keyboardRoute": "a real `<select>` plus two `aria-pressed` buttons",
+          "dataStateOwner": "per-category sort state; view persisted"
+        },
+        "perItemActions": {
+          "feature": "Per-item actions (card `More actions` menu)",
+          "currentRoute": "Media Center > Library > `.medialib-card__more`",
+          "keyboardRoute": "a real button; the menu takes Escape and arrow keys",
+          "dataStateOwner": "MediaLibraryShell cardMenu state"
+        },
+        "historyHonest": {
+          "feature": "History: Back / Forward across Media Center pages",
+          "currentRoute": "Media Center > top bar > `.mc-history-buttons`",
+          "keyboardRoute": "two real buttons with a real `disabled`",
+          "dataStateOwner": "MediaCenterView history trail"
+        },
+        "workspaceLauncher": {
+          "feature": "Route out to the Media workspace and back",
+          "currentRoute": "Media Center > `.mc-nav > details.mc-nav-group > .mc-seanime-link`, then the host bar's `Close`",
+          "keyboardRoute": "both are real buttons",
+          "dataStateOwner": "openMediaWorkspace / mediaWorkspaceHostExists"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close, Make Liquid",
+          "currentRoute": "Media Center window > `.fwin-b` chrome",
+          "keyboardRoute": "five real buttons; the Liquid toggle carries `aria-pressed`",
+          "dataStateOwner": "DesktopShell window state"
+        }
+      }
+    },
+    "grammar": {
+      "standardDestination": "GrammarContent in-window (`.gram-view`)",
+      "liquidDestination": "Same in-window `.gram-view`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "modeSwitch": {
+          "feature": "Switch between the four sections (Grammar points / Practice / Guides & hacks / Review)",
+          "currentRoute": "Grammar window > `.gram-mode-btn` segmented control",
+          "keyboardRoute": "buttons are real `<button>`s in tab order; exclusivity is carried by the `active` class, not by focus",
+          "dataStateOwner": "renderer-local view state (GrammarView)"
+        },
+        "patternList": {
+          "feature": "Browse the grammar catalogue with level badges",
+          "currentRoute": "Grammar window > `.gram-x-list` rows",
+          "keyboardRoute": "each row is a focusable `.gram-x-row-main` button",
+          "dataStateOwner": "bundled grammar dataset (renderer)"
+        },
+        "search": {
+          "feature": "Search/filter the catalogue",
+          "currentRoute": "Grammar window > `.gram-search` input",
+          "keyboardRoute": "text input, real keystrokes via the native value setter + `input` event",
+          "dataStateOwner": "renderer-local filter state"
+        },
+        "detail": {
+          "feature": "Open a pattern's detail (structure, gloss, examples)",
+          "currentRoute": "Grammar window > click a `.gram-x-row-main`",
+          "keyboardRoute": "row is a button; the detail pane renders below it in the same window",
+          "dataStateOwner": "bundled grammar dataset (renderer)"
+        },
+        "bandControl": {
+          "feature": "Grade a pattern (the study-state band control)",
+          "currentRoute": "Grammar window > `.gram-x-band .wk-grade-btn`",
+          "keyboardRoute": "four buttons in tab order",
+          "dataStateOwner": "persisted study state (grammar band store)"
+        },
+        "presets": {
+          "feature": "Filter presets (select + save)",
+          "currentRoute": "Grammar window > `.gram-x-preset-select` + `Save`",
+          "keyboardRoute": "select and button, both focusable",
+          "dataStateOwner": "persisted preset store"
+        },
+        "agentHandoff": {
+          "feature": "Hand the focused pattern to the Agent (L5 bullet 1)",
+          "currentRoute": "Grammar window > `.gram-ask-agent` in `GrammarDetail` (Blanc composes the same component)",
+          "keyboardRoute": "button, 209x31, contrast 7.9:1 (measured 2026-08-25, `d49d53cf`)",
+          "dataStateOwner": "agent conversation context store (session + persisted split by sensitivity)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Grammar window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
+    },
+    "agent": {
+      "standardDestination": "AgentWorkspaceShell in-window (`.agent-root`)",
+      "liquidDestination": "Same in-window `.agent-root`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "conversationRail": {
+          "feature": "Browse and select a conversation",
+          "currentRoute": "Agent window > `.agent-rail-entry` rows",
+          "keyboardRoute": "rail entries are real buttons",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "railCount": {
+          "feature": "The rail head count tracks the store",
+          "currentRoute": "Agent window > `.agent-rail-count`",
+          "keyboardRoute": "text, not interactive",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "conversation": {
+          "feature": "Read the selected conversation",
+          "currentRoute": "Agent window > `.agent-conversation` canvas",
+          "keyboardRoute": "scrollable region; messages are static content on an opaque anchor, deliberately not glass",
+          "dataStateOwner": "persisted agent conversation store"
+        },
+        "composer": {
+          "feature": "Compose a message",
+          "currentRoute": "Agent window > the composer textarea",
+          "keyboardRoute": "textarea; Send is a button beside it",
+          "dataStateOwner": "renderer-local draft state"
+        },
+        "contextShelf": {
+          "feature": "Remove a context item (the reverse of every surface's \"Ask the Agent\")",
+          "currentRoute": "Agent window > `Remove <name> from context` controls on the context shelf",
+          "keyboardRoute": "each item carries its own remove button, so every add has an intentional reverse (CLAUDE.md's enable/disable rule)",
+          "dataStateOwner": "agent conversation context store"
+        },
+        "viewToggle": {
+          "feature": "Switch the conversation view (Simple / Full)",
+          "currentRoute": "Agent window > `.agent-view-toggle-button`",
+          "keyboardRoute": "two buttons in tab order",
+          "dataStateOwner": "renderer-local view state"
+        },
+        "panels": {
+          "feature": "Reach the four side panels (Reusable prompts, Capabilities, Permissions and profile, Pipeline)",
+          "currentRoute": "Agent window > the workspace's docked panel controls",
+          "keyboardRoute": "all four are real buttons",
+          "dataStateOwner": "mixed: prompt library and capability registry are persisted; pipeline is main-process state"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Agent window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
+    },
+    "captures": {
+      "standardDestination": "ReadingCapturesView inside the Reading workspace (`.reading-captures` > `.lq-reading`)",
+      "liquidDestination": "Same in-window `.reading-captures`, on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`, dense work kept on an opaque anchor (L3.2, `20462e3a`)",
+      "features": {
+        "captureList": {
+          "feature": "Browse the persisted capture history with its source badge",
+          "currentRoute": "Reading window > Captures tab > the capture list tool",
+          "keyboardRoute": "each row is a real `<button>`; the list is reachable whether docked or a sheet",
+          "dataStateOwner": "main-process lens history (`lens:history:list`)"
+        },
+        "selection": {
+          "feature": "Select a capture and read it in the passage pane",
+          "currentRoute": "Reading window > Captures tab > click a row",
+          "keyboardRoute": "row buttons carry `aria-current`; the heading is an `<h2>` in the reader landmark",
+          "dataStateOwner": "main-process lens history + renderer selection state"
+        },
+        "canvasPlacement": {
+          "feature": "The capture list never partially covers the passage",
+          "currentRoute": "Reading window > Captures tab > `.lq-reading` resolves placement from its own width",
+          "keyboardRoute": "placement changes nothing about tab order — DOM order is document then tool at every width",
+          "dataStateOwner": "pure geometry (`shared/liquidReadingCanvas.ts`); no persisted state"
+        },
+        "measureClamp": {
+          "feature": "The passage stays at a legible measure at any pane width",
+          "currentRoute": "Reading window > Captures tab > `--lq-reading-measure` on the document region",
+          "keyboardRoute": "not a control; a rendered constraint",
+          "dataStateOwner": "pure geometry (`READING_CANVAS_POLICY.maxContentWidth` = 760)"
+        },
+        "listReversibility": {
+          "feature": "Hide and restore the capture list",
+          "currentRoute": "Reading window > Captures tab > `.reading-captures-list-toggle`",
+          "keyboardRoute": "`aria-pressed` is a real boolean and agrees with whether the tool is mounted",
+          "dataStateOwner": "renderer-local view state (ReadingCapturesView)"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle — Liquid on/off is reversible",
+          "currentRoute": "Reading window > `.fwin-b-liquid`",
+          "keyboardRoute": "`aria-pressed` is a real boolean on the toggle",
+          "dataStateOwner": "per-window presentation state (L3)"
+        }
+      }
+    }
+  }
+}

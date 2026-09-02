@@ -39,6 +39,10 @@
  *    this); dirtying after the drive scored a live row dead.
  *  - `document.hasFocus()` gates React's select synthesis, so `/focus` is POSTed before any
  *    step runs (`l6-parity.js` trap 6 refuses instead of lying, and this is how it is fed).
+ *  - A FIXED SLEEP IS NOT A SETTLE. `step()` returns as soon as it has clicked; the effect
+ *    arrives later. Every read of the surface is now preceded by `settle()`, which polls
+ *    until two consecutive `chars|nodes|controls` readings agree. See that function for the
+ *    two live Dictionary rows this scored dead, and `--settle-tries 0` for its control.
  *  - A STEP MAY NOT READ THE STATE IT JUST CHANGED. React commits after the dispatching
  *    task, so anything a step reads in the same expression as its own click/keydown is the
  *    PRE-change value. Twice on 2026-09-02 this produced a confident wrong answer: the
@@ -49,7 +53,8 @@
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat6-feature-parity.cjs \
- *     --app dictionary [--win main] [--label l6-dictionary] [--out file] [--no-control]
+ *     --app dictionary [--win main] [--label l6-dictionary] [--out file] [--no-control] \
+ *     [--settle-tries 20] [--settle-ms 350]
  *   node src/.coordination/liquid-workplace/probes/cat6-feature-parity.cjs --list
  *
  * ------------------------------------------------------------------ --mode duplication
@@ -106,6 +111,11 @@ const CONTROL = !has('no-control');
 const MODE = arg('mode', 'parity');
 const LABEL = arg('label', APP ? `l6-${APP}` : 'list');
 const STEP_MS = Number(arg('step-ms', '700'));
+// `--settle-tries 0` DISABLES settling and is this repair's own negative control: it
+// restores the pre-repair behaviour exactly (one fixed sleep, then read), so the same
+// command on the same window produces the old numbers. See `settle()` below.
+const SETTLE_TRIES = Number(arg('settle-tries', '20'));
+const SETTLE_MS = Number(arg('settle-ms', '350'));
 
 const cfg = JSON.parse(fs.readFileSync(
   path.join(__dirname, '..', '..', '..', '..', 'debug', 'bridge.json'),
@@ -299,17 +309,76 @@ async function windowHidden() {
   })()`);
 }
 
+/**
+ * WAIT FOR THE SURFACE TO STOP MOVING, then read it. A FIXED SLEEP IS NOT A SETTLE, and
+ * that difference scored two live Dictionary features dead on 2026-09-02.
+ *
+ * What was measured, on a fresh profile with the window open and nothing else touched.
+ * The `search` step types 食べる and clicks Search; the driver slept `STEP_MS` (700 ms) and
+ * checked. It read `lookup` unreachable at `chars=275 nodes=47` and `resultActions`
+ * unreachable at `actions=0`, so parity came out 5/7 in BOTH presentations — equal, which
+ * is why nothing looked wrong. Re-reading the SAME window through the SAME expression after
+ * the run finished: `chars=2345 nodes=262 hasTaberu=true hasJMdict=true actions=20`. Both
+ * rows were live the whole time; the query had simply not resolved yet (a first lookup on a
+ * cold profile opens and migrates the dictionary DB). The round trip was poisoned by the
+ * same boundary — snapshot A was taken pre-resolve at 275 chars and C post-resolve at
+ * 1,999, so `roundTripHeld` was false because the surface GAINED content, not lost it.
+ *
+ * So the signature is polled until two consecutive reads agree. `chars|nodes|controls` is
+ * the right signature and the fields are not: the fields are what the round trip COMPARES,
+ * and settling on them would make the instrument wait for its own answer. A run that never
+ * converges is recorded as `converged:false` and, where it bounds a round-trip snapshot,
+ * costs that bar — a diff between two moving readings proves nothing in either direction.
+ */
+async function settle(where) {
+  const t0 = Date.now();
+  const trace = [];
+  let last = null;
+  let snapshot = null;
+  for (let i = 0; i <= SETTLE_TRIES; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const s = await call(`window.__LQP.snapshot(${A(APP)})`);
+    if (s.refused) return { where, refused: s.refused, converged: false, reads: i + 1, trace };
+    snapshot = s;
+    const sig = `${s.chars}|${s.nodes}|${s.controls}`;
+    trace.push(sig);
+    if (sig === last) {
+      return {
+        where, converged: true, reads: i + 1, ms: Date.now() - t0, signature: sig, trace, snapshot,
+      };
+    }
+    last = sig;
+    if (i === SETTLE_TRIES) break;
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(SETTLE_MS);
+  }
+  return {
+    where,
+    converged: false,
+    reads: trace.length,
+    ms: Date.now() - t0,
+    signature: last,
+    trace,
+    snapshot,
+    note: SETTLE_TRIES === 0
+      ? 'settling disabled by --settle-tries 0 (negative control): this is the pre-repair reading'
+      : `surface still moving after ${SETTLE_TRIES} reads ${SETTLE_MS}ms apart`,
+  };
+}
+
 /** Flip presentation and READ IT BACK. A toggle that did not land must not be scored. */
 async function flip(pres, want) {
   const before = await call(`window.__LQP.toggleLiquid(${A(APP)}, ${A(pres)})`);
   if (before.refused) return { refused: before.refused };
   await sleep(900);
-  const now = await call(`window.__LQP.snapshot(${A(APP)})`);
+  const settled = await settle(`flip -> ${want || '(either)'}`);
+  if (settled.refused) return { refused: settled.refused };
+  const now = settled.snapshot;
   if (now.refused) return { refused: now.refused };
   if (want && now.presentation !== want) {
     return { refused: `toggle did not reach ${want}; surface reads ${now.presentation}` };
   }
-  return { presentation: now.presentation, snapshot: now };
+  return { presentation: now.presentation, snapshot: now, settled };
 }
 
 /* ======================================================================= --mode duplication
@@ -707,6 +776,13 @@ async function runDuplication() {
     out.driven = driven;
     out.drivenRefusals = driven.filter((d) => String(d.result).startsWith('REFUSED')).length;
 
+    // THE DRIVE'S OWN EFFECTS ARRIVE AFTER THE DRIVE RETURNS. `step()` clicks Search and
+    // comes back immediately; the query resolves later. Everything below reads the surface,
+    // so the surface has to have stopped moving first. See `settle()` for the run that
+    // proved this scored two live rows dead.
+    const settleAfterDrive = await settle('after drive, before parity check');
+    out.settle = { afterDrive: settleAfterDrive };
+
     // ---- 1. parity: the same feature list, checked in both presentations -------------
     // ORDER IS LOAD-BEARING, and the first version of this file got it wrong. Dirtying the
     // field BETWEEN the two checks made the `input` row read false in the presentation that
@@ -747,8 +823,9 @@ async function runDuplication() {
       await sleep(900);
       await post('/focus', {});
       await sleep(300);
-      snapC = await call(`window.__LQP.snapshot(${A(APP)})`);
-      if (snapC.refused) throw new Error(`restore did not land: ${snapC.refused}`);
+      out.settle.afterRestore = await settle('after minimize -> restore, before snapshot C');
+      snapC = out.settle.afterRestore.snapshot;
+      if (!snapC || snapC.refused) throw new Error(`restore did not land: ${(snapC || {}).refused || 'no snapshot'}`);
       rankC = await zRank();
       out.lifecycleTrip = {
         trip: 'minimize -> restore (taskbar)',
@@ -763,11 +840,13 @@ async function runDuplication() {
       inOther = await call(`window.__LQP.check(${A(APP)})`);
       if (inOther.refused) throw new Error(inOther.refused);
       snapB = toOther.snapshot;
+      out.settle.afterFlipOut = toOther.settled;
 
       const back = await flip(undefined, startPres);
       if (back.refused) throw new Error(back.refused);
       flipped = false;
       snapC = back.snapshot;
+      out.settle.afterFlipBack = back.settled;
     }
 
     // Geometry, focus and z-order are part of what the round trip must preserve, but the
@@ -808,6 +887,23 @@ async function runDuplication() {
         .filter((r, i) => r.reachable !== inOther.rows[i].reachable)
         .map((r, i) => `${r.id}: ${startPres}=${r.reachable} ${other}=${inOther.rows[i].reachable}`),
     };
+    // PER-ROW EVIDENCE, IN BOTH PRESENTATIONS, kept rather than summarised. `out.parity`
+    // above answers the rubric's question ("are the counts equal") and throws the evidence
+    // away, which is fine for a score and useless for §5.3's feature ledger: a ledger row's
+    // `observed` field is required to be a literal copy of the measurement, and until this
+    // existed the only way to get one was to hand-transcribe it out of a console log. That
+    // is how 19 apps ended up with a driven harness and no rows. `l6-parity-rows.cjs` reads
+    // this array and copies the strings mechanically, so `observed` cannot drift from what
+    // the instrument actually saw. Indices are the spec's own row order in both halves —
+    // `check()` walks `features` in order, which is the same assumption `rowsAgree` and
+    // `onlyInOne` already make three lines up.
+    out.rowEvidence = asFound.rows.map((r, i) => ({
+      id: r.id,
+      [startPres]: { reachable: r.reachable, evidence: r.evidence },
+      [other]: noLiquid
+        ? null
+        : { reachable: inOther.rows[i].reachable, evidence: inOther.rows[i].evidence },
+    }));
     out.roundTrip = {
       trip: noLiquid ? 'minimize -> restore' : `${startPres} -> ${other} -> ${startPres}`,
       dirtiedField: dirty.field === undefined ? null : dirty.field,
@@ -864,11 +960,24 @@ async function runDuplication() {
         // control, so this cannot be used to wave a real over-broad mutation through.
         const allowed = cascades[which] || [];
         const unexpected = fell.filter((r) => r.id !== which && !allowed.includes(r.id));
+        // UNARMABLE IS NOT BROKEN, and conflating the two VOIDed a run that had nothing
+        // wrong with it. Measured 2026-09-02 on `resources`: 8/8 in both presentations,
+        // all three bars pass, 7 of 8 mutations flip exactly their own row — and the run
+        // read VOID because `collectedSections`'s mutation targets `.mytool-card
+        // .mytool-remove`, which does not exist because nothing is collected on this
+        // profile. The mutation REFUSED; it never ran. That is a data gap, not an
+        // instrument defect, and the difference matters in both directions: a VOID here
+        // discards seven proved rows, while quietly passing it would let a row into the
+        // ledger with no control behind it at all. So it is named, the run stays scorable,
+        // and `l6-parity-rows.cjs` REFUSES to write the specific row it could not prove.
+        const unarmable = !!applied.refused;
         results.push({
           mutation: which,
           declaredCascade: allowed,
           preBaseline: pre.refused ? null : `${pre.reachable}/${pre.total}`,
           applied: applied.refused || applied.mutated || A(applied),
+          armed: !unarmable,
+          unarmableReason: unarmable ? applied.refused : null,
           reachable: dirtyCheck.refused ? null : `${dirtyCheck.reachable}/${dirtyCheck.total}`,
           fellRows: fell.map((r) => r.id),
           exactlyOwnRow: fell.some((r) => r.id === which) && unexpected.length === 0,
@@ -878,15 +987,44 @@ async function runDuplication() {
           returned: !after.refused && !pre.refused && after.reachable === pre.reachable,
         });
       }
-      const allProved = results.length > 0
-        && results.every((r) => r.exactlyOwnRow && r.returned);
+      const armedResults = results.filter((r) => r.armed);
+      const unarmableRows = results.filter((r) => !r.armed).map((r) => r.mutation);
+      // At least one mutation must ARM, or nothing was controlled and the run is VOID —
+      // an all-unarmable control is exactly the empty-harness case the rubric caps at 0.
+      const allProved = armedResults.length > 0
+        && armedResults.every((r) => r.exactlyOwnRow && r.returned);
       out.control = {
         mutations: results,
-        verdict: allProved
-          ? 'CONTROL FAILED AS REQUIRED - category 6 instrument is proven'
-          : 'VOID - a mutation did not flip exactly its own row, or did not restore',
+        armed: armedResults.length,
+        declared: results.length,
+        unarmable: unarmableRows,
+        verdict: (() => {
+          if (!allProved) return 'VOID - a mutation did not flip exactly its own row, or did not restore';
+          if (unarmableRows.length === 0) return 'CONTROL FAILED AS REQUIRED - category 6 instrument is proven';
+          return `CONTROL FAILED AS REQUIRED - ${armedResults.length} of ${results.length} mutations armed and`
+            + ` every one flipped exactly its own row; UNARMABLE on this profile, so their rows are NOT`
+            + ` control-proved and must not be written: ${unarmableRows.join(', ')}`;
+        })(),
       };
     }
+
+    // A ROUND TRIP MEASURED ACROSS A MOVING SURFACE PROVES NOTHING IN EITHER DIRECTION.
+    // `roundTripHeld` compares snapshot A with snapshot C; if either was taken while the
+    // surface was still changing, a difference is not lost state and an identity is not
+    // preserved state. So an unconverged settle at either end costs the bar and says which
+    // end. It costs only this bar: `allRowsReachable` and `parityEqual` are single readings,
+    // and their exposure to the same defect is removed at source by settling before them.
+    // `--settle-tries 0` MUST REPRODUCE THE PRE-REPAIR INSTRUMENT EXACTLY, or it is not a
+    // control. Zero tries can never produce two agreeing reads, so scoring its `converged:
+    // false` against the bar would fail every control run by arithmetic and prove nothing.
+    // With settling disabled the term is DROPPED, exactly as it did not exist before, and
+    // the only difference between control and repair is the waiting.
+    const settlePoints = Object.entries(out.settle || {});
+    const unsettled = settlePoints.filter(([, s]) => s && s.converged !== true).map(([k]) => k);
+    out.settle.disabled = SETTLE_TRIES === 0;
+    out.settle.allConverged = SETTLE_TRIES === 0 ? null : unsettled.length === 0;
+    out.settle.unconverged = SETTLE_TRIES === 0 ? [] : unsettled;
+    const settleHeld = out.settle.allConverged !== false;
 
     const bars = noLiquid ? {
       allRowsReachable: asFound.total > 0 && asFound.reachable === asFound.total,
@@ -896,11 +1034,12 @@ async function runDuplication() {
         && out.liquidAbsence.othersWithLiquidControl.length >= 1
         && out.liquidAbsence.targetPresentation === 'standard'
         && out.liquidAbsence.targetChromeButtons >= 3,
-      roundTripHeld: fieldsHeld && shellHeld && out.lifecycleTrip.rankHeld,
+      roundTripHeld: fieldsHeld && shellHeld && out.lifecycleTrip.rankHeld
+        && settleHeld,
     } : {
       allRowsReachable: asFound.total > 0 && asFound.reachable === asFound.total,
       parityEqual: reachableEqual && rowsAgree,
-      roundTripHeld: fieldsHeld && shellHeld,
+      roundTripHeld: fieldsHeld && shellHeld && settleHeld,
     };
     out.bars = bars;
     out.verdict = Object.values(bars).every(Boolean) ? 'PASS 10/10' : 'FAIL';

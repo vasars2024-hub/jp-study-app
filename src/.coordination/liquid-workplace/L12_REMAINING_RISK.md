@@ -3,9 +3,9 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `wt/files-app` at `17b3d833`, 2026-09-02T02:54:21.604Z.
+Branch `wt/files-app` at `32aae369`, 2026-09-02T05:35:36.556Z.
 
-**5 of 8 risks open** (2 high, 3 closed, 0 unmeasured).
+**7 of 9 risks open** (4 high, 2 closed, 0 unmeasured).
 
 | id | sev | state | risk |
 | --- | --- | --- | --- |
@@ -14,9 +14,10 @@ Branch `wt/files-app` at `17b3d833`, 2026-09-02T02:54:21.604Z.
 | R3 | MED | OPEN | Feature-parity rows are still pending |
 | R4 | MED | OPEN | Liquid plan bullets are still open |
 | R5 | MED | CLOSED | The architecture-audit gate is red |
-| R6 | HIGH | CLOSED | The visual atlas is not certification evidence |
+| R6 | HIGH | OPEN | The visual atlas is not certification evidence |
 | R7 | LOW | OPEN | The packaging stage has never completed in this tree |
 | R8 | HIGH | OPEN | The repo's own gates are not green at this HEAD |
+| R9 | HIGH | OPEN | Banked visual evidence has no per-run namespace, so a re-run overwrites it |
 
 ### R1 — Runtime blobs the app loads from public/ are not in git
 
@@ -141,8 +142,8 @@ What would close it: Close each remaining bullet against its own words with live
 
 ```json
 {
-  "closed": 34,
-  "open": 12,
+  "closed": 35,
+  "open": 11,
   "unknown": 0,
   "total": 46,
   "openTitles": [
@@ -154,7 +155,6 @@ What would close it: Close each remaining bullet against its own words with live
     "Validate every player feature in standard and Liquid modes.",
     "Keep review/input surfaces spatially fixed during active tasks.",
     "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-    "Run every app’s standard/Liquid/theme/state screenshot matrix.",
     "Close every feature-ledger row.",
     "Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.",
     "Produce a final visual atlas and remaining-risk report."
@@ -182,7 +182,7 @@ What would close it: Reconcile the stale baseline entries it names.
 
 ### R6 — The visual atlas is not certification evidence
 
-**HIGH · CLOSED**
+**HIGH · OPEN**
 
 Why it matters: L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.
 
@@ -192,15 +192,17 @@ What would close it: Every blocker the atlas lists, in its own words.
 {
   "available": true,
   "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
-  "generatedAt": "2026-09-02T02:52:01.735Z",
-  "certifiable": true,
-  "blockers": [],
-  "completeness": 94,
+  "generatedAt": "2026-09-02T05:32:48.937Z",
+  "certifiable": false,
+  "blockers": [
+    "21 indexed images no longer hash to their recorded sha256"
+  ],
+  "completeness": 93.47,
   "axes": {
     "app": "effective",
     "theme": "effective",
     "presentation": "effective",
-    "state": "not-swept"
+    "state": "effective"
   }
 }
 ```
@@ -241,19 +243,56 @@ What would close it: Each red identity fixed or hunk-scope committed by its owne
     "lastLine": "If a file is genuinely exempt, run with --update-baseline and say why in the commit."
   },
   "vitest": {
-    "available": true,
-    "log": "debug/_p2d-vitest.log",
-    "filesFailed": 5,
-    "filesPassed": 997,
-    "testsFailed": 5,
-    "testsPassed": 12906,
-    "failingFiles": [
-      "src/renderer/__tests__/readingLensI18n.test.tsx",
-      "src/shared/__tests__/i18n.test.ts",
-      "src/renderer/__tests__/mediaSurfaceImportGraph.test.ts",
-      "src/main/__tests__/extensionServerPort.test.ts",
-      "src/main/__tests__/flashcardAudio.test.ts"
-    ]
+    "available": false,
+    "why": "no --vitest-log given; the full suite is not run from inside this generator"
   }
+}
+```
+
+### R9 — Banked visual evidence has no per-run namespace, so a re-run overwrites it
+
+**HIGH · OPEN**
+
+Why it matters: Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.
+
+What would close it: l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.
+
+```json
+{
+  "available": true,
+  "manifests": 3,
+  "declaredPlatePaths": 701,
+  "pathsClaimedByMoreThanOneRun": 22,
+  "pathsWhereRunsRecordDifferentBytes": 21,
+  "examples": [
+    {
+      "file": "debug/shots/l12-matrix/agent__liquid__oled-black__normal.png",
+      "runs": [
+        "l12-matrix-normal.json",
+        "l12-matrix-tries40.json"
+      ]
+    },
+    {
+      "file": "debug/shots/l12-matrix/library__liquid__oled-black__normal.png",
+      "runs": [
+        "l12-matrix-normal.json",
+        "l12-matrix-tries40.json"
+      ]
+    },
+    {
+      "file": "debug/shots/l12-matrix/novels__liquid__oled-black__normal.png",
+      "runs": [
+        "l12-matrix-normal.json",
+        "l12-matrix-tries40.json"
+      ]
+    },
+    {
+      "file": "debug/shots/l12-matrix/dictionary__liquid__oled-black__normal.png",
+      "runs": [
+        "l12-matrix-normal.json",
+        "l12-matrix-tries40.json"
+      ]
+    }
+  ]
 }
 ```

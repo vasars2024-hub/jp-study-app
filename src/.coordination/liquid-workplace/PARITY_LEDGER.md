@@ -471,6 +471,199 @@ App restored and measured: presentation back to `standard`, overlay closed, 0 wi
 0 dialogs, `desktop-layout.json` sha256 **9DFB6E2F2361...**, byte-identical to the banked
 baseline before and after.
 
+## 2026-09-02 (primary2) — the ledger stops being hand-transcribed
+
+`33b3a10b`. 19 of the 24 apps `l6-parity.js` declares SPECS for have a driven, controlled
+cat6 harness and no ledger row, because the only writer was `l6-parity-write-rows.cjs` —
+hand-written, one `observed` string copied out of a console log at a time. Transcription was
+also the one step of the chain carrying no control: nothing here could tell a mistyped
+`rows=2410` from the real one.
+
+`probes/l6-parity-rows.cjs` keeps the two halves apart by construction:
+
+| half | fields | source |
+| --- | --- | --- |
+| measured | `observed`, `status` | verbatim from the run's `rowEvidence` + `control.mutations`; the writer never composes a number |
+| authored | feature, currentRoute, keyboardRoute, dataStateOwner, both destinations | `parity-row-metadata.json`; an id with no entry REFUSES BY NAME |
+
+`rowEvidence` is new in `cat6-feature-parity.cjs` (same commit): `out.parity` answers the
+rubric's question ("are the counts equal") and throws the evidence away, which is right for
+a score and useless for a ledger row.
+
+**Four refusals, all fired, ledger byte-untouched after each.** The first is against a REAL
+banked artifact — `cat6-notebook-final-20260827`, a genuine PASS 10/10 — which predates
+`rowEvidence` and is refused rather than written with an empty `observed`. The other three
+reach later branches from that same artifact used as a **labelled fixture, not a
+measurement**: no metadata block for `notebook`; a VOID verdict writing nothing; an unknown
+row id refused by its own name.
+
+**The dictionary block is a regression test, not just seed data.** It was copied
+mechanically out of the seven dictionary rows already here, in the spec's own id order, by a
+node read of this ledger — not retyped. The seventh row, *Window lifecycle*, has no spec id
+and is deliberately absent. So the first live `cat6 --app dictionary` run must re-derive
+those six features and add **zero** rows; if it adds one, the derived and hand-written halves
+disagree and one of them is wrong.
+
+**State: 0 rows written.** The writer is landed and UNARMED until a live cat6 run banks a
+`rowEvidence` artifact. That run is the next turn's opening slice.
+
+## 2026-09-02 — the writer is ARMED, and arming it found the instrument reading too early
+
+`ff63d811`, `1ec440ab`, `ba0d1070`, `e272640b`. Ledger **50 rows / 7 apps -> 62 rows /
+9 apps**, 57 `both` / 5 `pending`; `notWritten` **19 -> 17** root components.
+
+### The armament run found a real defect in cat6, not in the writer
+
+The opening slice was "re-derive Dictionary's rows and add ZERO". The live run came back
+**FAIL** — `lookup` unreachable at `chars=275 nodes=47`, `resultActions` at `actions=0`.
+Reading the SAME window through the SAME expression after the run: `chars=2345 nodes=262
+hasTaberu=true hasJMdict=true actions=20`. Both rows were live the whole time.
+
+A FIXED SLEEP IS NOT A SETTLE. `step()` returns as soon as it has clicked; the effect
+arrives later. And the two parity checks are not simultaneous, so the standard half can read
+pre-resolve and the liquid half post-resolve — which is a **fabricated parity regression**,
+and `REGRESSION` is a status this writer would have written into the ledger.
+
+`settle()` polls `chars|nodes|controls` until two consecutive reads agree, before the parity
+check and before each round-trip snapshot. It excludes `fields` on purpose: the fields are
+what the round trip COMPARES, and settling on them would make the instrument wait for its
+own answer. An unconverged settle costs `roundTripHeld` only.
+
+| run | settling | standard | liquid | verdict |
+| --- | --- | --- | --- | --- |
+| `--step-ms 0 --settle-tries 0` | off | **5/7** | **7/7** | FAIL on all three bars |
+| `--step-ms 0` | on | 7/7 | 7/7 | PASS 10/10, zero round-trip diffs |
+
+Same window, same profile, same command; the only difference is `--settle-tries 0`. The
+settle's own trace is the proof it did something: `275|47|16 -> 2345|262|50 -> 2345|262|50`.
+`--settle-tries 0` DROPS the bar term rather than scoring it false, because zero tries can
+never produce two agreeing reads and failing a control by arithmetic proves nothing.
+
+Naturalistic half, with its rate rather than an adjective: the race bit **2 of the first 3**
+runs and **0 of the 6** after. It is a COLD-START race — once the dictionary DB is open the
+query resolves inside 700 ms — which is why it survived every previous cat6 run.
+
+### What was written
+
+| app | rows | added | how the authored half was obtained |
+| --- | --- | --- | --- |
+| dictionary | 7 | **0** | back-derived from the 7 hand-written rows; the zero IS the test |
+| calendar | 5 | 5 | authored from source; first app with no prior ledger row |
+| settings | 7 | 7 | authored from source |
+
+**The dictionary zero is stronger than it looks.** The dedupe key is `app|feature`, so one
+mistyped feature string writes an EIGHTH row instead of matching. `added: 0` therefore also
+certifies that all seven authored strings match the hand-written ledger verbatim — the one
+link in this chain that had never had a control on it.
+
+**A false claim in `parity-row-metadata.json` was corrected, not left.** Its provenance note
+said the dictionary `windowLifecycle` row "has NO spec id and is deliberately absent".
+`l6-parity.js` declares `{ id: 'windowLifecycle', f: lifecycle }` for EVERY app, and the
+live run refused by that name — the refusal working. Six of seven had been written; the
+seventh existed in the ledger and was missing only its authored half.
+
+Writer self-control: **6 armed / 6 fired** across the two new runs
+(liquid-unreachable -> REGRESSION, unknown row id -> REFUSED by name, VOID -> writes nothing).
+
+### Not a defect, checked rather than assumed
+
+Settings' drive log shows `closeSearch -> expanded:"true"`, which reads as an Escape that
+did not close the panel. Reading the same input afterwards: `expanded:"false"`, no panel,
+value empty. The step reads the attribute in the SAME synchronous `/eval` as the keydown, so
+its return value is one React render behind. The product is correct; the STEP's report is
+stale. Same class as the defect above, one layer out.
+
+### What b2 still needs, exactly
+
+15 of the 24 specs still have no metadata block, and the 5 `pending` rows are still
+mediaWorkspace's — they have a destination now but no SUBJECT, because
+`seanimeStudyLibrary()` returns `{ok:true,files:[]}` on this profile. The next apps to
+author are the data-independent ones (`scraper`, `resources`, `city`, `shell`); the
+data-dependent ones (`flashcards`, `statistics`, `library`, `music`, `video`, `youtube`)
+need a profile with real content or they measure an empty harness, which is capped, not
+skipped.
+
+### Scraper: a VOID, and inside it a probe that asks a question the product deliberately stopped answering
+
+`cat6 --app scraper` on this profile: **VOID**, 4/7 both presentations, `drawerCategories`,
+`settingsFields` and `reverseControls` all unreachable, 2 driven refusals, control VOID.
+The writer refused it, which is correct — a VOID run writes no ledger row.
+
+The proximate cause is an EMPTY HARNESS and the instrument said so on both halves at once:
+the settings drawer is closed on a fresh profile, `switchDrawer` REFUSED with `drawer
+categories unavailable`, and the two mutations that own those rows could not be armed
+(`no current drawer category`, `no settings field control`) so `exactlyOwnRow` came out
+false and the control VOIDed. `l6-parity.js`'s scraper drive is
+`['switchDrawer', 'restoreDrawer', 'toggleRail', 'restoreRail', 'closeSearch']` — it has no
+step that OPENS the drawer, so it assumes a state a fresh profile does not have.
+
+**But `reverseControls` has a second, independent defect, and this one would survive opening
+the drawer.** The row reads:
+
+    const opener = qa(w, '.scr-topbar-actions button[aria-pressed="true"]');
+
+`.scr-topbar-actions` is ScraperTopBar.tsx:38-105, and it contains exactly ONE
+`aria-pressed`, at :91 — the **advanced-mode** toggle. The drawer opener at :78-86 carries
+`aria-expanded` + `aria-controls` instead, and the source comment says why in as many words:
+"A disclosure, not a toggle button… `aria-pressed` was the wrong contract twice over: a
+screen reader announced 'not pressed' for a panel that is closed, and nothing in the DOM
+linked the control to the region it opens."
+
+So the product was CORRECTED and the probe still asks the old question. The consequence is
+not a false negative, it is a latent **false positive**: with the drawer shut and advanced
+mode ON, `pressedOpeners` counts the advanced toggle and `reverseControls` would score a
+reversal affordance that is not on screen. Same class as the banked "control must attack the
+scored term" trap, one layer out.
+
+FIX, named rather than taken, because it needs a live re-run to verify: add an `openDrawer`
+step at the head of the scraper drive (click `.scr-topbar-actions [aria-controls]` when
+`aria-expanded` is false) with a matching `undo` that closes it only if the drive opened it,
+and re-point `reverseControls` at `aria-expanded="true"` on the disclosure that actually
+owns the drawer. Artifact: gitignored `debug/_p2f-cat6-scraper.json`.
+
+## 2026-09-02 — the scraper finding is FIXED and MEASURED (primary2, `ddeb97f3`)
+
+The fix named above was taken, and the re-run it needed happened. Both halves landed in
+`probes/l6-parity.js`.
+
+**The false positive, proven at one instant on one DOM.** Drawer SHUT and advanced mode ON,
+both expressions read over the same window in the same `/eval`:
+
+| expression | reading | scores a reversal affordance? |
+| --- | --- | --- |
+| OLD `.scr-topbar-actions button[aria-pressed="true"]` | `pressedOpeners=1` | **yes — falsely** |
+| NEW `.scr-topbar-actions button[aria-controls]` + `aria-expanded="true"` | `disclosures=1 expanded=0` | no |
+
+The single element the OLD expression counted reports `aria-label` **"Advanced controls
+shown"**. Advanced mode was captured (`aria-pressed=false`), driven ON for the reading, and
+restored to `false`, verified after.
+
+**The drive, with a discriminating control.** HEAD's `l6-parity.js` was copied into
+`debug/_p2g-ctrl/` at the same directory depth and run through the *same* cat6 harness
+against the *same* window and profile — the only difference is the spec file:
+
+| spec | verdict | parity | drive refusals | failing rows |
+| --- | --- | --- | --- | --- |
+| pre-fix (HEAD) | **VOID** — negative control did not falsify | 4/7 both | 2 | `drawerCategories` (categories=0 fields=0), `settingsFields` (fields=0), `reverseControls` (drawerClose=false pressedOpeners=0) |
+| post-fix | **PASS 10/10** | **7/7 both**, rowsAgree, 0 onlyInOne | **0** | none |
+
+All seven mutations flip exactly their own row and restore (`exactlyOwnRow` true ×7); round
+trip `standard -> liquid -> standard` held with **0 diffs**, `fieldsHeld` and `shellHeld`
+true, dirtied field `scr-search-input` returned.
+
+**`drawerReady` is a wait, not a sleep, and the number is why it exists.**
+`ScraperSettingsDrawer` is `lazy()` (ScraperApp.tsx:68). Measured on this profile: **403 ms**
+cold after a renderer reload, **113 ms** warm — but on the run where the dev server had never
+transformed the chunk, `.scr-drawer-cat` was still absent 1,400 ms after the click and both
+drawer steps refused. RATE, not an adjective: **2 refusals on that cold run, 0 on both warm
+re-runs.** `/eval` is synchronous, so a busy-wait in the renderer would block the very import
+it waits for; a step that spends one more step-interval and reports `cats` is the honest shape.
+
+**Ledger.** `scraper` is the third app authored from source with no prior row, so all seven
+are new: **62 rows / 9 apps -> 69 rows / 10 apps**, `both` 63 -> **66**, `pending` **3**
+unchanged. Validated rather than trusted: **0 duplicate `app|feature` keys**. The writer's own
+negative control fired 3 of 3 on this artifact — a one-presentation row comes out
+`REGRESSION`, an unknown row id refuses by name, and a `VOID` verdict writes nothing.
 ## 2026-09-02 (backup) — the two detach rows CLOSE, and driving them found a defect
 
 **49 `both` / 1 `pending` of 50**, up from 47 / 3. The Study Block menu was driven for the first
@@ -543,6 +736,79 @@ App and profile restored: overlay closed, presentation `standard` with the stora
 1 window, `study-block-windows.json` deleted (it was absent before), `desktop-layout.json`
 sha256 **9DFB6E2F2361...** unchanged across the whole turn including the restart.
 
+## 2026-09-02 (primary2) — `resources` joins, and one row is deliberately NOT written
+
+**69 rows / 10 apps -> 76 rows / 11 apps**, `both` 68 -> **75**, `pending` **1** unchanged;
+0 duplicate `app|feature` keys. `resources` declares EIGHT rows and **seven** were written.
+
+### The eighth row, and why the ledger does not claim it
+
+`collectedSections` guards the two optional landing strips. Its mutation detaches
+`.mytool-card .mytool-remove` — and **nothing is collected on this profile**, so the mutation
+did not run. It REFUSED.
+
+cat6 scored that identically to a mutation that ran and flipped the wrong row, so the run came
+back **VOID** with 8/8 in both presentations, all three bars passing and 7 of 8 mutations
+flipping exactly their own row. That is an instrument defect in the opposite direction from
+the usual one: it *discards* seven proved rows over a data gap. But quietly passing it would be
+worse — the row would enter the ledger with nothing having falsified it, and "verified by side
+effect" is the only thing a ledger row claims.
+
+So the two cases are now separated. cat6 reports `armed: false` with the refusal text,
+the run stays scorable, and `l6-parity-rows.cjs` skips **that row by name**:
+
+    "skipped": ["collectedSections (control unarmable: no collected tools)"]
+
+**DISCRIMINATING CONTROL on the relaxation itself, live and on the same window.**
+`catalogueCount`'s mutation was re-pointed at `.res-group .res-card .res-name` — an element
+that EXISTS, so the mutation arms, but whose removal flips `resourceCards` instead:
+
+| run | control verdict | run verdict |
+| --- | --- | --- |
+| unarmable mutation only | `7 of 8 armed, every one exact; UNARMABLE: collectedSections` | **PASS 10/10** |
+| armed-but-wrong mutation planted | `VOID - a mutation did not flip exactly its own row` | **VOID** |
+
+An armed mutation that misbehaves still voids the run, with an unarmable one present. The
+plant was reverted and the file verified byte-identical (sha256 equal, `git status` empty).
+
+`resources` itself: **8/8 reachable in both presentations**, rowsAgree, 0 onlyInOne, round trip
+`standard -> liquid -> standard` with 0 diffs, drive 8 steps / 0 refusals. Writer self-control
+3 armed / 3 fired.
+
+## 2026-09-02 (primary2) — `city` joins, and it is the first app with NO Liquid half
+
+**76 rows / 11 apps -> 85 rows / 12 apps**, `both` **75** unchanged, `pending` 1 -> **10**;
+0 duplicate `app|feature` keys. All nine new rows are `pending`, and that is a derivation
+rather than an omission: Mooncap is not Liquid-presentable, so there is no second
+presentation to compare, and `pending` is the status vocabulary's own word for it.
+
+**The absence is a MEASUREMENT, taken at one instant over every open window.** The harness's
+`noLiquid` branch refuses outright unless some other window can take the trip, so the reading
+is discriminating by construction:
+
+| | reading |
+| --- | --- |
+| `targetHasLiquidControl` | **false** |
+| `targetChromeButtons` | **3** — a real chrome cluster, so this is not "no title bar" |
+| `targetPresentation` | `standard` |
+| `othersWithLiquidControl` | **`["Resources"]`** — open beside it, rendering `.fwin-b-liquid` |
+
+That control is the whole point: without it, "this window has no toggle" and "no window has
+one" read identically. L12 bullet 1 independently records the same three sections —
+`city`, `musicwidget`, `visualizer` — as offering no presentation toggle, so two instruments
+now agree on the same product fact from different directions.
+
+The round trip that stands in for the presentation flip is **minimize -> restore through the
+taskbar** (the taskbar button is a toggle, so it is driven twice), and `rankHeld` was true.
+Rows **9/9 reachable**, drive 1 step / 0 refusals, and **all nine mutations armed**, each
+flipping exactly its own row and restoring. Writer self-control: 2 armed / 2 fired, and the
+third plant reports `NOT ARMABLE — no row is reachable in both presentations`, which is
+correct on this branch and is said rather than counted as a pass.
+
+`notWritten` is now **re-derived mechanically** instead of decremented by hand: 25 declared
+specs, 12 apps with rows, **14 specs still with no row at all**, each named, plus the one
+ledger app (`mediaCenter`) that has rows but no spec and so cannot be re-derived by this
+route at all.
 ## 2026-09-02 (primary) — 49 → **50 `both` of 50, 0 pending**
 
 Every written row in this ledger is now closed. The bullet L12 b2 does **not** close with it:
@@ -637,6 +903,149 @@ detach the two groups larger than the cap and the row still FAILS
 (`cap=7 maxDeclared=7 ceilingProven=false`), so a desk where every group is small cannot buy
 a 10. Both bodies re-attached; 5 bodies, row true, `cap=16 maxDeclared=3074`.
 
+## 2026-09-02 (primary2) — `shell` joins, and the row it needed first was wired-only
+
+**102 rows / 14 apps.** `shell` contributes **9**, all `both`, from a `PASS 10/10` run:
+9/9 reachable in BOTH presentations, round trip 0 diffs, 8 of 8 declared mutations armed and
+each flipped exactly its own row.
+
+The shell is the first subject that is the CONTAINER rather than a hosted window. `shq`
+excludes anything inside `.fwin`, so a taskbar of 2 buttons is never confused with a desktop
+of 300 controls, and the parity claim is the useful one: **a window going translucent must not
+cost the shell a capability**, since the taskbar is the only route back to a window that is
+behind another. The harness does not raise this host — there is nothing to raise — and POSTs
+`/focus` instead.
+
+### The `shellIdentity` row was wired-only on two counts, and aero proved both (`d9f1c213`)
+
+It scored `!!mat && theme.indexOf(mat) === 0 && owned > 0`. Measured live on `frutiger-aero`,
+not reasoned:
+
+1. the Aero theme's id is `frutiger-aero` and its materialSet is `aero`, so `indexOf` is
+   **9, not 0**. A correctly stamped Aero shell failed the stamp half outright.
+2. `.${mat}-wall-atmosphere, .${mat}-tray-lamps` are rendered only under `wired`
+   (DesktopShell.tsx:2748, :3502). On aero the shell renders **0** `aero-`prefixed elements
+   outside `.fwin`, against **178** inside the hosted Resources window — so there was nothing
+   to widen the selector to, and widening it would have scored the shell from a window's
+   contents.
+
+Aero's identity is CSS scoped to `[data-materials='aero']` restyling the same `.os-*`
+furniture. What both material sets own in the DOM is the secret start surface,
+`.os-start-aero-menu` (DesktopShell.tsx:683, `aero || wired`), which exists only while the
+menu is open — so `readStartOpen` records it and the row reads it back. On the base theme the
+row is now `na` (no material set stamped = no material identity to verify), never false.
+
+**CROSS-MATERIAL CONTROL, same harness / window / profile, three themes:**
+
+| theme | verdict | `shellIdentity` carried by |
+| --- | --- | --- |
+| `study-os` (before the fix) | **FAIL**, 8/9 reachable, mutation UNARMABLE | — |
+| `frutiger-aero` | **PASS 10/10**, 9/9 both | `materialStartMenu=1`, `identityElements=0` |
+| `wired-archive` | **PASS 10/10**, 9/9 both | `identityElements=2` AND `materialStartMenu=1` |
+
+Two materials, two different pieces of evidence, one row. The ledger rows were written from
+the `wired-archive` run deliberately: on `study-os` that row is `na` and eight rows would have
+been the whole ledger.
+
+### A second self-claim: 45 of 102 rows never named a control
+
+`controlCoverage` is new in `parity-ledger.json` and is derived from the rows themselves.
+**55 named / 1 NONE DECLARED / 45 silent of 102.** The 45 are older rows written before
+`l6-parity-rows.cjs` said anything when a spec declared no mutation for a row — dictionary 7,
+mediaCenter 8, flashcards 8, mediaWorkspace 5, grammar 5, agent 5, translate 4, captures 3.
+They are not disproved; the ledger simply never recorded a control for them, and that is a
+fact about the ledger rather than about the product. New rows now state
+`negative control: NONE DECLARED` explicitly, so `silent` can only shrink.
+
+`shell` > `desktopSurface` is the live NONE-DECLARED case and the reason is real: its subject
+is the shell ROOT, and `restore()` sweeps `qa(win, '*')`, which does not include `win` itself
+— a falsification there could not be guaranteed undone, and shrinking the desk risks the
+window-clamp path persisting geometry. That belongs in the row, not in a commit message.
+
+## 2026-09-02 (primary2) — `blancShell` joins: the second shell, and a route-scoped control
+
+**110 rows / 15 apps.** `blancShell` contributes **8**, all `both`, from a `PASS 10/10` run:
+8/8 reachable in BOTH presentations, round trip 0 diffs with an INPUT dirtied first, 8 of 8
+mutations armed and each flipping exactly its own row.
+
+Blanc is a genuinely separate shell — its own BrowserWindow (`blanc.html?blanc=1`) hosting
+**0** `.fwin`, reached with `--win blanc`. Its presentation axis is chrome REDUCTION
+(`.blanc-root.is-taskbar-hidden`, toggled by `.blanc-taskbar-toggle` and reversed by
+`.blanc-taskbar-reveal`), not a palette and not native fullscreen; both rejected candidates
+are recorded in the spec and the reasons stand.
+
+### `workspaceToggleHonest` was scoring a deliberate product decision as a lying label
+
+The row read the fullscreen control at CHECK time and returned `control=null` → **FALSE**.
+Measured live: the Blanc window renders exactly **ONE** `.blanc-icon-btn` ("Search Blanc") on
+the `Read` route, because the fullscreen control is route-scoped —
+`canExpandWorkspace = book || tab ∈ {mine, flashcards, media, stats, tools}`
+(BlancShell.tsx:430). The drive visits a qualifying route and then correctly RESTORES the
+user's own route, so by check time the control is legitimately gone.
+
+The reading is now taken WHERE THE CONTROL EXISTS (`readNav`, on the visited route) and read
+back at check time — the same act-then-read shape the driven rows already use — with a second
+chance on the restored route, and the row is `na` **naming both routes** if neither offers it.
+Its mutation falsifies the recorded label rather than the element, so it arms on exactly the
+runs the row can still score:
+
+```
+BEFORE  control=null exitAffordance=false                        -> FAIL 7/8, mutation UNARMABLE
+AFTER   readOnRoute="Mine" workspaceFull=false
+        control="Fullscreen workspace" exitAffordance=false      -> PASS 10/10, 8/8 both
+CONTROL recorded label "Fullscreen workspace" -> "Exit fullscreen workspace"
+        against workspaceFull=false -> 7/8, fell=[workspaceToggleHonest], restored 8/8
+```
+
+### The finding worth keeping about Blanc's state
+
+`dataStateOwner` is mostly COMPONENT state here, and deliberately: `taskbarHidden`,
+`compactToolsOpen`, `masterSearchOpen` and `workspaceFull` are all unpersisted, so a reduced
+or fullscreen Blanc cannot be inherited by the next launch. Only the route survives, and only
+when the user has asked Blanc to remember it (`jp-blanc-mode-v1` / `jp-blanc-memory-v1`,
+renderer/blancMode.ts). `blancMain.tsx` additionally strips `data-materials` on boot and keeps
+a MutationObserver on it, so a Study OS material pack cannot leak into this window — which is
+what `shellIdentity`'s `osDesktopPresent=false` half is checking from the other side.
+
+`notWritten` re-derived: **11** declared specs still have no row at all (was 14 at the start of
+this turn) — notebook, statistics, games, library, immersion, novels, manga, vn, music, video,
+youtube. `controlCoverage`: **63 named / 1 NONE DECLARED / 45 silent of 110**.
+
+## 2026-09-02 (primary2) — `games`, and an empty profile that still scores 10/10
+
+**120 rows / 16 apps.** `games` contributes **10**, all `both`, from a `PASS 10/10` run: 10/10
+reachable in BOTH presentations, round trip 0 diffs, 10 of 10 mutations armed and each flipping
+exactly its own row, **0 driven refusals**. It was driven end to end rather than inspected — a
+round was STARTED, `"ro"` was typed, submit moved `disabled true -> false`, and the round was
+ABORTED back to a ready state the harness then re-read.
+
+### The empty-harness warning does not apply here, and that is worth stating
+
+The standing warning is real: a surface whose rows need content scores an empty harness as
+CAPPED rather than skipped. Games is not one of those, because four of its rows are written to
+score **honest empty state** rather than content:
+
+| row | reading on this empty profile |
+| --- | --- |
+| `sourceMaterial` | `pct=noList scaleX=0 agrees=true`, with "No word list uploaded for this level" |
+| `exposureTracking` | `seen=0/59`, stated pct 0, derived pct 0, bar scale 0 |
+| `roundHistory` | `rows=0 complete=0`, against "No rounds recorded for this game yet" |
+| `materialScope` | `mode=auto scripts=0 groups=0 shapeHeld=true` |
+
+A bar that agrees with a zero is as real a reading as one that agrees with a 60. What an empty
+profile costs here is not the row, it is the *range* — `exposureTracking` cannot show the bar
+moving, only that all three statements of it are the same number.
+
+`dataStateOwner` names FIVE stores for this one app and they are not interchangeable:
+`jp-game-arena-settings-v1` (length, language, kana scope), `jp-game-arena-seen-v1` (exposure),
+`jp-game-progress-v1` (last 30 results and the high scores), `jp-level-lists` (the word lists
+coverage is computed against) and `renderer/levelService.ts` (the level). The round session
+itself is deliberately unpersisted, which is exactly what makes the abort recovery safe for a
+harness to drive against a real profile.
+
+`notWritten` re-derived: **10** declared specs still have no row — notebook, statistics,
+library, immersion, novels, manga, vn, music, video, youtube. It was **14** at the start of
+this turn. `controlCoverage`: **73 named / 1 NONE DECLARED / 45 silent of 120**.
 ## 2026-09-02 (primary) — L12 b2 coverage: `statistics` and `library`
 
 **`statistics`: 9 rows, `both` 9.** `cat6 --app statistics` = **PASS 10/10** — parity **9/9
@@ -783,6 +1192,135 @@ entry, which is why ledger apps (13) exceeds specs-with-rows (12).
 **Ledger this turn: 50 → 106 rows, 7 → 13 apps, 106 `both` / 0 `pending`, 0 duplicate
 `app|feature` keys — validated after every write, not asserted.**
 
+## 2026-09-02 (primary2) — the merge falsified this ledger's own claim about itself, and 53 controls were recovered rather than re-run
+
+The two concurrent b2 waves used **two different row writers**, and only one of them wrote
+down the controls it ran. `probes/l6-parity-rows.cjs` (this tree) copies both `rowEvidence`
+**and** `control.mutations` into a row's `observed`. The main tree's `debug/_pr4-rows.cjs`
+copies only `rowEvidence`. Same harness, same per-row mutations, same `PASS 10/10` verdicts —
+one writer simply does not transcribe the control.
+
+So the merge moved a number **against** this ledger: `controlCoverage` went **45 silent of 120
+→ 93 of 168**, and the block's own closing sentence — *"New rows now say NONE DECLARED
+explicitly, so `silent` can only shrink"* — was false the moment the two halves met. That
+sentence is now **retracted in the block itself**, not quietly dropped, and `silentByCause`
+splits the number by the two causes because they have two different remedies.
+
+### The controls were never lost, only unwritten
+
+cat6 banks its whole run. `debug/_pr4-<app>*.json` in the main tree carries
+`control.mutations` for every row: the mutation name, `preBaseline`, `reachable` after it was
+applied, `fellRows`, `exactlyOwnRow`, `afterRestore` and `returned`. `debug/_p2i-transcribe.cjs`
+copies those into the ledger through an identity chain that is **verified, not assumed**:
+
+| link | how it is established | measured |
+| --- | --- | --- |
+| receipt → run | the receipt is chosen **by its own content** — the unique file whose `verdict` is `PASS 10/10`, whose control verdict is `CONTROL FAILED AS REQUIRED`, and **every** one of whose mutations has `exactlyOwnRow` and `returned` true | 1 of 1 per app; the pre-fix `VOID`/`FAIL` receipts sitting beside them (`_pr4-flashcards.json`, `_pr4-library.json`, `_pr4-music.json`, `_pr4-music2.json`) are correctly **not** picked up |
+| mutation → row id | every `mutation` name must be a row id declared in that app's meta | 53 of 53, 0 unknown |
+| row id → ledger row | the meta's `feature` string must match **exactly one** ledger row of that app | 56 metaIds ↔ 56 ledger rows, 1:1, 0 duplicates, 0 unmatched either way |
+
+**Result: 53 rows given a transcribed control, 3 explicitly none-declared** (`library` declares
+6 mutations for 9 rows), 56 touched. `controlCoverage` **93 silent → 37**, `withNamedControl`
+**73 → 126 of 168**, and `silentByCause.b2WaveNotTranscribed` is **0** — the whole recoverable
+class is recovered. The 37 that remain genuinely pre-date any writer saying anything about
+controls; they are a different problem and the block now says so.
+
+### Provenance is part of the clause, because this process did not run these controls
+
+Every transcribed clause ends `-- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6
+receipt \`debug/_pr4-<app>.json\` (<mtime>), not re-run here`. A control someone else ran must
+never read like one this turn ran. The clause names the file and that receipt's own timestamp
+so the next worker can go back to the source.
+
+### The transcriber's own negative control — three plants, three refusals, restored
+
+Run against a **copy** of the youtube receipt+meta in `debug/_p2i-ctrl/` (`PR4_DIR` exists only
+for this), baseline **10 of 10 transcribed**:
+
+| plant | attacks | result |
+| --- | --- | --- |
+| meta `playlistRail.feature` changed to a string no ledger row carries | row id → ledger row | `REFUSED: youtube/playlistRail: feature matched 0 ledger rows, expected exactly 1` |
+| `mutations[3].exactlyOwnRow = false` | receipt → run | `REFUSED: youtube: expected exactly 1 qualifying PASS receipt, found 0` — the receipt stops qualifying at all |
+| `mutations[2].mutation = "notADeclaredRowId"` | mutation → row id | `REFUSED: youtube: mutation "notADeclaredRowId" is not a declared row id` |
+
+Baseline restored after each: **10 of 10** again. The writer also refuses to overwrite a row
+that already carries a control clause, so it cannot silently replace one worker's measured
+control with another's transcription.
+
+**Ledger after this turn: 168 rows / 21 apps, 0 duplicate `app|feature` keys, 126 named
+controls / 4 none-declared / 37 silent.** `notWritten` re-derived: **5 of 25 specs still have
+no row at all** — notebook, immersion, novels, manga, vn.
+
+## 2026-09-02 (primary2) — `notebook` is not an unwritten spec, it is a spec whose subject this branch deleted
+
+`notWritten` counted **5** specs with no rows — notebook, immersion, novels, manga, vn — as
+one bucket. That bucket was hiding two different things. Four of them genuinely await
+authoring. `notebook` cannot be authored at all here, because `wt/files-app` **deletes the
+section the spec measures**, on purpose, at `FILES_APP_PLAN` gate 7b.
+
+Read from source first: `AppSection.tsx` has no `case 'notebook'`;
+`LEGACY_WIN_SECTION_ALIASES` (`shared/desktop.ts:76`) maps `notebook -> files`; and
+`NotebookContent.tsx` is imported by exactly one file on this branch,
+`components/blanc/BlancStudyPanels.tsx` — the Blanc shell, not the Study OS desktop.
+
+### Driven live, one instant, one DOM — with both controls
+
+Desk found at **0 windows / 0 dialogs** and returned to **0 / 0**.
+
+| dispatched `os:open` | window title | body root | `app-section-unavailable` |
+| --- | --- | --- | --- |
+| `notebook` | **Files** | `DIV.lq-scaffold.fa-shell`, 52 buttons, 1,704 chars, "Everything 34" | false |
+| `dictionary` — **control: a section that exists and is not aliased** | Dictionary | `DIV.dict-view` | false |
+| `notAKnownSection` — **control: must fail** | notAKnownSection | `DIV.app-section-unavailable` | **true** |
+
+`.gx-notebook` — the spec's own `rootSel` — is **0 across the whole document**, searched over
+`document` rather than one window so a miss cannot be an artifact of looking in the wrong
+place.
+
+The two controls are what make this a measurement rather than an observation. Without the
+`dictionary` row, "notebook opened Files" is equally consistent with *`os:open` always opens
+Files*; without the unknown-id row it is equally consistent with *every unrecognised id falls
+through to Files*. Dictionary opening its own distinct surface kills the first, and an unknown
+id honestly reaching `unavailable` kills the second. The alias is doing real work.
+
+### What changed, and what deliberately did not
+
+`notWritten.derived.noRowsByCause` now splits the five: `noSubjectOnThisBranch: [notebook]`
+with the measurement inline, and `awaitingAuthoring: [immersion, novels, manga, vn]`. **The
+denominator did not move** — it is still 5 of 25, because reclassifying work is not doing it.
+
+The spec is **annotated, not deleted**. On a tree where the Notebook section still exists it is
+still a correct spec, and this branch is the one that is unusual. The annotation carries the
+three-row control table so the next worker does not spend a run discovering that
+`cat6 --app notebook` refuses — it refuses correctly, and now says why.
+
+### Addendum, same day: the gap reproduced within the hour, which is the argument for fixing the writer
+
+A second sync-down landed while this turn was running: **168 → 184 rows / 21 → 23 apps**,
+`novels` (9) and `manga` (7) joining from the main tree. Auto-merged, and **validated rather
+than trusted** — 0 duplicate `app|feature` keys, all **53** transcribed clauses still present,
+the `notebook` spec annotation intact and `l6-parity.js` still parsing.
+
+`silent` went **37 → 53** immediately, and `silentByCause` names the cause without anyone
+having to guess: `predatingTheClause: 37`, `b2WaveNotTranscribed: 16`, `b2WaveApps:
+[novels, manga]`. The 16 new rows have the same shape as the 53 this turn recovered, for the
+same reason — they came through the same non-transcribing writer.
+
+So the recovery is a **mop, not a fix**. `debug/_p2i-transcribe.cjs` is now written to survive
+the next wave rather than being a one-shot: its app list is **derived** from the ledger (every
+app with a control-less row that has a `_pr4-meta-*` block), and an app whose cat6 receipt is
+not banked yet is **skipped with a reason** rather than refused, because "that run is not
+finished" is not a defect. Run against the merged ledger it correctly reports:
+
+    SKIPPED (not a defect):
+      manga: no qualifying PASS receipt banked yet -- run cat6 for it first
+      novels: no qualifying PASS receipt banked yet -- run cat6 for it first
+    DRY RUN: 0 rows ... Considered apps: manga, novels.
+
+— it finds the two new apps, declines to invent anything, and leaves the already-transcribed
+rows alone. **The durable fix is one line in the other writer**: `debug/_pr4-rows.cjs` should
+copy `control.mutations` into `observed` the way `probes/l6-parity-rows.cjs` already does. Until
+it does, every wave adds silent rows and someone transcribes them afterwards.
 ## 2026-09-02 (primary) — L12 b2: the two readers and the browser, and three instrument defects
 
 Commits: `62097cc9` (novels chapter row), `8663391e` (novels rows), `0e618fe0` (manga drive +
@@ -1105,3 +1643,201 @@ a hit: **cold** (nothing open, Settings mounts from scratch) → `page=study`, p
 `Profile & dictionary`, `[data-setting-id="game-arena"]` present and highlighted; **warm**
 (Settings already up, parked on Home, `gameArenaOnPage=0`) → the same landing. No defect.
 Receipt: `debug/_bk6-arena-settings.cjs`.
+
+## 2026-09-02 (primary2) — `mediaCenter` was the last ledger app with no spec, and a candidate defect died
+
+Commits: `2ab8709d` (the spec), plus this turn's `--refresh` mode on the row writer.
+
+`mediaCenter` was the one app in this ledger carrying rows and declaring no `SPECS` entry, so
+`notWritten.derived` could not re-derive it by any route and `ledgerAppsWithNoSpec` had named
+it for days. Its 8 rows were also the largest single block with no recorded control — **not
+because anyone neglected them**, but by construction: they were driven 2026-08-25 by
+`window.__L6M`, an instrument `cat6-feature-parity.cjs` superseded and cannot re-run. A row
+whose instrument no longer exists cannot be re-proved, and the ledger's own writer is
+append-only, so it would have stayed silent no matter how well the surface was driven.
+
+**`cat6-feature-parity.cjs --app mediaCenter`: PASS 10/10.** Parity **6/6 standard == 6/6
+liquid**, 2 `na`, `rowsAgree` true, round trip held (`fieldsHeld` and `shellHeld`, 0 diffs),
+and **6 of 8 mutations armed, every one flipping exactly its own row and returning**.
+
+### Three things the first draft got wrong, and the receipt caught all three
+
+1. **`windowLifecycle`'s obvious control DID NOT FIRE.** Detaching one `.fwin-b` is the
+   literal falsification and it is inert here: `lifecycle()` requires `chrome.length >= 4`
+   and this shell renders **five** (Pop out, Make Liquid, Minimize, Maximize, Close), so
+   removing one leaves 4 and the row correctly stays up. The receipt said so in as many
+   words — `fellRows: []`, `exactlyOwnRow: false`, whole run **VOID**. Falsified through
+   `aria-pressed` on the Liquid toggle instead, which is the clause with no slack in it and
+   is the same one `__L6M` used, so the two instruments attack the same thing.
+2. **`librarySearch` reached the right verdict from false evidence, twice.** It scored `na`
+   reading "the library page is not the mounted tab" while the page was plainly mounted,
+   because the field is `LABEL.mc-global-search > INPUT` in the **shell topbar**, carries no
+   className at all, and its subject follows the tab ("Search your media library…" on
+   Library, "Search songs, artists, albums…" on Music). Two class-anchored selectors missed
+   it. A quiet row is exactly where right-verdict/wrong-reason ships unnoticed.
+3. **The drive step navigated AWAY from the tab four rows depend on.** It now MOUNTS Library,
+   idempotently, and the undo walks back with the product's own Back button rather than
+   re-clicking the origin (which would push a third trail entry and leave the window with a
+   longer history than it was found with).
+
+### A candidate defect from the last handoff is DISPROVEN, and the drive was the bug
+
+The last handoff carried, deliberately unfiled, "Media Center **Back stays `disabled` after
+the FIRST in-window navigation** (Home -> Library)". It reproduced on a second gesture — so
+the reading was real. The cause is not. `AppSection.tsx:79` mounts the `player` section as
+`<MediaCenterView initialTab="library" />`, so the window **opens on Library**; clicking
+Library is `setTab(same)`, and `setTab` correctly returns the trail unchanged
+(`MediaCenterView.tsx:1800`). Driven decisively on a **never-before-created** window: `os:open
+video` came up with breadcrumb **`Video`** and Back disabled, and Library -> Music enabled it
+(`title` "Back", `disabled=false`). The product opens on its own section and never on Home.
+**One gesture is noise even when it repeats; what settles it is a case where the two
+explanations predict different things.** Recorded in the spec's `steps.library` comment so the
+next worker does not re-derive it.
+
+### Three counts this spec deliberately does not hardcode
+
+Each is different here from the ledger prose that first named it, and all three are DERIVED
+from available media: the library shelf rail reads **6** (prose said 9), the sort `<select>`
+**4** options (prose said 7), and the section rail moves with workspace availability
+(**9** here, `.mc-seanime-link` included). Hardcoding any of them repeats
+`library.inboxFilters` exactly — a threshold a smaller profile can never reach, which then
+reads as a dead feature. Shelf "current" is **`aria-current="true"`**, not a class; a
+class-based selector matched **6 of 6** and could not fail.
+
+### `--refresh`, and why it is not "overwrite"
+
+`l6-parity-rows.cjs` filters new rows by `!have.has(app|feature)`, so it could only ever ADD.
+`--refresh` **appends** a `RE-DRIVEN from <run>` clause carrying the fresh evidence and the
+control, keyed on the run artifact's own filename so a second run is a no-op (proved: 6 then
+**0**, `alreadyCarryingThisRun` naming all six). The original observation and its `__L6M`
+provenance stay in the row. **Three plants, all fired**: a metadata `feature` string naming no
+ledger row -> REFUSED "that is an ADD, run without --refresh" (planted on the tracked metadata
+file under `--dry`, restored **byte-identical**, sha256
+`ea9a79fb…c52d3c` before and after); a `VOID` verdict -> REFUSED "only a PASS run may write";
+an armed mutation flipped to `armed:false` -> that row dropped **by name**, 6 -> 5.
+
+**Ledger: 191 rows / 24 apps / 0 duplicate `app|feature` keys, 182 `both` / 9 `pending`.
+`silent` 60 -> 54; `mediaCenter` 8 -> 2.** The two that stay silent are `librarySearch` and
+`perItemActions`, whose mutations are **UNARMABLE on this profile** (0 `.medialib-card`) and
+which are therefore named in the control verdict as NOT control-proved rather than counted.
+`ledgerAppsWithNoSpec` is now **empty**. 26 specs, rows for 24, and **2 specs still have no
+row: `notebook`** (its subject is deleted on this branch — see the 2026-09-02 section above)
+**and `vn`** (empty library on both profiles; adding one writes to the user's real library,
+which that spec's safety note forbids).
+
+**sampled-out:** none — this section covers one app and drove all eight of its rows.
+
+## 2026-09-02 (primary2) — `--refresh` applied: `dictionary` and `grammar` re-proved, and two apps could not be
+
+`--refresh` exists to un-strand rows written by an instrument that no longer runs. Applied to
+the three apps whose specs live in this tree and whose rows predate the control clause.
+
+**`dictionary` PASS 10/10, parity 7/7 == 7/7, 0 `na`** — 7 rows re-driven.
+**`grammar` PASS 10/10, parity 8/8 == 8/8, 0 `na`** — 8 rows re-driven.
+Plus `mediaCenter`'s 6. **21 rows now carry a `RE-DRIVEN` clause.**
+
+**Ledger: 191 rows / 24 apps / 0 duplicate keys, 182 `both` / 9 `pending`. `silent` 60 -> 42,
+`withNamedControl` 132 -> 135, `declaredNone` 4 -> 13.** The rise in `declaredNone` is the
+point, not a regression: a row whose spec declares no mutation now SAYS so in its own text,
+where before it was indistinguishable from a row that simply had not been written up.
+
+### The mapping was verified, not assumed
+
+`grammar`, `agent` and `captures` had no `parity-row-metadata.json` block; their rows were
+hand-written by `l6-parity-write-rows.cjs` in spec-declaration order. Rather than trusting
+that order, each app's spec ids were matched against its ledger rows BY INDEX and every row
+that already carried a control clause had to name the id at its own index. **9 independent
+matches across the three apps, 0 mismatches** (`grammar[0] modeSwitch`, `[5] presets`,
+`[7] windowLifecycle`; `agent[0] conversationRail`, `[4] contextShelf`, `[5] viewToggle`;
+`captures[0] captureList`, `[4] listReversibility`, `[5] windowLifecycle`). A single mismatch
+would have refused that app rather than writing a block.
+
+### Two apps did NOT refresh, and both reasons are on the record
+
+**`translate` VOID — "negative control did not falsify", parity 4/7 in BOTH presentations.**
+Three rows failed: `input (chars=0)`, `output (outputChars=6 before="猫が好きです"
+after="猫が好きです")` and `agentHandoff (before="Ask the Agent" after="Ask the Agent"
+disabled=true)`. The drive types `猫が好きです` and the input read back **0 characters**, so
+the two downstream rows had nothing to act on. Only a PASS run may write, so it wrote nothing
+— which is the writer behaving correctly. **Not filed as a product defect on one reading**:
+the same shape (a drive that reports its own write back to itself) was the manga instrument
+defect two sections above, and this has not been repeated yet.
+
+**`agent` FAIL 4/8 in both presentations**, on `conversationRail (conversations=0 selected=0)`,
+`railCount (headCount="1 conversation" rows=0)`, `composer (chars=0)` and `contextShelf
+(removeControls=0)`. A head saying "1 conversation" over a rail of 0 rows is exactly the
+disagreement that row exists to catch — but read again four seconds later, the SAME window
+reported **7 `.agent-rail-item` against a head of "7 conversations"**, i.e. consistent. The
+FAIL is a read of a surface still hydrating, not a proven defect.
+
+**DISCLOSED, because it is a real write and it is not undone.** The `agent` spec's drive
+includes a `newConversation` step that clicks the product's own New conversation button, and
+nothing in the run deletes it. The rail now holds **7 conversations, every one "0 messages"** —
+drive residue accumulated across turns, two of them from this turn's single FAILed run. The
+agent surface was NOT re-driven after that was noticed. Whoever takes `agent`'s 5 silent rows
+should give that step an undo first, or drive an existing conversation instead of making one.
+
+**sampled-out:** `agent` and `captures` (see above — `captures` was not reached; it is the
+next turn's cheapest remaining app), `mediaWorkspace` (5 silent rows, blocked on a scanned
+media library — 0 files on this profile), `novels`/`manga`/`immersion` (23 rows, the main
+tree's b2 wave; their receipts are banked in the main tree's `debug/`, not here).
+
+## 2026-09-02 (primary2) — `captures` has no subject on this profile, and the merge moved four ledger numbers
+
+### The slice the last handoff named, and why it wrote no row
+
+`captures` was called "the cheapest remaining app, ~5 min" because its metadata block was
+already written and index-verified. It is not cheap; it is empty.
+
+Driven through the product's own path, one window, desk at 0 `.fwin` before and after:
+`os:open` detail `reading` → window **Reading Finder**, root `.reading-workspace`, an
+8-button `.reading-workspace-tab` rail (Home, Reading Finder, Library, Captures, Continue
+reading, Plan, Import, Sources). Clicking **Captures** mounts `.reading-captures`. It then
+reads **`rows=0`, `passage=false`, `head=null`, `listToggle=true`**, with the surface's own
+words: *"Nothing captured yet. Scan a passage with the Reading Lens and send it here."*
+
+`cat6 --app captures` had already REFUSED, before the tab was clicked — *"the captures
+surface is not open. Open it and re-run; a surface that is not on screen measures as perfect
+because every count is zero."* That refusal is the instrument working, and it is the same
+sentence that would be the right verdict one step later: three of the six rows have no
+subject at all here (`captureList` needs `rows>0`, `selection` needs an `aria-current` row,
+`measureClamp` needs a rendered passage). A run would be capped, not a PASS, so none was
+banked.
+
+**NOT written and said plainly:** a capture can be manufactured by driving the Reading Lens
+over a passage, but that PERSISTS user data on the profile and takes a multi-step drive. It
+was not done. `captures` is data-blocked exactly the way `mediaWorkspace` is.
+
+So every remaining b2 app on THIS tree is blocked, and by four different causes:
+`captures` and `mediaWorkspace` by an empty profile, `novels`/`manga`/`immersion` by their
+cat6 receipts living in the main tree's `debug/`, `vn` by an empty library, `notebook`
+because this branch deleted its subject.
+
+### The sync-down merge, `a175e657` — five conflicts, and one taken wholly theirs
+
+Recorded because it moved this ledger's own numbers, not as housekeeping.
+
+- **The plan bullet** was spliced by SEGMENT, not by hand: 18 of the other side's 93
+  sentence-segments were absent here and went in before the closing arrow. Invariants
+  checked both sides of the edit — 46 tagged / 35 closed / 11 open, unchanged.
+- **PARITY_LEDGER.md** unioned **THEIRS FIRST**. Their region opens on `### calendar`, which
+  belongs to a `##` heading in the common context above; ours-first would have orphaned it
+  under our own `##`.
+- **The ledger's derived block** was taken by SHAPE and then RE-DERIVED with
+  `debug/_p2g-notwritten.cjs`. HEAD claimed 24 specs-with-rows, theirs 18, and neither was
+  true after the rows merged. Never hand-merge a computed block.
+- **`l12-atlas.cjs` was taken WHOLLY THEIRS**, and this tree's own `32aae369` is superseded
+  by it. b4 is the main tree's track; their `9c6474f9` + `6a1e48a5` reach integrity
+  `all-present` on the very 21 plates `32aae369` could only report as CORRUPT, and carry the
+  raw-NUL repair that `sourceNulBytes.test.ts` gates on. The finding this tree contributed
+  survived; the implementation did not need to.
+
+**Ledger after the union, validated:** 213 rows / 24 apps, 204 `both` / 9 `pending`, 0
+duplicate `app|feature` keys. Derived re-run: **2 specs with no row of 26** (notebook, vn).
+`controlCoverage` **135 named / 13 none-declared / 64 silent of 213** — silent rose 42 → 64
+purely by absorbing the other track's rows, which is the merge, not a regression.
+
+**sampled-out:** `mediaWorkspace` (0 scanned media on this profile), `translate` (VOID last
+turn on `chars=0`, one reading, not re-driven), `agent` (drive residue: 7 empty
+conversations, needs an undo before it is driven again), `novels`/`manga`/`immersion`
+(receipts banked in the main tree), `vn` (empty library), `notebook` (subject deleted here).

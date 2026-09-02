@@ -25,8 +25,10 @@
  */
 'use strict';
 
+/* eslint-disable @typescript-eslint/no-var-requires -- a .cjs build tool; `import` is not available here */
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const SCAN_DIRS = [path.join('src', 'renderer'), path.join('src', 'media')];
@@ -155,6 +157,59 @@ function adoptsI18n(src) {
   return /\buseT\s*\(/.test(src) || /\bt\(\s*['"`]/.test(src) || /\bsx\(\s*['"`]/.test(src);
 }
 
+/**
+ * Read the baseline as `{ path: recordedCount }`.
+ *
+ * The file used to be a bare array of paths, and a bare array makes baselining a
+ * pure loosening: once a file is listed, thirty more hardcoded strings can be
+ * added to it and no gate notices. Recording the COUNT makes the list a ratchet
+ * in both directions — a baselined file may shrink or hold, never grow.
+ *
+ * The array form is still accepted (count `null` = unknown, no growth check), so
+ * an older checkout or a hand-edited list does not hard-fail.
+ */
+function readBaseline() {
+  const raw = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+  if (Array.isArray(raw)) return new Map(raw.map((f) => [f, null]));
+  return new Map(Object.entries(raw));
+}
+
+/**
+ * A baseline written from a dirty tree is not a claim about the branch.
+ *
+ * Measured 2026-09-02: the committed baseline held 6 files, and a clean checkout
+ * of the same commit reported 33 — 27 "fresh" offenders that failed the vitest
+ * gate for everyone whose tree was clean. All 27 were `M` in the tree the
+ * baseline was generated from, each carrying an uncommitted partial i18n
+ * conversion; `adoptsI18n()` needs only one `t(` to clear a file, so the working
+ * copies passed while the committed blobs did not. That is the same defect the
+ * 2026-08-12 boss audit recorded one gate over ("does not pass its own i18n gate
+ * when checked out clean"), and it cost this branch its gate for two days.
+ *
+ * So `--update-baseline` refuses while any scanned file is dirty. Commit the
+ * conversions first, then record what HEAD actually contains.
+ *
+ * Returns a list of dirty scanned paths, or null when git cannot answer (a
+ * tarball, a non-repo CI checkout) — in which case the caller warns and writes,
+ * because refusing on the absence of git would block the honest case too.
+ */
+function dirtyScannedPaths() {
+  let out;
+  try {
+    out = execFileSync('git', ['status', '--porcelain', '--', ...SCAN_DIRS], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return null;
+  }
+  return out
+    .split('\n')
+    .map((l) => l.slice(3).trim().replace(/^"|"$/g, ''))
+    .filter((p) => p.endsWith('.tsx'));
+}
+
 function main() {
   const asJson = process.argv.includes('--json');
   const updating = process.argv.includes('--update-baseline');
@@ -179,21 +234,44 @@ function main() {
   offenders.sort((a, b) => b.count - a.count);
 
   if (updating) {
-    fs.writeFileSync(BASELINE_PATH, JSON.stringify(offenders.map((o) => o.file).sort(), null, 2) + '\n');
-    console.log(`baseline updated: ${offenders.length} file(s)`);
+    const dirty = dirtyScannedPaths();
+    if (dirty === null) {
+      console.log('warning: git could not report working-tree state; writing the baseline anyway.');
+    } else if (dirty.length > 0) {
+      console.log(
+        `REFUSED: ${dirty.length} scanned .tsx file(s) are dirty, so this baseline would\n` +
+          'record uncommitted work rather than what the branch contains. Commit them first.\n',
+      );
+      for (const p of dirty.slice(0, 20)) console.log(`  ${p}`);
+      if (dirty.length > 20) console.log(`  … and ${dirty.length - 20} more`);
+      process.exitCode = 1;
+      return;
+    }
+    const record = {};
+    for (const o of [...offenders].sort((a, b) => a.file.localeCompare(b.file))) record[o.file] = o.count;
+    fs.writeFileSync(BASELINE_PATH, JSON.stringify(record, null, 2) + '\n');
+    console.log(
+      `baseline updated: ${offenders.length} file(s), ` +
+        `${offenders.reduce((n, o) => n + o.count, 0)} string(s)`,
+    );
     return;
   }
 
-  const baseline = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  const baseline = readBaseline();
   const fresh = offenders.filter((o) => !baseline.has(o.file));
-  const fixed = [...baseline].filter((f) => !offenders.some((o) => o.file === f));
+  const grown = offenders.filter((o) => {
+    const was = baseline.get(o.file);
+    return typeof was === 'number' && o.count > was;
+  });
+  const fixed = [...baseline.keys()].filter((f) => !offenders.some((o) => o.file === f));
 
   if (asJson) {
-    console.log(JSON.stringify({ offenders, fresh, fixed }, null, 2));
-  } else if (fresh.length === 0) {
+    console.log(JSON.stringify({ offenders, fresh, grown, fixed }, null, 2));
+  } else if (fresh.length === 0 && grown.length === 0) {
     console.log(
-      `i18n-hardcoded: no new component renders UI text without adopting i18n. ` +
-        `${baseline.size} file(s) baselined.`,
+      `i18n-hardcoded: no new component renders UI text without adopting i18n, and no ` +
+        `baselined one grew. ${baseline.size} file(s) baselined, ` +
+        `${[...baseline.values()].reduce((n, v) => n + (v || 0), 0)} string(s).`,
     );
     if (fixed.length > 0) {
       console.log(
@@ -201,6 +279,10 @@ function main() {
           `tools/i18n-hardcoded-baseline.json:\n  ${fixed.join('\n  ')}`,
       );
     }
+  } else if (fresh.length === 0) {
+    console.log('These baselined components GREW more hardcoded UI text. Being on the\n' +
+      'baseline records existing debt; it does not license adding to it:\n');
+    for (const o of grown) console.log(`  ${o.file} — ${baseline.get(o.file)} -> ${o.count} string(s)`);
   } else {
     console.log(
       'These components render user-facing text and never adopted i18n. The catalog\n' +
@@ -217,7 +299,7 @@ function main() {
     );
   }
 
-  process.exitCode = fresh.length > 0 ? 1 : 0;
+  process.exitCode = fresh.length > 0 || grown.length > 0 ? 1 : 0;
 }
 
 /**
@@ -237,14 +319,17 @@ function scan() {
     if (hits.length < MIN_STRINGS) continue;
     offenders.push({ file: path.relative(ROOT, file).replace(/\\/g, '/'), count: hits.length });
   }
-  const baseline = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  const baseline = readBaseline();
   return {
     offenders,
     fresh: offenders.filter((o) => !baseline.has(o.file)),
-    fixed: [...baseline].filter((f) => !offenders.some((o) => o.file === f)),
+    grown: offenders
+      .filter((o) => typeof baseline.get(o.file) === 'number' && o.count > baseline.get(o.file))
+      .map((o) => ({ ...o, was: baseline.get(o.file) })),
+    fixed: [...baseline.keys()].filter((f) => !offenders.some((o) => o.file === f)),
   };
 }
 
-module.exports = { scan, strip, countUiStrings, adoptsI18n, MIN_STRINGS };
+module.exports = { scan, readBaseline, strip, countUiStrings, adoptsI18n, MIN_STRINGS };
 
 if (require.main === module) main();
