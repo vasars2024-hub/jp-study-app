@@ -82,8 +82,12 @@
  * ---------------------------------------------------------------------------------
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-atlas.cjs \
- *     [--manifest debug/l12-matrix-manifest.json] [--out <atlas.json>] \
+ *     [--manifest a.json[,b.json,...]] [--out <atlas.json>] \
  *     [--sheet debug/shots/l12-atlas.html] [--control]
+ *
+ * `--manifest` takes a comma-separated LIST and order is precedence — a later manifest
+ * supersedes an earlier one on the same cell coordinate. See `mergeManifests` for why
+ * bullet 1's evidence is three runs and what the merge is allowed to combine.
  *
  * WHAT IS COMMITTED: the atlas JSON only. The contact sheet is HTML that references
  * gitignored PNGs by relative path, so it lands in `debug/shots/` beside them.
@@ -206,11 +210,27 @@ function integrity(cells) {
  * with the surfaces listed, which is more visible than being one of nine anonymous
  * failures.
  */
+/**
+ * THE SAME DEFECT ON THE STATE AXIS, found the moment the state axis was actually merged
+ * in: 4 of the 5 "failed" cells are `note` at `maximized`, and the manifest's own error
+ * says the reason — a frameless sticky note has no maximize control to drive. That is the
+ * identical product gap as `presentable: false`, one axis over.
+ *
+ * It is matched on the harness's own emitted shape rather than on a per-app flag ONLY
+ * because the harness records no `maximizable` field; the reason still comes from the
+ * manifest, never from this file's guess. The pattern is deliberately narrow — it demands
+ * the harness's exact "surface has no <thing> control of its own" clause — so that a real
+ * capture failure (`Error: UnknownVizError`, the compositor flake on `agent`) cannot be
+ * laundered into `unavailable`. That cell staying `failed` is this rule's negative control.
+ */
+const STATE_UNAVAILABLE = /^state [^:]+: surface has no [^:]*control of its own\b/i;
+
 function classify(cell, manifest) {
   if (cell.ok) return 'captured';
   const app = (manifest.apps || {})[cell.app] || {};
   const dflt = ((manifest.dimensions || {}).presentations || ['standard'])[0];
   if (app.opened && app.presentable === false && cell.presentation !== dflt) return 'unavailable';
+  if (app.opened && STATE_UNAVAILABLE.test(cell.error || '')) return 'unavailable';
   return 'failed';
 }
 
@@ -253,6 +273,19 @@ function coverage(manifest) {
     // The product gap, named. These surfaces have NO Liquid presentation to photograph.
     unavailableSurfaces: [...new Set(unavailable.map((c) => c.app))],
     unavailableReason: unavailable.length ? (unavailable[0].error || null) : null,
+    /**
+     * Once the state axis merged in there are TWO kinds of product gap (no presentation
+     * toggle, no maximize control) and one `unavailableReason` string silently described
+     * both by the first one it happened to meet. Grouped, so each gap is named with the
+     * surfaces it actually applies to.
+     */
+    unavailableByReason: Object.entries(
+      unavailable.reduce((acc, c) => {
+        const why = c.error || 'no reason recorded';
+        (acc[why] = acc[why] || new Set()).add(c.app);
+        return acc;
+      }, {}),
+    ).map(([reason, apps]) => ({ reason, surfaces: [...apps], cells: unavailable.filter((c) => (c.error || 'no reason recorded') === reason).length })),
     attainableCells: attainable,
     attainableCompleteness: attainable ? +((100 * captured) / attainable).toFixed(2) : 0,
     neverAttempted: absent.length,
@@ -301,6 +334,131 @@ function duplicates(cells) {
   };
 }
 
+const CELL_KEY = (c) => [c.app, c.theme, c.presentation, c.state].join(' ');
+
+/**
+ * MULTI-MANIFEST ASSEMBLY — why the atlas takes a LIST and not a file.
+ *
+ * Bullet 1's evidence was never one manifest and structurally cannot be. The matrix is a
+ * live instrument driving a real desk, so its axes were swept in separate runs: the full
+ * 13-theme sweep at `normal`, a `maximized` run for the state axis, and an oled-black
+ * re-capture made after the plate-namespace fix. An assembler that reads ONE of those can
+ * never report the state axis as anything but `not-swept`, and it re-hashes stale plates
+ * that a later run has already replaced. Both were live findings, not hypotheticals:
+ * over the full matrix alone this file reported `state: not-swept` and 21 integrity
+ * mismatches whose replacements were sitting in a manifest it could not open.
+ *
+ * The merge is a UNION OF CELLS WITH LAST-WINS PRECEDENCE, and the two honesty rules that
+ * make it safe to trust are:
+ *
+ *   1. NOTHING DERIVED IS MERGED. Only `cells`, `dimensions` and `apps` are unioned; every
+ *      computed number — coverage, axis effectiveness, integrity, duplication — is then
+ *      re-derived by `assemble()` from the union. Hand-merging a computed block while its
+ *      inputs change underneath is how a merged artifact keeps pre-merge counts and lies.
+ *   2. SUPERSESSION IS COUNTED AND NAMED, never silent. A later run replacing an earlier
+ *      cell is the whole point, but it is also indistinguishable from an atlas quietly
+ *      dropping evidence it found inconvenient, so every replaced coordinate is recorded
+ *      with the source that lost it.
+ *
+ * Certification is CONJUNCTIVE across sources: the merge is certifiable only if every
+ * contributing run ran its controls and passed them. One un-controlled manifest in the
+ * list voids the atlas rather than being averaged away.
+ */
+function mergeManifests(loaded) {
+  if (loaded.length === 1) return { manifest: loaded[0].manifest, provenance: null };
+
+  const cells = new Map();
+  const superseded = [];
+  const dims = { apps: [], themes: [], presentations: [], states: [], themeCatalog: [] };
+  const apps = {};
+  const perSource = [];
+
+  for (const { file, manifest } of loaded) {
+    for (const c of manifest.cells || []) {
+      const key = CELL_KEY(c);
+      const prior = cells.get(key);
+      if (prior) {
+        superseded.push({
+          app: c.app, theme: c.theme, presentation: c.presentation, state: c.state,
+          supersededFrom: prior.__source, by: file,
+        });
+        const idx = perSource.find((s) => s.file === prior.__source);
+        if (idx) idx.superseded += 1;
+      }
+      cells.set(key, { ...c, __source: file });
+    }
+    const d = manifest.dimensions || {};
+    for (const axis of ['apps', 'themes', 'presentations', 'states']) {
+      for (const v of d[axis] || []) if (!dims[axis].includes(v)) dims[axis].push(v);
+    }
+    for (const t of d.themeCatalog || []) {
+      if (!dims.themeCatalog.some((x) => x.id === t.id)) dims.themeCatalog.push(t);
+    }
+    if (d.canonicalSections) dims.canonicalSections = d.canonicalSections;
+    for (const [id, v] of Object.entries(manifest.apps || {})) {
+      const cur = apps[id] || {};
+      // OR, not last-wins: a surface opened in ANY run really was opened, and
+      // `presentable` is a property of the product rather than of one run's luck.
+      apps[id] = { ...cur, ...v, opened: !!(cur.opened || v.opened), presentable: !!(cur.presentable || v.presentable) };
+    }
+    perSource.push({
+      file,
+      runId: manifest.runId || null,
+      generatedAt: manifest.generatedAt || null,
+      cells: (manifest.cells || []).length,
+      // Incremented in place by LATER sources that replace one of this source's cells;
+      // surviving = cells - superseded, and it is reported rather than inferred.
+      superseded: 0,
+      certifiable: !!manifest.certifiable,
+      controlsRan: !!manifest.controls,
+      caretFrozen: !!manifest.caretFrozen,
+    });
+  }
+
+  // Controls AND-ed across sources; a key any source failed is failed for the merge.
+  const controlKeys = [...new Set(loaded.flatMap(({ manifest }) => Object.keys(manifest.controls || {})))];
+  const controls = controlKeys.length ? {} : null;
+  for (const k of controlKeys) {
+    const passes = loaded
+      .map(({ manifest }) => (manifest.controls || {})[k])
+      .filter((v) => v !== undefined)
+      .map((v) => (v.pass === undefined ? v.identical : v.pass));
+    controls[k] = { pass: passes.every(Boolean) };
+  }
+  const uncontrolled = loaded.filter(({ manifest }) => !manifest.controls).map(({ file }) => file);
+  const notCertifiable = loaded.filter(({ manifest }) => !manifest.certifiable).map(({ file }) => file);
+
+  // sampledOut survives the merge only where EVERY source skipped it.
+  const sampledOut = (loaded[0].manifest.sampledOut || [])
+    .filter((s) => loaded.every(({ manifest }) => (manifest.sampledOut || []).includes(s)));
+
+  const merged = {
+    schema: 'l12-visual-matrix/v1',
+    generatedAt: loaded.map(({ manifest }) => manifest.generatedAt).filter(Boolean).sort().pop() || null,
+    dimensions: dims,
+    apps,
+    sampledOut,
+    cells: [...cells.values()].map(({ __source, ...c }) => c),
+    controls: uncontrolled.length ? null : controls,
+    certifiable: notCertifiable.length === 0,
+    void: notCertifiable.length ? `sources not certifiable on their own controls: ${notCertifiable.join(', ')}` : null,
+    caretFrozen: loaded.every(({ manifest }) => manifest.caretFrozen),
+  };
+
+  return {
+    manifest: merged,
+    provenance: {
+      sources: perSource,
+      mergedCells: cells.size,
+      supersededCells: superseded.length,
+      // Named, per rule 2 above. Truncated only in the printed list, never in the count.
+      supersededExamples: superseded.slice(0, 12),
+      uncontrolledSources: uncontrolled,
+      nonCertifiableSources: notCertifiable,
+    },
+  };
+}
+
 function assemble(manifest) {
   const cells = manifest.cells || [];
   const cov = coverage(manifest);
@@ -326,11 +484,9 @@ function assemble(manifest) {
    * It is a genuine L12 finding and belongs in the risk register, not in a verdict that
    * would be unfixable by any amount of photography.
    */
-  const gaps = cov.unavailableCells
-    ? [`${cov.unavailableSurfaces.length} of ${cov.appsOpened} surfaces have no Liquid presentation at all `
-      + `(${cov.unavailableSurfaces.join(', ')}) — ${cov.unavailableCells} declared cells cannot exist. `
-      + `Reported as a product gap, not an atlas defect: ${cov.unavailableReason}`]
-    : [];
+  const gaps = (cov.unavailableByReason || []).map((g) => `${g.surfaces.length} of ${cov.appsOpened} surfaces `
+    + `(${g.surfaces.join(', ')}) — ${g.cells} declared cells cannot exist. `
+    + `Reported as a product gap, not an atlas defect: ${g.reason}`);
   for (const a of decorative) blockers.push(`axis '${a}' moved no pixels in any comparable group — it is decorative, so the atlas does not cover that dimension`);
   for (const a of axes.filter((x) => x.verdict === 'partial')) {
     blockers.push(`axis '${a.axis}' moved pixels in only ${a.groupsWhereItMoved} of ${a.comparableGroups} comparable groups`
@@ -524,19 +680,29 @@ function runControls(manifest, base) {
 
 // ---------------------------------------------------------------------------------
 (() => {
-  const manifestPath = path.resolve(REPO, arg('manifest', path.join('debug', 'l12-matrix-manifest.json')));
-  if (!fs.existsSync(manifestPath)) {
-    console.error(`REFUSE - no matrix manifest at ${manifestPath}. Run l12-visual-matrix.cjs first.`);
-    process.exit(2);
-  }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (manifest.schema !== 'l12-visual-matrix/v1') {
-    console.error(`REFUSE - ${manifestPath} is schema '${manifest.schema}', not l12-visual-matrix/v1`);
-    process.exit(2);
+  // Comma-separated, and ORDER IS PRECEDENCE: a later manifest supersedes an earlier one
+  // on the same cell coordinate. One path behaves exactly as before.
+  const requested = arg('manifest', path.join('debug', 'l12-matrix-manifest.json'))
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  const loaded = [];
+  for (const rel of requested) {
+    const manifestPath = path.resolve(REPO, rel);
+    if (!fs.existsSync(manifestPath)) {
+      console.error(`REFUSE - no matrix manifest at ${manifestPath}. Run l12-visual-matrix.cjs first.`);
+      process.exit(2);
+    }
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (manifest.schema !== 'l12-visual-matrix/v1') {
+      console.error(`REFUSE - ${manifestPath} is schema '${manifest.schema}', not l12-visual-matrix/v1`);
+      process.exit(2);
+    }
+    loaded.push({ file: path.relative(REPO, manifestPath).replace(/\\/g, '/'), manifest });
   }
 
+  const { manifest, provenance } = mergeManifests(loaded);
   const atlas = assemble(manifest);
-  atlas.sourceManifest = path.relative(REPO, manifestPath).replace(/\\/g, '/');
+  atlas.sourceManifest = loaded.map((l) => l.file).join(',');
+  atlas.multiRun = provenance;
   if (has('control')) atlas.mutationControls = runControls(manifest, atlas);
   else atlas.mutationControls = null;
 
