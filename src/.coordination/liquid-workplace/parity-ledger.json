@@ -1760,7 +1760,7 @@
       "dataStateOwner": "renderer calendar view state; the drive walks week -> day -> agenda -> month and the spec's undo returns the view it found",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.viewModes, driven through steps `begin` / `visitWeek` / `visitDay` / `visitAgenda` / `visitMonth`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD buttons=4 active=1 visited=4/4 || LIQUID buttons=4 active=1 visited=4/4",
+      "observed": "STANDARD buttons=4 active=1 visited=4/4 || LIQUID buttons=4 active=1 visited=4/4 || CONTROL active added to 1 of 1: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "`visited=4/4` is the whole row. Read without the walk it would score `buttons=4 active=1` on a segment whose other three modes render nothing — presence scoring passes that every time, which is why the visit is recorded in spec state rather than inferred from the active class."
     },
@@ -1774,7 +1774,7 @@
       "dataStateOwner": "renderer calendar state, derived from the visible month",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.monthGrid; the mutation detaches the grid",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD dows=7 cells=42 numbered=42 || LIQUID dows=7 cells=42 numbered=42",
+      "observed": "STANDARD dows=7 cells=42 numbered=42 || LIQUID dows=7 cells=42 numbered=42 || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "42 is asserted rather than `>= 28` on purpose: a six-week grid is the layout, and a month rendered with fewer cells silently drops the leading and trailing days that make the previous and next month reachable by click."
     },
@@ -1788,7 +1788,7 @@
       "dataStateOwner": "renderer calendar cursor; the drive's shift is returned within its own step sequence, so nothing persists",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.dateTransport, driven through step `returnDate`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD buttons=3 named=3 jump=true shiftedAndReturned=true || LIQUID buttons=3 named=3 jump=true shiftedAndReturned=true",
+      "observed": "STANDARD buttons=3 named=3 jump=true shiftedAndReturned=true || LIQUID buttons=3 named=3 jump=true shiftedAndReturned=true || CONTROL element detached: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "`shiftedAndReturned` is the part that cannot be faked by presence: the drive moves the period off `September 2026` and back, and the row fails unless BOTH halves happened. A transport that moves and cannot return is the reversibility defect this ledger keeps finding elsewhere."
     },
@@ -1802,7 +1802,7 @@
       "dataStateOwner": "renderer composer state only — the drive opens and closes it and NEVER submits, so no event is written to the user's calendar",
       "automatedProof": "probes/l6-parity.js SPECS.calendar.eventComposer, driven through steps `openComposer` / `closeComposer` / `finish`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD trigger=true complete=true closed=true || LIQUID trigger=true complete=true closed=true",
+      "observed": "STANDARD trigger=true complete=true closed=true || LIQUID trigger=true complete=true closed=true || CONTROL type stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "The row requires the composer CLOSED at read time as well as complete when open, so an open flow that cannot be reversed fails it. `type=\"button\"` is asserted because a default-type button inside a form submits it, which on this surface would create an event."
     },
@@ -1816,7 +1816,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app calendar round trip",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 5/5 -> 4/5, fell exactly its own row, restored 5/5",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 820x580 in both. `dirtiedField` is null here and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and the composer that holds this surface's six inputs is CLOSED at trip time, so there is none. The composer's own reversibility is scored by `eventComposer` instead."
     }
