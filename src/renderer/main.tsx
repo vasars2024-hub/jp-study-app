@@ -80,6 +80,11 @@ import './theme/blanc.css';
 // Living-desktop weather overlays (Phase 3 · M3) + atmosphere polish (M5/M6).
 import './environment/weather.css';
 import './environment/atmosphere.css';
+// Last of the stylesheets on purpose: `flatten.css` mirrors rules from every
+// sheet above it (and from six component sheets that are imported lazily by
+// their own components), so it is written to out-specify each of them rather
+// than to win on order — but importing it last keeps the two consistent.
+import './theme/flatten.css';
 import { registerFrutigerAero } from './theme/frutiger-aero';
 import { registerWiredArchive } from './theme/wired-archive';
 import { installNotificationCapture } from './notificationStore';
@@ -88,6 +93,7 @@ import { bootAppBorderSettings } from './appBorderSettings';
 import { installShellSounds } from './shellSounds';
 import { bootPerf } from './theme/perf';
 import { bootGpuFallback } from './theme/gpuFallback';
+import { bootFlatten } from './theme/flatten';
 import { installAssetPackSync } from './theme/assetPacks';
 import { installGlobalInteractionBudget } from './perf/perfHub';
 import { registerAeroProofSoundPack } from './audio/aeroProofPack';
@@ -246,6 +252,11 @@ bootPerf();
 // arms the `webglcontextlost`/`restored` pair, which is L11's "GPU-loss
 // recovery" — after bootPerf so the attribute it writes lands on top.
 bootGpuFallback();
+// ...and the OR of all six "stop painting translucent material" states, written
+// to the root as `data-lq-flat`. After bootPerf/bootGpuFallback/bootAeroSafeMode
+// so the first frame is already correct; a MutationObserver keeps it correct
+// afterwards, so this is not order-critical beyond that first paint.
+bootFlatten();
 installGlobalInteractionBudget();
 bootWiredArchiveSettings();
 // Register the original source-generated Aero proof sounds before themes resolve
