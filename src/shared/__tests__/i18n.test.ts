@@ -270,7 +270,13 @@ describe('catalog hygiene', () => {
       'route these through useT()/t() per CLAUDE.md "i18n workflow", or baseline them ' +
         'with `node tools/i18n-hardcoded-check.cjs --update-baseline` and say why',
     ).toEqual([]);
-  });
+    // 60s. A whole-src sweep: its cost is the tree, and under a full `vitest run` with eight
+    // workers contending for one disk it exceeded the 20s default and was reported as a product
+    // regression. Measured in that run at 23,981ms. Same class as the suites repaired at
+    // 084dcfea and 23a30362; where the cause was removable it was removed instead (see
+    // mediaSurfaceImportGraph). Here the sweep is already single-pass, so the honest answer is a
+    // budget that matches the work. An assertion failure still fails on the assertion.
+  }, 60_000);
 
   it('does not let a date or time be formatted in the OS locale', () => {
     /*
