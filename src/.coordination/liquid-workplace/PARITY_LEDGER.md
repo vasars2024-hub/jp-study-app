@@ -664,3 +664,74 @@ are new: **62 rows / 9 apps -> 69 rows / 10 apps**, `both` 63 -> **66**, `pendin
 unchanged. Validated rather than trusted: **0 duplicate `app|feature` keys**. The writer's own
 negative control fired 3 of 3 on this artifact — a one-presentation row comes out
 `REGRESSION`, an unknown row id refuses by name, and a `VOID` verdict writes nothing.
+## 2026-09-02 (backup) — the two detach rows CLOSE, and driving them found a defect
+
+**49 `both` / 1 `pending` of 50**, up from 47 / 3. The Study Block menu was driven for the first
+time, in both presentations, on the now-scanned library.
+
+### Route
+
+Readiness -> `Ready` (1 row, THE Big O ep 1) -> `Open` -> `Toggle study controls` ->
+`Customize workspace` -> the Transcript block's `⋯`. The menu offers `Open in its own window`
+(`data-study-action="detach-block"`), `Remove from workspace`, and a **Send to display** group
+carrying all three real monitors — `window.api.displayList()` returns three entries, every one
+`virtual: false`.
+
+### Row 12 — detach and return
+
+| | window count | detached rect | panel in host |
+| --- | --- | --- | --- |
+| standard, detached | 1 -> 2 | 730,106 460x820 | gone |
+| standard, returned | 2 -> 1 | — | back at 384x424 |
+| liquid, detached | 1 -> 2 | 730,106 460x820 | gone |
+| liquid, returned | 2 -> 1 | — | back at 384x424 |
+
+Identical in both. The detached window is the real panel at
+`/?studyBlock=transcript&surface=workspace` with its own `Return to the player`.
+
+**Finding, recorded not repaired:** the detached window has **no presentation of its own** —
+`data-presentation` null, 0 nodes matching `[class*="liquid"]` — while its host is Liquid and
+`lq.workspace.presentation` is set in the same origin. Probably correct (a detached Transcript
+is entirely dense work, which §2.3 keeps on an anchor) but currently *silent* rather than
+decided. The honest shape is a `standard-only` row with its reason, which needs a row written
+for a host the ledger does not yet cover.
+
+### Row 13 — send to another monitor, and the defect it found
+
+`Send to display` on a block that is **still docked** means "detach it *there*", so it routes
+through `openStudyBlockWindow(..., displayKey)` — not through the `moveToDisplay` handler the
+2026-08-22 run exercised, which is the only path that called `rememberBounds`.
+
+| | placed | after close/reopen |
+| --- | --- | --- |
+| before `321d5f63`, liquid | 2090,20 460x512 | **730,106 460x820, primary** |
+| after `321d5f63`, standard | 2090,20 460x512 | 2090,20 460x512 |
+| after `321d5f63`, liquid | 2090,20 460x512 | 2090,20 460x512 |
+
+2090,20 460x512 is `centreOnWorkArea` exactly, derived from the formula rather than assumed:
+x = 1920 + (800-460)/2, height = min(820, 552-40) = 512, y = (552-512)/2 = 20.
+`study-block-windows.json` then held
+`{x:2090,y:20,width:460,height:512,displayKey:"vdd-by-mtt|800x600|1"}`.
+
+**Correction, published rather than buried.** `321d5f63`'s message says the store file was
+"ABSENT in userData both before and after". Every *node* read of that path this turn was VOID —
+shell escaping collapsed `process.env.APPDATA + "\jp..."` into `Roamingjp-study-app...`, which
+`existsSync` answers `false` for. Only the first check, from PowerShell before any detach,
+stands. The finding does not rest on it: the reopened **rectangle** is the discriminating
+measurement, because `openingBounds` returns a saved rectangle whenever one exists, so a
+primary-centred reopen proves nothing was saved.
+
+### The row that stays pending, and why it is a different reason again
+
+The transcript rail is mounted and honest in both presentations (384x424, "No subtitle track is
+loaded.", mining destination named) but has no **cues**, because the one file classified `Ready`
+does not play: opened through its own `Open` action and again through the product's
+`seanime:media-workspace-open` channel with an explicit `localFilePath`, the stage rendered
+`playback-error-container` — "The media server accepted this file and then stopped preparing
+it" — with 0 `<video>` elements. Cues come from the subtitle manager, which has tracks only once
+the file is playing. **Second finding:** the readiness pane says `Ready — Nothing to do` about a
+file that will not open.
+
+App and profile restored: overlay closed, presentation `standard` with the storage key removed,
+1 window, `study-block-windows.json` deleted (it was absent before), `desktop-layout.json`
+sha256 **9DFB6E2F2361...** unchanged across the whole turn including the restart.
