@@ -752,3 +752,33 @@ Opening section `video` gave a window titled **Video** whose body was the Media 
 rather than scoring the wrong page, which is the right failure. The rail's own `Video` entry
 has to be clicked first. After that: `navReach` reads 9 rail items, 1 active, label `Video`,
 page `mc-page mc-video-page`, window title `Video` — all three agreeing.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `youtube`, and the gap re-derived
+
+**`youtube`: 10 rows, `both` 10.** `cat6 --app youtube` = **PASS 10/10** first run — parity
+**10/10 and 10/10**, `onlyInOne` empty, all **10 mutations** flipping exactly their own row
+(10/10 → 9/10) and all restored, 0 refusals, box `980x640`, round trip field held / shell
+held / 0 diffs. Driven: tools disclosure `false → true`, folder draft, News → Playlist, row
+selection `0 → 1`.
+
+Three of its rows score a REFUSAL rather than an action, which is the honest shape:
+`addPlaylist` requires the submit to be **disabled** while the field is empty
+(`field="" submitDisabled=true expected=true`); `selectionActions` requires both bulk actions
+disabled while nothing is selected; `rowActions` requires `openImpliesDownloaded` on every row
+— offering Open for a file that is not on disk is a control that cannot do what it says. None
+of the row or bulk actions is executed: they download, delete, or write the user's study data.
+
+### The gap, re-derived instead of quoted
+
+`notWritten` said "the other **19** root components". That number is now computed rather than
+carried: `window.__LQP.apps()` = **25** specs, against the distinct `app` keys in `rows[]`,
+both read live and banked into the ledger as `notWritten.derived`.
+
+**13 of 25 specs have no row in this tree** — notebook, calendar, games, immersion, novels,
+manga, vn, city, scraper, resources, settings, shell, blancShell — and three of those
+(`city`, `scraper`, `resources`) are written in the concurrent worker's tree and arrive by
+merge. `mediaCenter` carries 8 rows from the pre-spec `__L6M` instrument and has no `SPECS`
+entry, which is why ledger apps (13) exceeds specs-with-rows (12).
+
+**Ledger this turn: 50 → 106 rows, 7 → 13 apps, 106 `both` / 0 `pending`, 0 duplicate
+`app|feature` keys — validated after every write, not asserted.**

@@ -1291,14 +1291,173 @@
       "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
       "status": "both",
       "_note": "Round trip on this window: field held, shell held, 0 diffs, box 1080x700 in both."
+    },
+    {
+      "app": "youtube",
+      "feature": "See the tracked playlists as a rail with exactly one selected",
+      "currentRoute": "YouTube window > playlist rail",
+      "standardDestination": "in-window rail; every item titled, exactly one active",
+      "liquidDestination": "same rail on the liquid material — `.fwin-liquid` + `data-presentation=\"liquid\"`; a rail is navigation, which §2.3 nominates for Liquid",
+      "keyboardRoute": "rail items are `<button>`s in the window's focus order",
+      "dataStateOwner": "main-process YouTube playlist store",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.playlistRail; probes/cat6-feature-parity.cjs --app youtube",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD items=2 titled=2 active=1 planBadge=0 || LIQUID items=2 titled=2 active=1 planBadge=0",
+      "status": "both"
+    },
+    {
+      "app": "youtube",
+      "feature": "Organise playlists into folders, every folder headed and its filings counted",
+      "currentRoute": "YouTube window > folder tree",
+      "standardDestination": "in-window tree; folders == headed, filed playlists counted",
+      "liquidDestination": "same tree on the liquid material",
+      "keyboardRoute": "folder heads are activatable controls",
+      "dataStateOwner": "main-process YouTube folder store",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.folderTree",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD folders=3 headed=3 playlists=1 filed=1 || LIQUID folders=3 headed=3 playlists=1 filed=1",
+      "status": "both"
+    },
+    {
+      "app": "youtube",
+      "feature": "Add a playlist, with the submit refusing while the field is empty",
+      "currentRoute": "YouTube window > add-playlist field + submit",
+      "standardDestination": "in-window field; submit DISABLED on an empty field, which is the honest state rather than a click that fails",
+      "liquidDestination": "same field and same refusal on the liquid material",
+      "keyboardRoute": "a native text input plus a button",
+      "dataStateOwner": "main-process YouTube playlist store",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.addPlaylist (disabled state matches the field's emptiness)",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD field=\"\" submitDisabled=true expected=true || LIQUID field=\"\" submitDisabled=true expected=true",
+      "status": "both",
+      "_note": "The row scores the AGREEMENT between field and submit, not the presence of either: `field=\"\" submitDisabled=true expected=true`. The add itself is not executed — it writes the user's real playlist store."
+    },
+    {
+      "app": "youtube",
+      "feature": "Switch between the window's tabs and have exactly one page mounted",
+      "currentRoute": "YouTube window > tab strip > News / Playlist",
+      "standardDestination": "exactly one active tab, and the mounted page agreeing with it",
+      "liquidDestination": "same switching on the liquid material",
+      "keyboardRoute": "tabs are `<button>`s in the focus order",
+      "dataStateOwner": "renderer view state; restored by the spec's `undo`",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.tabSwitching, driven through steps `openNews` + `openPlaylist`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD tabs=2 active=1 onNews=false list=true prefs=true || LIQUID tabs=2 active=1 onNews=false list=true prefs=true",
+      "status": "both"
+    },
+    {
+      "app": "youtube",
+      "feature": "See a playlist's videos as rows carrying a title, a thumbnail and real metadata",
+      "currentRoute": "YouTube window > open a playlist > video rows",
+      "standardDestination": "in-window rows; titled == thumbed == meta == rows, each a real list item",
+      "liquidDestination": "same rows on the liquid material; a dense list, so it stays on an opaque anchor per §2.3",
+      "keyboardRoute": "rows are list items with activatable controls",
+      "dataStateOwner": "main-process YouTube playlist store, per playlist",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.videoRows, reached through step `openPlaylist`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD rows=16 titled=16 thumbed=16 meta=16 listitems=16 || LIQUID rows=16 titled=16 thumbed=16 meta=16 listitems=16",
+      "status": "both",
+      "_note": "Reads `rows=0` without the drive because the window opens on the News tab; the drive opens a playlist first. This is the same class as `statistics.recentActivity` — a row read outside its own step sequence answers a different question."
+    },
+    {
+      "app": "youtube",
+      "feature": "Act on a video row, with Open offered only once the video is actually downloaded",
+      "currentRoute": "YouTube window > a video row > its three per-row actions",
+      "standardDestination": "in-window per-row actions; `openImpliesDownloaded` holds on every row",
+      "liquidDestination": "same actions on the liquid material",
+      "keyboardRoute": "the row actions are buttons in the focus order",
+      "dataStateOwner": "main-process YouTube store plus the local download index",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.rowActions",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD rows=16 threeActions=16 titled=16 openImpliesDownloaded=16 || LIQUID rows=16 threeActions=16 titled=16 openImpliesDownloaded=16",
+      "status": "both",
+      "_note": "`openImpliesDownloaded` is the honesty clause: offering Open for a file that is not on disk is a control that cannot do what it says. None of the three actions is executed — they download, delete or write the user's library."
+    },
+    {
+      "app": "youtube",
+      "feature": "Select rows and have the bulk actions disable themselves while nothing is selected",
+      "currentRoute": "YouTube window > select a row > the log / plan bulk actions",
+      "standardDestination": "with nothing selected both bulk actions are DISABLED, which is what the row scores",
+      "liquidDestination": "same disabled state on the liquid material",
+      "keyboardRoute": "the bulk actions are buttons in the focus order",
+      "dataStateOwner": "renderer selection state; restored by the spec's `undo`",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.selectionActions, driven through step `selectRow`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD actions=4 selected=1 logDisabled=false planDisabled=false expected=false || LIQUID actions=4 selected=0 logDisabled=true planDisabled=true expected=true",
+      "status": "both",
+      "_note": "Driven: selection 0 -> 1, on the row \"What's the difference between \\\"Para\\\" and…\". Neither bulk action is executed; both write the user's study data."
+    },
+    {
+      "app": "youtube",
+      "feature": "Set a playlist's own preferences, each one named and carrying a value",
+      "currentRoute": "YouTube window > playlist preferences pane",
+      "standardDestination": "in-window preferences; named == controls == valued, plus their sub-chips",
+      "liquidDestination": "same preferences on the liquid material — a form, so it stays on an opaque anchor per §2.3",
+      "keyboardRoute": "the preference controls are keyboard-operable",
+      "dataStateOwner": "main-process YouTube playlist store, per playlist",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.playlistPreferences, reached through the drive",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD prefs=11 named=11 controls=10 valued=10 subChips=4 || LIQUID prefs=11 named=11 controls=10 valued=10 subChips=4",
+      "status": "both"
+    },
+    {
+      "app": "youtube",
+      "feature": "Keep the advanced tools behind a disclosure that is closed by default and holds its controls",
+      "currentRoute": "YouTube window > tools disclosure",
+      "standardDestination": "a summaried disclosure, closed by default, whose controls are held inside it rather than leaking into the toolbar",
+      "liquidDestination": "same disclosure on the liquid material",
+      "keyboardRoute": "a native disclosure, operable from the keyboard without script",
+      "dataStateOwner": "renderer view state; restored by the spec's `undo`",
+      "automatedProof": "probes/l6-parity.js SPECS.youtube.progressiveDisclosure, driven through step `openTools`",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD disclosures=2 summaried=2 controlsHeld=2 open=1 || LIQUID disclosures=2 summaried=2 controlsHeld=2 open=1",
+      "status": "both",
+      "_note": "Driven: `was false -> now true`. Read closed it reports `open=0`, which is the correct DEFAULT and not a failure — the row's claim is that the disclosure opens and holds its controls, so it is scored under the drive. TRAP THE OTHER TRACK PAID FOR: a closed `<details>` child still reports its open box, so only `checkVisibility` and the element's own height are true here."
+    },
+    {
+      "app": "youtube",
+      "feature": "Enter and leave Liquid from the window's own chrome, without losing geometry or state",
+      "currentRoute": "YouTube `.fwin` title bar > Make Liquid / Return to standard, plus minimize/maximize/close",
+      "standardDestination": "conventional `.fwin`, the Liquid control reading `aria-pressed=false`, 5 chrome buttons",
+      "liquidDestination": "`.fwin-liquid`, `data-presentation=\"liquid\"`, the same control reading `aria-pressed=true`",
+      "keyboardRoute": "the chrome buttons are in the window's focus order",
+      "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app youtube, round trip standard -> liquid -> standard with a field dirtied first",
+      "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true",
+      "status": "both",
+      "_note": "Round trip on this window: field held, shell held, 0 diffs, box 980x640 in both."
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 19 root components — written in their own waves, against ALL_APPS_BASELINE.md",
-      "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
-    ]
+      "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'",
+      "specs with NO rows in this tree, re-derived live 2026-09-02 rather than asserted: notebook, calendar, games, immersion, novels, manga, vn, city, scraper, resources, settings, shell, blancShell (13 of 25; it was 19 before this turn)"
+    ],
+    "derived": {
+      "at": "2026-09-02 (primary), L12 b2",
+      "method": "window.__LQP.apps() against the distinct app keys in rows[], both read live rather than counted from prose",
+      "harnessSpecs": 25,
+      "specsWithRows": 12,
+      "specsWithNoRows": 13,
+      "noRows": [
+        "notebook",
+        "calendar",
+        "games",
+        "immersion",
+        "novels",
+        "manga",
+        "vn",
+        "city",
+        "scraper",
+        "resources",
+        "settings",
+        "shell",
+        "blancShell"
+      ],
+      "note": "city, scraper and resources are written in the concurrent worker's tree and arrive here by merge, so this tree's figure is the honest one FOR THIS TREE and not the project total. mediaCenter carries 8 rows from the pre-spec __L6M instrument and has no SPECS entry, which is why ledger apps (13) exceeds specs with rows (12)."
+    }
   }
 }
