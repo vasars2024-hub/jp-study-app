@@ -125,6 +125,21 @@
    * `qa(w, '.fwin')` is how it counts what it hosts, which is the taskbar-identity row.
    */
   const shq = (root, sel) => qa(root, sel).filter((e) => !e.closest('.fwin'));
+  /**
+   * Blanc's fullscreen-workspace control, recorded WHERE IT EXISTS rather than where the
+   * check happens. It is route-scoped (`canExpandWorkspace`, BlancShell.tsx:430) and the
+   * drive restores the user's own route before `check()` runs, so reading it at check time
+   * scored a deliberate product decision as a lying label. Sets `wsLabel` to `null` — not
+   * `undefined` — when the route genuinely does not offer it, so the row can tell "looked and
+   * it was not there" from "never driven".
+   */
+  function readWorkspaceControl(w, s, route) {
+    const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
+    s.wsRoute = route;
+    s.wsLabel = btn ? (btn.getAttribute('title') || '').trim() : null;
+    s.wsFull = w.classList.contains('is-workspace-full');
+    s.wsExit = !!q(w, '.blanc-fullscreen-exit');
+  }
   const shellState = specState('__LQP_SHELL_ORIG');
   const blancState = specState('__LQP_BLANC_ORIG');
   const libState = specState('__LQP_LIB_ORIG');
@@ -5253,17 +5268,37 @@
         },
         {
           id: 'workspaceToggleHonest',
-          f: (w) => {
+          f: () => {
             // `presentationHonest`'s analogue for the one presentation control this spec
             // deliberately does NOT drive (decision 1). Its label must describe the state it
             // would move to, or the user cannot tell which way it goes.
-            const full = w.classList.contains('is-workspace-full');
-            const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
-            const label = btn ? (btn.getAttribute('title') || '').trim() : null;
-            const exit = !!q(w, '.blanc-fullscreen-exit');
+            //
+            // REPAIRED 2026-09-02 (primary2). This used to read the control at CHECK time and
+            // scored `control=null` -> FALSE. Measured live: the Blanc window renders exactly
+            // ONE `.blanc-icon-btn` ("Search Blanc") on the `Read` route, because the
+            // fullscreen control is ROUTE-SCOPED — `canExpandWorkspace` (BlancShell.tsx:430)
+            // is `book || tab is one of mine/flashcards/media/stats/tools`. The drive visits
+            // such a route and then correctly RESTORES the user's own route, so by check time
+            // the control is legitimately gone. Scoring its absence as a lying label made a
+            // deliberate product decision read as a broken control.
+            // So the reading is RECORDED while the control exists (`readNav`, on the visited
+            // route) and read back here — the same act-then-read shape the driven rows use.
+            // If neither route this run touched offers it, the row is `na` and NAMES both
+            // routes, rather than failing the shell for a capability it never claimed there.
+            const s = blancState();
+            if (s.wsLabel === undefined) {
+              return { ok: null, na: 'readNav did not run, so nothing was recorded', ev: 'not driven' };
+            }
+            if (s.wsLabel === null) {
+              return {
+                ok: null,
+                na: `the fullscreen-workspace control is route-scoped (BlancShell.tsx:430 \`canExpandWorkspace\`) and neither route this run visited renders it`,
+                ev: `routesTried=[${JSON.stringify(s.navTo)}, ${JSON.stringify(s.navFrom)}] control=null`,
+              };
+            }
             return {
-              ok: !!btn && /^exit /i.test(label) === full && exit === full,
-              ev: `workspaceFull=${full} control=${JSON.stringify(label)} exitAffordance=${exit}`,
+              ok: /^exit /i.test(s.wsLabel) === s.wsFull && s.wsExit === s.wsFull,
+              ev: `readOnRoute=${JSON.stringify(s.wsRoute)} workspaceFull=${s.wsFull} control=${JSON.stringify(s.wsLabel)} exitAffordance=${s.wsExit}`,
             };
           },
         },
@@ -5285,7 +5320,7 @@
         },
       ],
       drive: [
-        'navClick', 'readNav', 'navRestore',
+        'navClick', 'readNav', 'navRestore', 'readWorkspaceOnRestored',
         'hideChrome', 'readChromeHidden', 'revealChrome', 'readChromeRevealed',
         'openSearch', 'readSearchOpen', 'closeSearch', 'readSearchClosed',
         'openTools', 'readToolsOpen', 'closeTools', 'readToolsClosed',
@@ -5310,7 +5345,11 @@
           const s = blancState();
           s.navPainted = txt(q(w, '.blanc-title'));
           s.navMoved = !!s.navTo && s.navPainted.indexOf(s.navTo) >= 0 && s.navTo !== s.navFrom;
-          return { painted: s.navPainted, moved: s.navMoved };
+          // The fullscreen-workspace control is route-scoped (BlancShell.tsx:430) and the
+          // drive restores the user's route before `check()` runs, so this is the only moment
+          // it may exist. Recorded here, read back by `workspaceToggleHonest`; see that row.
+          readWorkspaceControl(w, s, s.navTo);
+          return { painted: s.navPainted, moved: s.navMoved, workspaceControl: s.wsLabel };
         },
         navRestore: (w) => {
           // PRESENTED STATE IS THE USER'S. Whatever route was open when this ran goes back.
@@ -5319,6 +5358,15 @@
           s.navFromEl.click();
           s.navBack = s.navFrom;
           return { restored: s.navFrom };
+        },
+        readWorkspaceOnRestored: (w) => {
+          // Second chance for the route-scoped workspace control, on the route the user was
+          // actually on. Only fills a reading the visited route did not provide — it never
+          // overwrites one, so the row keeps the FIRST route that offered the control.
+          const s = blancState();
+          if (s.wsLabel) return { skipped: `already read on ${JSON.stringify(s.wsRoute)}` };
+          readWorkspaceControl(w, s, s.navFrom);
+          return { readOnRoute: s.navFrom, workspaceControl: s.wsLabel };
         },
         hideChrome: (w) => {
           const s = blancState();
@@ -5416,10 +5464,19 @@
         clock: (w) => detach(q(w, '.blanc-clock'), 'no clock'),
         // LIE rather than delete for the declared-state rows: a control that exists and
         // misdescribes itself is precisely the defect each of those rows is for.
-        workspaceToggleHonest: (w) => {
-          const btn = shq(w, '.blanc-icon-btn').find((b) => /fullscreen/i.test(b.getAttribute('title') || ''));
-          if (!btn) return { refused: 'no workspace control' };
-          return setAttr(btn, 'title', 'Exit fullscreen workspace');
+        // Falsified through the RECORDED reading, for the same reason the row now reads one:
+        // the live control is route-scoped and is legitimately absent at check time, so a
+        // mutation that needs the element refuses on exactly the runs the row can still score.
+        // The lie is well-formed — "Exit …" while `workspaceFull` is false is precisely the
+        // label-does-not-describe-the-state defect this row exists for.
+        workspaceToggleHonest: () => {
+          const s = blancState();
+          if (s.wsLabel === undefined || s.wsLabel === null) {
+            return { refused: `no workspace control was found on either route this run visited (${JSON.stringify(s.navTo)}, ${JSON.stringify(s.navFrom)}) — the row is \`na\`, so there is nothing to falsify` };
+          }
+          const had = s.wsLabel;
+          s.wsLabel = s.wsFull ? 'Fullscreen workspace' : 'Exit fullscreen workspace';
+          return { mutated: `recorded control label ${JSON.stringify(had)} -> ${JSON.stringify(s.wsLabel)} against workspaceFull=${s.wsFull}` };
         },
         shellIdentity: (w) => {
           const owned = shq(w, '[data-lq-role="liquid"]');

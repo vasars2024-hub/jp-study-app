@@ -961,3 +961,52 @@ fact about the ledger rather than about the product. New rows now state
 is the shell ROOT, and `restore()` sweeps `qa(win, '*')`, which does not include `win` itself
 — a falsification there could not be guaranteed undone, and shrinking the desk risks the
 window-clamp path persisting geometry. That belongs in the row, not in a commit message.
+
+## 2026-09-02 (primary2) — `blancShell` joins: the second shell, and a route-scoped control
+
+**110 rows / 15 apps.** `blancShell` contributes **8**, all `both`, from a `PASS 10/10` run:
+8/8 reachable in BOTH presentations, round trip 0 diffs with an INPUT dirtied first, 8 of 8
+mutations armed and each flipping exactly its own row.
+
+Blanc is a genuinely separate shell — its own BrowserWindow (`blanc.html?blanc=1`) hosting
+**0** `.fwin`, reached with `--win blanc`. Its presentation axis is chrome REDUCTION
+(`.blanc-root.is-taskbar-hidden`, toggled by `.blanc-taskbar-toggle` and reversed by
+`.blanc-taskbar-reveal`), not a palette and not native fullscreen; both rejected candidates
+are recorded in the spec and the reasons stand.
+
+### `workspaceToggleHonest` was scoring a deliberate product decision as a lying label
+
+The row read the fullscreen control at CHECK time and returned `control=null` → **FALSE**.
+Measured live: the Blanc window renders exactly **ONE** `.blanc-icon-btn` ("Search Blanc") on
+the `Read` route, because the fullscreen control is route-scoped —
+`canExpandWorkspace = book || tab ∈ {mine, flashcards, media, stats, tools}`
+(BlancShell.tsx:430). The drive visits a qualifying route and then correctly RESTORES the
+user's own route, so by check time the control is legitimately gone.
+
+The reading is now taken WHERE THE CONTROL EXISTS (`readNav`, on the visited route) and read
+back at check time — the same act-then-read shape the driven rows already use — with a second
+chance on the restored route, and the row is `na` **naming both routes** if neither offers it.
+Its mutation falsifies the recorded label rather than the element, so it arms on exactly the
+runs the row can still score:
+
+```
+BEFORE  control=null exitAffordance=false                        -> FAIL 7/8, mutation UNARMABLE
+AFTER   readOnRoute="Mine" workspaceFull=false
+        control="Fullscreen workspace" exitAffordance=false      -> PASS 10/10, 8/8 both
+CONTROL recorded label "Fullscreen workspace" -> "Exit fullscreen workspace"
+        against workspaceFull=false -> 7/8, fell=[workspaceToggleHonest], restored 8/8
+```
+
+### The finding worth keeping about Blanc's state
+
+`dataStateOwner` is mostly COMPONENT state here, and deliberately: `taskbarHidden`,
+`compactToolsOpen`, `masterSearchOpen` and `workspaceFull` are all unpersisted, so a reduced
+or fullscreen Blanc cannot be inherited by the next launch. Only the route survives, and only
+when the user has asked Blanc to remember it (`jp-blanc-mode-v1` / `jp-blanc-memory-v1`,
+renderer/blancMode.ts). `blancMain.tsx` additionally strips `data-materials` on boot and keeps
+a MutationObserver on it, so a Study OS material pack cannot leak into this window — which is
+what `shellIdentity`'s `osDesktopPresent=false` half is checking from the other side.
+
+`notWritten` re-derived: **11** declared specs still have no row at all (was 14 at the start of
+this turn) — notebook, statistics, games, library, immersion, novels, manga, vn, music, video,
+youtube. `controlCoverage`: **63 named / 1 NONE DECLARED / 45 silent of 110**.
