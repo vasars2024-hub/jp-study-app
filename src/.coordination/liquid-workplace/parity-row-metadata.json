@@ -46,6 +46,12 @@
           "currentRoute": "Dictionary window > `Your notes` + `Filter notes` (input.lexicon-notes-filter)",
           "keyboardRoute": "text input",
           "dataStateOwner": "lexicon notes store"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Dictionary window > `.fwin-b` title-bar controls",
+          "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
         }
       }
     }
