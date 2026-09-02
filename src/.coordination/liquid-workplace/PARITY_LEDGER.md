@@ -774,3 +774,38 @@ plant was reverted and the file verified byte-identical (sha256 equal, `git stat
 `resources` itself: **8/8 reachable in both presentations**, rowsAgree, 0 onlyInOne, round trip
 `standard -> liquid -> standard` with 0 diffs, drive 8 steps / 0 refusals. Writer self-control
 3 armed / 3 fired.
+
+## 2026-09-02 (primary2) — `city` joins, and it is the first app with NO Liquid half
+
+**76 rows / 11 apps -> 85 rows / 12 apps**, `both` **75** unchanged, `pending` 1 -> **10**;
+0 duplicate `app|feature` keys. All nine new rows are `pending`, and that is a derivation
+rather than an omission: Mooncap is not Liquid-presentable, so there is no second
+presentation to compare, and `pending` is the status vocabulary's own word for it.
+
+**The absence is a MEASUREMENT, taken at one instant over every open window.** The harness's
+`noLiquid` branch refuses outright unless some other window can take the trip, so the reading
+is discriminating by construction:
+
+| | reading |
+| --- | --- |
+| `targetHasLiquidControl` | **false** |
+| `targetChromeButtons` | **3** — a real chrome cluster, so this is not "no title bar" |
+| `targetPresentation` | `standard` |
+| `othersWithLiquidControl` | **`["Resources"]`** — open beside it, rendering `.fwin-b-liquid` |
+
+That control is the whole point: without it, "this window has no toggle" and "no window has
+one" read identically. L12 bullet 1 independently records the same three sections —
+`city`, `musicwidget`, `visualizer` — as offering no presentation toggle, so two instruments
+now agree on the same product fact from different directions.
+
+The round trip that stands in for the presentation flip is **minimize -> restore through the
+taskbar** (the taskbar button is a toggle, so it is driven twice), and `rankHeld` was true.
+Rows **9/9 reachable**, drive 1 step / 0 refusals, and **all nine mutations armed**, each
+flipping exactly its own row and restoring. Writer self-control: 2 armed / 2 fired, and the
+third plant reports `NOT ARMABLE — no row is reachable in both presentations`, which is
+correct on this branch and is said rather than counted as a pass.
+
+`notWritten` is now **re-derived mechanically** instead of decremented by hand: 25 declared
+specs, 12 apps with rows, **14 specs still with no row at all**, each named, plus the one
+ledger app (`mediaCenter`) that has rows but no spec and so cannot be re-derived by this
+route at all.

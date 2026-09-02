@@ -7,7 +7,8 @@
     "calendar": "AUTHORED 2026-09-02 from source, and it is the first app whose block was NOT back-derived from an existing ledger row -- parity-ledger.json had no calendar row at all, so all five are new and `added` is expected to be 5, not 0. Every `currentRoute` names the selector the spec.s own `f()` reads, so the authored half cannot drift from the measured half without the run failing. `dataStateOwner` read from src/renderer/calendar.ts (LS_KEYS.calendarEvents in localStorage, mirrored to IDB_KEYS.calendarEvents) and CalendarContent.tsx (mode / cursor / modal are component state, not persisted). Liquid destination read from calendarLiquid.css and the two LiquidSurface call sites at CalendarContent.tsx:391 and :403.",
     "settings": "AUTHORED 2026-09-02 from source, second app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec.s own f() reads. dataStateOwner separates persisted from not: advancedDisclosure is the only settings row here that survives a reopen (renderer/settingsAdvanced.ts, localStorage jp-settings-advanced-v1), while page, query and scroll are component state. Liquid destination read from the ContextualSurface call sites in SettingsNav.tsx (45, 46, 65, 69) and SettingsApp.tsx:604, and from the pane at SettingsApp.tsx:596-600 which is NOT wrapped.",
     "scraper": "AUTHORED 2026-09-02 from source, third app with no prior ledger row -- all seven are new. Every currentRoute names the selector the spec's own f() reads, so the authored half cannot drift from the measured half without the run failing. dataStateOwner separates the two localStorage documents this app owns: the SHELL shape (page, rail, drawerOpen, drawerCategory) in renderer/scraperShellStore.ts under jp-scraper-shell-v1, and the SETTINGS values in renderer/scraperSettingsStore.ts under jp-scraper-settings-v1. reverseControls is authored against the DISCLOSURE, not against aria-pressed, because the aria-pressed reading was a measured false positive fixed in ddeb97f3: with the drawer shut and advanced mode on, the old expression counted the button labelled \"Advanced controls shown\" (1) and scored a reversal affordance that is not on screen. Liquid destination read from the ContextualSurface call sites in ScraperTopBar.tsx:18, ScraperNav.tsx:22/34/42/53, ScraperStatusBar.tsx:25 and ScraperSettingsDrawer.tsx:248, and from the AnchorSurface anchors at ScraperSearch.tsx:89 and ScraperSettingsDrawer.tsx:261/:319.",
-    "resources": "AUTHORED 2026-09-02 from source, fourth app with no prior ledger row. SEVEN of its eight rows were written; `collectedSections` was DELIBERATELY NOT WRITTEN and its metadata entry is kept anyway so a later profile with collected tools writes it without re-authoring. The reason is a repair in the same commit: its mutation targets `.mytool-card .mytool-remove` and nothing is collected on this profile, so the mutation REFUSED rather than ran. cat6 used to score that identically to a mutation that ran and flipped the wrong row, which VOIDed a run whose other 7 mutations were exact; it now reports `armed: false` and `l6-parity-rows.cjs` skips exactly that row by name. Discriminating control, live: an ARMED-but-wrong mutation (catalogueCount re-pointed at `.res-name`, which flips `resourceCards` instead) still VOIDs the whole run, so the relaxation cannot wave a broken control through. dataStateOwner is three different owners here and they are not interchangeable: the catalogue is a STATIC module (renderer/data/resources.ts), the bundle checklists are localStorage under `resources.checklist.<id>`, and the collected tools are a MAIN-PROCESS store reached through window.api.toolsList (shared/collectedTools.ts), shared with Blanc. Liquid destination read from resourcesLiquid.css, whose `:is(.fwin.fwin-liquid, .popout-root.popout-liquid)` rules touch only `.res-command-surface` and its children."
+    "resources": "AUTHORED 2026-09-02 from source, fourth app with no prior ledger row. SEVEN of its eight rows were written; `collectedSections` was DELIBERATELY NOT WRITTEN and its metadata entry is kept anyway so a later profile with collected tools writes it without re-authoring. The reason is a repair in the same commit: its mutation targets `.mytool-card .mytool-remove` and nothing is collected on this profile, so the mutation REFUSED rather than ran. cat6 used to score that identically to a mutation that ran and flipped the wrong row, which VOIDed a run whose other 7 mutations were exact; it now reports `armed: false` and `l6-parity-rows.cjs` skips exactly that row by name. Discriminating control, live: an ARMED-but-wrong mutation (catalogueCount re-pointed at `.res-name`, which flips `resourceCards` instead) still VOIDs the whole run, so the relaxation cannot wave a broken control through. dataStateOwner is three different owners here and they are not interchangeable: the catalogue is a STATIC module (renderer/data/resources.ts), the bundle checklists are localStorage under `resources.checklist.<id>`, and the collected tools are a MAIN-PROCESS store reached through window.api.toolsList (shared/collectedTools.ts), shared with Blanc. Liquid destination read from resourcesLiquid.css, whose `:is(.fwin.fwin-liquid, .popout-root.popout-liquid)` rules touch only `.res-command-surface` and its children.",
+    "city": "AUTHORED 2026-09-02 from source, fifth app with no prior ledger row, and the FIRST written through the harness's `noLiquid` branch -- so all nine rows are `pending` by derivation, not by omission: there is no Liquid half to compare, and `pending` is the vocabulary’s own word for that. `noLiquidReason` is a MEASUREMENT, not an excuse: `liquidAbsence` reports targetHasLiquidControl false with targetChromeButtons 3 and presentation `standard`, while Resources open beside it DOES render `.fwin-b-liquid` -- the same query over every open window at the same instant, which is what separates \"this window has no toggle\" from \"no window has one\". The round trip is minimize -> restore through the taskbar (the taskbar button is a toggle, so the harness drives it twice) and `rankHeld` was true. All NINE mutations armed and each flipped exactly its own row. dataStateOwner names two separate localStorage documents: `jp-reading-garden-v1` (renderer/readingGardenProgress.ts -- stage, pagesRead, bankedPages) and `jp-mooncap-music-v1` (components/reading-garden/mooncapMusic.ts -- the ambient music choice and volume). The dossier itself is component state and correctly does not survive a reopen."
   },
   "apps": {
     "dictionary": {
@@ -245,6 +246,67 @@
           "feature": "Window lifecycle: pop out, minimize, maximize, close",
           "currentRoute": "Resources window > `.fwin-b` title-bar controls",
           "keyboardRoute": "four real buttons",
+          "dataStateOwner": "DesktopShell window state + main-process popOut"
+        }
+      }
+    },
+    "city": {
+      "standardDestination": "Mooncap window (frameless): the `.reading-garden` scene itself — parallax world layers, cloud sprites and the life canvases — with the mushroom hitbox as the only hero affordance, and the `.reading-garden-info` dossier dialog it discloses on top",
+      "liquidDestination": null,
+      "noLiquidReason": "NONE, and it is a product fact this run measured rather than assumed. Mooncap is a frameless window: `liquidAbsence` reports `targetHasLiquidControl: false` with `targetChromeButtons: 3` (a real chrome cluster, so the absence is not a missing title bar) and `targetPresentation: \"standard\"`, while Resources open beside it DOES render `.fwin-b-liquid` — a discriminating control taken at the same instant over every open window. The surface is a painted scene, not a document over a material, so there is nothing for a translucent layer to sit in front of; L12 bullet 1 records the same three sections (city / musicwidget / visualizer) as having no presentation toggle. The round trip that stands in for the presentation flip is therefore minimize -> restore through the taskbar, and it held.",
+      "features": {
+        "dossierDisclosure": {
+          "feature": "Open the dossier from the hero, and get back out of it",
+          "currentRoute": "Mooncap window > `.reading-garden-mushroom-hitbox` (`aria-expanded` + `aria-controls`) opens `.reading-garden-info` (`role=\"dialog\"` with an `aria-label`), closed again by `.reading-garden-info-close`",
+          "keyboardRoute": "the hitbox is a real focusable disclosure and the panel is a labelled dialog with an enabled close — the APG pattern, ratcheted by `renderer/__tests__/readingGardenDossierKeyboard.test.tsx`",
+          "dataStateOwner": "component state in ReadingGarden.tsx — the dossier is not persisted, so a reopen comes back closed"
+        },
+        "stageReadout": {
+          "feature": "The stage the badge claims is the stage the scene paints",
+          "currentRoute": "Mooncap window > `.reading-garden-info-stage strong` badge against the `stage-band-N` class on `.reading-garden` itself",
+          "keyboardRoute": "not a control; it is the surface stating its own state in two places",
+          "dataStateOwner": "renderer/readingGardenProgress.ts — localStorage `jp-reading-garden-v1`; the band is computed from the same stage by `floor((stage-1)/10)+1`, so a disagreement is the surface lying to itself"
+        },
+        "dossierFacts": {
+          "feature": "Three dossier facts, all filled, with the banked-pages sentence agreeing with the progress bar it sits above",
+          "currentRoute": "Mooncap window > `.reading-garden-info-dossier > div` (`dt`/`dd` pairs), `.reading-garden-info-copy strong` and the inline width of `.reading-garden-info-track i`",
+          "keyboardRoute": "not controls; a definition list and a progress bar",
+          "dataStateOwner": "renderer/readingGardenProgress.ts — `pagesRead` and `bankedPages` in localStorage `jp-reading-garden-v1`; the sentence and the bar are the SAME fraction rendered twice, which is what makes a bar that stopped tracking detectable"
+        },
+        "musicControls": {
+          "feature": "Ambient music on/off, with the volume slider disabled exactly when music is off",
+          "currentRoute": "Mooncap window > `.reading-garden-info-music-toggle button` x2 in a `role=\"group\"`, exactly one `aria-pressed`, gating `.reading-garden-info-music-volume input`",
+          "keyboardRoute": "two real buttons and a native range input",
+          "dataStateOwner": "renderer/components/reading-garden/mooncapMusic.ts — localStorage `jp-mooncap-music-v1`, so the choice survives a reopen"
+        },
+        "musicVolumeReadout": {
+          "feature": "The volume number shown is the volume the slider holds",
+          "currentRoute": "Mooncap window > `.reading-garden-info-music-volume input[type=range]` against the `strong` readout beside it",
+          "keyboardRoute": "a native range input, arrow-key operable",
+          "dataStateOwner": "same `jp-mooncap-music-v1` document; the readout is derived from the input value, never stored separately"
+        },
+        "scenePainted": {
+          "feature": "The scene is actually painted: every canvas has pixels and the parallax layers are all present",
+          "currentRoute": "Mooncap window > `.reading-garden canvas` elements, plus `.reading-garden-world` / `.reading-garden-cloud-sprite` parallax layers",
+          "keyboardRoute": "not a control; it is the decorative half, scored so an empty scene cannot pass as a working one",
+          "dataStateOwner": "drawn at runtime by ReadingGardenLifeCanvas.tsx and the mushroom-bed/sprite modules from the same stage value — no stored bitmap"
+        },
+        "heroPlacement": {
+          "feature": "The hero affordance is inside the window and big enough to hit",
+          "currentRoute": "Mooncap window > `.reading-garden-mushroom-hitbox` rect, compared against the window rect",
+          "keyboardRoute": "the hitbox is the keyboard route to the dossier as well as the pointer one",
+          "dataStateOwner": "derived from stage geometry (`cellForStage`, `cameraStyleForStage`) — no stored position"
+        },
+        "devOnlyIsolated": {
+          "feature": "Development-only affordances are marked as such and never mixed into the user controls",
+          "currentRoute": "Mooncap window > `[data-dev-only=\"true\"]` nodes, each of whose class names must say console/debug/dev, alongside the real `button, input, select, textarea` controls",
+          "keyboardRoute": "not a route; it is the guarantee that the surface a user reaches contains no developer instrumentation",
+          "dataStateOwner": "none — the marking is structural, from the sky-console harness in ReadingGardenSkyEvents.tsx"
+        },
+        "windowLifecycle": {
+          "feature": "Window lifecycle: pop out, minimize, maximize, close",
+          "currentRoute": "Mooncap window > `.fwin-frameless-controls` chrome cluster (frameless, so the buttons live outside the usual title bar)",
+          "keyboardRoute": "real buttons in the frameless control cluster",
           "dataStateOwner": "DesktopShell window state + main-process popOut"
         }
       }
