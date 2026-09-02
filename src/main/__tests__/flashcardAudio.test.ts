@@ -53,7 +53,14 @@ describe('flashcard audio safety', () => {
     // The run names the voice it used rather than leaving the caller to assume.
     expect(result.voice).toBeTruthy();
     expect(result.voiceResolution).toBe('preferred');
-  }, 20_000);
+    // 60s, not 20s. These four cases drive REAL external work on this machine — SAPI voice
+    // enumeration and an offline synthesis process — and 20_000 is exactly the configured
+    // default (vitest.config.ts:58), so the annotation bought nothing. Alone each takes ~1.2s;
+    // under a full `vitest run` with eight workers contending they exceeded 20s and were
+    // reported as a product regression on 2026-09-02. The cost is external, so there is no
+    // repeated work to remove the way `mediaSurfaceImportGraph` had. An assertion failure
+    // still fails on the assertion, not the clock.
+  }, 60_000);
 
   it.runIf(process.platform === 'win32')('enumerates this machine\'s real voices', async () => {
     const inventory = await listFlashcardVoices(true);
@@ -66,7 +73,7 @@ describe('flashcard audio safety', () => {
       expect(voice.id).toBeTruthy();
       expect(voice.language).toMatch(/^[a-z]{2}$/);
     }
-  }, 20_000);
+  }, 60_000);
 
   it.runIf(process.platform === 'win32')('falls back within the language and discloses it', async () => {
     // The negative control for the whole voice preference: a saved voice that is
@@ -81,7 +88,7 @@ describe('flashcard audio safety', () => {
     expect(result.voiceResolution).toBe('language');
     const japanese = (await listFlashcardVoices()).voices.filter((voice) => voice.language === 'ja');
     expect(japanese.map((voice) => voice.name)).toContain(result.voice);
-  }, 20_000);
+  }, 60_000);
 
   it.runIf(process.platform === 'win32')('cancels an in-flight offline synthesis process', async () => {
     const requestId = `cancel-${Date.now()}`;
@@ -99,7 +106,7 @@ describe('flashcard audio safety', () => {
     // The reverse transition is complete: a settled id no longer cancels
     // anything, so it cannot kill a later request that reuses the string.
     expect(cancelFlashcardSynthesis(requestId)).toBe(false);
-  }, 20_000);
+  }, 60_000);
 
   it('extracts a bounded sentence clip with bundled ffmpeg', async () => {
     fs.mkdirSync(testRoot, { recursive: true });

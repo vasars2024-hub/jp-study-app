@@ -78,7 +78,22 @@ beforeAll(async () => {
   AnalysisPanel = (await import('../components/lens/LensAnalysisPanel')).default;
   ReaderPanel = (await import('../components/lens/LensReaderPanel')).default;
   SettingsSection = (await import('../components/settings/pages/ReadingLensSection')).default;
-});
+  /*
+   * 60s, and unlike the sibling repairs this one genuinely IS a bigger number — because
+   * here the cost is not removable from inside the test. These four dynamic imports pull
+   * four React component graphs through Vite's transform, and that work happens once per
+   * worker no matter how the hook is written; there is no repeated walk to memoise away
+   * (contrast `mediaSurfaceImportGraph`, whose eight redundant graph walks were the whole
+   * cause, and `deletedPlayerDependents`/`sourceNulBytes` at 084dcfea).
+   *
+   * The default `hookTimeout` is 10s, and under a full `vitest run` with eight workers
+   * contending this hook exceeded it — which fails the FILE, so it prints no `> … failed`
+   * line and gets miscounted as a passing suite by anyone grepping for one. It was named
+   * that way on 2026-09-02. A hook timeout cannot mask a product regression: an assertion
+   * failure in any case below still fails on the assertion, and a genuinely hung import
+   * still fails, just later and with a truthful reason.
+   */
+}, 60_000);
 
 afterEach(() => {
   root?.unmount();
