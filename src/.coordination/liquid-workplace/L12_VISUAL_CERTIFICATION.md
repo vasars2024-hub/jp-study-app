@@ -176,3 +176,55 @@ desktop-layout.json` hashes **9DFB6E2F2361…**, byte-identical to `debug/_bk-la
 Run B sampled the theme axis to `oled-black,paper` (the extremes of the light flag) and run C
 to `oled-black`; both record exactly what they swept in `dimensions`, so neither can be read as
 a full sweep.
+
+## 2026-09-02 — the plate namespace was the defect; re-captured on the same profile (`backup`)
+
+`557cdf3b` — **a banked sha256 must name a file only its own run can write.** Plates were named
+by their four dimension coordinates alone, so any two runs sharing a coordinate wrote the same
+path: the later destroyed the earlier image while the earlier manifest kept asserting a hash for
+bytes that were gone. Fixed with a per-run **directory** (`SHOT_ROOT/RUN_ID`), not a longer
+filename — a run-tagged filename is still one namespace and a re-run with identical flags
+collides again. Default id is unique without being asked (manifest basename + UTC stamp + pid);
+`--run-id` pins one deliberately. `runId`/`shotDir` now ride in the manifest.
+
+THIRD INDEPENDENT INSTRUMENT, agreeing with primary2's two: 723 indexed cells over the three
+baselines resolve to **701 distinct paths — 22 written twice, 21 disagreeing**, all `oled-black`,
+all stale for `l12-matrix-normal.json`, all on-disk hashes equal to `l12-matrix-tries40.json`'s
+own. 680 verified / 0 missing. NEW FACT neither earlier instrument had: **16 of the 21 were
+`converged: true` in BOTH runs** — settled on three byte-identical frames, twice, and still
+differed. "Only the flaky cells were overwritten" is false, and convergence does not make a plate
+reproducible across runs. The 22nd shared path is `settings__liquid__oled-black__normal.png`,
+the lone re-shot that reproduced byte-for-byte.
+
+THE RE-CAPTURE, live on the SAME profile (pid 53288, the scene that produced the originals — a
+scratch profile would make these a different scene and the theme axis would then compare scenes):
+25 apps × oled-black × standard/liquid × normal = **50 cells, 46 captured, 0 mismatch, 0 missing,
+integrity `all-present`**, controls **C0–C5 all pass**, `certifiable: true`. Banked as
+`baselines/l12-matrix-oledblack.json`.
+
+THE DISCRIMINATING CONTROL, and it is a counterfactual on this very run: **all 46 of these plates
+would have overwritten banked plates under the old naming** — this run alone would have taken the
+damage from 21 to 67. With the fix, **0 of 46 collide** with the legacy 701.
+
+FOUR MUTATION CONTROLS on `l12PlateIdentity.test.ts`, all fire, baseline and final GREEN: flatten
+`SHOT_DIR` (harness restored byte-exact by sha256), a manifest with no `runId`, a plate outside
+its own `shotDir`, a collision with a legacy path. The legacy three are FROZEN at their known
+damage, not "repaired" — those images are gone and cannot be un-clobbered.
+
+`ed9a9f05` — `probes/l12-atlas.cjs` carried two raw NULs (bytes 11796/11990) past git's
+8000-byte binary window, so every diff read clean while ripgrep answered a search of its 566
+lines with "Binary file … matches". The existing gate exempted `src/.coordination/`; that scope
+was the defect, since the harm it names is searchability. Scan 2,637 → 2,750 files.
+
+ONE CAPTURE FAILURE, and it is NOT a product defect: `agent/standard` returned
+`Error: UnknownVizError` on the 25-window desk. Driven ALONE it captures in both presentations,
+converged in 4 attempts each — a compositor flake under load, reproduced 0 of 1 in isolation.
+The atlas correctly refuses `certifiable` on it while classifying the 3 toggle-less surfaces
+(visualizer, musicwidget, city) as a product gap rather than a failure.
+
+**b4 STAYS OPEN.** The blocker named in the last handoff is cleared and the instrument now reads
+`all-present` over a fresh matrix — but `final` still means bullet 1's full matrix, and 21 of its
+611 plates remain permanently unverifiable from disk. That is an evidence gap to state, not a
+reason to flip bullet 1: the run happened, its controls passed, and only re-verification of those
+21 hashes is lost. Restore measured, not asserted: theme `study-os`, 0 windows / 0 dialogs,
+`desktop-layout.json` **9DFB6E2F2361…**, byte-identical to `debug/_bk-layout-pre.json`.

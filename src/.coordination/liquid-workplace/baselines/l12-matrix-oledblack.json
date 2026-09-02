@@ -1,0 +1,1758 @@
+{
+  "schema": "l12-visual-matrix/v1",
+  "bullet": "L12 bullet 1 — every app standard/Liquid/theme/state screenshot matrix",
+  "generatedAt": "2026-09-02T06:04:58.783Z",
+  "runId": "_bk-l12-oledblack__20260902T060458Z__4736",
+  "shotDir": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736",
+  "bridge": {
+    "pid": 53288,
+    "port": 39273
+  },
+  "dimensions": {
+    "apps": [
+      "agent",
+      "library",
+      "novels",
+      "dictionary",
+      "grammar",
+      "translate",
+      "player",
+      "video",
+      "music",
+      "anki",
+      "flashcards",
+      "games",
+      "stats",
+      "resources",
+      "settings",
+      "note",
+      "visualizer",
+      "musicwidget",
+      "city",
+      "immersion",
+      "calendar",
+      "reading",
+      "youtube",
+      "scraper",
+      "files"
+    ],
+    "themes": [
+      "oled-black"
+    ],
+    "presentations": [
+      "standard",
+      "liquid"
+    ],
+    "states": [
+      "normal"
+    ],
+    "themeCatalog": [
+      {
+        "id": "study-os",
+        "light": false
+      },
+      {
+        "id": "classic-light",
+        "light": true
+      },
+      {
+        "id": "dark-nebula",
+        "light": false
+      },
+      {
+        "id": "soft-sepia",
+        "light": true
+      },
+      {
+        "id": "ocean-blue",
+        "light": true
+      },
+      {
+        "id": "high-contrast",
+        "light": false
+      },
+      {
+        "id": "mint-green",
+        "light": true
+      },
+      {
+        "id": "rose-pine",
+        "light": true
+      },
+      {
+        "id": "oled-black",
+        "light": false
+      },
+      {
+        "id": "midnight-ink",
+        "light": false
+      },
+      {
+        "id": "paper",
+        "light": true
+      },
+      {
+        "id": "cyberpunk",
+        "light": false
+      },
+      {
+        "id": "forest-night",
+        "light": false
+      }
+    ],
+    "canonicalSections": 25
+  },
+  "sampledOut": [],
+  "caretFrozen": true,
+  "convergence": {
+    "run": 3,
+    "tries": 12,
+    "gapMs": 300
+  },
+  "controls": {
+    "c0": {
+      "kind": "floor/instrument-noise",
+      "app": "agent",
+      "theme": "study-os",
+      "delta": {
+        "pixels": 475600,
+        "pctDiff": 0,
+        "pctOver8": 0,
+        "maxDelta": 0
+      },
+      "identical": true
+    },
+    "c1": {
+      "kind": "repeat/must-be-identical",
+      "app": "agent",
+      "theme": "study-os",
+      "a": "72a1441f3b8158ff19db54a44ec54bab4252c2a67b0436a8cd668be3ec2ead5f",
+      "b": "72a1441f3b8158ff19db54a44ec54bab4252c2a67b0436a8cd668be3ec2ead5f",
+      "converged": [
+        true,
+        true
+      ],
+      "attempts": [
+        9,
+        3
+      ],
+      "run": 3,
+      "delta": {
+        "pixels": 475600,
+        "pctDiff": 0,
+        "pctOver8": 0,
+        "maxDelta": 0
+      },
+      "pass": true
+    },
+    "c2": {
+      "kind": "theme/must-differ",
+      "app": "agent",
+      "themes": [
+        "study-os",
+        "classic-light"
+      ],
+      "a": "72a1441f3b8158ff19db54a44ec54bab4252c2a67b0436a8cd668be3ec2ead5f",
+      "b": "e06e43bc12c7d2c03abba8a7ba729e0d4c7f52e2c9f941d1c454f8234a2d7d94",
+      "delta": {
+        "pixels": 475600,
+        "pctDiff": 98.047,
+        "pctOver8": 97.931,
+        "maxDelta": 243
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "97.931% of pixels differ by >8 (floor 0, gate 1%)"
+      },
+      "pass": true
+    },
+    "c3": {
+      "kind": "presentation/must-differ",
+      "app": "agent",
+      "theme": "study-os",
+      "a": "72a1441f3b8158ff19db54a44ec54bab4252c2a67b0436a8cd668be3ec2ead5f",
+      "b": "1cf40ce13efdedc3446f2760bb9d1ad7e458aae531c08925fe914b0b1782d5fd",
+      "reached": true,
+      "delta": {
+        "pixels": 475600,
+        "pctDiff": 63.141,
+        "pctOver8": 35.445,
+        "maxDelta": 234
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "35.445% of pixels differ by >8 (floor 0, gate 1%)"
+      },
+      "pass": true,
+      "note": null
+    },
+    "c4": {
+      "kind": "app/must-differ",
+      "theme": "study-os",
+      "apps": [
+        "agent",
+        "library"
+      ],
+      "a": "3461cc1b3de6c36559c3bc8014db3d74d7c3425fd310cc5d65f0577a2961ca20",
+      "b": "05e4efd26d89b74a0ff1bac5ea028e8adab344cfc8e11d148230bd8e4d966cfe",
+      "delta": {
+        "pixels": 475600,
+        "pctDiff": 76.489,
+        "pctOver8": 74.153,
+        "maxDelta": 247
+      },
+      "magnitude": {
+        "enough": true,
+        "why": "74.153% of pixels differ by >8 (floor 0, gate 1%)"
+      },
+      "pass": true
+    },
+    "c5": {
+      "kind": "state/must-differ",
+      "app": "agent",
+      "normalRect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "maximizedRect": {
+        "x": 0,
+        "y": 0,
+        "width": 1264,
+        "height": 765
+      },
+      "areaNormal": 475600,
+      "areaMaximized": 966960,
+      "areaRatio": 2.03,
+      "b": "8fecbbd851350f7437a1e76f6fe7582ee0e3644e1f4edaca1776e14bb257fa2f",
+      "pass": true
+    }
+  },
+  "certifiable": true,
+  "cells": [
+    {
+      "app": "agent",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 68.19998168945312,
+        "y": 29.79998779296875,
+        "width": 803.60009765625,
+        "height": 568.4000244140625
+      },
+      "ok": false,
+      "error": "Error: UnknownVizError"
+    },
+    {
+      "app": "library",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 102.19998168945312,
+        "y": 59.79998779296875,
+        "width": 803.60009765625,
+        "height": 568.4000244140625
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/library__standard__oled-black__normal.png",
+      "bytes": 234061,
+      "sha256": "2d2a9a92497ac67224f802f10e40b75fca2dd605fbd815bc25dbd77f7739587a",
+      "size": {
+        "width": 804,
+        "height": 568
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/novels__standard__oled-black__normal.png",
+      "bytes": 42249,
+      "sha256": "d38e241706f8ebbe787c12f956adf5627adf47e72c15d1bd924e36227c7f22eb",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 2
+    },
+    {
+      "app": "dictionary",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/dictionary__standard__oled-black__normal.png",
+      "bytes": 22289,
+      "sha256": "5a3f03176685755a798583761042955f3660ac30cbe5a186e980bc952c779834",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 11,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/grammar__standard__oled-black__normal.png",
+      "bytes": 24546,
+      "sha256": "b2e3e9847e3ca07b353eedb399e9f6b1b5895b9863b074b8c18fefce5a562690",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/translate__standard__oled-black__normal.png",
+      "bytes": 26453,
+      "sha256": "8b2930b3815dddd03a892f9323be1da89251030ff6b65d801a0b15e1ce7d131f",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/player__standard__oled-black__normal.png",
+      "bytes": 326251,
+      "sha256": "2780b753ae8ca1c40e9057c57794235089ea48685f3080d1c2a1ac8caaa6f588",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 1
+    },
+    {
+      "app": "video",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/video__standard__oled-black__normal.png",
+      "bytes": 280644,
+      "sha256": "1fff234e2a878e617f4d3006475c9fd266abf3947d53eca332ce81716491b5d1",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 1
+    },
+    {
+      "app": "music",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 679
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/music__standard__oled-black__normal.png",
+      "bytes": 130416,
+      "sha256": "fe7925e540837e6ced1131fa795404760675b060b6f4e79464c093e177d98db3",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 2
+    },
+    {
+      "app": "anki",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/anki__standard__oled-black__normal.png",
+      "bytes": 31913,
+      "sha256": "24355c8e4363a887ce91f3b8aea75fa3a8967ce88b8ec0e916b38c29a4a0c5d9",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/flashcards__standard__oled-black__normal.png",
+      "bytes": 39031,
+      "sha256": "65f83e7c1d807fd2cf822cedc7ee4d35031068c11ef22d3a77836c542aeee843",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 589
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/games__standard__oled-black__normal.png",
+      "bytes": 87382,
+      "sha256": "b2f36cc6a0061194e57d76d8c07bf8d01a59d504b8f7d677d9405f159f705bd4",
+      "size": {
+        "width": 980,
+        "height": 589
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/stats__standard__oled-black__normal.png",
+      "bytes": 33829,
+      "sha256": "d62eca7d130020f615d2fa2afb44c8031e2de089e6ea06523153c738ed26f9b9",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/resources__standard__oled-black__normal.png",
+      "bytes": 66787,
+      "sha256": "df33ebeb1ce401e0821a640ae505bb6e544bb4b00ff0d993d8b1d1fd3247df68",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 679
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/settings__standard__oled-black__normal.png",
+      "bytes": 123321,
+      "sha256": "36094bf52a077bb5993801704b459174f6ccef2fb14e2971539f03949948ff26",
+      "size": {
+        "width": 960,
+        "height": 679
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/note__standard__oled-black__normal.png",
+      "bytes": 9140,
+      "sha256": "a7aebaa466497eafcb0d33fd7485660351504021615b7460bcd32ef30aaee5d4",
+      "size": {
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "visualizer",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/visualizer__standard__oled-black__normal.png",
+      "bytes": 18406,
+      "sha256": "5cce200aaddda7b477047f575eb98476649c38ab6a9034073c4312aac1de73d6",
+      "size": {
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "musicwidget",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/musicwidget__standard__oled-black__normal.png",
+      "bytes": 18406,
+      "sha256": "5cce200aaddda7b477047f575eb98476649c38ab6a9034073c4312aac1de73d6",
+      "size": {
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "city",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/city__standard__oled-black__normal.png",
+      "bytes": 18406,
+      "sha256": "5cce200aaddda7b477047f575eb98476649c38ab6a9034073c4312aac1de73d6",
+      "size": {
+        "width": 380,
+        "height": 200
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "immersion",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/immersion__standard__oled-black__normal.png",
+      "bytes": 38065,
+      "sha256": "5fc676be22a98c0a88e151b11a874c87b71496368ce35dc3371513ebbee2ce0d",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/calendar__standard__oled-black__normal.png",
+      "bytes": 25740,
+      "sha256": "b52819b114fa44a13a06ee693436f90d4d81b4dab25c8a505a1559e5d24849d9",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/reading__standard__oled-black__normal.png",
+      "bytes": 50918,
+      "sha256": "5f29d09a45257bb801be3c2fee00836761233a7eae0cc0505376f829ba79456f",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 619
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/youtube__standard__oled-black__normal.png",
+      "bytes": 26695,
+      "sha256": "86727872773616394c5ef51f4ee23c470fc80a038f7aa6d557332eaaad1a49a7",
+      "size": {
+        "width": 980,
+        "height": 619
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/scraper__standard__oled-black__normal.png",
+      "bytes": 20525,
+      "sha256": "2418372256e15223529137493f0436a0fb60da7e862a84416a9163c0eb7712de",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "oled-black",
+      "presentation": "standard",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 2480,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/files__standard__oled-black__normal.png",
+      "bytes": 47714,
+      "sha256": "9d1f1c0a83d0c5e674256cf16ac06342f6eec0371ae0a0a765b4aae0b80ee497",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "agent",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/agent__liquid__oled-black__normal.png",
+      "bytes": 83617,
+      "sha256": "bbb0f6977c44f41e48c3300aa3835265b0621b26a6845192a09e76fdf1bfcbe7",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 1
+    },
+    {
+      "app": "library",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/library__liquid__oled-black__normal.png",
+      "bytes": 235144,
+      "sha256": "6b9ca9d867a39215ba21b39f97015e44c7ff8cf5319fce4cab5aca9307689a2d",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "novels",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/novels__liquid__oled-black__normal.png",
+      "bytes": 45139,
+      "sha256": "37614d566f9bbdb2f57df88fe3b6a8c14e9aa4ab0aa83b692d4c0cdd3fdefb9a",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "dictionary",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/dictionary__liquid__oled-black__normal.png",
+      "bytes": 25170,
+      "sha256": "2194dc3356515624be90490d4d2abe826ccf597e8e5b8681915e98131c45562a",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "grammar",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/grammar__liquid__oled-black__normal.png",
+      "bytes": 51964,
+      "sha256": "ded913afe38a9c6f067666cb28ed3ceef02c6ed9109f1d00f07ef3d8fe426041",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "translate",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/translate__liquid__oled-black__normal.png",
+      "bytes": 28308,
+      "sha256": "72c703f7a774b41f04ca6c23dd337029197565cbab30a028be4103bc3265df7a",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "player",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 1080,
+        "height": 700
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/player__liquid__oled-black__normal.png",
+      "bytes": 324460,
+      "sha256": "3a40e5ec888707c7856936e42ab42213bb4af737b19f396422560384201c9372",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 1
+    },
+    {
+      "app": "video",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 1080,
+        "height": 700
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/video__liquid__oled-black__normal.png",
+      "bytes": 285108,
+      "sha256": "066a78dbf8eda04a67a7446f9280ca18b906055ca728f2040940f63459179ac2",
+      "size": {
+        "width": 1080,
+        "height": 700
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "music",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 1080,
+        "height": 679
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/music__liquid__oled-black__normal.png",
+      "bytes": 142838,
+      "sha256": "9f7c4e550822af4d5e624251da97e2d6c1d36f3d65b574554163639e4c762ac0",
+      "size": {
+        "width": 1080,
+        "height": 679
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "anki",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/anki__liquid__oled-black__normal.png",
+      "bytes": 37384,
+      "sha256": "56ea378d414f42426a043207d1a38b838c12f3f5c8e8cba4ce1e96d4bcd0454f",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "flashcards",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/flashcards__liquid__oled-black__normal.png",
+      "bytes": 43760,
+      "sha256": "f841127df78def9ea06a13faed1ff457e8213d119e0338abba902b397254da6a",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 3,
+      "streak": 3
+    },
+    {
+      "app": "games",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 980,
+        "height": 589
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/games__liquid__oled-black__normal.png",
+      "bytes": 81224,
+      "sha256": "24cff444245849f561b0abc66fc22e8ce47995fed22a92215324c4c2b6e9a1df",
+      "size": {
+        "width": 980,
+        "height": 589
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "stats",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/stats__liquid__oled-black__normal.png",
+      "bytes": 35563,
+      "sha256": "a47ee03a77221d958f9721fef8e088e6c3979e6450c7541b23349593537d889f",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "resources",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/resources__liquid__oled-black__normal.png",
+      "bytes": 70285,
+      "sha256": "99d4c07308609872eea624dbbecb56a008b0987f22f6ecd0673553b27f973828",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "settings",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 960,
+        "height": 679
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/settings__liquid__oled-black__normal.png",
+      "bytes": 106406,
+      "sha256": "44b8177e207fdb1b824e36b56e64c95b5cd70413ff923872e611d291cff79e76",
+      "size": {
+        "width": 960,
+        "height": 679
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "note",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 260,
+        "y": 60,
+        "width": 260,
+        "height": 220
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/note__liquid__oled-black__normal.png",
+      "bytes": 11695,
+      "sha256": "bce2d1d098280e432da464f73e15c89fb17b6848ca1aa430021de23c32b11580",
+      "size": {
+        "width": 260,
+        "height": 220
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "visualizer",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "musicwidget",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "city",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": false,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 380,
+        "height": 200
+      },
+      "ok": false,
+      "error": "surface offers no presentation toggle of its own"
+    },
+    {
+      "app": "immersion",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 94,
+        "y": 54,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/immersion__liquid__oled-black__normal.png",
+      "bytes": 41451,
+      "sha256": "f883048e443a5426aa548eae1f6fd076e3080431b9ea1b90dcec8201b7ae6fda",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 6,
+      "streak": 3
+    },
+    {
+      "app": "calendar",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 128,
+        "y": 84,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/calendar__liquid__oled-black__normal.png",
+      "bytes": 28054,
+      "sha256": "7c39a95aa11002d5b1de5fca42ab4be03c54b30678ac1add5497a40ca0446a31",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 4,
+      "streak": 3
+    },
+    {
+      "app": "reading",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 162,
+        "y": 114,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/reading__liquid__oled-black__normal.png",
+      "bytes": 52176,
+      "sha256": "b66e745254bd5ea17010923053e6a1081acad1264000145f43394419cf35af7d",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 5,
+      "streak": 3
+    },
+    {
+      "app": "youtube",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 196,
+        "y": 144,
+        "width": 980,
+        "height": 619
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/youtube__liquid__oled-black__normal.png",
+      "bytes": 30759,
+      "sha256": "7ef4fb170245ff25c6192754f9f95c54ffd2a147faebadbaf7a7c3180f47cce9",
+      "size": {
+        "width": 980,
+        "height": 619
+      },
+      "converged": true,
+      "attempts": 7,
+      "streak": 3
+    },
+    {
+      "app": "scraper",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 230,
+        "y": 174,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/scraper__liquid__oled-black__normal.png",
+      "bytes": 46585,
+      "sha256": "d5b928a09de11c6e9e51c173a5df259b0132862f2686d0676367714cdd53b103",
+      "size": {
+        "width": 820,
+        "height": 580
+      },
+      "converged": true,
+      "attempts": 8,
+      "streak": 3
+    },
+    {
+      "app": "files",
+      "theme": "oled-black",
+      "presentation": "liquid",
+      "state": "normal",
+      "themeSettled": true,
+      "themeSettledMs": 413,
+      "themeApplied": true,
+      "presentationReached": true,
+      "stateReached": true,
+      "rect": {
+        "x": 60,
+        "y": 24,
+        "width": 820,
+        "height": 580
+      },
+      "ok": true,
+      "file": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/files__liquid__oled-black__normal.png",
+      "bytes": 51862,
+      "sha256": "caa463a370d3b9e1f9f4c5570b8c3cc99343db4ea57bf6b3c584d990cea1ab98",
+      "size": null,
+      "converged": false,
+      "attempts": 12,
+      "streak": 1
+    }
+  ],
+  "apps": {
+    "agent": {
+      "opened": true,
+      "title": "Agent",
+      "presentable": true,
+      "note": null
+    },
+    "library": {
+      "opened": true,
+      "title": "Library",
+      "presentable": true,
+      "note": null
+    },
+    "novels": {
+      "opened": true,
+      "title": "Novels",
+      "presentable": true,
+      "note": null
+    },
+    "dictionary": {
+      "opened": true,
+      "title": "Dictionary",
+      "presentable": true,
+      "note": null
+    },
+    "grammar": {
+      "opened": true,
+      "title": "Grammar",
+      "presentable": true,
+      "note": null
+    },
+    "translate": {
+      "opened": true,
+      "title": "Translate",
+      "presentable": true,
+      "note": null
+    },
+    "player": {
+      "opened": true,
+      "title": "Media",
+      "presentable": true,
+      "note": null
+    },
+    "video": {
+      "opened": true,
+      "title": "Video",
+      "presentable": true,
+      "note": null
+    },
+    "music": {
+      "opened": true,
+      "title": "Music",
+      "presentable": true,
+      "note": null
+    },
+    "anki": {
+      "opened": true,
+      "title": "Anki",
+      "presentable": true,
+      "note": null
+    },
+    "flashcards": {
+      "opened": true,
+      "title": "Flashcards",
+      "presentable": true,
+      "note": null
+    },
+    "games": {
+      "opened": true,
+      "title": "Game Arena",
+      "presentable": true,
+      "note": null
+    },
+    "stats": {
+      "opened": true,
+      "title": "Statistics",
+      "presentable": true,
+      "note": null
+    },
+    "resources": {
+      "opened": true,
+      "title": "Resources",
+      "presentable": true,
+      "note": null
+    },
+    "settings": {
+      "opened": true,
+      "title": "Settings",
+      "presentable": true,
+      "note": null
+    },
+    "note": {
+      "opened": true,
+      "title": "Sticky note",
+      "presentable": true,
+      "note": null
+    },
+    "visualizer": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "musicwidget": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "city": {
+      "opened": true,
+      "title": null,
+      "presentable": false,
+      "note": "window has no presentation toggle of its own; standard-only"
+    },
+    "immersion": {
+      "opened": true,
+      "title": "Immersion",
+      "presentable": true,
+      "note": null
+    },
+    "calendar": {
+      "opened": true,
+      "title": "Calendar",
+      "presentable": true,
+      "note": null
+    },
+    "reading": {
+      "opened": true,
+      "title": "Reading Finder",
+      "presentable": true,
+      "note": null
+    },
+    "youtube": {
+      "opened": true,
+      "title": "YouTube",
+      "presentable": true,
+      "note": null
+    },
+    "scraper": {
+      "opened": true,
+      "title": "Scraper",
+      "presentable": true,
+      "note": null
+    },
+    "files": {
+      "opened": true,
+      "title": "Files",
+      "presentable": true,
+      "note": null
+    }
+  },
+  "totals": {
+    "cells": 50,
+    "captured": 46,
+    "failed": 4,
+    "distinctImages": 44,
+    "unsettled": 0,
+    "stateBlocked": 0,
+    "unconverged": 7,
+    "captureAttemptsTotal": 303,
+    "themeMisapplied": 0,
+    "appsOpened": 25,
+    "appsPresentable": 22,
+    "bytes": 3602139
+  },
+  "magnitudeGate": {
+    "pctOver8AtLeast": 1
+  },
+  "restore": {
+    "theme": "study-os",
+    "ok": true,
+    "stored": "study-os",
+    "caretFreezeRemoved": true,
+    "windowsClosed": true,
+    "destructiveConfirms": 1,
+    "windowsLeft": 0,
+    "dialogsLeft": 0
+  },
+  "atlasFile": "debug/shots/l12-matrix/_bk-l12-oledblack__20260902T060458Z__4736/atlas.html"
+}
