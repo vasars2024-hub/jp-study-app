@@ -540,7 +540,31 @@ async function handle(
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
       try {
-        const image = await win.webContents.capturePage();
+        // An optional `rect` crops the capture to one region of the renderer. Without it
+        // every capture is the WHOLE desktop, so a matrix that varies which app it is
+        // "photographing" while several windows are open produces byte-identical images
+        // per theme and the app dimension is not actually being measured — the L12
+        // matrix harness found exactly that. Electron wants integers, and a rect that
+        // escapes the page silently returns an empty image, so it is clamped here.
+        let image;
+        if (body.rect && typeof body.rect === 'object') {
+          const r = body.rect as { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
+          const [cw, ch] = win.getContentSize();
+          const x = Math.max(0, Math.round(Number(r.x) || 0));
+          const y = Math.max(0, Math.round(Number(r.y) || 0));
+          const width = Math.round(Number(r.width) || 0);
+          const height = Math.round(Number(r.height) || 0);
+          if (!(width > 0 && height > 0)) {
+            return { code: 400, body: { ok: false, error: 'rect needs positive width and height' } };
+          }
+          image = await win.webContents.capturePage({
+            x, y,
+            width: Math.min(width, Math.max(1, cw - x)),
+            height: Math.min(height, Math.max(1, ch - y)),
+          });
+        } else {
+          image = await win.webContents.capturePage();
+        }
         const dir = path.join(ensureDebugRoot(), 'shots');
         fs.mkdirSync(dir, { recursive: true });
         const file = path.join(dir, `win${win.id}-${Date.now()}.png`);
