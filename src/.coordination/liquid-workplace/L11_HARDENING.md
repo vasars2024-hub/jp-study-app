@@ -891,3 +891,45 @@ OOM that reads like a runner fault, not a test bug.
 
 **Bullet 4 still OPEN.** Clause 1 (blur fallback) and clause 2 (GPU-loss recovery) are closed
 with controls. Clauses 3-5 untouched: multi-monitor, restart persistence, long-session memory.
+
+## 2026-09-01, late night — L11 bullet 4, clause 4: restart persistence, measured across a real kill
+
+No product defect found, and that is the result: the clause PASSES. Recorded because an
+unmeasured clause and a measured-clean one are not the same thing, and this bullet has three
+clauses left that nobody should re-measure by accident.
+
+METHOD, through the product's own paths only — no probe wrote to the store. Opened a Liquid-
+capable window with `os:open`, then ran `os:window`/`togglePresentation`, which is exactly what
+`keyboardShortcuts.ts:1541` reduces the palette command to. Then **SIGKILL, not a graceful
+quit** (`Stop-Process -Force` on the Electron main and its forge parents), so the test cannot
+pass on state flushed during shutdown; then `npm start` again, new pid 51880.
+
+  standard    on disk: {"id":"dictionary","section":"dictionary",x:60,y:24,w:820,h:580,z:12,
+                        visible:true,maximized:false,pinned:false}
+  liquid      on disk: + presentation {v:1, mode:"liquid",
+                        standardRect:{x:60,y:24,w:820,h:580}, standardMaximized:false}
+  after kill+restart:  rendered `data-presentation="liquid"`, and the persisted window
+                       **byte-identical** to the pre-restart JSON.
+
+DISCRIMINATING CONTROL: the same comparison against the PRE-toggle blob returns **false**, so
+the reader can tell the two states apart and "identical" is not what it says about everything.
+REVERSE TRANSITION: `togglePresentation` again returned the persisted window byte-identical to
+the pre-toggle standard blob — reversibility survives the restart, which is the half a
+persistence test usually skips.
+
+The OTHER host was measured by the same kill without being set up for it: `lq.reader.presentation`
+in renderer localStorage came back holding `book` and `manga` at `mode:"liquid"` with
+`standardRect {x:320,y:86,w:1280,h:860}` — the real OS rect, i.e. NOT the `{x:0,y:0,w:1,h:1}`
+that `liquidWindowPresentation.ts:80` records as having once reached the store. Pre-existing
+user state, left exactly as found.
+
+NOT measured, named rather than implied: the pop-out host (`popoutPresentation.ts`) — its key
+was absent because no pop-out was open, and opening one to create state would have measured my
+own fixture rather than a restart.
+
+TREE RESTORED: `desktop-layout.json` is byte-identical to the 4,824-byte copy taken before the
+slice (`debug/_layout-BACKUP-20260901.json`), globalZTop included. The window was closed through
+`os:window`/`closeAll`; nothing of mine persisted.
+
+TRAP: the restarted app took **60 s** to write `debug/bridge.json` and reused **the same port**
+(39273) with a new token, so a restart-wait keyed on the port never fires. Key on the pid.
