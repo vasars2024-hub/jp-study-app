@@ -1,8 +1,8 @@
 {
   "schema": "l12-risk-register/v1",
   "bullet": "L12 bullet 4 — remaining-risk report",
-  "generatedAt": "2026-09-02T21:56:09.654Z",
-  "head": "ce35c9f2",
+  "generatedAt": "2026-09-02T21:59:03.396Z",
+  "head": "8b10bc75",
   "branch": "feat/nyaa-subtitles",
   "totals": {
     "risks": 9,
@@ -146,8 +146,8 @@
       "severity": "medium",
       "state": "open",
       "measurement": {
-        "closed": 36,
-        "open": 10,
+        "closed": 37,
+        "open": 9,
         "unknown": 0,
         "total": 46,
         "openTitles": [
@@ -159,8 +159,7 @@
           "Validate every player feature in standard and Liquid modes.",
           "Keep review/input surfaces spatially fixed during active tasks.",
           "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-          "Close every feature-ledger row.",
-          "Produce a final visual atlas and remaining-risk report."
+          "Close every feature-ledger row."
         ]
       },
       "whyItMatters": "The release gate is the plan’s own definition of done.",
@@ -310,8 +309,8 @@
     },
     "r4": {
       "kind": "append-one-open-bullet/R4-count-must-rise-by-one",
-      "base": 10,
-      "mutated": 11,
+      "base": 9,
+      "mutated": 10,
       "pass": true
     },
     "r3": {

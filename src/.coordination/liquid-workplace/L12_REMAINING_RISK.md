@@ -3,7 +3,7 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `feat/nyaa-subtitles` at `ce35c9f2`, 2026-09-02T21:56:09.654Z.
+Branch `feat/nyaa-subtitles` at `8b10bc75`, 2026-09-02T21:59:03.396Z.
 
 **6 of 9 risks open** (3 high, 3 closed, 0 unmeasured).
 
@@ -147,8 +147,8 @@ What would close it: Close each remaining bullet against its own words with live
 
 ```json
 {
-  "closed": 36,
-  "open": 10,
+  "closed": 37,
+  "open": 9,
   "unknown": 0,
   "total": 46,
   "openTitles": [
@@ -160,8 +160,7 @@ What would close it: Close each remaining bullet against its own words with live
     "Validate every player feature in standard and Liquid modes.",
     "Keep review/input surfaces spatially fixed during active tasks.",
     "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-    "Close every feature-ledger row.",
-    "Produce a final visual atlas and remaining-risk report."
+    "Close every feature-ledger row."
   ]
 }
 ```
