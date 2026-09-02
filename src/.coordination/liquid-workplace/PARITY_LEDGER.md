@@ -636,3 +636,46 @@ demonstrated**: some collection must exceed it. **CONTROL ON THE RELAXATION**, r
 detach the two groups larger than the cap and the row still FAILS
 (`cap=7 maxDeclared=7 ceilingProven=false`), so a desk where every group is small cannot buy
 a 10. Both bodies re-attached; 5 bodies, row true, `cap=16 maxDeclared=3074`.
+
+## 2026-09-02 (primary) — L12 b2 coverage: `statistics` and `library`
+
+**`statistics`: 9 rows, `both` 9.** `cat6 --app statistics` = **PASS 10/10** — parity **9/9
+and 9/9**, `onlyInOne` empty, all **9 mutations** flipped exactly their own row and restored,
+0 drive refusals, box `820x580`. The round trip is the WEAKER kind and says so: this surface
+has **no editable text field**, so `dirtiedField` is `null`; shell held, 0 diffs.
+
+`resetRecovery` is scored for reachability and its default-closed `<details>`, and is
+deliberately **not driven** — it deletes study history in the user's real profile and this
+ledger has no undo for it. Same reasoning keeps `library.cardActions` un-driven.
+
+**The drive comes before the read, and it cost a row.** `recentActivity` claims the jump
+*works*, so it compares `scrollTop` before and after. Read without the spec's own step
+sequence, on a surface already scrolled, it reports `scrolled=false` and a live feature
+reads dead. Under the drive: **before 0 → after 814, moved true.** The authoring tool now
+runs `__LQP.__drive()` in each presentation before `check()` — and, after one run that did
+not, calls `__LQP.restore()` afterwards, because the drive is a mutation of view state and
+every spec with steps declares an `undo` for that reason.
+
+**`library`: 9 rows, `both` 9.** `cat6 --app library` = **PASS 10/10** — parity **9/9 and
+9/9**, **6 mutations** each flipping exactly its own row (9/9 → 8/9) and all restored, 0
+refusals. Drive: folder `Unfiled 21` (from 24 cards), sort `date-desc → title`, group
+`none → lang`, scroll 240 of 1547. Restored and read back: `date-desc`, `none`, `All 24`.
+
+### A second instrument that had one profile's data written into it — and a row with no control
+
+`inboxFilters` read **false on a correct rail**: `chips=5 active=2` against a bar of
+`chips.length >= 6 && active === 2`. The chip SETS are derived —
+`LibraryView.tsx:1165/1175` maps `filterOptions.langs` and `.levels` from what the library
+actually holds — so a library with three languages and **one** level renders 3 + 2 = 5 and
+can never reach 6. Live: `All | Japanese | Unknown | All | L7`.
+
+The rail is now split at its own `All` heads, matched against the **first chip's own text**
+rather than the English word (the label is translated — trap 4), and the invariant is stated
+per group: two groups, each offering `All` plus at least one real value, each with exactly
+one active. That is strictly **stronger** than `active === 2`, which two actives in one group
+and none in the other satisfied. Live: `groups=2 sizes=[3,2] activePerGroup=[1,1]`.
+
+**It had no mutation at all** — one of the four library rows the control set never named, so
+its bar had never been falsified in either direction. The new one makes a second chip active
+inside the first group, the exact exclusivity loss the row exists to catch, and it flips
+**exactly** this row: 9/9 → 8/9, `unexpectedRows` empty, restored.

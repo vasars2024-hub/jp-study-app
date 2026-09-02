@@ -1793,13 +1793,39 @@
         {
           // Two chip groups — language and level — sharing one flat container, so exactly
           // TWO actives is the invariant, one per group.
+          //
+          // THE GROUPS ARE FOUND, NOT COUNTED — corrected 2026-09-02, after this row read
+          // false on a correct rail. The old bar was `chips.length >= 6 && active === 2`,
+          // and the 6 was one profile's data written into the instrument:
+          // `LibraryView.tsx:1165/1175` maps `filterOptions.langs` and `.levels`, both
+          // derived from what the library actually holds, so a library with three languages
+          // and ONE level renders 3 + 2 = 5 chips and can never reach 6. Measured live:
+          // `All | Japanese | Unknown | All | L7`.
+          //
+          // The structural fact is that each group is led by its own `All` chip, so the
+          // boundaries are read off the DOM by matching the FIRST chip's own text (never the
+          // English word — trap 4, the label is translated). Then the invariant is stated
+          // per group instead of in aggregate: two groups, each offering `All` plus at least
+          // one real value, each with exactly one active. That is strictly stronger than
+          // `active === 2`, which two actives in ONE group and none in the other satisfies.
           id: 'inboxFilters',
           f: (w) => {
             const box = q(w, '.lib-inbox-filters');
             if (!box) return { ok: false, ev: 'no inbox filter rail' };
             const chips = qa(box, '.lib-folder-chip');
             const active = activeOf(chips, 'active');
-            return { ok: chips.length >= 6 && active === 2, ev: `chips=${chips.length} active=${active}` };
+            if (!chips.length) return { ok: false, ev: 'filter rail rendered no chips' };
+            const allLabel = txt(chips[0]);
+            const heads = chips.map((c, i) => (txt(c) === allLabel ? i : -1)).filter((i) => i >= 0);
+            const groups = heads.map((start, n) => chips.slice(start, heads[n + 1] === undefined ? chips.length : heads[n + 1]));
+            const sized = groups.filter((g) => g.length >= 2).length;
+            const oneEach = groups.filter((g) => activeOf(g, 'active') === 1).length;
+            return {
+              ok: groups.length === 2 && sized === 2 && oneEach === 2 && active === 2,
+              ev: `chips=${chips.length} active=${active} groups=${groups.length} `
+                + `sizes=[${groups.map((g) => g.length).join(',')}] `
+                + `activePerGroup=[${groups.map((g) => activeOf(g, 'active')).join(',')}]`,
+            };
           },
         },
         {
@@ -1892,6 +1918,22 @@
         ),
         groupBy: (w) => detach(q(w, '.lib-group-head'), 'list is not grouped'),
         cardActions: (w) => detach(q(w, '.card-remove'), 'no cards rendered'),
+        // THIS ROW HAD NO CONTROL UNTIL 2026-09-02 — it was one of the four library rows the
+        // mutation set never named, so its bar had never been falsified. Added in the same
+        // commit that relaxed it, because a relaxed row with no control is a row that cannot
+        // fail. It falsifies by making a SECOND chip active inside the FIRST group, which is
+        // exactly the exclusivity loss the row exists to catch and is invisible to a bare
+        // `active === 2` count when the other group loses its own.
+        inboxFilters: (w) => {
+          const chips = qa(w, '.lib-inbox-filters .lib-folder-chip');
+          if (!chips.length) return { refused: 'no inbox filter rail' };
+          const head = txt(chips[0]);
+          const firstGroupEnd = chips.findIndex((c, i) => i > 0 && txt(c) === head);
+          const group = chips.slice(0, firstGroupEnd < 0 ? chips.length : firstGroupEnd);
+          const other = group.find((c) => !c.classList.contains('active'));
+          if (!other) return { refused: 'first filter group has no inactive chip to falsify with' };
+          return addClassAll([other], 'active');
+        },
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
       // Narrow FIRST so `folderFilter` records its before against the widest list, then
