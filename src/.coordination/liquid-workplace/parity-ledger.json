@@ -2977,7 +2977,7 @@
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
-      "at": "2026-09-03 (re-derived by debug/_p2g-notwritten.cjs)",
+      "at": "2026-09-03 (re-derived by probes/l6-ledger-coverage.cjs)",
       "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
       "harnessSpecs": 27,
       "specsWithRows": 25,
@@ -3000,7 +3000,7 @@
     }
   },
   "controlCoverage": {
-    "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
+    "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by probes/l6-ledger-coverage.cjs — never decremented by hand.",
     "rows": 221,
     "withNamedControl": 178,
     "declaredNone": 23,
