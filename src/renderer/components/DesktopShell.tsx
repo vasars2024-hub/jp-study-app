@@ -2023,12 +2023,13 @@ export default function DesktopShell({
         }
         case 'togglePresentation': {
           if (!topWin) return;
-          // The garden and the visualizer are frameless trinkets with no
-          // conventional chrome to swap, so `canPresentLiquid` refuses them —
-          // and the command SAYS so instead of doing nothing. A palette entry
-          // that silently no-ops is the dead control this phase exists to
-          // remove; the two pointer entry points simply hide the affordance,
-          // which a command list cannot do per-window.
+          // `visualizer` is the ONE section the predicate still refuses, and it
+          // is not refused for being frameless — the garden is frameless and
+          // presents (L12 b2, 2026-09-02). A command list cannot hide per-window,
+          // so this SAYS so rather than doing nothing; a palette entry that
+          // silently no-ops is the dead control this phase exists to remove. The
+          // desktop's three pointer affordances — the framed bar, the frameless
+          // dock and the taskbar menu — hide it instead, from this same predicate.
           if (!canPresentLiquid(topWin.section)) {
             showOsToast(t('desktop.presentation.unavailable'), 'muted');
             return;
