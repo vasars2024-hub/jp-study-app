@@ -223,6 +223,20 @@
   --color-gray-950: 13 12 18;
   --color-gray-default: 111 106 122;
 
+  /* Subtitle text names its OWN stack instead of inheriting one.
+     Cues used to take whatever `--font-body` the active theme happened to set, and two
+     themes set a stack with no Japanese face in it at all: aero-shell.css:116 and
+     aero-apps.css:100 both resolve to Tahoma / Segoe UI / sans-serif, and four more
+     rules in those files use Tahoma / MS Sans Serif. Neither Tahoma nor MS Sans Serif
+     covers kana or kanji, so those glyphs fell through to Chromium's last-resort
+     fallback — which covers some ranges and not others, and that is what produces a
+     frame where one line reads and its siblings are all boxes.
+     Every face named here has full kana + jouyou kanji coverage; the Latin faces are
+     LAST so a mixed cue still renders Japanese from a Japanese font. Guarded by
+     src/media/__tests__/subtitleFontStack.test.ts. */
+  --subtitle-font-stack: 'Yu Gothic UI', 'Yu Gothic', 'Meiryo', 'Noto Sans JP',
+    'Hiragino Kaku Gothic ProN', 'MS Gothic', 'Segoe UI', system-ui, sans-serif;
+
   --radius: 0.5rem;
   --radius-md: 0.5rem;
 
@@ -364,6 +378,7 @@
 
 #media-workspace .study-cue-text {
   margin: 0;
+  font-family: var(--subtitle-font-stack);
   /* Shrink-wrapped so the adjustable background hugs the words. As a block it
      would paint a band the full 46rem of the overlay whatever the line said. */
   display: inline-block;
@@ -393,6 +408,7 @@
 
 #media-workspace .study-cue-translation {
   margin: 0.55rem 0 0;
+  font-family: var(--subtitle-font-stack);
   color: rgb(var(--color-gray-200) / 1);
   font-size: 0.92rem;
   text-shadow: 0 2px 4px rgb(0 0 0 / 1);
@@ -400,6 +416,7 @@
 
 #media-workspace .study-cue-secondary {
   margin: 0.4rem 0 0;
+  font-family: var(--subtitle-font-stack);
   display: inline-block;
   max-width: 100%;
   color: rgb(225 231 255 / 0.94);
@@ -570,6 +587,9 @@
 }
 
 #media-workspace .study-dictation input {
+  /* The learner types the cue back in kana/kanji here and the answer is diffed against
+     it on screen, so this is a subtitle text path like the cue itself. */
+  font-family: var(--subtitle-font-stack);
   width: min(24rem, 60vw);
 }
 
@@ -1047,6 +1067,7 @@
 }
 
 #media-workspace .study-transcript-text {
+  font-family: var(--subtitle-font-stack);
   font-size: 0.82rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
