@@ -201,12 +201,15 @@ describe('the overlay wires the file-track cue clock', () => {
 describe('the second subtitle line reaches a file track', () => {
   it('offers file tracks as secondary candidates, not only event tracks', () => {
     const source = overlaySource();
-    expect(source).toContain("(track.type === 'event' || track.type === 'file')");
+    // The disjunction, not the whole parenthesised expression: the MediaCaptions track
+    // picker landed a `!manager ||` term in front of it on 2026-09-03, and pinning the
+    // punctuation would have failed a merge that changed no behaviour at all.
+    expect(source).toContain("track.type === 'event' || track.type === 'file'");
   });
 
   it('falls back to the cached ASS when the event cache answers nothing', () => {
     const source = overlaySource();
-    expect(source).toContain('const resolved = cues.length ? cues : fileCues();');
+    expect(source).toContain('cues.length ? cues : fileCues()');
     expect(source).toContain('manager.getTrackContent(secondaryTrack)');
   });
 
