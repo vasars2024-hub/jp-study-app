@@ -1,0 +1,535 @@
+{
+  "surface": "music",
+  "title": "Music",
+  "root": ".mc-music-page",
+  "at": "2026-09-03T23:20:18.689Z",
+  "strictMode": "on - figures carry the dev double-render tax; see correction 31",
+  "scene": {
+    "fwins": 1,
+    "fwinElements": 270,
+    "root": null,
+    "rootElements": null,
+    "documentElements": 387,
+    "titles": [
+      "Music"
+    ],
+    "theme": null,
+    "viewport": "1264x821",
+    "dpr": 1,
+    "heapMB": 235
+  },
+  "surfaceWindow": {
+    "mechanism": "floating .fwin",
+    "matched": 1,
+    "elements": 270,
+    "deskWindows": 1,
+    "titles": [
+      "Music"
+    ]
+  },
+  "process": {
+    "pid": 6756,
+    "uptimeSecAtStart": 596,
+    "mainRssMbBefore": 160.2,
+    "mainRssMbAfter": 139.7,
+    "mainHeapUsedMbAfter": 297.4
+  },
+  "sessionCeiling": {
+    "p50": 8.3,
+    "p95": 8.4,
+    "frames": 222,
+    "runs": [
+      {
+        "p50": 8.3,
+        "p95": 8.5,
+        "max": 8.6,
+        "over100": 0,
+        "frames": 222
+      },
+      {
+        "p50": 8.3,
+        "p95": 8.4,
+        "max": 8.5,
+        "over100": 0,
+        "frames": 223
+      },
+      {
+        "p50": 8.3,
+        "p95": 8.4,
+        "max": 8.5,
+        "over100": 0,
+        "frames": 221
+      }
+    ],
+    "noiseFloorOver100": 0,
+    "noiseFloorMaxMs": 8.6,
+    "l0P50": 10,
+    "note": "comparable to L0",
+    "environmentNote": "ceiling clean — no environmental stall observed in this session"
+  },
+  "legs": {
+    "ceiling": {
+      "interaction": "ceiling",
+      "label": "ceiling",
+      "title": null,
+      "root": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 233
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 233
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "note": "compositor ceiling",
+        "spanMs": 1305
+      },
+      "jank_blocks": null,
+      "frames": 222,
+      "frame_min_ms": 8.1,
+      "frame_p50_ms": 8.3,
+      "frame_p95_ms": 8.5,
+      "frame_max_ms": 8.6,
+      "frames_over_16": 0,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 60,
+      "main_span_ms": 1827,
+      "main_p50_ms": 2.7,
+      "main_p95_ms": 3.4,
+      "main_max_ms": 13.1
+    },
+    "ceilingRuns": [
+      {
+        "p50": 8.3,
+        "p95": 8.5,
+        "max": 8.6,
+        "over100": 0,
+        "frames": 222
+      },
+      {
+        "p50": 8.3,
+        "p95": 8.4,
+        "max": 8.5,
+        "over100": 0,
+        "frames": 223
+      },
+      {
+        "p50": 8.3,
+        "p95": 8.4,
+        "max": 8.5,
+        "over100": 0,
+        "frames": 221
+      }
+    ],
+    "themeControlRuns": [
+      {
+        "p50": 8.3,
+        "p95": 8.5,
+        "max": 33.4,
+        "over100": 0,
+        "mainMax": 10.1
+      },
+      {
+        "p50": 8.3,
+        "p95": 8.4,
+        "max": 25,
+        "over100": 0,
+        "mainMax": 14.9
+      }
+    ],
+    "drag": {
+      "interaction": "drag",
+      "label": "drag",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 235
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 237
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 220,
+      "frame_min_ms": 7.6,
+      "frame_p50_ms": 8.3,
+      "frame_p95_ms": 8.5,
+      "frame_max_ms": 16.7,
+      "frames_over_16": 1,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1811,
+      "main_p50_ms": 2.4,
+      "main_p95_ms": 3.8,
+      "main_max_ms": 16,
+      "repeats": [
+        {
+          "p50": 8.3,
+          "p95": 8.5,
+          "max": 16.7,
+          "over100": 0,
+          "mainMax": 16,
+          "breached": false
+        },
+        {
+          "p50": 8.3,
+          "p95": 8.4,
+          "max": 8.5,
+          "over100": 0,
+          "mainMax": 13,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "resize": {
+      "interaction": "resize",
+      "label": "resize",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 239
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 233
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": null,
+      "frames": 219,
+      "frame_min_ms": 8,
+      "frame_p50_ms": 8.3,
+      "frame_p95_ms": 8.5,
+      "frame_max_ms": 17,
+      "frames_over_16": 1,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 58,
+      "main_span_ms": 1812,
+      "main_p50_ms": 2.1,
+      "main_p95_ms": 4.1,
+      "main_max_ms": 12.4,
+      "repeats": [
+        {
+          "p50": 8.3,
+          "p95": 8.5,
+          "max": 17,
+          "over100": 0,
+          "mainMax": 12.4,
+          "breached": false
+        },
+        {
+          "p50": 8.3,
+          "p95": 8.5,
+          "max": 16.5,
+          "over100": 0,
+          "mainMax": 3.3,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "theme": {
+      "interaction": "theme",
+      "label": "theme",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 232
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 232
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "applyPaintedMs": 9.5,
+        "restorePaintedMs": 16.6,
+        "restoredTo": null
+      },
+      "jank_blocks": null,
+      "frames": 221,
+      "frame_min_ms": 8.1,
+      "frame_p50_ms": 8.3,
+      "frame_p95_ms": 8.4,
+      "frame_max_ms": 8.5,
+      "frames_over_16": 0,
+      "frames_over_33": 0,
+      "frames_over_100": 0,
+      "main_samples": 59,
+      "main_span_ms": 1818,
+      "main_p50_ms": 2.2,
+      "main_p95_ms": 6.1,
+      "main_max_ms": 13.3,
+      "repeats": [
+        {
+          "p50": 8.3,
+          "p95": 8.4,
+          "max": 8.5,
+          "over100": 0,
+          "mainMax": 13.3,
+          "breached": false
+        },
+        {
+          "p50": 8.3,
+          "p95": 8.4,
+          "max": 16.6,
+          "over100": 0,
+          "mainMax": 13.7,
+          "breached": false
+        }
+      ],
+      "unstable": false
+    },
+    "heavy": {
+      "label": "music: cycle all four library sort modes (DURING -DuringJs)",
+      "samples": 128,
+      "span_ms": 4002,
+      "min_ms": 2.2,
+      "p50_ms": 3.2,
+      "p95_ms": 7.4,
+      "max_ms": 17.5
+    },
+    "heavyProof": "cycled 48 sorts (12/12/12/12), restored recent",
+    "idle": {
+      "label": "music: idle",
+      "samples": 129,
+      "span_ms": 4023,
+      "min_ms": 2.2,
+      "p50_ms": 3.6,
+      "p95_ms": 7.9,
+      "max_ms": 14.3
+    },
+    "dragJank": {
+      "interaction": "drag (CONTROL: 120 ms renderer blocks)",
+      "label": "drag",
+      "title": "Music",
+      "root": null,
+      "scene_before": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 234
+      },
+      "scene_after": {
+        "fwins": 1,
+        "fwinElements": 270,
+        "root": null,
+        "rootElements": null,
+        "documentElements": 387,
+        "titles": [
+          "Music"
+        ],
+        "theme": null,
+        "viewport": "1264x821",
+        "dpr": 1,
+        "heapMB": 237
+      },
+      "scene_stable": true,
+      "stale_recorder": false,
+      "gesture": {
+        "done": true,
+        "steps": 60,
+        "amplitudePx": 140,
+        "title": "Music",
+        "before": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "after": {
+          "x": "94px",
+          "y": "54px",
+          "w": "1080px",
+          "h": "700px"
+        },
+        "closedLoop": true
+      },
+      "jank_blocks": 11,
+      "frames": 95,
+      "frame_min_ms": 8.1,
+      "frame_p50_ms": 8.3,
+      "frame_p95_ms": 116.7,
+      "frame_max_ms": 125,
+      "frames_over_16": 10,
+      "frames_over_33": 10,
+      "frames_over_100": 10,
+      "main_samples": 57,
+      "main_span_ms": 1807,
+      "main_p50_ms": 5.8,
+      "main_p95_ms": 10.9,
+      "main_max_ms": 18.3
+    }
+  },
+  "findings": [],
+  "voided": [],
+  "environment": [],
+  "score": 10,
+  "l0Provenance": {
+    "ceilingP50": 10,
+    "drag": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 90.1,
+      "over100": 0,
+      "mainMax": 129.5
+    },
+    "resize": {
+      "p50": 10,
+      "p95": 10.2,
+      "max": 80.1,
+      "over100": 0,
+      "mainMax": 145.8
+    },
+    "theme": {
+      "p50": 10,
+      "p95": 10.1,
+      "max": 20,
+      "over100": 0,
+      "mainMax": 143.4,
+      "paintedMs": 20
+    },
+    "mainBlockBarMs": 500
+  }
+}

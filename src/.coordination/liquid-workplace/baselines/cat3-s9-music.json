@@ -1,0 +1,97 @@
+{
+  "label": "s9-music",
+  "surface": "@.fwin:has(.mc-root)",
+  "win": "main",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "1080x700",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 37,
+  "controlsSkipped": 42,
+  "byRole": {
+    "Work": 1,
+    "Liquid-eligible": 9,
+    "Anchor": 21,
+    "Anchor(holds work)": 5,
+    "Ambient": 1
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 9,
+  "sharedPrimitiveEligible": 9,
+  "eligibleTotal": 9,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.lq-anchor.music-yt",
+      "path": [
+        0,
+        1,
+        1,
+        0,
+        1,
+        0,
+        4,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        9,
+        9,
+        9,
+        1
+      ],
+      "oneRegionGlass": [
+        1,
+        9,
+        9,
+        9,
+        1
+      ],
+      "allGlass": [
+        1,
+        9,
+        9,
+        9,
+        1
+      ],
+      "restored": [
+        0,
+        9,
+        9,
+        9,
+        1
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgb(26, 24, 35)",
+      "immediate": "none|rgb(26, 24, 35)",
+      "settled": "none|rgb(26, 24, 35)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

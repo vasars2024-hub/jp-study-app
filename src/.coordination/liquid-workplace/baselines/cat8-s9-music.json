@@ -1,0 +1,275 @@
+{
+  "label": "s9-music",
+  "surface": "Music",
+  "win": "main",
+  "lang": "en",
+  "storedLang": null,
+  "theme": null,
+  "rect": "1080x700",
+  "textRuns": 66,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 53,
+  "textHash": -800789007,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 3,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10234,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10234 catalog keys / 107 namespaces",
+  "raised": "already-on-top",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 66,
+        "textHash": -800789007,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 66,
+        "textHash": 805631388,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 33,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "ブラウズ"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "ホーム"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "メディアの概要"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "ライブラリ"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "すべてのローカルメディア"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "ビデオ"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 66,
+        "textHash": 1400284561,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 33,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "浏览"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "首页"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "媒体概览"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "媒体库"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "全部本地媒体"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "视频"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 66,
+        "textHash": -18506249,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 33,
+        "diffExamples": [
+          {
+            "i": 8,
+            "was": "Browse",
+            "now": "Разделы"
+          },
+          {
+            "i": 9,
+            "was": "Home",
+            "now": "Главная"
+          },
+          {
+            "i": 10,
+            "was": "Your media at a glance",
+            "now": "Обзор вашей медиатеки"
+          },
+          {
+            "i": 11,
+            "was": "Library",
+            "now": "Медиатека"
+          },
+          {
+            "i": 12,
+            "was": "All local media",
+            "now": "Все локальные медиа"
+          },
+          {
+            "i": 13,
+            "was": "Video",
+            "now": "Видео"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": null
+    },
+    "after": {
+      "html": "en",
+      "stored": null
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 33,
+    "baseRuns": 66,
+    "diffShare": 0.5
+  },
+  "drive": {
+    "input": ".music-search input",
+    "value": "zzqqxx-no-such-song",
+    "originalValue": "",
+    "openedBy": null,
+    "restoredAfterEscape": null,
+    "restoredAfterUndo": null,
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 64,
+      "states": {
+        "empty": {
+          "hosts": 1,
+          "messages": [
+            "No songs match \"zzqqxx-no-such-song\"."
+          ],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "label": "s9-music",
+  "surface": "@.fwin:has(.mc-root)",
+  "win": "main",
+  "task": "wait:800 >> click:.music-song:not(.active)",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 66,
+    "controlCount": 37,
+    "box": "1080x700",
+    "results": null
+  },
+  "inputCost": {
+    "clicks": 1,
+    "keystrokes": 0,
+    "total": 1
+  },
+  "latencyMs": {
+    "clickRecv": [
+      0.7
+    ],
+    "inputRecv": [],
+    "worstRecv": 0.7,
+    "overBar100": 0,
+    "n": 1,
+    "clickStampUnscored": [
+      13.3
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 13.3
+  },
+  "steps": [
+    {
+      "step": "wait:800",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "click:.music-song:not(.active)",
+      "target": {
+        "sel": ".music-song:not(.active)",
+        "label": "hana13-emotion-excerpt-jaDownloads",
+        "disabled": false,
+        "at": "431,442"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": true,
+      "rawChannels": [
+        "text",
+        "controls"
+      ],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 2,
+        "controls": 1
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": true,
+      "rawChannels": [
+        "text",
+        "controls"
+      ],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 2,
+        "controls": 1
+      }
+    }
+  ],
+  "churn": ".mc-player-progress",
+  "undo": null,
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": "UNMEASURED",
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": "UNMEASURED"
+  },
+  "spatialFixity": null,
+  "spatialFixitySamples": null,
+  "spatialFixityControl": null,
+  "spatialFixityVerdict": null,
+  "verdict": "UNMEASURED - costParity; drive the surface with --task or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "costParity"
+  ],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "anchorControl": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.3
+    ]
+  }
+}
