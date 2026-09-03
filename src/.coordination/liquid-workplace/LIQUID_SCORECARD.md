@@ -1759,3 +1759,35 @@ both directions after a reload. It also forced correction 26 in `cat4-use-of-spa
 matched this button by `title === 'Maximize'` — the English string, and the one the control
 stops carrying the instant it is maximized, so the restore leg would have found nothing and
 left every scored window maximized. It now matches the state affordance instead.
+
+## 2026-09-03 · primary — Resources and Calendar take category 2, both at a controlled 10/10, in BOTH presentations
+
+Same RULE C pair, same eighteen sampled-out sections as the two entries above. Instrument:
+`probes/cat2-clunkiness.cjs`, unchanged, `--win 1 --control --both-presentations`. Zero new
+probes. `--both-presentations` is what makes `costParity` a measurement instead of an
+`UNMEASURED`: it drives the identical task twice in the same window at the same geometry,
+once Standard and once Liquid, and asserts the presentation and the box came back.
+
+| # | Category | Surface | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ------- | ----- | --------------- | ------------------------------------- |
+| 2 | Clunkiness | Resources | **10/10** | task `type:.gram-search=yomi` over 51 cards / 257 text runs / 64 controls: **4 keystrokes, 0 clicks**; dead ends **0**; modal traps **0**; scroll traps **0**; worst renderer-side ack **43.5 ms**, **0 over the 100 ms bar** (4 samples: 50.4/20.4/9.1/5.1 on the first pass); idle churn none in either phase; undo `clear:` round-tripped the text hash `s1hb05 → s1hb05` | planted dead end / modal trap / scroll trap `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline: true`; inert-click floor 0.3 ms |
+| 2 | Clunkiness | Calendar | **10/10** | task `click:.cal-mode-btn:not(.active)` (Month → Week): **1 click, 0 keystrokes**; dead ends **0**; modal traps **0**; scroll traps **0**; worst ack **11.1 ms**, **0 over bar** | same three plants, same `0,0,0 → 1,1,1 → 0,0,0`, restored |
+
+costParity, read rather than asserted — same window, same 820×580 box, same task:
+Resources Standard **4** vs Liquid **4** (worst ack 43.5 / 47.8 ms); Calendar Standard **1**
+vs Liquid **1** (11.1 / 6.3 ms). Liquid costs no extra input on either, and both windows came
+back to `presentation: standard`, `aria-pressed: false`, `820x580`.
+
+Evidence: `debug/_pri-cat2-res.json`, `_pri-cat2-cal.json`.
+
+**TRAP, and it cost a run: this harness VOIDs on a surface the PREVIOUS run left dirty.**
+`VOID - undo did not restore the surface: baseHash 2td9na afterHash s1hb05` — the base hash was
+taken with `yomi` still in the search field from an earlier leg, so the undo restored the
+surface to its true empty state and the round trip read as a failure. Reset the surface before
+re-running, not after. And note `--out` is written only on a scoring exit: an `exit 3` VOID
+leaves the PREVIOUS run's JSON on disk, which reads exactly like a fresh result (`ls -la` the
+mtime, or delete the file first).
+
+**Running total for this pair: categories 1, 2, 3 and 4 all at a controlled 10/10 — 4 of 8.**
+Remaining for these two surfaces: 5 (UI clarity), 6 (feature parity and reversibility),
+7 (performance under real load), 8 (honest states).
