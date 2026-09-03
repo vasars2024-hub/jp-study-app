@@ -2042,3 +2042,42 @@ read the file, not the exit code.
 **Running total: 9 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
 `youtube`, `calendar`, `resources`, `flashcards`, `library`. **16 left**, of which 15 are
 scorable in both presentations (`visualizer` and `musicwidget` offer no presentation toggle).
+
+## 2026-09-03 · primary2 — Files takes its first category-1 measurement; a repair lands, the SCORE VOIDS — commit `f8503bbc`
+
+**Not an 80/80 entry, and not a closed category.** Recorded here because the numbers are real
+and the next worker should not re-derive them.
+
+**Scene.** `files` is the 25th `DESKTOP_WIN_SECTIONS` member and had no entry at all. Driven on a
+SECOND dev instance — `JP_DEBUG_PORT=39291`, `JP_EXTENSION_PORT=18865`, `PORT=5199`,
+`JP_USER_DATA_DIR=~\.claude-runs\jp-fresh-p2b`, pid 5204 — so the sibling worker's app on 39273
+was never touched. The cat1 harness resolves `bridge.json` from its own `__dirname`, so running it
+from this worktree drives this instance and only this one. Window: "Files", 820x580, standard,
+396 elements, 103 controls.
+
+**Three bars pass, one fails.** contrast min **4.65** (`span.fa-tree-count`), 0 failing of 190
+measured; keyboard **0 unreachable** of 103; motion 43 over threshold → **0** under emulated
+reduce-motion, emulation taken and released; WCAG 2.5.8 **0** fails. `targets32` FAILS: **63**
+under the floor by rect, **39** by pointer.
+
+**Repaired in `f8503bbc`** — `input.fa-bulk-check` x24 (rect 18x32, pointer 18.5x28 → rect 32x32)
+and `button.fa-view-mode-button` x2 (`::after` absent → 32px computed; visual rect unchanged at
+59x28). The checkbox took the floor on its own box because an input is a replaced element and
+`::after` generates nothing on it; the pill buttons took `.lq-hit` because raising their box would
+grow the pill. Neither moved layout: `.fa-row` already reserved `var(--lq-hit-target)` for the
+select column, so only the glyph was small.
+
+**Why the category is VOID rather than scored.** The harness's own `--control` moved contrast,
+targetsByRect, wcag258 and keyboard, but **not `targetsByPointer`** — the injected 12px button did
+not register on the pointer leg. The rubric says a control that fails to falsify VOIDS the score.
+So cat1 for `files` is UNSCORED, and the next turn's first job is to find why that leg did not
+move before any number here is claimed.
+
+**Left alone on purpose.** `button.fa-tree-node` x11 reads 24px WIDE while declaring `width:100%`
+and `min-height:var(--lq-hit-target)`, and `.fa-tree` carries `overflow-y:auto` — a clipper, which
+is a recorded way for this measurement to lie. Also unexplained: 25 controls report `occluded`,
+three of them `by: div.os-desktop`. Both are instrument-vs-product questions, not yet findings.
+
+**Cats 3/4/5/6 were NOT attempted and must not be scored on this profile.** A fresh
+`JP_USER_DATA_DIR` leaves the Files index at `Everything 28` with every content folder at 0 —
+an empty harness, which the rubric caps at 0. They need a populated profile.
