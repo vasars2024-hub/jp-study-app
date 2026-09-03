@@ -104,21 +104,40 @@ const DICT_QUERIES_JS = JSON.stringify(DICT_QUERIES).replace(
 // ranking `cat7-collection-weight.cjs` uses, and for the same reason: a list that is not
 // virtualised scrolls in an ANCESTOR, so a hardcoded child selector silently misses and the
 // load never happens. Returns the element it chose so the record shows what was scrolled.
+//
+// CORRECTION 36 -- the paragraph above named the ancestor case and the code did not implement
+// it: the sweep was `[root, ...root.querySelectorAll('*')]`, root and DESCENDANTS only, so a
+// surface that scrolls in an ancestor hit `REFUSE: nothing scrolls inside <root>` and its load
+// never armed. That is not hypothetical; it is exactly what the Video spec below did on every
+// run it was ever given (measured 2026-09-03: no descendant of `.mc-video-page` has any
+// overflow, and `main.mc-content` above it has 563 px). The fallback walks OUTWARD only when
+// nothing inside qualifies, so every surface that already passed keeps the same scroller and
+// the same numbers, and `rec.sel` now carries `inside:`/`ancestor:` so a banked JSON says which.
 const scrollAll = (rootSel) => `(() => {
   // Cleared before any refuse, so a load that never armed cannot be vouched for by the
   // PREVIOUS run's receipt. That is the zombie-recorder shape this repo has already paid for.
   delete window.__lqScrollLoad;
   const root = document.querySelector(${JSON.stringify(rootSel)});
   if (!root) return 'REFUSE: no ' + ${JSON.stringify(rootSel)};
-  let best = null, over = 0;
+  let best = null, over = 0, where = 'inside';
   for (const e of [root, ...root.querySelectorAll('*')]) {
     if (e.clientHeight < 40) continue;
     const o = e.scrollHeight - e.clientHeight;
     if (o > over) { over = o; best = e; }
   }
-  if (!best || over < 20) return 'REFUSE: nothing scrolls inside ' + ${JSON.stringify(rootSel)};
+  if (!best || over < 20) {
+    where = 'ancestor';
+    best = null; over = 0;
+    let p = root.parentElement;
+    while (p && p !== document.body) {
+      const o = p.scrollHeight - p.clientHeight;
+      if (p.clientHeight >= 40 && o > 20) { best = p; over = o; break; }
+      p = p.parentElement;
+    }
+  }
+  if (!best || over < 20) return 'REFUSE: neither ' + ${JSON.stringify(rootSel)} + ' nor any ancestor of it scrolls';
   const start = best.scrollTop;
-  const rec = { sel: String(best.className || best.tagName).slice(0, 60), over: over, ticks: 0, reached: 0, start, restored: false };
+  const rec = { sel: where + ':' + String(best.className || best.tagName).slice(0, 60), over: over, ticks: 0, reached: 0, start, restored: false };
   window.__lqScrollLoad = rec;
   let n = 0;
   const t = setInterval(() => {
@@ -419,6 +438,7 @@ const SPECS = {
         }, 45);
         return 'cycling four views from ' + start;
       })()`,
+      progress: `(window.__lqCalendarLoad ? window.__lqCalendarLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqCalendarLoad;
         if (!r) return 'REFUSE: calendar load never armed';
@@ -465,6 +485,7 @@ const SPECS = {
         }, 55);
         return 'cycling ' + (chips.length - 1) + ' categories from chip ' + start;
       })()`,
+      progress: `(window.__lqResourcesLoad ? window.__lqResourcesLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqResourcesLoad;
         if (!r) return 'REFUSE: the resources load never armed';
@@ -490,22 +511,46 @@ const SPECS = {
       // tools behind `<details class="mc-inspector-advanced">` (06708e7c) while the Up Next
       // shelf paints its artwork tiles. Cycle the disclosure and sweep the shelf together,
       // and put both back exactly as they were found.
+      //
+      // CORRECTION 36 — this leg refused 'Video load never armed' on every run it was ever
+      // given, and the cause was here, not in the surface. It looked for the scroller INSIDE
+      // '.mc-video-page' and no descendant of that root scrolls: measured live 2026-09-03,
+      // '.mc-video-empty' is scrollHeight 422 / clientHeight 422 and every other descendant is
+      // 0, because the Video page does not scroll its own shelf — its scroller is the ANCESTOR
+      // 'main.mc-content' (overflow 563 px). The old filter therefore matched nothing, the arm
+      // returned REFUSE before setting the receipt, and the proof one layer up reported the
+      // missing receipt as 'never armed' — a refusal that named the surface for the
+      // instrument's own mistake. Same family as the cat6 instrument defect banked at
+      // 'af21269d': an instrument that models a state the product cannot enter. The scroller is
+      // now RESOLVED — inside the root first, then the nearest scrollable ancestor — and the
+      // node it picked is recorded in the receipt so no reader has to guess which one moved.
       label: 'cycle the inspector disclosure across the recent-media shelf',
       durationMs: 3000,
       js: `(() => {
         delete window.__lqVideoLoad;
-        const det = document.querySelector('.mc-video-page details.mc-inspector-advanced');
+        const page = document.querySelector('.mc-video-page');
+        if (!page) return 'REFUSE: no Video page';
+        const det = page.querySelector('details.mc-inspector-advanced');
         if (!det) return 'REFUSE: no advanced inspector disclosure on the Video page';
-        const shelf = [].slice.call(document.querySelectorAll('.mc-video-page .mc-video-empty'))
-          .filter((e) => e.scrollHeight - e.clientHeight > 20)
+        const scrolls = (e) => e && e.scrollHeight - e.clientHeight > 20;
+        let shelf = [].slice.call(page.querySelectorAll('.mc-video-empty, .mc-up-next'))
+          .filter(scrolls)
           .sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))[0];
-        if (!shelf) return 'REFUSE: the Up Next shelf has no scrollable overflow to sweep';
+        let where = 'inside';
+        if (!shelf) {
+          where = 'ancestor';
+          let p = page.parentElement;
+          while (p && p !== document.body && !scrolls(p)) p = p.parentElement;
+          shelf = scrolls(p) ? p : null;
+        }
+        if (!shelf) return 'REFUSE: neither the Video page nor any ancestor of it scrolls';
         const openStart = det.open;
         const scrollStart = shelf.scrollTop;
         const rec = {
           openStart, scrollStart, ticks: 0, opens: 0, closes: 0,
+          scroller: where + ':' + shelf.tagName.toLowerCase() + '.' + String(shelf.className).trim().split(/\\s+/)[0],
           overflow: shelf.scrollHeight - shelf.clientHeight,
-          tiles: document.querySelectorAll('.mc-video-page .mc-media-tile').length,
+          tiles: page.querySelectorAll('.mc-media-tile').length,
           maxScroll: 0, restored: false,
         };
         window.__lqVideoLoad = rec;
@@ -524,8 +569,14 @@ const SPECS = {
             setTimeout(() => { rec.restored = det.open === openStart && shelf.scrollTop === scrollStart; }, 120);
           }
         }, 60);
-        return 'cycling the disclosure over ' + rec.overflow + ' px of shelf';
+        return 'cycling the disclosure over ' + rec.overflow + ' px of ' + rec.scroller;
       })()`,
+      // Correction 33's `progress`, which this spec never declared and which VOIDed both of its
+      // under-load legs the first time they ever reached the surface: the load runs 40 x 60 ms
+      // ~= 2.4 s and re-arms on its own 3 s `durationMs`, so a ~1.8 s gesture can never contain a
+      // whole ARM and the arm counter reads 0 by construction. A tick is real work here — each
+      // one mounts or unmounts the inspector's three setup tools and moves the page scroller.
+      progress: `(window.__lqVideoLoad ? window.__lqVideoLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqVideoLoad;
         if (!r) return 'REFUSE: Video load never armed';
@@ -533,7 +584,7 @@ const SPECS = {
         if (r.maxScroll < r.overflow * 0.8) return 'REFUSE: the shelf never swept its overflow ' + JSON.stringify(r);
         if (!r.restored) return 'REFUSE: Video did not restore open=' + r.openStart + ' scrollTop=' + r.scrollStart;
         return 'cycled ' + r.ticks + ' disclosures (' + r.opens + ' open / ' + r.closes + ' closed) over ' + r.tiles
-          + ' tiles and ' + r.overflow + ' px, restored';
+          + ' tiles and ' + r.overflow + ' px of ' + r.scroller + ', restored';
       })()`,
     },
     collection: { container: '.mc-up-next', row: '.mc-media-tile' },
@@ -602,6 +653,7 @@ const SPECS = {
         }, 130);
         return 'toggling the dossier over ' + rec.canvases + ' animating canvases';
       })()`,
+      progress: `(window.__lqCityLoad ? window.__lqCityLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqCityLoad;
         if (!r) return 'REFUSE: City load never armed';
@@ -698,6 +750,7 @@ const SPECS = {
         }, 45);
         return 'cycling ' + buttons.length + ' games from ' + start;
       })()`,
+      progress: `(window.__lqGamesLoad ? window.__lqGamesLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqGamesLoad;
         if (!r) return 'REFUSE: Games load never armed';
@@ -759,6 +812,7 @@ const SPECS = {
         }, 110);
         return 'cycling ' + btns.length + ' pages twice from ' + rec.start;
       })()`,
+      progress: `(window.__lqScraperLoad ? window.__lqScraperLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqScraperLoad;
         if (!r) return 'REFUSE: the load never armed';
@@ -830,6 +884,7 @@ const SPECS = {
         }, every);
         return 'cycling ' + btns.length + ' pages twice from ' + rec.start + ' at ' + every + ' ms';
       })()`,
+      progress: `(window.__lqSettingsLoad ? window.__lqSettingsLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqSettingsLoad;
         if (!r) return 'REFUSE: the load never armed';
@@ -888,6 +943,7 @@ const SPECS = {
         }, 110);
         return 'swapping ' + btns.length + ' destinations x12 from ' + rec.start;
       })()`,
+      progress: `(window.__lqYtLoad ? window.__lqYtLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqYtLoad;
         if (!r) return 'REFUSE: the load never armed';
@@ -1031,6 +1087,7 @@ const SPECS = {
         }, 120);
         return 'cycling Start over ' + rec.minNodes + ' initial nodes';
       })()`,
+      progress: `(window.__lqShellLoad ? window.__lqShellLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqShellLoad;
         if (!r) return 'REFUSE: shell load never armed';
@@ -1096,6 +1153,7 @@ const SPECS = {
         }, 200);
         return 'cycling master search over ' + rec.minNodes + ' initial nodes';
       })()`,
+      progress: `(window.__lqBlancLoad ? window.__lqBlancLoad.ticks : -1)`,
       proof: `(() => {
         const r = window.__lqBlancLoad;
         if (!r) return 'REFUSE: Blanc load never armed';

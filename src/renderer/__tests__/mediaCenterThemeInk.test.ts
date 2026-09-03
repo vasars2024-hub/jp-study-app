@@ -132,7 +132,20 @@ describe('Media Center theme ink and material tokens', () => {
     // The sweep has to have found the tokens it is guarding, or an empty list passes.
     expect(declared.length).toBeGreaterThanOrEqual(10);
 
-    for (const token of declared) {
+    /*
+     * THEME-INVARIANT INK, exempt by the same argument `--mc-stage-plate` above it already
+     * won. The rule this guard enforces is "a light palette inverts the surface, so the ink
+     * on it must invert too". `.mc-video-stage` is the one surface where the premise is
+     * false: it is a fixed #05070b letterbox behind a video in EVERY palette, so ink that
+     * followed the palette would be the defect — it measured 3.18:1 in classic-light on
+     * 2026-09-03 for exactly that reason, and the fix was to stop it following.
+     *
+     * Listed literally rather than matched by prefix, so exempting a third token stays a
+     * deliberate act with an argument attached. Every other ink token is still swept.
+     */
+    const THEME_INVARIANT = new Set(['--mc-stage-ink', '--mc-stage-ink-muted']);
+
+    for (const token of declared.filter((tk) => !THEME_INVARIANT.has(tk))) {
       expect(lightBlock, `${token} is not remapped for the light palettes`).toContain(`${token}:`);
       expect(hcBlock, `${token} is not remapped for high contrast`).toContain(`${token}:`);
     }

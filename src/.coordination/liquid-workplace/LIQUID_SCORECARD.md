@@ -1453,3 +1453,125 @@ models a state the product cannot enter certifies only the state it can see.**
 Evidence: `baselines/cat{1,2,3,4,5,6,8}-l1rd-video*.json`, `cat7-video-perf.json`.
 **sampled-out: (none)** — all eight categories were attempted; two did not close.
 Still open for gate 495: **Video categories 5 and 7.**
+
+## 2026-09-03 · backup — Video category 5 CLOSES at a controlled 10/10, in BOTH stage states
+
+**Category 5 goes 7/10 → 10/10.** All three NOs the previous entry named are fixed and
+re-measured in their fixing commits. Video is now **7 of 8**; category 7 stays VOID and is
+the only thing between this surface and gate 495.
+
+Instrument: `probes/cat5-ui-clarity.cjs`, `--surface "@.fwin:has(.mc-video-page)"`, 1080×700,
+`bodyScrollTop 0`, presentation `standard`, 34 painted controls. **Zero new probes** (RULE 1).
+
+| Q | was | now | number |
+| - | --- | --- | ------ |
+| Q1 dominant task | NO, `entryPoints 4` | **YES** | `entryPoints 1`, accentButtons 0, one primary input |
+| Q3 primary visible without hunting | NO, `insideBodyViewport false` | **YES** | primaryAction inside the body viewport, `explicitlyMarked true`, in both states |
+| Q5 stable contrast in both themes | NO, **3.18:1** | **YES** | 84 runs loaded / 78 empty per theme, **0 failing**, axis moved (minRatio and paint digest both) |
+
+**Negative control, run fresh on the fixed surface:** `CONTROL FAILED AS REQUIRED on Q2, Q3,
+Q4, Q5, Q10` — all four plants the category names moved, so the 10 is not VOID.
+
+`1b77bedb` — **Q5.** `.mc-video-stage` is a fixed `#05070b` slab in EVERY theme (correct: it
+is the letterbox behind a video), but its status text inherited `--muted`, which classic-light
+takes dark to `#5f5f66` → **3.18:1**. `--mc-stage-ink{,-muted}` freeze the default dark
+palette's own ink, as `--mc-stage-plate` already froze the gradient. Live: **7.11:1** in both
+themes; CONTROL reverting that one row to `var(--muted)` reproduced **3.18** exactly and
+restored to 7.11 with no residue. Second half: `.mc-video-stage .media-generation-status`
+matched **nothing** — `MediaGenerationStatus` returns a FRAGMENT, so its blocks are direct
+children — and its 8px inset had never applied. Left edge 340 → **348** against a stage at 339.
+
+`f8c1aa0a` — **Q1 and Q3, one cause.** Three buttons carried `mc-button-primary` at once.
+"Open video" and "Open Study Mode" are demoted outright (the first is described by its own
+comment as returning "contextually"; the second is an inspector-rail follow-on). The stage's
+"Open in the media workspace" is **conditional on `state.src`**, because its correct weight
+really does differ by state: with a source it is the dominant task at y=493; with none it
+renders into **the same grid cell** as "Choose what to watch" (both at `grid-area 1/1`) and
+that block carries the up-next shelf, so the cell is **1051px inside a 665px body** and the
+button centres at **y=807** — below the body's 753 bottom, reachable only by scrolling
+`.mc-content` — while the empty state's real action sits at y=402.
+
+**THE TRAP THIS TURN BANKS, because it manufactured a false pass and nearly banked it.**
+The previous entry scored the **empty** stage; an intermediate run of mine scored the
+**loaded** one and read Q1 and Q3 YES *before any fix*. Same box, same scroll, same 34-control
+census, same 12 scanned — only the vertical layout differed, because `entryBand` is
+`top < B.top + B.height/3` and the two states put the same three CTAs on opposite sides of a
+310px cutoff. **A cat5 score is only meaningful with its stage state named.** Both states are
+therefore recorded above, and the fix is what makes both pass rather than one.
+
+Evidence: `baselines/cat5-l1rd3-video-{loaded,empty,empty-control}.json`.
+**sampled-out: (none)** — Video only, this is a per-surface close.
+Still open for gate 495: **Video category 7** (drag disagrees across repeats; heavy leg
+refuses `Video load never armed`).
+
+## 2026-09-03 — Video — 80/80 — commit `e54cdd9d` (instrument) + this entry
+
+**Category 7 goes VOID → PASS 10/10, and with it Video completes 8 of 8. Gate 495 closes.**
+Both of the previous entry's VOID legs are answered, and neither was a Video defect: one was
+three instrument bugs in a row and the other was the DESK the surface was standing on.
+
+State driven: the Media Center Video page with the same real library item still selected —
+`JoJo no Kimyou na Bouken - Ougon no Kaze 38 RAW`, `.media-substatus` reading "Loaded 486
+subtitle lines.", 7 `.mc-media-tile`s, the advanced inspector disclosure present, page
+scroller `main.mc-content` with 563 px of overflow. Window 1080×700, presentation standard.
+Restart before main-process measurement: not required — `/health` availability is read by the
+perf probe against a process well past its two-minute settle, and the runner refuses otherwise.
+Instrument: `probes/cat7-perf.cjs --surface video --under-load`. **Zero new probes** (RULE 1).
+
+**SCENE, first, because it is the finding.** `fwins 2` / `fwinElements 361` /
+`documentElements 490` / viewport 1264×821 / dpr 1 / heap 332 MB. The desk was **7,772
+elements** when this turn opened: a `.seanime-host` media workspace (7,284 elements,
+`position: fixed; inset: 0`) was mounted over the whole viewport, so the Video window was
+being measured through a full-screen overlay. Closed through its own `.seanime-host-close`
+button; 7,772 → 490. The previous turn's handoff recorded no host, so this was not its state.
+
+| # | Category | Score | Number measured | Negative control (must have failed) |
+| - | -------- | ----- | --------------- | ----------------------------------- |
+| 7 | Performance under real load | **10/10** | ceiling p50 **16.7** / p95 16.9 / max 18.3, over100 **0**, across 3 runs of 110 frames. drag p50 16.7 / p95 16.8 / max **19.5**, over100 **0**, repeats 19.5 and 18.3 — **stable**. resize max 19.2 / 33.4, over100 **0**. theme max 33.4 / 35.3 against a theme-control max of 33.5, over100 **0**. Main availability under the surface's heaviest real work: **98 samples over 3,015 ms, p50 2.2 ms, p95 3.5 ms, max 7.9 ms** against a 500 ms bar. UNDER LOAD (L11 b3's actual question): drag max **33.5**, over100 **0**, `sceneStable true`, `workDuring` **40** real ticks. | `--jank` fired: 12 frames over 100 ms and p95 **117.0** against the clean run's **0** and 16.8. Heavy proof: `cycled 40 disclosures (20 open / 20 closed) over 7 tiles and 563 px of ancestor:main.mc-content, restored` — a receipt, not an arm count |
+
+**Leg one — "heavy leg refuses `Video load never armed`" was three instrument defects in a
+chain, none of them the surface's.** Fixed and committed at `e54cdd9d` before anything was
+scored. (a) `tools/liquid-perf-probe.ps1:88` fed inline JS to `Join-Path`, which normalises `/`
+to `\` and then THROWS; any expression carrying a regex literal or a `//` comment killed the
+whole run before one sample. (b) the spec looked for its scroller INSIDE `.mc-video-page`, and
+nothing inside it scrolls — `.mc-video-empty` is scrollHeight 422 / clientHeight 422 and every
+other descendant is 0 — so the arm returned REFUSE before writing its receipt and the proof one
+layer up blamed the surface for the instrument's own miss. The scroller resolves outward now
+and names itself in the receipt. (c) both under-load legs then VOIDed `0 cycle(s)`, correction
+33's by-construction failure, because the spec declared no `progress`; ten specs now do.
+
+**Leg two — "drag disagrees across repeats (BREACH, clean, clean, BREACH, clean)" is a
+DOSE-RESPONSE ON THE DESK, and it is recorded here rather than smoothed away.** Same window,
+same gesture, same surface, same session; only the number of other open windows changed:
+
+| documentElements | windows open | drag frame max (ms) | over 100 |
+| ---------------- | ------------ | ------------------- | -------- |
+| 490 | Dictionary, Video | 19.5, 18.3 | 0 |
+| 766 | + Settings | 50.2, 50.2, 50.1 | 0 |
+| 968 | + Calendar, Statistics | 83.5, 66.9, 66.9 | 0 |
+| 1,184 (previous entry's scene) | Video, Settings | 100.2, 83.4, 83.7, 100.3, 83.5 | 1, 0, 0, 1, 0 |
+
+Monotone, and repeatable in both directions — the effect was reproduced on demand by opening
+windows and removed by closing them. **The idle ceiling does NOT move with it**: 19.0 / 18.3 /
+18.1 at 968 elements against 18.3 at 490, so this is not a slower machine or a heavier page, it
+is the shell's drag path costing more per frame the more window elements the desk holds. At the
+previous entry's scene that cost sat astride the 100 ms bar, so a ±0.3 ms wobble flipped the
+verdict from reading to reading — which is exactly the "BREACH, clean, clean, BREACH, clean"
+the leg reported, and why it was right to refuse to score it.
+
+**So the 10/10 is scene-conditional, and this says so in its own entry.** Video meets the bar
+at 2-, 3- and 5-window desks with 0 frames over 100 in every one; at ~1,184 open-window
+elements the same gesture breaches. That is not withdrawn or explained away. It is also not
+Video's: what it names is the shell's window-drag path, and the fair comparison is Game Arena,
+which passed at **5,070** documentElements with drag max 33.3 — a much larger desk and a much
+smaller hitch. Video's drag therefore starts from a higher base than the other sampled
+surfaces even though it is well inside the bar. **Recorded as an open observation against the
+shell's drag path, with the four dose points above as its evidence, for whoever takes L11's
+performance work.** It is not a cat7 failure for this surface at the scene measured.
+
+Evidence: `baselines/cat7-video-perf.json`.
+**sampled-out: (none)** — Video only, this is a per-surface close.
+**VIDEO IS 80/80**: cat 1, 2, 3, 4, 6, 8 at `d337f958`; cat 5 at `522022dc` (both stage
+states); cat 7 here. Dictionary is 80/80 at `c97b864d`. **Gate 495 — "the layout studies score
+80/80 against Video and Dictionary" — is CLOSED on both named surfaces**, so L1's four bullets
+close with it.

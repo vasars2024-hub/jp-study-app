@@ -487,10 +487,10 @@ Gate: no Liquid product code until the baseline and parity ledger exist.
 
 ### L1 — Design contract and reference calibration
 
-- Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.  <!-- status: open; evidence: plan:464 -->
-- Confirm the four surface roles and orientation-spine behavior.  <!-- status: open; evidence: plan:464 -->
-- Approve standard/Liquid entry, exit, and recovery UX.  <!-- status: open; evidence: plan:464 -->
-- Produce static layout studies for compact, default, and maximized states.  <!-- status: open; evidence: plan:464 -->
+- Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.  <!-- status: closed; evidence: gate 495 CLOSED 2026-09-03 -- LIQUID_SCORECARD.md carries a COMPLETED entry for BOTH named surfaces: Dictionary 80/80 (c97b864d) and Video 80/80, whose last cell (cat 7) closed this turn at PASS 10/10 after e54cdd9d fixed three instrument defects in the harness. Both re-driven on THIS tree, not inherited. cat7 numbers: ceiling p50 16.7 / max 18.3 over100 0; drag max 19.5 over100 0, stable across repeats; under-load drag max 33.5, workDuring 40 real ticks; -jank control fired 12 frames over 100 vs the clean 0. The pass is scene-conditional and the entry says so, with a four-point dose-response on desk size -->
+- Confirm the four surface roles and orientation-spine behavior.  <!-- status: closed; evidence: gate 495 CLOSED 2026-09-03 -- LIQUID_SCORECARD.md carries a COMPLETED entry for BOTH named surfaces: Dictionary 80/80 (c97b864d) and Video 80/80, whose last cell (cat 7) closed this turn at PASS 10/10 after e54cdd9d fixed three instrument defects in the harness. Both re-driven on THIS tree, not inherited. cat7 numbers: ceiling p50 16.7 / max 18.3 over100 0; drag max 19.5 over100 0, stable across repeats; under-load drag max 33.5, workDuring 40 real ticks; -jank control fired 12 frames over 100 vs the clean 0. The pass is scene-conditional and the entry says so, with a four-point dose-response on desk size -->
+- Approve standard/Liquid entry, exit, and recovery UX.  <!-- status: closed; evidence: gate 495 CLOSED 2026-09-03 -- LIQUID_SCORECARD.md carries a COMPLETED entry for BOTH named surfaces: Dictionary 80/80 (c97b864d) and Video 80/80, whose last cell (cat 7) closed this turn at PASS 10/10 after e54cdd9d fixed three instrument defects in the harness. Both re-driven on THIS tree, not inherited. cat7 numbers: ceiling p50 16.7 / max 18.3 over100 0; drag max 19.5 over100 0, stable across repeats; under-load drag max 33.5, workDuring 40 real ticks; -jank control fired 12 frames over 100 vs the clean 0. The pass is scene-conditional and the entry says so, with a four-point dose-response on desk size -->
+- Produce static layout studies for compact, default, and maximized states.  <!-- status: closed; evidence: gate 495 CLOSED 2026-09-03 -- LIQUID_SCORECARD.md carries a COMPLETED entry for BOTH named surfaces: Dictionary 80/80 (c97b864d) and Video 80/80, whose last cell (cat 7) closed this turn at PASS 10/10 after e54cdd9d fixed three instrument defects in the harness. Both re-driven on THIS tree, not inherited. cat7 numbers: ceiling p50 16.7 / max 18.3 over100 0; drag max 19.5 over100 0, stable across repeats; under-load drag max 33.5, workDuring 40 real ticks; -jank control fired 12 frames over 100 vs the clean 0. The pass is scene-conditional and the entry says so, with a four-point dose-response on desk size -->
 
 Gate: the layout studies score 80/80 on `src/LIQUID_UI_RUBRIC.md` against Video and Dictionary
 before shared primitives are built. (Was "user approves"; amended 2026-08-16, see §10.4.)
@@ -583,6 +583,33 @@ The four bullets stay OPEN because gate 495 names **Video AND Dictionary**, and 
 remaining half. It is the same 8 categories, same harnesses, same protocol, and the L9 baselines
 (`baselines/cat{1..8}-l9-video.json`, 2026-08-31) record the exact `--surface`/`--task`/`--win`
 arguments each one took, so nothing has to be re-derived to start.
+
+**RE-DRIVE COMPLETE — 2026-09-03 (backup). GATE 495 IS CLOSED and the four bullets above are
+now tagged `closed`; the paragraph immediately above is the state before that and is kept as
+the record.** Video's last two cells landed in order: **cat 5** at `522022dc`, 7/10 → 10/10 in
+both stage states, and **cat 7** this turn, VOID → **PASS 10/10**, giving Video **80/80**
+against Dictionary's 80/80 at `c97b864d`. The full entry with every number and its control is
+`LIQUID_SCORECARD.md`, last section.
+
+Two things from cat 7 that are worth more than the bullet, and both generalise:
+
+- **The heavy leg's `Video load never armed` was never the surface.** It was three instrument
+  defects in a chain, all fixed at `e54cdd9d`: `liquid-perf-probe.ps1` fed inline JS to
+  `Join-Path`, which normalises `/` to `\` and then THROWS, so any expression carrying a regex
+  literal or a `//` comment killed the run before one sample; the spec hunted its scroller
+  INSIDE `.mc-video-page`, where nothing scrolls, when the page's scroller is the ancestor
+  `main.mc-content`; and no `progress` was declared, so correction 33 VOIDed both under-load
+  legs by construction. **A refusal that names a surface is a claim about the instrument until
+  the instrument has been read.**
+- **A cat 7 gesture number is a property of the DESK, not only of the surface.** Same window,
+  same gesture, same session, drag frame max against `documentElements`: **490 → 19.5 ms;
+  766 → 50.2; 968 → 83.5; 1,184 → 100.2** — monotone, and reproduced in both directions by
+  opening and closing windows. The idle ceiling does **not** move with it (18.1–19.0 ms at
+  every size), so this is the shell's drag path, not a slower machine. At ~1,184 elements it
+  sits astride the 100 ms bar, which is precisely why that leg read "BREACH, clean, clean,
+  BREACH, clean". Video passes at 2-, 3- and 5-window desks with 0 frames over 100; the
+  scene-sensitivity itself is recorded as an **open observation against the shell's drag
+  path** for L11's performance work, not as a Video failure. Always name the scene.
 
 **THE TRAP THAT DECIDED A VERDICT, and the next worker must not repeat it: drive the surface into
 its REAL functional state before scoring, or the number is not a measurement.** Dictionary at rest
