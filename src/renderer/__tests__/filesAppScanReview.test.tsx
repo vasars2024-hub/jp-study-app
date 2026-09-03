@@ -69,6 +69,11 @@ const fileDropClassify = vi.fn();
 const importPaths = vi.fn();
 const addMediaPaths = vi.fn();
 const dictImportYomitan = vi.fn();
+// A dropped subtitle used to be routed by a `media:attach-subtitle` CustomEvent
+// nothing listened to, so `ep01.srt` "imported" without any call at all. It now
+// goes through `subtitleDiscovery:attachFile`, which means this gate's "3 of 4
+// land" only holds if the route answers — the point of the change.
+const attachSubtitleFile = vi.fn();
 const setWallpaperFromPath = vi.fn();
 const getWallpaper = vi.fn();
 const removeMedia = vi.fn();
@@ -90,6 +95,7 @@ beforeEach(() => {
     importPaths,
     addMediaPaths,
     dictImportYomitan,
+    attachSubtitleFile,
     setWallpaperFromPath,
     getWallpaper,
     removeMedia,
@@ -111,6 +117,7 @@ beforeEach(() => {
   importPaths.mockImplementation(async () => [{ id: 'lib-1' }]);
   addMediaPaths.mockImplementation(async () => [{ id: 'med-1' }]);
   dictImportYomitan.mockImplementation(async () => ({ ok: true }));
+  attachSubtitleFile.mockImplementation(async () => ({ ok: true, message: '', lang: 'ja' }));
   getWallpaper.mockImplementation(async () => 'C:\\old.jpg');
   Object.defineProperty(window, 'api', {
     configurable: true,
@@ -121,6 +128,7 @@ beforeEach(() => {
       importPaths,
       addMediaPaths,
       dictImportYomitan,
+      attachSubtitleFile,
       setWallpaperFromPath,
       getWallpaper,
       removeMedia,
@@ -311,6 +319,11 @@ describe('gate 24 — the import half, and its reversal', () => {
     expect(outcomes).toHaveLength(4);
     expect(q('.fa-review-outcomes .fa-review-summary').textContent).toContain('3 of 4');
     expect(outcomes[2]?.textContent).toContain('Nothing here can open vocab.csv yet');
+    // The `.srt` counts toward "3 of 4" only because a real route answered.
+    // Until 2026-09-03 it counted with NO importer call at all: the case
+    // dispatched a `media:attach-subtitle` event nothing listened to, so this
+    // gate's own summary was reporting a file that had been discarded.
+    expect(attachSubtitleFile).toHaveBeenCalledWith(SRT);
     expect(onImported).toHaveBeenCalled();
 
     await act(async () => {
