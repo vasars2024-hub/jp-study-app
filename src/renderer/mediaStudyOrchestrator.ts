@@ -723,7 +723,11 @@ export function speechRateOpportunity(
     type: 'speech-rate-challenge',
     title: t('study.speechRate.title', { title: challenge.title }),
     explanation: t('study.speechRate.explanation', {
-      rate: challenge.preferredPlaybackRate.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''),
+      // Rounded as a NUMBER. `t()` runs numbers through Intl and passes strings
+      // through verbatim (core.ts:62), so `toFixed` printed "1.25" to a Russian
+      // reader who sees "1,25" everywhere else. Rounding also drops the trailing
+      // zeros the two `.replace` chains here used to strip by hand.
+      rate: Math.round(challenge.preferredPlaybackRate * 100) / 100,
       faster,
     }),
     priority: 66,
@@ -744,14 +748,14 @@ export function speechRateOpportunity(
       {
         code: 'speech-rate-effective',
         label: t('study.speechRate.effectiveEvidence', {
-          rate: challenge.effectiveWordsPerSecond.toFixed(2),
+          rate: Math.round(challenge.effectiveWordsPerSecond * 100) / 100,
         }),
         value: challenge.effectiveWordsPerSecond,
       },
       {
         code: 'speech-rate-baseline',
         label: t('study.speechRate.baselineEvidence', {
-          rate: challenge.baselineWordsPerSecond.toFixed(2),
+          rate: Math.round(challenge.baselineWordsPerSecond * 100) / 100,
           count: challenge.comparedTitles,
         }),
         value: challenge.baselineWordsPerSecond,
@@ -759,7 +763,7 @@ export function speechRateOpportunity(
       {
         code: 'speech-rate-suggestion',
         label: t('study.speechRate.suggestionEvidence', {
-          rate: challenge.recommendedPlaybackRate.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''),
+          rate: Math.round(challenge.recommendedPlaybackRate * 100) / 100,
         }),
         value: challenge.recommendedPlaybackRate,
       },

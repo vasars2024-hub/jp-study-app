@@ -107,7 +107,10 @@ export default function MonitorsPage() {
                     )}
                   </div>
                   <div className="muted os-set-hint">
-                    {t('settings.monitors.scaleLabel', { scale: display.scaleFactor.toFixed(2) })}
+                    {/* A number, not `toFixed(2)` — see core.ts:62; a string skips Intl. */}
+                    {t('settings.monitors.scaleLabel', {
+                      scale: Math.round(display.scaleFactor * 100) / 100,
+                    })}
                   </div>
 
                   <label className="os-toggle">
