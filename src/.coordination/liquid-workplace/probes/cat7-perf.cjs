@@ -62,6 +62,17 @@
  * trips of the real Liquid cadence, sampling the RENDERER's heap and DOM counters after a
  * forced collection on every cycle. It refuses without a collector control that both arms and
  * fires. See correction 34.
+ *
+ *   node src/.coordination/liquid-workplace/probes/cat7-perf.cjs --surface player --playback
+ *
+ * --playback is L0's SIXTH baseline row — player frame stability — the one number of the six
+ * that PERF_BASELINE.md:104 and VIDEO_BASELINE.md:109 both record as never measured, for the
+ * same reason: it needs a real clip and none was loaded. It keeps the ceiling legs (frames are
+ * unreadable without them), drops the gesture legs, and adds the decoder's own ledger, because
+ * the rAF distribution alone CANNOT see a dropped video frame: the compositor repaints the
+ * previous picture, on time, so a decoder losing every second frame looks identical to a
+ * healthy one. It refuses without two controls — a PAUSED player the instrument must decline
+ * to score, and -Jank. See correction 40.
  */
 'use strict';
 const fs = require('node:fs');
@@ -526,6 +537,28 @@ const SPECS = {
       })()`,
     },
     collection: { container: '.mc-up-next', row: '.mc-media-tile' },
+  },
+  player: {
+    /*
+     * THE PLAYER, and it exists for exactly one row: L0's `Record performance baselines` bullet
+     * lists six numbers and five of them were taken on 2026-08-16. The sixth —
+     * `player frame stability` — is recorded open in two places (PERF_BASELINE.md:104,
+     * VIDEO_BASELINE.md:109) with the same reason: it "needs a real clip" and none was loaded.
+     *
+     * NOT the `video` spec. That one measures `.mc-video-page`, which is a LAUNCHER: its own
+     * comment records that the stage renders workspace/connecting/needs-server copy and hands
+     * playback to another surface. A clip plays inside `#media-workspace`, which REPLACES the
+     * desktop shell — no `.fwin` ancestor, so the runner takes the -Root path — and which the
+     * `video` spec's own trap notes occludes every `.fwin` on the desk while it is open.
+     *
+     * `playbackOnly`: this spec declares no `heavy` leg, and that is a refusal rather than an
+     * omission. Every repeatable operation this surface offers writes user state — seeking and
+     * playing both persist a resume position, and there is no restore point for it — so there
+     * is no honest heaviest-real-work leg here. `--playback` is the whole spec.
+     */
+    title: '@#media-workspace',
+    root: '#media-workspace',
+    playbackOnly: 'the player has no read-only heavy leg: every repeatable operation on it writes a resume position. Run it with --playback.',
   },
   city: {
     // Mooncap Garden is FRAMELESS: no `.fwin-title-text` for a substring to match, so it is
@@ -1099,10 +1132,18 @@ const UNDER_LOAD = has('under-load');
 // Correction 34. A MODE, not a probe: it reuses this file's refusals (settled main process,
 // resolved window, structural root present), its bridge client and its retry policy verbatim.
 const LONG_SESSION = has('long-session');
+// L0's sixth baseline row. A MODE, not a probe: it reuses this file's refusals, its bridge
+// client, its retry policy and — the part that makes the numbers readable at all — this
+// session's own frame ceiling. See the PLAYBACK block for the two controls it refuses without.
+const PLAYBACK = has('playback');
 const CYCLES = Math.max(1, Number(arg('cycles', '12')) || 12);
 const spec = SPECS[SURFACE];
 if (!spec) {
   console.error(`REFUSE - --surface must be one of: ${Object.keys(SPECS).join(', ')}`);
+  process.exit(2);
+}
+if (spec.playbackOnly && !PLAYBACK) {
+  console.error(`REFUSE - --surface ${SURFACE}: ${spec.playbackOnly}`);
   process.exit(2);
 }
 /**
@@ -1560,6 +1601,192 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   // The noise floor: the worst the machine did with nothing of ours running.
   const ceilingOver100 = Math.max(...ceilingRuns.map((r) => r.frames_over_100));
   const ceilingMaxMs = Math.max(...ceilingRuns.map((r) => r.frame_max_ms));
+
+  /**
+   * `--playback` — PLAYER FRAME STABILITY, L0's sixth baseline row and the only one of the six
+   * still open (PERF_BASELINE.md:104 and VIDEO_BASELINE.md:109 both record it so, for the same
+   * reason: it needs a real clip and none was ever loaded).
+   *
+   * TWO LEDGERS, and the rAF one alone would have been a false pass. The recorder every other
+   * leg here uses reports the RENDERER's frame cadence, and on a video surface that is the
+   * compositor: a dropped video frame simply repaints the previous picture, on time, so a
+   * decoder dropping every second frame produces the same clean rAF distribution as a healthy
+   * one. `getVideoPlaybackQuality()` is the decoder's own ledger and is what the rubric's words
+   * name. Both are recorded; the decoder ledger is what can fail this leg on its own.
+   *
+   * TWO CONTROLS IT REFUSES WITHOUT, and this leg needs both because the two ledgers fail
+   * independently:
+   *
+   *  1. THE NEGATIVE CONTROL, and it runs FIRST. The failure this leg exists to avoid is
+   *     scoring a player that is not playing — a paused `<video>` decodes nothing and drops
+   *     nothing, which reports as a flawless 0.00%. So the clip is PAUSED and the instrument
+   *     must REFUSE. If it scores a paused player, every number below is void. The renderer
+   *     also arms its own watchdog before pausing: `refusing-leg-strands-app-state` is banked
+   *     here, and a run that dies mid-control must not leave the user's clip stopped.
+   *  2. THE SENSITIVITY CONTROL. `-Jank`'s 120 ms renderer blocks must make the rAF
+   *     distribution visibly worse, exactly as the drag leg's control does. Without it a clean
+   *     playback reading only says the recorder saw nothing.
+   *
+   * It changes nothing else. The scored leg DRIVES NOTHING — it observes a clip the app is
+   * already playing — so there is no restore step and no state to strand.
+   */
+  if (PLAYBACK) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    // Picks the same element the instrument picks — largest painted box — so the control acts on
+    // the video the leg is about to score and not on a wallpaper loop that happens to be first
+    // in the document. `control-must-attack-the-scored-term` is banked for exactly that gap.
+    const PICK = `const painted = [].slice.call(document.querySelectorAll('video')).filter(function (x) {
+      const b = x.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && getComputedStyle(x).visibility !== 'hidden';
+    });
+    const v = painted.length ? painted.map(function (e) { return { e: e, r: e.getBoundingClientRect() }; })
+      .sort(function (a, b) { return b.r.width * b.r.height - a.r.width * a.r.height; })[0].e : null;`;
+
+    step('playback NEGATIVE CONTROL — pause the clip; the instrument must refuse');
+    const paused = String(await ev(`(() => { ${PICK}
+      if (!v) return 'REFUSE: no painted <video> to pause';
+      if (v.paused) return 'REFUSE: the clip is already paused, so this control cannot prove anything';
+      window.__lqPlayCtl = { at: v.currentTime, rate: v.playbackRate };
+      v.pause();
+      // The renderer restores itself on wall-clock time even if nothing ever calls the resume.
+      window.__lqPlayWatchdog = setTimeout(function () { try { v.play(); } catch (e) { /* the user closed it */ } }, 20000);
+      return 'paused at ' + v.currentTime.toFixed(2) + ' s';
+    })()`));
+    let controlRefused = null;
+    let controlScored = null;
+    if (/^REFUSE/.test(paused)) {
+      voidedEarly.push(`playback negative control could not arm: ${paused}`);
+    } else {
+      try {
+        controlScored = ps(IPROBE, ['-Interaction', 'playback', '-AsJson']);
+      } catch (e) {
+        // PowerShell colours Write-Error, and the escape sequences land verbatim in a banked
+        // JSON file where they make the one string that PROVES the control fired unreadable.
+        controlRefused = String(e && e.message ? e.message : e)
+          // fromCharCode, not an escape literal: write-tool-emits-raw-nul is banked here.
+          .split(String.fromCharCode(27)).join('')
+          .replace(/\[[0-9;]*m/g, '').replace(/\s+/g, ' ').trim();
+        // PowerShell echoes the offending SOURCE LINE before the message, so a plain head-slice
+        // banks the guard's own code and cuts off the reason it fired -- which is the one thing
+        // this record exists to show. Take the last REFUSE marker where there is one.
+        const reasonAt = controlRefused.lastIndexOf('REFUSE:');
+        controlRefused = (reasonAt >= 0 ? controlRefused.slice(reasonAt) : controlRefused).slice(0, 400);
+      } finally {
+        const resumed = String(await ev(`(() => { ${PICK}
+          if (window.__lqPlayWatchdog) { clearTimeout(window.__lqPlayWatchdog); delete window.__lqPlayWatchdog; }
+          if (!v) return 'REFUSE: the player left the screen while the control was running';
+          const ctl = window.__lqPlayCtl || {};
+          delete window.__lqPlayCtl;
+          // play() returns a promise and /eval serialises a promise to {} - fire it, do not
+          // return it, and read the paused flag back on the next call instead. NO BACKTICK in
+          // this comment: these lines live inside a template literal and one would close it.
+          v.play();
+          return 'resume requested from ' + (ctl.at === undefined ? '?' : ctl.at.toFixed(2)) + ' s';
+        })()`));
+        await sleep(700);
+        const backPlaying = String(await ev(`(() => { ${PICK}
+          return v ? JSON.stringify({ paused: v.paused, at: +v.currentTime.toFixed(2) }) : 'REFUSE: no video';
+        })()`));
+        legs.playbackControlRestore = { resumed, backPlaying };
+        if (/^REFUSE/.test(backPlaying) || JSON.parse(backPlaying).paused !== false) {
+          voidedEarly.push(`playback negative control did NOT put the clip back: ${resumed} / ${backPlaying}. The surface is left in a state this run created.`);
+        }
+      }
+      if (controlRefused === null) {
+        voidedEarly.push(`CONTROL DID NOT FAIL: the instrument SCORED a paused player (${controlScored ? `${controlScored.frames} frames, p50 ${controlScored.frame_p50_ms} ms` : 'no record'}). A still picture drops no frames, so every playback number here would be a fabricated pass.`);
+      }
+      legs.playbackNegativeControl = {
+        armed: paused,
+        refusedWith: controlRefused,
+        scoredAnyway: controlRefused === null ? controlScored : null,
+      };
+    }
+
+    step('playback');
+    legs.playback = ps(IPROBE, ['-Interaction', 'playback', '-AsJson']);
+    step('playback (repeat)');
+    legs.playbackRepeat = ps(IPROBE, ['-Interaction', 'playback', '-AsJson']);
+    step('playback CONTROL (-Jank)');
+    legs.playbackJank = ps(IPROBE, ['-Interaction', 'playback', '-Jank', '-AsJson']);
+
+    const memEnd = await get('/mem');
+    const findings = [];
+    const voided = [...voidedEarly];
+    const environment = [];
+    const g = legs.playback.gesture;
+    const gr = legs.playbackRepeat.gesture;
+
+    if (!legs.playback.scene_stable) {
+      voided.push(`playback: the scene moved during the reading (${legs.playback.scene_before.fwins}/${legs.playback.scene_before.fwinElements} -> ${legs.playback.scene_after.fwins}/${legs.playback.scene_after.fwinElements})`);
+    }
+    if (legs.playback.stale_recorder) voided.push('playback: a stale frame recorder was found and disarmed; re-run to be sure');
+    if (legs.playbackJank.frames_over_100 <= (legs.playback.frames_over_100 || 0)
+      && legs.playbackJank.frame_p95_ms <= legs.playback.frame_p95_ms) {
+      voided.push(`CONTROL DID NOT FAIL: -Jank produced ${legs.playbackJank.frames_over_100} frames over 100 ms / p95 ${legs.playbackJank.frame_p95_ms} ms against the clean run's ${legs.playback.frames_over_100} / ${legs.playback.frame_p95_ms} ms. The recorder is not seeing the frames it claims to.`);
+    }
+
+    // --- the renderer half, scored against THIS session's ceiling ---------------------
+    if (legs.playback.frame_p50_ms > ceilingP50 * 1.5) findings.push(`playback: renderer p50 ${legs.playback.frame_p50_ms} ms against a ${ceilingP50} ms control`);
+    if (legs.playback.frame_p95_ms > ceilingP95 * 2) findings.push(`playback: renderer p95 ${legs.playback.frame_p95_ms} ms against a ${ceilingP95} ms control`);
+    if (legs.playback.frames_over_100 > ceilingOver100) findings.push(`playback: ${legs.playback.frames_over_100} renderer frames over 100 ms, against a control that produced ${ceilingOver100}`);
+    if (legs.playback.main_max_ms > L0.mainBlockBarMs) findings.push(`playback: main blocked ${legs.playback.main_max_ms} ms, over the ${L0.mainBlockBarMs} ms bar`);
+
+    // --- the decoder half, which is what "player frame stability" actually names ------
+    // 1.0% is the bar, and it is the industry's rather than one invented here: below it a
+    // viewer cannot see a dropped frame, above it playback visibly stutters. Stated as a
+    // number so the next worker can move it deliberately instead of by feel. Corrupted frames
+    // have no allowance at all — one is a decode error, not a scheduling loss.
+    const DROP_BAR_PCT = 1.0;
+    if (g && gr) {
+      if (g.dropPct !== null && g.dropPct > DROP_BAR_PCT && gr.dropPct !== null && gr.dropPct > DROP_BAR_PCT) {
+        findings.push(`playback: the decoder dropped ${g.droppedFrames} of ${g.decodedFrames} frames (${g.dropPct}%) and ${gr.droppedFrames} of ${gr.decodedFrames} (${gr.dropPct}%) on the repeat, against a ${DROP_BAR_PCT}% bar`);
+      } else if ((g.dropPct > DROP_BAR_PCT) !== (gr.dropPct > DROP_BAR_PCT)) {
+        // One reading is noise here for the same measured reason it is on the gesture legs.
+        environment.push(`playback: the two readings disagree on the drop bar (${g.dropPct}% vs ${gr.dropPct}%) — recorded as noise, not scored`);
+      }
+      if (g.corruptedFrames > 0 || gr.corruptedFrames > 0) {
+        findings.push(`playback: the decoder reported ${g.corruptedFrames}/${gr.corruptedFrames} CORRUPTED frames; that is a decode error, not a scheduling loss`);
+      }
+    } else {
+      voided.push('playback: the instrument returned no decoder ledger, so the leg measured nothing about the player');
+    }
+
+    const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
+    const out = {
+      surface: SURFACE, mode: 'playback', title: spec.title, root: spec.root,
+      at: new Date().toISOString(),
+      scene: legs.playback.scene_before,
+      process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, mainRssMbBefore: mem.rssMb, mainRssMbAfter: memEnd.rssMb, mainHeapUsedMbAfter: memEnd.heapUsedMb },
+      sessionCeiling: {
+        p50: ceilingP50, p95: ceilingP95, runs: legs.ceilingRuns,
+        noiseFloorOver100: ceilingOver100, noiseFloorMaxMs: ceilingMaxMs, l0P50: L0.ceilingP50,
+      },
+      player: g ? {
+        source: g.source, intrinsic: g.intrinsic, box: g.box, playbackRate: g.playbackRate,
+        spanMs: g.spanMs, advancedSec: g.advancedSec,
+        decodedFrames: g.decodedFrames, droppedFrames: g.droppedFrames, corruptedFrames: g.corruptedFrames,
+        decodedFps: g.decodedFps, dropPct: g.dropPct,
+        repeat: gr ? { decodedFrames: gr.decodedFrames, droppedFrames: gr.droppedFrames, decodedFps: gr.decodedFps, dropPct: gr.dropPct, advancedSec: gr.advancedSec } : null,
+        dropBarPct: DROP_BAR_PCT,
+      } : null,
+      renderer: {
+        p50: legs.playback.frame_p50_ms, p95: legs.playback.frame_p95_ms, max: legs.playback.frame_max_ms,
+        over100: legs.playback.frames_over_100, frames: legs.playback.frames,
+        repeat: { p50: legs.playbackRepeat.frame_p50_ms, p95: legs.playbackRepeat.frame_p95_ms, over100: legs.playbackRepeat.frames_over_100 },
+        jankControl: { p50: legs.playbackJank.frame_p50_ms, p95: legs.playbackJank.frame_p95_ms, over100: legs.playbackJank.frames_over_100, blocks: legs.playbackJank.jank_blocks },
+      },
+      legs, findings, voided, environment, score,
+    };
+    console.log(JSON.stringify(out, null, 2));
+    const file = arg('out', path.join('src/.coordination/liquid-workplace/baselines', `cat7-${SURFACE}-playback.json`));
+    fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
+    console.log('wrote', file);
+    console.log(`\nPLAYER FRAME STABILITY — ${SURFACE}: ${score === 10 ? 'PASS 10/10' : score === 'VOID' ? 'VOID' : `${findings.length} finding(s), NOT a 10`}`);
+    for (const f of findings) console.log(`  FINDING  ${f}`);
+    for (const v of voided) console.log(`  VOID     ${v}`);
+    for (const e of environment) console.log(`  ENV      ${e}`);
+    return;
+  }
 
   // A bare compositor is not the control for theme switching on a multi-window desk: every
   // other open app still repaints. Measure that shared cost with only this surface's root hidden,

@@ -40,7 +40,14 @@
   renderer blocks, which MUST come back visibly worse or the probe cannot score anything.
 
 .PARAMETER Interaction
-  drag | resize | theme | ceiling
+  drag | resize | theme | ceiling | playback
+
+  `playback` is the odd one and deliberately so: it DRIVES NOTHING. It observes a clip the app
+  is already playing and reports the decoder's own ledger (decoded / dropped / corrupted frames
+  from `getVideoPlaybackQuality`) beside the usual rAF distribution, because on a video surface
+  the rAF numbers alone cannot tell a healthy decoder from one dropping every second frame — a
+  dropped video frame repaints the previous picture, on time. It refuses on a paused, stalled,
+  unstarted or absent player rather than scoring a still picture as perfectly stable.
 
 .PARAMETER Jank
   Sensitivity control. Schedules repeated ~120 ms synchronous renderer blocks across the
@@ -80,9 +87,10 @@
   pwsh tools/liquid-interaction-probe.ps1 -Interaction ceiling
   pwsh tools/liquid-interaction-probe.ps1 -Interaction drag -Title Dictionary
   pwsh tools/liquid-interaction-probe.ps1 -Interaction drag -Jank    # must look worse
+  pwsh tools/liquid-interaction-probe.ps1 -Interaction playback -AsJson   # a clip must be playing
 #>
 param(
-  [ValidateSet('drag', 'resize', 'theme', 'ceiling')]
+  [ValidateSet('drag', 'resize', 'theme', 'ceiling', 'playback')]
   [string]$Interaction = 'ceiling',
   [int]$DurationMs = 1800,
   [switch]$Jank,
@@ -164,6 +172,120 @@ $gestureJs = switch ($Interaction) {
   };
   requestAnimationFrame(step);
   return 'ceiling started';
+})()
+"@
+  }
+  'playback' {
+    # PLAYER FRAME STABILITY — the one perf baseline row L0 left open (PERF_BASELINE.md:104,
+    # VIDEO_BASELINE.md:109), because it "needs media playing" and no clip was ever loaded.
+    #
+    # It is an OBSERVATION, not a gesture, and that is deliberate: every other interaction here
+    # drives the app and then proves it put the app back. This one must not touch the player at
+    # all — calling play(), seeking, or setting playbackRate would write the user's resume
+    # position, and the number wanted is what the app does on its own while a real clip runs.
+    # So the leg refuses unless the clip is ALREADY playing, and restores nothing because it
+    # changed nothing.
+    #
+    # TWO NUMBERS, and the rAF one alone is not the answer. The recorder installed below reports
+    # the RENDERER's frame cadence, which on a video surface is dominated by the compositor and
+    # looks identical whether the decoder is keeping up or dropping every second frame — a
+    # dropped video frame simply repaints the previous picture, on time. `getVideoPlaybackQuality`
+    # is the decoder's own ledger and is the number the rubric's words actually name.
+    #
+    # THE REFUSALS, each one a way this leg could otherwise score a still picture as perfect:
+    #   no painted <video>      nothing is playing anywhere; an absent player measures as a fast one
+    #   readyState < 2          no frame has been decoded, so there is nothing to be stable
+    #   paused / ended          a frozen frame drops nothing and decodes nothing: a fabricated 0%
+    #   no getVideoPlaybackQuality  the decoder ledger is the measurement; without it there is none
+    #   currentTime did not advance   THE load-bearing one. A <video> can report `paused === false`
+    #                           while its clock stands still (a stalled network source, a decoder
+    #                           that never produced a second frame). directstreamOpenRecovery.ts:90
+    #                           documents exactly that state on this app's own player. Advancement
+    #                           is asserted against the elapsed span and the clip's own
+    #                           playbackRate, so a 0.5x clip is not accused of stalling.
+    @"
+(() => {
+  const painted = [].slice.call(document.querySelectorAll('video')).filter((v) => {
+    const r = v.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(v).visibility !== 'hidden';
+  });
+  if (!painted.length) {
+    window.__lip = { done: true, refuse: 'no painted <video> element is on screen, so nothing is playing to be measured' };
+    return 'refused';
+  }
+  // Largest painted box, the same ranking every other leg here uses to pick its target: a
+  // wallpaper loop and a poster preview are both <video> and neither is the player.
+  const v = painted.map((e) => ({ e: e, r: e.getBoundingClientRect() }))
+    .sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height)[0].e;
+  const box = Math.round(v.getBoundingClientRect().width) + 'x' + Math.round(v.getBoundingClientRect().height);
+  if (v.readyState < 2) {
+    window.__lip = { done: true, refuse: 'the largest <video> (' + box + ') is at readyState ' + v.readyState + ': no frame has been decoded, so there is no stability to measure' };
+    return 'refused';
+  }
+  if (v.paused || v.ended) {
+    window.__lip = { done: true, refuse: 'the largest <video> (' + box + ') is ' + (v.ended ? 'ended' : 'paused') + ': a still frame decodes nothing and drops nothing, which would score as perfect' };
+    return 'refused';
+  }
+  if (typeof v.getVideoPlaybackQuality !== 'function') {
+    window.__lip = { done: true, refuse: 'getVideoPlaybackQuality() is unavailable on this <video>, so decoded and dropped frame counts cannot be read' };
+    return 'refused';
+  }
+  const q0 = v.getVideoPlaybackQuality();
+  const t0 = performance.now();
+  const from = { time: v.currentTime, total: q0.totalVideoFrames, dropped: q0.droppedVideoFrames, corrupted: q0.corruptedVideoFrames };
+  window.__lip = { done: false, mechanism: 'observe an already-playing <video>; nothing is driven', from: from };
+  const step = (now) => {
+    if (now - t0 < 1300) { requestAnimationFrame(step); return; }
+    const q = v.getVideoPlaybackQuality();
+    const spanMs = now - t0;
+    const rate = v.playbackRate || 1;
+    const advancedSec = v.currentTime - from.time;
+    const decoded = q.totalVideoFrames - from.total;
+    const dropped = q.droppedVideoFrames - from.dropped;
+    const corrupted = q.corruptedVideoFrames - from.corrupted;
+    window.__lip = {
+      done: true,
+      mechanism: 'observe an already-playing <video>; nothing is driven',
+      spanMs: +spanMs.toFixed(0),
+      // Path and media id ONLY. This record is banked to disk under baselines/, and the
+      // directstream URL carries a bearer token in its query string -- a plain slice of the
+      // href wrote 90 characters of live JWT into the first run's JSON.
+      source: (() => {
+        const s = String(v.currentSrc || v.src || '(no src)');
+        try {
+          const u = new URL(s);
+          const id = u.searchParams.get('id');
+          return u.origin + u.pathname + (id ? '?id=' + id : '');
+        } catch (e) { return s.slice(0, 60) + ' (unparseable)'; }
+      })(),
+      intrinsic: v.videoWidth + 'x' + v.videoHeight,
+      box: box,
+      playbackRate: rate,
+      muted: v.muted,
+      advancedSec: +advancedSec.toFixed(3),
+      decodedFrames: decoded,
+      droppedFrames: dropped,
+      corruptedFrames: corrupted,
+      decodedFps: spanMs > 0 ? +((decoded * 1000) / spanMs).toFixed(1) : null,
+      dropPct: decoded > 0 ? +((dropped * 100) / decoded).toFixed(2) : null,
+      stillPlaying: !v.paused && !v.ended,
+      // 60% of what the clock should have covered. Slack for the sampling boundaries, but far
+      // too tight to be met by a player that is not actually running.
+      advanced: advancedSec >= (spanMs / 1000) * rate * 0.6,
+      // A leg that decoded nothing has no denominator: dropPct would be null and 'no drops'
+      // would be a statement about an empty sample.
+      decodedSomething: decoded > 0,
+    };
+    if (!window.__lip.advanced) {
+      window.__lip.refuse = 'currentTime advanced ' + window.__lip.advancedSec + ' s across ' + window.__lip.spanMs
+        + ' ms at rate ' + rate + ': the player reports playing but its clock is standing still, so every frame count below is a still picture';
+    } else if (!window.__lip.decodedSomething) {
+      window.__lip.refuse = 'the decoder produced 0 new frames across ' + window.__lip.spanMs
+        + ' ms, so there is no denominator for a drop rate';
+    }
+  };
+  requestAnimationFrame(step);
+  return 'playback observation started';
 })()
 "@
   }
@@ -480,6 +602,12 @@ for ($i = 0; $i -lt 60; $i++) {
   Start-Sleep -Milliseconds 250
 }
 if (-not ($state -and $state.done)) { Write-Error "Gesture never reported done -- refusing to report frame numbers for an unfinished interaction." }
+# A gesture that REFUSED still sets done, and until 2026-09-03 the run then printed a full,
+# clean-looking frame distribution for an interaction that never happened -- `refuse` was carried
+# in the `gesture` field and left for the caller to notice. That is the same false-pass shape this
+# file's header records for the zombie recorder: the numbers are real frames of an idle window,
+# and nothing in the record says the gesture was not among them. Refuse here instead.
+if ($state.refuse) { Write-Error "REFUSE: $($state.refuse)" }
 
 # Focus is checked BEFORE the recorder is installed, but it can be lost DURING the
 # gesture -- another process taking the foreground backgrounds this window and Chromium

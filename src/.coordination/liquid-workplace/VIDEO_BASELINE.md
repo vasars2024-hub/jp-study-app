@@ -106,4 +106,8 @@ capture — so it is closed at the end of the turn and the layout returns to its
   not on screen is absent from the record rather than assumed present.
 - Alternate routes into this surface (`player`, `music` open the same `MediaCenterView` with a
   different `initialTab`) — captured as one component here, per the census's ledger-row rule.
-- Playing-clip measurements, including player frame stability, which needs a real clip.
+- ~~Playing-clip measurements, including player frame stability, which needs a real clip.~~
+  **Player frame stability CLOSED 2026-09-03** — `PERF_BASELINE_PLAYER.md`. A real clip was
+  loaded (JoJo 39-END RAW over the sidecar directstream) and measured in `#media-workspace`,
+  which is where playback actually happens; `.mc-video-page`, the surface this file records, is
+  the launcher. The rest of the playing-clip measurements stay open.

@@ -141,6 +141,6 @@ have this: its `up` explicitly assigns `left`/`top` and clears `transform` befor
 
 | Baseline | Status | Blocker |
 | --- | --- | --- |
-| Player frame stability | **not measured** | Needs a clip playing in `src/media/`. Not attempted in this pass. |
+| Player frame stability | ~~not measured~~ **CLOSED 2026-09-03** | Taken in a separate session with a real clip loaded — `PERF_BASELINE_PLAYER.md`. 0 dropped / 0 corrupted frames over six readings, renderer p50 at the session ceiling. Not folded into this file because it is a different process and a different scene; nothing above is restated by it. |
 | Packaged-build boot | **not measured** | Only the dev boot exists; the 106 s figure includes Vite and forge. |
 | Memory peak attribution | **observed, unexplained** | One sample; needs a second cold boot plus a bisect. |

@@ -95,11 +95,15 @@ These are the rest of L0's perf list. They are listed as gaps rather than quietl
 | Resize | **not measured** | Same as drag. |
 | Theme-switch cost | **not measured** | Must go through the app's own `jp-theme-changed` event rather than writing storage; capture-restore the current `forest-night` value and assert it byte-for-byte. |
 | Main-process memory | **not measured** | Only the renderer heap (229 MB) was read. Main RSS needs the process, not the bridge. |
-| Player frame stability | **not measured** | Needs media playing in `src/media/`; no clip was loaded. |
+| Player frame stability | **MEASURED 2026-09-03** | Closed — see `PERF_BASELINE_PLAYER.md`. A real clip (JoJo 39-END RAW, 1280x720, directstream) playing in `#media-workspace`: 0 dropped and 0 corrupted frames across six readings in three runs, renderer p50 16.7 ms against a 16.7 ms session ceiling. Negative control (paused player must refuse) and `-Jank` sensitivity control both fired. |
 
 The next turn should take the restart-dependent rows in one pass, because they all need the
 same fresh process and a restart mid-sequence invalidates whatever came before it.
 
 > **Done — see `PERF_BASELINE_RESTART.md`** (same milestone, restart leg, 2026-08-16). Five of
-> these six rows are measured there off one cold start; player frame stability is still open.
+> these six rows are measured there off one cold start.
 > **No number above was modified by that pass** — this is a pointer, not a correction.
+
+> **The sixth row is done too — see `PERF_BASELINE_PLAYER.md`** (same milestone, player leg,
+> 2026-09-03). All six of L0's perf baselines are now measured. Again a pointer, not a
+> correction: no number in this file or in `PERF_BASELINE_RESTART.md` was modified by it.
