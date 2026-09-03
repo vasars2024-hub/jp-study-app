@@ -543,6 +543,42 @@ re-rendered on every key; memoised, now **15.9 ms**) and **cat 8** (`890c4074` â
 the INSTRUMENT: `textOf` counted an UNPAINTED empty-state host in the denominator while filtering
 messages by `painted()`, so an honest surface could not pass).
 
+**RE-DRIVE, HALF TWO -- 2026-09-02 (backup), `d337f958`. 14 of the 16 cells are banked and the
+scorecard's header grep is now 3. VIDEO IS NOT DONE, and L1's four bullets STAY OPEN.** Six of
+Video's eight categories hold a controlled 10 (`cat{1,2,3,4,6,8}`); **cat 5 is 7/10 and cat 7 is
+VOID**, so the surface has no total and this turn closed no bullet. Named so the next worker
+starts without re-deriving: cat 5's three NOs are Q1 `entryPoints 4` against a 1..3 bar (three
+accent CTAs compete once a video is loaded -- `Open video`, `Open in the media workspace`,
+`Open Study Mode`), Q3 the primary action sitting outside the body viewport at 1080x700, and Q5
+`div.media-substatus` at **3.18:1** in `classic-light` against a 4.5 bar. cat 7 VOIDs on two
+separate legs, not one: the drag leg disagrees across repeats (BREACH, clean, clean, BREACH,
+clean) and the heavy leg refuses with `Video load never armed`.
+
+Two product FAILs were fixed and re-scored in their own commits, both in DOM that exists ONLY
+with a video loaded: `5eaa3573` (cat 1 -- the inspector's score-row captions at **4.49:1**
+against 4.5, and the MAL link's hit area **26.5 px** against the 32 px floor; now 5.28 and 0)
+and `4c2df362` (cat 2 -- the first keystroke into the YouTube URL field received after
+**171.7 ms**, because `ytUrl` lives in `useMedia` and every character reconciled the whole Media
+Center including the seven-poster shelf; `useDeferredText` is now extracted from
+`GlobalSearchField` and shared by both fields; now **11.7 ms**).
+
+**The trap that cost this turn the most, and it wore three faces (`af21269d`): cat 6 could not
+score Video AT ALL until its instrument was repaired.** Its round-trip step types into the first
+visible text field, which `df00b4be` had made the topbar GLOBAL SEARCH -- a NAVIGATION control,
+so the driver navigated away from the page it was about to score and refused `no video surface`.
+Two of its rows read source-ness as `.mc-video-stage video`, a node this page never mounts
+because playback is delegated to the media workspace, so their "with a source" branch was
+unreachable and both scored FAIL on an honest surface. Three of its mutations were armable only
+at rest and refused, VOIDing the category twice. **An instrument that models a state the product
+cannot enter certifies only the state it can see** -- the same lesson the Dictionary half
+recorded about cat 4, arriving from the opposite direction.
+
+Second trap, cheaper to hear than to rediscover: every `cat*` run VOIDs with "N of M controls
+occluded" if anything covers the surface, and the occluder is not always a window. Clicking an
+up-next tile OPENS the full-screen `.seanime-host` media workspace over the whole desk, and
+`document.querySelectorAll('.fwin')` keeps answering normally, so the desktop looks fine from
+every DOM query. Close it by its own `.seanime-host-close` and confirm with `elementFromPoint`.
+
 The four bullets stay OPEN because gate 495 names **Video AND Dictionary**, and Video is the
 remaining half. It is the same 8 categories, same harnesses, same protocol, and the L9 baselines
 (`baselines/cat{1..8}-l9-video.json`, 2026-08-31) record the exact `--surface`/`--task`/`--win`
