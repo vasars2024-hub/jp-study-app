@@ -1108,7 +1108,15 @@ export default function VideoCoreStudyOverlay({
         currentTime,
         subtitleDelaySec,
       );
-      setActiveCues(cues);
+      /*
+        `timeupdate` fires about four times a second, and this runs on every one of them —
+        so without the guard a single three-second line handed the overlay a dozen fresh
+        arrays saying the same thing, and re-rendered every child for each. The signature
+        below cannot cover it: it gates `onCueChange`, and it is computed AFTER this line.
+        The file-track path a hundred lines up already returns early on that signature; this
+        one never did, which is the asymmetry rather than a second design.
+      */
+      setActiveCues(stableCueList(cues));
       const signature = cues
         .map((cue) => `${cue.trackNumber}:${cue.index}:${cue.startMs}:${cue.endMs}`)
         .join('|');
@@ -1265,12 +1273,15 @@ export default function VideoCoreStudyOverlay({
     */
     let cancelled = false;
     const syncActive = (): void => {
+      // Same four-times-a-second tick as the primary above, and the bridge deliberately
+      // returns the SAME cue across a short gap — so the steady state here is an unchanged
+      // answer rebuilt into a new array, which is precisely what the guard is for.
       setActiveSecondaryCues(
-        bridgedSecondaryCuesAtTime(
+        stableCueList(bridgedSecondaryCuesAtTime(
           secondaryCuesRef.current,
           video.currentTime,
           subtitleDelaySec,
-        ),
+        )),
       );
     };
     /**

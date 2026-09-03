@@ -191,6 +191,26 @@ describe('the overlay routes every whole-track read through the guard', () => {
     );
   });
 
+  /*
+    The two per-TICK paths, which are a different rate from the per-boundary one above.
+    `timeupdate` fires ~4 Hz, and both of these ran on every tick: the MediaCaptions
+    `syncActive` set the primary before computing the signature that would have caught it
+    (the file-track path returns early on that same signature, which is the asymmetry), and
+    the secondary sync had no guard at all while the S3 bridge deliberately returns the SAME
+    cue across a short gap.
+  */
+  it('guards the MediaCaptions per-tick primary activation', () => {
+    expect(overlaySource()).toMatch(
+      /setActiveCues\(stableCueList\(cues\)\);\s*const signature = cues/,
+    );
+  });
+
+  it('guards the per-tick secondary activation without changing what computes it', () => {
+    expect(overlaySource()).toMatch(
+      /setActiveSecondaryCues\(\s*stableCueList\(bridgedSecondaryCuesAtTime\(/,
+    );
+  });
+
   it('leaves no unguarded whole-track assignment anywhere in the file', () => {
     const source = overlaySource();
     expect(source).not.toMatch(/setAllCues\(manager\.getCues\(\)\)/);
