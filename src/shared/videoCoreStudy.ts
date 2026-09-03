@@ -13,6 +13,71 @@ export interface VideoCoreStudyLoopState {
   abEndSec: number | null;
 }
 
+/**
+ * Typeface choices for the cue line, as CSS stacks rather than one family each.
+ *
+ * Every stack ends in a generic so a missing font degrades to something readable instead
+ * of to the browser default, and each names a Japanese-capable face first: a stack that
+ * falls through to a Latin-only font renders study content as tofu, which is worse than
+ * ignoring the setting. `default` is the empty string on purpose — it means "inherit the
+ * stylesheet" rather than "impose a family", so the app's own font choice still wins for
+ * anyone who never touches this control.
+ */
+export const SUBTITLE_FONT_STACKS = {
+  default: '',
+  gothic: '"Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif',
+  mincho: '"Yu Mincho", "MS Mincho", "Noto Serif JP", serif',
+  universal: '"BIZ UDPGothic", "BIZ UDGothic", "Noto Sans JP", sans-serif',
+} as const;
+
+export type SubtitleFontChoice = keyof typeof SUBTITLE_FONT_STACKS;
+
+/**
+ * Offered languages for the second subtitle line.
+ *
+ * A closed list rather than free text because this code is also what the mined card's
+ * translation is generated in — a typo would silently produce a card in no language at
+ * all. The translator itself handles arbitrary pairs, so extending this is a one-line
+ * change when a language is actually wanted.
+ */
+export const SECONDARY_SUB_LANGS = ['en', 'ru', 'zh', 'ja', 'ko', 'es', 'fr', 'de'] as const;
+
+/**
+ * Each offered language written in itself.
+ *
+ * Deliberately not routed through the i18n catalogs, following what
+ * `settings.analysis.explainIn.*` already does: a language's own name does not change
+ * with the app's UI language, so four catalog copies of `Русский` would be four chances
+ * for one of them to drift or go missing and fail the catalog hygiene gate for nothing.
+ */
+export const SECONDARY_SUB_LANG_LABELS: Readonly<Record<string, string>> = {
+  en: 'English',
+  ru: 'Русский',
+  zh: '中文',
+  ja: '日本語',
+  ko: '한국어',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+};
+
+export const SUBTITLE_FONT_CHOICES = Object.keys(
+  SUBTITLE_FONT_STACKS,
+) as SubtitleFontChoice[];
+
+/**
+ * Narrow a raw `<select>` value to a font choice, falling back the same way the
+ * preference normalizer does.
+ *
+ * A cast at the call site would be the shorter route and would also be a lie: the value
+ * arrives as `string` from the DOM, and the one place that is allowed to decide what an
+ * unrecognized string means is this rule, not each caller's assumption that the option
+ * list can never drift from the type.
+ */
+export function toSubtitleFontChoice(value: string): SubtitleFontChoice {
+  return (value in SUBTITLE_FONT_STACKS ? value : 'default') as SubtitleFontChoice;
+}
+
 export interface VideoCoreStudyPreferences {
   playbackRate: number;
   autoPause: boolean;
@@ -25,6 +90,29 @@ export interface VideoCoreStudyPreferences {
   subtitleFontSize: number;
   /** Cue background opacity, 0 (fully transparent) to 90. */
   subtitleBgOpacity: number;
+  /** Typeface for the cue line — a key into `SUBTITLE_FONT_STACKS`. */
+  subtitleFontFamily: SubtitleFontChoice;
+  /** Cue weight, 400–800. Heavier reads better over a bright frame than a bigger box. */
+  subtitleFontWeight: number;
+  /** Paint the dark outline behind the cue. Off suits a release that is already letterboxed. */
+  subtitleOutline: boolean;
+  /**
+   * Show the `cue N · track N · start–end ms` readout under the line.
+   *
+   * Off by default. It is diagnostic text sitting in the middle of the picture, and the
+   * reason to keep it at all is that it is the only on-screen evidence of which cue the
+   * mining panel is about to capture when a timing question comes up.
+   */
+  cueTimingReadout: boolean;
+  /**
+   * Language for the second subtitle line, as a BCP-47-ish code.
+   *
+   * Read by two surfaces on purpose. It picks the secondary track when the release ships
+   * one in that language, falls back to translating the primary cue when it does not, and
+   * is the language the mined card's sentence translation is written in — so the line the
+   * user chose to read along with is the line that ends up on the card.
+   */
+  secondarySubLang: string;
   /** Colour-code the active cue by grammar/vocab/particle and allow click-to-explain. */
   grammarHighlight: boolean;
   /** Show the whole subtitle track as a seekable transcript rail. */
@@ -175,12 +263,61 @@ export function normalizeVideoCoreStudyPreferences(value: unknown): VideoCoreStu
       && Number.isFinite(raw.subtitleBgOpacity)
       ? Math.round(Math.max(0, Math.min(90, raw.subtitleBgOpacity)))
       : 35,
+    subtitleFontFamily: typeof raw.subtitleFontFamily === 'string'
+      && raw.subtitleFontFamily in SUBTITLE_FONT_STACKS
+      ? raw.subtitleFontFamily as SubtitleFontChoice
+      : 'default',
+    subtitleFontWeight: typeof raw.subtitleFontWeight === 'number'
+      && Number.isFinite(raw.subtitleFontWeight)
+      // Snapped to the 100s CSS actually interpolates, so a hand-edited 637 in the stored
+      // JSON becomes a weight a font can select rather than one it rounds unpredictably.
+      ? Math.round(Math.max(400, Math.min(800, raw.subtitleFontWeight)) / 100) * 100
+      : 600,
+    subtitleOutline: raw.subtitleOutline !== false,
+    cueTimingReadout: raw.cueTimingReadout === true,
+    secondarySubLang: typeof raw.secondarySubLang === 'string'
+      && (SECONDARY_SUB_LANGS as readonly string[]).includes(raw.secondarySubLang)
+      ? raw.secondarySubLang
+      : 'en',
     grammarHighlight: raw.grammarHighlight === true,
     transcriptPanel: raw.transcriptPanel === true,
     seekStepSec: typeof raw.seekStepSec === 'number' && Number.isFinite(raw.seekStepSec)
       ? Math.round(Math.max(1, Math.min(60, raw.seekStepSec)))
       : 5,
   };
+}
+
+/**
+ * ISO 639-2 codes for the offered languages, mapped to their two-letter form.
+ *
+ * Only these need mapping: truncating a three-letter tag to its first two characters
+ * turns `jpn` into `jp`, which is not a language code and matches nothing.
+ */
+const THREE_LETTER_LANGS: Readonly<Record<string, string>> = {
+  jpn: 'ja',
+  eng: 'en',
+  rus: 'ru',
+  zho: 'zh',
+  chi: 'zh',
+  kor: 'ko',
+  spa: 'es',
+  fra: 'fr',
+  fre: 'fr',
+  deu: 'de',
+  ger: 'de',
+};
+
+/**
+ * The two-letter form of a subtitle track's language tag.
+ *
+ * Track metadata is inconsistent here — the same language arrives as `ja`, `jpn` or
+ * `ja-JP` depending on who muxed the file — so any comparison against a stored preference
+ * has to be made on a normalized first subtag rather than on the raw string.
+ */
+export function shortLangTag(value: string | null | undefined): string {
+  if (!value) return '';
+  const base = value.trim().toLowerCase().split(/[-_]/)[0] ?? '';
+  return THREE_LETTER_LANGS[base] ?? base.slice(0, 2);
 }
 
 export function stripAssCueText(text: string): string {
