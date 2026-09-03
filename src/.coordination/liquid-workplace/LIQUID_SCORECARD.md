@@ -1792,7 +1792,7 @@ mtime, or delete the file first).
 Remaining for these two surfaces: 5 (UI clarity), 6 (feature parity and reversibility),
 7 (performance under real load), 8 (honest states).
 
-## 2026-09-03 · primary — Calendar — 80/80 — commit `<this commit>`
+## 2026-09-03 · primary — Calendar — 80/80 — commit `9b5b437f`
 
 The four categories the previous entries left open (5, 6, 7, 8), all driven this turn against
 the current tree, all controlled. With categories 1–4 from the three entries above, `calendar`
@@ -1833,3 +1833,41 @@ different profile). Both halves proven live: the key was deleted, the run was re
 
 **Running total: 6 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
 `youtube`, `calendar`. Resources is at 4 of 8 and is the next to close.
+
+## 2026-09-03 · primary — Resources — 80/80 — commit `<this commit>`
+
+The same four categories, same instruments, same turn, on the other half of the RULE C pair.
+With categories 1–4 from the three entries above, `resources` is the **seventh** of the 25
+`DESKTOP_WIN_SECTIONS` at 80/80. Zero new probes. Scene: exactly one desktop window and, for
+the category-7 run, exactly one floating window — the operating rule the previous entry's
+finding produced.
+
+**sampled-out (RULE C):** the same eighteen sections listed in the Calendar entry above.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 5 | UI clarity | **10/10** | Q1 **2** entry points (`All`, `.gram-search`); Q2 location `Resources` + **1** way back; Q3 primary action inside the body viewport at rest; Q4 **1** collapsed disclosure, **10** controls scanned against a bar of 12; Q5 **246** text runs in both themes, **0** failing, min **5.35** (study-os, “11 links” on a bundle card) vs **5.17** (classic-light, “Pearl”) and the axis moved; Q6 **1** Liquid region by contextual paint, 0 infinite animations; Q10 5 identity markers, `res:139` bespoke prefix — not a generic dashboard; body scroll top **0**, so “at rest” means at rest | 65 controls painted vs 32 in the Q4 plant; **Q2, Q3, Q4, Q5 and Q10 all went NO** |
+| 6 | Feature parity + reversibility | **10/10** | ledger **8/8 reachable in standard, 8/8 in Liquid**, `na` 0, rows agree, nothing only-in-one; round trip `standard → liquid → standard` with **0** diffs — and this surface **has** an editable field, so the trip carried a dirtied `gram-search` and `fieldsHeld` is a measurement rather than a stated absence | **8 of 8** mutations armed, each felled exactly its own row, each restored |
+| 7 | Performance under real load | **10/10** | ceiling p50 **8.3** / p95 **8.5** ms over 3 runs, noise floor 0 over 100 ms; drag **8.3 / 8.6 / 12.0** max with **0 frames over 16 ms**, resize **8.3 / 16.7 / 25.1** (6 over 16, **0 over 33**), theme swap **8.3 / 8.7 / 25.0** — **0 over 100 ms in every leg**; the heavy leg cycled **44 filters (22 category / 22 landing)** and restored chip 0, main-loop p50 **2.2** vs idle **1.9** ms, worst **8.9** against a 500 ms bar; main RSS **88.9 → 87.4 MB** | `--jank`: drag p95 **8.6 → 116.6 ms**, frames over 100 ms **0 → 10** |
+| 8 | Honest states | **10/10** | raw i18n keys **0**, placeholders **0**, mute pairs **0** across **256** text runs; states **1 of 1 observable** — typing `zzzznomatch` into `.gram-search` renders “No resources match your search.” in 1 host, 0 unpainted, and the field restored to empty; four languages give **4 distinct text hashes**, **32 of 256** runs move (12.5 %), max raw keys in any language **0** | rawKeys/placeholders/mutePairs **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+
+Evidence: `baselines/cat5-l8-resources.json` + `-control.json`, `cat6-l8-resources.json`,
+`cat7-l8-resources.json`, `cat8-l8-resources.json`, all rewritten this turn.
+
+**Correction 37's absent-key restore proved itself here rather than in the run that motivated
+it.** This cell's language leg started from `ui-lang: null` and ended at `ui-lang: null` —
+`before`/`after` both `{html:'en', stored:null}`, `restored: true` — which is the byte-identical
+restore the repo's persisted-setting rule asks for and which the pre-correction leg could not
+produce. See the Calendar entry for the reasoning.
+
+**TRAP, new this turn: `cat8-honest-states.cjs --control` can crash node ON EXIT after writing
+its result.** The Resources control run ended `Assertion failed: !(handle->flags &
+UV_HANDLE_CLOSING), file src\win\async.c, line 94` — a libuv teardown assertion in the *probe
+process*, not the app. `/health` was clean immediately after and `--out` had already been
+written in full. Read the file's mtime before concluding a control did not run; the run itself
+was valid and its counts are the ones in the table.
+
+**Running total: 7 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
+`youtube`, `calendar`, `resources`. **18 left**, of which 17 are scorable in both presentations
+(`visualizer` and `musicwidget` offer no presentation toggle; `city` became scorable at
+`2b5a73cf`).

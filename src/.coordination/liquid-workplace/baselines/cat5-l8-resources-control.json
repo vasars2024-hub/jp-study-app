@@ -2,19 +2,21 @@
   "surface": "@.fwin:has(.res-view)",
   "label": "l8-resources",
   "control": true,
-  "at": "2026-08-29T05:27:26.672Z",
+  "at": "2026-09-03T21:03:49.536Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
+  "hostedSelector": ".fwin",
+  "shellScope": null,
   "box": "820x580",
   "bodyScrollTop": 0,
-  "presentationAsFound": "liquid",
+  "presentationAsFound": "standard",
   "cat6": {
     "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json",
     "verdict": "PASS 10/10",
     "parity": {
-      "liquid": "8/8",
       "standard": "8/8",
+      "liquid": "8/8",
       "na": 0,
       "equal": true,
       "rowsAgree": true,
@@ -27,22 +29,25 @@
   },
   "axes": {
     "theme": [
-      "forest-night",
+      null,
       "classic-light"
     ]
   },
   "storeBefore": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "planted": {
     "savedTitle": "Resources",
     "savedTransform": "",
-    "primaryFound": "input.gram-search",
+    "clutterPlanted": 17,
+    "clutterSelfGuard": "cat5-ctl-self declares itself its own disclosure; the guard must refuse it",
+    "primaryFound": "button.gram-level-btn",
     "primaryFromPin": true,
-    "primariesMoved": 1,
-    "primariesFromPin": 1,
+    "primariesMoved": 2,
+    "primariesFromPin": 2,
     "primaryList": [
+      "button.gram-level-btn",
       "input.gram-search"
     ],
     "titlesBlanked": 2,
@@ -54,28 +59,39 @@
     "expect": {
       "Q2": "NO",
       "Q3": "NO",
+      "Q4": "NO",
       "Q5": "NO",
       "Q10": "NO"
     }
   },
   "q6leg": {
-    "presentationAsFound": "liquid",
-    "note": "surface was already in Liquid presentation; measured where it was found",
-    "measuredIn": "liquid"
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
+  },
+  "replantedPrimaries": {
+    "selectors": [
+      "button.gram-level-btn.active",
+      "input.gram-search"
+    ],
+    "matched": 2,
+    "replacements": 0
   },
   "unplanted": {
-    "restoredMoved": 1,
+    "restoredMoved": 2,
     "restoredTitles": 1,
     "residue": 0
   },
   "storeAfter": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "storeIdentical": true,
   "restored": {
-    "theme": "forest-night",
-    "presentation": "liquid",
+    "theme": null,
+    "presentation": "standard",
     "box": "820x580",
     "plantResidue": 0
   },
@@ -84,7 +100,7 @@
       "id": 1,
       "q": "dominant task immediately obvious",
       "verdict": "NO",
-      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
       "numbers": {
         "entryPoints": 0,
         "primaryInputs": 0,
@@ -125,14 +141,20 @@
       "bar": ">=1 collapsed disclosure AND <=12 controls scanned in the default state",
       "numbers": {
         "collapsedDisclosures": 1,
-        "scannedControls": 15,
-        "chromeControlsRaw": 17,
+        "scannedControls": 32,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "scannedBeforeNavCollapse": 32,
+        "navRouteGroups": [],
+        "chromeControlsRaw": 34,
         "summaryHeaders": 2,
         "behindDisclosure": 0,
         "disclosures": {
           "total": 1,
           "open": 0
         },
+        "ariaDisclosures": [],
         "scannedList": [
           "All",
           "Dictionaries & lookup",
@@ -148,7 +170,12 @@
           "card 1",
           "card 2",
           "card 3",
-          "card 4"
+          "card 4",
+          "clutter 0",
+          "clutter 1",
+          "clutter 2",
+          "clutter 3",
+          "clutter 4"
         ]
       }
     },
@@ -161,8 +188,9 @@
         "verdict": "NO",
         "cells": [
           {
-            "theme": "forest-night",
-            "measured": 252,
+            "cell": "theme=null",
+            "theme": "null",
+            "measured": 269,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 1,
@@ -175,8 +203,9 @@
             }
           },
           {
+            "cell": "theme=classic-light",
             "theme": "classic-light",
-            "measured": 252,
+            "measured": 269,
             "unmeasurable": 0,
             "minRatio": 1.14,
             "failingCount": 3,
@@ -219,7 +248,11 @@
             "text": "card 5"
           }
         ],
-        "themeAxisMoved": false
+        "themeAxisMoved": true,
+        "axisWitness": {
+          "minRatioMoved": false,
+          "paintDigestMoved": true
+        }
       }
     },
     {
@@ -230,9 +263,11 @@
       "numbers": {
         "measuredIn": "liquid",
         "leg": {
-          "presentationAsFound": "liquid",
-          "note": "surface was already in Liquid presentation; measured where it was found",
-          "measuredIn": "liquid"
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
         },
         "liquidRegions": 1,
         "byBackdropFilter": 0,
@@ -245,7 +280,7 @@
           "div.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 1
+        "inStandardPresentation": 0
       }
     },
     {
@@ -255,9 +290,10 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "parity": {
-          "liquid": "8/8",
           "standard": "8/8",
+          "liquid": "8/8",
           "na": 0,
           "equal": true,
           "rowsAgree": true,
@@ -273,6 +309,9 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
         "roundTrip": {
           "diffs": []
         }
@@ -285,6 +324,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "rowsAgree": true,
         "onlyInOne": []
       }
@@ -385,12 +425,12 @@
     "q2": "NO",
     "q3": "NO",
     "q4": "NO",
-    "q6": "YES",
+    "q6": "NO-SUBJECT",
     "q10": "NO"
   },
   "altThemeNumbers": {
     "theme": "classic-light",
-    "controlsPainted": 71,
+    "controlsPainted": 88,
     "q1": {
       "entryPoints": 0,
       "primaryInputs": 0,
@@ -400,14 +440,20 @@
     },
     "q4": {
       "collapsedDisclosures": 1,
-      "scannedControls": 15,
-      "chromeControlsRaw": 17,
+      "scannedControls": 32,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "scannedBeforeNavCollapse": 32,
+      "navRouteGroups": [],
+      "chromeControlsRaw": 34,
       "summaryHeaders": 2,
       "behindDisclosure": 0,
       "disclosures": {
         "total": 1,
         "open": 0
       },
+      "ariaDisclosures": [],
       "scannedList": [
         "All",
         "Dictionaries & lookup",
@@ -423,20 +469,23 @@
         "card 1",
         "card 2",
         "card 3",
-        "card 4"
+        "card 4",
+        "clutter 0",
+        "clutter 1",
+        "clutter 2",
+        "clutter 3",
+        "clutter 4"
       ]
     },
     "q6": {
-      "liquidRegions": 1,
+      "liquidRegions": 0,
       "byBackdropFilter": 0,
-      "byContextualPaint": 1,
-      "carryingATransition": 1,
+      "byContextualPaint": 0,
+      "carryingATransition": 0,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 1,
+      "liquidMaterialTotal": 0,
       "decoratedLeaves": [],
-      "regionList": [
-        "div.lq-contextual"
-      ],
+      "regionList": [],
       "withoutTransition": []
     },
     "q10": {
@@ -524,13 +573,20 @@
       "dashboardHosts": 1
     }
   },
-  "controlsPaintedA": 71,
+  "controlsPaintedA": 88,
   "controlResult": {
     "Q2": true,
     "Q3": true,
+    "Q4": true,
     "Q5": true,
     "Q10": true
   },
-  "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q5, Q10",
+  "controlQ4": {
+    "scannedControls": 32,
+    "bar": 12,
+    "behindDisclosure": 0,
+    "ariaDisclosures": []
+  },
+  "verdict": "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10",
   "score": "CONTROL-OK"
 }

@@ -1,13 +1,17 @@
 {
   "label": "l8-resources",
   "surface": "@.fwin:has(.res-view)",
-  "win": "(focused)",
+  "win": "1",
   "lang": "en",
-  "storedLang": "en",
-  "theme": "forest-night",
+  "storedLang": null,
+  "theme": null,
   "rect": "820x580",
-  "textRuns": 312,
-  "textHash": -1655901182,
+  "textRuns": 256,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 241,
+  "textHash": 341715876,
   "rawKeyCount": 0,
   "rawKeys": [],
   "rawKeysTruncated": false,
@@ -19,28 +23,32 @@
   "states": {
     "empty": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "loading": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "error": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "offline": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     }
   },
   "statusCandidatesNeedingEmptyProfile": [],
-  "rawKeyCatalogSize": 9506,
+  "rawKeyCatalogSize": 10227,
   "keyShapedNonCatalog": [
-    {
-      "token": "heavenlypath.notion.site",
-      "el": "span.res-host"
-    },
     {
       "token": "apps.ankiweb.net",
       "el": "span.res-host"
@@ -58,59 +66,166 @@
       "el": "span.res-host"
     }
   ],
-  "rawKeyBasis": "9506 catalog keys / 105 namespaces",
+  "rawKeyBasis": "10227 catalog keys / 107 namespaces",
   "raised": "root surface - no taskbar button",
   "languages": {
     "perLang": [
       {
         "lang": "en",
         "htmlLang": "en",
-        "textRuns": 312,
-        "textHash": -1655901182,
+        "textRuns": 256,
+        "textHash": 341715876,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
       },
       {
         "lang": "ja",
         "htmlLang": "ja",
-        "textRuns": 312,
-        "textHash": 373615146,
+        "textRuns": 256,
+        "textHash": 611351146,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 32,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "A hand-picked directory of the",
+            "now": "日本語学習に役立つ厳選サイト集。リンクはブラウザで開きます。"
+          },
+          {
+            "i": 7,
+            "was": "All",
+            "now": "すべて"
+          },
+          {
+            "i": 15,
+            "was": "Refresh",
+            "now": "更新"
+          },
+          {
+            "i": 16,
+            "was": "Built-in catalogue",
+            "now": "内蔵カタログ"
+          },
+          {
+            "i": 17,
+            "was": "Learners in 1 country · 21 tot",
+            "now": "1か国の学習者 · 合計21人"
+          },
+          {
+            "i": 18,
+            "was": "Study bundles",
+            "now": "学習バンドル"
+          }
+        ]
       },
       {
         "lang": "zh",
         "htmlLang": "zh-Hans",
-        "textRuns": 312,
-        "textHash": 2057544389,
+        "textRuns": 256,
+        "textHash": 2132465891,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 32,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "A hand-picked directory of the",
+            "now": "精选的日语学习网站目录。链接将在浏览器中打开。"
+          },
+          {
+            "i": 7,
+            "was": "All",
+            "now": "全部"
+          },
+          {
+            "i": 15,
+            "was": "Refresh",
+            "now": "刷新"
+          },
+          {
+            "i": 16,
+            "was": "Built-in catalogue",
+            "now": "内置目录"
+          },
+          {
+            "i": 17,
+            "was": "Learners in 1 country · 21 tot",
+            "now": "1 个国家/地区的学习者 · 共 21 人"
+          },
+          {
+            "i": 18,
+            "was": "Study bundles",
+            "now": "学习合集"
+          }
+        ]
       },
       {
         "lang": "ru",
         "htmlLang": "ru",
-        "textRuns": 312,
-        "textHash": 1993799100,
+        "textRuns": 256,
+        "textHash": 165011280,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 32,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "A hand-picked directory of the",
+            "now": "Тщательно отобранный каталог л"
+          },
+          {
+            "i": 7,
+            "was": "All",
+            "now": "Все"
+          },
+          {
+            "i": 15,
+            "was": "Refresh",
+            "now": "Обновить"
+          },
+          {
+            "i": 16,
+            "was": "Built-in catalogue",
+            "now": "Встроенный каталог"
+          },
+          {
+            "i": 17,
+            "was": "Learners in 1 country · 21 tot",
+            "now": "Учащиеся в 1 стране · всего 21"
+          },
+          {
+            "i": 18,
+            "was": "Study bundles",
+            "now": "Учебные наборы"
+          }
+        ]
       }
     ],
     "before": {
       "html": "en",
-      "stored": "en"
+      "stored": null
     },
     "after": {
       "html": "en",
-      "stored": "en"
+      "stored": null
     },
     "restored": true,
     "rawKeyCountMax": 0,
-    "distinctHashes": 4
+    "distinctHashes": 4,
+    "diffRunsMax": 32,
+    "baseRuns": 256,
+    "diffShare": 0.125
   },
   "drive": {
     "input": ".gram-search",
     "value": "zzzznomatch",
     "originalValue": "",
+    "openedBy": null,
+    "restoredAfterEscape": null,
+    "restoredAfterUndo": null,
     "surfaceChanged": true,
     "restored": true,
     "driven": {
@@ -120,19 +235,27 @@
           "hosts": 1,
           "messages": [
             "No resources match your search."
-          ]
+          ],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "loading": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "error": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "offline": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         }
       },
       "mutePairCount": 0,
@@ -165,30 +288,5 @@
   "notMeasuredHere": [
     "dead-control count (honesty-probe A - every control driven for a side effect)",
     "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
-  ],
-  "control": {
-    "moved": {
-      "rawKeys": true,
-      "placeholders": true,
-      "mutePairs": true
-    },
-    "backToBaseline": true,
-    "counts": {
-      "base": [
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        1,
-        1
-      ],
-      "restored": [
-        0,
-        0,
-        0
-      ]
-    }
-  }
+  ]
 }
