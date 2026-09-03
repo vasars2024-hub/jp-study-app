@@ -331,3 +331,58 @@ R5 and R8 are red **in the shared working tree only** and are boss-audit Finding
 ` M` files, `VideoCoreStudyOverlay.tsx` and `SeanimeDevPanel.tsx`); the register runs in the
 shared tree, so it reports the tree it is standing in. Do not read them as branch blockers —
 that inversion is exactly what boss-audit Finding 1 was.
+
+## 2026-09-03 — city's presentability, and the retraction of my own two wrong figures (`primary2`)
+
+`2b5a73cf` (L12 b2) made `city` Liquid-presentable. My previous turn recorded that as a debt on
+b1/b4 with the figures "22 of 25 → **23 of 25**" and "39 → **26** unavailable cells". **Both are
+retracted.** They were computed off the *committed* matrices while the live evidence had already
+moved, and they conflated two different artifacts' numbers.
+
+Re-derived from the manifests themselves:
+
+| manifest | generatedAt | `appsPresentable` |
+| --- | --- | --- |
+| `l12-matrix-normal.json` | 2026-09-02T02:51Z | 22 |
+| `l12-matrix-normal-v2.json` | 15:34Z | 23 |
+| `l12-matrix-maximized-v2.json` | 16:09Z | 23 |
+| `l12-matrix-normal-v3.json` | 21:23Z | 23 |
+
+The 23rd app is **`musicwidget`**, set-differenced app-by-app off `normal.json` vs `normal-v3.json`
+— *not* `city`. `2b5a73cf` landed 2026-09-03T02:10Z, after all four, so city appears in none of
+them. True move: **23 → 24 of 25**. And 39 vs 91 are different artifacts: `l12-atlas-final-v2.json`
+reports **91** unavailable = 39 (`note`+`city`, no maximize) + 52 (`visualizer`+`city`, no
+presentation toggle).
+
+**Measured, not predicted.** Two targeted sweeps on a scratch instance serving THIS worktree
+(pid 42468 / port 39274; `http://localhost:5174/src/renderer/liquidWindowPresentation.ts` verified
+to serve `return section !== 'visualizer';` before starting):
+
+    node probes/l12-visual-matrix.cjs --apps city --themes all --states {normal,maximized} \
+      --address section --out baselines/l12-matrix-city-{normal,maximized}-v1.json
+
+- `l12-matrix-city-normal-v1.json`, sha256 `388d283a28e8cf7e67ab…`, runId
+  `l12-cal-city__20260903T030257Z__14648` — 26 cells / **26 captured** / 26 distinct /
+  `appsPresentable` 1. City's 13 liquid cells that were `unavailable` are now capturable.
+- `l12-matrix-city-maximized-v1.json`, sha256 `b758671853bd7bb4fb6f…` — 26 cells /
+  **0 captured / 26 `stateBlocked`** / `appsPresentable` 1. The no-maximize gap grows 13 → 26,
+  because city now has a second presentation to be blocked in. That growth is the reason the net
+  is not +26.
+
+Net **−13** on `unavailable`: 91 − 13 = **78**; attainable 1,209 → **1,222**. Both manifests are
+gitignored (`.gitignore:235`, `src/.coordination/**/*-matrix*.json`), so the sha256s are the
+checkable artifact — the same standing as every other v2/v3 manifest cited here.
+
+**STILL OWED, with its cost, so this is not read as a fresh atlas.** The figures above are
+*composed* from the published atlas plus two targeted runs, not re-derived by one `l12-atlas.cjs`
+pass. That pass re-hashes every indexed plate from disk, and `normal-v3`/`maximized-v2`'s 1,209
+plates live in the MAIN tree's `debug/shots/`, not this worktree's. A self-contained re-derivation
+needs both 650-cell sweeps re-captured here; calibrated at **3m17s / 26 cells**, that is ~40 min
+per state axis plus the atlas.
+
+**Instrument note for the next worker.** City is pathological for the convergence gate: all 26
+normal cells came back `converged:false` at the full 12 attempts with `worstResidualDelta` 0. That
+is the Mooncap painted scene animating, i.e. the same live-content constraint already recorded for
+translucent Liquid surfaces above — not a regression from `2b5a73cf`. Restore was measured, not
+asserted: `theme study-os`, `caretFreezeRemoved true`, `windowsClosed true`, `destructiveConfirms
+0`, `dialogsLeft 0` on both runs.
