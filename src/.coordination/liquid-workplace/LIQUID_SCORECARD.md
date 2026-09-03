@@ -1692,3 +1692,70 @@ Clicking a Start-menu app tile in the unfocused window 1 returned `clicked`, clo
 — `/focus`'s own comment in `main/debugBridge.ts` says Chromium throttles `rAF` there. One
 `POST /focus {window:1}` and every one of them opened first try. A worker who does not know
 this will file the Start menu as broken.
+
+## 2026-09-03 · primary — Resources and Calendar take categories 3 and 4, all four at a controlled 10/10 — and a SECOND desktop window silently falsifies the numbers
+
+Same RULE C pair as the category-1 entry above, same reason, same eighteen
+**sampled-out: `agent` `library` `novels` `grammar` `translate` `player` `music` `anki`
+`flashcards` `stats` `immersion` `reading` `scraper` `files` `note` `city` `visualizer`
+`musicwidget`**. Instruments: `probes/cat3-liquid-utilization.cjs` and
+`probes/cat4-use-of-space.cjs`, both `--win 1 --control`, **zero new probes** (RULE 1).
+Category 3 was driven with `--presentation liquid` (a Standard window is *supposed* to be
+opaque, so scoring one as-is is the harness scoring the wrong thing); category 4 in the
+as-found Standard, which is the product default.
+
+| # | Category | Surface | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ------- | ----- | --------------- | ------------------------------------- |
+| 3 | Liquid utilization | Calendar | **10/10** | 9 regions — Work 1, Liquid-eligible 2, Anchor 5, Anchor(holds work) 1, Ambient 0; **denseWorkOnTranslucent 0**; liquid-treated eligible **2/2**, all 2 backed by a shared primitive; window paint alpha 0.72, `blur(8px) saturate(1.25)` | one-region blur AND all-glass: Work failures `0 → 1 → 0` and `0 → all → 0`, both materials returned (`none\|rgb(26,24,35)` before and after) |
+| 3 | Liquid utilization | Resources | **10/10** | 244 regions — Work 10, Liquid-eligible 1, Anchor 210, Anchor(holds work) 11, Ambient 12; **denseWorkOnTranslucent 0**; eligible **1/1** and shared-primitive-backed | same two falsifications, `CONTROL FAILED AS REQUIRED` |
+| 4 | Use of space | Calendar | **10/10** | 3 of 3 sizes. default 820×580 · maximized 1264×773 · compact 260×170; clipped **0**, overlaps **0**, horizontal scrollers **0**, hidden overflow-x **0** at every size; dead region **5.4 / 9.8 / 0.9 %**; chrome **17.8 → 13.7 %** and canvas **93.7 → 95.3 %** default→maximized; all three legs restored | injected clip `0 → 1 → 0` and `backToBaseline`; art-plate and backdrop exclusions both `removalProven`; sub-minimum 200×140 stays 0/0/0/0 |
+| 4 | Use of space | Resources | **10/10** | same three sizes; 0/0/0/0 at each; dead region **4.7 / 6.7 / 0.8 %** (largest empty box 327×150 default, 757×92 maximized); chrome **5.7 → 4.3 %**, canvas **93.7 → 95.3 %**; all restored | identical control set, all proven |
+
+Evidence: `debug/_pri-cat3-cal.json`, `_pri-cat3-res.json`, `_pri-cat4-cal2.json`,
+`_pri-cat4-res.json`. Calendar's category-4 run is the one taken AFTER `dbf58818`, so the
+scored build is the committed one.
+
+**THE FINDING IS NOT IN THE TABLE. A SECOND DESKTOP WINDOW ON THE SAME DESK MAKES THE
+PRODUCT DROP THE USER'S CLICKS, AND MADE THIS CATEGORY SCORE FAIL.** The app was found with
+two desktop renderers open — window 1 at `localhost:5173/` and window 2 at
+`?desk=0&displayKey=display|1920x1080|1`, both rendering **desk 0** and both holding the same
+`calendar` window. Under that condition category 4 returned **FAIL** twice, on
+`restored` and then on `contentGrowsNotChrome`, with default chrome reading **5.7 %** —
+`.fwin-bar` alone, `header.lq-contextual`'s 728×79 missing from a set the same run listed it
+in. Closing window 2 changed nothing else and the surface scored **10/10** with chrome 17.8 %.
+
+The controlled measurement, because a differing score is not yet evidence of a cause. Six
+clicks on the window's own Maximize control, 2 s apart, state read before and after each:
+
+| condition | trials | clicks that changed the window |
+| --------- | ------ | ------------------------------ |
+| two desktop windows on desk 0 | 6 | **2** (`norm→norm`, `norm→MAX`, `MAX→MAX`, `MAX→MAX`, `MAX→norm`, `norm→norm`) |
+| window 2 closed, nothing else changed | 6 | **6**, alternating perfectly |
+
+It is not the bridge and not throttling: a `click` listener on the button and a capturing one
+on `document` both fired on **every** trial including the dead ones, `document.hasFocus()` was
+true and `/health` reported window 1 focused, and a fresh `POST /reload` did not clear it (2 of
+the first 4 post-reload clicks were still dead). It is not `.click()` versus a real pointer
+either — the same no-ops hit the Liquid toggle and the `os:window` `togglePresentation`
+command. A `MutationObserver` caught the mechanism directly: **one** click produced
+`fwin-max` off at t+6 ms and back on at t+131 ms, and `style.zIndex` went `20 → 18` — a
+*decrease*, i.e. a second write restoring an older snapshot. `DesktopShell` recognises its own
+layout echo by **signature** (`committedSignatures`, a 16-deep ring), not by origin, so a
+second renderer — which re-fits geometry for its own `displayKey` before committing — produces
+signatures this one never wrote and hydrates over the top of it.
+
+Not repaired here, and that is a decision rather than an omission: the fix is per-display
+layout convergence in the desktop shell, which is the most load-bearing surface in the app,
+and it is not a Liquid defect. **What every later worker needs is the operating rule: score
+with exactly one desktop window open, and check `/health` for a second one before believing
+any FAIL.** Two of the three FAILs seen this turn were fabricated by it.
+
+**`dbf58818` — the Maximize control never said which way it points.** Found while chasing the
+above. Maximized, it still read `title="Maximize"`, carried no `aria-label` and no
+`aria-pressed`, and drew the same glyph; the Liquid toggle three buttons up has swapped all
+three since L3. Now `Maximize`/`Restore down` (`desktop.restoreDown`, added en/ja/zh/ru,
+`i18n-check` 12,260 keys exit 0), `aria-pressed` carrying the state, `▢`/`❐`. Verified live in
+both directions after a reload. It also forced correction 26 in `cat4-use-of-space.cjs`, which
+matched this button by `title === 'Maximize'` — the English string, and the one the control
+stops carrying the instant it is maximized, so the restore leg would have found nothing and
+left every scored window maximized. It now matches the state affordance instead.
