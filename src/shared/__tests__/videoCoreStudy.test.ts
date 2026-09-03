@@ -48,6 +48,32 @@ describe('videoCoreStudy', () => {
     expect(raw).toBe('{\\an8}猫が\\N寝ている。');
   });
 
+  /*
+    The regression that let 633 of one track's 2,650 cues through unstripped: a karaoke
+    template marker sits between the brace and the backslash, so a rule anchored on `{\`
+    matched none of them. Per-letter blocks are the shape that release actually ships.
+  */
+  it('strips a braced override block that does not open with a backslash', () => {
+    expect(stripAssCueText('T{*\\fs30.235\\fax-0.575}a{*\\fs30.471}n{*\\fax-0.56}a'))
+      .toBe('Tana');
+    expect(stripAssCueText('{\\k23}こん{\\k18}にちは')).toBe('こんにちは');
+    // The documented boundary, pinned so a later widening is a deliberate act: a template
+    // marker carrying no backslash is left in, for the same reason `{laughs}` is.
+    expect(stripAssCueText('{=12}{\\k23}こんにちは')).toBe('{=12}こんにちは');
+  });
+
+  it('treats an ASS hard space as a space', () => {
+    expect(stripAssCueText('Itsuka\\hKotori')).toBe('Itsuka Kotori');
+  });
+
+  /*
+    The deliberate limit on the widening. An SRT stage direction is real content, and a
+    study card that silently loses it is worse than one that keeps a stray brace.
+  */
+  it('leaves a braced block with no backslash alone', () => {
+    expect(stripAssCueText('{laughs} そうですね')).toBe('{laughs} そうですね');
+  });
+
   it('applies subtitle delay only to playback seeks', () => {
     expect(cuePlaybackStartSec(cues[1], 0.25)).toBe(3.25);
     expect(cuePlaybackEndSec(cues[1], -0.5)).toBe(4);

@@ -320,10 +320,33 @@ export function shortLangTag(value: string | null | undefined): string {
   return THREE_LETTER_LANGS[base] ?? base.slice(0, 2);
 }
 
+/**
+ * A cue's readable text — what the transcript shows, what a lookup is run on, and what
+ * a mined card carries. Never what the renderer draws; JASSUB gets the raw line.
+ *
+ * ## The brace is the block, not `{\`
+ *
+ * This used to require a backslash immediately after the opening brace. Karaoke
+ * templating writes `{*\fs30.235\fax-0.575}` — libass ignores the whole braced block
+ * either way, and the `*` is just a template marker — so a whole class of release went
+ * through unstripped. Measured live 2026-09-03 on the `FFF (default)` track of one OVA:
+ * **633 of 2,650 cues (24 %)** reached the transcript still carrying override blocks,
+ * the worst of them one block *between every letter*, so a line reading `Tanabata`
+ * arrived as `T{*\fs30.235\fax-0.575}a{*\fs30.471\fax-0.571}n…`. That text is what the
+ * tokenizer, the search box and the mining panel all see.
+ *
+ * So the match is any braced block **containing a backslash**, which is what an ASS
+ * override or transform block always has. Deliberately not "any `{…}`": an SRT line can
+ * carry `{laughs}` as real content, and silently deleting a stage direction from a study
+ * card is a worse failure than leaving one in.
+ *
+ * `\h` is ASS's non-breaking space and joins `\N` / `\n` here — 376 of those same 2,650
+ * cues contained one, and it was reaching the reader as a literal backslash-h.
+ */
 export function stripAssCueText(text: string): string {
   return text
-    .replace(/\{\\[^}]*\}/g, '')
-    .replace(/\\[Nn]/g, ' ')
+    .replace(/\{[^}]*\\[^}]*\}/g, '')
+    .replace(/\\[Nnh]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
