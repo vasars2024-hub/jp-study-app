@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   AppChrome,
   StatusBarField,
   StatusBarSpacer,
   Toolbar,
   ToolbarSpacer,
+  useDismissableDisclosure,
   type MenuBarMenu,
   useAeroMaterials,
 } from '../components/ui';
@@ -29,6 +30,12 @@ export default function StatisticsView() {
   const state = useStats();
   const { summary: s, peak, hasData, refresh, resetAllStats } = state;
   const recentActivityRef = useRef<HTMLElement>(null);
+  // The Reset disclosure's panel is positioned out of flow and lands on top of the Word
+  // Knowledge "Sync from Anki" button one row below it, so without a light dismiss the only
+  // gesture that reads as "never mind" presses Reset instead. See the hook's own measurement.
+  const dataToolsRef = useRef<HTMLDetailsElement>(null);
+  const [dataToolsOpen, setDataToolsOpen] = useState(false);
+  useDismissableDisclosure(dataToolsRef, dataToolsOpen);
 
   const menus: MenuBarMenu[] = [
     {
@@ -175,7 +182,11 @@ export default function StatisticsView() {
               <Icon name="chart-bar" size={13} />
               {t('stats.last14Days')}
             </button>
-            <details className="stats-data-tools">
+            <details
+              className="stats-data-tools"
+              ref={dataToolsRef}
+              onToggle={(e) => setDataToolsOpen((e.currentTarget as HTMLDetailsElement).open)}
+            >
               <summary className="btn">{t('stats.reset')}</summary>
               <div className="stats-data-tools-panel">
                 <button

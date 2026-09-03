@@ -1585,6 +1585,7 @@
         recentActivity: (w) => removeClassAll(
           [q(w, '.stats-recent-activity')],
           'stats-recent-activity',
+          'no recent-activity section — this surface has no study data yet',
         ),
         resetRecovery: (w) => detach(q(w, '.stats-data-tools-panel > button'), 'no reset action'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
@@ -6590,16 +6591,23 @@
     });
     return { mutated: `${cls} added to ${n} of ${nodes.length}` };
   }
-  function removeClassAll(nodes, cls) {
+  // A SPEC MAY HAND THIS A MISSING NODE, and a mutation that THROWS is not a control — it is
+  // an unreadable run. `statistics.recentActivity` passes `[q(w, '.stats-recent-activity')]`,
+  // which is `[null]` on an unseeded surface; 2026-09-03 that deref reached the bridge as
+  // `{__error}` and every cat harness reported `"[object Object]" is not valid JSON`. Refuse
+  // by name, exactly as `detach`/`stripAttr` already do when their node is absent.
+  function removeClassAll(nodes, cls, refusal) {
+    const present = (nodes || []).filter(Boolean);
+    if (!present.length) return { refused: refusal || `no node carrying ${cls}` };
     let n = 0;
-    nodes.forEach((el) => {
+    present.forEach((el) => {
       if (el.classList.contains(cls)) {
         el.classList.remove(cls);
         el.setAttribute('data-lqp-removed-class', cls);
         n += 1;
       }
     });
-    return { mutated: `${cls} removed from ${n} of ${nodes.length}` };
+    return { mutated: `${cls} removed from ${n} of ${present.length}` };
   }
   function stripAttr(node, attr, refusal) {
     if (!node) return { refused: refusal };
