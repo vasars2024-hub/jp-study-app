@@ -89,6 +89,21 @@ playback frees anything — do not read a trend into three points taken 2 minute
    drop video frames. That is exactly why the rAF half alone could never have answered this
    bullet, and it is the measured version of the claim, not the assumed one.
 
+## The same reading in Liquid presentation
+
+Taken while closing plan:739 ("Validate every player feature in standard and Liquid modes"),
+on the same clip and the same process, with the workspace host toggled through its own
+`.seanime-host-liquid` control (`data-presentation` standard → liquid, `workspace-liquid` on):
+
+**31 decoded / 0 dropped / 0 corrupted, 23.6 fps, advanced 1.315 s, renderer p50 16.7 / p95
+16.9 ms, 0 frames over 100 ms, box 1264x821.** Indistinguishable from the six standard
+readings above on every field.
+
+And the switch itself is not a stall: the clip played straight through it — **currentTime
++8.88 s, 212 frames decoded, 0 dropped** across the toggle. Returning to standard reproduced
+all nine measured presentation properties byte-identically and REMOVED
+`lq.workspace.presentation` (null, not the string `standard`).
+
 ## What this leg does NOT cover, stated rather than implied
 
 - **One clip, one container, one codec.** 1280x720 H.264-in-MKV over the local directstream.
