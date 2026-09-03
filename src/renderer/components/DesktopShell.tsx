@@ -30,7 +30,12 @@ import {
   type FitMemory,
 } from '../desktopLayoutFit';
 import { neighbourDisplayKey } from '../monitorRing';
-import { fitNewWindowRect } from '../desktopWindowGeometry';
+import {
+  canMaximizeSection,
+  fitNewWindowRect,
+  maximizedGeometry,
+  restorePoint,
+} from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
 import { createRenderIdentityCache } from '../renderIdentityCache';
 import { markSectionOpenHandled } from '../sectionSurface';
@@ -317,6 +322,10 @@ const NOTE_COLOR_LABEL_KEYS = [
 const MIN_W = 260;
 const MIN_H = 170;
 const WIN_SNAP = 26;
+
+// `canMaximizeSection`, `maximizedGeometry` and `restorePoint` are imported from
+// `../desktopWindowGeometry` — pure, so they carry their own unit tests rather
+// than a regex over this file.
 /** HTML5 DnD payload for pinning a Start-menu app onto the desktop. */
 const START_APP_DND = 'text/x-study-os-app';
 
@@ -1556,7 +1565,7 @@ export default function DesktopShell({
     setWins((ws) =>
       ws.map((w) => {
         if (w.id !== id) return w;
-        const next = w.section === 'city' && p.max ? { ...p, max: false } : p;
+        const next = p.max && !canMaximizeSection(w.section) ? { ...p, max: false } : p;
         return { ...w, ...next };
       }),
     );
@@ -1877,21 +1886,20 @@ export default function DesktopShell({
       if (ws.length < 1) return;
       // Find currently focused window (highest z that's not minimized)
       const currentFocused = ws.filter((w) => !w.min).reduce((a, b) => (b.z > a.z ? b : a), ws[0]);
-      if (dir === 1) {
-        // Forward: cycle to next window and maximize it
-        const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
-        const nextIdx = (currentIdx + 1) % ws.length;
-        const next = ws[nextIdx];
-        focus(next.id);
-        patch(next.id, { max: next.section !== 'city', min: false });
-      } else {
-        // Backward: cycle to previous window and maximize it
-        const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
-        const prevIdx = currentIdx <= 0 ? ws.length - 1 : currentIdx - 1;
-        const prev = ws[prevIdx];
-        focus(prev.id);
-        patch(prev.id, { max: prev.section !== 'city', min: false });
+      const currentIdx = ws.findIndex((w) => w.id === currentFocused.id);
+      const target =
+        dir === 1
+          ? ws[(currentIdx + 1) % ws.length]
+          : ws[currentIdx <= 0 ? ws.length - 1 : currentIdx - 1];
+      focus(target.id);
+      // A section that renders no maximize control is raised and left alone,
+      // rather than given a full-desk rect it then owns no way out of.
+      if (!canMaximizeSection(target.section)) {
+        patch(target.id, { min: false });
+        return;
       }
+      const { w: dw, h: dh } = deskSize();
+      patch(target.id, { ...maximizedGeometry(dw, dh), ...restorePoint(target) });
     };
     // Window-management shortcuts (Settings → Shortcuts → Window). One event
     // with an action tag; geometry maths all run against the live desk size so
@@ -1903,20 +1911,18 @@ export default function DesktopShell({
       const topWin = open.length ? open.reduce((a, b) => (b.z > a.z ? b : a)) : null;
       const { w: dw, h: dh } = deskSize();
 
-      // Remember pre-snap geometry once, so restore returns to the real size
-      // rather than to whatever half-screen the last snap left behind.
-      const withRestore = (w: Win): Partial<Win> =>
-        w.rect ? {} : { rect: { x: w.x, y: w.y, w: w.w, h: w.h } };
+      // `restorePoint` (module scope) remembers pre-snap geometry once.
+      const withRestore = restorePoint;
 
       switch (action) {
         case 'maximize': {
           if (!topWin) return;
-          if (topWin.section === 'city') return;
+          if (!canMaximizeSection(topWin.section)) return;
           if (topWin.max) {
             const r = topWin.rect;
             patch(topWin.id, r ? { max: false, ...r, rect: undefined } : { max: false });
           } else {
-            patch(topWin.id, { max: true, min: false, ...withRestore(topWin) });
+            patch(topWin.id, { ...maximizedGeometry(dw, dh), ...withRestore(topWin) });
           }
           return;
         }
@@ -2102,7 +2108,16 @@ export default function DesktopShell({
         if (w.id !== id) return w;
         if (w.max) return { ...w, max: false, ...(w.rect ?? {}), z: ++zTop.current };
         const { w: dw, h: dh } = deskSize();
-        return { ...w, max: true, rect: { x: w.x, y: w.y, w: w.w, h: w.h }, x: 0, y: 0, w: dw, h: dh, z: ++zTop.current };
+        // Same geometry the two shortcut routes now apply. This one captures the
+        // rect unconditionally rather than through `restorePoint`: the button is
+        // the only route that can be pressed on a window the user just snapped,
+        // and its own restore leg reads `w.rect` back.
+        return {
+          ...w,
+          ...maximizedGeometry(dw, dh),
+          rect: { x: w.x, y: w.y, w: w.w, h: w.h },
+          z: ++zTop.current,
+        };
       }),
     );
   };
@@ -3715,7 +3730,8 @@ const FloatingWindow = memo(function FloatingWindow({
   const isVisualizer = win.section === 'visualizer';
   const isMusicWidget = win.section === 'musicwidget';
   const isGarden = win.section === 'city';
-  const isMaximized = Boolean(win.max) && !isGarden;
+  const canMaximize = canMaximizeSection(win.section);
+  const isMaximized = Boolean(win.max) && canMaximize;
   // The `.fwin` root also carries `data-section`, so a window can be addressed
   // by WHAT IT IS rather than by the localised text in its title bar. Three
   // sections render an EMPTY title — `visualizer`, `musicwidget` and the
@@ -3909,7 +3925,7 @@ const FloatingWindow = memo(function FloatingWindow({
           className="fwin-bar"
           style={isNote && noteColor && !liquid ? { background: noteColor, borderBottomColor: 'rgba(0,0,0,0.15)' } : undefined}
           onPointerDown={dragStart}
-          onDoubleClick={() => !isNote && onMaximize()}
+          onDoubleClick={() => canMaximize && onMaximize()}
         >
           <span className="fwin-title" style={isNote && !liquid ? { color: '#3a3320' } : undefined}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
@@ -3933,22 +3949,27 @@ const FloatingWindow = memo(function FloatingWindow({
               </button>
             )}
             {!isNote && (
-              <>
-                <button
-                  className="fwin-b lq-hit"
-                  title={t('desktop.minimize')}
-                  onClick={onMinimize}
-                >
-                  ─
-                </button>
-                <button
-                  className="fwin-b lq-hit"
-                  title={t('desktop.maximize')}
-                  onClick={onMaximize}
-                >
-                  ▢
-                </button>
-              </>
+              <button
+                className="fwin-b lq-hit"
+                title={t('desktop.minimize')}
+                onClick={onMinimize}
+              >
+                ─
+              </button>
+            )}
+            {/* Two gates, because they are two different refusals: a note is not
+                minimizable (it has no taskbar identity to return from) and it is
+                not maximizable (nothing here could bring it back). Split so the
+                maximize control and every route that sets the flag read the one
+                predicate. */}
+            {canMaximize && (
+              <button
+                className="fwin-b lq-hit"
+                title={t('desktop.maximize')}
+                onClick={onMaximize}
+              >
+                ▢
+              </button>
             )}
             <button
               className="fwin-b lq-hit fwin-close"
