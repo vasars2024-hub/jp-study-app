@@ -1126,3 +1126,15 @@ Mutation control measured: reverting the four declarations fails all 3; styles.c
 byte-identically (sha256 `4b964fcf6aff0e3d0568` before and after). It reads a **comment-stripped**
 copy of the sheet, because `.flash-review-shell .flash-card` also appears in prose there and a
 raw `indexOf` finds the comment first.
+
+**The instrument gap recorded above is CLOSED — `d84bb72a`, same day.** cat3's two eligibility
+bars are `eligibleTotal > 0 && ...`, and the branch that forgives a zero denominator lived
+inside `if (!work)`, where controls C and D prove the zero is measured. Controls A and B never
+ask that question, so a surface with a Work region AND a correct zero — this one — could not
+reach it. The plant now runs in the A/B branch as well. Re-run, same surface and flags:
+**PASS 10/10, `failedBars []`, `vacuousContextual true`, exit 0**, against the FAIL it printed
+before. Control on the repair, because a forgiveness that always fires is just a widened bar:
+control C's `<nav>` swapped for a `<div>` — same box, same alpha, no landmark — left
+`eligibleTotal` at 0 and the run returned **VOID at exit 1** with both bars still false; the
+probe was restored byte-identically. `barsWhilePlanted` is now recorded in every such run, so
+the low score this category must be able to produce stays visible on the passing surface.
