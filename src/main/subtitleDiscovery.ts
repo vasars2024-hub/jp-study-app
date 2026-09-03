@@ -1031,16 +1031,22 @@ export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
     : (input && typeof input === 'object' && typeof (input as { path?: unknown }).path === 'string'
         ? (input as { path: string }).path
         : '');
-  if (!filePath) return { ok: false, message: 'No subtitle file was given.' };
+  if (!filePath) return { ok: false, message: 'No subtitle file was given.', reason: 'no-path' };
 
   const format = path.extname(filePath).slice(1).toLowerCase() as SubtitleRecordFormat;
   if (!READABLE_EXTENSIONS.includes(format)) {
-    return { ok: false, message: `${path.extname(filePath) || 'That file'} is not a subtitle format this app can read.` };
+    return {
+      ok: false,
+      message: `${path.extname(filePath) || 'That file'} is not a subtitle format this app can read.`,
+      reason: 'unreadable-format',
+    };
   }
   try {
-    if (!fs.statSync(filePath).isFile()) return { ok: false, message: 'That path is not a file.' };
+    if (!fs.statSync(filePath).isFile()) {
+      return { ok: false, message: 'That path is not a file.', reason: 'missing-file' };
+    }
   } catch {
-    return { ok: false, message: 'That subtitle file is no longer on disk.' };
+    return { ok: false, message: 'That subtitle file is no longer on disk.', reason: 'missing-file' };
   }
 
   const dir = path.dirname(filePath).toLowerCase();
@@ -1055,12 +1061,17 @@ export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
     return {
       ok: false,
       message: `No library item sits beside ${fileName}. Add the video first, then the subtitle attaches to it.`,
+      reason: 'no-owner',
     };
   }
 
   const existing = owner.subtitles ?? [];
   if (existing.some((record) => record.path?.toLowerCase() === filePath.toLowerCase())) {
-    return { ok: false, message: `${fileName} is already attached to ${owner.title ?? owner.fileName}.` };
+    return {
+      ok: false,
+      message: `${fileName} is already attached to ${owner.title ?? owner.fileName}.`,
+      reason: 'duplicate',
+    };
   }
 
   const stem = path.basename(owner.path, path.extname(owner.path));
@@ -1069,6 +1080,7 @@ export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
     return {
       ok: false,
       message: `${fileName} does not name a language, so it cannot be filed as one. Rename it like "${stem}.ja${path.extname(filePath)}".`,
+      reason: 'no-language',
     };
   }
 

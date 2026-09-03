@@ -1386,6 +1386,13 @@ export const en: Catalog = {
     other: 'The {count} files were received but could not be examined, so nothing was imported.',
   },
   'fileDrop.toast.failed': 'Could not import {name}.',
+  // A dropped subtitle refuses five distinct ways and every one of them used to
+  // read "Could not import {name}." The first is the one the user can act on.
+  'fileDrop.toast.subtitleNoOwner': 'No video beside {name} is in the library yet. Add the video first, then drop the subtitle again.',
+  'fileDrop.toast.subtitleDuplicate': '{name} is already attached to that video.',
+  'fileDrop.toast.subtitleNoLanguage': '{name} does not name a language. Rename it so the language comes before the extension, like "episode.ja.srt".',
+  'fileDrop.toast.subtitleUnreadable': '{name} is not a subtitle format this app can read.',
+  'fileDrop.toast.subtitleMissing': '{name} is no longer where it was dropped from.',
   'fileDrop.toast.undone': 'Undone.',
   'desktop.task.onDesktop': '{name} — on {desktop}',
   // Motion & Accessibility (Phase 4.5)

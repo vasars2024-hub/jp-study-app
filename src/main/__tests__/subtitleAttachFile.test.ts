@@ -169,6 +169,47 @@ describe('attachSubtitleFile', () => {
     expect(attachSubtitleFile('').ok).toBe(false);
     expect(patches).toHaveLength(0);
   });
+
+  /**
+   * Each refusal carries a CODE, not only a sentence.
+   *
+   * The prose is written for surfaces that render a sentence. The drop router
+   * cannot: `ImportHooks.onRefused` takes an i18n key, so before this every one
+   * of these arrived at the user as "Could not import {name}." — the six honest
+   * states below collapsed into one useless one.
+   *
+   * Asserted as a set rather than one at a time so that adding a seventh
+   * refusal without a code is caught here instead of at a toast.
+   */
+  it('names every refusal with a distinct machine-readable reason', () => {
+    items = [mediaItem()];
+    const gone = path.join(libraryDir, 'jojo-01.ja.srt');
+    const cases: [string, unknown][] = [
+      ['no-path', undefined],
+      ['unreadable-format', sidecar('jojo-01.ja.txt')],
+      ['missing-file', gone],
+      ['no-owner', sidecar('totally-unrelated.ja.srt')],
+      ['no-language', sidecar('jojo-01.srt')],
+    ];
+    for (const [expected, input] of cases) {
+      const res = attachSubtitleFile(input);
+      expect(res.ok, `${expected} must refuse`).toBe(false);
+      expect(res.reason, `input ${String(input)}`).toBe(expected);
+    }
+
+    // `duplicate` needs a successful attach first, so it is measured separately.
+    const good = sidecar('jojo-01.ja.srt');
+    expect(attachSubtitleFile(good).ok).toBe(true);
+    items = [mediaItem({ subtitles: [{ path: good } as SubtitleRecord] })];
+    expect(attachSubtitleFile(good).reason).toBe('duplicate');
+
+    // The control: a refusal code is never set on success.
+    fs.rmSync(good);
+    items = [mediaItem()];
+    const ok = attachSubtitleFile(sidecar('jojo-01.ja.srt'));
+    expect(ok.ok).toBe(true);
+    expect(ok.reason).toBeUndefined();
+  });
 });
 
 describe('the import call site actually uses it', () => {
@@ -184,8 +225,42 @@ describe('the import call site actually uses it', () => {
   it('the dropped-subtitle case calls the real route', () => {
     const importer = source('renderer', 'fileImportExecute.ts');
     expect(importer).toContain('window.api.attachSubtitleFile(subject.path)');
-    // And refuses on failure rather than returning a receipt for nothing.
-    expect(importer).toContain('if (!res?.ok) return refuse(IMPORT_REFUSE_FAILED)');
+    // And refuses on failure rather than returning a receipt for nothing —
+    // through the reason map, so the toast says which of the five it was.
+    expect(importer).toContain('if (!res?.ok) return refuse(subtitleRefusalKey(res?.reason))');
+  });
+
+  /**
+   * Every reason main can emit reaches a key that exists in all four catalogs.
+   *
+   * Derived from the union in `shared/subtitleDiscoveryIpc.ts` rather than from
+   * a list written here, so adding a code without a translation fails this test
+   * instead of shipping an untranslated toast. `no-path` is deliberately absent
+   * from the map — a drop always has a path — and falls through to the generic
+   * key, which is asserted as the default rather than assumed.
+   */
+  it('maps every reason to a key present in en, ja, zh and ru', async () => {
+    const ipc = source('shared', 'subtitleDiscoveryIpc.ts');
+    const union = ipc.slice(ipc.indexOf('export type SubtitleAttachRefusal'));
+    const codes = [...union.slice(0, union.indexOf(';')).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+    expect(codes.sort()).toEqual([
+      'duplicate', 'missing-file', 'no-language', 'no-owner', 'no-path', 'unreadable-format',
+    ]);
+
+    const { subtitleRefusalKey, IMPORT_REFUSE_FAILED } =
+      await import('../../renderer/fileImportExecute');
+    expect(subtitleRefusalKey('no-path' as never)).toBe(IMPORT_REFUSE_FAILED);
+    expect(subtitleRefusalKey(undefined)).toBe(IMPORT_REFUSE_FAILED);
+
+    const catalogs = ['en', 'ja', 'zh', 'ru'].map((lang) =>
+      source('shared', 'i18n', 'catalogs', `${lang}.ts`));
+    for (const code of codes.filter((c) => c !== 'no-path')) {
+      const key = subtitleRefusalKey(code as never);
+      expect(key, code).not.toBe(IMPORT_REFUSE_FAILED);
+      for (const [i, catalog] of catalogs.entries()) {
+        expect(catalog, `${code} in ${['en', 'ja', 'zh', 'ru'][i]}`).toContain(`'${key}':`);
+      }
+    }
   });
 
   it('no dispatch of the dead media:attach-subtitle event survives', () => {

@@ -1417,6 +1417,11 @@ export const ru: Catalog = {
     other: 'Получено {count} файла, но изучить их не удалось, поэтому ничего не импортировано.',
   },
   'fileDrop.toast.failed': 'Не удалось импортировать {name}.',
+  'fileDrop.toast.subtitleNoOwner': 'Видео рядом с {name} ещё нет в библиотеке. Сначала добавьте видео, затем перетащите субтитры снова.',
+  'fileDrop.toast.subtitleDuplicate': '{name} уже прикреплён к этому видео.',
+  'fileDrop.toast.subtitleNoLanguage': 'В имени {name} не указан язык. Переименуйте так, чтобы язык шёл перед расширением, например «episode.ja.srt».',
+  'fileDrop.toast.subtitleUnreadable': '{name} — не тот формат субтитров, который приложение умеет читать.',
+  'fileDrop.toast.subtitleMissing': '{name} больше нет там, откуда его перетащили.',
   'fileDrop.toast.undone': 'Отменено.',
   'desktop.task.onDesktop': '{name} — на «{desktop}»',
   // Motion & Accessibility (Phase 4.5)

@@ -24,6 +24,7 @@
  * behaviour this whole router exists to remove.
  */
 import type { DropTargetId } from '../shared/fileRouting';
+import type { SubtitleAttachRefusal } from '../shared/subtitleDiscoveryIpc';
 import { importApkgCards } from './apkgImport';
 import { removeDeckCards } from './flashcardDeck';
 
@@ -56,6 +57,30 @@ export interface ImportHooks {
 export const IMPORT_REFUSE_FAILED = 'fileDrop.toast.failed';
 export const IMPORT_REFUSE_NO_DESTINATION = 'fileDrop.toast.noDestination';
 export const IMPORT_REFUSE_EMPTY_FOLDER = 'fileDrop.toast.emptyFolder';
+
+/**
+ * A subtitle attach refusal, as the key the toast can actually translate.
+ *
+ * `attachSubtitleFile` in main refuses five distinct ways and writes a sentence
+ * for each — but `onRefused` carries an i18n KEY, not prose, so all five arrived
+ * here as "Could not import {name}." The user was told the drop failed and never
+ * that the fix is to add the video first, which is the one refusal they can act
+ * on and by far the most common.
+ *
+ * Unknown or absent reasons fall back to the generic key rather than throwing:
+ * main is free to add a code before the renderer knows it, and an untranslated
+ * toast is a worse failure than a vague one.
+ */
+export function subtitleRefusalKey(reason: SubtitleAttachRefusal | undefined): string {
+  switch (reason) {
+    case 'no-owner': return 'fileDrop.toast.subtitleNoOwner';
+    case 'duplicate': return 'fileDrop.toast.subtitleDuplicate';
+    case 'no-language': return 'fileDrop.toast.subtitleNoLanguage';
+    case 'unreadable-format': return 'fileDrop.toast.subtitleUnreadable';
+    case 'missing-file': return 'fileDrop.toast.subtitleMissing';
+    default: return IMPORT_REFUSE_FAILED;
+  }
+}
 
 /**
  * Import one subject into one destination.
@@ -147,7 +172,7 @@ export async function executeImport(
         by name when no library item sits beside the file.
       */
       const res = await window.api.attachSubtitleFile(subject.path);
-      if (!res?.ok) return refuse(IMPORT_REFUSE_FAILED);
+      if (!res?.ok) return refuse(subtitleRefusalKey(res?.reason));
       hooks.onOpenSection?.('player');
       return { targetId: target, libraryIds: [], mediaIds: [] };
     }

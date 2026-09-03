@@ -222,11 +222,44 @@ export interface NyaaSubtitleListResult {
   message: string;
 }
 
+/**
+ * Why a subtitle attach refused, as a code the UI can act on.
+ *
+ * `message` is written for a person and is the right thing to *show* wherever a
+ * surface can show a sentence. But the file-drop router cannot: `ImportHooks.
+ * onRefused` takes an i18n key, so every named refusal `attachSubtitleFile`
+ * produces collapsed into one "Could not import {name}." — the user was told
+ * that something failed and never that the fix is to add the video first. These
+ * codes are what a caller with only a key to give can still translate.
+ *
+ * Deliberately NOT a replacement for `message`: main writes English prose there
+ * for surfaces that render it directly, and dropping that would make every
+ * non-drop caller worse to fix one caller.
+ */
+export type SubtitleAttachRefusal =
+  /** Nothing was handed in — an empty or non-string path. */
+  | 'no-path'
+  /** The extension is not one this app can parse. */
+  | 'unreadable-format'
+  /** The path is gone, or is a directory rather than a file. */
+  | 'missing-file'
+  /** No library item sits beside it, so there is nobody to attach it to. */
+  | 'no-owner'
+  /** That exact path is already attached to that item. */
+  | 'duplicate'
+  /** The name carries no language tag, so it cannot be filed as one. */
+  | 'no-language';
+
 export interface NyaaSubtitleAcceptResult {
   ok: boolean;
   message: string;
   /** Language of the attached record, so the caller can refresh the right row. */
   lang?: string;
+  /**
+   * Set on refusals that a caller may want to act on differently. Optional and
+   * additive: every existing caller reads `ok` and `message` and is unaffected.
+   */
+  reason?: SubtitleAttachRefusal;
 }
 
 /**

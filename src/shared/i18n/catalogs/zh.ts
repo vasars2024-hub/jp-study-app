@@ -1268,6 +1268,11 @@ export const zh: Catalog = {
     other: '已收到 {count} 个文件，但无法检查其内容，因此未导入任何内容。',
   },
   'fileDrop.toast.failed': '无法导入 {name}。',
+  'fileDrop.toast.subtitleNoOwner': '{name} 旁边的视频还不在媒体库中。请先添加视频，然后再拖入字幕。',
+  'fileDrop.toast.subtitleDuplicate': '{name} 已经附加到该视频了。',
+  'fileDrop.toast.subtitleNoLanguage': '{name} 没有标注语言。请重命名，让语言位于扩展名之前，例如“episode.ja.srt”。',
+  'fileDrop.toast.subtitleUnreadable': '{name} 不是本应用能读取的字幕格式。',
+  'fileDrop.toast.subtitleMissing': '{name} 已不在拖入时所在的位置。',
   'fileDrop.toast.undone': '已撤销。',
   'desktop.task.onDesktop': '{name} — 位于 {desktop}',
   // Motion & Accessibility (Phase 4.5)

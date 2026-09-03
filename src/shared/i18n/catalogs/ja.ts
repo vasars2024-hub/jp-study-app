@@ -1271,6 +1271,11 @@ export const ja: Catalog = {
     other: 'ファイル {count} 件を受け取りましたが、内容を調べられなかったため何も取り込みませんでした。',
   },
   'fileDrop.toast.failed': '{name} を取り込めませんでした。',
+  'fileDrop.toast.subtitleNoOwner': '{name} の隣にある動画はまだライブラリにありません。先に動画を追加してから、字幕をもう一度ドロップしてください。',
+  'fileDrop.toast.subtitleDuplicate': '{name} はその動画にすでに添付されています。',
+  'fileDrop.toast.subtitleNoLanguage': '{name} に言語が書かれていません。「episode.ja.srt」のように、拡張子の前に言語が来る名前に変更してください。',
+  'fileDrop.toast.subtitleUnreadable': '{name} はこのアプリが読める字幕形式ではありません。',
+  'fileDrop.toast.subtitleMissing': '{name} はドロップ元の場所にもうありません。',
   'fileDrop.toast.undone': '取り消しました。',
   'desktop.task.onDesktop': '{name} — {desktop} にあります',
   // Motion & Accessibility (Phase 4.5)
