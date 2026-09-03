@@ -3962,13 +3962,22 @@ const FloatingWindow = memo(function FloatingWindow({
                 not maximizable (nothing here could bring it back). Split so the
                 maximize control and every route that sets the flag read the one
                 predicate. */}
+            {/* A toggle that never says which way it is pointing. Measured on the
+                Calendar window 2026-09-03: maximized, the control still read
+                `title="Maximize"`, carried no `aria-label` and no `aria-pressed`,
+                so a screen reader announced "Maximize" on an already-maximized
+                window and the tooltip promised the opposite of what the click
+                does. The Liquid toggle three buttons up has swapped all three
+                since L3; this one never did. Same shape, same fix. */}
             {canMaximize && (
               <button
                 className="fwin-b lq-hit"
-                title={t('desktop.maximize')}
+                title={isMaximized ? t('desktop.restoreDown') : t('desktop.maximize')}
+                aria-label={isMaximized ? t('desktop.restoreDown') : t('desktop.maximize')}
+                aria-pressed={isMaximized}
                 onClick={onMaximize}
               >
-                ▢
+                {isMaximized ? '❐' : '▢'}
               </button>
             )}
             <button

@@ -3875,6 +3875,7 @@ export const en: Catalog = {
   'desktop.popOut': 'Pop out into its own window',
   'desktop.minimize': 'Minimize',
   'desktop.maximize': 'Maximize',
+  'desktop.restoreDown': 'Restore down',
   'desktop.resize': 'Resize',
   'desktop.makeLiquid': 'Make Liquid',
   'desktop.returnToStandard': 'Return to standard window',
