@@ -10976,7 +10976,7 @@ export const zh: Catalog = {
     other: '正在监视 {count} 个文件夹',
   },
   'filesApp.watch.arrived': {
-    other: '已到达 {count} 个文件，最后一个用时 {seconds} 秒',
+    other: '已到达 {count} 个文件，最后一个是 {name}，用时 {seconds} 秒',
   },
   'filesApp.watch.dismiss': '关闭',
   'filesApp.settings.error.emptyRoot': '请先在上面输入要监视的文件夹。',

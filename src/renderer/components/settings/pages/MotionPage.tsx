@@ -243,7 +243,10 @@ export default function MotionPage() {
           {t('settings.motion.reset.action')}
         </button>
         <p className="muted os-set-hint">
-          {t('settings.motion.effective', { velocity: effectiveVelocity(m).toFixed(2) })}
+          {/* A number, not `toFixed(2)` — see core.ts:62; a string skips Intl. */}
+          {t('settings.motion.effective', {
+            velocity: Math.round(effectiveVelocity(m) * 100) / 100,
+          })}
         </p>
       </SettingsCard>
     </>

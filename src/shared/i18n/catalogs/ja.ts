@@ -11082,7 +11082,7 @@ export const ja: Catalog = {
     other: '{count} 個のフォルダーを監視中',
   },
   'filesApp.watch.arrived': {
-    other: '{count} 件が届きました（最後の 1 件は {seconds} 秒後）',
+    other: '{count} 件が届きました（最後は {name}、{seconds} 秒後）',
   },
   'filesApp.watch.dismiss': '閉じる',
   'filesApp.settings.error.emptyRoot': '監視する前に、上にフォルダーを入力してください。',

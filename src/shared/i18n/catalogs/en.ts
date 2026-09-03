@@ -11562,7 +11562,7 @@ export const en: Catalog = {
   },
   'filesApp.watch.arrived': {
     one: '{name} arrived after {seconds} s',
-    other: '{count} files arrived, the last after {seconds} s',
+    other: '{count} files arrived, the last {name} after {seconds} s',
   },
   'filesApp.watch.dismiss': 'Dismiss',
   'filesApp.settings.error.emptyRoot': 'Type a folder above before watching it.',

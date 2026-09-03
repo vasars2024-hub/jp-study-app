@@ -463,7 +463,11 @@ export function FilesMemoryPanel({ focusCardId = null }: FilesMemoryPanelProps) 
             detail={t('settings.memory.usedOf', {
               used: formatBytes(usage.used),
               total: formatBytes(usage.quota),
-              pct: usagePct.toFixed(1),
+              // Rounded as a NUMBER, not `toFixed(1)`: `t()` locale-formats
+              // numbers via Intl and passes strings through verbatim, so the
+              // string form prints "3.2" to a Russian reader whose every other
+              // number on this panel says "3,2" (core.ts:62).
+              pct: Math.round(usagePct * 10) / 10,
             })}
           />
         ) : (
