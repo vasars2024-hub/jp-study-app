@@ -521,8 +521,12 @@ const CONTROL_INJECT = `(function(){
   d.id = '__cat1Control';
   d.style.cssText = 'position:relative;background:#3a3a3a;padding:4px;display:flex;gap:8px;align-items:center';
   d.innerHTML = '<span style="color:#4a4a4a;font-size:13px">contrast control</span>'
-    + '<button style="width:12px;height:12px;padding:0" aria-label="tiny a">a</button>'
-    + '<button style="width:12px;height:12px;padding:0;margin-left:-4px" aria-label="tiny b">b</button>'
+    // The class is what the pointer leg's assertion NAMES. l1-hit-area.js labels a row
+    // tag.class1.class2, so these two arrive as button.cat1TinyTarget and the control can
+    // demand that exact victim rather than a count that layout can move underneath it.
+    // (No backticks in here - this comment lives INSIDE a template literal.)
+    + '<button class="cat1TinyTarget" style="width:12px;height:12px;padding:0" aria-label="tiny a">a</button>'
+    + '<button class="cat1TinyTarget" style="width:12px;height:12px;padding:0;margin-left:-4px" aria-label="tiny b">b</button>'
     + '<button tabindex="-1" style="width:40px;height:40px" aria-label="unreachable">u</button>'
     // Correction 30's own control, two halves that must land on OPPOSITE sides of the
     // exemption. The first is pure decoration and must be exempted (decorativeSkipped moves).
@@ -1104,9 +1108,22 @@ async function runKeyboard() {
     const dirtyHit = await hitArea();
     await ev(CONTROL_REMOVE);
     const restored = await run();
+    // Correction 31, and it cost `files` a whole scored category. The pointer leg used to be
+    // `dirtyHit.belowFloorByHit > base.hit.belowFloorByHit` — a COUNT comparison — and the
+    // plant is a 48px-tall flex row appended into a fixed-height `.fwin` flex column. On Files
+    // it shrank `.fwin-body` by 48px, pushed five real below-floor controls out of their scroll
+    // parents into `occluded` (25 -> 27), and the total went 39 -> 36 WITH the two 12px buttons
+    // correctly caught inside it. The control had falsified the bar and the harness said it had
+    // not. So the assertion now NAMES its victim: the walk must file `button.cat1TinyTarget`
+    // below the floor while dirty, and must not have it at baseline. The count delta is kept
+    // beside it as information, never as the gate.
+    const plantRows = (hit) => (hit && !hit.refuse ? (hit.belowFloor || []) : [])
+      .filter((g) => String(g.sel || '').includes('cat1TinyTarget'))
+      .reduce((n, g) => n + g.n, 0);
+    const plantCaught = plantRows(dirtyHit);
     const moved = {
       contrast: dirty.text.failingCount > base.text.failingCount,
-      targetsByPointer: !dirtyHit.refuse && dirtyHit.belowFloorByHit > base.hit.belowFloorByHit,
+      targetsByPointer: !dirtyHit.refuse && plantCaught >= 2 && plantRows(base.hit) === 0,
       targetsByRect: dirty.targets.under32Count > base.targets.under32Count,
       wcag258: dirty.targets.wcag258FailCount > base.targets.wcag258FailCount,
       keyboard: dirty.keyboard.unreachableCount > base.keyboard.unreachableCount,
@@ -1131,6 +1148,10 @@ async function runKeyboard() {
       moved,
       backToBaseline,
       rectDrift,
+      // Information, not a bar: the plant reflows the surface, so this delta can go either way.
+      plantCaughtByPointer: plantCaught,
+      pointerCountDelta: dirtyHit.refuse ? null : dirtyHit.belowFloorByHit - base.hit.belowFloorByHit,
+      pointerOccludedDelta: dirtyHit.refuse ? null : (dirtyHit.occludedCount || 0) - (base.hit.occludedCount || 0),
       // [contrast failures, rect under32, wcag2.5.8 failures, unreachable, belowFloorByHit]
       counts: {
         base: [base.text.failingCount, base.targets.under32Count, base.targets.wcag258FailCount, base.keyboard.unreachableCount, base.hit.belowFloorByHit],

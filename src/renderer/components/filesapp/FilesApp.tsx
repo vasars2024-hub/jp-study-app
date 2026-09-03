@@ -1057,6 +1057,11 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       <button
         type="button"
         className="fa-tree-node fa-tree-root"
+        /* The collapsed rail clips the label out of the layout (filesApp.css,
+           §collapsed rail) — `title` is how a pointer user gets the name back.
+           Set unconditionally: it is the same string either way, and a title
+           that only exists at one breakpoint is a thing to forget. */
+        title={t('filesApp.tree.everything')}
         data-selected={folderSelection.kind === 'root' ? 'true' : undefined}
         aria-pressed={folderSelection.kind === 'root'}
         onClick={() => {
@@ -1073,6 +1078,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           key={node.id}
           type="button"
           className="fa-tree-node"
+          title={t(node.labelKey)}
           data-leaf={node.isLeaf ? 'true' : undefined}
           data-panel={isFilesPanelCategory(node.id) ? 'true' : undefined}
           data-derived="true"
@@ -1174,6 +1180,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             <button
               type="button"
               className="fa-tree-node fa-smart-node"
+              title={folder.nameKey ? t(folder.nameKey) : (folder.name ?? '')}
               data-smart={folder.id}
               data-selected={smartScope === folder.id ? 'true' : undefined}
               aria-pressed={smartScope === folder.id}
@@ -1243,6 +1250,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 <button
                   type="button"
                   className="fa-tree-node fa-favorite-node"
+                  title={favoriteLabel(favorite.target)}
                   data-favorite={key}
                   /* A stale favorite is still clickable — it just cannot lead
                      anywhere, and disabling it would remove the only thing that
@@ -1316,6 +1324,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
                 key={collection.id}
                 type="button"
                 className="fa-tree-node fa-collection-node"
+                title={collection.name}
                 style={{ '--fa-depth': depth } as CSSProperties}
                 data-collection={collection.id}
                 data-dragover={dragOverId === collection.id ? 'true' : undefined}
