@@ -12781,15 +12781,17 @@ mark.lookup-mark,
   top: 0;
   left: 0;
   /* Reserves the frameless control cluster, which grew a fourth button when
-     `city` became Liquid-presentable (L12 b2). Arithmetic, not taste:
-     4 x 26px `.fwin-b` + 3 x 2px gap + 2 x 2px padding = 114, at `right: 6px`
-     = 120, plus the ~2px `lq-hit` pointer overhang on the leftmost button.
-     122 was exactly the old 3-button figure's slack and would now be flush to
-     the pixel. The controls sit at `z-index: 3` above this strip's 2, so an
-     overlap would not actually steal the click — the margin is here so the
-     strip stops being a grab target under a button, which is a cursor bug
-     rather than a broken control. */
-  right: 132px;
+     `city` became Liquid-presentable (L12 b2). MEASURED, not computed from the
+     `.fwin-b` rule: `lq-hit` raises each button to 30px in LAYOUT, not merely
+     in pointer region, so 4 x 30 + 3 x 2 gap + 2 x 2 padding = 130 at
+     `right: 6px` puts the cluster's left edge 136px in. Deriving this from the
+     26px in `.fwin-b` gives 120 and is wrong by 16px — the first draft of this
+     comment did exactly that and the live cluster contradicted it.
+     The controls sit at `z-index: 3` above this strip's 2, so an overlap would
+     not steal the click; the reserve exists so the strip stops being a grab
+     target under a button, which is a cursor bug rather than a broken control,
+     and it only does that if it clears 136. */
+  right: 140px;
   height: 34px;
   z-index: 2;
   cursor: grab;

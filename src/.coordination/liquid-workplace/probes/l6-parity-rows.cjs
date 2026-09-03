@@ -272,6 +272,23 @@ for (const { name, run } of runs) {
       // re-runnable. A refresh that kept a stale `pending` would be the whole point missed.
       live.status = row.status;
       live.automatedProof = row.automatedProof;
+      // AND SO ARE THE TWO DESTINATIONS, added 2026-09-02 with City's ninth row.
+      //
+      // These are authored, not measured — but they are authored in
+      // `parity-row-metadata.json`, and this file is the only thing that ever copies them
+      // into a row. Leaving them alone on a refresh produced the one self-contradicting
+      // ledger state possible here: City's rows went `pending` -> `both` off a real
+      // standard -> liquid -> standard trip while still carrying the `noLiquidReason`
+      // sentence "NONE, and it is a product fact this run measured rather than assumed",
+      // which had been true for exactly as long as `canPresentLiquid` refused the section.
+      // A row that states its status and its destination from two different dates is worse
+      // than a stale row, because each half looks sourced.
+      //
+      // `observed` still only ever APPENDS: the history that matters is the READING, and
+      // that is the field the marker guards. A destination is a description of where the
+      // feature lives now, and git holds every earlier one.
+      live.standardDestination = row.standardDestination;
+      live.liquidDestination = row.liquidDestination;
       touched.push(row.feature);
     }
     refreshed.push(...touched);
