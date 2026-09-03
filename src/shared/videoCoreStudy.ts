@@ -374,9 +374,24 @@ export function stripAssCueText(text: string): string {
  * Runs on the RAW cue text, before `stripAssCueText` — which deletes the brace groups this
  * reads. An SRT track carries no override tags at all, so nothing is flagged and such a rail
  * is unchanged; that is the correct safe default rather than an oversight.
+ *
+ * **`\an` was REMOVED after an ablation, and the removal is the interesting part.** Dropping
+ * each term in turn against the same ground truth: without the positioning group recall falls
+ * to **92.1 %** and 199 signs survive, so it carries the whole signal — but dropping `\p`,
+ * `\fr` OR `\an` changes **nothing at all** (recall stays 100.0 %, rail stays 430), because
+ * each of those three flags **zero** lines that the positioning group does not already catch.
+ * `\an` is alignment, and `\an8` is align-top, which fansubbers use for ordinary dialogue
+ * moved to the top of frame when signs occupy the bottom — so it was pure precision risk
+ * earning nothing. This repo's own `videoGrammarHighlightRender` suite had used `{\an8}
+ * こんにちは` as its example of an override on plain speech since long before S6, which is
+ * exactly the case it would have hidden.
+ *
+ * `\p` and `\fr` stay despite also scoring zero here, because unlike alignment they are
+ * format-level facts rather than track habits: a `\p1` line is a vector DRAWING, not text at
+ * all, and would otherwise leak path coordinates into the rail as if they were a sentence.
  */
 const ASS_TYPESETTING_OVERRIDE =
-  /\\(?:pos|move|clip|iclip|org|fad|fade|t)\s*\(|\\p[1-9]|\\fr[xyz]?-?\d|\\an[1-9]/i;
+  /\\(?:pos|move|clip|iclip|org|fad|fade|t)\s*\(|\\p[1-9]|\\fr[xyz]?-?\d/i;
 
 export function isTypesettingCueText(text: string): boolean {
   return ASS_TYPESETTING_OVERRIDE.test(text);

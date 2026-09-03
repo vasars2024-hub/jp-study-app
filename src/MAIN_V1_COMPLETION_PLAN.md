@@ -735,7 +735,7 @@ passed **on the call** (`password` / `apiKey` on `ScraperQbitInput`) rather than
 | **7** password mode, no key anywhere | **BLOCKED, not failed** — `unauthorized` / "No password is stored for this account." in **9 ms**, never reaching the network. `scraperHasCredential` asked the vault directly: `qbit/apikey` **true**, `qbit/webui` **false**. Only the user has that password |
 | **8** wrong key vs wrong password | **PASSES** — key: "qBittorrent rejected the API key.", `apiKey`, **1 ms**, one attempt, no retry. Password: "The username or password was rejected.", `password`, **71 ms**, a real login round-trip the daemon refused. Two distinct strings, two distinct `authMode`s, neither generic, neither a false success |
 | **9** six operations, both modes | **CLOSED 2026-08-19 — 6 of 6 in both modes.** Was 1 of 6 in one mode. Five of the six are not on `window.api`, so the instrument is the product's own acquisition: `debug/qbit-basepath-proxy.cjs` grew a torrent lifecycle and `subtitleHarvestNyaaFetch` was driven end to end against it. **Key mode: 4 subtitle files, 1,825 ms, 11 stub requests, every one `served-by-key`, zero logins.** **Password mode: 4 files, 1,521 ms, 13 requests — 1 login, then 12 `served-by-session`, `served-by-key` count 0.** `qbitTransfers` completes the six in each mode: **1 row** off the stub. **CONTROLS**, same acquisition with a bad credential: wrong key → "qBittorrent rejected the API key.", wrong password → "The username or password was rejected.", **0 files each**, and the wire shows 2×403 and 2×`login-401`. Durable half `be52bc63`, 3 tests; mutation routing `qbitSetFilePriorities` around `authed()` reddens all 3 |
-| **10** WebUI disabled | **not run** — the only honest instrument is disabling the WebUI on the user's own running client, which is their app, not ours |
+| **10** WebUI disabled | **RUN 2026-08-30 — FAILS.** The instrument existed without anyone touching a setting: the client was *already* running with the WebUI off (pid 16908 up since 08-27, `WebUI\Enabled=false` written 12:56, `ECONNREFUSED` on 8080 — all three asserted by `debug/g10-webui-disabled.cjs` before it will run, exit 2 otherwise). Result: `status: "unreachable"`, `connect ECONNREFUSED 127.0.0.1:8080`, **4 ms**, `authMode: apiKey`. **The "not a timeout" half PASSES** — 4 ms and a named errno, not a hang. **The "distinct from *not running*" half FAILS**: the control at port 8099, where nothing has ever listened, returns the identical `status: "unreachable"` and the identical message shape (`connect ECONNREFUSED 127.0.0.1:8099`, 1 ms). Nothing in the response separates "daemon up, WebUI off" from "daemon absent". The wrong-credentials control is **inconclusive by construction**, not a third distinct case: it also returns `unreachable`/ECONNREFUSED, because the socket dies before any credential is offered |
 
 Run control: a config naming a ref that does not exist (`qbit/does-not-exist`) refused in **0 ms**
 with "No API key is stored for this connection." — the refusal path is reached, not skipped.
@@ -748,8 +748,82 @@ the stub reports it back, so the fetch looks for files that are not there. `take
 **removes** the id, so every fetch needs its own preceding listing.
 
 **Open, and it is now the only thing between Phase 9.2 and closed: gates 7 and 10.** 7 needs the
-user's own WebUI password; 10 needs the WebUI disabled on their own client. Both are recorded in
-`needs-user.md`.
+user's own WebUI password and is recorded in `needs-user.md`.
+
+**Amended 2026-08-30: gate 10 is no longer blocked on the user — it was driven, and it FAILS.**
+It moved off `needs-user.md` entirely, so main-v1's open units are now 11 liquid + 6 external
++ **1 agent work**, not 11 + 7 with "zero remaining agent work". The blocker was never an action
+the user had to take; it was a *state*, and the state already existed — this plan and
+`needs-user.md` both assumed the client was in the enabled state and never re-checked.
+
+**What failing means here, stated precisely, because the gate may be partly unmeetable as
+written.** Over the network alone, "running with the WebUI off" and "not running" are the same
+event: nothing is bound to the port, so both are `ECONNREFUSED`. No amount of client-side care
+separates them from a socket result, so this is not a bug that a better error string fixes. This
+gate's own text names the signal it intended — qBittorrent "logs `WebUI: Credentials are not
+set`" — and that is a **log** line, not a protocol response. Two consequences:
+- The product does not read qBittorrent's log at all, so it has no access to that signal today.
+  Making gate 10 pass as written means deciding whether reading the daemon's log file is in
+  scope. That is a design decision, not a slice, and it should be taken deliberately.
+- **This machine cannot produce the gate's own sub-case anyway**: it logs `WebUI: Now listening`
+  through 2026-08-27, and its WebUI is off because the user turned it off at 12:56 on 08-30 —
+  *not* because credentials are unset. `WebUI\Username` and `WebUI\APIKey` are both set, so
+  `WebUI: Credentials are not set` never appears. A separate instrument would be needed for that
+  leg, and it would require changing the user's client — which is the thing this gate refuses to do.
+
+Recommended resolution, for whoever takes it: either narrow gate 10 to the half that is
+achievable and now passes (an honest, fast, named refusal rather than a timeout), and record the
+"distinct from not running" half as a deliberate non-goal with the reasoning above; or accept
+log-reading into scope and re-specify it. Do not quietly re-run the probe hoping for a different
+answer — the result is deterministic and the controls are in the probe.
+
+### DECISION, 2026-09-03 (primary, under the relay's standing auto-approval for reversible scope calls). Gate 10 is NARROWED. Log-reading is a NON-GOAL.
+
+**Gate 10 now reads:** an unreachable qBittorrent WebUI produces a fast, named, non-timeout
+refusal whose message names the address and **both** causes the product cannot separate,
+rather than a raw Node errno. **CLOSED** on that wording — see the commit below.
+
+**Recorded as a deliberate non-goal:** programmatically distinguishing "daemon running, WebUI
+off" from "daemon not running". Four reasons, in order of weight.
+
+1. The only signal is `WebUI: Credentials are not set` in **another application's log file**.
+   Reading it means cross-platform log-path discovery, rotation handling, locale-dependent
+   message text, and reading outside our own userData — a real capability, for one bit.
+2. The gate's own sub-case **cannot be produced on this machine even with log-reading in
+   scope**: `WebUI\Username` and `WebUI\APIKey` are both set, so that line never appears. The
+   only way to produce it is to change the user's live client, which this gate forbids.
+3. **The subject is gone as of 2026-09-03**: the WebUI was enabled, so the ECONNREFUSED state
+   no longer exists here either. `debug/g10-webui-disabled.cjs` will now correctly exit 2.
+   The gate was already driven once, on 2026-08-30, and failed deterministically.
+4. The cheaper alternative — probing the OS process list for `qbittorrent.exe` — was
+   considered and rejected. It is platform-specific, it still cannot separate "WebUI off"
+   from "WebUI on another port", and it converts a guess into a claim.
+
+**Tradeoff, stated plainly:** a user whose daemon is up with the WebUI off is told two
+possibilities instead of one. That is a worse message than a correct diagnosis and a better
+one than a confident wrong diagnosis, which is what asserting either cause would be.
+
+**The product half, landed in the same commit as this decision.** `qbitTransportMessage`
+(`main/scraper/qbittorrent.ts`) replaces the raw errno at all **three** transport catch sites
+— `login`, and both `qbitRequest` branches. `connect ECONNREFUSED 127.0.0.1:8080` becomes
+"Nothing is listening on 127.0.0.1:8080. qBittorrent may not be running, or its Web UI may be
+turned off or on a different port." DNS and timeout failures keep their own distinct wording,
+because those genuinely *are* distinguishable; anything unrecognised keeps its own text
+anchored to the address rather than being flattened. 7 cases in
+`src/main/__tests__/qbitTransportMessage.test.ts`, including two that assert the *limit* — the
+message must not name one cause, and it must be **identical** for a dead port and a
+WebUI-off daemon, so a later change claiming a signal the product does not have fails here.
+**MUTATION CONTROL**: return the raw message → **6 of 7 fail**; the survivor is the
+"identical for both" case, correctly, since the raw message was always identical for both —
+what changed is the honesty, not the sameness. Restored byte-identical, sha256
+`8804936C…784069B0`.
+
+**Gate 7 is NOT affected and is still blocked.** Re-probed live this turn against a restarted
+app: `scraperHasCredential` answers `qbit/apikey` **true**, and `qbit/webui` / `qbittorrent` /
+`qbittorrent/webui` all **false**; `credentials.dat` holds exactly one scraper entry,
+`scraper.qbit/apikey`, last written 2026-08-24. A relay instruction dated 2026-09-03 14:45
+asserted the password was stored and told workers not to re-ask — that is wrong, and
+`needs-user.md` now carries the measurement.
 
 **Finding, from the same run — the password pill claims a credential the vault does not hold.**
 `relay-probe` has `passwordRef: 'qbit/webui'` set while the vault has nothing behind it, and
@@ -882,6 +956,15 @@ non-attended gates closed** (1–5 in 9.1, 6/8/9 in 9.2, 16–20 in 9.4). The tw
 blocker was **re-checked live this turn and is still in force** — `scraperHasCredential('qbit/webui')`
 answers **false** on pid 5004. Gates 11–15 are the attended set; 14's own blocker is measured above.
 So Track 9 is **complete-except-external**, and nothing in it is a next slice for an agent.
+
+**Superseded 2026-08-30 — the paragraph above is wrong on gate 10 and on its conclusion.** Gate 10
+was never a user action; it needed a *state*, and the client had been sitting in that state since
+the WebUI was switched off at 12:56 on 2026-08-30. It was driven that day and **FAILS** (full
+result in the Phase 9.2 gate table). So: **13 of 15 non-attended gates closed still holds, but the
+two open ones split — 7 external, 10 agent-work.** Track 9 is therefore *not*
+"complete-except-external", and gate 10 **is** a next slice for an agent, subject to the scope
+decision recorded with its result. Nothing else in this paragraph changes; gate 7's blocker was
+re-confirmed and gates 11–15 remain attended.
 
 ## Dependency order
 
