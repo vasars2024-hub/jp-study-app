@@ -351,6 +351,37 @@ export function stripAssCueText(text: string): string {
     .trim();
 }
 
+/**
+ * Positioning, drawing and transform overrides — what a typesetter writes over on-screen
+ * text, and what a translator of speech does not.
+ *
+ * DEFECT S6: the transcript rail renders every ASS `Dialogue:` line, signs included, so a
+ * 30-minute OVA whose script is 430 spoken lines presents as thousands of rows. The obvious
+ * filter is the ASS `Style` field, but `VideoCoreActiveCue` is `{index, trackNumber, text,
+ * startMs, endMs}` — no style — so using it means plumbing a new field through the seanime
+ * vendor boundary. The raw text carries the same signal, which is measurable rather than
+ * arguable because the Style field IS available offline and makes a ground truth this
+ * classifier never sees.
+ *
+ * Measured 2026-09-03 with `debug/_pri-s6-census.cjs` against the app's own live clip
+ * (`[project-gxs] Date a Live II - Kurumi Star Festival OVA`, one `ass` stream): 3,056
+ * `Dialogue:` lines, ground truth 2,510 `Sign*` / 546 other. This flags **2,626 at 100.0 %
+ * recall — zero signs survive** — and leaves the rail at **430 rows**, which is precisely
+ * the `Default` set. The 116 nominal false positives are NOT lost sentences: they are
+ * exactly the OP/ED karaoke and Title styles (22 + 22 + 2 + 70 = 116, arithmetic that
+ * closes), so no `Default` line is flagged.
+ *
+ * Runs on the RAW cue text, before `stripAssCueText` — which deletes the brace groups this
+ * reads. An SRT track carries no override tags at all, so nothing is flagged and such a rail
+ * is unchanged; that is the correct safe default rather than an oversight.
+ */
+const ASS_TYPESETTING_OVERRIDE =
+  /\\(?:pos|move|clip|iclip|org|fad|fade|t)\s*\(|\\p[1-9]|\\fr[xyz]?-?\d|\\an[1-9]/i;
+
+export function isTypesettingCueText(text: string): boolean {
+  return ASS_TYPESETTING_OVERRIDE.test(text);
+}
+
 export function cuePlaybackStartSec(
   cue: Pick<VideoCoreStudyCue, 'startMs'>,
   subtitleDelaySec: number,
