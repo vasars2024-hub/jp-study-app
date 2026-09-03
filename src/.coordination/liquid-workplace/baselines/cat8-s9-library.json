@@ -1,0 +1,273 @@
+{
+  "label": "s9-library",
+  "surface": "Library",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": null,
+  "theme": null,
+  "rect": "820x580",
+  "textRuns": 167,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 144,
+  "textHash": -1718611699,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10234,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10234 catalog keys / 107 namespaces",
+  "raised": "raised",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 167,
+        "textHash": -1718611699,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 167,
+        "textHash": 1366399256,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 48,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Your books and manga. Import f",
+            "now": "本やマンガをここに集めて、読み始めましょう。"
+          },
+          {
+            "i": 7,
+            "was": "+ Import file(s)",
+            "now": "+ ファイルをインポート"
+          },
+          {
+            "i": 8,
+            "was": "More ways to add",
+            "now": "他の追加方法"
+          },
+          {
+            "i": 9,
+            "was": "Auto-importing from",
+            "now": "自動インポート元"
+          },
+          {
+            "i": 11,
+            "was": "All",
+            "now": "すべて"
+          },
+          {
+            "i": 17,
+            "was": "Unfiled",
+            "now": "未整理"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 167,
+        "textHash": -54469368,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 48,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Your books and manga. Import f",
+            "now": "你的图书和漫画。导入文件即可开始阅读。"
+          },
+          {
+            "i": 7,
+            "was": "+ Import file(s)",
+            "now": "+ 导入文件"
+          },
+          {
+            "i": 8,
+            "was": "More ways to add",
+            "now": "更多添加方式"
+          },
+          {
+            "i": 9,
+            "was": "Auto-importing from",
+            "now": "自动导入自"
+          },
+          {
+            "i": 11,
+            "was": "All",
+            "now": "全部"
+          },
+          {
+            "i": 17,
+            "was": "Unfiled",
+            "now": "未归类"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 167,
+        "textHash": -111414029,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 48,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Your books and manga. Import f",
+            "now": "Ваши книги и манга. Импортируй"
+          },
+          {
+            "i": 7,
+            "was": "+ Import file(s)",
+            "now": "+ Импорт файла(ов)"
+          },
+          {
+            "i": 8,
+            "was": "More ways to add",
+            "now": "Другие способы добавить"
+          },
+          {
+            "i": 9,
+            "was": "Auto-importing from",
+            "now": "Автоимпорт из"
+          },
+          {
+            "i": 11,
+            "was": "All",
+            "now": "Все"
+          },
+          {
+            "i": 17,
+            "was": "Unfiled",
+            "now": "Без папки"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": null
+    },
+    "after": {
+      "html": "en",
+      "stored": null
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 48,
+    "baseRuns": 167,
+    "diffShare": 0.2874
+  },
+  "drive": {
+    "click": ".lib-folders .lib-folder-chip:nth-of-type(3)",
+    "clickedLabel": "Inbox 0",
+    "undo": ".lib-folders .lib-folder-chip:nth-of-type(1)",
+    "undoLabel": "All 24",
+    "surfaceChanged": true,
+    "restored": true,
+    "driven": {
+      "textRuns": 30,
+      "states": {
+        "empty": {
+          "hosts": 2,
+          "messages": [
+            "This folder is emptyUse the folder button on any book to file it here, or switch back to All."
+          ],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "loading": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "error": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        },
+        "offline": {
+          "hosts": 0,
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
+        }
+      },
+      "mutePairCount": 0,
+      "mutePairs": [],
+      "rawKeyCount": 0,
+      "rawKeys": [],
+      "placeholderCount": 0
+    }
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

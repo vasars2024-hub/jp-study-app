@@ -1993,3 +1993,52 @@ moves 47 of the 55.
 **Running total: 8 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
 `youtube`, `calendar`, `resources`, `flashcards`. **17 left**, of which 16 are scorable in both
 presentations (`visualizer` and `musicwidget` offer no presentation toggle).
+
+## 2026-09-03 · primary — Library — 80/80 — commits `87ab9004`, `185f8fd6`, `80e87f92`
+
+`library` is the **ninth** of the 25 `DESKTOP_WIN_SECTIONS` at 80/80, and the first half of the
+RULE C pair opened for this bullet (`library` densest, `music` most different — `music` is still
+open). All eight categories driven live this turn on the same window: `.fwin` "Library",
+standard presentation, 820×580 at 60,24, viewport 1264×821, 24 books over 3 folders. Zero new
+probes (RULE 1) — every number below comes from the eight `cat*` harnesses unchanged.
+
+**sampled-out for this bullet:** `agent` `novels` `grammar` `translate` `player` `anki` `stats`
+`immersion` `reading` `scraper` `files` `note` `city` `visualizer` `musicwidget`. `music` is the
+pair's second surface and is scored next, not sampled out.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10** after a repair | **155** text runs, 0 unmeasurable, **0 failing**, min **5.35** (`span.lib-chip-count "24"`, 11 px); 30 targets by rect, smallest `button.fwin-b` **24 px**, 23 under the 32 px floor by rect but **0** WCAG 2.5.8 failures; **36** controls hit-tested, **26** below the floor by RECT and **0 by hit box**, smallest painted hit **32×32.5**; keyboard **30/30** reachable, 0 focus hosts; motion **61** declarations over threshold at rest → **0** under emulated `prefers-reduced-motion`, emulation taken and released | 6 axes planted, all 6 moved (`0,23,0,0,0 → 2,25,2,1,2 → 0,23,0,0`), `rectDrift 0`, back to baseline |
+| 2 | Clunkiness | **10/10** | 2 counted steps driven (a folder chip, then the layout switch), **0** dead ends, **0** modal traps, **0** scroll traps, worst click→recv **28 ms**, **0** over the 100 ms bar; cost parity Liquid **2** = Standard **2**, 820×580 both, restored to standard | `--control`: dead end / modal trap / scroll trap **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true`, inert click 0.6 ms |
+| 3 | Liquid utilization | **10/10** | driven into Liquid and restored: `denseWorkOnTranslucent` **0** over **66** regions; Liquid-eligible **1/1** treated and **1/1** backed by a shared primitive; roles Work **3**, Anchor **56**, Anchor-holds-work **6**, Ambient **0**; the window's own paint `alpha 0.72`, `blur(8px) saturate(1.25)` | both plants fired — one region to glass, then every Work region (`allWorkFailed`); `oneMaterialReturned` and `allGlassReturned` true |
+| 4 | Use of space | **10/10** after a repair | all three sizes ran and restored: default 820×580 dead **3.9 %** / dominant canvas **93.7 %**, compact 260×170 dead **0.9 %**, maximized 1264×773 dead **10.8 %** / canvas **95.3 %** against a 15 bar; clipped **0**, overlaps **0**, horizontal scrollers **0**, hidden-overflow-x **0** at every size | injected clip **0→1→0**; the art-plate exclusion named its own plant (hangs out 269 px, `clipped` did NOT rise); backdrop overlap **0→14→0**, not excused |
+| 5 | UI clarity | **10/10** after a repair | all ten questions YES. Q1 **2** entry points, 0 primary inputs; Q2 a location label and a way back; Q3 the primary action inside the body viewport at rest; Q4 **7** collapsed disclosures and **6** controls scanned against a bar of 12; Q5 stable across the theme axis; Q6/Q7/Q8/Q9 from this turn's own category-6 baseline; Q10 5 identity markers against a bar of 3 | `--control` re-run AFTER the repair: **Q2, Q3, Q4, Q5 and Q10 all went NO**, planted clutter taking scanned to **28** against the bar of 12 |
+| 6 | Feature parity + reversibility | **10/10** | ledger **9/9 reachable in standard, 9/9 in Liquid**, `na` 0, rows agree, nothing only-in-one; 4 drive steps (folder, sort, group, a 240 px scroll) with **0** refusals; round trip `standard → liquid → standard` with **0** diffs, shell held, other-presentation box 820×580. No editable text field on this surface, so the dirtied-field leg is recorded as N/A rather than silently skipped | **6 of 6** mutations armed; each felled **exactly its own row**, no unexpected row moved, each restored (`afterRestore 9/9`) |
+| 7 | Performance under real load | **10/10** | ceiling p50/p95 **8.3 / 8.5** ms over 3 runs, noise floor **0** over 100; drag p95 **8.5** (max 16.6, 0 over 16), theme p95 **8.5** (max 16.7, 0 over 16), resize p95 **8.5** (max 75.0, 3 over 16, 2 over 33, **0 over 100**); main-loop max **12.2 / 13.8 / 10.0** ms against a 500 ms bar; heavy leg "scroll the whole library" **82 samples / 2,528 ms**, main-loop p50 **2.4** max **9.1**; idle 81 samples p50 **2.1** p95 **4.9** | `--jank`: drag p95 **8.5 → 116.7 ms**, frames over 100 **0 → 10** |
+| 8 | Honest states | **10/10**, both driven bars MEASURED | raw keys **0**, placeholders **0**, mute pairs **0**; states **1 of 1 observable** — the empty `Inbox 0` folder names it in full ("This folder is empty / Use the folder button on any book to file it here, or switch back to All."), 0 unpainted, and `loading`/`error`/`offline` are `notObservable` and excluded rather than passed; four languages give **4 distinct hashes**, **48 of 167** runs move (**28.7 %**), max raw keys in any language **0**, and `ui-lang` started and ended **absent**; drive restored `Inbox 0 → All 24` | rawKeys/placeholders/mutePairs **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+
+Evidence: `baselines/cat{1..8}-s9-library*.json`, all written this turn.
+
+**THREE PRODUCT REPAIRS, all found by these instruments.**
+
+1. `87ab9004` — **the manga cover-picker was the one card button with no pointer floor.**
+   36 controls, 26 below 32 px by rect and exactly **one** still below it by hit box.
+   After: `belowFloorByHit` **1 → 0**, smallest painted hit 32×32.5.
+2. `185f8fd6` — **a 200 px label floor made the shelf 25 px wider than the window could show.**
+   At 260×170 `.fwin-body` carried **273 px** of content in a **248 px** box with
+   `overflow-x: hidden` — no scrollbar, no clip marker. The floor was stale: it dated from when
+   `.watch-bar` was one flex row. After: `hiddenOverflowX` **1 → 0**, scrollWidth **273 → 248**.
+3. `80e87f92` — **the shelf asked a user to scan 13 chips before a single cover.** Q4's bar is
+   12. Ten of the 13 were the language and level refine banks sitting open above the grid; they
+   now sit behind a `<details>` whose summary names whatever is filtering. **13 → 6**, and the
+   disclosure count went 2 → 3.
+
+**Two instrument notes the next surface should not rediscover.** `cat8 --langs` needs the
+Settings ▸ Appearance language card actually on screen: `os:open` with detail `settings`, then
+click the `.os-set-nav-item` reading "Appearance", or the leg refuses on every tag. And
+`cat8 --control` still crashes node on exit (`UV_HANDLE_CLOSING`) **after** writing `--out` —
+read the file, not the exit code.
+
+**Running total: 9 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
+`youtube`, `calendar`, `resources`, `flashcards`, `library`. **16 left**, of which 15 are
+scorable in both presentations (`visualizer` and `musicwidget` offer no presentation toggle).

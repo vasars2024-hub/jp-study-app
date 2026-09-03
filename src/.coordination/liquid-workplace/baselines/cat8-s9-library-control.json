@@ -1,0 +1,106 @@
+{
+  "label": "s9-library",
+  "surface": "Library",
+  "win": "(focused)",
+  "lang": "en",
+  "storedLang": null,
+  "theme": null,
+  "rect": "820x580",
+  "textRuns": 167,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 144,
+  "textHash": -1718611699,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10234,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10234 catalog keys / 107 namespaces",
+  "raised": "already-on-top",
+  "statesObservable": [],
+  "statesNotObservable": [
+    "empty",
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "0 of 0 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": "UNMEASURED",
+    "languagesDiffer": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - statesNamed,languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "statesNamed",
+    "languagesDiffer"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "hostedIsolation": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}
