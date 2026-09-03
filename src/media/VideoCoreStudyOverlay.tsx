@@ -87,7 +87,7 @@ import {
   type VideoCoreTimingSignal,
 } from '../shared/videoCoreStudy';
 import { decideExternalSubtitleMount } from '../shared/externalSubtitleMount';
-import { parseStudySubtitles } from '../shared/subtitleCues';
+import { parseStudySubtitles, parseSubtitles } from '../shared/subtitleCues';
 import type { VideoCoreMiningSource } from '../shared/videoCoreMining';
 import {
   mediaCaptionCues,
@@ -286,6 +286,15 @@ export default function VideoCoreStudyOverlay({
   const dockRef = React.useRef<HTMLElement | null>(null);
   const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
   const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
+  /**
+   * A file track's parsed timeline, cached against the track it belongs to.
+   *
+   * Keyed rather than a bare array so a track change can never show one track's cues
+   * under another's number — the same rule `externalTrackSplit` follows above.
+   */
+  const secondaryFileCuesRef = React.useRef<
+    { trackNumber: number; cues: VideoCoreActiveCue[] } | null
+  >(null);
   const shadowRecorderRef = React.useRef<MediaRecorder | null>(null);
   const shadowStreamRef = React.useRef<MediaStream | null>(null);
   const shadowStopTimerRef = React.useRef<number | null>(null);
@@ -940,8 +949,13 @@ export default function VideoCoreStudyOverlay({
       setSecondaryTrack(null);
       return;
     }
+    // `file` as well as `event`: a libass file track is a real, selectable track whose
+    // cues this overlay can now read (see the file-track cue clock above). Excluding it
+    // here is what made a downloaded translation — the ordinary shape of a Russian or
+    // English second line — un-offerable while the same file was fine as the primary.
     const candidates = tracks.filter(
-      (track) => track.type === 'event' && track.number !== selectedTrack,
+      (track) => (track.type === 'event' || track.type === 'file')
+        && track.number !== selectedTrack,
     );
     setSecondaryTrack((current) =>
       current != null && candidates.some((track) => track.number === current)
@@ -965,20 +979,55 @@ export default function VideoCoreStudyOverlay({
         ),
       );
     };
+    /**
+     * The secondary track's timeline, from whichever half of the manager holds it.
+     *
+     * `getCuesForTrack` reads the event cache only, so it answers `[]` for a file track
+     * exactly as `getCues()` does for the primary. The cached ASS is the fallback, parsed
+     * once per track rather than on every `cuechange` — this runs at each cue boundary and
+     * a translation track is hundreds of lines.
+     *
+     * `parseSubtitles`, NOT `parseStudySubtitles`: the second line is a translation the
+     * viewer asked to see, so it must arrive whole. The Japanese-style split belongs to
+     * the primary track, and applying it here would drop the very line being shown.
+     */
+    const fileCues = (): VideoCoreActiveCue[] => {
+      if (secondaryFileCuesRef.current?.trackNumber === secondaryTrack) {
+        return secondaryFileCuesRef.current.cues;
+      }
+      const content = manager.getTrackContent(secondaryTrack);
+      if (!content) return [];
+      const parsed = studyCuesFromParsedCues(parseSubtitles(content), secondaryTrack);
+      if (!parsed.length) return [];
+      secondaryFileCuesRef.current = { trackNumber: secondaryTrack, cues: parsed };
+      return parsed;
+    };
     const refreshTimeline = (): void => {
       const cues = manager.getCuesForTrack(secondaryTrack);
-      secondaryCuesRef.current = cues;
-      setSecondaryCues(cues);
+      const resolved = cues.length ? cues : fileCues();
+      secondaryCuesRef.current = resolved;
+      setSecondaryCues(resolved);
       syncActive();
+    };
+    /*
+      While the timeline is still empty the playback clock is the retry, because a file
+      track's ASS is filled by a fetch that track selection does not wait for, and a
+      primary that is ALSO a file track dispatches no `cuechange` to retry on. Once cues
+      are held this degrades to the activation sync it always was — re-listing a
+      several-hundred-line track four times a second is not free.
+    */
+    const tick = (): void => {
+      if (secondaryCuesRef.current.length) syncActive();
+      else refreshTimeline();
     };
     refreshTimeline();
     manager.addEventListener('cuechange', refreshTimeline);
-    video.addEventListener('timeupdate', syncActive);
-    video.addEventListener('seeked', syncActive);
+    video.addEventListener('timeupdate', tick);
+    video.addEventListener('seeked', tick);
     return () => {
       manager.removeEventListener('cuechange', refreshTimeline);
-      video.removeEventListener('timeupdate', syncActive);
-      video.removeEventListener('seeked', syncActive);
+      video.removeEventListener('timeupdate', tick);
+      video.removeEventListener('seeked', tick);
     };
   }, [manager, secondaryTrack, subtitleDelaySec, video]);
 

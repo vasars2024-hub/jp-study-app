@@ -31,7 +31,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseStudySubtitles } from '../../shared/subtitleCues';
+import { parseStudySubtitles, parseSubtitles } from '../../shared/subtitleCues';
 import {
   activeStudyCuesAtTime,
   studyCuesFromParsedCues,
@@ -186,5 +186,71 @@ describe('the overlay wires the file-track cue clock', () => {
       expect(source).toContain(`video?.addEventListener('${event}', tick)`);
       expect(source).toContain(`video?.removeEventListener('${event}', tick)`);
     }
+  });
+});
+
+/**
+ * The same gap on the DUAL-subtitle line, which is the second half of the same defect.
+ *
+ * `getCuesForTrack` reads the event cache exactly as `getCues()` does, so it answers `[]`
+ * for a file track too — and the secondary-track picker filtered `type === 'event'`, so a
+ * file track could not even be OFFERED as a second line. A downloaded translation, which
+ * is the ordinary shape of a Russian or English second line, was therefore unreachable
+ * while the very same file worked as the primary.
+ */
+describe('the second subtitle line reaches a file track', () => {
+  it('offers file tracks as secondary candidates, not only event tracks', () => {
+    const source = overlaySource();
+    expect(source).toContain("(track.type === 'event' || track.type === 'file')");
+  });
+
+  it('falls back to the cached ASS when the event cache answers nothing', () => {
+    const source = overlaySource();
+    expect(source).toContain('const resolved = cues.length ? cues : fileCues();');
+    expect(source).toContain('manager.getTrackContent(secondaryTrack)');
+  });
+
+  it('parses the second line WHOLE, without the Japanese-style split', () => {
+    // `parseStudySubtitles` would drop a translation track's own styles: the split
+    // belongs to the primary study track, and the second line is the one the viewer
+    // asked to see. Pinned because using the wrong parser here shows an empty line
+    // rather than an error.
+    const source = overlaySource();
+    expect(source).toContain('studyCuesFromParsedCues(parseSubtitles(content), secondaryTrack)');
+    expect(source).not.toContain('parseStudySubtitles(content), secondaryTrack');
+  });
+
+  it('keeps a parsed timeline keyed to its own track number', () => {
+    // An unkeyed cache shows one track's cues under another's number on a track switch.
+    expect(overlaySource())
+      .toContain('secondaryFileCuesRef.current?.trackNumber === secondaryTrack');
+  });
+
+  it('re-lists the track only while it has nothing, not four times a second', () => {
+    expect(overlaySource())
+      .toContain('if (secondaryCuesRef.current.length) syncActive();');
+  });
+
+  it('parses a Russian second line whole, styles and all', () => {
+    const russianAss = [
+      '[Script Info]',
+      'ScriptType: v4.00+',
+      '',
+      '[V4+ Styles]',
+      'Format: Name, Fontname, Fontsize',
+      'Style: Main,Arial,24',
+      'Style: Sign,Arial,18',
+      '',
+      '[Events]',
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+      'Dialogue: 0,0:00:04.00,0:00:06.50,Main,,0,0,0,,Что происходит',
+      'Dialogue: 0,0:00:07.00,0:00:09.25,Sign,,0,0,0,,Токио, 2011 год',
+    ].join('\n');
+    // Neither style carries kana, so the study split would be the wrong instrument here.
+    const cues = studyCuesFromParsedCues(parseSubtitles(russianAss), 1001);
+    expect(cues.map((cue) => cue.text))
+      .toEqual(['Что происходит', 'Токио, 2011 год']);
+    expect(activeStudyCuesAtTime(cues, 8, 0).map((cue) => cue.text))
+      .toEqual(['Токио, 2011 год']);
   });
 });
