@@ -336,15 +336,34 @@ const PROBE = `(function(){
 
   // Correction 5: a state counts only when it RENDERS a real message, and correction 6: a state
   // this surface cannot currently be in is reported as unobservable rather than scored either way.
+  // Correction 39: hosts used to be found.length - the RAW query count - while messages was
+  // filtered by painted(). So any UNPAINTED host put a member in the denominator that could
+  // never put one in the numerator, i.e. a guaranteed FAIL that no product change could clear.
+  // Measured on Dictionary 2026-09-02: p.muted.lexicon-notes-empty carries a real, correct,
+  // translated empty message ("You have not written any notes yet...") but sits inside a CLOSED
+  // details.lexicon-notes-browser, so checkVisibility() is false - hosts 1, messages 0,
+  // statesNamed "0 of 1 observable", FAIL on an honest surface. This is the recorded
+  // closed-details-rect-lies trap: a collapsed group's child still answers a query and still
+  // reports a box. An unpainted host means the user is not being shown that state at all,
+  // which is precisely correction 6's "cannot currently be in it" - so it belongs in NEITHER
+  // column. Note this cannot hide the defect it exists to catch: a PAINTED host whose text is
+  // absent or under the weight bar still scores hosts 1 with messages 0.
+  // (No backtick or dollar-brace syntax in this in-page comment; correction 8.)
   function textOf(sel){
     var out = [];
     var found = rq(sel);
+    var live = 0;
+    var unpainted = [];
     for (var j = 0; j < found.length; j++) {
-      if (!painted(found[j])) continue;
+      if (!painted(found[j])) {
+        unpainted.push(identify(found[j]));
+        continue;
+      }
+      live++;
       var v = (found[j].textContent || '').trim();
       if (weigh(v) >= 12 && !KEY.test(v)) out.push(v);
     }
-    return { hosts: found.length, messages: out };
+    return { hosts: live, messages: out, unpaintedHosts: unpainted.length, unpainted: unpainted };
   }
   var states = {
     empty: textOf('[class*="empty"],[class*="placeholder"],[class*="no-results"]'),
@@ -788,6 +807,10 @@ function mergeStates(a, b) {
     out[k] = {
       hosts: Math.max(a[k].hosts, b ? b[k].hosts : 0),
       messages: a[k].messages.concat(b ? b[k].messages : []),
+      // Correction 39: carried through, or the reason a host left the denominator is invisible
+      // in the banked baseline and the next worker re-derives it from scratch.
+      unpaintedHosts: Math.max(a[k].unpaintedHosts || 0, b ? b[k].unpaintedHosts || 0 : 0),
+      unpainted: (a[k].unpainted || []).concat(b ? b[k].unpainted || [] : []),
     };
   }
   return out;
