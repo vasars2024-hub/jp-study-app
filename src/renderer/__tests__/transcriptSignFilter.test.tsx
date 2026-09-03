@@ -128,6 +128,22 @@ describe('isTypesettingCueText', () => {
     // in reverse either: a bare `\p0` turns drawing OFF and is not by itself typesetting.
     expect(isTypesettingCueText('{\\p0}ふつうの行')).toBe(false);
   });
+
+  it('does not treat alignment alone as typesetting — `\\an8` is top-placed SPEECH', () => {
+    // Measured, not assumed. Ablating each term against the OVA's ground truth: dropping
+    // `\an` changes nothing (recall stays 100.0%, rail stays 430 rows) because it flags
+    // ZERO lines the positioning group does not already catch, while the positioning group
+    // alone is worth 199 signs. So `\an` was pure precision risk. And the risk is real:
+    // `\an8` is align-top, which fansubbers use for ordinary dialogue moved above on-screen
+    // text — `videoGrammarHighlightRender` has used exactly this line as its example of an
+    // override on plain speech since before S6 existed, and an earlier draft of this
+    // classifier hid it.
+    expect(isTypesettingCueText('{\\an8}こんにちは')).toBe(false);
+    expect(isTypesettingCueText('{\\an2}下に寄せたセリフ')).toBe(false);
+    // But alignment ALONGSIDE positioning is still a sign, so the removal did not
+    // punch a hole in the real cases.
+    expect(isTypesettingCueText('{\\an8\\pos(640,50)}看板')).toBe(true);
+  });
 });
 
 describe('the sign filter in the rail', () => {
