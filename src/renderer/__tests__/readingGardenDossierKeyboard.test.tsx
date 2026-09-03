@@ -115,6 +115,34 @@ describe('Reading Garden dossier — keyboard', () => {
     expect(document.activeElement).toBe(trigger());
   });
 
+  it('the dossier is the garden\'s Liquid region, and the scene is not', async () => {
+    // L12 b2. `city` became Liquid-presentable by giving its ONE disclosed
+    // inspector the contextual role — not by making the painted world glass.
+    // Mounted rather than grepped, because the claim is about which node carries
+    // the role: a `ContextualSurface` that wrapped the scene, or that sat beside
+    // the panel instead of on it, would read identically in source.
+    await mount();
+    await act(async () => {
+      trigger().focus();
+      trigger().click();
+    });
+    const dossier = panel()!;
+    expect(dossier.classList.contains('lq-contextual')).toBe(true);
+    expect(dossier.getAttribute('data-lq-role')).toBe('contextual');
+    // The role survives `as="aside"` — the panel is still the labelled dialog
+    // the disclosure points at, not a `div` the primitive defaulted to.
+    expect(dossier.tagName).toBe('ASIDE');
+    expect(dossier.getAttribute('role')).toBe('dialog');
+    // NEGATIVE, and it is the half that matters: §2.3 keeps content on an
+    // anchor, and this surface's content is a painted world. Nothing outside
+    // the dossier may carry a Liquid-role class, or the toggle would put the
+    // scene itself behind a material.
+    const roled = [...host.querySelectorAll('[data-lq-role]')];
+    expect(roled).toHaveLength(1);
+    expect(roled[0]).toBe(dossier);
+    expect(host.querySelector('.reading-garden')?.className).not.toMatch(/\blq-/);
+  });
+
   it('Escape with the dossier already closed is not swallowed from the garden', async () => {
     await mount();
     let sawEscape = false;

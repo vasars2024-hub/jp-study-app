@@ -52,16 +52,35 @@ export interface PresentableWin {
 /**
  * The ONE predicate for "this section can be presented as Liquid at all".
  *
- * The frameless garden and visualizer trinkets have no conventional chrome to
- * swap, so they never offer the toggle. Sticky notes deliberately do: their
- * conventional paper stays the default, while Liquid reveals the compact color
- * edge palette required by the Note transformation contract. Before this was
- * one function the shell carried two hand-written lists that differed by
- * `visualizer` (boss audit 2026-08-17, finding 2): a visualizer window whose
- * persisted blob validated rendered Liquid while the button that leaves Liquid
- * was not rendered at all — an enable flow with no disable path, at the exact
- * seam L3 exists to guarantee. Presentability and reversibility are now the
- * same expression, so they cannot disagree again.
+ * The test is NOT "does this window have a title bar to swap". It is "does this
+ * section own a region §2.3 assigns to the Liquid role — navigation, transport,
+ * contextual tools, a temporary inspector — that a presentation flip could hand
+ * to `--lq-*` instead of one hardcoded palette". Sticky notes have one (the
+ * compact colour edge palette the Note contract requires) and so they present,
+ * although their paper stays conventional by default. The visualizer trinket has
+ * none: it is a 380x200 canvas and a bar, with no disclosed surface of its own,
+ * so a flip there would be a class name and no material change — inert glass,
+ * which §2 calls a failure rather than a maximum.
+ *
+ * `city` MOVED to presentable 2026-09-02 (L12 b2). It was refused for being
+ * frameless, and frameless was the wrong reason: the Mooncap garden discloses a
+ * real HUD — `.reading-garden-info`, a labelled `role="dialog"` carrying the
+ * growth dossier, the reading-source facts and the ambient-music controls, i.e.
+ * exactly the "growth detail, reading source, and settings appear only when
+ * requested" column the transformation plan's §7 row assigns it. That HUD was
+ * the app's last hand-rolled glass: a hardcoded teal gradient that never read
+ * the theme, so it stayed the same translucent teal under `high-contrast`, where
+ * `--lq-liquid-bg` resolves to an OPAQUE `--panel` with a `--text` border. The
+ * painted scene stays the anchor in BOTH presentations (`.fwin-body-flush`'s
+ * rule, for its reason); Liquid changes the HUD and the frameless control dock
+ * only, in cascade, with no component state — so the trip back is free.
+ *
+ * Before this was one function the shell carried two hand-written lists that
+ * differed by `visualizer` (boss audit 2026-08-17, finding 2): a visualizer
+ * window whose persisted blob validated rendered Liquid while the button that
+ * leaves Liquid was not rendered at all — an enable flow with no disable path,
+ * at the exact seam L3 exists to guarantee. Presentability and reversibility are
+ * now the same expression, so they cannot disagree again.
  *
  * It gates the SNAPSHOT converters too, not just the render: a non-presentable
  * section drops the key on load instead of re-persisting a blob nothing can
@@ -74,7 +93,7 @@ export function canPresentLiquid(
   host: LiquidPresentationHost = 'desktop',
 ): boolean {
   if (section === 'note') return host === 'desktop';
-  return section !== 'city' && section !== 'visualizer';
+  return section !== 'visualizer';
 }
 
 /**

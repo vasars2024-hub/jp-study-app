@@ -3729,16 +3729,19 @@ const FloatingWindow = memo(function FloatingWindow({
   // recorded maximized. It also published a false product fact: the L12 atlas
   // reported "3 of 25 surfaces offer no Liquid presentation", but
   // `canPresentLiquid` is TRUE for `musicwidget` and the bar below renders its
-  // toggle — only `city` and `visualizer` genuinely refuse. (Written this way
-  // round on purpose: `liquidWindowSnapshotFidelity.test.ts` names every call
-  // site of that predicate in this file by regex, and the regex reads comments
-  // too — a comment spelling the call out was scored as a fourth caller.)
+  // toggle. As of 2026-09-02 it is true for `city` as well — the garden's
+  // frameless cluster below renders the identical control — so `visualizer`
+  // is the one section left that refuses, and the atlas figure is 24 of 25.
+  // (Written this way round on purpose: `liquidWindowSnapshotFidelity.test.ts`
+  // names every call site of that predicate in this file by regex, and the
+  // regex reads comments too — a comment spelling the call out was scored as a
+  // fourth caller.)
   // `data-section` is already the idiom here (`media/StudyBlocks.tsx:54`).
-  // Liquid presentation is opt-in per window and reversible. The frameless
-  // garden and visualizer have no conventional chrome to swap, so they do not
-  // offer it. Note keeps conventional paper as its default and uses Liquid only
-  // for its compact color edge palette. ONE predicate means "renders liquid"
-  // and "can leave liquid" cannot
+  // Liquid presentation is opt-in per window and reversible. Note keeps
+  // conventional paper as its default and uses Liquid only for its compact
+  // color edge palette; the garden keeps its painted scene in both and uses
+  // Liquid only for its disclosed HUD and control dock. ONE predicate means
+  // "renders liquid" and "can leave liquid" cannot
   // disagree (boss audit 2026-08-17 finding 2).
   const canGoLiquid = canPresentLiquid(win.section);
   const liquid = isWinLiquid(win) && canGoLiquid;
@@ -3969,6 +3972,23 @@ const FloatingWindow = memo(function FloatingWindow({
             {canPopOut && (
               <button className="fwin-b lq-hit" title={t('desktop.popOut')} onClick={onPopOut}>
                 ⧉
+              </button>
+            )}
+            {/* The SAME control the framed bar renders, from the SAME predicate. It is
+                repeated rather than hoisted because the two clusters differ in nothing
+                else, and a shared sub-component here would put a third render path
+                between `canGoLiquid` and the button — which is the shape boss audit
+                2026-08-17 finding 2 was. Frameless windows reserve room for it in
+                `.fwin-drag-strip`'s `right`. */}
+            {canGoLiquid && (
+              <button
+                className={`fwin-b lq-hit fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
+                title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+                aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
+                aria-pressed={liquid}
+                onClick={onToggleLiquid}
+              >
+                {liquid ? '◆' : '◇'}
               </button>
             )}
             <button className="fwin-b lq-hit" title={t('desktop.minimize')} onClick={onMinimize}>

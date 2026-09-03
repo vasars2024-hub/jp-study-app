@@ -199,7 +199,7 @@ describe('liquid window presentation — loading a persisted blob', () => {
 describe('presentability and reversibility are the same predicate', () => {
   const LIQUID = { v: 1 as const, mode: 'liquid' as const, standardRect: { x: 1, y: 2, w: 3, h: 4 } };
 
-  it.each(['city', 'visualizer'])('%s can never present liquid', (section) => {
+  it.each(['visualizer'])('%s can never present liquid', (section) => {
     expect(canPresentLiquid(section)).toBe(false);
     // The state the audit found reachable from a hand-edited layout file: a
     // well-formed blob that `parsePresentation` accepts. The gate is the
@@ -208,7 +208,7 @@ describe('presentability and reversibility are the same predicate', () => {
     expect(Object.keys(presentationToSnapshot({ section, presentation: LIQUID }))).toEqual([]);
   });
 
-  it.each(['dictionary', 'video', 'settings', 'musicwidget', 'agent'])(
+  it.each(['dictionary', 'video', 'settings', 'musicwidget', 'agent', 'city'])(
     '%s presents liquid and keeps its key',
     (section) => {
       expect(canPresentLiquid(section)).toBe(true);

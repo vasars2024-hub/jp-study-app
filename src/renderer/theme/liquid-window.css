@@ -132,6 +132,62 @@
 }
 
 /*
+ * L12 b2 — City / Mooncap Garden, the fifth Liquid host and the only frameless one.
+ *
+ * The painted scene is the ANCHOR and stays untouched in both presentations. It takes
+ * `.fwin-body-flush`'s exception above for that rule's reason: an `--lq-anchor-bg`
+ * plate behind a moon canvas is a visible band, and §2's "Liquid is SELECTIVE" is the
+ * whole point of a surface whose content is art. So Liquid changes exactly two things
+ * here, both of them chrome:
+ *
+ * 1. THE FRAMELESS CONTROL CLUSTER, which is the only chrome a frameless window has.
+ *    `.desk-note-palette`'s precedent: a targeted rule rather than `.lq-contextual`,
+ *    because that primitive's shared card geometry (`padding: var(--lq-space-3)`)
+ *    would quadruple the padding of a 2px strip of 26px buttons.
+ * 2. THE DOSSIER, which IS `.lq-contextual` and is handed the shared material by the
+ *    rule below like every other migrated inspector. Only its palette needs saying
+ *    here, and it needs saying because the garden's HUD was the app's last hand-rolled
+ *    glass: `readingGarden.css` hardcodes `rgba(224, 242, 237, 0.9)` text and a teal
+ *    gradient at (0,1,0)-(0,2,0), which the shared material replaces but the shared
+ *    material carries no colour. Left alone, Liquid would paint `--lq-liquid-bg` —
+ *    an OPAQUE `--panel` under `high-contrast`, a light one under `paper` — behind
+ *    text still pinned to near-white. These selectors are (0,4,0) by carrying both
+ *    `.reading-garden-info` and its `.lq-contextual`, so they beat every descendant
+ *    rule in the component sheet outright and do not depend on sheet order.
+ *
+ * `backdrop-filter` is deliberately NOT RESTATED for either of them, and this sheet
+ * carries none: rule 2's guard pins every `backdrop-filter` in here to `.fwin.fwin-liquid`
+ * itself. Both regions already declare their own in `styles.css` / `readingGarden.css`
+ * at (0,1,0), and unlike `.fwin-bar`'s it is not inert — the backdrop each samples is
+ * the scene painted inside this very window. Leaving them there means the flip changes
+ * tint, edge and elevation while the blur is the SAME in both presentations, which is
+ * the honest reading of "presentation only".
+ */
+.fwin.fwin-liquid.fwin-frameless .fwin-frameless-controls {
+  background: var(--lq-liquid-bg);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  box-shadow: var(--lq-liquid-shadow);
+}
+
+.fwin.fwin-liquid.fwin-frameless .fwin-frameless-controls .fwin-b {
+  color: var(--lq-liquid-text);
+}
+
+/* One line per branch, deliberately: `anchoredOn` in `liquidWindowPresentation.test.ts`
+   is a `startsWith(host + ' ')` prefix test, so a newline between the `:is()` and the
+   descendant reads as an unanchored selector and fails a guard about specificity for a
+   reason that is only whitespace. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .reading-garden-info.lq-contextual,
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .reading-garden-info.lq-contextual :where(h1, dd, strong, button, label, input) {
+  color: var(--lq-liquid-text);
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid, .reader.reader-liquid, .seanime-host.workspace-liquid) .reading-garden-info.lq-contextual :where(p, dt, span, small) {
+  color: var(--lq-liquid-text-muted);
+}
+
+/*
  * L5 — the interior half of rule 1, and the only place `.lq-contextual` is ever
  * painted.
  *

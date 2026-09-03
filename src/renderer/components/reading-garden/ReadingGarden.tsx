@@ -29,6 +29,7 @@ import {
   readingGardenPendingPhases,
   type ReadingGardenProgress,
 } from "../../readingGardenProgress";
+import { ContextualSurface } from "../liquid/LiquidSurface";
 import ReadingGardenLifeCanvas from "./ReadingGardenLifeCanvas";
 import ReadingGardenSkyEvents, {
   MooncapSkyDevConsole,
@@ -1020,7 +1021,19 @@ export default function ReadingGarden({
 
       {isInfoOpen && (
         <div className="reading-garden-info-chrome">
-          <aside
+          {/*
+           * L12 b2 — the dossier is the garden's Liquid region, and the ONLY one.
+           * §2.3 assigns "temporary inspectors" to the Liquid role and this is one:
+           * disclosed by the hero, dismissable, floating over content it does not
+           * replace. `ContextualSurface` is inert in a conventional window by
+           * construction, so the teal glass below is still exactly what a standard
+           * Mooncap window paints; `theme/liquid-window.css` hands it `--lq-*`
+           * material and text only under `.fwin-liquid`/`.popout-liquid`. The scene
+           * itself never becomes a Liquid surface — it is the anchor, in both
+           * presentations, for `.fwin-body-flush`'s reason.
+           */}
+          <ContextualSurface
+            as="aside"
             className="reading-garden-info"
             id="reading-garden-info"
             role="dialog"
@@ -1143,7 +1156,7 @@ export default function ReadingGarden({
                 }}
               />
             </div>
-          </aside>
+          </ContextualSurface>
           <p className="reading-garden-game-title" aria-hidden="true">
             {t("mooncap.info.gameName")}
           </p>

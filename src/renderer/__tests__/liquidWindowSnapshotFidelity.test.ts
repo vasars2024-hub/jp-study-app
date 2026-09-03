@@ -259,6 +259,28 @@ describe('DesktopShell actually routes every rebuild through the converters', ()
     );
   });
 
+  it('gives the FRAMELESS cluster the same toggle, from the same predicate', () => {
+    // L12 b2. `city` is the only frameless window that presents Liquid, and its
+    // chrome is not `.fwin-bar` — it is `.fwin-frameless-controls`, rendered by a
+    // completely separate branch. The exact failure boss audit 2026-08-17 finding 2
+    // recorded is reachable again here and only here: `canPresentLiquid` says yes,
+    // `.fwin-liquid` paints, and the branch that actually renders the way back out
+    // is the OTHER one. So the cluster is asserted to carry the control, gated on
+    // the same `canGoLiquid` the framed bar uses, with the same reversible label.
+    const cluster = SHELL_CODE.match(
+      /<div className="fwin-frameless-controls">[\s\S]*?<\/div>/,
+    )?.[0];
+    expect(cluster, 'no frameless control cluster in the shell').toBeTruthy();
+    expect(cluster).toContain('{canGoLiquid && (');
+    expect(cluster).toContain('fwin-b-liquid');
+    expect(cluster).toContain('aria-pressed={liquid}');
+    expect(cluster).toContain('onClick={onToggleLiquid}');
+    expect(cluster).toContain("t('desktop.returnToStandard')");
+    // And it is not a second predicate: `canGoLiquid` is still assigned exactly
+    // once, from the call site the test above names.
+    expect(SHELL_CODE.match(/const canGoLiquid =/g) ?? []).toHaveLength(1);
+  });
+
   it('keeps Note paper conventional until opt-in, then exposes a reversible color palette', () => {
     expect(SHELL).toContain('{isNote && liquid && (');
     expect(SHELL).toContain('className="desk-note-palette lq-contextual"');

@@ -12780,7 +12780,16 @@ mark.lookup-mark,
   position: absolute;
   top: 0;
   left: 0;
-  right: 122px;
+  /* Reserves the frameless control cluster, which grew a fourth button when
+     `city` became Liquid-presentable (L12 b2). Arithmetic, not taste:
+     4 x 26px `.fwin-b` + 3 x 2px gap + 2 x 2px padding = 114, at `right: 6px`
+     = 120, plus the ~2px `lq-hit` pointer overhang on the leftmost button.
+     122 was exactly the old 3-button figure's slack and would now be flush to
+     the pixel. The controls sit at `z-index: 3` above this strip's 2, so an
+     overlap would not actually steal the click — the margin is here so the
+     strip stops being a grab target under a button, which is a cursor bug
+     rather than a broken control. */
+  right: 132px;
   height: 34px;
   z-index: 2;
   cursor: grab;
