@@ -54,8 +54,10 @@ import {
 } from '../shared/subtitleStorage';
 import type { MediaItem } from '../shared/types';
 import {
+  READABLE_EXTENSIONS,
   extractEmbeddedSubtitle,
   findSidecarSubtitles,
+  guessSidecarLanguage,
   listEmbeddedSubtitleStreams,
   normalizeStreamLanguage,
 } from './subtitleLocalSources';
@@ -1001,6 +1003,94 @@ export function attachSubtitleText(input: unknown): NyaaSubtitleAcceptResult {
 }
 
 /**
+ * Attaches a subtitle FILE already on disk to the library item it sits beside.
+ *
+ * The route behind a dropped or scanned `.srt`/`.ass`. Until 2026-09-03 that
+ * import had no route at all: `renderer/fileImportExecute.ts` dispatched a
+ * `media:attach-subtitle` CustomEvent whose comment said "the player owns
+ * subtitle attachment", and a grep of the whole tree found **one** reference to
+ * that name — the dispatch. Nothing listened. The import reported success and
+ * navigated to the player, and the file was discarded.
+ *
+ * Two things it deliberately does NOT do:
+ *   - It does not copy. `attachSubtitleText` above writes into userData because
+ *     it is handed bytes with nowhere to live; this one is handed a path the
+ *     user already manages, so the record references it in place (`external`),
+ *     the same shape the sidecar sweep at the top of this file produces. Two
+ *     copies of one subtitle drift apart.
+ *   - It does not guess an owner. The match is the sidecar rule and only that
+ *     rule — same directory, and the subtitle's name starts with the media
+ *     file's stem — reused from `findSidecarSubtitles` rather than restated, so
+ *     a folder of 24 episodes cannot attach episode 1's track to all of them.
+ *     No match is a NAMED refusal; there is no "nearest item" fallback, because
+ *     a wrong attachment is worse than none and this surface has no undo.
+ */
+export function attachSubtitleFile(input: unknown): NyaaSubtitleAcceptResult {
+  const filePath = typeof input === 'string'
+    ? input
+    : (input && typeof input === 'object' && typeof (input as { path?: unknown }).path === 'string'
+        ? (input as { path: string }).path
+        : '');
+  if (!filePath) return { ok: false, message: 'No subtitle file was given.' };
+
+  const format = path.extname(filePath).slice(1).toLowerCase() as SubtitleRecordFormat;
+  if (!READABLE_EXTENSIONS.includes(format)) {
+    return { ok: false, message: `${path.extname(filePath) || 'That file'} is not a subtitle format this app can read.` };
+  }
+  try {
+    if (!fs.statSync(filePath).isFile()) return { ok: false, message: 'That path is not a file.' };
+  } catch {
+    return { ok: false, message: 'That subtitle file is no longer on disk.' };
+  }
+
+  const dir = path.dirname(filePath).toLowerCase();
+  const fileName = path.basename(filePath);
+  const owner = (host?.listItems() ?? []).find((entry) => {
+    if (typeof entry.path !== 'string' || !entry.path) return false;
+    if (path.dirname(entry.path).toLowerCase() !== dir) return false;
+    const stem = path.basename(entry.path, path.extname(entry.path));
+    return fileName.toLowerCase().startsWith(stem.toLowerCase());
+  });
+  if (!owner) {
+    return {
+      ok: false,
+      message: `No library item sits beside ${fileName}. Add the video first, then the subtitle attaches to it.`,
+    };
+  }
+
+  const existing = owner.subtitles ?? [];
+  if (existing.some((record) => record.path?.toLowerCase() === filePath.toLowerCase())) {
+    return { ok: false, message: `${fileName} is already attached to ${owner.title ?? owner.fileName}.` };
+  }
+
+  const stem = path.basename(owner.path, path.extname(owner.path));
+  const lang = guessSidecarLanguage(fileName, stem);
+  if (!lang) {
+    return {
+      ok: false,
+      message: `${fileName} does not name a language, so it cannot be filed as one. Rename it like "${stem}.ja${path.extname(filePath)}".`,
+    };
+  }
+
+  const record: SubtitleRecord = {
+    id: crypto.randomUUID(),
+    lang,
+    source: 'sidecar',
+    format,
+    path: filePath,
+    external: true,
+    label: fileName,
+    hearingImpaired: /\b(sdh|cc|hi)\b/.test(fileName.toLowerCase()),
+    addedAt: Date.now(),
+  };
+  host?.patchItems([owner.id], {
+    subtitles: [...existing, record],
+    subtitlesCheckedAt: Date.now(),
+  });
+  return { ok: true, message: '', lang };
+}
+
+/**
  * Removes one subtitle track from an item, and its cached file with it.
  *
  * The reverse of every add on this surface — discovery, nyaa accept, transcribe,
@@ -1076,6 +1166,11 @@ export function registerSubtitleDiscoveryIpc(discoveryHost: SubtitleDiscoveryHos
    * goes to the network, this one is given the bytes and cannot reach it.
    */
   ipcMain.handle('subtitleDiscovery:attachText', (_e, input: unknown) => attachSubtitleText(input));
+  /**
+   * Attaches a subtitle file already on disk. The route behind a dropped
+   * `.srt`/`.ass`, which before this had none at all — see `attachSubtitleFile`.
+   */
+  ipcMain.handle('subtitleDiscovery:attachFile', (_e, input: unknown) => attachSubtitleFile(input));
   /** The reverse of every add on this surface. See `detachSubtitleRecord`. */
   ipcMain.handle('subtitleDiscovery:detach', (_e, mediaId: unknown, recordId: unknown) =>
     detachSubtitleRecord(mediaId, recordId));

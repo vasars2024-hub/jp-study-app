@@ -1685,6 +1685,16 @@ const api = {
   ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
     ipcRenderer.invoke('subtitleDiscovery:attachText', input),
   /**
+   * Attach a subtitle FILE already on disk to the library item it sits beside.
+   * The counterpart to `attachSubtitleText` for a dropped or scanned file: it
+   * references the path in place rather than copying, and refuses by name when
+   * no item sits beside it rather than guessing an owner.
+   */
+  attachSubtitleFile: (
+    filePath: string,
+  ): Promise<import('./shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult> =>
+    ipcRenderer.invoke('subtitleDiscovery:attachFile', { path: filePath }),
+  /**
    * Remove one subtitle track from an item. The reverse of every add on this
    * surface, none of which had one — a wrong track could only be got rid of by
    * removing the media item. Deletes the cached file, never a sidecar in place.

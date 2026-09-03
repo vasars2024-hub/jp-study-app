@@ -22,7 +22,12 @@ import type { SubtitleRecordFormat } from '../shared/subtitleRecord';
 
 const ffmpegPath = ffmpegStatic as unknown as string;
 
-const READABLE_EXTENSIONS: SubtitleRecordFormat[] = ['srt', 'ass', 'ssa', 'vtt', 'lrc'];
+/**
+ * Every subtitle container this app can read as text. Exported because the drop
+ * importer's attach route has to answer the same question and a second copy of
+ * this list is the "second opinion" defect the file router exists to remove.
+ */
+export const READABLE_EXTENSIONS: SubtitleRecordFormat[] = ['srt', 'ass', 'ssa', 'vtt', 'lrc'];
 
 /** Subtitle codecs worth extracting. Bitmap formats are deliberately excluded. */
 const TEXT_SUBTITLE_CODECS = /^(subrip|srt|ass|ssa|mov_text|webvtt|text)$/i;

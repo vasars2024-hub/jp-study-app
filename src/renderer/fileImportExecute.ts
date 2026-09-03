@@ -137,11 +137,17 @@ export async function executeImport(
       return { targetId: target, libraryIds: [], mediaIds: [] };
     }
     case 'subtitle': {
-      // The player owns subtitle attachment; hand it the path and let the open
-      // media session pick it up.
-      window.dispatchEvent(
-        new CustomEvent('media:attach-subtitle', { detail: { path: subject.path } }),
-      );
+      /*
+        This used to dispatch a `media:attach-subtitle` CustomEvent, with a
+        comment claiming "the player owns subtitle attachment". It did not: a
+        grep of the whole tree found exactly one reference to that event name,
+        the dispatch itself. So every dropped subtitle reported success, opened
+        the player, and was discarded — the false success this router exists to
+        remove. `subtitleDiscovery:attachFile` is the real route, and it refuses
+        by name when no library item sits beside the file.
+      */
+      const res = await window.api.attachSubtitleFile(subject.path);
+      if (!res?.ok) return refuse(IMPORT_REFUSE_FAILED);
       hooks.onOpenSection?.('player');
       return { targetId: target, libraryIds: [], mediaIds: [] };
     }
