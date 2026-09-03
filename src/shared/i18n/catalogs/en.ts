@@ -5179,6 +5179,7 @@ export const en: Catalog = {
   'calendar.today': 'Today',
   'calendar.jumpToDate': 'Jump to date',
   'calendar.moreCount': '+{count} more',
+  'calendar.monthGrid': 'Month grid — arrow keys move by day, Enter adds an event on the selected day',
   'calendar.noEventsToday': 'No events on this day.',
   'calendar.addEvent': '+ Add event',
   'calendar.addInline': '+ Add',

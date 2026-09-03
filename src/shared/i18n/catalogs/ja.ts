@@ -5181,6 +5181,7 @@ export const ja: Catalog = {
   'calendar.today': '今日',
   'calendar.jumpToDate': '日付へ移動',
   'calendar.moreCount': '他{count}件',
+  'calendar.monthGrid': '月間グリッド — 矢印キーで日を移動、Enter で選択した日に予定を追加',
   'calendar.noEventsToday': 'この日には予定がありません。',
   'calendar.addEvent': '＋ 予定を追加',
   'calendar.addInline': '＋ 追加',
