@@ -7023,7 +7023,9 @@ mark.lookup-mark,
    Measured before this: revealing an answer moved the grading row on 6 of 10 sampled
    cards, up to 88 px, because the card grew 360 -> 448/1011 px under it.
    The centring is `safe` because a plain `center` in a scroll container clips the top of
-   anything taller than the box -- the part the reader needs most. */
+   anything taller than the box -- the part the reader needs most. `.manga-stage` warns
+   AGAINST `safe` for the opposite case: there the item is a centred image and falling back
+   to start leaves an asymmetric void. Here the fallback is the whole point. */
 .flash-review-shell .flash-card {
   flex: 1 1 0;
   min-height: 360px;

@@ -1083,3 +1083,46 @@ the `if (!work)` branch, where controls C/D prove the zero is a MEASURED zero. H
 A/B ran and the vacuous branch is unreachable. **Do not read those two bars as a Flashcards
 defect.** The fix is to run control C's eligibility plant in the A/B branch too, so the zero is
 measured there as well — never to widen the bars.
+
+## 2026-09-03 — 997 CLOSES. The grading row now survives the task's own steps.
+
+`1bdfd7ca`. The remaining condition the previous entry named, met on its own terms.
+
+BEFORE, re-derived this session at HEAD (not inherited): 10 cards through the strip, revealed
+with a real click at the Show-answer button's own live centre — **6 of 10 moved, max 88 px**.
+Card 360 → 448 px on four of them; on two the *prompt* outran the answer and it shrank
+849/1011 → 501/554, taking `.fwin-body` scrollTop 687/849 → 404/457 with it. (The last entry's
+9-of-10/431 px is the same defect on a different draw — the strip order is not stable across a
+reload, which is banked.)
+
+MECHANISM: the review card was sized by its own content — `min-height: 360px` with no cap — so
+the row below it was wherever the answer's length put it.
+
+FIX: a zero flex-basis inside a bounded shell column. The card's used height then has no term
+for its content: it is the shell's leftover space, floored at the same 360 px that already
+shipped. `.flash-view.review` gets `height: 100%` + `align-items: stretch` to make that leftover
+definite; against an indefinite host it resolves to `auto` (`.gram-view--explorer`'s reasoning)
+and the floor carries the property alone.
+
+AFTER: **0 of 10 moved, max 0 px**, `actionsY` 530 on every card, `cardH` 360 → 360 on every card.
+
+CONTROL, same instrument, same session: an injected sheet re-declaring the card
+`flex: 0 0 auto; overflow-y: visible; justify-content: center` → **4 of 6 moved, max 88 px**;
+removing that sheet → **0 of 6**. The instrument sees the defect when it is there.
+
+PARITY, because capping a card is only honest if the overflow stays reachable: 10 cards
+re-driven, **6 answers overflow (max 194 px), all 6 scroll, 0 clipped at the top**, and the last
+child of each `.flash-answer` is fully visible AND hit-testable after scrolling to the bottom.
+
+TRAP, worth carrying: `justify-content: safe center` is explicitly warned against elsewhere in
+this sheet (`.manga-stage`, "falls back to start when zoomed/tall"). That warning is correct for
+a centred *image*, where start-alignment leaves an asymmetric void. Here the fallback is the
+point — a plain `center` in a scroll container puts the top of a long answer above the
+scrollport, where no scroll reaches it. Different case, opposite conclusion; do not "fix" it.
+
+GUARD: `flashcardReviewRowAnchor.test.ts`, 3 cases. It asserts the property, not the spelling —
+it computes the card's used height for a 360 px and a 1011 px answer and requires them equal.
+Mutation control measured: reverting the four declarations fails all 3; styles.css restored
+byte-identically (sha256 `4b964fcf6aff0e3d0568` before and after). It reads a **comment-stripped**
+copy of the sheet, because `.flash-review-shell .flash-card` also appears in prose there and a
+raw `indexOf` finds the comment first.
