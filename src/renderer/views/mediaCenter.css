@@ -125,6 +125,15 @@
   --mc-stage-plate:
     radial-gradient(circle at 50% 36%, rgba(216, 74, 104, 0.1), transparent 26%),
     linear-gradient(145deg, rgba(9, 11, 17, 0.9), rgba(5, 7, 11, 0.98));
+  /*
+   * Ink for the stage's own status row, which paints on `.mc-video-stage`'s fixed
+   * `#05070b` rather than on the plate above it. Deliberately NOT re-sourced by the
+   * light or high-contrast blocks at the bottom of this file, unlike the plate: the
+   * slab those rows sit on is theme-invariant, so their ink must be too. Argued in
+   * full at the `.mc-video-stage > .media-substatus` rule.
+   */
+  --mc-stage-ink: #f5f4f7;
+  --mc-stage-ink-muted: #9d97a6;
 
   /*
    * The one type scale for Media Center.
@@ -1558,8 +1567,44 @@
   border-radius: 0;
 }
 
-.mc-video-stage .media-generation-status {
-  margin: 8px;
+/*
+ * `MediaGenerationStatus` returns a FRAGMENT (`MediaContent.tsx:2020`), so its three
+ * blocks — `.media-gen`, `.media-error`, `.media-substatus` — are direct children of
+ * the stage. There has never been a `.media-generation-status` element anywhere in
+ * `src/**`, so the rule that stood here selected nothing and the 8px inset it asks for
+ * was never applied: measured live with a clip loaded, the status line's left edge was
+ * 340px against the stage's 339, i.e. flush against the slab with only the 1px border
+ * between the two.
+ *
+ * The INK is the other half, and it is what category 5 Q5 failed this surface on. The
+ * stage's background is a fixed near-black slab (`#05070b` above) in EVERY theme, and
+ * that is correct — it is the letterbox behind a video, not a themed panel. But the
+ * text on it inherits the page palette: `.media-substatus.muted` takes `--muted`, which
+ * in `classic-light` correctly goes dark (`#5f5f66`), and `.media-gen` takes `--text`,
+ * which does the same. Measured on the loaded Video page: `#5f5f66` on `rgb(5,7,11)` is
+ * **3.18:1** against the 4.5 bar. Text painted on a theme-invariant slab needs
+ * theme-invariant ink.
+ *
+ * The two literals below ARE the default dark palette's own `--text`/`--muted`
+ * (`styles.css:20-21`), exactly as `--mc-stage-plate` above froze the previous inline
+ * gradient — so the default surface is pixel-identical and every other palette
+ * converges onto it rather than onto its own page ink. `#9d97a6` on the slab is
+ * **7.12:1**. The tradeoff taken deliberately: a non-default DARK palette (forest-night
+ * and the rest) loses its own muted tint on this one row. That is the point — the row
+ * is not on that palette's surface.
+ */
+.mc-video-stage > .media-gen,
+.mc-video-stage > .media-error,
+.mc-video-stage > .media-substatus {
+  margin-inline: 8px;
+}
+
+.mc-video-stage > .media-gen {
+  color: var(--mc-stage-ink);
+}
+
+.mc-video-stage > .media-substatus {
+  color: var(--mc-stage-ink-muted);
 }
 
 .mc-video-inspector {
