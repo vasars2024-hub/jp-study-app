@@ -1342,6 +1342,13 @@ async function ev(js) {
     body: JSON.stringify({ ...(WIN ? { window: WIN } : {}), js: js.replace(/\s*;\s*$/, '').trimEnd() }),
   });
   if (!r.ok) throw new Error(`eval failed: ${JSON.stringify(r).slice(0, 300)}`);
+  // `ok:true` WITH `{__error}` IS A THROW, not an answer: main caught the exception, so
+  // the REQUEST succeeded and `.ok` is true. Readers that JSON.parse the result then report
+  // `"[object Object]" is not valid JSON`, which names neither the throw nor the expression.
+  // Measured 2026-09-03: a null deref inside one cat6 mutation surfaced only as that message.
+  if (r.result && typeof r.result === 'object' && r.result.__error) {
+    throw new Error(`eval THREW in the renderer: ${r.result.__error} :: ${js.trim().slice(0, 200)}`);
+  }
   return r.result;
 }
 

@@ -140,6 +140,13 @@ async function post(route, body) {
 async function ev(js) {
   const t = await post('/eval', { js: js.replace(/\s*;\s*$/, '').trimEnd() });
   if (!t.ok) throw new Error(`eval failed: ${JSON.stringify(t).slice(0, 400)}`);
+  // `ok:true` WITH `{__error}` IS A THROW, not an answer: main caught the exception, so
+  // the REQUEST succeeded and `.ok` is true. Readers that JSON.parse the result then report
+  // `"[object Object]" is not valid JSON`, which names neither the throw nor the expression.
+  // Measured 2026-09-03: a null deref inside one cat6 mutation surfaced only as that message.
+  if (t.result && typeof t.result === 'object' && t.result.__error) {
+    throw new Error(`eval THREW in the renderer: ${t.result.__error} :: ${js.trim().slice(0, 200)}`);
+  }
   return t.result;
 }
 
