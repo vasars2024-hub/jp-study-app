@@ -2081,3 +2081,66 @@ three of them `by: div.os-desktop`. Both are instrument-vs-product questions, no
 **Cats 3/4/5/6 were NOT attempted and must not be scored on this profile.** A fresh
 `JP_USER_DATA_DIR` leaves the Files index at `Everything 28` with every content folder at 0 —
 an empty harness, which the rubric caps at 0. They need a populated profile.
+
+## 2026-09-03 · backup — Music — 80/80 — commit `3efa3647`
+
+`music` is the **tenth** of the 25 `DESKTOP_WIN_SECTIONS` at 80/80 and closes the RULE C pair
+opened for this bullet (`library` densest, `music` most different — `library` closed at
+`c8e5f2e7`). Driven on the `.fwin` "Music" (`@.fwin:has(.mc-root)`), standard presentation,
+1080×700, viewport 1264×821, ONE desktop window and ONE `.fwin`, with a track CURRENT — the
+state half these bars only exist in. Zero new probes (RULE 1).
+
+**sampled-out for this bullet:** `agent` `novels` `grammar` `translate` `player` `anki` `stats`
+`immersion` `reading` `scraper` `files` `note` `city` `visualizer` `musicwidget`.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10**, re-derived AFTER the repair | **65** text runs, 0 unmeasurable, **0 failing**, min **5.00** (`small "2 tracks"`, 11 px) — the same sweep read min **4.43** before the repair; 38 targets by rect, smallest `button.fwin-b` **24 px**, 14 under the 32 px floor by rect and **0** WCAG 2.5.8 failures; **40** controls hit-tested, 14 below the floor by RECT and **0 by hit box**, smallest painted hit **32×32.5**; keyboard **38/38** reachable, 1 focus host (`div.mc-root`, `tabindex=-1`); motion **19** declarations over threshold at rest → **0** under emulated `prefers-reduced-motion` → 19 after, emulation taken and released | 6 axes planted, all 6 moved (`0,14,0,0,0 → 2,16,2,1,2 → 0,14,0,0`), `rectDrift 0`, back to baseline |
+| 2 | Clunkiness | **10/10** | 1 counted step, **0** dead ends, **0** modal traps, **0** scroll traps, worst click→recv **0.7 ms**, **0** over the 100 ms bar; cost parity Liquid **1** = Standard **1**, 1080×700 both, restored to standard; resting and after-task idle both churn **net false** over 1,600 ms once the player strip is excluded | `--control`: dead end / modal trap / scroll trap **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true`, inert click 0.3 ms |
+| 3 | Liquid utilization | **10/10** | driven into Liquid and restored: `denseWorkOnTranslucent` **0** over **37** regions; Liquid-eligible **9/9** treated and **9/9** backed by a shared primitive; roles Work **1**, Anchor **21**, Anchor-holds-work **5**, Ambient **1** | both plants fired on `div.lq-anchor.music-yt` — one region to glass, then every Work region (`allWorkFailed`); `oneMaterialReturned` and `allGlassReturned` true |
+| 4 | Use of space | **10/10** | all three sizes ran and restored: default dead **10.4 %**, compact **0.5 %**, maximized **13.5 %** against a 15 bar; clipped **0**, overlaps **0**, horizontal scrollers **0** at every size; content grows not chrome, `default → maximized` | injected clip **0→1→0** with removal proven; the art-plate exclusion named its own plant (hangs out **279 px**, `clipped` did NOT rise); backdrop overlap rose and was **not excused** |
+| 5 | UI clarity | **10/10** after a repair | all ten questions YES. Q4 **8** controls scanned against a bar of 12 with 21 shell-chrome controls excluded by name and **2** collapsed disclosures; Q5 **65** runs, **0 failing in EITHER theme**, min **4.77** (classic-light) / **4.93** (default), theme axis moved on both minRatio and paint digest; Q6/Q7/Q8/Q9 from this surface's own category-6 baseline; Q10 above the identity bar | `--control` re-run AFTER the repair: **Q2, Q3, Q4, Q5 and Q10 all went NO**, planted clutter taking scanned to **30** against the bar of 12 |
+| 6 | Feature parity + reversibility | **10/10** | ledger **10/10 reachable in standard, 10/10 in Liquid**, `na` 0, rows agree, nothing only-in-one; round trip `standard → liquid → standard` with **0** diffs, an INPUT dirtied and held, shell held, other-presentation box 1080×700 | every mutation armed and felled **exactly its own row** (`libraryRows`, `librarySearch`, …), no unexpected row moved, each restored to `10/10` |
+| 7 | Performance under real load | **10/10** | ceiling p50/p95 **8.3 / 8.5** ms, max 8.8, 0 over 16, main-loop max 12.2; drag p95 **8.5** (max 16.8, 1 over 16, 0 over 33); resize p95 **8.5** (max 8.8, 0 over 16); theme p95 **8.5** (max 25.0, 1 over 16, applyPainted 16.7 ms); heavy leg "cycle all four library sort modes" **131 samples / 4,026 ms**, main-loop p50 **2.0** max **8.0**, receipt `cycled 48 sorts (12/12/12/12), restored recent`; idle 132 samples p50 **2.1** p95 **3.0** | `--jank`: drag p95 **8.5 → 116.7 ms**, max **125.0**, frames over 100 **0 → 10**, **11** blocks injected |
+| 8 | Honest states | **10/10**, both driven bars MEASURED | raw keys **0** against a 10,234-key / 107-namespace catalog, placeholders **0**, mute pairs **0** (3 disabled controls, all explained); states **1 of 1 observable** — the search empty state names it in full (`No songs match "zzqqxx-no-such-song".`), 0 unpainted, and `loading`/`error`/`offline` are `notObservable` and excluded rather than passed; four languages give **4 distinct hashes**, **33 of 66** runs move (**50.0 %**), max raw keys in any language **0**, and `ui-lang` started and ended **absent** (`restored: true`); the drive restored the search box | rawKeys/placeholders/mutePairs **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+
+Evidence: `baselines/cat{1..8}-s9-music*.json`.
+
+**ONE PRODUCT REPAIR, found by cat5 and confirmed by cat1.**
+
+`3efa3647` — **a current track's row text sat 0.07 under the contrast bar.** Two 11 px runs in
+`.mc-track-queue` (`small` "Downloads" and the trailing `span` "—") carry `--mc-dim` (#7f8598,
+5.2:1 on the flat `--mc-bg`); a hovered or `.is-active` row paints `rgba(255,255,255,.035)` over
+a 72 %-opaque `.lq-contextual` aside and the composite measured **4.43:1**. Swapped to
+`--mc-muted`, the same token swap `.mc-inspector-score-row small` already carries for the
+identical composite. Separately `.music-row.active .music-song-artist` measured **4.43:1 in
+classic-light** — the only failing run of 66 — because the active row's 16 % accent tint darkens
+a light panel; it now mixes 40 % `--text` into `--muted`. cat1's whole-surface min went
+**4.43 → 5.00**; cat5's classic-light cell went 1 failing → **0**.
+
+**HONEST SCOPE NOTE.** Categories 2, 3, 4 and 6 were driven earlier the same day, on the build
+immediately before this repair. The repair changes two `color:` declarations and nothing else —
+no geometry, no material, no control, no route — so those four cells are carried rather than
+re-driven, and category 1, the one that scores contrast, WAS re-driven after it. Saying which
+cells predate the fix is the point; silently re-labelling them would not be.
+
+**THREE INSTRUMENT TRAPS, all paid for this turn.**
+
+1. **A SECOND desktop window makes the Liquid toggle lag one click.** After the 2026-09-03
+   reboot the app restored a window for a display that is not attached (`/health` listed two).
+   With it open, clicking `.fwin-b-liquid` left the class one interaction behind, so cat5's Q6
+   leg read `toggle did not reach liquid; surface reads standard` and the whole run VOIDed —
+   twice. Closing it (POST `/eval` with `{"window":2,"js":"window.close()"}`) fixed it outright,
+   one click, 600 ms. **`/health` must list ONE desktop window before any presentation run.**
+2. **`cat5` on this surface needs `--shell-chrome ".mc-sidebar,.mc-topbar,.mc-playerbar"`.**
+   Without it Q4 counts the Media Center's shared shell as the surface's own tools — 22 scanned
+   against a bar of 12 — and reports a clutter defect that does not exist. With it, 8 scanned
+   and 21 named in `shellList` where a reader can add them back and disagree.
+3. **Half of this surface's bars only exist once a track is CURRENT.** At rest the queue rows
+   are untinted and both failing runs are unreachable; `statesNamed` is `0 of 0 observable` until
+   `--drive-input ".music-search input"` produces the empty state. An at-rest sweep of Music
+   scores 10/10 on a defect it cannot see.
+
+**Running total: 10 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
+`youtube`, `calendar`, `resources`, `flashcards`, `library`, `music`. **15 left**, of which 14
+are scorable in both presentations (`visualizer` and `musicwidget` offer no presentation toggle).

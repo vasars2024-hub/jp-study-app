@@ -1,0 +1,108 @@
+{
+  "label": "s10-stats",
+  "surface": "@.fwin:has(.stats-view)",
+  "win": "main",
+  "lang": "en",
+  "storedLang": null,
+  "theme": null,
+  "rect": "820x580",
+  "textRuns": 25,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 16,
+  "textHash": 1181493722,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 2,
+      "messages": [
+        "No reading tracked yet.Open a book from your Library and start reading — your time and characters read will show up here."
+      ],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10234,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10234 catalog keys / 107 namespaces",
+  "raised": "root surface - no taskbar button",
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": "UNMEASURED"
+  },
+  "verdict": "UNMEASURED - languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "failedBars": [],
+  "unmeasuredBars": [
+    "languagesDiffer"
+  ],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ],
+  "control": {
+    "moved": {
+      "rawKeys": true,
+      "placeholders": true,
+      "mutePairs": true
+    },
+    "backToBaseline": true,
+    "hostedIsolation": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    }
+  }
+}

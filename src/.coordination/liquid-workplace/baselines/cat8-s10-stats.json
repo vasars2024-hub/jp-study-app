@@ -1,0 +1,231 @@
+{
+  "label": "s10-stats",
+  "surface": "@.fwin:has(.stats-view)",
+  "win": "main",
+  "lang": "en",
+  "storedLang": null,
+  "theme": null,
+  "rect": "820x580",
+  "textRuns": 25,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 16,
+  "textHash": 1181493722,
+  "rawKeyCount": 0,
+  "rawKeys": [],
+  "rawKeysTruncated": false,
+  "placeholderCount": 0,
+  "placeholders": [],
+  "mutePairCount": 0,
+  "mutePairs": [],
+  "disabledTotal": 0,
+  "states": {
+    "empty": {
+      "hosts": 2,
+      "messages": [
+        "No reading tracked yet.Open a book from your Library and start reading — your time and characters read will show up here."
+      ],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "loading": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "error": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    },
+    "offline": {
+      "hosts": 0,
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
+    }
+  },
+  "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10234,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10234 catalog keys / 107 namespaces",
+  "raised": "root surface - no taskbar button",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 25,
+        "textHash": 1181493722,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 25,
+        "textHash": -684975612,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 14,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Statistics",
+            "now": "統計"
+          },
+          {
+            "i": 6,
+            "was": "Your reading time and characte",
+            "now": "アプリ内で読んだ時間と文字数を、端末内で記録します。"
+          },
+          {
+            "i": 7,
+            "was": "Word knowledge",
+            "now": "単語の習熟度"
+          },
+          {
+            "i": 8,
+            "was": "Sync from Anki",
+            "now": "Ankiから同期"
+          },
+          {
+            "i": 10,
+            "was": "Estimated level",
+            "now": "推定レベル"
+          },
+          {
+            "i": 11,
+            "was": "From Familiar-or-better covera",
+            "now": "JLPT／HSK単語リストのうち「なじみあり」以上の割合から"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 25,
+        "textHash": 1175632670,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 14,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Statistics",
+            "now": "统计"
+          },
+          {
+            "i": 6,
+            "was": "Your reading time and characte",
+            "now": "你在应用内阅读的时间和字数，全部保存在本地。"
+          },
+          {
+            "i": 7,
+            "was": "Word knowledge",
+            "now": "词汇掌握度"
+          },
+          {
+            "i": 8,
+            "was": "Sync from Anki",
+            "now": "从 Anki 同步"
+          },
+          {
+            "i": 10,
+            "was": "Estimated level",
+            "now": "预估等级"
+          },
+          {
+            "i": 11,
+            "was": "From Familiar-or-better covera",
+            "now": "根据 JLPT／HSK 词表中“熟悉”及以上覆盖率估算。"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 25,
+        "textHash": -1221667082,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 14,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Statistics",
+            "now": "Статистика"
+          },
+          {
+            "i": 6,
+            "was": "Your reading time and characte",
+            "now": "Время чтения и количество проч"
+          },
+          {
+            "i": 7,
+            "was": "Word knowledge",
+            "now": "Знание слов"
+          },
+          {
+            "i": 8,
+            "was": "Sync from Anki",
+            "now": "Синхронизировать с Anki"
+          },
+          {
+            "i": 10,
+            "was": "Estimated level",
+            "now": "Оценка уровня"
+          },
+          {
+            "i": 11,
+            "was": "From Familiar-or-better covera",
+            "now": "По доле слов уровня «знакомо» "
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": null
+    },
+    "after": {
+      "html": "en",
+      "stored": null
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 14,
+    "baseRuns": 25,
+    "diffShare": 0.56
+  },
+  "statesObservable": [
+    "empty"
+  ],
+  "statesNotObservable": [
+    "loading",
+    "error",
+    "offline"
+  ],
+  "statesNamed": "1 of 1 observable",
+  "mutePairCountWorst": 0,
+  "bars": {
+    "rawKeys": true,
+    "placeholders": true,
+    "mutePairs": true,
+    "statesNamed": true,
+    "languagesDiffer": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead-control count (honesty-probe A - every control driven for a side effect)",
+    "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
+  ]
+}

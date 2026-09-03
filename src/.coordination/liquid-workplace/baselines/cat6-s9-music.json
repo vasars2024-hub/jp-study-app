@@ -1,0 +1,490 @@
+{
+  "label": "s9-music",
+  "app": "music",
+  "win": "main",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "1080x700",
+  "driven": [
+    {
+      "step": "pick",
+      "result": "{\"alreadySelected\":\"hana13-emotion-excerpt-ja\",\"via\":\"queue\"}"
+    },
+    {
+      "step": "searchNarrow",
+      "result": "{\"before\":2}"
+    },
+    {
+      "step": "searchRestore",
+      "result": "{\"narrowed\":0}"
+    },
+    {
+      "step": "sort",
+      "result": "{\"was\":\"recent\",\"now\":\"title\"}"
+    },
+    {
+      "step": "youtube",
+      "result": "{\"drafted\":true}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "settle": {
+    "afterDrive": {
+      "where": "after drive, before parity check",
+      "converged": true,
+      "reads": 2,
+      "ms": 360,
+      "signature": "836|267|43",
+      "trace": [
+        "836|267|43",
+        "836|267|43"
+      ],
+      "snapshot": {
+        "app": "music",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 94,
+          "y": 54,
+          "w": 1080,
+          "h": 700
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "91",
+        "chars": 836,
+        "nodes": 267,
+        "controls": 43,
+        "fields": {
+          "input0:": "",
+          "input1:": "",
+          "select2:": "title",
+          "input3:music-yt-input": "https://youtu.be/aaaaaaaaaaa",
+          "input4:mc-player-seek": "100",
+          "input5:": "1"
+        },
+        "scroll": []
+      }
+    },
+    "afterFlipOut": {
+      "where": "flip -> liquid",
+      "converged": true,
+      "reads": 2,
+      "ms": 373,
+      "signature": "836|267|43",
+      "trace": [
+        "836|267|43",
+        "836|267|43"
+      ],
+      "snapshot": {
+        "app": "music",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "liquid",
+        "liquidClass": true,
+        "rect": {
+          "x": 94,
+          "y": 54,
+          "w": 1080,
+          "h": 700
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "91",
+        "chars": 836,
+        "nodes": 267,
+        "controls": 43,
+        "fields": {
+          "input0:": "",
+          "input1:": "",
+          "select2:": "title",
+          "input3:music-yt-input": "https://youtu.be/aaaaaaaaaaa",
+          "input4:mc-player-seek": "100",
+          "input5:": "1"
+        },
+        "scroll": []
+      }
+    },
+    "afterFlipBack": {
+      "where": "flip -> standard",
+      "converged": true,
+      "reads": 2,
+      "ms": 359,
+      "signature": "836|267|43",
+      "trace": [
+        "836|267|43",
+        "836|267|43"
+      ],
+      "snapshot": {
+        "app": "music",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 94,
+          "y": 54,
+          "w": 1080,
+          "h": 700
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "91",
+        "chars": 836,
+        "nodes": 267,
+        "controls": 43,
+        "fields": {
+          "input0:": "",
+          "input1:": "",
+          "select2:": "title",
+          "input3:music-yt-input": "https://youtu.be/aaaaaaaaaaa",
+          "input4:mc-player-seek": "100",
+          "input5:": "1"
+        },
+        "scroll": []
+      }
+    },
+    "disabled": false,
+    "allConverged": true,
+    "unconverged": []
+  },
+  "parity": {
+    "standard": "10/10",
+    "liquid": "10/10",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "rowEvidence": [
+    {
+      "id": "libraryRows",
+      "standard": {
+        "reachable": true,
+        "evidence": "rows=2 complete=2"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "rows=2 complete=2"
+      }
+    },
+    {
+      "id": "librarySearch",
+      "standard": {
+        "reachable": true,
+        "evidence": "input=true before=2 narrowed=0 restored=2"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "input=true before=2 narrowed=0 restored=2"
+      }
+    },
+    {
+      "id": "sortOrder",
+      "standard": {
+        "reachable": true,
+        "evidence": "sort=title titles=2 ordered=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "sort=title titles=2 ordered=true"
+      }
+    },
+    {
+      "id": "playerSelection",
+      "standard": {
+        "reachable": true,
+        "evidence": "active=1 selected=\"hana13-emotion-excerpt-ja\" now=\"hana13-emotion-excerpt-ja\""
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "active=1 selected=\"hana13-emotion-excerpt-ja\" now=\"hana13-emotion-excerpt-ja\""
+      }
+    },
+    {
+      "id": "transport",
+      "standard": {
+        "reachable": true,
+        "evidence": "play=true enabled=6 seek=true max=100"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "play=true enabled=6 seek=true max=100"
+      }
+    },
+    {
+      "id": "like",
+      "standard": {
+        "reachable": true,
+        "evidence": "like=true enabled=true pressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "like=true enabled=true pressed=false"
+      }
+    },
+    {
+      "id": "lyricsRecovery",
+      "standard": {
+        "reachable": true,
+        "evidence": "lines=0 hint=true recovery=2"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "lines=0 hint=true recovery=2"
+      }
+    },
+    {
+      "id": "queueMirror",
+      "standard": {
+        "reachable": true,
+        "evidence": "songs=2 queue=2 active=1/1"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "songs=2 queue=2 active=1/1"
+      }
+    },
+    {
+      "id": "youtubeDraft",
+      "standard": {
+        "reachable": true,
+        "evidence": "draft=true actionEnabled=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "draft=true actionEnabled=true"
+      }
+    },
+    {
+      "id": "windowLifecycle",
+      "standard": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=true"
+      }
+    }
+  ],
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": "INPUT",
+    "dirtyNote": null,
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "1080x700"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "libraryRows",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "title stripped",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "libraryRows"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "librarySearch",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "librarySearch"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "sortOrder",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "sortOrder"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "playerSelection",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "playerSelection"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "transport",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "transport"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "like",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "like"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "lyricsRecovery",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "lyricsRecovery"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "queueMirror",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "queueMirror"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "youtubeDraft",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "youtubeDraft"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "10/10",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "9/10",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"music:sort+youtube\"]",
+        "afterRestore": "10/10",
+        "returned": true
+      }
+    ],
+    "armed": 10,
+    "declared": 10,
+    "unarmable": [],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}
