@@ -1625,3 +1625,70 @@ So the shortfall is not repair work on scored surfaces; it is **20 unscored surf
 **So the honest denominator for the remaining work is 20 surfaces, of which 18 are scorable in
 both presentations today.** That is the remaining Liquid work, and it is stated here rather than
 in a handoff so it survives the next hop.
+
+## 2026-09-03 · primary — Resources and Calendar take category 1, both at a controlled 10/10 — and the second 10 is the finding
+
+RULE C's pair, chosen by measurement rather than taste. Every unscored section was opened
+from the real Start menu and counted: `resources` **937 elements / 78 controls** is the
+densest of the twenty, and `calendar` is the most different shape on the desk — a date grid,
+which §2.3 names by name as dense work that must stay on a stable anchor. (`stats` 61/6,
+`calendar` 171/14, `flashcards` 190/52, `grammar` 208/59, `novels` 233/41.)
+**sampled-out: `agent` `library` `novels` `grammar` `translate` `player` `music` `anki`
+`flashcards` `stats` `immersion` `reading` `scraper` `files` `note` `city` `visualizer`
+`musicwidget`** — eighteen, named, not silently truncated.
+
+Instrument: `probes/cat1-accessibility.cjs`, unchanged, `--win 1`. **Zero new probes** (RULE 1).
+Standard presentation, 820×580, one floating window on the desk.
+
+| # | Category | Surface | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | Resources | **10/10** | 246 text records, min **5.35:1** (`span "11 links" 11.5px`), 0 failing, 0 unmeasurable; 64 controls, **0 unreachable**; 0 WCAG 2.5.8 fails; smallest target 24 px (`fwin-b`, which `.lq-hit` carries to the floor — 0 below floor by hit); motion 54 → **0** → 54 under emulation; 0 occluded of 78 measured | counts `0/5/0/0/0` → `2/7/2/1/2`, all five bars moved, `backToBaseline: true`, `rectDrift: 0` |
+| 1 | Accessibility | Calendar | **10/10** | 67 text records, min **5.35:1** (`div.cal-month-daynum "30" 12px`), 0 failing; 14 controls, **0 unreachable**; 0 WCAG 2.5.8 fails; motion 9 → **0** → 9; 0 occluded | same shape: `0/5/0/0/0` → `2/7/2/1/2`, restored, `rectDrift: 0` |
+
+Evidence: `baselines/cat1-resources.json`, `cat1-resources-control.json`,
+`cat1-calendar.json`, `cat1-calendar-after.json`, `cat1-calendar-control.json`.
+
+**CALENDAR SCORED 10/10 BEFORE THE FIXES TOO, AND THAT IS THE POINT.** Two real
+accessibility defects were sitting on the surface while the category-1 harness called it
+clean, because the harness enumerates `button,a,input,select,[tabindex]` and neither defect
+is in that set:
+
+1. **`e077fdd6` — the month grid had no keyboard route to a day.** All 42 cells carried
+   `onDoubleClick={() => openNew(key)}` on a bare `<div>`: no role, no `tabIndex`, no key
+   handler, `cursor: auto`. Week and Day each ship a real button for the same action; Month
+   did not. Now `role="grid"` + **one** tab stop + `aria-activedescendant`, the repo's own
+   `DeckWorkbenchBrowser` pattern — 42 focusable cells would have traded a category-1 failure
+   for a category-2 one. Driven live through `/key`: Right ×3 moved 2026-09-03 → 09-06, Down
+   → 09-13, Enter opened New event dated **2026-09-13**. Layout unchanged and proven so: 42
+   cells, 7 distinct X, 6 distinct Y, cell 99 px = (728 − 36)/7 exactly; forcing the
+   `display: contents` rows to `block` moved columns 7 → 6 and the grid 607 → 644 px, then
+   restored with zero style residue.
+2. **`1dffda14` — the event modal was a div that Escape did not close.** Measured before
+   touching it: Escape through `/key` left `modal: true`. No `role`, no `aria-modal`, no
+   label. Now a labelled `role="dialog"` that Escape closes — verified live, `modal: false`,
+   no event created — with the handler on the window and skipping an already-`defaultPrevented`
+   Escape so a native `<select>` popup keeps eating its own first.
+
+**So the honest reading of these two rows is: category 1 is a controlled 10/10 on both
+surfaces, and on Calendar that 10 became TRUE this turn rather than staying true.** A
+category score that does not move across a repair is normally a sign the repair was
+unnecessary; here it is a sign the instrument is blind to a whole class — a control that
+exists only as a mouse gesture. Recorded as an open instrument gap for whoever next touches
+`cat1-accessibility.cjs`: its control set cannot see `onDoubleClick`/`onClick` handlers on
+elements with no role and no `tabIndex`, and adding that would re-open, not re-confirm,
+surfaces already scored.
+
+**Two first-run overlays block any run on this app profile and are not defects.** The
+2026-09-03 restart lost `localStorage`, so a full-viewport `div.consent` ("Put your country
+on the map?", z-index 40000) and an 8-step `.tour-bubble` were both up. The first VOIDed a
+run at *"6 of 6 controls occluded"* and the second at *"28 of 64"* — neither names an overlay,
+so both read as a layout defect. **Decline the consent (it is the option that makes no
+network request) and Skip tour, then re-run.**
+
+**AND THE TRAP THAT COST THE MOST THIS TURN: drive the app only in a FOCUSED window.**
+Clicking a Start-menu app tile in the unfocused window 1 returned `clicked`, closed the menu
+(so `open()` demonstrably ran) and opened **nothing**, repeatably, across `anki`, `stats`,
+`grammar` and `library`. It is renderer throttling in an occluded window, not a dead control
+— `/focus`'s own comment in `main/debugBridge.ts` says Chromium throttles `rAF` there. One
+`POST /focus {window:1}` and every one of them opened first try. A worker who does not know
+this will file the Start menu as broken.
