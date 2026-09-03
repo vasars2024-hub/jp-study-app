@@ -971,16 +971,37 @@ async function runDuplication() {
         // ledger with no control behind it at all. So it is named, the run stays scorable,
         // and `l6-parity-rows.cjs` REFUSES to write the specific row it could not prove.
         const unarmable = !!applied.refused;
+        const exactlyOwn = fell.some((r) => r.id === which) && unexpected.length === 0;
+        // A VOID THAT NAMES NOTHING COSTS THE NEXT WORKER THE HOUR IT COST ME. Until
+        // 2026-09-02 a mutation that armed and did not flip its row published
+        // `fellRows: []` and nothing else, so "the control did not falsify" was
+        // indistinguishable from three different causes: the row was ALREADY false in
+        // `pre` (so it could not fall), the row is `na` in `pre` (same), or the mutation
+        // hit the wrong element. Only the first is a spec bug and only the third is an
+        // instrument bug. `ownRowBefore`/`ownRowAfter` separate them in one line, and the
+        // two full row maps are attached so the diagnosis needs no second run.
+        const preRow = (pre.rows || []).find((r) => r.id === which);
+        const dirtyRow = (dirtyCheck.rows || []).find((r) => r.id === which);
+        const rowState = (r) => (r ? (r.reachable === null ? `na(${r.na})` : String(r.reachable)) : 'absent');
         results.push({
           mutation: which,
           declaredCascade: allowed,
           preBaseline: pre.refused ? null : `${pre.reachable}/${pre.total}`,
+          ownRowBefore: rowState(preRow),
+          ownRowAfter: rowState(dirtyRow),
+          ...(exactlyOwn ? {} : {
+            whyNotFalsified: preRow && preRow.reachable !== true
+              ? `its own row was already ${rowState(preRow)} before the mutation, so it had nothing to lose -- fix the row or the drive, not the mutation`
+              : 'the mutation applied and the row stayed reachable -- it is hitting an element the row does not read',
+            preRows: (pre.rows || []).map((r) => `${r.id}=${rowState(r)} ${r.evidence}`),
+            dirtyRows: (dirtyCheck.rows || []).map((r) => `${r.id}=${rowState(r)} ${r.evidence}`),
+          }),
           applied: applied.refused || applied.mutated || A(applied),
           armed: !unarmable,
           unarmableReason: unarmable ? applied.refused : null,
           reachable: dirtyCheck.refused ? null : `${dirtyCheck.reachable}/${dirtyCheck.total}`,
           fellRows: fell.map((r) => r.id),
-          exactlyOwnRow: fell.some((r) => r.id === which) && unexpected.length === 0,
+          exactlyOwnRow: exactlyOwn,
           unexpectedRows: unexpected.map((r) => r.id),
           restored: A(restored.restored),
           afterRestore: after.refused ? null : `${after.reachable}/${after.total}`,

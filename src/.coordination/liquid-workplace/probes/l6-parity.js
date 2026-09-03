@@ -150,6 +150,7 @@
   const vnState = specState('__LQP_VN_ORIG');
   const flashState = specState('__LQP_FLASH_ORIG');
   const notebookState = specState('__LQP_NOTEBOOK_ORIG');
+  const filesState = specState('__LQP_FILES_ORIG');
   const statsState = specState('__LQP_STATS_ORIG');
   const calendarState = specState('__LQP_CAL_ORIG');
   const gamesState = specState('__LQP_GAMES_ORIG');
@@ -1108,6 +1109,331 @@
         lineage: (w) => detach(q(w, '.gx-notebook-lineage-stage'), 'no lineage stage'),
         liveCaptions: (w) => detach(q(w, '.gx-lc-state'), 'no capture state'),
         handoffActions: (w) => detach(q(w, '.gx-notebook-actions .btn.primary'), 'no review handoff'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * FILES — the Notebook section's replacement (FILES_APP_PLAN gate 7b; `LEGACY_WIN_SECTION_ALIASES`
+     * maps notebook -> files), the 25th desktop section and the first built in L2's language from
+     * its first line: `LiquidAppScaffold` root `.fa-shell` with rail / toolbar / canvas / inspector /
+     * dock slots. Every count below is DERIVED from the live surface — the rail's node count, the
+     * sort options, the row count — because all three come from the index and a hardcoded figure
+     * would repeat the `library.inboxFilters` defect.
+     *
+     * TWO TRAPS, both known before this spec was written (PARITY_LEDGER 2026-09-02, primary2):
+     *  - THE DRIVER'S `dirtyField` LANDS IN `.fa-search` AND FILTERS THE LIST (the music trap). It
+     *    happens BEFORE the drive, so every row is scored on the filtered list and `aria-rowcount`
+     *    may read 1 (the header alone). Rows therefore score the list's SHAPE and its honest empty
+     *    state, never a content count. The drive turns the trap into the search row's proof: it
+     *    clears the box, reads the unfiltered count, puts the driver's mark back and reads again —
+     *    the filter is live if the second figure is the smaller one. On a profile whose index is
+     *    empty the two figures are both 1 and the row is `na` by declaration, not false.
+     *  - THE INSPECTOR NEEDS A SELECTED ROW. Under the driver's own filter there may be nothing to
+     *    select, so `inspector` declares `na` with the reason and its mutation refuses (armed
+     *    false). With a row on screen it scores the gate-3/gate-10 contract: Open is ALWAYS
+     *    offered and EXACTLY ONE of Mine / the mine refusal is.
+     */
+    files: {
+      titleRe: /\bFiles\b|ファイル|文件|Файлы/i,
+      rootSel: '.fa-shell',
+      features: [
+        {
+          id: 'folderTree',
+          f: (w) => {
+            const nodes = qa(w, '.fa-tree .fa-tree-node');
+            const pressed = nodes.filter((n) => n.getAttribute('aria-pressed') === 'true').length;
+            const counted = nodes.filter((n) => /^\d+$/.test(txt(q(n, '.fa-tree-count')).replace(/[^\d]/g, ''))).length;
+            const g = window.__LQP_FILES_ORIG || {};
+            return { ok: nodes.length >= 2 && pressed === 1 && counted >= 2 && g.treeMoved === true,
+              ev: `nodes=${nodes.length} pressed=${pressed} counted=${counted} visitedAndReturned=${g.treeMoved === true}` };
+          },
+        },
+        {
+          id: 'search',
+          /*
+           * THE ROW BRINGS ITS OWN SUBJECT. Measured 2026-09-02: the first draft scored the
+           * DRIVER's `dirtyField` mark, and `dirtyField()` runs ONCE, before the FIRST drive
+           * only — while the control loop RE-DRIVES before every mutation. So this row read
+           * `withMark=1 cleared=46 narrowed=true` in the parity phase and
+           * `withMark=46 cleared=46 narrowed=false` on every control baseline, was therefore
+           * already false when its own mutation ran, and could not fall. Seven proved rows
+           * were discarded by that VOID. A row may not depend on state another component of
+           * the harness owns and only guarantees once.
+           *
+           * It also asks a STRICTER question than the draft did. "The list got shorter" is
+           * satisfied by a filter that empties it, which is what a broken matcher does too.
+           * The probe token is derived from a row that is really on screen, so the honest
+           * outcome is SELECTION: 1 < rowsQueried < rowsCleared, at least one row kept and
+           * at least one dropped. Both bounds are published.
+           */
+          f: (w) => {
+            const input = q(w, '.fa-search input[type="search"]');
+            const list = q(w, '.fa-list');
+            const rowcount = list ? Number(list.getAttribute('aria-rowcount')) : NaN;
+            const g = window.__LQP_FILES_ORIG || {};
+            const ev = `input=${!!input} rowcount=${rowcount} probe="${g.probe == null ? '-' : g.probe}" unfiltered=${g.rowsCleared} queried=${g.rowsQueried} selects=${g.searchLive === true}`;
+            if (input && Number.isFinite(rowcount) && g.searchNoSubject === true) {
+              return { ok: null, na: 'nothing is listed under this folder on this profile, so no probe token could be derived from a real row — a filter with no subject cannot be shown to select', ev };
+            }
+            return { ok: !!input && Number.isFinite(rowcount) && g.searchLive === true, ev };
+          },
+        },
+        {
+          id: 'sortControls',
+          f: (w) => {
+            const sel = q(w, '.fa-sort select');
+            const options = sel ? qa(sel, 'option').length : 0;
+            const dir = q(w, '.fa-sort-dir');
+            const labelled = !!dir && (dir.getAttribute('aria-label') || '').length > 0;
+            const g = window.__LQP_FILES_ORIG || {};
+            return { ok: !!sel && options >= 2 && labelled && g.sortFlipped === true,
+              ev: `select=${!!sel} options=${options} dirLabelled=${labelled} flippedAndReturned=${g.sortFlipped === true}` };
+          },
+        },
+        {
+          id: 'viewMode',
+          f: (w) => {
+            const buttons = qa(w, '.fa-view-mode-button');
+            const pressed = buttons.filter((b) => b.getAttribute('aria-pressed') === 'true').length;
+            const list = q(w, '.fa-list');
+            const mode = list ? list.getAttribute('data-view') : null;
+            const agrees = !!mode && buttons.some((b) => b.getAttribute('data-mode') === mode && b.getAttribute('aria-pressed') === 'true');
+            const g = window.__LQP_FILES_ORIG || {};
+            return { ok: buttons.length === 2 && pressed === 1 && agrees && g.viewSwitched === true,
+              ev: `buttons=${buttons.length} pressed=${pressed} mode=${mode} agrees=${agrees} switchedAndReturned=${g.viewSwitched === true}` };
+          },
+        },
+        {
+          id: 'itemList',
+          f: (w) => {
+            const list = q(w, '.fa-list');
+            const grid = !!list && list.getAttribute('role') === 'grid';
+            const rowcount = list ? Number(list.getAttribute('aria-rowcount')) : NaN;
+            const head = list ? q(list, '.fa-row.fa-head') : null;
+            const painted = list ? qa(list, '.fa-row:not(.fa-head)').length : 0;
+            const empty = list ? !!q(list, '.fa-state') : false;
+            // A windowed list paints fewer rows than it declares. The declared body is either 0
+            // with the empty state on screen, or > 0 with at least one row painted and never more
+            // than declared — the shape the `virtualListSemantics` test enforces at the source.
+            const body = rowcount - 1;
+            const honest = body === 0 ? (empty && painted === 0) : (painted > 0 && painted <= body);
+            return { ok: grid && !!head && Number.isFinite(rowcount) && honest,
+              ev: `grid=${grid} header=${!!head} rowcount=${rowcount} painted=${painted} emptyState=${empty}` };
+          },
+        },
+        {
+          id: 'inspector',
+          f: (w) => {
+            const selectedRow = q(w, '.fa-row[aria-selected="true"]');
+            const details = q(w, '.fa-details');
+            if (!selectedRow && !details) {
+              return { ok: null, na: 'no selected item — the list has no row to select under the driver\'s own filter', ev: 'selected=0 details=0' };
+            }
+            const open = !!(details && q(details, '.fa-action-open'));
+            const mine = details ? qa(details, '.fa-action-mine').length : 0;
+            // `:not([role="status"])` is load-bearing, not decoration. `fa-mine-refusal` is
+            // written TWICE in FilesApp.tsx: the gate-3 contract refusal that REPLACES the Mine
+            // button (:2004, no role) and a mine-RESULT note that appears beside a still-present
+            // button after an attempt is declined (:1846, role="status"). This drive never mines,
+            // so the bare selector would read 1 today and 2 the first time anyone adds a mine leg
+            // — a row that goes red on a surface that got no worse.
+            const refusal = details ? qa(details, '.fa-mine-refusal:not([role="status"])').length : 0;
+            return { ok: !!selectedRow && !!details && open && (mine + refusal === 1),
+              ev: `selected=${!!selectedRow} details=${!!details} open=${open} mine=${mine} mineRefusal=${refusal}` };
+          },
+        },
+        {
+          id: 'statusDock',
+          f: (w) => {
+            const dock = q(w, '.fa-status');
+            const live = !!dock && dock.getAttribute('role') === 'status';
+            const spans = dock ? qa(dock, 'span') : [];
+            const items = spans[0] ? txt(spans[0]).replace(/[^\d]/g, '') : '';
+            const list = q(w, '.fa-list');
+            const body = list ? Number(list.getAttribute('aria-rowcount')) - 1 : NaN;
+            // The dock's item figure and the grid's declared body are two readings of one
+            // number, so a dock that says 0 over a grid declaring 12 is a lying label.
+            const agrees = items.length > 0 && Number(items) === body;
+            return { ok: live && spans.length >= 2 && agrees,
+              ev: `dock=${!!dock} role=${dock ? dock.getAttribute('role') : '-'} spans=${spans.length} items=${items || '-'} listBody=${body} agrees=${agrees}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      steps: {
+        begin: (w) => {
+          const g = filesState();
+          const nodes = qa(w, '.fa-tree .fa-tree-node');
+          if (g.pressedIndex == null) g.pressedIndex = nodes.findIndex((n) => n.getAttribute('aria-pressed') === 'true');
+          const el = scroller(w);
+          if (g.scrollTop == null && el) { g.scrollTop = el.scrollTop; g.scrollKey = keyOf(el); }
+          const root = q(w, '.fa-tree-root');
+          if (!root) return { refused: 'no Everything node' };
+          root.click();
+          return { from: g.pressedIndex, to: 'root' };
+        },
+        visitFolder: (w) => {
+          const g = filesState();
+          const root = q(w, '.fa-tree-root');
+          g.rootPressed = !!root && root.getAttribute('aria-pressed') === 'true';
+          const target = qa(w, '.fa-tree-node[data-derived="true"]').find((n) => !n.hasAttribute('data-panel'));
+          if (!target) return { refused: 'no derived folder node' };
+          target.click();
+          return { rootPressed: g.rootPressed, to: txt(q(target, '.fa-tree-label')) };
+        },
+        returnRoot: (w) => {
+          const g = filesState();
+          const pressed = qa(w, '.fa-tree .fa-tree-node').filter((n) => n.getAttribute('aria-pressed') === 'true');
+          g.folderPressed = pressed.length === 1 && pressed[0].hasAttribute('data-derived');
+          const root = q(w, '.fa-tree-root');
+          if (!root) return { refused: 'no Everything node' };
+          root.click();
+          return { folderPressed: g.folderPressed, back: 'root' };
+        },
+        clearSearch: (w) => {
+          const g = filesState();
+          const root = q(w, '.fa-tree-root');
+          const rootNow = !!root && root.getAttribute('aria-pressed') === 'true';
+          g.treeMoved = g.rootPressed === true && g.folderPressed === true && rootNow;
+          const input = q(w, '.fa-search input');
+          if (!input) return { refused: 'no search input' };
+          const list = q(w, '.fa-list');
+          g.rowsAsFound = list ? Number(list.getAttribute('aria-rowcount')) : NaN;
+          // Recorded on the FIRST drive only, so a re-drive cannot mistake the probe token
+          // it typed last time for the user's own query. `undo` puts this back.
+          if (g.userQuery == null) g.userQuery = input.value;
+          typeInto(input, '');
+          return { treeMoved: g.treeMoved, rowsAsFound: g.rowsAsFound, userQuery: g.userQuery.length, cleared: true };
+        },
+        restoreSearch: (w) => {
+          const g = filesState();
+          const list = q(w, '.fa-list');
+          g.rowsCleared = list ? Number(list.getAttribute('aria-rowcount')) : NaN;
+          const input = q(w, '.fa-search input');
+          if (!input) return { refused: 'no search input' };
+          // THE TOKEN COMES OFF A ROW THAT IS REALLY ON SCREEN, so the filter is asked to
+          // SELECT rather than merely to empty: whatever this matches, it matches at least
+          // the row it was cut from. `matchesQuery` (shared/filesApp/catalog.ts:592) folds
+          // and matches name | kind | provenance, so a name fragment is a live query.
+          const first = q(w, '.fa-row:not(.fa-head) .fa-cell-name');
+          const token = txt(first).trim().slice(0, 4).trim();
+          g.probe = token.length >= 2 ? token : null;
+          typeInto(input, g.probe || '');
+          return { rowsCleared: g.rowsCleared, probe: g.probe, from: txt(first).slice(0, 40) };
+        },
+        flipSort: (w) => {
+          const g = filesState();
+          const list = q(w, '.fa-list');
+          const rowsNow = list ? Number(list.getAttribute('aria-rowcount')) : NaN;
+          g.rowsQueried = rowsNow;
+          // No listed row means no token could be cut, and a filter with no subject is a
+          // data gap rather than a defect — the row declares `na` instead of scoring false.
+          g.searchNoSubject = g.rowsCleared === 1 || g.probe == null;
+          // SELECTION, not just shrinkage: at least one row kept (> 1 counts the header)
+          // and at least one dropped. A matcher that empties the list on any input would
+          // satisfy "narrowed" and fails this.
+          g.searchLive = Number.isFinite(g.rowsCleared) && g.rowsCleared > 1 && g.probe != null
+            && rowsNow > 1 && rowsNow < g.rowsCleared;
+          const dir = q(w, '.fa-sort-dir');
+          if (!dir) return { refused: 'no sort-direction control' };
+          g.sortLabel = dir.getAttribute('aria-label') || '';
+          dir.click();
+          return { searchLive: g.searchLive, noSubject: g.searchNoSubject, rowsNow, label: g.sortLabel };
+        },
+        flipSortBack: (w) => {
+          const g = filesState();
+          const dir = q(w, '.fa-sort-dir');
+          if (!dir) return { refused: 'no sort-direction control' };
+          const now = dir.getAttribute('aria-label') || '';
+          g.sortChanged = now.length > 0 && now !== g.sortLabel;
+          dir.click();
+          return { changed: g.sortChanged, now };
+        },
+        switchView: (w) => {
+          const g = filesState();
+          const dir = q(w, '.fa-sort-dir');
+          g.sortFlipped = g.sortChanged === true && !!dir && (dir.getAttribute('aria-label') || '') === g.sortLabel;
+          const list = q(w, '.fa-list');
+          g.viewBefore = list ? list.getAttribute('data-view') : null;
+          const other = qa(w, '.fa-view-mode-button').find((b) => b.getAttribute('aria-pressed') !== 'true');
+          if (!other) return { refused: 'no alternate view-mode control' };
+          g.viewOther = other.getAttribute('data-mode');
+          other.click();
+          return { sortFlipped: g.sortFlipped, from: g.viewBefore, to: g.viewOther };
+        },
+        switchViewBack: (w) => {
+          const g = filesState();
+          const list = q(w, '.fa-list');
+          const now = list ? list.getAttribute('data-view') : null;
+          g.viewChanged = !!now && now === g.viewOther && now !== g.viewBefore;
+          const back = qa(w, '.fa-view-mode-button').find((b) => b.getAttribute('data-mode') === g.viewBefore);
+          if (!back) return { refused: 'original view-mode control gone' };
+          back.click();
+          return { changed: g.viewChanged, now };
+        },
+        selectFirst: (w) => {
+          const g = filesState();
+          const list = q(w, '.fa-list');
+          const now = list ? list.getAttribute('data-view') : null;
+          g.viewSwitched = g.viewChanged === true && now === g.viewBefore;
+          const row = q(w, '.fa-row:not(.fa-head)');
+          if (!row) return { viewSwitched: g.viewSwitched, none: true };
+          row.click();
+          return { viewSwitched: g.viewSwitched, selected: txt(row).slice(0, 40) };
+        },
+        finish: (w) => {
+          const el = scroller(w);
+          if (el) el.scrollTop = Math.min(120, Math.max(0, el.scrollHeight - el.clientHeight));
+          return { inspector: !!q(w, '.fa-details'), scroll: el ? el.scrollTop : 0 };
+        },
+      },
+      drive: ['begin', 'visitFolder', 'returnRoot', 'clearSearch', 'restoreSearch', 'flipSort',
+        'flipSortBack', 'switchView', 'switchViewBack', 'selectFirst', 'finish'],
+      undo: {
+        files: (w) => {
+          const g = window.__LQP_FILES_ORIG;
+          if (!g) return null;
+          const done = [];
+          const nodes = qa(w, '.fa-tree .fa-tree-node');
+          const pressed = nodes.findIndex((n) => n.getAttribute('aria-pressed') === 'true');
+          if (g.pressedIndex >= 0 && nodes[g.pressedIndex] && pressed !== g.pressedIndex) {
+            nodes[g.pressedIndex].click(); done.push('folder');
+          }
+          const dir = q(w, '.fa-sort-dir');
+          if (dir && g.sortLabel && (dir.getAttribute('aria-label') || '') !== g.sortLabel) { dir.click(); done.push('sort'); }
+          // The probe token this drive typed is the harness's, not the user's. The runner's
+          // `undirtyField` also restores this field at the very end of the run, but only
+          // then — between control mutations `restore()` is the only thing that runs, so
+          // without this the box would carry a probe token across the next re-drive.
+          const box = q(w, '.fa-search input');
+          if (box && g.userQuery != null && box.value !== g.userQuery) {
+            typeInto(box, g.userQuery); done.push('query');
+          }
+          const back = g.viewBefore && qa(w, '.fa-view-mode-button').find((b) => b.getAttribute('data-mode') === g.viewBefore);
+          if (back && back.getAttribute('aria-pressed') !== 'true') { back.click(); done.push('view'); }
+          const el = qa(w, '*').find((e) => keyOf(e) === g.scrollKey);
+          if (el && g.scrollTop != null && el.scrollTop !== g.scrollTop) {
+            el.scrollTop = g.scrollTop; done.push('scroll');
+          }
+          window.__LQP_FILES_ORIG = null;
+          return done.length ? `files:${done.join('+')}` : null;
+        },
+      },
+      mutations: {
+        folderTree: (w) => stripAttr(
+          qa(w, '.fa-tree .fa-tree-node').find((n) => n.getAttribute('aria-pressed') === 'true'),
+          'aria-pressed', 'no pressed folder node',
+        ),
+        search: (w) => detach(q(w, '.fa-search input'), 'no search input'),
+        sortControls: (w) => detach(q(w, '.fa-sort-dir'), 'no sort-direction control'),
+        viewMode: (w) => stripAttr(
+          qa(w, '.fa-view-mode-button').find((b) => b.getAttribute('aria-pressed') === 'true'),
+          'aria-pressed', 'no pressed view-mode control',
+        ),
+        itemList: (w) => stripAttr(q(w, '.fa-list'), 'role', 'no item grid'),
+        inspector: (w) => detach(q(w, '.fa-details .fa-action-open'), 'no inspector — no item is selected'),
+        statusDock: (w) => stripAttr(q(w, '.fa-status'), 'role', 'no status dock'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
     },

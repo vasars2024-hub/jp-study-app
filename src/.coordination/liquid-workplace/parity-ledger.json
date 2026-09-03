@@ -2370,7 +2370,7 @@
       "dataStateOwner": "renderer reader `idx`; the drive's page move is restored by the spec's undo against the STAGE, not against the seek",
       "automatedProof": "probes/l6-parity.js SPECS.manga.pageRender; probes/cat6-feature-parity.cjs --app manga",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD img=502x714 painted=1/1 seekPage=3 of 17 rendered=[3] agree=true || LIQUID img=502x714 painted=1/1 seekPage=3 of 17 rendered=[3] agree=true",
+      "observed": "STANDARD img=502x714 painted=1/1 seekPage=3 of 17 rendered=[3] agree=true || LIQUID img=502x714 painted=1/1 seekPage=3 of 17 rendered=[3] agree=true || negative control `pageRender` -> 6/7 (baseline 7/7), fell=[pageRender], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json` (2026-09-02 10:40), not re-run here",
       "status": "both",
       "_note": "REPAIRED at 0e618fe0. The row's comment had promised this cross-check for longer than the predicate performed it — it asked `declared >= 1`, comparing the seek to the number 1, so the exact stale-detail case it describes scored 7/7. The page is read from the image's own `alt` (`t('manga.pageAlt',{n})`, so the numeral survives all four locales), and it is a MEMBERSHIP test because the spread layout renders two pages at once."
     },
@@ -2384,7 +2384,7 @@
       "dataStateOwner": "renderer reader `idx` and `scrub`; `scrub` is a PREVIEW and the jump commits separately, which is why a drive that only fires `change` moves nothing",
       "automatedProof": "probes/l6-parity.js SPECS.manga.pageTransport; mutation `pageTransport` sets `max=\"1\"`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD range=1..17 first=1 last=1 || LIQUID range=1..17 first=1 last=1",
+      "observed": "STANDARD range=1..17 first=1 last=1 || LIQUID range=1..17 first=1 last=1 || negative control `pageTransport` -> 5/7 (baseline 7/7), fell=[pageRender, pageTransport], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json` (2026-09-02 10:40), not re-run here",
       "status": "both",
       "_note": "First and Last are ICON buttons with no text node, so their accessible name is read from `aria-label`/`title` — reading `textContent` scored a live transport `first=false last=false`. This mutation DECLARES a cascade onto `pageRender`: clamping the range clamps the seek's value too, so the transport stops declaring the page on screen. That is a true consequence of breaking it, and declaring it is honest where engineering it away would leave a row nothing could falsify."
     },
@@ -2398,7 +2398,7 @@
       "dataStateOwner": "renderer OCR presentation state; the drive SETS a named segment rather than cycling, and the spec's undo puts the original back",
       "automatedProof": "probes/l6-parity.js SPECS.manga.ocrModes, driven through step `mode` with the segment named",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD segments=5 active=1 (\"Regions\") || LIQUID segments=5 active=1 (\"Regions\")",
+      "observed": "STANDARD segments=5 active=1 (\"Regions\") || LIQUID segments=5 active=1 (\"Regions\") || negative control: NONE DECLARED for this row -- the run's other 3 rows were controlled (cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json`, 2026-09-02 10:40), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The `mode` step is idempotent by construction — it sets `Regions` rather than cycling — because cat6 re-runs the whole drive once per mutation and a cycling step would walk the surface somewhere new on every pass. Driven: `wasActive=false`, so the row scores a segment this drive activated."
     },
@@ -2412,7 +2412,7 @@
       "dataStateOwner": "renderer OCR state; nothing persisted is written by reading it",
       "automatedProof": "probes/l6-parity.js SPECS.manga.ocrTool",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD tool=true liquid=true doc=true anchor=true || LIQUID tool=true liquid=true doc=true anchor=true",
+      "observed": "STANDARD tool=true liquid=true doc=true anchor=true || LIQUID tool=true liquid=true doc=true anchor=true || negative control: NONE DECLARED for this row -- the run's other 3 rows were controlled (cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json`, 2026-09-02 10:40), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The row scores the ROLES and not just presence: without `lq-liquid` on the tool and `lq-anchor` on the page, category 3's treatment on this surface would be decorating something that is not a tool."
     },
@@ -2426,7 +2426,7 @@
       "dataStateOwner": "the canvas's own `data-measured` / `data-covered`, written by the reading layout",
       "automatedProof": "probes/l6-parity.js shared `canvasPlacement()`, L6's gate as one row; five specs score the identical row",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD canvas=1264 doc=952 docked=1 sheets=0 sum=1264 covered=false || LIQUID canvas=1264 doc=952 docked=1 sheets=0 sum=1264 covered=false",
+      "observed": "STANDARD canvas=1264 doc=952 docked=1 sheets=0 sum=1264 covered=false || LIQUID canvas=1264 doc=952 docked=1 sheets=0 sum=1264 covered=false || negative control: NONE DECLARED for this row -- the run's other 3 rows were controlled (cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json`, 2026-09-02 10:40), this one is asserted from its own reading only",
       "status": "both",
       "_note": "The `pageRender` mutation deliberately detaches the `<img>` and NOT `.manga-stage`: detaching the stage would collapse the document region and take this row down with it, and a control that fails two rows proves neither."
     },
@@ -2440,7 +2440,7 @@
       "dataStateOwner": "`localStorage['lq.reader.presentation']` under the `manga` host key; the key is REMOVED on return to standard rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js SPECS.manga.presentationHonest; the mutation writes a WRONG boolean rather than stripping the attribute",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD ariaPressed=false dataPresentation=standard readerLiquidClass=false || LIQUID ariaPressed=true dataPresentation=liquid readerLiquidClass=true",
+      "observed": "STANDARD ariaPressed=false dataPresentation=standard readerLiquidClass=false || LIQUID ariaPressed=true dataPresentation=liquid readerLiquidClass=true || negative control `presentationHonest` -> 6/7 (baseline 7/7), fell=[presentationHonest], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json` (2026-09-02 10:40), not re-run here",
       "status": "both",
       "_note": "The mutation flips the boolean instead of removing it on purpose: stripping `aria-pressed` also fails `windowLifecycle`, which reads the same attribute for a different reason, and a control that fails two rows proves neither. This disagreement is what made the reader host unreachable to the harness in the first place."
     },
@@ -2454,7 +2454,7 @@
       "dataStateOwner": "reader host state; the presentation half is the localStorage key above",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`, reader branch — counts the back-to-Library control, NOT `.fwin-b`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, primary)",
-      "observed": "STANDARD chromeButtons=1/1 liquidAriaPressed=false || LIQUID chromeButtons=1/1 liquidAriaPressed=true",
+      "observed": "STANDARD chromeButtons=1/1 liquidAriaPressed=false || LIQUID chromeButtons=1/1 liquidAriaPressed=true || negative control: NONE DECLARED for this row -- the run's other 3 rows were controlled (cat6 receipt `debug/_pr5-manga3.json == _pr5-manga4.json`, 2026-09-02 10:40), this one is asserted from its own reading only",
       "status": "both",
       "_note": "Manga and Novels are the two readers that share `ReaderLiquidToggle`, which is why `LIQUID_BTN` exists as a table: before it the reader's control name was absent from `toggleLiquid`, `lifecycle` and every spec, and the whole host scored as chromeless."
     },
@@ -2636,7 +2636,7 @@
       "dataStateOwner": "renderer Game Arena selection state; the drive switches away from whatever was active and the spec's undo clicks the original index back",
       "automatedProof": "probes/l6-parity.js SPECS.games.gameCatalog, driven through step `begin` and read back in `startRound`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD games=15 named=15 buttons=15 active=1 selectionWorks=true || LIQUID games=15 named=15 buttons=15 active=1 selectionWorks=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD games=15 named=15 buttons=15 active=1 selectionWorks=true || LIQUID games=15 named=15 buttons=15 active=1 selectionWorks=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `gameCatalog` -> 9/10 (baseline 10/10), fell=[gameCatalog], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "`selectionWorks` is the whole row and it is the reason this is a drive rather than a read. Undriven, the same predicate scores `games=15 named=15 buttons=15 active=1 selectionWorks=false` — a rail that renders perfectly and may switch nothing. The switch is read back in a LATER bridge call (`startRound`), because React has not re-rendered the stage head yet when the click returns."
     },
@@ -2650,7 +2650,7 @@
       "dataStateOwner": "renderer Game Arena selection state; read-only for this row",
       "automatedProof": "probes/l6-parity.js SPECS.games.stageIdentity; the mutation detaches `.game-stage-head h3`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || LIQUID stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || LIQUID stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `stageIdentity` -> 9/10 (baseline 10/10), fell=[stageIdentity], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Scored as an EQUALITY against the rail rather than `title.length > 0`, because a stage that renders a stale title after a switch is exactly the defect a presence check passes. Read live at `stage=\"Kana Sprint\" listed=\"Kana Sprint\" descMatches=true` after the drive moved the selection from index 0 to index 3."
     },
@@ -2664,7 +2664,7 @@
       "dataStateOwner": "renderer level/deck state, derived from the uploaded word list for the active level",
       "automatedProof": "probes/l6-parity.js SPECS.games.sourceMaterial; the mutation detaches the section's note",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || LIQUID label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || LIQUID label=\"Deck coverage for this level\" note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `sourceMaterial` -> 9/10 (baseline 10/10), fell=[sourceMaterial], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "This profile has NO word list uploaded, so the row is scored on its honest-empty branch: `note=\"No word list uploaded for this level\" pct=noList scaleX=0 agrees=true`. That is a real pass of the agreement the row asserts, but it is NOT a measurement of the populated branch — a profile with a deck loaded should re-run this row before anyone quotes it as covering both."
     },
@@ -2678,7 +2678,7 @@
       "dataStateOwner": "persisted per-level exposure state in the renderer; read-only for this row — the drive types but never submits, so nothing is scored or recorded",
       "automatedProof": "probes/l6-parity.js SPECS.games.exposureTracking; the mutation detaches the section",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || LIQUID seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || LIQUID seen=0/59 statedPct=0 derivedPct=0 scaleX=0 || CONTROL style set to \"transform: scaleX(1)\": 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `exposureTracking` -> 9/10 (baseline 10/10), fell=[exposureTracking], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Read live at `seen=0/10 statedPct=0 derivedPct=0 scaleX=0`. Zero is a genuinely weak discriminator for a three-way agreement — 0 = 0 = 0 holds for a broken derivation too — so the row's strength here comes from its mutation (detaching the section takes exactly this row and nothing else), not from the numbers. A profile with exposure history should re-run it."
     },
@@ -2692,7 +2692,7 @@
       "dataStateOwner": "renderer round session state; the round is ABORTED (the active catalogue entry is clicked, which discards it) rather than submitted, so no score is written",
       "automatedProof": "probes/l6-parity.js SPECS.games.typingInput, driven through steps `startRound` / `typeRound` / `abortRound` / `settle`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || LIQUID round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || CONTROL type stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || LIQUID round=value=\"ro\" submitDisabled true->false readyStateReturned=true startControl=button enabled=true || CONTROL type stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `typingInput` -> 9/10 (baseline 10/10), fell=[typingInput], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Live: `value=\"ro\" submitDisabled true->false readyStateReturned=true`. The disabled->enabled TRANSITION is the claim; an enabled submit read once proves nothing, and a present `<input>` proves less. Undriven this row reads `round=not driven` and scores false, which is correct rather than a defect."
     },
@@ -2706,7 +2706,7 @@
       "dataStateOwner": "renderer round session state; read during the aborted round and gone with it",
       "automatedProof": "probes/l6-parity.js SPECS.games.scoreHud, driven through step `typeRound`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || LIQUID hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || LIQUID hud=spans=4 valuenow=99 labelled=true readyStateRounds=5 hudRoundTotal=5 || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `scoreHud` -> 9/10 (baseline 10/10), fell=[scoreHud], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Live: HUD `[\"1/5\",\"60s\",\"Combo 0\",\"Best 0\"]`, `valuenow=99`, and the ready panel's declared `5` equals the HUD's own round total `5`. That cross-check is the point: a HUD counting to a different total than the panel promised is a mismatch presence scoring never sees. `valuenow=99` rather than 100 because the timer had already started ticking."
     },
@@ -2720,7 +2720,7 @@
       "dataStateOwner": "persisted per-game round history; untouched by this drive, which aborts its round instead of submitting it",
       "automatedProof": "probes/l6-parity.js SPECS.games.roundHistory; the mutation detaches the section heading",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || LIQUID heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || LIQUID heading=\"Your recent rounds\" rows=0 complete=0 emptyState=\"No rounds recorded for this game y\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `roundHistory` -> 9/10 (baseline 10/10), fell=[roundHistory], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Read live at `rows=0 emptyState=\"No rounds recorded for this game y[et]\"` — the honest-empty branch, and it is empty BECAUSE this drive deliberately never submits. The populated branch (complete === rows.length) is unmeasured on this profile and should not be quoted as covered."
     },
@@ -2734,7 +2734,7 @@
       "dataStateOwner": "renderer per-game material scope; the drive only selects the game, never the scope, and the spec's undo returns the original selection",
       "automatedProof": "probes/l6-parity.js SPECS.games.materialScope; the mutation adds `primary` to a mode button so two read as chosen",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || LIQUID picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || CONTROL primary added to 1 of 1: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || LIQUID picker=true modes=2 chosen=1 mode=auto scripts=0 groups=0 shapeHeld=true || CONTROL primary added to 1 of 1: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `materialScope` -> 9/10 (baseline 10/10), fell=[materialScope], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "THE PICKER ONLY EXISTS ON A KANA GAME. Undriven, with `Sentence Builder` active, this row reads `probe threw: Cannot read properties of null` — a null picker, not a defect, and the spec's `begin` step REFUSES outright if the catalogue has no kana-typing game rather than scoring the absence. The mutation is deliberately additive (a second `primary`) rather than a detach, because `chosen === 1` must fail upward as well as downward."
     },
@@ -2748,7 +2748,7 @@
       "dataStateOwner": "arena-wide level/language settings, shared across games; the drive opens the disclosure and the spec's undo returns its original open state",
       "automatedProof": "probes/l6-parity.js SPECS.games.levelSettings, with `levelBefore` captured in step `begin` and compared after the switch",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || LIQUID meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || LIQUID meta=[Level 1 | English | No high score yet] levelBeforeSwitch=\"Level 1\" stable=true optionsOpen=true settingsEntry=\"Settings\" || CONTROL element detached: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `levelSettings` -> 9/10 (baseline 10/10), fell=[levelSettings], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "The level is ARENA-WIDE, not per game, so the row asserts stability across the switch: `Level 1` before, `Level 1` after (`meta=[Level 1 | English | No high score yet]`). A per-game decoration would drift here and nothing else in the suite would notice. `stable=false` on the undriven read is the absence of a captured baseline, not a drift."
     },
@@ -2762,7 +2762,7 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app games round trip",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 10/10 -> 9/10, fell exactly its own row, restored 10/10 || negative control `windowLifecycle` -> 9/10 (baseline 10/10), fell=[windowLifecycle], restored 10/10 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb1-games.json` (2026-09-02 11:13), not re-run here",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: shellHeld true, 0 diffs, 980x660 in both. `dirtiedField` is null and the reason is recorded rather than glossed — the driver dirties the first VISIBLE text field, and this surface's only text field is the round answer box, which exists only inside a live round. The answer field's own reversibility is scored by `typingInput` instead."
     },
@@ -2776,7 +2776,7 @@
       "dataStateOwner": "renderer settings route state; the drive returns to Home and the spec's undo clicks the originally-current entry back by label",
       "automatedProof": "probes/l6-parity.js SPECS.settings.categoryRail; the mutation strips `aria-current` from the current entry",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD items=23 current=1 named=23 titled=23 || LIQUID items=23 current=1 named=23 titled=23 || CONTROL aria-current stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD items=23 current=1 named=23 titled=23 || LIQUID items=23 current=1 named=23 titled=23 || CONTROL aria-current stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `categoryRail` -> 6/7 (baseline 7/7), fell=[categoryRail], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Live: `items=23 current=1 named=23 titled=23`. Both the span and the `title` are required because below 420px of `.os-set-body` the label is CLIPPED and `title` is the only text left — an entry with one but not the other is stranded in exactly one width tier, which counting either alone would never show."
     },
@@ -2790,7 +2790,7 @@
       "dataStateOwner": "static rail structure from the settings registry; read-only for this row",
       "automatedProof": "probes/l6-parity.js SPECS.settings.groupedNavigation; the mutation strips `aria-labelledby` from a list",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD groups=5 labelled=5 lists=5 wired=5 || LIQUID groups=5 labelled=5 lists=5 wired=5 || CONTROL aria-labelledby stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD groups=5 labelled=5 lists=5 wired=5 || LIQUID groups=5 labelled=5 lists=5 wired=5 || CONTROL aria-labelledby stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `groupedNavigation` -> 6/7 (baseline 7/7), fell=[groupedNavigation], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Live: `groups=5 labelled=5 lists=5 wired=5`. `wired` is a RESOLUTION, not a presence check — an `aria-labelledby` pointing at an id that does not exist announces nothing and reads identically to a correct one in any attribute-counting probe."
     },
@@ -2804,7 +2804,7 @@
       "dataStateOwner": "renderer search-field state; the drive types `theme`, clears back to empty, dismisses, and the spec's undo re-clears and re-dismisses if anything is left",
       "automatedProof": "probes/l6-parity.js SPECS.settings.settingsSearch, driven through steps `search` / `closeSearch` / `readSearchClosed`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || LIQUID input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || CONTROL aria-controls stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || LIQUID input=true controls=_r_cv_ expanded=false dismissal=expandedAfterEscape=false panelMounted=false || CONTROL aria-controls stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `settingsSearch` -> 6/7 (baseline 7/7), fell=[settingsSearch], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "STRENGTHENED THIS TURN, and the old bar is why. It asked only that `aria-expanded` be a well-formed boolean — which a widget stuck permanently open passes. It now scores the dismissal: driven, `expandedAfterEscape=false panelMounted=false`; undriven, the same row reads `dismissal=not driven` and correctly scores FALSE (6/7). The read had to move into its own bridge leg because React commits the collapse after the dispatching task, so the old same-expression read reported `\"true\"` on every run and would have had a worker filing drive residue that was not there."
     },
@@ -2818,7 +2818,7 @@
       "dataStateOwner": "persisted advanced-mode preference; NOT touched by this drive — the row reads the agreement in whatever state it finds, it never flips the toggle",
       "automatedProof": "probes/l6-parity.js SPECS.settings.advancedDisclosure; the mutation strips the button's own `aria-pressed`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD pressed=true advancedItemsInRail=5 agrees=true || LIQUID pressed=true advancedItemsInRail=5 agrees=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD pressed=true advancedItemsInRail=5 agrees=true || LIQUID pressed=true advancedItemsInRail=5 agrees=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `advancedDisclosure` -> 6/7 (baseline 7/7), fell=[advancedDisclosure], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Live: `pressed=true advancedItemsInRail=5 agrees=true`. The row is the AGREEMENT, not the button: a toggle reading true over a rail showing zero advanced entries is a control that claims an effect it does not have, and that is invisible to any check that reads only the attribute. This profile has advanced mode ON, so the `pressed=false / dots=0` branch is UNMEASURED here and must not be quoted as covered. The mutation deliberately targets `.os-set-advanced-btn` and not `.fwin-b-liquid`, so this row and `windowLifecycle` stay independent."
     },
@@ -2832,7 +2832,7 @@
       "dataStateOwner": "renderer settings route state; the drive visits `Appearance` and returns to Home within its own step sequence",
       "automatedProof": "probes/l6-parity.js SPECS.settings.pageRegion; the mutation strips the pane's `aria-label`",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD role=main page=home label=Home rail=Home || LIQUID role=main page=home label=Home rail=Home || CONTROL aria-label stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD role=main page=home label=Home rail=Home || LIQUID role=main page=home label=Home rail=Home || CONTROL aria-label stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `pageRegion` -> 6/7 (baseline 7/7), fell=[pageRegion], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Live: `role=main page=home label=Home rail=Home`. Scored as an equality against the rail rather than `label.length > 0`, because a pane that keeps announcing the previous page after a rail click is exactly how a keyboard user loses track of where they are — and it passes every presence check. The mutation detaches the LABEL, not the pane: removing the pane would take `homeOverview` with it and the row would fall for the wrong reason."
     },
@@ -2846,7 +2846,7 @@
       "dataStateOwner": "derived app state (the chips read live app status); the drive navigates away and back but writes nothing",
       "automatedProof": "probes/l6-parity.js SPECS.settings.homeOverview; the mutation detaches a chip's value",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD chips=5 valued=5 quickCards=10 live=10 || LIQUID chips=5 valued=5 quickCards=10 live=10 || CONTROL element detached: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD chips=5 valued=5 quickCards=10 live=10 || LIQUID chips=5 valued=5 quickCards=10 live=10 || CONTROL element detached: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `homeOverview` -> 6/7 (baseline 7/7), fell=[homeOverview], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Live: `chips=5 valued=5 quickCards=10 live=10`. `valued` and `live` are the row, not the counts: a splash screen renders five chips and ten cards too. A chip with a caption and no value, or a card rendered `disabled`, is the honest-states failure this catches, and the mutation removes exactly one chip's `strong` to prove the predicate can see it."
     },
@@ -2860,23 +2860,127 @@
       "dataStateOwner": "per-window presentation state; the key is REMOVED on return rather than written as the string \"standard\"",
       "automatedProof": "probes/l6-parity.js shared `lifecycle()`; probes/cat6-feature-parity.cjs --app settings round trip",
       "visualProof": "live bridge drive, 2026-09-02 (L12 b2, backup)",
-      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7",
+      "observed": "STANDARD chromeButtons=5/4 liquidAriaPressed=false || LIQUID chromeButtons=5/4 liquidAriaPressed=true || CONTROL aria-pressed stripped: 7/7 -> 6/7, fell exactly its own row, restored 7/7 || negative control `windowLifecycle` -> 6/7 (baseline 7/7), fell=[windowLifecycle], restored 7/7 -- TRANSCRIBED 2026-09-02 (primary2) from the banked cat6 receipt `debug/_pb2-settings.json == _pb2-settings2.json` (2026-09-02 11:19), not re-run here",
       "status": "both",
       "_note": "Round trip standard -> liquid -> standard: `dirtiedField=\"os-set-search-input\"`, fieldsHeld true, shellHeld true, 0 diffs, 960x680 in both. This is one of the few surfaces in the ledger where the round trip had a REAL editable field to dirty, so `fieldsHeld` here is a measurement rather than a vacuous true."
+    },
+    {
+      "app": "files",
+      "feature": "Folder rail: Everything, the derived categories, saved searches, favorites and collections, each with a live count",
+      "currentRoute": "Files window > `.fa-tree` > `.fa-tree-node` buttons; the current one carries `aria-pressed=\"true\"`, counts in `.fa-tree-count`",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "every node is a real `type=\"button\"`, focusable",
+      "dataStateOwner": "component state (scope / collectionScope / smartScope) in FilesApp.tsx; the folders are VIEWS over the index (FILES_APP_PLAN decision 1). Saved searches persist via renderer/filesSmartFoldersStore.ts, collections via renderer/filesCollectionsStore.ts, favorites via renderer/filesFavoritesStore.ts",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: nodes=32 pressed=1 counted=30 visitedAndReturned=true || liquid: nodes=32 pressed=1 counted=30 visitedAndReturned=true || negative control `folderTree` -> 7/8 (baseline 8/8), fell=[folderTree], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "Search narrows the item list",
+      "currentRoute": "Files window > `.fa-toolbar` > `.fa-search input[type=\"search\"]`; the list answers in `.fa-list[aria-rowcount]`",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "a real `type=\"search\"` input, focusable; the label is visually hidden but present",
+      "dataStateOwner": "component state (`query`) in FilesApp.tsx, applied over the live index -- not persisted",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: input=true rowcount=2 probe=\"62/8\" unfiltered=46 queried=2 selects=true || liquid: input=true rowcount=2 probe=\"62/8\" unfiltered=46 queried=2 selects=true || negative control `search` -> 7/8 (baseline 8/8), fell=[search], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "Sort column and direction",
+      "currentRoute": "Files window > `.fa-toolbar` > `.fa-sort select` (one option per FILES_SORT_COLUMNS entry) + `.fa-sort-dir` (aria-labelled ascending / descending toggle)",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "a real `<select>` plus a real button with `aria-label`",
+      "dataStateOwner": "PER-FOLDER persisted view state -- renderer/filesViewStateStore.ts over the shared/filesApp/viewState.ts model (gate 22: remembered per folder across a restart)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: select=true options=7 dirLabelled=true flippedAndReturned=true || liquid: select=true options=7 dirLabelled=true flippedAndReturned=true || negative control `sortControls` -> 7/8 (baseline 8/8), fell=[sortControls], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "View mode: details / compact",
+      "currentRoute": "Files window > `.fa-toolbar` > `.fa-view-mode[role=\"group\"]` > two `.fa-view-mode-button[aria-pressed]`; the grid echoes the mode in `.fa-list[data-view]`",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "two real buttons carrying `aria-pressed`",
+      "dataStateOwner": "PER-FOLDER persisted view state -- renderer/filesViewStateStore.ts (gate 22)",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: buttons=2 pressed=1 mode=details agrees=true switchedAndReturned=true || liquid: buttons=2 pressed=1 mode=details agrees=true switchedAndReturned=true || negative control `viewMode` -> 7/8 (baseline 8/8), fell=[viewMode], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "The item grid: a header row over a windowed list, with an honest empty state",
+      "currentRoute": "Files window > `.fa-list[role=\"grid\"][aria-rowcount]` > `.fa-row.fa-head` + windowed `.fa-row` rows, or `.fa-state` when the body is empty",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "rows are `tabIndex=0` and select on Enter / Space",
+      "dataStateOwner": "derived from the live index (useFilesIndex.ts: main-process enumerators + renderer enumerators), windowed by VirtualList; selection is component state",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: grid=true header=true rowcount=2 painted=1 emptyState=false || liquid: grid=true header=true rowcount=2 painted=1 emptyState=false || negative control `itemList` -> 7/8 (baseline 8/8), fell=[itemList], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "Inspector for the selected item: Open is always offered, and exactly one of Mine / the mine refusal",
+      "currentRoute": "Files window > `.fa-details` (after a `.fa-row[aria-selected=\"true\"]`) > `.fa-action-open` always, and EXACTLY ONE of `.fa-action-mine` / `.fa-mine-refusal` (gates 3 and 10)",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "real buttons; the refusal is a `<p>` that states the reason rather than a disabled control",
+      "dataStateOwner": "selection is component state; Open routes through shared/filesApp/openPlan.ts, Mine through components/filesapp/filesMineChain.ts",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: selected=true details=true open=true mine=0 mineRefusal=1 || liquid: selected=true details=true open=true mine=0 mineRefusal=1 || negative control `inspector` -> 7/8 (baseline 8/8), fell=[inspector], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "Status dock: item count and total size agree with the grid",
+      "currentRoute": "Files window > `.fa-status[role=\"status\"]` > item-count span + total-size span (+ selection and watch spans when present)",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "a live region, not a control",
+      "dataStateOwner": "derived from the same visible list the grid declares in `aria-rowcount`",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: dock=true role=status spans=3 items=1 listBody=1 agrees=true || liquid: dock=true role=status spans=3 items=1 listBody=1 agrees=true || negative control `statusDock` -> 7/8 (baseline 8/8), fell=[statusDock], restored 8/8",
+      "status": "both"
+    },
+    {
+      "app": "files",
+      "feature": "Window lifecycle: pop out, minimize, maximize, close",
+      "currentRoute": "Files window > `.fwin-b` title-bar controls",
+      "standardDestination": "FilesApp in-window: the folder rail on the left, the search / sort / view toolbar, the item grid as the canvas, the inspector on the right, over a status dock",
+      "liquidDestination": "Same in-window FilesApp on the liquid material -- `.fwin-liquid` + `data-presentation=\"liquid\"`. Built in L2's language from the start: the root is `LiquidAppScaffold` (`.lq-scaffold.fa-shell`) whose rail / toolbar / inspector / dock are the contextual slots, while the item grid (`.fa-list[role=\"grid\"]`) stays on an opaque anchor because a table of rows is a table",
+      "keyboardRoute": "four real buttons",
+      "dataStateOwner": "DesktopShell window state + main-process popOut",
+      "automatedProof": "probes/cat6-feature-parity.cjs --app files (the surface-parameterised category-6 harness) driving probes/l6-parity.js; `observed` is copied mechanically from that run's `rowEvidence` and `control.mutations` by probes/l6-parity-rows.cjs — not transcribed",
+      "visualProof": "live bridge drive, see run artifact (label l6-files)",
+      "observed": "standard: chromeButtons=5/4 liquidAriaPressed=false || liquid: chromeButtons=5/4 liquidAriaPressed=true || negative control `windowLifecycle` -> 7/8 (baseline 8/8), fell=[windowLifecycle], restored 8/8",
+      "status": "both"
     }
   ],
   "notWritten": {
     "reason": "§5.3 says the ledger is created per app BEFORE that app is redesigned. Dictionary is written here because it is one of L1's two representative apps and because a ledger no one has driven is a template, not a ledger.",
     "apps": [
       "mediaWorkspace — FOUR rows are now written and driven (2026-08-17, L4.2). What of §6.4 is still NOT driven, stated so no one reads four rows as the inventory: speed, volume, fullscreen, frame stepping, subtitle track/version choice, dual subtitles, offset and styling, transcript search/jump, dictionary/grammar/AI handoff, the mining write path itself, shadowing/dictation, block library reorder, and every degraded state. Detach and multi-monitor placement LEFT this list on 2026-08-22 (rows 12 and 13, driven live on real two-monitor hardware); block reorder has not. The mining and asset rows write to the user's collection, so they need a reversible target chosen before they are driven, not a click. LIQUID DESTINATION, 2026-09-01: these rows are no longer blocked on L4 giving this surface a presentation of its own -- f2619b91 gave it one (`renderer/workspacePresentation.ts`, host four). Row 8 is driven in Liquid and CLOSES; rows 7, 9, 10, 11 and 12 are blocked only on a scanned media library (0 files live).",
-      "the other 2 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 2 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 26 apps, parity-ledger.json carries rows for 24, and 2 declared specs still have NO row at all — notebook, vn. EVERY ledger app now has a spec: `mediaCenter` was the last one without, and got one on 2026-09-02, so the whole ledger is re-derivable by this route. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
+      "the other 2 root components — was 19 on 2026-09-01, 17 and then 13 on 2026-09-02, and 2 once the two tracks' concurrent b2 waves were MERGED (the drop is one merge, not one turn's throughput; each track measured only its own side and both figures were honest). calendar (5) and settings (7) left this list first; scraper (7), resources (7 of 8) and city (9) left it next, then shell (9), blancShell (8) and games (10) from this tree and flashcards/statistics/library/music/video/youtube from the main tree — all derived from live cat6 PASS runs rather than hand-transcribed. files (8) left it LAST and arrived on this list after it was written: it is the 25th DESKTOP_WIN_SECTIONS entry, added since df751d60, so for one turn it was a section with neither spec nor row and `left` could not see it (this count reads SPECS, and there was none). Written in their own waves, against ALL_APPS_BASELINE.md. Counted mechanically, not decremented by hand: probes/l6-parity.js declares SPECS for 27 apps, parity-ledger.json carries rows for 25, and 2 declared specs still have NO row at all — notebook, vn. EVERY ledger app now has a spec: `mediaCenter` was the last one without, and got one on 2026-09-02, so the whole ledger is re-derivable by this route. resources contributes 7 of its 8 rows: collectedSections is written only when a profile has a collected tool, because its mutation cannot arm otherwise.",
       "note / visualizer / musicwidget — no baseline yet, see ALL_APPS_BASELINE.md 'Not captured'"
     ],
     "derived": {
-      "at": "2026-09-02 (re-derived by debug/_p2g-notwritten.cjs)",
+      "at": "2026-09-03 (re-derived by probes/l6-ledger-coverage.cjs)",
       "method": "l6-parity.js SPECS keys parsed from source, against the distinct `app` values in rows[] — the same computation that writes the prose in notWritten.apps[1], so the two cannot drift",
-      "harnessSpecs": 26,
-      "specsWithRows": 24,
+      "harnessSpecs": 27,
+      "specsWithRows": 25,
       "specsWithNoRows": 2,
       "noRows": [
         "notebook",
@@ -2896,27 +3000,22 @@
     }
   },
   "controlCoverage": {
-    "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by debug/_p2g-notwritten.cjs — never decremented by hand.",
-    "rows": 213,
-    "withNamedControl": 150,
-    "declaredNone": 19,
-    "silent": 43,
+    "reason": "A ledger row claims \"verified by side effect\". That is only true if a mutation falsified it and the row fell. This block is re-derived from the rows themselves by probes/l6-ledger-coverage.cjs — never decremented by hand.",
+    "rows": 221,
+    "withNamedControl": 178,
+    "declaredNone": 23,
+    "silent": 19,
     "silentByApp": {
       "mediaWorkspace": 5,
       "mediaCenter": 2,
       "translate": 4,
       "agent": 5,
-      "captures": 3,
-      "manga": 7,
-      "games": 10,
-      "settings": 7
+      "captures": 3
     },
     "silentByCause": {
-      "predatingTheClause": 36,
-      "b2WaveNotTranscribed": 7,
-      "b2WaveApps": [
-        "manga"
-      ]
+      "predatingTheClause": 19,
+      "b2WaveNotTranscribed": 0,
+      "b2WaveApps": []
     },
     "note": "`silent` means this ledger records no control clause for the row. It is a gap in the LEDGER, not a disproof of the row — but it is a real gap and it is not monotone. THIS BLOCK RETRACTS ITS OWN EARLIER CLAIM: it used to end \"New rows now say NONE DECLARED explicitly, so `silent` can only shrink\", and the 2026-09-02 merge of the two concurrent b2 waves falsified that — silent went 45/120 -> 93/168, because the main tree's row writer (debug/_pr4-rows.cjs) copies only `rowEvidence` into `observed` while this tree's (probes/l6-parity-rows.cjs) also copies `control.mutations`. See `silentByCause`: the `b2WaveNotTranscribed` rows DID have per-row mutations run by cat6 and their receipts survive, so those are recoverable by transcription; the `predatingTheClause` rows are the older ones written before any writer said anything about controls. Two writers, one ledger, one claim that only held for one of them."
   }
