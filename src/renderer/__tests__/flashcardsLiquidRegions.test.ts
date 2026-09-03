@@ -66,7 +66,43 @@ describe('Flashcards Liquid regions', () => {
     // `Jiten vocab` shipped as a raw literal in JSX until this landed.
     expect(SOURCE).not.toContain('>\n                Jiten vocab\n');
     expect(SOURCE).toContain("{t('flash.jitenVocab')}");
-    expect(CONTROL_STYLES).toMatch(/\.flash-more-tools > summary \{[\s\S]*min-height:\s*32px/);
+    // The rule is now a SELECTOR LIST — the deck-preferences disclosure below reuses the same
+    // treatment — so this reads the declaration block that the launcher summary is part of,
+    // rather than a rule whose selector is exactly that one string. Both summaries have to keep
+    // the 32px pointer target category 1 measures.
+    for (const cls of ['flash-more-tools', 'flash-deck-prefs']) {
+      const at = CONTROL_STYLES.indexOf(`.flash-view .${cls} > summary {`);
+      const grouped = CONTROL_STYLES.indexOf(`.flash-view .${cls} > summary,`);
+      const start = at >= 0 ? at : grouped;
+      expect(start, `${cls} has no summary rule`).toBeGreaterThan(-1);
+      const open = CONTROL_STYLES.indexOf('{', start);
+      const block = CONTROL_STYLES.slice(open, CONTROL_STYLES.indexOf('}', open));
+      expect(block, `${cls} summary lost its 32px target`).toMatch(/min-height:\s*32px/);
+    }
+  });
+
+  it('folds the five preference panels behind their own disclosure', () => {
+    // Rubric category 5 Q4 again, measured 2026-09-03: card voice, automatic audio, automatic
+    // readings, scheduling and deck audio export sat OPEN above the deck, and the overview asked
+    // a user to scan 26 controls against a bar of 12. Behind the disclosure it scans 6.
+    expect(SOURCE).toContain('<details className="flash-deck-prefs">');
+    expect(SOURCE).toContain('<summary className="btn">{t(\'flash.deckPreferences\')}</summary>');
+    const body = SOURCE.slice(
+      SOURCE.indexOf('<div className="flash-deck-prefs-body">'),
+      SOURCE.indexOf('</details>', SOURCE.indexOf('<div className="flash-deck-prefs-body">')),
+    );
+    for (const panel of [
+      '<CardVoicePicker />',
+      '<AutoAudioPreferencesPanel />',
+      '<AutoReadingPreferencesPanel />',
+      '<SchedulingPreferencesPanel />',
+      '<DeckAudioExport />',
+    ]) {
+      expect(body, `${panel} is not inside the disclosure`).toContain(panel);
+    }
+    // A state the user did not ask for must not be hidden behind a disclosure.
+    expect(body).not.toContain('<TranscriptionCardDeckStatus />');
+    expect(SOURCE).toContain('<TranscriptionCardDeckStatus />');
   });
 
   it('leaves dense import, editing, and virtualized deck work outside the contextual regions', () => {

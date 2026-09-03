@@ -12252,7 +12252,15 @@ mark.lookup-mark,
 .card-cover-btn {
   position: absolute;
   top: 6px;
-  left: 34px;
+  /*
+   * 38, not 34. This button carries `.lq-hit-placed` like its two siblings, so
+   * its pointer region is 32px wide and centred on a 24px box — it reaches 4px
+   * past each edge. `.card-file` sits at left:6 and its own expander already
+   * ends at 34, so at left:34 the two regions overlapped by 4px and the later
+   * one in the DOM would have taken that strip off the file button. Four extra
+   * pixels put the two expanders flush instead of overlapping.
+   */
+  left: 38px;
   width: 24px;
   height: 24px;
   display: none;
@@ -12283,7 +12291,8 @@ mark.lookup-mark,
 .card-cover-menu {
   position: absolute;
   top: 34px;
-  left: 34px;
+  /* Follows `.card-cover-btn`'s left edge; see the note there for why it is 38. */
+  left: 38px;
   z-index: 5;
   width: 220px;
   max-height: 260px;
