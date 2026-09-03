@@ -100,6 +100,55 @@ export function qbitBaseUrl(config: ScraperQbittorrentSettings): string {
   return `${config.scheme}://${config.host}:${config.port}${config.basePath}`;
 }
 
+/**
+ * What a transport failure says when the product genuinely cannot tell two causes apart.
+ *
+ * GATE 10, driven 2026-08-30 and failed, resolved 2026-09-03. Its two halves came apart:
+ * "an honest, fast, named refusal rather than a timeout" passed (4 ms and a named errno),
+ * and "distinct from *not running*" failed — a control against port 8099, where nothing
+ * has ever listened, returned the identical `unreachable` and the identical message.
+ * That second half is not a bug a better string fixes. With the WebUI off, nothing is
+ * bound to the port, so "daemon up, WebUI off" and "daemon absent" are the SAME socket
+ * event. The gate's own text names the signal it wanted — qBittorrent logging `WebUI:
+ * Credentials are not set` — and that is a line in another application's log file, not a
+ * protocol response. Reading it is now a recorded non-goal; see
+ * `MAIN_V1_COMPLETION_PLAN.md` Phase 9.2 for the decision and its reasoning.
+ *
+ * So the achievable repair is the opposite of distinguishing them: say both, and name the
+ * address. What shipped before was the raw Node errno — `connect ECONNREFUSED
+ * 127.0.0.1:8080` — which is not a sentence, tells a user nothing they can act on, and
+ * quietly implies a single cause. A message that lists the real possibilities is honest
+ * about a limit the product actually has, which is the standard everywhere else here.
+ *
+ * Deliberately NOT done: probing the OS process list for `qbittorrent.exe` to guess which
+ * case it is. It is platform-specific, it still cannot separate "WebUI off" from "WebUI on
+ * another port", and it would turn a guess into a claim.
+ */
+export function qbitTransportMessage(
+  config: Pick<ScraperQbittorrentSettings, 'host' | 'port'>,
+  error: unknown,
+): string {
+  const where = `${config.host}:${config.port}`;
+  const raw = error instanceof Error ? error.message : String(error);
+  // Node nests the syscall errno on the error; the message is the reliable carrier
+  // because `fetch` wraps the cause and the code does not always survive the wrap.
+  const code = (error as { code?: unknown })?.code;
+  const signal = `${typeof code === 'string' ? code : ''} ${raw}`;
+
+  if (/ECONNREFUSED/.test(signal)) {
+    return `Nothing is listening on ${where}. qBittorrent may not be running, or its Web UI may be turned off or on a different port.`;
+  }
+  if (/ENOTFOUND|EAI_AGAIN/.test(signal)) {
+    return `The host ${config.host} could not be resolved.`;
+  }
+  if (/ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ENETUNREACH|abort|timed? ?out/i.test(signal)) {
+    return `${where} did not answer in time. qBittorrent may be busy, or a firewall may be dropping the connection.`;
+  }
+  // Anything unrecognised keeps its own text rather than being flattened into a generic
+  // failure — but it is anchored to the address, so it is still actionable.
+  return `Could not reach qBittorrent at ${where}: ${raw}`;
+}
+
 /** qBittorrent's raw state strings, collapsed onto the vocabulary the UI has. */
 export function mapQbitState(state: string): QbitTransferRow['state'] {
   switch (state) {
@@ -342,7 +391,7 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
       ok: false,
       cookie: '',
       status: 'unreachable',
-      message: error instanceof Error ? error.message : String(error),
+      message: qbitTransportMessage(config, error),
       latencyMs: Date.now() - started,
     };
   }
@@ -418,7 +467,7 @@ async function authed(
           ok: false,
           cookie: '',
           status: 'unreachable',
-          message: error instanceof Error ? error.message : String(error),
+          message: qbitTransportMessage(input.config, error),
           latencyMs: 0,
         },
       };
@@ -449,7 +498,7 @@ async function authed(
         ok: false,
         cookie: '',
         status: 'unreachable',
-        message: error instanceof Error ? error.message : String(error),
+        message: qbitTransportMessage(input.config, error),
         latencyMs: 0,
       },
     };
