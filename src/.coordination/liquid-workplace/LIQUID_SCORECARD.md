@@ -1392,3 +1392,64 @@ bar, not under it — anything that adds chrome at maximized will tip it.
 Evidence: `baselines/cat{1,2,3,5,6,7,8}-l1rd-dictionary*.json`,
 `cat4-l1rd-dictionary-loaded.json`. **sampled-out: (none)**.
 Still open for gate 495: **Video**, all eight categories, same protocol.
+
+## 2026-09-02 · backup — Video, 6 of 8 categories at a controlled 10/10 — NOT an 80/80 entry
+
+**L1's re-drive, half two, INCOMPLETE and reported as incomplete.** Six categories hold a
+controlled 10; **category 5 scores 7/10 on three named findings and category 7 is VOID.**
+This entry exists because the rubric's own rule is that a partial result is published with
+its numbers, not held back until it is flattering. Video is NOT done.
+
+State driven: the Media Center Video page with a REAL library item selected — `JoJo no
+Kimyou na Bouken - Ougon no Kaze 38 RAW`, **486 subtitle lines**, MAL 8.5 — reached by
+clicking its own up-next tile, not by injection. Everything below was measured in that
+state, and that is the whole point of the turn: **one instrument defect with three faces and
+two product defects existed only in the loaded state and were invisible at rest.**
+Restart before main-process measurement: not required; every category here is renderer-side.
+Instrument: the eight parameterised `cat*-*.cjs` harnesses via `jp-bridge` (pid 47004, port
+39273, `eval 1+1` → 2). **Zero new probes** (RULE 1).
+
+| # | Category                        | Score | Number measured | Negative control (must have failed) |
+| - | ------------------------------- | ----- | --------------- | ----------------------------------- |
+| 1 | Accessibility                   | 10/10 | 84 text runs, minRatio **5.28:1**, 0 failing, 0 unmeasurable; 38 controls measured, **0** below the 32 px hit floor, 0 occluded, 0 stolen; 33 focusable, **0** unreachable; WCAG 2.5.8 fails **0**; reduce-motion 41 → **0** durations, released back to 41 | same process, six legs all moved: contrast, targets-by-pointer, targets-by-rect, 2.5.8, keyboard, decorative-exemption-is-narrow — findings `[0,5,0,0,0]` → `[2,7,2,1,2]` → `[0,5,0,0]`, rectDrift 0 |
+| 2 | Clunkiness                      | 10/10 | `worstRecv` **11.7 ms** vs the 100 ms bar (11.1, 8.2, 4.7, 2.0), `overBar100` **0**; 0 dead ends, 0 modal traps, 0 scroll traps; costParity **true** — same window, same geometry, same task in BOTH presentations, presentation and box restored | banked separately as `cat2-l1rd-video-control.json` because the control arm overwrites `--out`: deadEnd / modalTrap / scrollTrap each **0 → 1 → 0**, inert plant received in 0.5 ms |
+| 3 | Liquid utilization              | 10/10 | `denseWorkOnTranslucent` **0**; liquid-treated eligible **4 of 4**, shared-primitive-backed **4 of 4**; measured in `liquid`, restored | A blur one Work region → count moved; B force all-glass → **every** Work region failed; both restored |
+| 4 | Use of space                    | 10/10 | three sizes, all four bars clean at each: dead region **6.9% / 0.6% / 9.8%** against a 15% bar; clipped 0, overlaps 0, horizontal scrollers 0 everywhere | injected must-clip box 0 → 1 → 0; art-plate exclusion proven narrow (a plate hanging out 279 px did NOT raise `clipped`); backdrop plant raised overlaps **0 → 10 → 0**; sub-minimum 200×140 shrink restored |
+| 5 | UI clarity                      | **7/10** | **3 of 10 questions answer NO** — see below. 84 text runs per theme, alt-theme axis `[null, classic-light]` and the axis demonstrably moved (minRatio and paint digest both changed) | the theme axis is its own control and it fired: `classic-light` found a failure `null` did not |
+| 6 | Feature parity + reversibility  | 10/10 | standard **10/10** = liquid **10/10**, na 0, rows agree, 0 failing, 0 only-in-one; round trip standard → liquid → standard with a dirtied field: fields held, shell held, **0** diffs, 1080×700 both ways | **10 of 10 mutations armed, 0 unarmable**, each falling **exactly its own row** and each restored to 10/10 — up from 8 armed / 2 unarmable / VOID before the repair in `af21269d` |
+| 7 | Performance under real load     | **VOID** | drag readings disagree across repeats (BREACH, clean, clean, BREACH, clean) → leg UNSTABLE; heavy leg refused, `Video load never armed`; resize longest frame 100.3 ms against a control max of 18.5 ms, recorded ENV not scored | `--jank` ran, but a VOID leg cannot be scored 10 and is not scored at all |
+| 8 | Honest states                   | 10/10 | 84 text runs, raw i18n keys **0**, placeholders **0**, mute pairs **0**, `statesNamed` clean, `languagesDiffer` **TRUE** across all four languages — 49 of 84 runs differ per language (`Video`→`動画`→`视频`), restored to `en` | banked separately as `cat8-l1rd-video-control.json`: rawKeys / placeholders / mutePairs each **0 → 1 → 0** |
+
+**Two product defects, both fixed and re-scored in their own commits, both loaded-only.**
+`5eaa3573` — category 1: the inspector's three score-row captions measured **4.49:1** against
+a 4.5 bar (11px `--mc-dim` on the cell tint) and the MAL link's hit area was **26.5 px**
+against a 32 px floor. Both elements render only with a video loaded. After: 5.28 and 0.
+`4c2df362` — category 2: the first keystroke into the YouTube URL field was received after
+**171.7 ms** (then 128.4, 82.5, 47.2), because `ytUrl` lives in `useMedia` and every character
+reconciled the whole Media Center including the seven-poster shelf. `useDeferredText` is now
+extracted from `GlobalSearchField` and shared by both fields. After: **11.7 ms**, over-bar 0.
+
+**One INSTRUMENT defect, three faces, fixed in `af21269d` — and it is the finding to carry.**
+Category 6 could not score this surface at all until it was repaired, and each face failed
+differently: (a) the driver DELETED the surface, because `dirtyField` types into the first
+visible text field and `df00b4be` made that the topbar GLOBAL SEARCH — a navigation control,
+so the Media Center left the Video page and `check('video')` refused `no video surface`;
+(b) two rows read source-ness as `.mc-video-stage video`, a node this page never mounts
+(playback is delegated to the media workspace), so their "with a source" branch was
+unreachable and both scored FAIL the moment a real item was selected; (c) three mutations
+were armable only at rest and refused, VOIDing the category twice. **An instrument that
+models a state the product cannot enter certifies only the state it can see.**
+
+**Category 5's three NOs, stated as the next worker's slice, not smoothed over:**
+- **Q1 dominant task** — `entryPoints 4` against a bar of 1..3. Three accent buttons compete
+  in the loaded state: `Open video` (topbar), `Open in the media workspace` (stage),
+  `Open Study Mode` (inspector), plus one primary input.
+- **Q3 primary action visible without hunting** — `insideBodyViewport: false`. The primary is
+  explicitly marked but requires scrolling at 1080×700.
+- **Q5 stable contrast in BOTH themes** — `div.media-substatus` ("Loaded 486 subtitle lines")
+  measures **3.18:1** on `.mc-video-stage` in `classic-light`, against 4.5. Clean in the
+  default theme, which is exactly why the alt-theme axis exists.
+
+Evidence: `baselines/cat{1,2,3,4,5,6,8}-l1rd-video*.json`, `cat7-video-perf.json`.
+**sampled-out: (none)** — all eight categories were attempted; two did not close.
+Still open for gate 495: **Video categories 5 and 7.**
