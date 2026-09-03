@@ -15,7 +15,17 @@ const CSS = readFileSync(resolve(__dirname, '../views/mediaCenter.css'), 'utf8')
 // MOUNTED rather than spelled — see `mediaGlobalSearchRace.test.tsx`, which is now the guard that
 // actually holds the behaviour. What stays here is the half that lives at the CALL SITE and no
 // mounted test of the component can see: which store the top bar hands it, and on which tabs.
+// And once more, 2026-09-02: the deferred commit moved OUT of the component into
+// `useDeferredText`, because a second field in the Media Center — the YouTube import URL in
+// `MediaYoutubeBar` — had the identical whole-view-reconcile defect (first key 171.7 ms on
+// the loaded Video window) and no reason to grow a second copy of the cure. The component
+// keeps the markup and the Enter path; the hook keeps the timer, the sync effect and the
+// context identity. So the assertions below are split the same way: whatever asserts on the
+// deferral reads `HOOK`, whatever asserts on the field's own JSX reads `FIELD`. Nothing was
+// weakened in the move — `mediaGlobalSearchRace.test.tsx` mounts the component and is the
+// guard that actually holds the behaviour, and its six cases were green before and after.
 const FIELD = FIELD_SOURCE.match(/export const GlobalSearchField = memo\(([\s\S]*?)\n\}\);\n/)?.[1] ?? '';
+const HOOK = FIELD_SOURCE.match(/export function useDeferredText\(\{([\s\S]*?)\n\}\n/)?.[1] ?? '';
 const COMMIT = SOURCE.match(/const commitSearch = useStableCallback\(([\s\S]*?)\n {2}\}\);\n/)?.[1] ?? '';
 
 describe('Media Center global search focus', () => {
@@ -31,14 +41,17 @@ describe('Media Center global search focus', () => {
   it('keeps typing off the shell reconcile path, and lets Discover opt out', () => {
     // The field holds its own in-flight text and commits on a timer; committing every keystroke
     // to `useMedia` re-rendered the whole Media Center (worst input 85.1 ms against a 100 ms bar).
-    expect(FIELD).toContain('useState(value)');
-    expect(FIELD).toContain('setTimeout');
+    expect(HOOK).not.toBe('');
+    expect(HOOK).toContain('useState(value)');
+    expect(HOOK).toContain('setTimeout');
     // Discover submits on Enter through a useCallback over its own `query`, so a deferred commit
     // would hand `submitQuery` the text as it stood one character ago.
     expect(SOURCE).toContain("deferMs={tab === 'music' || tab === 'discover' ? 0 : GLOBAL_SEARCH_COMMIT_MS}");
-    expect(FIELD).toMatch(/if \(deferMs <= 0\) \{\s*commit\(next\);/);
-    // Enter flushes before submitting.
-    expect(FIELD).toMatch(/event\.key !== 'Enter'[\s\S]*cancel\(\);\s*commit\(text\);\s*onEnter\(\)/);
+    expect(HOOK).toMatch(/if \(deferMs <= 0\) \{\s*commit\(next\);/);
+    // Enter flushes before submitting: the field calls `flush`, and `flush` is the cancel plus
+    // the commit of the text as it stands now.
+    expect(FIELD).toMatch(/event\.key !== 'Enter'[\s\S]*flush\(\);\s*onEnter\(\)/);
+    expect(HOOK).toMatch(/const flush = useStableCallback\(\(\) => \{\s*cancel\(\);\s*commit\(text\);/);
   });
 
   /*
@@ -58,14 +71,14 @@ describe('Media Center global search focus', () => {
    * that changes when the OWNER changes, and an effect that treats that change as external.
    */
   it('treats a context switch as an external change, not just a value change', () => {
-    expect(FIELD).not.toBe('');
+    expect(HOOK).not.toBe('');
     // The switch must be observable independently of `value`, or the equal-value case is blind.
-    expect(FIELD).toMatch(/const switched = context\.current !== contextKey;/);
-    expect(FIELD).toMatch(/if \(!switched && value === seen\.current\) return;/);
+    expect(HOOK).toMatch(/const switched = context\.current !== contextKey;/);
+    expect(HOOK).toMatch(/if \(!switched && value === seen\.current\) return;/);
     // …and the effect must actually re-run on it.
-    expect(FIELD).toMatch(/\}, \[value, contextKey, cancel\]\);/);
+    expect(HOOK).toMatch(/\}, \[value, contextKey, cancel\]\);/);
     // Cancelling is the whole point: the pending commit belongs to the previous owner.
-    const effect = FIELD.match(/const switched[\s\S]*?\}, \[value, contextKey, cancel\]\);/)?.[0] ?? '';
+    const effect = HOOK.match(/const switched[\s\S]*?\}, \[value, contextKey, cancel\]\);/)?.[0] ?? '';
     expect(effect).toContain('cancel();');
     expect(effect).toContain('setText(value);');
   });
@@ -98,12 +111,12 @@ describe('Media Center global search focus', () => {
    * the library query landing in Discover. That is the defect, observed.
    */
   it('the pre-fix effect fails the same source assertions (spelling only — see the mounted control)', () => {
-    const preFix = FIELD
+    const preFix = HOOK
       .replace(/\s*const switched = context\.current !== contextKey;/, '')
       .replace(/\s*context\.current = contextKey;/, '')
       .replace('if (!switched && value === seen.current) return;', 'if (value === seen.current) return;')
       .replace('}, [value, contextKey, cancel]);', '}, [value, cancel]);');
-    expect(preFix).not.toBe(FIELD);
+    expect(preFix).not.toBe(HOOK);
     expect(preFix).not.toMatch(/const switched = context\.current !== contextKey;/);
     expect(preFix).not.toMatch(/\}, \[value, contextKey, cancel\]\);/);
     // And the guard the fix relies on is genuinely absent from it.
