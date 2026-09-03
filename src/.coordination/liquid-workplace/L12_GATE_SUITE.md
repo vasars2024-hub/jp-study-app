@@ -159,3 +159,55 @@ migration: closed 2026-09-01 (primary2), `L3_PRESENTATION.md`.
 **Not claimed:** no second full run was made. The 13 flake identities are proven by re-run
 alone, and a full run beside a concurrent worker will flake again; the number that is stable
 is *zero failures that are not load flakes*, and that is the number the bullet needed.
+
+## 2026-09-02 late (backup) — the branch's deterministic red, and the two gates that are not the branch's
+
+Recovery turn: `primary` died at 16:50:42 EDT, 16 s after committing `c51e4232`. It left one
+verified-but-uncommitted edit (landed as `b037607c`) and one red it never re-ran.
+
+**The branch was red at its own tip, and not for the reason anyone recorded.**
+`liquidWindowSnapshotFidelity` fails at `c51e4232` with
+`expected [ 'map(winToSnapshot)', …(3) ] to have a length of 3 but got 4`: the zoom re-fit added
+a real fourth `.map(winToSnapshot)` (`toAuthoredSpace(winsRef.current.map(winToSnapshot))`,
+DesktopShell.tsx:947) against a count pinned at 3. This is the SECOND time this one suite has
+been the branch's only deterministic red in two days, and the first repair (`0227993f`) fixed
+the sentence rather than the instrument. Fixed at `03758f25`: every counting/enumerating
+assertion reads a comment-stripped copy of the shell. Controls — fixture (prose counts 2 raw,
+0 stripped); mutation A on the REAL file (append a comment naming two call sites → still
+15/15); mutation B (a hand-built literal beside a converter call → RED, "expected 5 to be 4").
+Both mutations restored byte-identical, verified by sha256.
+
+**Boss-audit Finding 1, re-derived rather than quoted, and the plan is corrected (`bf8875d4`).**
+Same three files, same command, two trees. Detached worktree at HEAD, node_modules junctioned:
+`architectureBaseline` + `i18n` + `liquidWindowSnapshotFidelity` = **3 files / 42 tests, ALL
+PASS**. Shared main tree: **2 failed / 40 passed**, the two being `architectureBaseline > has no
+stale baseline entries` and `i18n > catalog hygiene`. The plan's L12 tag said those two were the
+BRANCH's blocker and named two benched owners as the only people who could clear it. Inverted:
+they are the SHARED TREE's, and no action by those owners would have closed the bullet.
+
+**Finding 6 re-derived at `b76fb0ac`, both directions.** Committed tree (clean worktree):
+`architecture-audit` **exit 0** ("Nothing new", 9 pending), `i18n-hardcoded-check` **exit 0**
+(33 files / 815 strings). Shared tree, same commit: arch **exit 1** on the 3
+`src/media/Study*.tsx` orphan-module baseline entries, hardcoded **exit 1** on
+`SeanimeDevPanel.tsx 18 -> 21`. The whole delta is two foreign ` M` files, named not asserted.
+`i18n-check` **exit 0** in both (12,250 keys).
+
+**Trap for the next worker, stated once:** a shared-tree number for these two gates is not a
+statement about the branch, in either direction. Run them in a detached worktree or do not
+report them.
+
+### Full suite, same turn — and it found a regression the interrupted turn could not have seen
+
+`npx vitest run --testTimeout=60000 --hookTimeout=60000`, shared tree: **3 failed files /
+7 tests of 1,030 / 13,290**, exit 1. Two are the shared-tree-only identities above. The third
+was **new and deterministic**: `dictionaryNotes.test.ts`, 5 cases,
+`SqliteError: unable to open database file`, caused by `4f946a34` — which landed at 16:48:38
+and whose turn died at 16:50:42, so it never ran one. Attributed by bisect in a detached
+worktree: green at `0c0cd38a`, red at `495ddb89`. Fixed at `775838c8` (`skipMigrations` split
+out of `readonly`), with a 7-case mutation control. Clean checkout of `775838c8`: dictionaryNotes
++ dictionaryDb + architectureBaseline + i18n + liquidWindowSnapshotFidelity +
+mediaGlobalSearchRace + deletedPlayerDependents = **139 passed / 139**.
+
+**The lesson, and it is the fourth time this file records a version of it:** a commit landed
+minutes before a quota exit is the one most likely to be red. Bisect before believing a
+full-suite failure is inherited — 3 of this turn's 7 failures were, and 5 were not.

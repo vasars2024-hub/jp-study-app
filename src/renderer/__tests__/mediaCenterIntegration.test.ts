@@ -126,7 +126,11 @@ describe('Media Center integration contract', () => {
   it('keeps search, local library, discovery, and the Seanime source in the shell', () => {
     const source = read('renderer/views/MediaCenterView.tsx');
     expect(source).toContain('className="mc-sidebar"');
-    expect(source).toContain('className="mc-global-search"');
+    // The field's own markup moved to `views/GlobalSearchField.tsx` so its 70 ms race could be
+    // mounted (boss audit 2026-09-02, Finding 4). Both halves are asserted, or "the shell still
+    // has a search field" passes on a component nothing renders.
+    expect(source).toContain('<GlobalSearchField');
+    expect(read('renderer/views/GlobalSearchField.tsx')).toContain('className="mc-global-search"');
     expect(source).toContain('<MediaLibraryShell');
     expect(source).toContain('<DiscoveryControls');
     expect(source).toContain('data-media-source="seanime"');

@@ -452,10 +452,19 @@ describe('user notes — bounding untrusted input', () => {
 // A file that already exists on a user's disk is at version 5, and the columns a
 // note is keyed on do not exist in it yet.
 describe('schema 6 — giving existing notes a word to hang off', () => {
-  /** A database built by every step up to 5 and stopped there. */
+  /**
+   * A database built by every step up to 5 and stopped there.
+   *
+   * `skipMigrations`, not `readonly`: this handle WRITES — it drives `MIGRATIONS`
+   * itself and stamps `user_version`. It asked for `readonly` while that flag was
+   * only a naming convention for "skip the ladder", and when 4f946a34 made the
+   * flag real this broke with `unable to open database file`, because
+   * SQLITE_OPEN_READONLY will not create a file. The two meanings are separate
+   * options now; this is the one this suite always wanted.
+   */
   function openV5(): SqliteDb {
     const v5Dir = path.join(tempRoot, 'v5');
-    const handle = openDictionaryDb({ dir: v5Dir, readonly: true });
+    const handle = openDictionaryDb({ dir: v5Dir, skipMigrations: true });
     for (const step of MIGRATIONS) {
       if (step.version > 5) break;
       step.up(handle);

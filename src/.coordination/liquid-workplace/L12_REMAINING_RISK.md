@@ -3,9 +3,9 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `wt/files-app` at `32aae369`, 2026-09-02T05:35:36.556Z.
+Branch `feat/nyaa-subtitles` at `8b10bc75`, 2026-09-02T21:59:03.396Z.
 
-**7 of 9 risks open** (4 high, 2 closed, 0 unmeasured).
+**6 of 9 risks open** (3 high, 3 closed, 0 unmeasured).
 
 | id | sev | state | risk |
 | --- | --- | --- | --- |
@@ -13,9 +13,9 @@ Branch `wt/files-app` at `32aae369`, 2026-09-02T05:35:36.556Z.
 | R2 | HIGH | CLOSED | A source file is imported by tracked code but is itself untracked |
 | R3 | MED | OPEN | Feature-parity rows are still pending |
 | R4 | MED | OPEN | Liquid plan bullets are still open |
-| R5 | MED | CLOSED | The architecture-audit gate is red |
-| R6 | HIGH | OPEN | The visual atlas is not certification evidence |
-| R7 | LOW | OPEN | The packaging stage has never completed in this tree |
+| R5 | MED | OPEN | The architecture-audit gate is red |
+| R6 | HIGH | CLOSED | The visual atlas is not certification evidence |
+| R7 | LOW | CLOSED | The packaging stage has never completed in this tree |
 | R8 | HIGH | OPEN | The repo's own gates are not green at this HEAD |
 | R9 | HIGH | OPEN | Banked visual evidence has no per-run namespace, so a re-run overwrites it |
 
@@ -29,10 +29,14 @@ What would close it: Either track the blobs (they are large), or make the packag
 
 ```json
 {
-  "entriesOnDisk": 3,
+  "entriesOnDisk": 7,
   "entryNames": [
+    "cedict",
+    "kuromoji",
+    "models",
     "ort",
     "sounds",
+    "tesseract",
     "tray-icon.png"
   ],
   "pathsTrackedByGit": 2,
@@ -63,11 +67,7 @@ What would close it: Either track the blobs (they are large), or make the packag
     }
   ],
   "referenceTreeEntries": 7,
-  "referenceTreeOnly": [
-    "cedict",
-    "kuromoji",
-    "models",
-    "tesseract"
+  "referenceTreeOnly": []
 ```
 
 ### R2 — A source file is imported by tracked code but is itself untracked
@@ -80,8 +80,8 @@ What would close it: git add the resolved target, or delete the import.
 
 ```json
 {
-  "specifiers": 7749,
-  "resolved": 7722,
+  "specifiers": 7905,
+  "resolved": 7878,
   "findings": []
 }
 ```
@@ -97,39 +97,44 @@ What would close it: Each pending row names its own blocker in the ledger.
 ```json
 {
   "available": true,
-  "rows": 50,
+  "rows": 213,
   "tally": {
-    "both": 45,
-    "pending": 5
+    "both": 204,
+    "pending": 9
   },
   "pendingRows": [
     {
-      "surface": "mediaWorkspace",
-      "feature": "Open a study-ready file into the player",
+      "surface": "city",
+      "feature": "Open the dossier from the hero, and get back out of it",
       "blocker": null
     },
     {
-      "surface": "mediaWorkspace",
-      "feature": "Readiness category filters over the whole library",
+      "surface": "city",
+      "feature": "The stage the badge claims is the stage the scene paints",
       "blocker": null
     },
     {
-      "surface": "mediaWorkspace",
-      "feature": "Transcript rail: cue list, active-cue follow, per-cue translate, card preview",
+      "surface": "city",
+      "feature": "Three dossier facts, all filled, with the banked-pages sentence agreeing with the progress bar it sits above",
       "blocker": null
     },
     {
-      "surface": "mediaWorkspace",
-      "feature": "Detach a Study Block into its own OS window, and return it",
+      "surface": "city",
+      "feature": "Ambient music on/off, with the volume slider disabled exactly when music is off",
       "blocker": null
     },
     {
-      "surface": "mediaWorkspace",
-      "feature": "Send a detached block to another monitor, and restore its rectangle across close/reopen",
+      "surface": "city",
+      "feature": "The volume number shown is the volume the slider holds",
       "blocker": null
-    }
-  ]
-}
+    },
+    {
+      "surface": "city",
+      "feature": "The scene is actually painted: every canvas has pixels and the parallax layers are all present",
+      "blocker": null
+    },
+    {
+      "surface": "city",
 ```
 
 ### R4 — Liquid plan bullets are still open
@@ -142,8 +147,8 @@ What would close it: Close each remaining bullet against its own words with live
 
 ```json
 {
-  "closed": 35,
-  "open": 11,
+  "closed": 37,
+  "open": 9,
   "unknown": 0,
   "total": 46,
   "openTitles": [
@@ -155,16 +160,14 @@ What would close it: Close each remaining bullet against its own words with live
     "Validate every player feature in standard and Liquid modes.",
     "Keep review/input surfaces spatially fixed during active tasks.",
     "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-    "Close every feature-ledger row.",
-    "Run focused tests, full suite, architecture/i18n gates, packaged-app checks, and fresh-profile migration.",
-    "Produce a final visual atlas and remaining-risk report."
+    "Close every feature-ledger row."
   ]
 }
 ```
 
 ### R5 — The architecture-audit gate is red
 
-**MEDIUM · CLOSED**
+**MEDIUM · OPEN**
 
 Why it matters: It is one of the four repo gates; red on inherited state hides a genuinely new finding behind noise.
 
@@ -172,17 +175,17 @@ What would close it: Reconcile the stale baseline entries it names.
 
 ```json
 {
-  "exit": 0,
-  "modules": 2515,
+  "exit": 1,
+  "modules": 2542,
   "stale": null,
   "fresh": null,
-  "tail": "  duplicate-export        7  (0 pending)\n  duplicate-storage       3  (0 pending)\n  orphan-module           7  (3 pending)\n  test-only-module       13  (6 pending)\n\nNothing new. 9 known finding(s) still marked pending."
+  "tail": "  test-only-module       13  (6 pending)\n\nBaseline entries that no longer occur (3) — remove them:\n  orphan-module:src/media/StudyBottomBar.tsx\n  orphan-module:src/media/StudyDocks.tsx\n  orphan-module:src/media/StudyWorkspaceCustomizer.tsx"
 }
 ```
 
 ### R6 — The visual atlas is not certification evidence
 
-**HIGH · OPEN**
+**HIGH · CLOSED**
 
 Why it matters: L12 exists to certify the transformation visually. An atlas that cannot certify is the whole bullet unmet, however many images it holds.
 
@@ -191,13 +194,19 @@ What would close it: Every blocker the atlas lists, in its own words.
 ```json
 {
   "available": true,
-  "file": "src/.coordination/liquid-workplace/baselines/l12-atlas.json",
-  "generatedAt": "2026-09-02T05:32:48.937Z",
-  "certifiable": false,
-  "blockers": [
-    "21 indexed images no longer hash to their recorded sha256"
+  "file": "src/.coordination/liquid-workplace/baselines/l12-atlas-final-v2.json",
+  "selectedBy": "newest generatedAt",
+  "candidates": 3,
+  "candidateFiles": [
+    "l12-atlas-final-v2.json",
+    "l12-atlas-final.json",
+    "l12-atlas.json"
   ],
-  "completeness": 93.47,
+  "unreadable": 0,
+  "generatedAt": "2026-09-02T21:54:15.921Z",
+  "certifiable": true,
+  "blockers": [],
+  "completeness": 93,
   "axes": {
     "app": "effective",
     "theme": "effective",
@@ -209,7 +218,7 @@ What would close it: Every blocker the atlas lists, in its own words.
 
 ### R7 — The packaging stage has never completed in this tree
 
-**LOW · OPEN**
+**LOW · CLOSED**
 
 Why it matters: Compilation is proven (8 of 8 forge targets build), but the file-copy stage that produces a shippable app is unexercised here.
 
@@ -217,9 +226,9 @@ What would close it: Windows Developer Mode, or running the packager in a tree w
 
 ```json
 {
-  "nodeModules": "reparse-point",
-  "packagerCopyStageRunnable": false,
-  "outDirPresent": false,
+  "nodeModules": "real-directory",
+  "packagerCopyStageRunnable": true,
+  "outDirPresent": true,
   "viteBuildPresent": true
 }
 ```
@@ -236,11 +245,11 @@ What would close it: Each red identity fixed or hunk-scope committed by its owne
 {
   "i18nCheck": {
     "exit": 0,
-    "lastLine": "i18n: all 12115 English keys are translated in ja/zh/ru. Nothing to do."
+    "lastLine": "      ja 142, zh 140, ru 146 keys still render English verbatim and are baselined as accepted (product names, format strings, the Aero easter egg) — tools/i18n-untranslated-baseline.json."
   },
   "i18nHardcoded": {
     "exit": 1,
-    "lastLine": "If a file is genuinely exempt, run with --update-baseline and say why in the commit."
+    "lastLine": "  src/renderer/components/SeanimeDevPanel.tsx — 18 -> 21 string(s)"
   },
   "vitest": {
     "available": false,
@@ -260,8 +269,8 @@ What would close it: l12-visual-matrix.cjs writing plates under a per-run direct
 ```json
 {
   "available": true,
-  "manifests": 3,
-  "declaredPlatePaths": 701,
+  "manifests": 9,
+  "declaredPlatePaths": 2604,
   "pathsClaimedByMoreThanOneRun": 22,
   "pathsWhereRunsRecordDifferentBytes": 21,
   "examples": [

@@ -3,13 +3,19 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SOURCE = readFileSync(resolve(__dirname, '../views/MediaCenterView.tsx'), 'utf8');
+const FIELD_SOURCE = readFileSync(resolve(__dirname, '../views/GlobalSearchField.tsx'), 'utf8');
 const CSS = readFileSync(resolve(__dirname, '../views/mediaCenter.css'), 'utf8');
 
 // The field moved out of the top bar's JSX into a memoized `GlobalSearchField` (326d1cc7), so the
 // two halves this file guards now live apart: the input owns focus behaviour, `commitSearch` owns
 // where a query goes. Both are matched separately, and each match is asserted non-empty first —
 // a selector that quietly stops matching would otherwise assert `''` and pass forever.
-const FIELD = SOURCE.match(/const GlobalSearchField = memo\(([\s\S]*?)\n\}\);\n/)?.[1] ?? '';
+//
+// The field then moved again, into `views/GlobalSearchField.tsx`, so that its 70 ms race could be
+// MOUNTED rather than spelled — see `mediaGlobalSearchRace.test.tsx`, which is now the guard that
+// actually holds the behaviour. What stays here is the half that lives at the CALL SITE and no
+// mounted test of the component can see: which store the top bar hands it, and on which tabs.
+const FIELD = FIELD_SOURCE.match(/export const GlobalSearchField = memo\(([\s\S]*?)\n\}\);\n/)?.[1] ?? '';
 const COMMIT = SOURCE.match(/const commitSearch = useStableCallback\(([\s\S]*?)\n {2}\}\);\n/)?.[1] ?? '';
 
 describe('Media Center global search focus', () => {
@@ -78,9 +84,20 @@ describe('Media Center global search focus', () => {
     );
   });
 
-  it('MUTATION CONTROL: the pre-fix effect fails the same assertions', () => {
-    // The real shipping block with only the context check removed — i.e. the code as it stood
-    // before this fix. If these assertions passed against that, they would be decorative.
+  /*
+   * Boss audit 2026-09-02, Finding 4: this case is SELF-REFERENTIAL and is kept only as a
+   * spelling check on the source it reads. It string-replaces the anchors out of the text it
+   * just read and asserts they are gone, which is true by construction; it would go green on
+   * any equivalent refactor and could not see the race arriving by another route.
+   *
+   * The real control now lives in `mediaGlobalSearchRace.test.tsx`, where the same four
+   * replacements are applied to `GlobalSearchField.tsx` ITSELF and the mounted component is
+   * re-driven: 2 of its 6 cases go red — "drops the pending commit when the owning store
+   * changes under it" and "a switch BACK does not resurrect the dropped commit", both
+   * `expected "vi.fn()" to not be called at all, but actually been called 1 times`, which is
+   * the library query landing in Discover. That is the defect, observed.
+   */
+  it('the pre-fix effect fails the same source assertions (spelling only — see the mounted control)', () => {
     const preFix = FIELD
       .replace(/\s*const switched = context\.current !== contextKey;/, '')
       .replace(/\s*context\.current = contextKey;/, '')

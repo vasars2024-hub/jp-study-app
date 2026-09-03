@@ -228,3 +228,106 @@ The atlas correctly refuses `certifiable` on it while classifying the 3 toggle-l
 reason to flip bullet 1: the run happened, its controls passed, and only re-verification of those
 21 hashes is lost. Restore measured, not asserted: theme `study-os`, 0 windows / 0 dialogs,
 `desktop-layout.json` **9DFB6E2F2361…**, byte-identical to `debug/_bk-layout-pre.json`.
+
+## 2026-09-02 — the floor is not always zero, and only the equality gates assumed it was (`backup`, checkpointed by `primary`)
+
+Recovered from `backup`'s interrupted 13:05–13:12 EDT turn (session limit mid-verification; the
+edit and both verification runs were on disk, nothing committed, no handoff). Re-derived here
+from the manifests, not from prose.
+
+**What the section-addressed re-capture found.** Two full sweeps on the real-profile instance
+(pid 47004, port 39273), both `--address section`, 650 cells each, `--control`:
+`l12-matrix-maximized-v2.json` (sha256 `b553bf79…`) C0 floor **0.000% / Δ0**, C1 identical,
+**certifiable:true**, 40 unconverged. `l12-matrix-normal-v2.json` (sha256 `d61f103d…`) C0 floor
+**0.008% of pixels at max channel delta 4**, C1 **0.009% / Δ8 with 0% over 8** — VOIDed by the
+`pctDiff > 0` rule, **228 of 624** cells `converged:false`, run exit 1. Same instance, 50 minutes
+apart. So `capturePage` is not byte-deterministic here; it usually is, which is a weaker claim
+than the 2026-09-02 closure text ("byte-identity is the right gate, not a tolerance") made.
+
+**The repair, in `probes/l12-visual-matrix.cjs`.** Equality is scored against the threshold the
+file already used for its must-differ controls: `withinNoise` = `pctOver8 === 0 && maxDelta <= 8
+&& pctDiff <= 0.1%`. The extent bound (`NOISE_MAX_PCT = DIFF_MIN_PCT / 10`) is not decoration —
+the first verification run had **5 of 12** cells needing the tolerance, four at 0.007–0.027% and
+one, `stats/oled-black/liquid`, at **1.917% at Δ8**: a low-amplitude animation on a translucent
+material, which an amplitude-only bound would have banked as settled. Cells bank `settledBy`
+('bytes' | 'tolerance') and `residual`; totals bank `settledByTolerance` and `worstResidualDelta`;
+C0/C1 bank `identical` (raw byte fact) beside `withinNoise` (verdict); the void fires only when
+C0 exceeds the bound, and a sub-threshold nonzero floor is a `floorNote`, never silent.
+
+**Verification, 12 cells (dictionary, stats × 3 themes × standard/liquid), extent bound in force:**
+`l12-matrix-tolcheck2.json` (sha256 `6af9ed05…`, gitignored per e7fb4071): controls C0–C5 all
+pass, `certifiable:true`, `void:null`, C0 0.000%/Δ0, C1 identical, C2 98.835% over 8, C3 86.959%,
+C4 87.28%; `floorNote`: "C0 floor read 0.000%, but **4 of 12** cells still needed the noise
+tolerance to settle". `node --check` clean; eslint ignores the path by default.
+
+**Consequence for bullet 1 / b4.** `normal-v2` would pass C0 and C1 under the corrected gate
+(0.008%/Δ4 and 0.009%/Δ8, both 0% over 8) but its 228 unconverged cells were measured under
+byte-identity and cannot be re-scored from disk — the run is re-captured under this harness
+before any atlas is assembled from it. `maximized-v2` stands.
+
+## 2026-09-02 late (backup) — normal-v3 re-captured, and the atlas finally covers the whole product
+
+`normal-v2` did not stand (above). Re-captured under the corrected harness, same flags,
+same live instance (pid 47004 / port 39273, one window, `eval 1+1` → 2 before starting):
+
+    node probes/l12-visual-matrix.cjs --apps all --themes all --states normal
+      --address section --control --out baselines/l12-matrix-normal-v3.json
+
+**`l12-matrix-normal-v3.json` — EXIT 0**, runId `l12-matrix-normal-v3__20260902T212358Z__30176`,
+sha256 `4cf0db68067384bf…`. 25 apps × 13 themes × 2 presentations × normal = **650 cells,
+624 captured, 624 distinct images**, 60.3 MB, 3,768 capture attempts, 0 retries.
+`themeMisapplied` **0**, `unsettled` **0**, `stateBlocked` **0**, `certifiable: true`.
+
+The number this re-capture existed for: **unconverged 228 → 37**, and `settledByTolerance`
+318 with `worstResidualDelta` **8**. That is the whole difference between the two runs —
+v2 scored convergence by byte-identity, which a translucent Liquid surface over a live desk
+cannot reach; v3 scores it against the magnitude gate (`noiseMaxDelta` 8, `noiseMaxPct` 0.1).
+
+**C0 IS NOT BYTE-IDENTICAL AND MUST NOT BE QUOTED AS IF IT WERE.** `maximized-v2`'s floor was
+0.000% / Δ0; v3's is `identical: false`, **maxDelta 1**, pctDiff 0, pctOver8 0 — i.e. one
+channel level of instrument noise, inside the gate (`withinNoise: true`). The other five
+controls fire with magnitudes: C1 repeat pctDiff 0.002 / 0% over 8; C2 theme **97.924%** of
+475,600 px over Δ8; C3 presentation **35.442%**; C4 app **74.161%**; C5 state geometric,
+475,600 → 966,960 px. Restore measured: theme back to `study-os`, caret freeze removed,
+0 windows / 0 dialogs left.
+
+### The atlas, over the FULL 1,300-cell product
+
+    node probes/l12-atlas.cjs --manifest baselines/l12-matrix-maximized-v2.json,
+      baselines/l12-matrix-normal-v3.json --control --out baselines/l12-atlas-final-v2.json
+
+Only those two manifests, deliberately: between them they ARE the whole product (13 themes ×
+both states), and the three legacy manifests are the ones whose plates were overwritten before
+the per-run namespace fix — merging them would re-import 21 unverifiable hashes for nothing.
+
+`l12-atlas-final-v2.json`, sha256 `eab1d3fc0f9f03bf…`: **1,300 declared / 91 unavailable /
+1,209 attainable / attainable completeness 100% / failed 0 / neverAttempted 0.** Integrity
+re-hashed from disk: **1,209 verified, 0 missing, 0 mismatch, all-present.** All four axes
+`effective`. `blockers: []`, `certifiable: true`. 100% app-universe (25 of 25 canonical
+sections), 100% theme-universe (13 of 13), **`sampledOut` empty** — RULE C's sampling is not
+used here because nothing was sampled out. Atlas mutation controls **4 fired / 0 failed**.
+
+This closes bullet 4's own stated blocker verbatim. It read: *"550 of the full 1,300-cell
+product were never attempted — the state axis was swept at 2 of 13 themes."* `neverAttempted`
+is now **0**.
+
+The 91 unavailable cells are a PRODUCT gap, published as one and not counted as capture
+failures: `note` + `city` have no maximize control of their own (39 cells, frameless chrome),
+`visualizer` + `city` offer no presentation toggle (52 cells).
+
+### Remaining-risk report
+
+Regenerated, never hand-edited: **9 risks, 6 open (3 high) / 3 closed / 0 unmeasured**,
+4 of 4 mutation controls fire. R6 closed this turn — see `288dd6f5`, and note the closure is
+a source-selection fix with a control, not a loosened verdict.
+
+**R9 stays open on LEGACY damage only, and here is the number that says so.** Its 22
+plate paths claimed by more than one run, 21 disagreeing, are claimed exclusively by
+`l12-matrix-normal.json` and `l12-matrix-tries40.json` — both pre-dating the per-run directory
+fix (`557cdf3b`). `normal-v3` wrote **624** plates into its own run directory and added
+**0** collisions. The risk is historical evidence that cannot be re-verified, not a live defect.
+
+R5 and R8 are red **in the shared working tree only** and are boss-audit Finding 6 (two foreign
+` M` files, `VideoCoreStudyOverlay.tsx` and `SeanimeDevPanel.tsx`); the register runs in the
+shared tree, so it reports the tree it is standing in. Do not read them as branch blockers —
+that inversion is exactly what boss-audit Finding 1 was.

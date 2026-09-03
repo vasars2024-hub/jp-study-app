@@ -891,11 +891,11 @@ declare global {
       listMedia(): Promise<MediaItem[]>;
       scanMediaStorage(paths: string[]): Promise<{ totalBytes: number; files: Array<{ path: string; size: number; modifiedAt: number }> }>;
       updateMediaMetadata(id: string, metadata: Partial<Pick<MediaItem, 'title' | 'artist' | 'genres' | 'actors' | 'year' | 'lang' | 'category' | 'jlptLevel' | 'vocabularyCount' | 'kanjiCount' | 'metadataSource'>>): Promise<MediaItem | null>;
-      previewMediaOrganization(id: string, root: string): Promise<import('../../shared/mediaHub').MediaOrganizationPreview | null>;
-      organizeMedia(preview: import('../../shared/mediaHub').MediaOrganizationPreview, choice?: import('../../shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }>;
-      backupMedia(): Promise<import('../../shared/mediaHub').MediaBackupContract>;
-      listMediaRelationships(fromId?: string): Promise<import('../../shared/mediaHub').MediaRelationship[]>;
-      addMediaRelationship(relationship: Omit<import('../../shared/mediaHub').MediaRelationship, 'id' | 'createdAt'>): Promise<import('../../shared/mediaHub').MediaRelationship>;
+      previewMediaOrganization(id: string, root: string): Promise<import('../shared/mediaHub').MediaOrganizationPreview | null>;
+      organizeMedia(preview: import('../shared/mediaHub').MediaOrganizationPreview, choice?: import('../shared/mediaHub').MediaDuplicateChoice): Promise<{ ok: boolean; path?: string; error?: string }>;
+      backupMedia(): Promise<import('../shared/mediaHub').MediaBackupContract>;
+      listMediaRelationships(fromId?: string): Promise<import('../shared/mediaHub').MediaRelationship[]>;
+      addMediaRelationship(relationship: Omit<import('../shared/mediaHub').MediaRelationship, 'id' | 'createdAt'>): Promise<import('../shared/mediaHub').MediaRelationship>;
       mediaPathExists(filePath: string): Promise<boolean>;
       coverArt(id: string): Promise<string | null>;
       /** Library artwork as a `playfile://` URL; null when there is none. */
@@ -908,14 +908,14 @@ declare global {
         >>,
       ): Promise<MediaItem | null>;
       runSubtitleDiscovery(
-        request?: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryRequest,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryResult>;
+        request?: import('../shared/subtitleDiscoveryIpc').SubtitleDiscoveryRequest,
+      ): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleDiscoveryResult>;
       cancelSubtitleDiscovery(mediaId?: string): Promise<void>;
       subtitleDiscoveryStatus(): Promise<{ running: boolean }>;
-      getSubtitleDiscoverySettings(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+      getSubtitleDiscoverySettings(): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
       saveSubtitleDiscoverySettings(
-        settings: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
+        settings: import('../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings,
+      ): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleDiscoverySettings>;
       /** The user's list, optionally narrowed to one MAL status. Read-only. */
       malFetchList(
         status?: import('../shared/malSync').MalListStatus,
@@ -938,44 +938,44 @@ declare global {
         entries: import('../shared/malLibrary').MalLibraryEntry[];
         summary: import('../shared/malLibrary').MalLibrarySummary;
       }>;
-      subtitleProviderCredentials(): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
+      subtitleProviderCredentials(): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
       setSubtitleProviderKey(
         id: string,
         key: string,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
+      ): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleProviderCredentialState[]>;
       testSubtitleProvider(
         id: string,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').SubtitleProviderTestResult>;
+      ): Promise<import('../shared/subtitleDiscoveryIpc').SubtitleProviderTestResult>;
       listNyaaSubtitles(
         mediaId: string,
-        acquisition: import('../../shared/subtitleNyaa').NyaaAcquisitionConfig,
+        acquisition: import('../shared/subtitleNyaa').NyaaAcquisitionConfig,
         languages?: string[],
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleListResult>;
+      ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleListResult>;
       acceptNyaaSubtitle(
         mediaId: string,
         candidateId: string,
-        acquisition: import('../../shared/subtitleNyaa').NyaaAcquisitionConfig,
+        acquisition: import('../shared/subtitleNyaa').NyaaAcquisitionConfig,
         lang: string,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       attachSubtitleText(
-        input: import('../../shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+        input: import('../shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
+      ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       detachSubtitleRecord(
         mediaId: string,
         recordId: string,
-      ): Promise<import('../../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       readSubtitleRecord(mediaId: string, recordId: string): Promise<SubtitlePick | null>;
       onSubtitleDiscoveryProgress(
-        cb: (p: import('../../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
+        cb: (p: import('../shared/subtitleDiscoveryIpc').SubtitleDiscoveryProgress) => void,
       ): () => void;
       runMediaMetadata(
-        request?: import('../../shared/mediaMetadataIpc').MediaMetadataRequest,
-      ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataResult>;
+        request?: import('../shared/mediaMetadataIpc').MediaMetadataRequest,
+      ): Promise<import('../shared/mediaMetadataIpc').MediaMetadataResult>;
       cancelMediaMetadata(seriesKey?: string): Promise<void>;
       mediaMetadataStatus(): Promise<{ running: boolean }>;
       searchMediaMetadata(
         query: string,
-      ): Promise<import('../../shared/mediaMetadataIpc').MediaMetadataSearchHit[]>;
+      ): Promise<import('../shared/mediaMetadataIpc').MediaMetadataSearchHit[]>;
       clearMediaMetadataCache(): Promise<void>;
       searchDiscovery(
         query: string,
@@ -988,7 +988,7 @@ declare global {
         id: number,
       ): Promise<import('../shared/mediaDiscovery').DiscoveryCandidate | null>;
       onMediaMetadataProgress(
-        cb: (p: import('../../shared/mediaMetadataIpc').MediaMetadataProgress) => void,
+        cb: (p: import('../shared/mediaMetadataIpc').MediaMetadataProgress) => void,
       ): () => void;
       pickMedia(): Promise<MediaOpen | null>;
       addMediaFolder(): Promise<{ items: MediaItem[]; added: number }>;
@@ -1174,7 +1174,7 @@ declare global {
         config?: Partial<TraditionalMiningConfig>,
       ): Promise<MiningCandidate>;
       onMiningEnrichProgress(
-        cb: (p: import('../../shared/mining').MiningEnrichProgress) => void,
+        cb: (p: import('../shared/mining').MiningEnrichProgress) => void,
       ): () => void;
       miningRenderEpubDeck(
         analysis: EpubMiningAnalysis,
@@ -1300,7 +1300,7 @@ declare global {
       }>;
       aiEnrichCard(req: AiEnrichmentRequest): Promise<AiEnrichmentResult>;
       aiGenerateDeck(req: AiDeckGenerationRequest): Promise<AiEnrichmentResult[]>;
-      onAiGenerateProgress(cb: (p: import('../../shared/mining').AiGenerationProgress) => void): () => void;
+      onAiGenerateProgress(cb: (p: import('../shared/mining').AiGenerationProgress) => void): () => void;
       aiSaveCsv(csv: string): Promise<{ ok: boolean; path?: string; error?: string }>;
       mediaStudyAssist(
         req: import('../shared/mediaStudyAssistant').MediaStudyAssistantRequest,

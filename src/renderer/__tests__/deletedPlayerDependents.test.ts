@@ -31,7 +31,7 @@
  * adopted player's own speed control — in Blanc's toolbox, the one window that mounts
  * `useMedia('full')` and the adopted player at the same time.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import type { EpisodeRow, StreamRow } from '../../shared/scraperResults';
@@ -289,19 +289,38 @@ describe('the study keys reach a player that exists', () => {
 });
 
 describe("Media Center's Study tab hands the episode to the adopted player", () => {
+  /*
+   * Boss audit 2026-09-02, Finding 7: the case below still timed out at 60,000 ms
+   * inside a full `vitest run` while passing in 14.0 s alone, and no worker on this
+   * branch could produce a reproducible green full-suite number because of it.
+   *
+   * Raising the case budget again would have been the third attempt at the same
+   * move (084dcfea, f898b52c), and it was the wrong move each time: the ~1,900-file
+   * walk is not part of any assertion, it is a FIXTURE, and whichever case happened
+   * to call `sweep()` first paid for all of them out of a per-test budget. Hoisting
+   * it here charges it to the hook that actually incurs it and leaves every case
+   * measuring only its own regex pass, comfortably inside the 20 s default.
+   *
+   * The budget is generous because a fixture's is allowed to be — a walk that
+   * genuinely hangs still fails at 180 s, and `allStrippedSource` throws below 500
+   * files, so a silent empty cache cannot masquerade as a fast one.
+   */
+  beforeAll(() => {
+    allStrippedSource();
+  }, 180_000);
+
   it('nothing in src/ attaches videoRef, so nothing may claim to seek it', () => {
     expect(sweep(/ref=\{(state\.)?videoRef\}/)).toEqual([]);
     const panel = /function StudyPanel[\s\S]*?\n}/.exec(code(readFileSync(MEDIA_CENTER, 'utf8')))?.[0] ?? '';
     expect(panel).toContain('<MediaStudyMode');
     expect(panel).not.toContain('state.videoRef.current.currentTime');
     expect(panel).not.toMatch(/\bisPlayerVisible\b/);
-    // 60s. A whole-src sweep: its cost is the tree, and under a full `vitest run` with eight
-    // workers contending for one disk it exceeded the 20s default and was reported as a product
-    // regression. Measured in that run at 31,113ms. Same class as the suites repaired at 084dcfea
-    // and 23a30362; where the cause was removable it was removed instead (see
-    // mediaSurfaceImportGraph). Here the sweep is already single-pass, so the honest answer is a
-    // budget that matches the work. An assertion failure still fails on the assertion.
-  }, 60_000);
+    // No per-case budget any more: the tree walk this used to pay for is charged to
+    // the `beforeAll` above, so what remains here is one cached regex pass. History,
+    // so the extension is not re-attempted a fourth time — 20 s default, raised to
+    // 60 s (measured 31,113 ms under an 8-worker run), and the audit then caught it
+    // exceeding 60 s too. The number was never the problem.
+  });
 
   it('the study hand-off goes through the workspace request, not a parked seek', () => {
     const source = code(readFileSync(STUDY_MODE, 'utf8'));

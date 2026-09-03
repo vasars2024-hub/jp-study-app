@@ -325,13 +325,60 @@ function plateNamespace() {
   };
 }
 
+/**
+ * Every atlas banked under `baselines/`, newest `generatedAt` first.
+ *
+ * WHY THIS EXISTS. R6 used to read one hardcoded filename, `baselines/l12-atlas.json`, and
+ * that is the same rot this whole file was built to prevent, one level down: on 2026-09-02 a
+ * certifying atlas was banked as `l12-atlas-final-v2.json` and R6 went on reporting the stale
+ * 05:32 atlas's "21 indexed images no longer hash to their recorded sha256" — a HIGH risk held
+ * open by a filename rather than by evidence. The atlas assembler deliberately takes `--out`,
+ * because an atlas is per-run evidence and must not be overwritten (that is R9), so a register
+ * that reads exactly one name can only ever be right by luck.
+ *
+ * A missing `generatedAt` sorts last rather than throwing; an unparseable file is skipped and
+ * counted, never silently treated as absent.
+ */
+function atlasCandidates() {
+  const dir = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'baselines');
+  if (!fs.existsSync(dir)) return { found: [], unreadable: 0 };
+  let unreadable = 0;
+  const found = fs.readdirSync(dir)
+    .filter((f) => /^l12-atlas.*\.json$/.test(f))
+    .map((f) => {
+      const full = path.join(dir, f);
+      try {
+        const a = JSON.parse(fs.readFileSync(full, 'utf8'));
+        return { full, a, at: Date.parse(a.generatedAt || '') || 0 };
+      } catch {
+        unreadable += 1;
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((x, y) => y.at - x.at);
+  return { found, unreadable };
+}
+
 /** R6. */
 function atlasVerdict(p) {
-  if (!p || !fs.existsSync(p)) return { available: false };
-  const a = JSON.parse(fs.readFileSync(p, 'utf8'));
+  // An explicit `--atlas` always wins; the DEFAULT is "the newest atlas in the tree", not a
+  // fixed name. Which one was read, and what else was on offer, is published in the
+  // measurement — a pass-through verdict whose source is invisible is not re-derivable.
+  const { found, unreadable } = atlasCandidates();
+  const explicit = !!p && fs.existsSync(p);
+  const chosen = explicit
+    ? { full: p, a: JSON.parse(fs.readFileSync(p, 'utf8')) }
+    : found[0];
+  if (!chosen) return { available: false, candidates: 0, unreadable };
+  const a = chosen.a;
   return {
     available: true,
-    file: path.relative(REPO, p).replace(/\\/g, '/'),
+    file: path.relative(REPO, chosen.full).replace(/\\/g, '/'),
+    selectedBy: explicit ? 'explicit --atlas' : 'newest generatedAt',
+    candidates: found.length,
+    candidateFiles: found.map((c) => path.basename(c.full)),
+    unreadable,
     generatedAt: a.generatedAt,
     certifiable: !!a.certifiable,
     blockers: a.blockers || [],
@@ -593,8 +640,10 @@ function markdown(reg) {
 
 // ---------------------------------------------------------------------------------
 (() => {
-  const atlasPath = path.resolve(REPO, arg('atlas',
-    path.join('src', '.coordination', 'liquid-workplace', 'baselines', 'l12-atlas.json')));
+  // No default filename here on purpose — see `atlasCandidates`. Empty means "let R6 pick the
+  // newest banked atlas"; `--atlas <file>` still pins it to one.
+  const atlasArg = arg('atlas', '');
+  const atlasPath = atlasArg ? path.resolve(REPO, atlasArg) : '';
   const vl = arg('vitest-log', '');
   const reg = build(atlasPath, vl ? path.resolve(REPO, vl) : '');
   if (has('control')) reg.controls = controls(reg);

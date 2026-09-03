@@ -12,6 +12,37 @@
  */
 import type { DesktopLayout, IconSnapshot, WidgetSnapshot, WindowSnapshot } from '../shared/desktop';
 
+type Rect = { x: number; y: number; w: number; h: number };
+
+/**
+ * The scale a fit applies, and the space it applies it from.
+ *
+ * A layout that has never recorded the viewport it was authored against still
+ * has to FIT. Treating "unknown" as "same as here" and returning early let a
+ * 1264x773 window sit inside an 880x563 desktop, overflowing it with no way to
+ * reach the far edge — seen on a desktop torn off the taskbar, whose window
+ * geometry came from a much larger shell.
+ *
+ * Unknown origin means proportional scaling is not available (there is no
+ * ratio to scale by), but clamping into the viewport always is.
+ */
+export function fitScale(
+  layout: Pick<DesktopLayout, 'authoredW' | 'authoredH'>,
+  viewport: { w: number; h: number },
+  mode: 'clamp' | 'proportional',
+): { known: boolean; rescaled: boolean; sx: number; sy: number; authoredW: number; authoredH: number } {
+  const { w: vw, h: vh } = viewport;
+  const known = typeof layout.authoredW === 'number' && typeof layout.authoredH === 'number';
+  const authoredW = layout.authoredW ?? vw;
+  const authoredH = layout.authoredH ?? vh;
+  const sameViewport = known && authoredW === vw && authoredH === vh;
+  const effectiveMode = known && !sameViewport ? mode : 'clamp';
+  const rescaled = effectiveMode === 'proportional';
+  const sx = rescaled ? vw / Math.max(1, authoredW) : 1;
+  const sy = rescaled ? vh / Math.max(1, authoredH) : 1;
+  return { known, rescaled, sx, sy, authoredW, authoredH };
+}
+
 /**
  * Pull a layout authored on one monitor into the viewport of another (B4).
  *
@@ -33,22 +64,7 @@ export function clampLayoutToViewport(
   if (vw <= 0 || vh <= 0) return layout;
 
   /*
-   * A layout that has never recorded the viewport it was authored against still
-   * has to FIT. Treating "unknown" as "same as here" and returning early let a
-   * 1264x773 window sit inside an 880x563 desktop, overflowing it with no way to
-   * reach the far edge — seen on a desktop torn off the taskbar, whose window
-   * geometry came from a much larger shell.
-   *
-   * Unknown origin means proportional scaling is not available (there is no
-   * ratio to scale by), but clamping into the viewport always is.
-   */
-  const known = typeof layout.authoredW === 'number' && typeof layout.authoredH === 'number';
-  const authoredW = layout.authoredW ?? vw;
-  const authoredH = layout.authoredH ?? vh;
-  const sameViewport = known && authoredW === vw && authoredH === vh;
-
-  /*
-   * No early return on `sameViewport`.
+   * No early return on `sameViewport` (see `fitScale`).
    *
    * `authoredW/H` is bookkeeping, and bookkeeping can be wrong: a hydrate that
    * ran before the desk had been laid out skipped the fit but still committed
@@ -60,10 +76,7 @@ export function clampLayoutToViewport(
    * desk it lives on — so it is enforced every time. The maps preserve object
    * identity when nothing changes, so re-running costs nothing.
    */
-  const effectiveMode = known && !sameViewport ? mode : 'clamp';
-  const rescaled = effectiveMode === 'proportional';
-  const sx = rescaled ? vw / Math.max(1, authoredW) : 1;
-  const sy = rescaled ? vh / Math.max(1, authoredH) : 1;
+  const { known, rescaled, sx, sy } = fitScale(layout, viewport, mode);
 
   const MIN_W = 240;
   const MIN_H = 140;
@@ -169,71 +182,89 @@ export function clampLayoutToViewport(
   };
 }
 
-/** One window-sized rect, the only geometry a zoom re-fit ever moves. */
-export interface FitRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+/**
+ * What one fit remembered, so the next fit can be derived from what the user
+ * authored rather than from what the previous fit produced.
+ *
+ * A fit is not invertible on its own. `fitRect` floors a window at MIN_W x MIN_H
+ * and caps it at the viewport, and both bounds throw information away: a 260x220
+ * note fitted proportionally into a half-size desk (200% zoom) lands on the
+ * 240x140 floor, and fitting THAT back into the full desk multiplies the floor —
+ * 480x302, written to disk, measured live 2026-09-02 (boss audit
+ * `audit-20260902-121014-bab1b330`, Finding 3). In clamp mode the cap does the
+ * same thing in the other direction: a 960x680 window capped to a 632x355 desk
+ * is 632x355 forever, because a clamp of a rect that fits is the identity.
+ *
+ * So a fit remembers, per window, the rect it fitted FROM (`base`, expressed in
+ * `authoredW x authoredH`) and the rect it fitted TO (`fitted`, expressed in
+ * `viewport`). The next fit asks each live window whether it still holds the
+ * rect this fit gave it. If it does, the user has not touched it and its base
+ * rect is the truth; if it does not, the user re-authored it in this viewport
+ * and the live rect is carried back by the inverse of `sx`/`sy` — which is the
+ * identity in clamp mode, exactly as clamp-mode coordinates are defined.
+ */
+export interface FitMemory {
+  /** The space the base rects are expressed in. */
+  authoredW: number;
+  authoredH: number;
+  /** The forward scale the fit applied (both 1 for a clamp). */
+  sx: number;
+  sy: number;
+  /** The viewport the fitted rects are expressed in. */
+  viewport: { w: number; h: number };
+  rects: Map<string, { base: Rect; fitted: Rect }>;
+}
+
+function rectOf(r: Rect): Rect {
+  return { x: r.x, y: r.y, w: r.w, h: r.h };
+}
+
+/** Record what `clampLayoutToViewport(source, viewport, mode)` did to each window. */
+export function rememberFit(
+  source: DesktopLayout,
+  fitted: DesktopLayout,
+  viewport: { w: number; h: number },
+  mode: 'clamp' | 'proportional',
+): FitMemory {
+  const scale = fitScale(source, viewport, mode);
+  const fittedById = new Map(fitted.windows.map((w) => [w.id, w]));
+  const rects = new Map<string, { base: Rect; fitted: Rect }>();
+  for (const win of source.windows) {
+    rects.set(win.id, { base: rectOf(win), fitted: rectOf(fittedById.get(win.id) ?? win) });
+  }
+  return {
+    authoredW: scale.authoredW,
+    authoredH: scale.authoredH,
+    sx: scale.sx,
+    sy: scale.sy,
+    viewport: { w: viewport.w, h: viewport.h },
+    rects,
+  };
 }
 
 /**
- * What a zoom re-fit did to one window: where it PUT the window (`fit`) and the
- * rect the user had actually authored before the fit touched it (`authored`).
+ * Express live windows in the space a remembered fit was derived from.
+ *
+ * Size and position are judged separately: a note the user dragged but never
+ * resized keeps its authored size and takes its dragged position, rather than
+ * having its floored size scaled up because one coordinate moved. A window the
+ * memory has never seen (opened while zoomed) is carried back by the inverse
+ * scale, which is what its coordinates mean in this viewport. Without a memory
+ * there is nothing to invert and the live rects are returned as they are.
  */
-export interface ZoomFit {
-  fit: FitRect;
-  authored: FitRect;
-}
-
-const sameRect = (a: FitRect, b: FitRect): boolean =>
-  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-
-/**
- * The commit-side inverse of the zoom re-fit (boss audit 2026-09-02, Finding 3).
- *
- * `DesktopShell`'s `onZoomChanged` re-fits the STORED layout into the zoomed
- * viewport and applies the result to the live windows. Its header promised
- * "nothing is committed", but the `hydrating` guard it relied on is cleared in
- * a microtask — before React runs the debounced commit effect — so the clamp
- * WAS committed, and a window that hit the `MIN_W`/`MIN_H` floor lost its size
- * for good: a desktop note authored 260x220 was floored to 240x140 at 200% zoom,
- * then re-expanded proportionally to 480x302 on the way back, and 480x302 was
- * what reached disk. Measured live, survives restart.
- *
- * The fix is not to block the commit (other state in the same burst is real)
- * but to commit the AUTHORED rect for every window that is still sitting
- * exactly where the fit put it. The stored layout then keeps holding what the
- * user authored, so zooming back out re-fits from the true origin and restores
- * it byte-for-byte — the round trip is exact instead of approximately scaled.
- *
- * A window whose live rect no longer matches its `fit` has been moved or
- * resized by the user since the zoom change; those coordinates are theirs and
- * are committed as they are. Its id comes back in `stale` so the caller drops
- * the record — a stale record that outlived a user edit would later overwrite
- * that edit with the pre-zoom rect.
- *
- * Identity-preserving: a list with nothing to substitute is returned as-is.
- */
-export function unfitZoomedWindows<T extends FitRect & { id: string }>(
-  wins: T[],
-  fits: ReadonlyMap<string, ZoomFit>,
-): { wins: T[]; stale: string[] } {
-  if (fits.size === 0) return { wins, stale: [] };
-  const stale: string[] = [];
-  let changed = false;
-  const next = wins.map((win) => {
-    const rec = fits.get(win.id);
-    if (!rec) return win;
-    if (!sameRect(win, rec.fit)) {
-      stale.push(win.id);
-      return win;
-    }
-    if (sameRect(win, rec.authored)) return win;
-    changed = true;
-    return { ...win, x: rec.authored.x, y: rec.authored.y, w: rec.authored.w, h: rec.authored.h };
+export function toAuthoredSpace(live: WindowSnapshot[], memory: FitMemory | null): WindowSnapshot[] {
+  if (!memory) return live;
+  const { sx, sy } = memory;
+  return live.map((win) => {
+    const m = memory.rects.get(win.id);
+    const sizeKept = !!m && win.w === m.fitted.w && win.h === m.fitted.h;
+    const posKept = !!m && win.x === m.fitted.x && win.y === m.fitted.y;
+    const w = m && sizeKept ? m.base.w : Math.round(win.w / sx);
+    const h = m && sizeKept ? m.base.h : Math.round(win.h / sy);
+    const x = m && posKept ? m.base.x : Math.round(win.x / sx);
+    const y = m && posKept ? m.base.y : Math.round(win.y / sy);
+    return win.x === x && win.y === y && win.w === w && win.h === h ? win : { ...win, x, y, w, h };
   });
-  return { wins: changed ? next : wins, stale };
 }
 
 /** The subset of a layout whose numbers `authoredW/H` is a claim about. */

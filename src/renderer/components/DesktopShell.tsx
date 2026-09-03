@@ -24,10 +24,11 @@ import { DESKTOP_STUDY } from '../../shared/desktop';
 import {
   clampLayoutToViewport,
   layoutGeometrySignature,
+  rememberFit,
   resolveAuthoredViewport,
-  unfitZoomedWindows,
+  toAuthoredSpace,
+  type FitMemory,
 } from '../desktopLayoutFit';
-import type { ZoomFit } from '../desktopLayoutFit';
 import { neighbourDisplayKey } from '../monitorRing';
 import { fitNewWindowRect } from '../desktopWindowGeometry';
 import { collectForeignWindows } from '../foreignWindows';
@@ -704,10 +705,12 @@ export default function DesktopShell({
   // for — from `applyDesktopLayout` to every `buildLayout` call site.
   const authoredOrigin = useRef<{ w: number; h: number } | null>(null);
   const hydratedGeometry = useRef<string | null>(null);
-  // Per window, where the last zoom re-fit PUT it and what the user had authored
-  // before. The commit effect writes the authored rect for any window still at
-  // its fit, so a clamp is never persisted (boss audit 2026-09-02, Finding 3).
-  const zoomFits = useRef<Map<string, ZoomFit>>(new Map());
+  /**
+   * What the last fit (hydrate or zoom) did to each window, so the next zoom
+   * re-fit derives from the authored rects instead of the fitted ones. See
+   * `FitMemory` for why a fit cannot simply be run backwards.
+   */
+  const lastFit = useRef<FitMemory | null>(null);
   const winsRef = useRef<Win[]>([]);
   const notesRef = useRef<Record<string, NoteData>>({});
   const openRef = useRef<(section: WinSection) => void>(() => undefined);
@@ -844,10 +847,15 @@ export default function DesktopShell({
       h: (deskEl?.clientHeight || window.innerHeight) - taskbarH(loadDesktopPrefs()),
     };
     const stored = getDesktopLayout(desktopIndex);
+    const fitMode = loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp';
     const fitted =
       viewport.w > 0 && viewport.h > 0
-        ? clampLayoutToViewport(stored, viewport, loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp')
+        ? clampLayoutToViewport(stored, viewport, fitMode)
         : stored;
+    // Seeded here as well as by the zoom re-fit, so a desk hydrated while
+    // already zoomed still knows its authored rects when the zoom comes off.
+    lastFit.current =
+      viewport.w > 0 && viewport.h > 0 ? rememberFit(stored, fitted, viewport, fitMode) : null;
     const next = hydrateLayout(fitted);
     // Remember what the fit concluded, and the geometry it concluded it for.
     // The signature is built through the same snapshot mappers `buildLayout`
@@ -862,9 +870,6 @@ export default function DesktopShell({
       icons: next.icons.map(iconToSnapshot),
       widgets: next.widgets,
     });
-    // A hydrate is a fresh fit of stored geometry; whatever a zoom re-fit did to
-    // the previous desk's windows is not a claim about this one.
-    zoomFits.current.clear();
     setActiveDesktop(desktopIndex);
     setWins(next.wins);
     setIcons(next.icons);
@@ -910,21 +915,20 @@ export default function DesktopShell({
    * reached from here, because zoom is not a `resize` and does not re-hydrate.
    *
    * Two choices worth stating, because the obvious implementations are both wrong:
-   *  - The fit is re-derived from the STORED layout, not from the live windows. A clamp applied
-   *    to live state is NOT reversible: zooming back out would leave every window at its
-   *    shrunken size forever. Stored geometry always holds what the user authored, so zoom-out
-   *    restores it.
-   *  - Nothing CLAMPED is committed. The first version of this effect claimed "nothing is
-   *    committed" on the strength of the `hydrating` guard — which is cleared in a microtask,
-   *    before React runs the debounced commit effect, so the clamp reached disk on every zoom
-   *    change (boss audit 2026-09-02, Finding 3: at zoom 2 `desktop-layout.json` held the
-   *    floored 240x140 for a note authored 260x220, and zoom-out re-expanded that floor to
-   *    480x302 and persisted it). The guard is still set so the burst is recognised, but the
-   *    real protection is `zoomFits`: every window the fit moved is recorded with the rect it
-   *    was authored at, and the commit effect writes THAT rect for as long as the window sits
-   *    where the fit put it (`unfitZoomedWindows`). Stored geometry therefore keeps holding
-   *    what the user authored, and the zoom-out re-fit restores it exactly rather than scaling
-   *    a floored value.
+   *  - The fit is re-derived from the AUTHORED rects, not from the live (or stored) windows. A
+   *    fit is not invertible: it floors a window at its minimum size and caps it at the desk,
+   *    and scaling the floored value back up is how a 260x220 note came back from a 200% round
+   *    trip as 480x302, on disk (boss audit 2026-09-02, Finding 3). The first version of this
+   *    effect fitted the STORED layout and called that reversible — but the commit below
+   *    stores the fitted rects, so the second fit was already reading the first fit's output.
+   *    `lastFit` keeps the rect each window was fitted FROM; a window the user has not touched
+   *    since is fed that rect, and one they have is carried back by the inverse scale.
+   *  - The fitted geometry IS committed, and that is deliberate. The commit effect writes it
+   *    stamped with the viewport it is expressed in (`resolveAuthoredViewport` sees the
+   *    geometry change and records the live desk), so a user who lives at 200% authors and
+   *    persists in that space like any other viewport. What must not happen is the commit
+   *    becoming the SOURCE of the next re-fit, and `lastFit` is what prevents that. (An
+   *    earlier version of this comment said "nothing is committed"; live, it always was.)
    */
   useEffect(() => onZoomChanged(() => {
     const deskEl = deskRef.current;
@@ -934,31 +938,30 @@ export default function DesktopShell({
     };
     if (viewport.w <= 0 || viewport.h <= 0) return;
     const stored = getDesktopLayout(activeDesktopRef.current);
-    const storedById = new Map(stored.windows.map((snap) => [snap.id, snap]));
-    // A window opened this session may not be in storage yet, and it has to fit too — so it
-    // enters the fit at its live geometry rather than being skipped.
-    const merged = {
-      ...stored,
-      windows: winsRef.current.map((win) => storedById.get(win.id) ?? winToSnapshot(win)),
-    };
-    const fitted = clampLayoutToViewport(
-      merged,
-      viewport,
-      loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp',
-    );
-    const fittedById = new Map(fitted.windows.map((snap) => [snap.id, snap]));
-    // Record the fit against the rect it was derived FROM — the stored (authored) one, or
-    // the live one for a window storage has not seen yet. A window the fit left alone
-    // needs no record; a stale record from an earlier zoom level is replaced or dropped.
-    for (const snap of merged.windows) {
-      const fit = fittedById.get(snap.id);
-      const authored = { x: snap.x, y: snap.y, w: snap.w, h: snap.h };
-      if (!fit || (fit.x === authored.x && fit.y === authored.y && fit.w === authored.w && fit.h === authored.h)) {
-        zoomFits.current.delete(snap.id);
-      } else {
-        zoomFits.current.set(snap.id, { fit: { x: fit.x, y: fit.y, w: fit.w, h: fit.h }, authored });
-      }
+    const fitMode = loadDisplayPrefs().remapLayoutProportionally ? 'proportional' : 'clamp';
+    const memory = lastFit.current;
+    let source: DesktopLayout;
+    if (memory) {
+      source = {
+        ...stored,
+        windows: toAuthoredSpace(winsRef.current.map(winToSnapshot), memory),
+        authoredW: memory.authoredW,
+        authoredH: memory.authoredH,
+      };
+    } else {
+      // No fit has been remembered (the hydrate ran against a zero-sized desk), so the
+      // stored layout is the best authored record there is. A window opened this session
+      // may not be in storage yet, and it has to fit too — so it enters the fit at its live
+      // geometry rather than being skipped.
+      const storedById = new Map(stored.windows.map((snap) => [snap.id, snap]));
+      source = {
+        ...stored,
+        windows: winsRef.current.map((win) => storedById.get(win.id) ?? winToSnapshot(win)),
+      };
     }
+    const fitted = clampLayoutToViewport(source, viewport, fitMode);
+    lastFit.current = rememberFit(source, fitted, viewport, fitMode);
+    const fittedById = new Map(fitted.windows.map((snap) => [snap.id, snap]));
     hydrating.current = true;
     setWins((prev) => prev.map((win) => {
       const fit = fittedById.get(win.id);
@@ -979,25 +982,18 @@ export default function DesktopShell({
     if (commitTimer.current) clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(() => {
       commitTimer.current = null;
-      // What reaches disk is the AUTHORED geometry, not a zoom re-fit's clamp of it: a
-      // window still sitting where the last zoom change put it is written at the rect
-      // it had before, and one the user has since moved is written as it is (see the
-      // `onZoomChanged` effect). Substituted here, once, ahead of both commit paths.
-      const unfit = unfitZoomedWindows(wins, zoomFits.current);
-      for (const id of unfit.stale) zoomFits.current.delete(id);
-      const committedWins = unfit.wins;
       // Don't compete with an active window/icon drag for main-thread time.
       if (document.documentElement.classList.contains('os-interacting')) {
         commitTimer.current = setTimeout(() => {
           commitTimer.current = null;
           const nextLayout = buildLayout(
             activeDesktop,
-            committedWins,
+            wins,
             icons,
             notes,
             widgets,
             wall,
-            authoredViewport(committedWins, icons, widgets),
+            authoredViewport(wins, icons, widgets),
           );
           rememberSignature(layoutSignature(nextLayout));
           void commitLayout(activeDesktop, nextLayout).catch((err) => {
@@ -1009,12 +1005,12 @@ export default function DesktopShell({
       }
       const nextLayout = buildLayout(
         activeDesktop,
-        committedWins,
+        wins,
         icons,
         notes,
         widgets,
         wall,
-        authoredViewport(committedWins, icons, widgets),
+        authoredViewport(wins, icons, widgets),
       );
       rememberSignature(layoutSignature(nextLayout));
       void commitLayout(activeDesktop, nextLayout).catch((err) => {
