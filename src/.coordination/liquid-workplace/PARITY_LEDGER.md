@@ -1932,3 +1932,65 @@ reproducing identical figures from there; the debug copies are DELETED, not mirr
 **Where b2 stands:** 212/221 `both`, 9 `pending` (all city — no Liquid destination yet), 2
 specs with no rows (`vn`, human-blocked and re-checked this turn: 0 VN localStorage keys;
 `notebook`, no subject on this branch). Nothing recoverable by counting remains.
+
+## 2026-09-03 (primary2) — City becomes the fifth Liquid host, and the ledger reaches 221/221
+
+Commits: `2b5a73cf` (product — `canPresentLiquid` admits `city`, the frameless cluster carries
+the toggle, the dossier becomes a `ContextualSurface`), `daa8a919` (cat6 drive, ledger refresh,
+writer fix).
+
+**b2's last 9 `pending` rows are closed, and NOT by relabelling them.** They were `pending`
+because City had no Liquid destination, so the previous turn recorded the correct decision:
+this is a product slice, not a status flip. It was built.
+
+**The refusal was real but its stated reason was wrong.** `canPresentLiquid` rejected `city`
+for being frameless — "no conventional chrome to swap". Frameless is not the test §2.3 asks:
+the question is whether a section owns a region in the LIQUID role — navigation, transport,
+contextual tools, a temporary inspector — that a flip could hand to `--lq-*` instead of one
+hardcoded palette. Mooncap owns exactly one, `.reading-garden-info`, the labelled dossier the
+hero discloses, which is the transformation plan's own §7 row for City ("growth detail,
+reading source, and settings appear only when requested"). `visualizer` owns none and still
+refuses, so the predicate keeps a live negative and both tests assert it from both sides.
+
+**cat6 --app city, live: PASS 10/10.** Host `fwin` where every prior city run recorded
+`fwin-no-liquid`. Parity standard 9/9 / liquid 9/9, **`na` 0** where it was 9. `roundTrip.trip`
+is now `standard -> liquid -> standard`, `diffs: []` — the real flip, not the minimize ->
+restore substitute those rows had to stand in with. 9 of 9 mutations armed, each fell exactly
+its own row, all restored 9/9. Ledger **221 rows, 221 `both`, 0 pending, 0 duplicate keys.**
+
+**The flip is material, measured before the harness ran** (same window, same instant): bg
+`linear-gradient(145deg, rgba(10,22,34,.42) …)` -> `color(srgb .102 .094 .137 / .72)`, border
+`rgba(151,209,207,.28)` -> `color(srgb .961 .957 .969 / .14)`, radius 14 -> 16px, padding
+`12px 14px 11px` -> 8px, colour `rgba(224,242,237,.9)` -> `rgb(245,244,247)`. Flipping back:
+0 diffs across left/top/width/height/zIndex, the rect, the 13-control count and the still-open
+dossier. In STANDARD the panel reads back its exact conventional pixels — `ContextualSurface`
+is inert by construction and the gradient, 14px radius and 12/14/11 padding are all unchanged.
+
+**Accessibility, because this changed text colours and that debt is owed:** cat1 anchored on
+`@.fwin[data-section="city"]`, both arms, artifact records its own `presentation`.
+standard **PASS 10/10** and liquid **PASS 10/10** — 32 text runs, 0 unmeasurable, minRatio
+**4.62**, 0 failing, identical in both. Worst owner is the dev console's 8px "Force sky events"
+paragraph, not the dossier. **Zero accessibility delta from the flip**, which is the claim; the
+high-contrast improvement asserted in the metadata is derived from `liquid-tokens.css:178-186`
+(`--lq-liquid-bg: var(--panel)`, `--lq-liquid-border: var(--text)`, `--lq-liquid-blur: 0px`)
+and was NOT driven under that theme — read it as a source fact, not a measurement.
+
+**Two instrument defects found by doing this, both fixed:**
+
+1. `--refresh` re-derived `status` but not the two destinations, which produced the one
+   self-contradicting state reachable here: rows going `pending -> both` off a real
+   presentation trip while still carrying `noLiquidReason`'s sentence "NONE, and it is a
+   product fact this run measured rather than assumed" — true for exactly as long as the
+   predicate refused the section. A row whose status and destination are sourced to different
+   dates is worse than a stale row, because both halves look sourced. Refresh now re-projects
+   both destinations from `parity-row-metadata.json`; `observed` still only APPENDS.
+2. `.fwin-drag-strip`'s reserve was derived from `.fwin-b`'s 26px CSS and the live cluster
+   measured **130px** with its left edge 136px in — `lq-hit` raises each button to 30px in
+   LAYOUT, not only in pointer region. The first fix (132px) still underlapped by 4px. 140px:
+   `sr.right - cr.left = -4` and `elementFromPoint` at the leftmost button's centre returns
+   that button. **A hit-target expander can move layout, not just the pointer region.**
+
+**Where b2 stands: every row is closed.** 221/221 `both`. Two declared specs still carry no
+rows and neither is recoverable by work in this repo: `vn` is human-blocked (re-checked live
+this turn — 0 VN/novel localStorage keys, library empty; needs-user.md 2026-09-02 05:40
+stands), and `notebook` has no subject on this branch, which deletes that section.
