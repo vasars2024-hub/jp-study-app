@@ -7,9 +7,9 @@
  * is the reason the old `height: 60vh; max-height: 640px` grid box is gone.
  */
 
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import VirtualGrid from '../../VirtualGrid';
-import { Button, Select } from '../../ui';
+import { Button, Select, useDismissableDisclosure } from '../../ui';
 import Icon from '../../Icons';
 import { ContextualSurface } from '../../liquid/LiquidSurface';
 import { useT } from '../../../i18n';
@@ -61,38 +61,9 @@ export interface MediaLibraryBrowserProps {
   empty?: React.ReactNode;
 }
 
-/**
- * Outside-`pointerdown` and Escape dismissal for a toolbar `<details>`.
- *
- * `pointerdown`, not `click`: a click that starts outside and ends inside a re-rendered popover
- * never fires as one `click` on the document, so the panel stays open. Escape has to leave focus
- * somewhere real, or the next Tab restarts at the document.
- *
- * Extracted when the toolbar grew its second disclosure. A toolbar popover that stays open after
- * you have used it is the clunkiness this surface is scored on, and two copies of that behaviour
- * are two chances for one of them to drift out of it.
- */
-function useDismissableDisclosure(ref: React.RefObject<HTMLDetailsElement | null>, open: boolean): void {
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = () => { if (ref.current) ref.current.open = false; };
-    const onDown = (event: PointerEvent) => {
-      const node = ref.current;
-      if (node && !node.contains(event.target as Node)) close();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      close();
-      ref.current?.querySelector('summary')?.focus();
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, ref]);
-}
+/* `useDismissableDisclosure` was extracted here when this toolbar grew its second disclosure,
+ * with the note that two copies are two chances for one to drift. Statistics' Reset popover is
+ * the third caller, so it now lives in `components/ui` — same behaviour, one definition. */
 
 /**
  * One grid cell, memoized.

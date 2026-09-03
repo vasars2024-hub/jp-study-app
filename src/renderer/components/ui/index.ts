@@ -44,3 +44,4 @@ export * from './AppChrome';
 export * from './dialogService';
 // Utilities
 export * from './zoom';
+export * from './useDismissableDisclosure';
