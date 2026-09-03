@@ -1907,3 +1907,89 @@ something to claim now.
 
 **sampled-out for this bullet:** unchanged from the two entries above, minus `flashcards`.
 **Running total: still 7 of 25 sections at 80/80.** Flashcards is 2 of 8.
+
+## 2026-09-03 · primary — Flashcards — 80/80 — commit `ade42136` (+ `91bf8708`, `4b0772e0`)
+
+The six categories the previous entry left open (2, 3, 4, 5, 6, 7), plus a re-derivation of
+1 and 8 on the repaired build — the three fixes below changed this surface's layout and its
+resting control count, so August's and this morning's numbers describe a build that no longer
+exists. `flashcards` is the **eighth** of the 25 `DESKTOP_WIN_SECTIONS` at 80/80. Zero new
+probes (RULE 1); the one new file is a deck FIXTURE (`debug/_pri-fcseed.cjs`, gitignored),
+not an instrument.
+
+**THE DECK HAD TO BE REAL, and that is the entry's first finding.** The 2026-09-03 dev-app
+restart wiped this profile's `localStorage`, so `jp-flashcard-deck` was ABSENT. Category 6 on
+that profile returned **4/8** with four rows reading "no book groups rendered" / "no card rows
+rendered" — an empty harness, which the rubric caps at 0, not a product failure. Seeded through
+`addDeckCards` (the miners' own call), measured, then removed through `removeDeckCards` with the
+raw value restored to its captured state; `--read` confirms `present:false, cards:0` afterwards.
+**24 cards over 3 books was still not enough:** `virtualizedList` demands `cap < maxDeclared` and
+the render window is 8 at this pane height, so 8-card groups made windowing unprovable. 20 per
+group answered it. Categories 1, 2, 3, 4, 6 and 7 were measured on the seeded deck; category 5's
+Q4/Q5 and category 8 were measured EMPTY, because the empty state is this surface's one
+observable state and hiding it would have made `statesNamed` UNMEASURED.
+
+**sampled-out (RULE C), unchanged from the Calendar/Resources entries, minus `flashcards`:**
+`agent` `library` `novels` `grammar` `translate` `player` `music` `anki` `stats` `immersion`
+`reading` `scraper` `files` `note` `city` `visualizer` `musicwidget`.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10** re-derived | 600-card deck, 856 elements: **452** text runs, 0 unmeasurable, **0 failing**, min **5.05**; 135 targets, smallest 13 px `input`, 7 under 32 px but **0** WCAG 2.5.8 failures; 156 controls hit-tested, 5 below floor by rect and **0 by hit box**, smallest painted hit **32×32.5**; keyboard **135/135** reachable, 0 focus hosts; motion **75** declarations over threshold at rest → **0** under emulated `prefers-reduced-motion`, emulation taken and released | 6 axes planted, **all 6 moved** (`0,7,0,0,0 → 2,9,2,1,86 → 0,7,0,0`), `rectDrift 0`, back to baseline |
+| 2 | Clunkiness | **10/10** | 4 counted steps driven (folder chip out and back, tab switch, a typed filter), **0** dead ends, **0** scroll traps, **0** modal traps, worst click→recv **18.8 ms** and worst input→recv **73.7 ms**, **0** over the 100 ms bar; cost parity Liquid **7** = Standard **7**, geometry 820×580 both, restored | `--control`: dead end / modal trap / scroll trap **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+| 3 | Liquid utilization | **10/10** | driven into Liquid and restored: `denseWorkOnTranslucent` **0**; Liquid-eligible **2/2** treated and **2/2** backed by a shared primitive; roles Work **9**, Anchor **48**, Anchor-holds-work **5**, Ambient **0** | both plants fired — blurring the first Work region, then making the whole surface glass; `oneMaterialReturned` and `allGlassReturned` true, "CONTROL FAILED AS REQUIRED" |
+| 4 | Use of space | **10/10** after a repair | all three sizes ran and restored: default 820×580 dead **5.5 %**, compact 260×170 **0.7 %**, maximized 1264×773 **13.5 %** against a 15 bar; clipped **0** and horizontal scrollers / hidden-overflow-x **0** at every size | injected clip **0→1→0**; art-plate exclusion named its own plant; backdrop overlap **0→13→0**; all three `removalProven` |
+| 5 | UI clarity | **10/10** after a repair | Q1 **2** entry points, 0 primary inputs; Q2 `Flashcards` + 1 way back; Q3 primary action inside the body viewport at rest, explicitly marked; Q4 **2** collapsed disclosures and **6** controls scanned against a bar of 12; Q5 **452** runs in both themes, **0** failing, min **5.07** (study-os) vs **5.71** (classic-light), axis moved; Q6 **2** Liquid regions, both carrying a transition, **0** infinite animations; Q7/Q8/Q9 from this turn's own category-6 baseline | **Q2, Q3, Q4, Q5 and Q10 all went NO** |
+| 6 | Feature parity + reversibility | **10/10** | ledger **8/8 reachable in standard, 8/8 in Liquid**, `na` 0, rows agree, nothing only-in-one; round trip `standard → liquid → standard` with **0** diffs, a dirtied `flash-search-input` held, shell held, other-presentation box 820×580 | **8 of 8** mutations armed; each felled **exactly its own row**, no unexpected row moved, each restored |
+| 7 | Performance under real load | **10/10** after a repair | 600-card deck: ceiling p50/p95 **8.3 / 8.5** ms over 3 runs, noise floor 0 over 100; drag **8.6**, resize **8.7**, theme **8.5** p95, **0 frames over 100 ms in every leg** and at most 1 over 16; heavy leg "scroll the whole deck" **98 samples / 3,002 ms**, main-loop p50 **2.0** and max **8.8** against a 500 ms bar | `--jank`: drag p95 **8.6 → 116.6 ms**, frames over 100 **0 → 10** |
+| 8 | Honest states | **10/10**, `languagesDiffer` now MEASURED | raw keys **0**, placeholders **0**, mute pairs **0** with `disabledTotal` still **10**; states **1 of 1 observable** — the empty deck names it in **2** hosts ("Mine cards in EPUB mining to fill this strip.", "No cards in this view…"), 0 unpainted, and `loading`/`error`/`offline` are `notObservable` and excluded rather than passed; four languages give **4 distinct hashes**, **47 of 55** runs move (85.5 %), max raw keys in any language **0**, and `ui-lang` started and ended **absent** | rawKeys/placeholders/mutePairs **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+
+Evidence: `baselines/cat{1,2,3,4,5,6,7,8}-l7-flashcards*.json` and `cat7-flashcards-perf.json`,
+all rewritten this turn.
+
+**THREE PRODUCT REPAIRS, all found by these instruments and all re-scored in their own commits.**
+
+1. `91bf8708` — **the option panels clipped at the window minimum and wasted a maximized window.**
+   `.fwin-body` scrollWidth **255** against clientWidth **248** at 260×170 with
+   `overflow-x: hidden` (a `fieldset`'s UA `min-inline-size` is `min-content`); and at 1264×773
+   the largest dead rectangle was **536×480 — 24.8 %** of the window, these panels' unused
+   right-hand side. After: overflow gone at every size, maximized **13.5 %**, default
+   **10.5 → 5.5 %**.
+2. `4b0772e0` — **the overview asked a user to scan 26 controls before showing a card.** Q4's bar
+   is 12. Twenty-four of the 26 were five preference panels sitting open above the deck. Folded
+   behind the `<details>` this surface already uses for its specialist launchers: **26 → 6**.
+3. `ade42136` — **a window resize re-rendered every mounted row because its WIDTH moved.** Resize
+   p95 **33.3 ms** against an 8.5 ms ceiling, 20 frames over 16, repeated (33.3 then 33.2) —
+   while drag and theme were clean at 8.6 and 8.5, which is the whole shape of it.
+   `useElementSize` allocated a new `{width,height}` on every ResizeObserver callback and
+   `VirtualList` reads only `height`. After: **8.7 ms**, 0 frames over 16.
+
+**A NUMBER THAT DID NOT MOVE, and it is why (3) was found at all.** August's banked run scored
+this surface 10/10 with resize p95 **33.5 ms** — one tenth of a millisecond under its bar, because
+that session's ceiling was 16.8 ms and the bar is `2 ×` the ceiling. The surface has always been
+this slow on resize; the machine got faster (ceiling 16.8 → 8.5) and stopped hiding it. A banked
+pass on a ratio bar is only as good as the ceiling it was taken against.
+
+**ATTRIBUTION IS WHAT MADE (3) FIXABLE, and it is worth copying.** The same 70-frame resize was
+run five times in the live renderer with one subtree hidden each time: nothing hidden p95 **30.0**
+/ 10 frames over 16; `.flash-group-body-vlist` hidden **8.7 / 0**; `.flash-explorer` **8.6 / 0**;
+`.flash-group` **8.6 / 1**; `.flash-strip-section` **28.2 / 9** — so the card strip, the obvious
+suspect, was exonerated by measurement rather than by argument. Forced synchronous layout was
+~1.4 ms and main-loop max 5.7 ms, so it was never layout and never the main process.
+
+**TRAPS, both new.** (a) `cat2-clunkiness.cjs` needs `--both-presentations` or `costParity`
+returns UNMEASURED and the run exits 3 with every other bar green — it reads like a scoring
+failure and is a missing flag. (b) This surface's controls sit **1,747 px down its own body**:
+every `--task` step that touches the tabs, the search field or the folder chips must be preceded
+by `scroll:.fwin-body=<px>`, and the folder chips do not exist on the Dictionary tab, so they
+have to be driven BEFORE the tab switch. Three runs were spent discovering that.
+
+**HONEST CONSEQUENCE OF REPAIR (2), stated rather than buried:** folding the preference panels
+away drops this surface's resting painted text from 452 runs to **55**, so category 8's sweep
+covers less at rest than it did this morning. That is what progressive disclosure costs an
+at-rest instrument; the text is unchanged and one keystroke away, and the language leg still
+moves 47 of the 55.
+
+**Running total: 8 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
+`youtube`, `calendar`, `resources`, `flashcards`. **17 left**, of which 16 are scorable in both
+presentations (`visualizer` and `musicwidget` offer no presentation toggle).

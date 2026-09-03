@@ -1,17 +1,17 @@
 {
   "label": "l7-flashcards",
   "surface": "Flashcards",
-  "win": "1",
+  "win": "(focused)",
   "lang": "en",
   "storedLang": null,
   "theme": null,
   "rect": "820x580",
-  "textRuns": 105,
+  "textRuns": 55,
   "devOnlyRuns": 0,
   "hostedTextRunsExcluded": 0,
   "hostedWindowsExcluded": 0,
-  "wordRuns": 98,
-  "textHash": -1668977138,
+  "wordRuns": 48,
+  "textHash": 745426892,
   "rawKeyCount": 0,
   "rawKeys": [],
   "rawKeysTruncated": false,
@@ -50,10 +50,161 @@
     }
   },
   "statusCandidatesNeedingEmptyProfile": [],
-  "rawKeyCatalogSize": 10232,
+  "rawKeyCatalogSize": 10233,
   "keyShapedNonCatalog": [],
-  "rawKeyBasis": "10232 catalog keys / 107 namespaces",
+  "rawKeyBasis": "10233 catalog keys / 107 namespaces",
   "raised": "already-on-top",
+  "languages": {
+    "perLang": [
+      {
+        "lang": "en",
+        "htmlLang": "en",
+        "textRuns": 55,
+        "textHash": 745426892,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
+      },
+      {
+        "lang": "ja",
+        "htmlLang": "ja",
+        "textRuns": 55,
+        "textHash": -505269661,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 47,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Dictionary saves, EPUB deck st",
+            "now": "辞書の保存語、EPUBデッキストリップ、フォルダエクスプロー"
+          },
+          {
+            "i": 7,
+            "was": "Simple EPUB mining",
+            "now": "シンプルEPUBマイニング"
+          },
+          {
+            "i": 8,
+            "was": "Review dictionary",
+            "now": "辞書を復習"
+          },
+          {
+            "i": 9,
+            "was": "More tools",
+            "now": "その他のツール"
+          },
+          {
+            "i": 10,
+            "was": "No saved dictionary cards yet ",
+            "now": "保存された辞書カードはまだありません。単語を調べて保存すると"
+          },
+          {
+            "i": 11,
+            "was": "Card audio, readings and sched",
+            "now": "カードの音声・読み・スケジュール"
+          }
+        ]
+      },
+      {
+        "lang": "zh",
+        "htmlLang": "zh-Hans",
+        "textRuns": 55,
+        "textHash": 1644720178,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 47,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Dictionary saves, EPUB deck st",
+            "now": "词典收藏、EPUB 卡组条、文件夹浏览器。"
+          },
+          {
+            "i": 7,
+            "was": "Simple EPUB mining",
+            "now": "简单 EPUB 挖掘"
+          },
+          {
+            "i": 8,
+            "was": "Review dictionary",
+            "now": "复习词典"
+          },
+          {
+            "i": 9,
+            "was": "More tools",
+            "now": "更多工具"
+          },
+          {
+            "i": 10,
+            "was": "No saved dictionary cards yet ",
+            "now": "还没有已保存的词典卡片——查询一个词并保存，它就会出现在这里"
+          },
+          {
+            "i": 11,
+            "was": "Card audio, readings and sched",
+            "now": "卡片音频、读音与排程"
+          }
+        ]
+      },
+      {
+        "lang": "ru",
+        "htmlLang": "ru",
+        "textRuns": 55,
+        "textHash": 298810932,
+        "rawKeyCount": 0,
+        "rawKeys": [],
+        "diffRuns": 47,
+        "diffExamples": [
+          {
+            "i": 6,
+            "was": "Dictionary saves, EPUB deck st",
+            "now": "Сохранённые слова словаря, лен"
+          },
+          {
+            "i": 7,
+            "was": "Simple EPUB mining",
+            "now": "Простая добыча из EPUB"
+          },
+          {
+            "i": 8,
+            "was": "Review dictionary",
+            "now": "Повторить словарь"
+          },
+          {
+            "i": 9,
+            "was": "More tools",
+            "now": "Другие инструменты"
+          },
+          {
+            "i": 10,
+            "was": "No saved dictionary cards yet ",
+            "now": "Сохранённых словарных карточек"
+          },
+          {
+            "i": 11,
+            "was": "Card audio, readings and sched",
+            "now": "Звук карточек, чтения и распис"
+          }
+        ]
+      }
+    ],
+    "before": {
+      "html": "en",
+      "stored": null
+    },
+    "after": {
+      "html": "en",
+      "stored": null
+    },
+    "restored": true,
+    "rawKeyCountMax": 0,
+    "distinctHashes": 4,
+    "diffRunsMax": 47,
+    "baseRuns": 55,
+    "diffShare": 0.8545
+  },
   "statesObservable": [
     "empty"
   ],
@@ -69,13 +220,11 @@
     "placeholders": true,
     "mutePairs": true,
     "statesNamed": true,
-    "languagesDiffer": "UNMEASURED"
+    "languagesDiffer": true
   },
-  "verdict": "UNMEASURED - languagesDiffer; drive the surface with --drive-input and --langs, or score 0, never 10",
+  "verdict": "PASS 10/10",
   "failedBars": [],
-  "unmeasuredBars": [
-    "languagesDiffer"
-  ],
+  "unmeasuredBars": [],
   "notMeasuredHere": [
     "dead-control count (honesty-probe A - every control driven for a side effect)",
     "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
