@@ -2043,3 +2043,40 @@ mutation controls MEASURED: delete the `host === 'detached'` rule → **2 failed
 ledger app with rows and **no spec** in `probes/l6-parity.js`, so it cannot be re-derived by the
 cat6 route. `l6-ledger-coverage.cjs` was re-run and prints exactly that sentence rather than
 the "EVERY ledger app now has a spec" one it printed before.
+
+### The Follow defect this ledger records is real — and it is NOT on this branch
+
+Recorded here because the note above would otherwise send the next reader to a file that
+does not contain the code. Row 10's closing clause — *"the presentation switch reflows the
+list … and Follow silently turns itself off (listScrollTop 3693 → 4552, followChecked true →
+false)"* — is a correct live measurement and is **not reproducible at HEAD**.
+`git show HEAD:src/media/VideoCoreTranscriptPanel.tsx` has no `onScroll` on
+`.study-transcript-list` (line 360), no `programmaticScrollRef`, no `handleScroll`, and no
+`setFollow(false)` anywhere. At HEAD, scrolling away does not suspend following **at all**.
+
+The whole scroll-suspension mechanism is the MEDIA track's **uncommitted** work in the shared
+tree — which is what the dev server serves, and therefore what was driven. That is not a
+criticism of the measurement; it is the thing a shared dirty tree does to evidence, and the
+only defence is to name the tree a number came from.
+
+**Fixed in the working tree and deliberately not committed.** `handleScroll` compares the
+scroller's own `scrollHeight`/`clientHeight` against the last pair it judged: a user gesture
+never changes either, a reflow almost always changes one. On a reflow it forgives the event
+and calls `scrollToActive()`, because a reflow is exactly when the active line has been pushed
+out of view. Not a `ResizeObserver` — that does not fire in an unfocused window, and this panel
+is watched while a video plays.
+
+5 tests in `src/renderer/__tests__/transcriptFollowReflow.test.tsx`, including the one that
+keeps the fix honest (a scroll at unchanged geometry must still suspend following) and one
+pinning its single measured cost: the reflow event is forgiven and the *next* event suspends
+normally. They live under `src/renderer/__tests__/` because the `src/media/**` vitest glob
+matches `.test.ts` and never `.tsx` — a `.tsx` test under `src/media` is silently not run,
+which is `FINDINGS_T5_TEST_GLOB.md` biting again. Mutation control MEASURED: pin
+`reflowed = false` → **3 failed**; file restored byte-identical (sha256 `76C7DF16…`).
+
+Neither artefact is committable by this worker: both reference symbols HEAD does not have, so
+`HEAD + my edit` does not compile and the test would be red on the branch. Both are preserved
+outside the repository at `~/.claude-runs/patches/2026-09-03-primary-transcript-follow-reflow-*`
+(a `.diff` with context, the replacement region, and the test file), because an uncommittable
+edit is one `git checkout --` from gone. **MEDIA TRACK: this is yours to land with the
+mechanism it repairs.**
