@@ -743,3 +743,54 @@ export function isCueEndTransition(
   const end = cuePlaybackEndSec(cue, subtitleDelaySec);
   return currentTimeSec >= end - 0.3 && currentTimeSec <= end + toleranceSec;
 }
+
+/**
+ * Study cues for a track the player renders but never *indexes*.
+ *
+ * `VideoCoreSubtitleManager` keeps two kinds of subtitle track and only one of them
+ * reaches the study layer. An **event track** (the container's own muxed streams, and
+ * anything mounted through `addEventTrack`/`onSubtitleEvents`) lands in the manager's
+ * event cache, which is the only thing its cue index is built from. A **file track** —
+ * every `playbackInfo.subtitleTracks` entry with `useLibassRenderer`, numbered from 1000
+ * up — is handed to libass as ASS *text* and cached on the track, never as events. So
+ * `getCues()` and `getActiveCues()` both return `[]` for it forever, and every study
+ * surface downstream reads that as "this file has no subtitles": the cue line stays on
+ * `Waiting for subtitle` while the very same lines are painted on the video by libass.
+ *
+ * The manager exposes the cached ASS through `getTrackContent(n)`, so the missing half is
+ * a parse, not a fetch. `parseStudySubtitles` rather than `parseSubtitles` for the same
+ * reason the external-mount path uses it: this is the PRIMARY study track, the one the
+ * transcript, the analyser and every mined card read, so a dual-script `.ass` must not
+ * feed its non-Japanese half into mining. That split is inert on `.srt`/`.vtt` and on any
+ * single-script `.ass`, which is the common case here.
+ *
+ * Timing is normalised to the same `startMs`/`endMs` the event path produces, so
+ * `activeStudyCuesAtTime` and every consumer of `VideoCoreStudyCue` work unchanged.
+ */
+export function studyCuesFromParsedCues(
+  cues: readonly VideoCoreWhisperCue[],
+  trackNumber: number,
+): VideoCoreStudyCue[] {
+  const usable: VideoCoreStudyCue[] = [];
+  for (const cue of cues) {
+    const text = cue.text.trim();
+    if (
+      !text
+      || !Number.isFinite(cue.start)
+      || !Number.isFinite(cue.end)
+      || cue.end <= cue.start
+    ) {
+      continue;
+    }
+    usable.push({
+      index: 0,
+      trackNumber,
+      text,
+      startMs: Math.round(Math.max(0, cue.start) * 1000),
+      endMs: Math.round(Math.max(0, cue.end) * 1000),
+    });
+  }
+  usable.sort((left, right) => left.startMs - right.startMs);
+  usable.forEach((cue, index) => { cue.index = index; });
+  return usable;
+}

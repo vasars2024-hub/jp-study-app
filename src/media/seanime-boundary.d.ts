@@ -185,6 +185,14 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
     getCues(): VideoCoreActiveCue[];
     getCuesForTrack(trackNumber: number): VideoCoreActiveCue[];
     getActiveCues(): VideoCoreActiveCue[];
+    /**
+     * The cached ASS text of a **file track**, or null for an event track.
+     *
+     * Declared because it is the only way to reach a libass file track's cues: those
+     * tracks never enter the manager's event cache, so `getCues()`/`getActiveCues()`
+     * report nothing for them. See `studyCuesFromParsedCues`.
+     */
+    getTrackContent(trackNumber: number): string | null;
     getTracks(): NormalizedTrackInfo[];
     getSelectedTrackNumberOrNull(): number | null;
     selectTrack(trackNumber: number): Promise<void>;

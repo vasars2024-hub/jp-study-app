@@ -72,6 +72,7 @@ import {
   shouldSuggestVideoCoreShadowing,
   shouldSuggestVideoCoreTimingRepair,
   stripAssCueText,
+  studyCuesFromParsedCues,
   transcriptSeekSec,
   VIDEO_CORE_TIMING_APPLY_STEP_SEC,
   videoCoreDriftDelaySec,
@@ -684,6 +685,85 @@ export default function VideoCoreStudyOverlay({
       window.clearTimeout(timer);
     };
   }, [manager, mediaRevision, playbackInfo?.localFile?.path]);
+
+  /**
+   * The cue clock for a libass **file track**, which the manager renders but never indexes.
+   *
+   * `VideoCoreSubtitleManager` builds its cue index only out of the *event* cache, so a
+   * track that arrived as ASS text — every `playbackInfo.subtitleTracks` entry with
+   * `useLibassRenderer`, numbered from 1000 up — has `getCues()` and `getActiveCues()`
+   * return `[]` for as long as it is selected, and never dispatches a single `cuechange`.
+   * The lines are on screen, painted by libass, while this overlay sits on
+   * `Waiting for subtitle` and the transcript, the analyser and mining all read the file as
+   * having no subtitles at all. That is DEFECT S2, and the missing half is a parse: the
+   * manager already caches the converted ASS and exposes it through `getTrackContent`.
+   *
+   * Shaped exactly like the `mediaCaptionsManager` branch below — parse once, then
+   * `timeupdate` as the activation clock — because that branch solves the same problem for
+   * the other manager and a second shape is how the two start disagreeing.
+   *
+   * Deliberately inert whenever the manager has an index of its own: one `getCues()` check
+   * at setup, re-run on every track change, so an event track (muxed, Whisper, or the
+   * downloaded track mounted above) keeps its own path untouched.
+   */
+  React.useEffect(() => {
+    if (!manager || selectedTrack == null) return undefined;
+    if (manager.getCues().length) return undefined;
+
+    let cancelled = false;
+    let cues: VideoCoreActiveCue[] = [];
+    let lastCueSignature = '';
+
+    const publish = (): void => {
+      if (cancelled || !cues.length) return;
+      const currentTime = video?.currentTime ?? 0;
+      const active = activeStudyCuesAtTime(cues, currentTime, subtitleDelaySec);
+      const signature = active
+        .map((cue) => `${cue.trackNumber}:${cue.index}:${cue.startMs}:${cue.endMs}`)
+        .join('|');
+      if (signature === lastCueSignature) return;
+      lastCueSignature = signature;
+      setActiveCues(active);
+      onCueChange?.(new CustomEvent('cuechange', {
+        detail: { cues: active, currentTimeMs: Math.round(currentTime * 1_000) },
+      }) as SubtitleManagerCueChangeEvent);
+    };
+
+    /**
+     * True once the track's cues are held. The content is filled by an async fetch and
+     * ASS conversion that `trackselected` does not wait for, so the first look is usually
+     * null — `timeupdate` is the retry, and it is already firing.
+     */
+    const adopt = (): boolean => {
+      if (cancelled) return false;
+      if (cues.length) return true;
+      const content = manager.getTrackContent(selectedTrack);
+      if (!content) return false;
+      const parsed = studyCuesFromParsedCues(
+        parseStudySubtitles(content).cues,
+        selectedTrack,
+      );
+      if (!parsed.length) return false;
+      cues = parsed;
+      setAllCues(parsed);
+      return true;
+    };
+
+    const tick = (): void => {
+      if (adopt()) publish();
+    };
+
+    tick();
+    video?.addEventListener('timeupdate', tick);
+    video?.addEventListener('seeked', tick);
+    video?.addEventListener('loadeddata', tick);
+    return () => {
+      cancelled = true;
+      video?.removeEventListener('timeupdate', tick);
+      video?.removeEventListener('seeked', tick);
+      video?.removeEventListener('loadeddata', tick);
+    };
+  }, [manager, onCueChange, selectedTrack, subtitleDelaySec, video]);
 
   React.useEffect(() => {
     if (manager || !mediaCaptionsManager) return;
