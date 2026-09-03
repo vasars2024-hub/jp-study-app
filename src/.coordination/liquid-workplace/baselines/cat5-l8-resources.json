@@ -2,19 +2,21 @@
   "surface": "@.fwin:has(.res-view)",
   "label": "l8-resources",
   "control": false,
-  "at": "2026-08-29T05:27:21.087Z",
+  "at": "2026-09-03T21:03:57.023Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
+  "hostedSelector": ".fwin",
+  "shellScope": null,
   "box": "820x580",
   "bodyScrollTop": 0,
-  "presentationAsFound": "liquid",
+  "presentationAsFound": "standard",
   "cat6": {
     "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l8-resources.json",
     "verdict": "PASS 10/10",
     "parity": {
-      "liquid": "8/8",
       "standard": "8/8",
+      "liquid": "8/8",
       "na": 0,
       "equal": true,
       "rowsAgree": true,
@@ -27,27 +29,29 @@
   },
   "axes": {
     "theme": [
-      "forest-night",
+      null,
       "classic-light"
     ]
   },
   "storeBefore": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "q6leg": {
-    "presentationAsFound": "liquid",
-    "note": "surface was already in Liquid presentation; measured where it was found",
-    "measuredIn": "liquid"
+    "presentationAsFound": "standard",
+    "toggle": "clicked",
+    "reached": "liquid",
+    "measuredIn": "liquid",
+    "restoredTo": "standard"
   },
   "storeAfter": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "storeIdentical": true,
   "restored": {
-    "theme": "forest-night",
-    "presentation": "liquid",
+    "theme": null,
+    "presentation": "standard",
     "box": "820x580",
     "plantResidue": 0
   },
@@ -56,12 +60,14 @@
       "id": 1,
       "q": "dominant task immediately obvious",
       "verdict": "YES",
-      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
       "numbers": {
-        "entryPoints": 1,
+        "entryPoints": 2,
         "primaryInputs": 1,
-        "accentButtons": 0,
-        "accentList": [],
+        "accentButtons": 1,
+        "accentList": [
+          "button.gram-level-btn::All"
+        ],
         "inputList": [
           "input.gram-search"
         ]
@@ -87,7 +93,7 @@
       "verdict": "YES",
       "bar": "the primary action is inside the body viewport at rest — \"without hunting\" means without scrolling",
       "numbers": {
-        "primaryAction": "input.gram-search",
+        "primaryAction": "button.gram-level-btn",
         "insideBodyViewport": true,
         "explicitlyMarked": false
       }
@@ -100,6 +106,11 @@
       "numbers": {
         "collapsedDisclosures": 1,
         "scannedControls": 10,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "scannedBeforeNavCollapse": 10,
+        "navRouteGroups": [],
         "chromeControlsRaw": 11,
         "summaryHeaders": 1,
         "behindDisclosure": 0,
@@ -107,6 +118,7 @@
           "total": 1,
           "open": 0
         },
+        "ariaDisclosures": [],
         "scannedList": [
           "All",
           "Dictionaries & lookup",
@@ -130,20 +142,22 @@
         "verdict": "YES",
         "cells": [
           {
-            "theme": "forest-night",
+            "cell": "theme=null",
+            "theme": "null",
             "measured": 246,
             "unmeasurable": 0,
-            "minRatio": 5.3,
+            "minRatio": 5.35,
             "failingCount": 0,
             "worst": {
               "el": "span.",
-              "ratio": 5.3,
+              "ratio": 5.35,
               "bar": 4.5,
               "bg": "button.bundle-card@100%",
               "text": "11 links"
             }
           },
           {
+            "cell": "theme=classic-light",
             "theme": "classic-light",
             "measured": 246,
             "unmeasurable": 0,
@@ -159,7 +173,11 @@
           }
         ],
         "failing": [],
-        "themeAxisMoved": true
+        "themeAxisMoved": true,
+        "axisWitness": {
+          "minRatioMoved": true,
+          "paintDigestMoved": true
+        }
       }
     },
     {
@@ -170,9 +188,11 @@
       "numbers": {
         "measuredIn": "liquid",
         "leg": {
-          "presentationAsFound": "liquid",
-          "note": "surface was already in Liquid presentation; measured where it was found",
-          "measuredIn": "liquid"
+          "presentationAsFound": "standard",
+          "toggle": "clicked",
+          "reached": "liquid",
+          "measuredIn": "liquid",
+          "restoredTo": "standard"
         },
         "liquidRegions": 1,
         "byBackdropFilter": 0,
@@ -185,7 +205,7 @@
           "div.lq-contextual"
         ],
         "withoutTransition": [],
-        "inStandardPresentation": 1
+        "inStandardPresentation": 0
       }
     },
     {
@@ -195,9 +215,10 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "parity": {
-          "liquid": "8/8",
           "standard": "8/8",
+          "liquid": "8/8",
           "na": 0,
           "equal": true,
           "rowsAgree": true,
@@ -213,6 +234,9 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
         "roundTrip": {
           "diffs": []
         }
@@ -225,6 +249,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "rowsAgree": true,
         "onlyInOne": []
       }
@@ -319,7 +344,7 @@
     "q2": "YES",
     "q3": "YES",
     "q4": "YES",
-    "q6": "YES",
+    "q6": "NO-SUBJECT",
     "q10": "YES"
   },
   "altThemeNumbers": {
@@ -337,6 +362,11 @@
     "q4": {
       "collapsedDisclosures": 1,
       "scannedControls": 10,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "scannedBeforeNavCollapse": 10,
+      "navRouteGroups": [],
       "chromeControlsRaw": 11,
       "summaryHeaders": 1,
       "behindDisclosure": 0,
@@ -344,6 +374,7 @@
         "total": 1,
         "open": 0
       },
+      "ariaDisclosures": [],
       "scannedList": [
         "All",
         "Dictionaries & lookup",
@@ -358,16 +389,14 @@
       ]
     },
     "q6": {
-      "liquidRegions": 1,
+      "liquidRegions": 0,
       "byBackdropFilter": 0,
-      "byContextualPaint": 1,
-      "carryingATransition": 1,
+      "byContextualPaint": 0,
+      "carryingATransition": 0,
       "infiniteAnimationsOnLiquid": 0,
-      "liquidMaterialTotal": 1,
+      "liquidMaterialTotal": 0,
       "decoratedLeaves": [],
-      "regionList": [
-        "div.lq-contextual"
-      ],
+      "regionList": [],
       "withoutTransition": []
     },
     "q10": {

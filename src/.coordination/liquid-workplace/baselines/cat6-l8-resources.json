@@ -1,11 +1,11 @@
 {
   "label": "l8-resources",
   "app": "resources",
-  "win": "(focused)",
+  "win": "1",
   "raised": "already-on-top",
   "matchedBy": "title",
   "host": "fwin",
-  "presentationAsFound": "liquid",
+  "presentationAsFound": "standard",
   "box": "820x580",
   "driven": [
     {
@@ -38,21 +38,224 @@
     },
     {
       "step": "scroll",
-      "result": "{\"scroller\":\"fwin-body\",\"top\":240,\"range\":5612}"
+      "result": "{\"scroller\":\"fwin-body\",\"top\":240,\"range\":4678}"
     }
   ],
   "drivenRefusals": 0,
+  "settle": {
+    "afterDrive": {
+      "where": "after drive, before parity check",
+      "converged": true,
+      "reads": 2,
+      "ms": 361,
+      "signature": "9142|937|78",
+      "trace": [
+        "9142|937|78",
+        "9142|937|78"
+      ],
+      "snapshot": {
+        "app": "resources",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "85",
+        "chars": 9142,
+        "nodes": 937,
+        "controls": 78,
+        "fields": {
+          "input0:gram-search": ""
+        },
+        "scroll": [
+          "fwin-body:240,0"
+        ]
+      }
+    },
+    "afterFlipOut": {
+      "where": "flip -> liquid",
+      "converged": true,
+      "reads": 2,
+      "ms": 364,
+      "signature": "9142|937|78",
+      "trace": [
+        "9142|937|78",
+        "9142|937|78"
+      ],
+      "snapshot": {
+        "app": "resources",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "liquid",
+        "liquidClass": true,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "85",
+        "chars": 9142,
+        "nodes": 937,
+        "controls": 78,
+        "fields": {
+          "input0:gram-search": ""
+        },
+        "scroll": [
+          "fwin-body:238,0"
+        ]
+      }
+    },
+    "afterFlipBack": {
+      "where": "flip -> standard",
+      "converged": true,
+      "reads": 2,
+      "ms": 361,
+      "signature": "9142|937|78",
+      "trace": [
+        "9142|937|78",
+        "9142|937|78"
+      ],
+      "snapshot": {
+        "app": "resources",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "85",
+        "chars": 9142,
+        "nodes": 937,
+        "controls": 78,
+        "fields": {
+          "input0:gram-search": ""
+        },
+        "scroll": [
+          "fwin-body:240,0"
+        ]
+      }
+    },
+    "disabled": false,
+    "allConverged": true,
+    "unconverged": []
+  },
   "parity": {
-    "liquid": "8/8",
     "standard": "8/8",
+    "liquid": "8/8",
     "na": 0,
     "equal": true,
     "rowsAgree": true,
     "failing": [],
     "onlyInOne": []
   },
+  "rowEvidence": [
+    {
+      "id": "categoryRail",
+      "standard": {
+        "reachable": true,
+        "evidence": "chips=8 active=1 groups=7 offeredAsChips=7"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chips=8 active=1 groups=7 offeredAsChips=7"
+      }
+    },
+    {
+      "id": "catalogueCount",
+      "standard": {
+        "reachable": true,
+        "evidence": "claimed=36 renderedGroupCards=36"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "claimed=36 renderedGroupCards=36"
+      }
+    },
+    {
+      "id": "resourceCards",
+      "standard": {
+        "reachable": true,
+        "evidence": "cards=36 named=36 costed=36 hosted=36 external=36"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "cards=36 named=36 costed=36 hosted=36 external=36"
+      }
+    },
+    {
+      "id": "bundleGrid",
+      "standard": {
+        "reachable": true,
+        "evidence": "bundles=10 gemmed=10 titled=10 withLinkCount=10 progressSane=10/10"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "bundles=10 gemmed=10 titled=10 withLinkCount=10 progressSane=10/10"
+      }
+    },
+    {
+      "id": "collectedSections",
+      "standard": {
+        "reachable": true,
+        "evidence": "myTools=1 named=1 removable=1 | new=14 named=14 hosted=14"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "myTools=1 named=1 removable=1 | new=14 named=14 hosted=14"
+      }
+    },
+    {
+      "id": "learnerHeatMap",
+      "standard": {
+        "reachable": true,
+        "evidence": "choropleth paths=256 painted=1 captionCountries=1"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "choropleth paths=256 painted=1 captionCountries=1"
+      }
+    },
+    {
+      "id": "landingAgreement",
+      "standard": {
+        "reachable": true,
+        "evidence": "query=\"\" allChipActive=true showLanding=true bundlesMounted=true landingSections=4"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "query=\"\" allChipActive=true showLanding=true bundlesMounted=true landingSections=4"
+      }
+    },
+    {
+      "id": "windowLifecycle",
+      "standard": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=true"
+      }
+    }
+  ],
   "roundTrip": {
-    "trip": "liquid -> standard -> liquid",
+    "trip": "standard -> liquid -> standard",
     "dirtiedField": "gram-search",
     "dirtyNote": null,
     "fieldsHeld": true,
@@ -66,7 +269,11 @@
         "mutation": "categoryRail",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "active added to 1 of 1",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "categoryRail"
@@ -81,7 +288,11 @@
         "mutation": "catalogueCount",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "catalogueCount"
@@ -96,7 +307,11 @@
         "mutation": "resourceCards",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "resourceCards"
@@ -111,7 +326,11 @@
         "mutation": "bundleGrid",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "bundleGrid"
@@ -126,7 +345,11 @@
         "mutation": "collectedSections",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "collectedSections"
@@ -141,7 +364,11 @@
         "mutation": "learnerHeatMap",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "fill set to \"var(--panel-2)\"",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "learnerHeatMap"
@@ -156,7 +383,11 @@
         "mutation": "landingAgreement",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "landingAgreement"
@@ -171,7 +402,11 @@
         "mutation": "windowLifecycle",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "windowLifecycle"
@@ -183,6 +418,9 @@
         "returned": true
       }
     ],
+    "armed": 8,
+    "declared": 8,
+    "unarmable": [],
     "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
   },
   "bars": {

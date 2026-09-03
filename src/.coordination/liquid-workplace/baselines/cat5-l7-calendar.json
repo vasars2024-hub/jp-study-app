@@ -2,11 +2,14 @@
   "surface": "Calendar",
   "label": "l7-calendar",
   "control": false,
-  "at": "2026-08-28T18:18:50.157Z",
+  "at": "2026-09-03T20:58:56.947Z",
   "category": 5,
   "question": "UI clarity and user-friendliness — the ten §10.4 questions, scored",
   "hostClass": "fwin",
+  "hostedSelector": ".fwin",
+  "shellScope": null,
   "box": "820x580",
+  "bodyScrollTop": 0,
   "presentationAsFound": "standard",
   "cat6": {
     "file": "src\\.coordination\\liquid-workplace\\baselines\\cat6-l7-calendar.json",
@@ -26,12 +29,12 @@
   },
   "axes": {
     "theme": [
-      "forest-night",
+      null,
       "classic-light"
     ]
   },
   "storeBefore": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "q6leg": {
@@ -42,12 +45,12 @@
     "restoredTo": "standard"
   },
   "storeAfter": {
-    "jp-os-theme": "forest-night",
+    "jp-os-theme": "study-os",
     "jp-os-theme-engine-v": "1"
   },
   "storeIdentical": true,
   "restored": {
-    "theme": "forest-night",
+    "theme": null,
     "presentation": "standard",
     "box": "820x580",
     "plantResidue": 0
@@ -57,7 +60,7 @@
       "id": 1,
       "q": "dominant task immediately obvious",
       "verdict": "YES",
-      "bar": "1..3 entry points in the top third — 0 offers nothing to do, many offers no dominant task",
+      "bar": "1..3 entry points in the host entry band — top for an app, taskbar for a shell",
       "numbers": {
         "entryPoints": 2,
         "primaryInputs": 0,
@@ -102,6 +105,11 @@
       "numbers": {
         "collapsedDisclosures": 1,
         "scannedControls": 8,
+        "shellChromeSelector": null,
+        "shellControls": 0,
+        "shellList": [],
+        "scannedBeforeNavCollapse": 8,
+        "navRouteGroups": [],
         "chromeControlsRaw": 9,
         "summaryHeaders": 1,
         "behindDisclosure": 0,
@@ -109,6 +117,7 @@
           "total": 1,
           "open": 0
         },
+        "ariaDisclosures": [],
         "scannedList": [
           "New event",
           "Month",
@@ -130,20 +139,22 @@
         "verdict": "YES",
         "cells": [
           {
-            "theme": "forest-night",
+            "cell": "theme=null",
+            "theme": "null",
             "measured": 67,
             "unmeasurable": 0,
-            "minRatio": 5.3,
+            "minRatio": 5.35,
             "failingCount": 0,
             "worst": {
               "el": "div.cal-month-daynum",
-              "ratio": 5.3,
+              "ratio": 5.35,
               "bar": 4.5,
               "bg": "div.cal-month-cell@100%",
-              "text": "26"
+              "text": "30"
             }
           },
           {
+            "cell": "theme=classic-light",
             "theme": "classic-light",
             "measured": 67,
             "unmeasurable": 0,
@@ -154,12 +165,16 @@
               "ratio": 5.71,
               "bar": 4.5,
               "bg": "div.cal-month-cell@100%",
-              "text": "26"
+              "text": "30"
             }
           }
         ],
         "failing": [],
-        "themeAxisMoved": true
+        "themeAxisMoved": true,
+        "axisWitness": {
+          "minRatioMoved": true,
+          "paintDigestMoved": true
+        }
       }
     },
     {
@@ -198,6 +213,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "parity": {
           "standard": "5/5",
           "liquid": "5/5",
@@ -216,6 +232,9 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
+        "liquidAbsence": null,
+        "lifecycleTrip": null,
         "roundTrip": {
           "diffs": []
         }
@@ -228,6 +247,7 @@
       "verdict": "YES",
       "numbers": {
         "drivenBy": "probes/cat6-feature-parity.cjs",
+        "basis": null,
         "rowsAgree": true,
         "onlyInOne": []
       }
@@ -250,7 +270,7 @@
         "fillsViewport": false,
         "bespokePrefixes": [
           "cal:47",
-          "out:11"
+          "out:12"
         ],
         "contentDominant": "svg.[object media",
         "contentFrac": 0,
@@ -287,6 +307,11 @@
     "q4": {
       "collapsedDisclosures": 1,
       "scannedControls": 8,
+      "shellChromeSelector": null,
+      "shellControls": 0,
+      "shellList": [],
+      "scannedBeforeNavCollapse": 8,
+      "navRouteGroups": [],
       "chromeControlsRaw": 9,
       "summaryHeaders": 1,
       "behindDisclosure": 0,
@@ -294,6 +319,7 @@
         "total": 1,
         "open": 0
       },
+      "ariaDisclosures": [],
       "scannedList": [
         "New event",
         "Month",
@@ -329,7 +355,7 @@
       "fillsViewport": false,
       "bespokePrefixes": [
         "cal:47",
-        "out:11"
+        "out:12"
       ],
       "contentDominant": "svg.[object media",
       "contentFrac": 0,
