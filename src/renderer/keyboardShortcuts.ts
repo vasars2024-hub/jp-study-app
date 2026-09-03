@@ -113,9 +113,27 @@ export const COMMAND_CATALOG: AppCommand[] = [
   // Defaults deliberately avoid the Meta (Win) key: Windows reserves Win+Arrow
   // for its own snap layouts and Win+D for show-desktop, and the OS wins those
   // races before Electron ever sees the keydown. Ctrl+Alt+* is the safe band.
-  { id: 'nav.closeWindow', label: 'Close window', category: 'Window', defaultKeys: 'Ctrl+W' },
-  { id: 'nav.nextWindow', label: 'Next window', category: 'Window', defaultKeys: 'Ctrl+Tab' },
-  { id: 'nav.prevWindow', label: 'Previous window', category: 'Window', defaultKeys: 'Ctrl+Shift+Tab' },
+  {
+    id: 'nav.closeWindow',
+    label: 'Close window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+W',
+    note: 'Closes the window in front. A sticky note asks before it is deleted.',
+  },
+  {
+    id: 'nav.nextWindow',
+    label: 'Next window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Tab',
+    note: 'Raises the window at the back of the stack, restoring it if it was minimized. Needs at least two windows.',
+  },
+  {
+    id: 'nav.prevWindow',
+    label: 'Previous window',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Shift+Tab',
+    note: 'Sends the window in front to the back of the stack so the one beneath it surfaces.',
+  },
   {
     id: 'nav.nextAppFullscreen',
     label: 'Next app (full screen)',
@@ -191,6 +209,9 @@ export const COMMAND_CATALOG: AppCommand[] = [
     label: 'Show desktop (minimize all)',
     category: 'Window',
     defaultKeys: 'Ctrl+Alt+D',
+    // One-way on purpose, and the note says so: pressing it again does not put
+    // the desk back. Restore all windows is the return trip.
+    note: 'Sends every visible window to the taskbar. Ctrl+Alt+Shift+D brings them back.',
   },
   {
     id: 'window.restoreAll',
@@ -247,8 +268,20 @@ export const COMMAND_CATALOG: AppCommand[] = [
     defaultKeys: 'Ctrl+Alt+=',
     note: 'Scales the whole interface. Plain Ctrl+= is the reader font size, which is scoped to a book.',
   },
-  { id: 'window.zoomOut', label: 'Zoom out', category: 'Window', defaultKeys: 'Ctrl+Alt+-' },
-  { id: 'window.zoomReset', label: 'Reset zoom to 100%', category: 'Window', defaultKeys: 'Ctrl+Alt+0' },
+  {
+    id: 'window.zoomOut',
+    label: 'Zoom out',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+-',
+    note: 'Scales the whole interface. Plain Ctrl+- is the reader font size, which is scoped to a book.',
+  },
+  {
+    id: 'window.zoomReset',
+    label: 'Reset zoom to 100%',
+    category: 'Window',
+    defaultKeys: 'Ctrl+Alt+0',
+    note: 'Returns the interface scale to 100%. A reader keeps its own font size.',
+  },
 
   // Reader (handlers attach while a book is open)
   {
