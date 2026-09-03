@@ -1453,3 +1453,53 @@ models a state the product cannot enter certifies only the state it can see.**
 Evidence: `baselines/cat{1,2,3,4,5,6,8}-l1rd-video*.json`, `cat7-video-perf.json`.
 **sampled-out: (none)** — all eight categories were attempted; two did not close.
 Still open for gate 495: **Video categories 5 and 7.**
+
+## 2026-09-03 · backup — Video category 5 CLOSES at a controlled 10/10, in BOTH stage states
+
+**Category 5 goes 7/10 → 10/10.** All three NOs the previous entry named are fixed and
+re-measured in their fixing commits. Video is now **7 of 8**; category 7 stays VOID and is
+the only thing between this surface and gate 495.
+
+Instrument: `probes/cat5-ui-clarity.cjs`, `--surface "@.fwin:has(.mc-video-page)"`, 1080×700,
+`bodyScrollTop 0`, presentation `standard`, 34 painted controls. **Zero new probes** (RULE 1).
+
+| Q | was | now | number |
+| - | --- | --- | ------ |
+| Q1 dominant task | NO, `entryPoints 4` | **YES** | `entryPoints 1`, accentButtons 0, one primary input |
+| Q3 primary visible without hunting | NO, `insideBodyViewport false` | **YES** | primaryAction inside the body viewport, `explicitlyMarked true`, in both states |
+| Q5 stable contrast in both themes | NO, **3.18:1** | **YES** | 84 runs loaded / 78 empty per theme, **0 failing**, axis moved (minRatio and paint digest both) |
+
+**Negative control, run fresh on the fixed surface:** `CONTROL FAILED AS REQUIRED on Q2, Q3,
+Q4, Q5, Q10` — all four plants the category names moved, so the 10 is not VOID.
+
+`1b77bedb` — **Q5.** `.mc-video-stage` is a fixed `#05070b` slab in EVERY theme (correct: it
+is the letterbox behind a video), but its status text inherited `--muted`, which classic-light
+takes dark to `#5f5f66` → **3.18:1**. `--mc-stage-ink{,-muted}` freeze the default dark
+palette's own ink, as `--mc-stage-plate` already froze the gradient. Live: **7.11:1** in both
+themes; CONTROL reverting that one row to `var(--muted)` reproduced **3.18** exactly and
+restored to 7.11 with no residue. Second half: `.mc-video-stage .media-generation-status`
+matched **nothing** — `MediaGenerationStatus` returns a FRAGMENT, so its blocks are direct
+children — and its 8px inset had never applied. Left edge 340 → **348** against a stage at 339.
+
+`f8c1aa0a` — **Q1 and Q3, one cause.** Three buttons carried `mc-button-primary` at once.
+"Open video" and "Open Study Mode" are demoted outright (the first is described by its own
+comment as returning "contextually"; the second is an inspector-rail follow-on). The stage's
+"Open in the media workspace" is **conditional on `state.src`**, because its correct weight
+really does differ by state: with a source it is the dominant task at y=493; with none it
+renders into **the same grid cell** as "Choose what to watch" (both at `grid-area 1/1`) and
+that block carries the up-next shelf, so the cell is **1051px inside a 665px body** and the
+button centres at **y=807** — below the body's 753 bottom, reachable only by scrolling
+`.mc-content` — while the empty state's real action sits at y=402.
+
+**THE TRAP THIS TURN BANKS, because it manufactured a false pass and nearly banked it.**
+The previous entry scored the **empty** stage; an intermediate run of mine scored the
+**loaded** one and read Q1 and Q3 YES *before any fix*. Same box, same scroll, same 34-control
+census, same 12 scanned — only the vertical layout differed, because `entryBand` is
+`top < B.top + B.height/3` and the two states put the same three CTAs on opposite sides of a
+310px cutoff. **A cat5 score is only meaningful with its stage state named.** Both states are
+therefore recorded above, and the fix is what makes both pass rather than one.
+
+Evidence: `baselines/cat5-l1rd3-video-{loaded,empty,empty-control}.json`.
+**sampled-out: (none)** — Video only, this is a per-surface close.
+Still open for gate 495: **Video category 7** (drag disagrees across repeats; heavy leg
+refuses `Video load never armed`).
