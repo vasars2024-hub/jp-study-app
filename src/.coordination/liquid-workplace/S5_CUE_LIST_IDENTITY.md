@@ -69,3 +69,73 @@ clip playing. A within-build differential is the right gate here; comparing agai
   study bar — it lives in the layout customizer's Study category, and it persists.
 - PowerShell variables are case-insensitive: `$h` and `$H` are one variable, and a health
   response silently overwrote a headers hashtable mid-script.
+
+## 2026-09-03 (backup) — the live leg, and the cue-identity fix is NOT the whole of S5
+
+Subject: the same OVA, opened dialog-free through `seanime:media-workspace-open`
+(`{localFilePath}`) rather than the library card — no ffmpeg mux needed, so the banked recipe
+above is unspent. **Renderer reloaded first**, so every renderer module is the working tree;
+`/focus` before every arm and `visibilityState`+`hasFocus()` recorded at every tick (`vF` in
+all of them), because a hidden window clamps timers to the interval being measured.
+Track `FFF (default)`, **2,650 rows**, 123,723 token spans, host subtree **132,021** elements.
+
+| arm | panel | clip | rows | ticks/20 s | longest gap | longtasks |
+|---|---|---|---|---|---|---|
+| D  | closed | playing | 0     | 20 | **1,038 ms** | 1 / 60 ms |
+| E  | open   | playing | 2,650 | 2  | 14,590 ms | 7 / 27,374 ms, max 10,839 |
+| E2 | open, follow OFF, tokenizer settled | playing | 2,650 | 6 | **24,952 ms** | 20 / 23,497 ms, max 10,942 |
+| F  | open   | **paused** | 2,650 | 19 | 2,193 ms | 14 / 3,619 ms, max 1,366 |
+| H  | open, needle `e` | playing | 1,808 | 18 | **2,115 ms** | 34 / 8,255 ms, **max 792** |
+
+**S5 survives the cue-identity fix.** E2 is the worst arm ever recorded on a fresh graph.
+
+**The cause is `data-distance`, not the row count and not virtualisation.** A MutationObserver
+over the list caught one cue boundary as a single batch of **2,650 mutations — 2,647 of them
+`data-distance`** against exactly 1 `class` / 1 `data-active` / 1 `aria-current`, with
+`[data-distance="mid"]` going 2,650 → 3 across that batch. `rowDistance(i, null)` returns
+`'mid'` for *every* row, and `activeIndex` is `activeCue?.index ?? null` — so each cue END and
+each cue START rewrites the attribute on the whole list and re-renders all 2,650 memoized
+rows with their ~47 token spans each. Twice per line.
+
+**Negative control, and it is a product control rather than a patch:** arm H suspends the
+banding through the panel's own search box (`distance={needle ? 'mid' : rowDistance(...)}`),
+keeping **68 % of the rows and 88 % of the DOM** — 2,115 ms against E2's 24,952 ms, worst
+single task 792 ms against 10,942 ms. Not a row-count effect. Arm F is the other control:
+same 132,021 elements, same completed tokenizer pass, clip paused — no boundaries, no stall.
+
+**WHY NOTHING IS COMMITTED FOR THIS, and the next worker must not read it as an oversight.**
+`rowDistance` / `data-distance` do **not exist at HEAD**: `git show HEAD:…VideoCoreTranscriptPanel.tsx`
+has no match, and the whole banding feature is inside that file's **uncommitted +131/−9**
+liquid-track redesign. So the defect is in work that is not on the branch, a fix cannot be
+staged as HEAD+edit, and a test importing `rowDistance` would not compile on a clean checkout.
+The five-line fix is applied **in the working tree only** and re-measured below; whoever
+commits that redesign carries it. Do not `git add` that file to land it.
+
+**The fix:** hold the last non-null `activeIndex` as the band anchor. `active` still comes from
+the real `activeIndex`, so the highlight clears between lines — only the emphasis bands persist,
+which is also what the reader wants: the playhead does not stop existing between two cues.
+
+**Arm E3 — the same measurement with that fix live in the tree.** Identical subject, identical
+conditions to E2: 2,650 rows, **131,992** host elements, follow OFF, no filter, clip playing,
+`vF` at all 18 ticks.
+
+| | ticks/20 s | longest gap | worst single task | largest MutationObserver batch |
+|---|---|---|---|---|
+| E2 before | 6  | 24,952 ms | 10,942 ms | **2,650** (2,647 × `data-distance`) |
+| E3 after  | 18 | **1,862 ms** | **777 ms** | **73** (4 batches, 97 mutations in 20 s) |
+
+**A 36× smaller largest batch and a 13× shorter worst stall on the same DOM.** E3 also lands
+inside arm D's closed-panel floor band (1,038 ms) and arm H's suspended-banding control
+(2,115 ms), which is where it should land if the banding was the whole term.
+
+**S5 STAYS OPEN, and this is the reason — not that the number is unproven.** The fix is real
+and measured but cannot be committed (see above), so nothing about it is on
+`feat/nyaa-subtitles`. Two further things are honestly unsettled and must not be rounded away:
+
+- **A second term cannot be excluded.** The 2026-09-03 FIRST PASS measured 137,254 ms on a
+  29.9 h old module graph that predates the 04:06 banding edit entirely. Passes two and three,
+  and every arm above, ran on trees that already carried the banding. Whether HEAD's
+  bandless panel still stalls needs a detached-worktree app at HEAD; it was not run here.
+- The transcript list is still **un-virtualised** — 2,650 `<li>` and 123,723 spans. CLAUDE.md's
+  performance rule still points at it. These arms say the row count is not what freezes the
+  renderer *today*; they do not say the list is cheap.
