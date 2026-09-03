@@ -997,3 +997,56 @@ export function studyCuesFromParsedCues(
   usable.forEach((cue, index) => { cue.index = index; });
   return usable;
 }
+
+/**
+ * Whether two cue lists describe the same timeline.
+ *
+ * The subtitle manager hands back a freshly built array from every `getCues()`, and the
+ * overlay calls it on `cuechange` — i.e. once per spoken line. So the whole-track list
+ * arrives with a new identity, and new element identities, several times a minute while
+ * nothing about it has changed. Everything downstream is memoized on that identity, so
+ * every consumer redoes its full-track work at each cue boundary. Content equality is
+ * what those consumers actually mean, and this is the only place that can say it.
+ *
+ * All five fields are compared rather than a cheap length-and-endpoints probe, because
+ * the same setter also carries a genuine track SWAP: two tracks for one release have the
+ * same cue count and near-identical timings, and a guard that missed that would leave the
+ * transcript showing the previous language with no way to notice.
+ *
+ * O(n) over a few thousand numeric/string comparisons, against the tokenizer pass and the
+ * full-list reconciliation it replaces.
+ */
+export function sameVideoCoreCueList(
+  left: readonly VideoCoreStudyCue[],
+  right: readonly VideoCoreStudyCue[],
+): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    const a = left[i];
+    const b = right[i];
+    if (
+      a.index !== b.index
+      || a.trackNumber !== b.trackNumber
+      || a.startMs !== b.startMs
+      || a.endMs !== b.endMs
+      || a.text !== b.text
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * A `setState` updater that keeps the previous cue array when the new one says the same
+ * thing. See `sameVideoCoreCueList`.
+ *
+ * An updater rather than a hook so the call sites stay plain `setState` calls with no new
+ * dependency to thread through the effects that own the subtitle listeners.
+ */
+export function stableCueList<T extends VideoCoreStudyCue>(
+  next: readonly T[],
+): (current: readonly T[]) => T[] {
+  return (current) => (sameVideoCoreCueList(current, next) ? (current as T[]) : (next as T[]));
+}

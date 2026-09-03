@@ -72,6 +72,7 @@ import {
   shouldSuggestVideoCoreShadowing,
   shortLangTag,
   shouldSuggestVideoCoreTimingRepair,
+  stableCueList,
   stripAssCueText,
   studyCuesFromParsedCues,
   transcriptSeekSec,
@@ -618,9 +619,21 @@ export default function VideoCoreStudyOverlay({
     }
 
     onManagerReady?.(manager.constructor.name);
+    /*
+      Every whole-track read goes through `stableCueList`, and it is not a micro-optimisation.
+      `getCues()` builds a new array of new objects on each call, and `handleCueChange` below
+      calls it once per spoken line, so `allCues` used to change identity several times a
+      minute while describing exactly the same timeline. The transcript panel keys its chunked
+      tokenizer off that identity: every cue boundary threw away the furigana it had built and
+      restarted the whole pass, and — because the cue objects were new too — `TranscriptRow`'s
+      memo failed on every row, re-rendering the entire list instead of the two rows whose
+      active state actually moved. That is DEFECT S5 in the Liquid plan: the renderer stopped
+      servicing its own timers for whole seconds at a time while a clip played, and it is why
+      it reproduced only with the transcript block open.
+    */
     const sync = (): void => {
       setActiveCues(manager.getActiveCues());
-      setAllCues(manager.getCues());
+      setAllCues(stableCueList(manager.getCues()));
       setTracks(manager.getTracks());
       setSelectedTrack(manager.getSelectedTrackNumberOrNull());
     };
@@ -639,7 +652,7 @@ export default function VideoCoreStudyOverlay({
       }
       previousCueRef.current = next ?? previous;
       setActiveCues(event.detail.cues);
-      setAllCues(manager.getCues());
+      setAllCues(stableCueList(manager.getCues()));
       onCueChange?.(event);
     };
     const handleTracksLoaded = (event: SubtitleManagerTracksLoadedEvent): void => {
@@ -648,7 +661,7 @@ export default function VideoCoreStudyOverlay({
     };
     const handleTrackSelected = (event: SubtitleManagerTrackSelectedEvent): void => {
       setSelectedTrack(event.detail.trackNumber);
-      setAllCues(manager.getCues());
+      setAllCues(stableCueList(manager.getCues()));
     };
     const handleTrackDeselected = (): void => {
       setSelectedTrack(null);
@@ -893,7 +906,7 @@ export default function VideoCoreStudyOverlay({
           );
           setTracks(manager.getTracks());
           setSelectedTrack(manager.getSelectedTrackNumberOrNull());
-          setAllCues(manager.getCues());
+          setAllCues(stableCueList(manager.getCues()));
           setActiveCues(manager.getActiveCues());
         } catch {
           // A mount failure is not worth breaking playback over — the video plays, and
@@ -967,7 +980,7 @@ export default function VideoCoreStudyOverlay({
       );
       if (!parsed.length) return false;
       cues = parsed;
-      setAllCues(parsed);
+      setAllCues(stableCueList(parsed));
       return true;
     };
 
@@ -1130,7 +1143,7 @@ export default function VideoCoreStudyOverlay({
           return;
         }
         selectedCues = cues;
-        setAllCues(cues);
+        setAllCues(stableCueList(cues));
         syncActive();
       } catch {
         if (cancelled) return;
@@ -1971,7 +1984,7 @@ export default function VideoCoreStudyOverlay({
           if (generation !== whisperGenerationRef.current) return;
           setTracks(manager.getTracks());
           setSelectedTrack(manager.getSelectedTrackNumberOrNull());
-          setAllCues(manager.getCues());
+          setAllCues(stableCueList(manager.getCues()));
           setActiveCues(manager.getActiveCues());
           setWhisperState('done');
           setWhisperMessage(translateUi('mediaWorkspace.study.generatedLines', {
