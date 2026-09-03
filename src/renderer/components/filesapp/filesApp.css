@@ -503,9 +503,20 @@
   place-items: center;
 }
 
+/* The floor is on the control's OWN box, not a `.lq-hit` overlay: an input is a
+   replaced element, so `::after` generates no box and a scope covering it would
+   read as fixed while leaving it under the bar (`liquid-controls.css`, §hit-area
+   floor). Measured 2026-09-03 on this surface: 24 of these at 18px rect / 18.5px
+   pointer against the 32px bar — the largest single family under the floor, and
+   it gates BULK DELETE, so it is the worst one to make a user aim at.
+
+   Growing it inflates no chrome, which is the usual objection: `.fa-row` already
+   reserves `var(--lq-hit-target)` for this column (see `grid-template-columns`),
+   so the cell was 32px wide all along and only the glyph inside it was small.
+   Nothing in the row shifts. */
 .fa-bulk-check {
-  width: 18px;
-  height: 18px;
+  width: var(--lq-hit-target);
+  height: var(--lq-hit-target);
   accent-color: var(--accent);
 }
 

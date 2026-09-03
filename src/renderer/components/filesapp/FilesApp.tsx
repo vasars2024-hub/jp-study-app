@@ -1500,7 +1500,14 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
               <button
                 key={mode}
                 type="button"
-                className="fa-view-mode-button"
+                /* `lq-hit` and not a taller `min-height`: these sit inside a
+                   1px-padded bordered pill, so raising the box would grow the
+                   pill itself — the chrome inflation `liquid-controls.css`
+                   calls damage rather than repair. The shared `::after` gives
+                   the POINTER 32px and moves no layout. Safe here because
+                   `.fa-view-mode` sets no `overflow`, which is the one thing
+                   that silently clips the expander back. Measured at 28px. */
+                className="fa-view-mode-button lq-hit"
                 data-mode={mode}
                 aria-pressed={viewMode === mode}
                 onClick={() => applyView({ viewMode: mode })}
