@@ -69,8 +69,57 @@
   scroll-snap-type: none;
 }
 
+/*
+ * ...but the REVIEW navigator is not the preview, and the rule above says so itself: it justifies
+ * the grid on "the recent-card preview is content, not navigation". `.flash-review-strip` IS the
+ * navigation, and it lists the whole session rather than a handful of recent cards.
+ *
+ * Measured live 2026-09-03 on a real 3,235-card session, before this rule: the grid laid 3,235
+ * cards into 3 columns and stood **96,806px** tall, so the window's scroller ran 98,000px against
+ * a 545px viewport - **179.8 screens** - and the review card itself began at **97,068px**, 98.9%
+ * of the way down, with the grading row at 97,937px. The card the user came to review was below
+ * 178 screens of its own table of contents.
+ *
+ * Two other things say this strip was always meant to scroll sideways: `.flash-strip-card` is
+ * `flex: 0 0 200px`, and `.flash-review-strip` in styles.css hides its own scrollbar
+ * (`scrollbar-width: none`, `::-webkit-scrollbar { display: none }`) - rules that mean nothing on
+ * a `overflow: visible` grid and had been inert. Restoring the scroller makes them live again.
+ *
+ * Specificity 0,3,0 deliberately, so this wins over the 0,2,0 rule above WITHOUT depending on
+ * source order; an equal-specificity rule here would be one reorder away from silently reverting.
+ */
+.flash-view .flash-strip.flash-review-strip {
+  display: flex;
+  grid-template-columns: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .flash-view .flash-strip-card {
   min-width: 0;
+}
+
+/* The review strip is the one flex-row strip left, so its cards keep their authored track width;
+   `min-width: 0` above is for grid cells and would let these collapse to their content. */
+.flash-view .flash-review-strip > .flash-strip-card {
+  min-width: 200px;
+}
+
+/*
+ * ...and the same sentence-in-a-word-slot problem reaches the navigator chips. `.flash-strip-word`
+ * is 20px and the chip is 200px wide, so a comprehension card - whose `word` IS the sentence -
+ * wraps to dozens of lines. In a flex row every chip stretches to the tallest one, so ONE such card
+ * made all 3,235 chips 312px tall and the strip 326px of a 545px viewport.
+ *
+ * Clamped rather than hidden, and the full string stays reachable: the button already carries
+ * `title={card.word}` (FlashcardsContent.tsx), which is the hover route AND the accessible name.
+ * That is the same condition the category-2 harness requires before it will excuse a clamp.
+ */
+.flash-view .flash-review-strip .flash-strip-word {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .flash-view,
