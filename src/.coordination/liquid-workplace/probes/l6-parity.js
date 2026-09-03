@@ -4122,16 +4122,39 @@
       titleRe: /Video|ビデオ|视频|Виде/i,
       rootSel: '.mc-video-page',
       notSel: '.mc-music-layout',
+      // The surface's own draft field, and the one the `youtube` step below already treats
+      // as "the field the runner dirtied". Naming it explicitly is what keeps the driver off
+      // `.mc-global-search input`, which is a NAVIGATION control: typing into it leaves the
+      // Video page entirely. See `__probeInput`.
+      probeInput: (w) => q(w, '.media-yt-input'),
       features: [
         {
           // The stage's honest state: with no source there is no `<video>` element at all,
           // and the file-entry empty offers its two real entry actions, both enabled. A
           // stage that mounts a player with nothing to play is the dishonest half; an empty
           // that names a dead end is the other.
+          //
+          // SOURCE SIGNAL CORRECTED 2026-09-02, and the correction is the finding. This row
+          // used to read source-ness as `.mc-video-stage video` — a `<video>` node the page
+          // NEVER mounts, because `MediaCenterView.tsx:882` delegates playback to the media
+          // workspace and the stage only ever renders one of three `.mc-video-empty` states.
+          // So the "with a source" branch was unreachable and the row could certify Video
+          // only AT REST. Driven into its real functional state (a library item selected,
+          // live: JoJo 38 RAW, 486 subtitle lines) the chooser empty is gone by design and
+          // the row scored FAIL on an honest surface — the same shape as cat8's `textOf`
+          // defect, an instrument that cannot see the state the product is actually in.
+          // The signal is the INSPECTOR's loaded block (`.mc-video-meta`, `:951` — rendered
+          // only under `current ? … : <p class="mc-muted">`). Deliberately not the topbar's
+          // primary action, which is the other faithful render of the same state: the row
+          // below scores that topbar, and a source term shared by both rows means one
+          // mutation falls both and neither control proves anything. Signals belong to a
+          // region no row under test owns. The `<video>` clause is KEPT and is now strictly
+          // additive: a player may never be mounted without a source.
           id: 'stageHonesty',
           f: (w) => {
             const empties = qa(w, '.mc-video-empty');
             const media = qa(w, '.mc-video-stage video').length;
+            const hasSrc = !!q(w, '.mc-video-inspector .mc-video-meta');
             // `:scope > div > button` and NOT a bare `button`: `04e51992` moved the
             // up-next shelf INSIDE this empty state, so a descendant query counts its
             // seven poster cards as entry actions — and the control then could not falsify
@@ -4144,8 +4167,9 @@
             const titled = empties.filter((e) => txt(q(e, 'strong'))).length;
             return {
               ok: empties.length > 0 && titled === empties.length
-                && (media > 0 ? !entry : !!entry && acts.length >= 2 && live === acts.length),
-              ev: `empties=${empties.length} titled=${titled} video=${media} entryActions=${acts.length} enabled=${live}`,
+                && (media === 0 || hasSrc)
+                && (hasSrc ? !entry : !!entry && acts.length >= 2 && live === acts.length),
+              ev: `empties=${empties.length} titled=${titled} video=${media} src=${hasSrc} entryActions=${acts.length} enabled=${live}`,
             };
           },
         },
@@ -4179,7 +4203,6 @@
             const off = acts.filter((b) => b.disabled);
             const explained = off.filter((b) => (b.title || '').trim().length > 0).length;
             const on = acts.length - off.length;
-            const hasSource = !!q(w, '.mc-video-stage video');
             const entry = qa(w, '.mc-video-empty').find((e) => qa(e, ':scope > div > button').length >= 2);
             const entryLive = entry ? qa(entry, ':scope > div > button').filter((b) => !b.disabled).length : 0;
             // The action the topbar GAINS with a source is the primary one — that is the
@@ -4188,13 +4211,22 @@
             // identity rather than an arithmetic literal, so a layout change cannot quietly
             // keep passing the way `acts.length === 3` did.
             const primary = qa(w, '.mc-video-actions .mc-button-primary').length;
-            const countAgrees = acts.length >= 2
-              && (hasSource ? primary === 1 && !entry : primary === 0 && !!entry);
+            // CORRECTED 2026-09-02, same finding as `stageHonesty` above: the source term
+            // used to be `.mc-video-stage video`, a node this page never mounts, so the
+            // whole `hasSource ? … : …` branch collapsed to its no-source arm and the row
+            // read FAIL the moment a real item was selected. The comment above already
+            // states the invariant this row is FOR — "exactly one of {topbar Open video,
+            // stage entry actions} exists — never both, never neither" — so it is now
+            // written as that exclusive-or directly, with no third signal to go stale.
+            // Strictly at least as strong: on the at-rest state `primary === 0 && !!entry`
+            // and the XOR agree, and the XOR is additionally defined on the loaded state,
+            // where it still fails if the topbar keeps its primary AND the chooser returns.
+            const countAgrees = acts.length >= 2 && ((primary === 1) !== !!entry);
             const liveSomewhere = on + entryLive >= 1;
             return {
               ok: countAgrees && liveSomewhere && explained === off.length,
               ev: `actions=${acts.length} enabled=${on} disabled=${off.length} explained=${explained}`
-                + ` primary=${primary} source=${hasSource} stageEntry=${!!entry} stageLive=${entryLive}`,
+                + ` primary=${primary} stageEntry=${!!entry} stageLive=${entryLive}`,
             };
           },
         },
@@ -4354,9 +4386,13 @@
         },
       },
       drive: ['toggle', 'youtube'],
-      // topbarActions deliberately cross-checks whether the empty stage owns file entry.
-      // Detaching that entry must therefore falsify both its own row and this agreement row.
-      cascades: { stageHonesty: ['topbarActions'] },
+      // DROPPED 2026-09-02. This licence existed because the old `stageHonesty` mutation
+      // detached an ENTRY ACTION, which `topbarActions` also reads — so the two had to be
+      // allowed to fall together. The replacement takes an empty's `<strong>` instead, which
+      // no other row measures, so the licence would now only make the control laxer than it
+      // has to be. A cascade is a concession, not a default; it is removed the moment the
+      // mutation that needed it is gone.
+      cascades: {},
       undo: {
         video: (w) => {
           const g = window.__LQP_VIDEO_ORIG;
@@ -4381,22 +4417,41 @@
         },
       },
       mutations: {
-        stageHonesty: (w) => detach(
-          qa(w, '.mc-video-empty').filter((e) => qa(e, ':scope > div > button').length >= 2)
-            .map((e) => qa(e, ':scope > div > button')[1])[0],
-          'no multi-action empty state',
-        ),
-        topbarActions: (w) => stripAttr(
-          qa(w, '.mc-video-actions button').filter((b) => b.disabled)[0],
-          'title',
-          'every topbar action is enabled — no muted control to falsify',
+        // BOTH of these were rewritten 2026-09-02, and for the same reason as the two rows
+        // they falsify: each was only armable in the surface's AT-REST state. The old
+        // `stageHonesty` mutation detached the second action of the multi-action empty —
+        // but with a source selected that empty does not exist, so it refused with "no
+        // multi-action empty state". The old `topbarActions` mutation stripped `title` from
+        // a muted control — but with a source every action is enabled, so it refused with
+        // "no muted control to falsify". Two refusals VOID the whole category, which is the
+        // rubric working: a control that cannot fire earns nothing.
+        //
+        // Each replacement is armable in BOTH states, so no branch is needed and neither is
+        // silently untested. `stageHonesty` loses the title of an empty state — `titled`
+        // falls below `empties` whether there are one or two — and touches no button, so the
+        // topbar row does not move with it (its old cascade is dropped for that reason).
+        // `topbarActions` promotes a second topbar action to primary, which breaks the
+        // exclusive-or in either state (0 -> 1 beside a live chooser; 1 -> 2 beside none) and
+        // reads on nothing the stage row measures.
+        stageHonesty: (w) => detach(q(w, '.mc-video-empty strong'), 'no titled empty state'),
+        topbarActions: (w) => addClassAll(
+          qa(w, '.mc-video-actions button').filter((b) => !b.classList.contains('mc-button-primary')).slice(0, 1),
+          'mc-button-primary',
         ),
         learningToggles: (w) => detach(q(w, '.mc-toggle-list .mc-toggle'), 'no learning toggles'),
         transcriptionModel: (w) => removeClassAll(qa(w, '.media-modelseg .sp-seg-btn.active'), 'active'),
         watchFolder: (w) => detach(q(w, '.media-watch button'), 'no watch-folder control'),
         youtubeDraft: (w) => detach(q(w, '.media-yt button'), 'no YouTube action'),
         upNextShelf: (w) => detach(q(w, '.mc-up-next'), 'no up-next shelf'),
-        inspectorHonesty: (w) => removeClassAll(qa(w, '.mc-video-inspector .mc-muted'), 'mc-muted'),
+        // The third at-rest-only mutation found by the same run, and the only one here that
+        // genuinely NEEDS a branch: this row asserts the inspector is coherently `loaded` OR
+        // coherently `blank`, so the edit that breaks coherence is a different edit in each
+        // state — removing the empty copy when there is none to remove is not a control.
+        // Loaded, it takes the score row, NOT `.mc-video-meta`: `stageHonesty` above reads
+        // meta as its source signal, and a mutation that falls a second row proves neither.
+        inspectorHonesty: (w) => (q(w, '.mc-video-inspector .mc-video-meta')
+          ? detach(q(w, '.mc-video-inspector .mc-inspector-score-row'), 'loaded inspector has no score row')
+          : removeClassAll(qa(w, '.mc-video-inspector .mc-muted'), 'mc-muted')),
         navReach: (w) => removeClassAll(qa(w, '.mc-nav .is-active'), 'is-active'),
         windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
       },
@@ -6946,6 +7001,28 @@
     // Rows a mutation is ALLOWED to take with it. Removing one feature can honestly disable
     // another that depends on it; naming those keeps the control strict about everything else.
     __cascades: (app) => (SPECS[app] && SPECS[app].cascades) || {},
+    // The field the round trip is allowed to dirty, when the surface owns a control that the
+    // driver's generic "first visible text field" rule must NOT touch.
+    //
+    // `probeInput` was declared on `dictionary` on the day this file was written and then
+    // never read by anything — dead until 2026-09-02. What made it load-bearing is a product
+    // change: `df00b4be` put a GLOBAL SEARCH field in the Media Center topbar, and the
+    // topbar sits above the page, so it is now the first visible text field inside the
+    // `video` window. `dirtyField` typed its mark into it, the search NAVIGATED the Media
+    // Center to the library page, and `check('video')` then refused with `no video surface` —
+    // the driver destroyed the surface it was about to score. A dirty step may not use a
+    // control that navigates.
+    //
+    // Measured before wiring, not assumed: on `dictionary` this accessor returns the SAME
+    // element the generic rule already picks (both the `食べる`/`eat` search box), so the
+    // banked dictionary score is unaffected and the change is strictly additive.
+    // Returns a live node; only ever used inside an injected expression.
+    __probeInput: (app, pres) => {
+      const s = SPECS[app];
+      const win = findWin(app, pres).win;
+      if (!s || !s.probeInput || !win) return null;
+      return s.probeInput(win) || null;
+    },
   };
 
   return JSON.stringify({
