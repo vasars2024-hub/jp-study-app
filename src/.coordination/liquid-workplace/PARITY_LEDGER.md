@@ -1994,3 +1994,52 @@ and was NOT driven under that theme — read it as a source fact, not a measurem
 rows and neither is recoverable by work in this repo: `vn` is human-blocked (re-checked live
 this turn — 0 VN/novel localStorage keys, library empty; needs-user.md 2026-09-02 05:40
 stands), and `notebook` has no subject on this branch, which deletes that section.
+
+## 2026-09-03 (primary) — the detached Study Block host gets its row, and the silence becomes a decision
+
+The 2026-09-02 finding above — *"the detached window has no presentation of its own …
+currently silent rather than decided"* — is repaired rather than re-recorded. `9d…` (this
+commit): **222 rows / 27 apps, `both` 221 unchanged, `standard-only` 1, `pending` 0.**
+
+**What was actually wrong was not the pixels.** A detached Transcript at 460x512 rendering on
+an opaque anchor is correct and was correct before this change. What was wrong is that the
+window said *nothing*: `data-presentation` null reads identically to a host nobody has wired,
+which is the ambiguity that let a visualizer window render Liquid with no button to leave it
+(boss audit 2026-08-17, finding 2) and the reason `canPresentLiquid` was collapsed into one
+expression in the first place.
+
+**The refusal is asked at the shared seam, not hardcoded at the render.**
+`LiquidPresentationHost` gains `'detached'` and `canPresentLiquid(section, 'detached')` is
+`false` — by the visualizer's own test, applied to a host rather than a section: one panel and
+a three-element bar, no region §2.3 assigns to the Liquid role, so a flip would be a class name
+and no material change. It is deliberately a HOST rule; the same block still presents normally
+when docked, which a section blocklist would have broken.
+
+**Where this host DIVERGES from the other three, on purpose.** The pop-out, the reader and the
+workspace all render `data-presentation={presentable ? … : undefined}`, because for them
+absence means "this section could present, and this one does not". Here absence would mean the
+wrong thing, so the detached root always declares what it is *and* why it can be nothing else:
+`data-presentation="standard"` plus `data-presentation-locked="dense-work"`. A probe can now
+tell a decision from an omission without reading source — which is the whole complaint.
+
+**Driven live, pid 47004 / port 39273, through the product's own `studyblock:open`.** Window 6
+at 2090,20 460x512: root reads `standard` + `dense-work`, with 0 `[class*=liquid]` nodes, 0
+`lq-` nodes, 0 `aria-pressed` controls and 0 buttons labelled Liquid — nothing offered and then
+refused. **The discriminating leg reproduces the finding's own condition:**
+`lq.workspace.presentation` planted as `{v:1,mode:"liquid",…}` in the same origin, the detached
+window reloaded, and it read that key back — so it *is* the same origin — while still declaring
+`standard` + `dense-work`. **The negative control fires on the other side of the same
+attribute:** the two `.fwin` windows live in that session also read `data-presentation="standard"`,
+with `data-presentation-locked` **null**, because they can go Liquid and this one cannot. The
+lock, not the value, is what carries the decision. Storage restored to null and the window
+closed; /health 1 window before and after.
+
+Ratchet `src/media/__tests__/detachedStudyBlockPresentation.test.ts`, 5 tests, with two
+mutation controls MEASURED: delete the `host === 'detached'` rule → **2 failed**; delete
+`data-presentation-locked` from the root → **1 failed**. Both files restored byte-identical
+(sha256 captured before and re-checked after).
+
+**One honest cost, and the derived block already says it:** `detachedStudyBlock` is the first
+ledger app with rows and **no spec** in `probes/l6-parity.js`, so it cannot be re-derived by the
+cat6 route. `l6-ledger-coverage.cjs` was re-run and prints exactly that sentence rather than
+the "EVERY ledger app now has a spec" one it printed before.

@@ -31,6 +31,7 @@ import {
 } from '../shared/studyDetach';
 import type { CueAnalysisState } from './useCueAnalysis';
 import type { StudyLang } from '../renderer/studyEnvironment';
+import { canPresentLiquid } from '../renderer/liquidWindowPresentation';
 import { useT } from '../renderer/i18n';
 import './mediaWorkspace.css';
 import './studyWorkspace.css';
@@ -135,6 +136,15 @@ export default function DetachedStudyBlock({
 
   if (!blockId) return null;
 
+  /*
+    Asked through the shared policy, not hardcoded here, so presentability and
+    reversibility stay one expression — the boss-audit finding that made
+    `canPresentLiquid` a single function in the first place. It is `false` for
+    every block; the call exists so a future block that DID disclose a Liquid
+    region would change one rule rather than this render.
+  */
+  const liquidAllowed = canPresentLiquid(blockId, 'detached');
+
   const lang: StudyLang = snapshot.studyLang === 'zh' ? 'zh' : 'ja';
   const cues = snapshot.cues ?? [];
   const activeCue = snapshot.activeIndex != null
@@ -234,6 +244,23 @@ export default function DetachedStudyBlock({
       className="detached-study-block"
       data-detached-block={blockId}
       data-connected={snapshot.revision > 0 ? 'true' : 'false'}
+      /*
+        L4 parity, recorded 2026-09-02 against rows 11 and 12 and repaired here:
+        this window carried NO presentation at all — `data-presentation` null and
+        zero `[class*="liquid"]` nodes — while the host it was detached FROM was
+        Liquid and `lq.workspace.presentation` was set in the same origin. That is
+        indistinguishable from a host nobody has wired yet, which is the state L3
+        exists to make impossible in either direction.
+
+        So the answer is declared rather than left absent. The other three hosts
+        render `data-presentation={presentable ? … : undefined}`, because for them
+        absence means "this section could present and this one does not". Here
+        absence would mean the wrong thing, so this host DIVERGES: it always
+        declares what it is, plus why it can be nothing else. A probe reading the
+        root can now tell a decision from an omission without reading source.
+      */
+      data-presentation={liquidAllowed ? 'liquid' : 'standard'}
+      data-presentation-locked={liquidAllowed ? undefined : 'dense-work'}
     >
       <header className="detached-study-header">
         <h1>{t(TITLE_KEY[blockId])}</h1>
