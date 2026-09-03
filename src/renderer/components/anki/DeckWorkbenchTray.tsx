@@ -1286,7 +1286,12 @@ export default function DeckWorkbenchTray({
               />
             </label>
             <label>
-              {t('ankiWorkbench.tray.stale.mode')}
+              {/* `stale.mode` is the PREFIX of the two option keys below, not a key
+                  itself — the label's own key is `modes`. Asking for the prefix
+                  rendered the literal string `ankiWorkbench.tray.stale.mode` above
+                  the select, in all four languages, while the four translations
+                  written for it sat unreachable in the catalogs. */}
+              {t('ankiWorkbench.tray.stale.modes')}
               <select
                 value={staleMode}
                 onChange={(e) => setStaleMode(e.target.value as StaleRemedyMode)}

@@ -83,10 +83,19 @@ function walk(dir, out = []) {
   return out;
 }
 
-function scan() {
+/**
+ * `dirs` exists only so the guard that now runs this check can prove the check
+ * still fires. A scanner asserted to return `[]` against the real tree is
+ * indistinguishable from one that returns `[]` because it read nothing, and this
+ * repo has banked that exact false pass. The test points `dirs` at a fixture
+ * holding one deliberately undefined key and one real one, and asserts it finds
+ * exactly the first. Absolute paths are honoured so the fixture can live outside
+ * `src/`; the default is unchanged.
+ */
+function scan({ dirs = SCAN_DIRS } = {}) {
   const en = loadEnglish();
-  const files = SCAN_DIRS.flatMap((d) => {
-    const abs = path.join(ROOT, d);
+  const files = dirs.flatMap((d) => {
+    const abs = path.isAbsolute(d) ? d : path.join(ROOT, d);
     return fs.existsSync(abs) ? walk(abs) : [];
   });
 
