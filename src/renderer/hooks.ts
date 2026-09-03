@@ -14,20 +14,45 @@ export function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-/** Track an element's content-box size via ResizeObserver. */
-export function useElementSize<T extends HTMLElement>(): [React.RefObject<T>, { width: number; height: number }] {
+/**
+ * Track an element's content-box size via ResizeObserver.
+ *
+ * `axis` exists because the old unconditional `setSize({width, height})` allocated a NEW
+ * object on every ResizeObserver callback, so a consumer that reads only one dimension
+ * still re-rendered on every change to the other. Measured 2026-09-03 on Flashcards with a
+ * 600-card deck: resizing the window re-rendered three `VirtualList`s (48 mounted rows) on
+ * every frame purely because their WIDTH moved, and the resize gesture ran at renderer
+ * frame p95 **30.0 ms** against an 8.5 ms compositor ceiling — 10 frames over 16 ms. Hiding
+ * the three lists took the same gesture to p95 8.7 ms and 0 frames over 16, which is how the
+ * cost was attributed to them rather than to the strip or the group headers.
+ *
+ * `'both'` (the default) is the original behaviour. A narrowed axis is a REAL narrowing:
+ * the untracked dimension is never observed and stays at its initial 0, so ask for it only
+ * when the consumer genuinely does not read the other value.
+ */
+export function useElementSize<T extends HTMLElement>(
+  axis: 'both' | 'height' | 'width' = 'both',
+): [React.RefObject<T>, { width: number; height: number }] {
   const ref = useRef<T>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const apply = (width: number, height: number): void => setSize((prev) => {
+      const next = {
+        width: axis === 'height' ? prev.width : width,
+        height: axis === 'width' ? prev.height : height,
+      };
+      // Returning `prev` is what actually skips the render: React bails out on Object.is.
+      return next.width === prev.width && next.height === prev.height ? prev : next;
+    });
     const ro = new ResizeObserver((entries) => {
       const box = entries[0]?.contentRect;
-      if (box) setSize({ width: box.width, height: box.height });
+      if (box) apply(box.width, box.height);
     });
     ro.observe(el);
-    setSize({ width: el.clientWidth, height: el.clientHeight });
+    apply(el.clientWidth, el.clientHeight);
     return () => ro.disconnect();
-  }, []);
+  }, [axis]);
   return [ref, size];
 }
