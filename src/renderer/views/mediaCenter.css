@@ -1017,9 +1017,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 26px;
-  margin: -5px -8px;
-  padding: 5px 8px;
+  /* 26 -> 32, and the padding/negative-margin pair moves with it so the heading baseline
+     these align to does not shift. The 26px box was the ONLY control on Video that fell
+     below the rubric's 32px hit floor by its real hit area (40x26 rect, 26.5px hit) — the
+     MAL link in "Now studying", which renders only with a video loaded. Every other
+     under-32 control on this surface clears the floor once padding is counted. */
+  min-height: 32px;
+  margin: -8px -8px;
+  padding: 8px 8px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -1663,9 +1668,14 @@
   font-size: 14px;
 }
 
+/* `--mc-dim` (#7f8598) on the tinted score cell measured 4.49:1 at 11px — a rubric
+   category-1 FAIL by 0.01 against the 4.5 body-text bar, and one that only exists once a
+   video is LOADED, which is why every earlier at-rest sweep of this surface reported the
+   worst ratio as something else entirely. `--mc-muted` is the next step up the same scale
+   the rest of this rail already uses, so the fix is a token swap rather than a new colour. */
 .mc-inspector-score-row small {
   margin-top: 2px;
-  color: var(--mc-dim);
+  color: var(--mc-muted);
   font-size: var(--mc-fs-micro, 11px);
 }
 

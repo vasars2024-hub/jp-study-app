@@ -155,6 +155,14 @@ const A = (v) => JSON.stringify(v);
  * app's field; this takes the first visible text field the surface actually has. A surface
  * with none is recorded as `null` and the round trip is reported as carrying no user-entered
  * state — which is a weaker result, and says so, rather than a silent pass.
+ *
+ * ONE ESCAPE HATCH, added 2026-09-02 because the generic rule DESTROYED a surface. A spec may
+ * declare `probeInput`, and when it does that element wins. `video` needs it: `df00b4be` added
+ * a global search to the Media Center topbar, the topbar is above the page, so the first
+ * visible text field in the `video` window became a NAVIGATION control — the mark went in, the
+ * Media Center left the Video page, and `check('video')` refused with `no video surface`. The
+ * driver had deleted the surface it was scoring. Verified the other way too: on `dictionary`
+ * the accessor returns the same element the generic rule picks, so nothing already banked moves.
  */
 const DIRTY_MARK = 'lqp-roundtrip-食';
 async function dirtyField(pres) {
@@ -168,7 +176,8 @@ async function dirtyField(pres) {
     var all = [].slice.call(w.querySelectorAll('input,textarea')).filter(function(x){
       return !w.classList.contains('os-desktop') || !x.closest('.fwin');
     });
-    var el = all.filter(function(x){
+    var declared = window.__LQP.__probeInput(${A(APP)}, ${A(pres)});
+    var el = declared || all.filter(function(x){
       var b = x.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !x.disabled && !x.readOnly
         && (x.tagName === 'TEXTAREA' || !x.type || /^(text|search)$/i.test(x.type));
@@ -178,7 +187,12 @@ async function dirtyField(pres) {
     var was = el.value;
     Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, ${A(DIRTY_MARK)});
     el.dispatchEvent(new Event('input', { bubbles: true }));
-    return { field: (el.className || el.tagName).split(' ')[0], was: was, now: el.value };
+    return {
+      field: (el.className || el.tagName).split(' ')[0],
+      via: declared ? 'probeInput' : 'first-visible',
+      was: was,
+      now: el.value,
+    };
   })()`);
 }
 

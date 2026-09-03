@@ -74,21 +74,34 @@ export const GLOBAL_SEARCH_COMMIT_MS = 70;
  * here: `commitSearch` calls `setTab('library')` on the first query typed from another tab, so a
  * remount would tear the focused input out from under someone mid-word.
  */
-export const GlobalSearchField = memo(function GlobalSearchField({
+/**
+ * The deferred commit itself, with no markup attached.
+ *
+ * Extracted from `GlobalSearchField` 2026-09-02 because a SECOND field in the Media Center
+ * turned out to have the identical defect and no reason to have a second implementation of
+ * the cure: the YouTube import URL (`MediaContent.tsx`, `MediaYoutubeBar`) also holds its
+ * text in `useMedia`, so every keystroke reconciled the whole view. Measured on the Video
+ * window with a library item loaded — first key **171.7 ms**, then 128.4, 82.5, 47.2, two
+ * over the rubric's 100 ms bar. That field cannot reuse `GlobalSearchField` itself: it is a
+ * `type="text"` input with a `disabled` state and two `<select>`s beside it inside
+ * `.media-yt`, not a labelled search box. The behaviour is what is shared, so the behaviour
+ * is what moved, and `mediaGlobalSearchRace.test.tsx`'s six mounted cases keep covering it
+ * through this call site unchanged.
+ *
+ * `flush()` is the Enter path: a commit still in flight would otherwise hand the submit
+ * handler the text as it stood one character ago.
+ */
+export function useDeferredText({
   value,
   contextKey,
-  placeholder,
   deferMs,
   onCommit,
-  onEnter,
 }: {
   value: string;
   contextKey: string;
-  placeholder: string;
   deferMs: number;
   onCommit: (next: string) => void;
-  onEnter?: () => void;
-}) {
+}): { text: string; change: (next: string) => void; flush: () => void } {
   const [text, setText] = useState(value);
   const seen = useRef(value);
   const context = useRef(contextKey);
@@ -119,31 +132,56 @@ export const GlobalSearchField = memo(function GlobalSearchField({
     onCommit(next);
   });
 
+  const change = useStableCallback((next: string) => {
+    setText(next);
+    cancel();
+    if (deferMs <= 0) {
+      commit(next);
+      return;
+    }
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      commit(next);
+    }, deferMs);
+  });
+
+  const flush = useStableCallback(() => {
+    cancel();
+    commit(text);
+  });
+
+  return { text, change, flush };
+}
+
+export const GlobalSearchField = memo(function GlobalSearchField({
+  value,
+  contextKey,
+  placeholder,
+  deferMs,
+  onCommit,
+  onEnter,
+}: {
+  value: string;
+  contextKey: string;
+  placeholder: string;
+  deferMs: number;
+  onCommit: (next: string) => void;
+  onEnter?: () => void;
+}) {
+  const { text, change, flush } = useDeferredText({ value, contextKey, deferMs, onCommit });
+
   return (
     <label className="mc-global-search">
       <Icon name="search" size={13} />
       <input
         type="search"
         value={text}
-        onChange={(event) => {
-          const next = event.target.value;
-          setText(next);
-          cancel();
-          if (deferMs <= 0) {
-            commit(next);
-            return;
-          }
-          timer.current = setTimeout(() => {
-            timer.current = null;
-            commit(next);
-          }, deferMs);
-        }}
+        onChange={(event) => change(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || !onEnter) return;
           // Flush before submitting: a deferred commit still in flight would otherwise hand
           // `submitQuery` the text as it stood one character ago.
-          cancel();
-          commit(text);
+          flush();
           onEnter();
         }}
         placeholder={placeholder}

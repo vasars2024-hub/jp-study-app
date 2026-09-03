@@ -78,6 +78,7 @@ import {
 import { openMediaWorkspace } from '../../mediaWorkspaceBridge';
 import { findSubtitleMatches, wrapSubtitleMatch } from '../../../shared/subtitleSearch';
 import { youtubeDownloadDisabledReason } from '../../../shared/mediaVideoActionReason';
+import { useDeferredText, GLOBAL_SEARCH_COMMIT_MS } from '../../views/GlobalSearchField';
 import {
   buildPlayerDiagnosticReport,
   type PlayerDiagnosticReport,
@@ -337,7 +338,10 @@ export interface MediaState {
   /** Loads an item AND brings the player forward. See the implementation note. */
   playItem: (id: string) => Promise<void>;
   removeItem: (id: string, e: React.MouseEvent) => Promise<void>;
-  downloadYouTube: () => Promise<void>;
+  /* `override` is the deferred YouTube field flushing its in-flight text: `ytUrl` is only
+     committed 70 ms after the last keystroke, so an Enter or a click arriving inside that
+     window would otherwise start the download for the URL as it stood one character ago. */
+  downloadYouTube: (override?: string) => Promise<void>;
   chooseWatchFolder: () => Promise<void>;
   clearWatch: () => Promise<void>;
   openSubs: () => Promise<void>;
@@ -999,8 +1003,8 @@ export function useMedia(mode: MediaViewMode = 'full', wired = false): MediaStat
     [current],
   );
 
-  const downloadYouTube = useCallback(async () => {
-    const url = ytUrl.trim();
+  const downloadYouTube = useCallback(async (override?: string) => {
+    const url = (override ?? ytUrl).trim();
     if (!url) return;
     setYtError('');
     setYt({ stage: 'starting', percent: 0 });
@@ -1885,11 +1889,33 @@ export function MediaWatchFolder({ state }: { state: MediaState }) {
 /** YouTube download + subtitle-language row. Player modes only. */
 export function MediaYoutubeBar({ state }: { state: MediaState }) {
   const { t } = useT();
+  /*
+   * `ytUrl` lives in `useMedia`, so committing every keystroke to it reconciled the WHOLE
+   * Media Center — sidebar, topbar, the video page and the seven-poster up-next shelf — for
+   * one character in a field the shelf knows nothing about. Rubric category 2, measured live
+   * on the Video window with a library item loaded (JoJo 38 RAW, 486 cues): first keystroke
+   * **171.7 ms**, then 128.4, 82.5, 47.2, against a 100 ms bar — `overBar100: 2`, a FAIL.
+   *
+   * The cure already existed one directory over and is now a hook rather than a second copy:
+   * hold the text locally, commit upward on the same 70 ms schedule the top bar's search uses.
+   * `flush()` before a download is not optional — `downloadYouTube` reads `ytUrl`, so a commit
+   * still in flight would start the download for the URL as it stood one character ago; both
+   * entry points pass the field's own text as the override for exactly that reason.
+   */
+  const ytField = useDeferredText({
+    value: state.ytUrl,
+    contextKey: 'media-yt',
+    deferMs: GLOBAL_SEARCH_COMMIT_MS,
+    onCommit: state.setYtUrl,
+  });
   // Video's third mute pair. `disabled` derives from the reason so the two cannot
   // disagree, and the rule is shared rather than inline because its ORDER matters:
   // the same running download that greys the button also disables the input above.
   const downloadReason = youtubeDownloadDisabledReason({
-    url: state.ytUrl,
+    // The FIELD's text, not the committed store: the button's own grey-out must not lag the
+    // typing by the 70 ms the commit is deferred, or pasting a URL and clicking straight away
+    // hits a control that is still disabled for a URL the user can already see.
+    url: ytField.text,
     downloading: !!state.yt,
   });
   return (
@@ -1898,9 +1924,13 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
         <input
           className="gram-search media-yt-input"
           type="text"
-          value={state.ytUrl}
-          onChange={(e) => state.setYtUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void state.downloadYouTube()}
+          value={ytField.text}
+          onChange={(e) => ytField.change(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            ytField.flush();
+            void state.downloadYouTube(ytField.text);
+          }}
           placeholder={t('media.yt.placeholder')}
           disabled={!!state.yt}
         />
@@ -1943,7 +1973,10 @@ export function MediaYoutubeBar({ state }: { state: MediaState }) {
         </select>
         <button
           className="btn"
-          onClick={() => void state.downloadYouTube()}
+          onClick={() => {
+            ytField.flush();
+            void state.downloadYouTube(ytField.text);
+          }}
           title={downloadReason ? t(downloadReason) : undefined}
           disabled={!!downloadReason}
         >
