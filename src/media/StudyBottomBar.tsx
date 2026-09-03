@@ -123,6 +123,29 @@ export interface StudyBottomBarProps {
   onStopGeneration: () => void;
 }
 
+/** What a study control needs before the user can act on it. */
+export type CueRequirement = 'cues' | 'active-cue';
+
+/**
+ * The i18n key explaining why a cue-dependent control is disabled, or `null` when it is not.
+ *
+ * Exported and pure so the decision can be tested without mounting the bar, which needs the
+ * whole study-workspace context. The two strings already exist and already say the right
+ * thing in all four languages, so this invents no copy.
+ */
+export function cueControlTitleKey(
+  needs: CueRequirement,
+  hasCues: boolean,
+  hasActiveCue: boolean,
+): 'mediaWorkspace.study.transcriptEmpty' | 'mediaWorkspace.study.waitingSubtitle' | null {
+  const blocked = needs === 'cues' ? !hasCues : !hasActiveCue;
+  if (!blocked) return null;
+  // "No track" is something the user must act on; "between lines" resolves on its own.
+  return hasCues
+    ? 'mediaWorkspace.study.waitingSubtitle'
+    : 'mediaWorkspace.study.transcriptEmpty';
+}
+
 export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactElement {
   const { t } = useT();
   const { doc, layout, idle, dispatch, trigger, isVisible, customizing } = useStudyWorkspace();
@@ -136,6 +159,35 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
     setOpen((current) => (current === category ? null : category));
   }, []);
   const close = React.useCallback(() => setOpen(null), []);
+
+  /*
+    The title a cue-dependent control carries, and why a shortcut hint is the wrong thing
+    to say while it is disabled.
+
+    Measured 2026-09-03 on a real clip with no subtitle track: category 8's harness counted
+    THREE mute pairs on this bar -- `Previous line`, `Replay line` and `Next line`, all
+    disabled, all explaining only `Shortcut: W/R/S`. A key that also does nothing is not a
+    reason, so the user is told which button is dead and nothing about why. `Translate line`
+    and `Mine` are the same defect one layer worse: disabled on the same condition with no
+    title at all.
+
+    Both reasons already exist as translated strings and say exactly the right thing, so
+    nothing new is invented here: `transcriptEmpty` ("No subtitle track is loaded.") for a
+    file with no cues, and `waitingSubtitle` -- the words the overlay itself shows in that
+    state -- for a file that HAS cues while playback sits between two of them. Keeping the
+    two apart matters: "no track" is something the user must act on, "between lines" resolves
+    on its own in a second.
+  */
+  const cueTitle = React.useCallback((
+    needs: CueRequirement,
+    shortcutKey?: string,
+  ): string | undefined => {
+    const key = cueControlTitleKey(needs, props.hasCues, props.hasActiveCue);
+    if (key) return t(key);
+    return shortcutKey
+      ? t('mediaWorkspace.study.shortcutHint', { key: shortcutKey })
+      : undefined;
+  }, [props.hasCues, props.hasActiveCue, t]);
 
   /*
     Immersion shows the bar only while the pointer is awake, and never a sheet.
@@ -294,6 +346,9 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
             <button
               type="button"
               disabled={!props.hasActiveCue || props.translationBusy}
+              title={props.translationBusy
+                ? t('mediaWorkspace.study.translating')
+                : cueTitle('active-cue')}
               onClick={() => { props.onTranslateLine(); }}
             >
               {t(props.translationBusy
@@ -321,6 +376,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="mine-current-line"
               disabled={!props.hasActiveCue}
+              title={cueTitle('active-cue')}
               onClick={() => {
                 close();
                 props.onMineCurrentLine();
@@ -686,7 +742,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="previous-cue"
               disabled={!props.hasCues}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'W' })}
+              title={cueTitle('cues', 'W')}
               onClick={props.onPrevCue}
             >
               {t('mediaWorkspace.study.previousLine')}
@@ -695,7 +751,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="replay-cue"
               disabled={!props.hasActiveCue}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'R' })}
+              title={cueTitle('active-cue', 'R')}
               onClick={props.onReplayCue}
             >
               {t('mediaWorkspace.study.replayLine')}
@@ -704,7 +760,7 @@ export default function StudyBottomBar(props: StudyBottomBarProps): React.ReactE
               type="button"
               data-study-action="next-cue"
               disabled={!props.hasCues}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'S' })}
+              title={cueTitle('cues', 'S')}
               onClick={props.onNextCue}
             >
               {t('mediaWorkspace.study.nextLine')}

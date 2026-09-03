@@ -1036,6 +1036,109 @@ and absent game progress all restore.
 **Games is 8 of 8 categories / 80/80.** Fix/evidence commit `b6e55253`; scorecard and receipts:
 `LIQUID_SCORECARD.md`, `cat{1,2,3,4,5,6,8}-l7-games*.json`, and `cat7-games-perf{,-control}.json`.
 
+## 2026-09-03 05:2x-05:5x EDT — bullets 997/998 measured on the ACTIVE task; 998 passes, 997 does not
+
+The two L7 bullets had never been measured across a task's own steps. The Flashcards note of
+2026-08-26 records the card and action rects byte-identical across a Liquid → Standard → Liquid
+**presentation** round trip — which returns to the same state by construction. 997 is about the
+surface staying put while the state ADVANCES. Instrument: `cat2 --anchors/--anchor-tol` (no new
+probe), anchors scored root-relative, `present → absent` given its own verdict rather than a shift
+of 0. Its control has to fire DURING a step, so the plant is armed on a button and displaces the
+real anchor 37px on click.
+
+**997 is OPEN and the number is worse than the bullet's bar, not better.** `.flash-card >>
+.flash-actions`, 10 cards, reveal driven at the button's own live centre: the grading row moved on
+**9 of 10** reveals, **max 431px**, `actionsY` 530 → 465/530/539/566/592/645/961. `.flash-actions`
+is a plain flex row under a variable-height card, so its position is whatever the answer's length
+makes it. **No sampled reveal put a grade button under the pointer** that pressed Show answer
+(`landedOnGrade` false, 10 of 10) — that harm is NOT claimed; the nearest miss was 6px.
+
+**Two product defects found and fixed on the way, both structural, both live-measured.**
+`6232e0f3` — the comprehension branch renders `current.sentence` into `.flash-word`, the
+single-word class, so a sentence gets `clamp(42px, 8vw, 64px)`. Discriminating pair, one card, one
+build, class toggled off and back: 266 chars at 64px → prompt 1,870px, card 2,017px, **3.70
+screens** of a 545px viewport; at 36px → 702px, 849px, **1.56 screens**; restored byte-identical.
+Before, 4 of 8 sampled prompt cards were 1,422–1,677px; after, 8 of 8 sit at the 360px min-height.
+`11df744e` — `.flash-view .flash-strip` makes the strip a reflowing grid, justified in its own
+comment on "the recent-card preview", and `.flash-review-strip` was caught by it while listing all
+3,235 session cards. Strip **96,806px → 86px**; window scroller 98,000 → 1,280px (**179.8 → 2.3
+screens**); the review card's top **97,068px → 348px**, i.e. from 98.9% down its own table of
+contents to above the fold. Restoring the flex row alone gave 326px — in a flex row every chip
+stretches to the tallest, and one comprehension card's `word` IS the 266-char sentence; clamping
+the chip label to 2 lines took it to 86px, honest because the button already carries
+`title={card.word}`. Both guards assert numbers, not spellings, and both mutation controls fired
+(1 failed / 2 failed), each file restored by sha256.
+
+**998 PASSES on this surface, on its own term.** `cat3 --presentation liquid --control` on the live
+review: **denseWorkOnTranslucent 0**, roles Work 1 / Anchor 29 / Anchor-holds-work 4 / Ambient 0.
+Control A blurred the one Work region 0 → 1, control B made every Work region fail, both restored
+(`oneMaterialReturned`, `allGlassReturned`) — "CONTROL FAILED AS REQUIRED".
+Baseline: `cat3-l7-997-flashcards-review.json`.
+
+**INSTRUMENT GAP, and it is the instrument rather than the surface.** That same run reports
+`verdict: FAIL` on `contextualTreated` and `sharedPrimitives` — both computed as
+`eligibleTotal > 0 && ...` against `eligibleTotal: 0`. A review state with zero contextual regions
+is exactly what 998 ASKS FOR. cat3 already forgives this as `vacuousContextual`, but only inside
+the `if (!work)` branch, where controls C/D prove the zero is a MEASURED zero. Here Work = 1, so
+A/B ran and the vacuous branch is unreachable. **Do not read those two bars as a Flashcards
+defect.** The fix is to run control C's eligibility plant in the A/B branch too, so the zero is
+measured there as well — never to widen the bars.
+
+## 2026-09-03 — 997 CLOSES. The grading row now survives the task's own steps.
+
+`1bdfd7ca`. The remaining condition the previous entry named, met on its own terms.
+
+BEFORE, re-derived this session at HEAD (not inherited): 10 cards through the strip, revealed
+with a real click at the Show-answer button's own live centre — **6 of 10 moved, max 88 px**.
+Card 360 → 448 px on four of them; on two the *prompt* outran the answer and it shrank
+849/1011 → 501/554, taking `.fwin-body` scrollTop 687/849 → 404/457 with it. (The last entry's
+9-of-10/431 px is the same defect on a different draw — the strip order is not stable across a
+reload, which is banked.)
+
+MECHANISM: the review card was sized by its own content — `min-height: 360px` with no cap — so
+the row below it was wherever the answer's length put it.
+
+FIX: a zero flex-basis inside a bounded shell column. The card's used height then has no term
+for its content: it is the shell's leftover space, floored at the same 360 px that already
+shipped. `.flash-view.review` gets `height: 100%` + `align-items: stretch` to make that leftover
+definite; against an indefinite host it resolves to `auto` (`.gram-view--explorer`'s reasoning)
+and the floor carries the property alone.
+
+AFTER: **0 of 10 moved, max 0 px**, `actionsY` 530 on every card, `cardH` 360 → 360 on every card.
+
+CONTROL, same instrument, same session: an injected sheet re-declaring the card
+`flex: 0 0 auto; overflow-y: visible; justify-content: center` → **4 of 6 moved, max 88 px**;
+removing that sheet → **0 of 6**. The instrument sees the defect when it is there.
+
+PARITY, because capping a card is only honest if the overflow stays reachable: 10 cards
+re-driven, **6 answers overflow (max 194 px), all 6 scroll, 0 clipped at the top**, and the last
+child of each `.flash-answer` is fully visible AND hit-testable after scrolling to the bottom.
+
+TRAP, worth carrying: `justify-content: safe center` is explicitly warned against elsewhere in
+this sheet (`.manga-stage`, "falls back to start when zoomed/tall"). That warning is correct for
+a centred *image*, where start-alignment leaves an asymmetric void. Here the fallback is the
+point — a plain `center` in a scroll container puts the top of a long answer above the
+scrollport, where no scroll reaches it. Different case, opposite conclusion; do not "fix" it.
+
+GUARD: `flashcardReviewRowAnchor.test.ts`, 3 cases. It asserts the property, not the spelling —
+it computes the card's used height for a 360 px and a 1011 px answer and requires them equal.
+Mutation control measured: reverting the four declarations fails all 3; styles.css restored
+byte-identically (sha256 `4b964fcf6aff0e3d0568` before and after). It reads a **comment-stripped**
+copy of the sheet, because `.flash-review-shell .flash-card` also appears in prose there and a
+raw `indexOf` finds the comment first.
+
+**The instrument gap recorded above is CLOSED — `d84bb72a`, same day.** cat3's two eligibility
+bars are `eligibleTotal > 0 && ...`, and the branch that forgives a zero denominator lived
+inside `if (!work)`, where controls C and D prove the zero is measured. Controls A and B never
+ask that question, so a surface with a Work region AND a correct zero — this one — could not
+reach it. The plant now runs in the A/B branch as well. Re-run, same surface and flags:
+**PASS 10/10, `failedBars []`, `vacuousContextual true`, exit 0**, against the FAIL it printed
+before. Control on the repair, because a forgiveness that always fires is just a widened bar:
+control C's `<nav>` swapped for a `<div>` — same box, same alpha, no landmark — left
+`eligibleTotal` at 0 and the run returned **VOID at exit 1** with both bars still false; the
+probe was restored byte-identically. `barsWhilePlanted` is now recorded in every such run, so
+the low score this category must be able to produce stays visible on the passing surface.
+
 ## 2026-09-03 (primary2) — bullets 970 and 971 close; one product defect, and one surface is gone
 
 **RULE C pair: Calendar and Games, and both are 8/8 at 10/10** — re-derived mechanically from

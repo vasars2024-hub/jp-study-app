@@ -10,9 +10,17 @@
  * rather than quietly deleted, because the claim is what stopped the canvas half being
  * looked at for a turn.
  *
- * What actually went wrong on the DOM side, because the plan's recorded lead was a dead
- * end and the next reader should not chase it again: there is no `SUBTITLE_FONT_STACKS`
- * symbol anywhere in the tree, and nothing reads an ASS track's own `fontname`.
+ * What actually went wrong on the DOM side. NOTE, corrected 2026-09-03: an earlier
+ * version of this comment said "there is no `SUBTITLE_FONT_STACKS` symbol anywhere in
+ * the tree". That is FALSE and is withdrawn. It is declared at
+ * `src/shared/videoCoreStudy.ts:26` and genuinely read at
+ * `VideoCoreStudyOverlay.tsx:215` (`SUBTITLE_FONT_STACKS[preferences.subtitleFontFamily]`),
+ * 11 references in all — it is the user's own subtitle-typeface preference, and
+ * `default: ''` is deliberate there ("inherit the stylesheet", not "impose a family").
+ * The lead built on it was still the wrong LAYER, which is the real lesson: it is a DOM
+ * preference and the screenshot came from the canvas. Do not delete the symbol on the
+ * strength of the retracted sentence. (`fontname` is separately still true: nothing in
+ * app code reads an ASS track's own font name; libass consults it inside the WASM.)
  * Cues are DOM text (`SubtitleCueLine` -> `.study-cue-text`), and
  * `mediaWorkspace.css` declared no `font-family` at all, so they inherited whatever the
  * active theme set. Two themes set a stack with no Japanese face in it —

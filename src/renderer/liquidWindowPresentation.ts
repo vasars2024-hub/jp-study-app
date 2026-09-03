@@ -86,13 +86,27 @@ export interface PresentableWin {
  * section drops the key on load instead of re-persisting a blob nothing can
  * act on.
  */
-export type LiquidPresentationHost = 'desktop' | 'popout' | 'reader' | 'workspace';
+export type LiquidPresentationHost =
+  | 'desktop'
+  | 'popout'
+  | 'reader'
+  | 'workspace'
+  | 'detached';
 
 export function canPresentLiquid(
   section?: string,
   host: LiquidPresentationHost = 'desktop',
 ): boolean {
   if (section === 'note') return host === 'desktop';
+  // A detached Study Block refuses on the SECTION test above, applied to the
+  // host rather than to one section: it is one panel and a three-element bar,
+  // with no disclosed surface of its own — the visualizer's shape, and the
+  // visualizer's answer. Its body is a cue list, a grammar table or a mining
+  // queue, which §2.3 keeps on an opaque anchor in every presentation, so a
+  // flip here would be a class name and no material change. Refusing is a
+  // DECISION and `DetachedStudyBlock` says so in the DOM; see the note there
+  // on why that host declares `standard` where the other three declare nothing.
+  if (host === 'detached') return false;
   return section !== 'visualizer';
 }
 

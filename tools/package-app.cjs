@@ -29,6 +29,11 @@ function run(label, cmd, args) {
   }
 }
 
+// FIRST, before the multi-minute Vite build: this path calls `electron-forge`
+// directly rather than through `npm run package`, so it does not inherit that
+// script's preflight and would otherwise be the one way to package a build with
+// no kuromoji dictionary, no OCR core and no ONNX backend.
+run('Checking bundled runtime assets', 'node', [path.join(__dirname, 'check-runtime-assets.cjs')]);
 run('Syncing chrome-extension mirror', 'node', [path.join(__dirname, 'sync-extension-mirror.cjs')]);
 run('Patching @electron-forge/plugin-vite', 'node', [path.join(__dirname, 'patch-forge-vite.cjs')]);
 run('Patching @electron/packager unzip', 'node', [path.join(__dirname, 'patch-packager-unzip.cjs')]);

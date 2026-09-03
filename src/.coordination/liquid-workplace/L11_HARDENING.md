@@ -1167,3 +1167,48 @@ note removed through its own dialog ("Remove"), 0 `.fwin` / 0 dialogs, `jp-app-z
 TRAP: `.fwin` inline `left/top/width/height` are layout px at every zoom; `getBoundingClientRect`
 is scaled by CSS `zoom` and comparing it with `clientWidth` fabricates an overflow (the audit's own
 first reading did exactly that).
+
+## 2026-09-03 — two shortcuts claimed full screen and only froze the window (`primary`, `e2dc88ef`)
+
+Opened on the handoff's exact-next slice: re-derive the L12 atlas's FIRST `productGap`,
+"2 of 25 surfaces (note, city) — state maximized: surface has no maximize control of its own".
+Driven live (pid 47004, port 39273), never scored from source.
+
+**The gap is TRUE as written** — unlike the atlas's second gap, which had rotted. Enumerated
+`:scope > .fwin-bar .fwin-b` and `:scope > .fwin-frameless-controls .fwin-b` on all four open
+windows: `note` = Make Liquid / Delete note; `city` = Pop out / Make Liquid / Minimize / Close.
+CONTROL: `dictionary` and `video` both = Pop out / Make Liquid / Minimize / **Maximize** / Close.
+The atlas keeps its wording; nothing to retract.
+
+**But the STATE was reachable anyway, by two routes, and neither maximized anything.**
+`toggleMax` (the button) applied `x:0,y:0,w:dw,h:dh`. `os:window` `maximize` and
+`os:cycle-app-fullscreen` (F11, `nav.nextAppFullscreen`, whose own note reads "Cycles through
+open apps and switches to full screen") patched `max: true` and no geometry. `isMaximized`
+suppresses `dragStart` and all three resize handles, so both shortcuts removed move+resize and
+gave nothing back. Discriminating pair, same build/desk/session, BEFORE:
+
+| route | result on a 1264x821 desk |
+| --- | --- |
+| button, dictionary | `0,0 1264x765` — real maximize |
+| `os:window` maximize, dictionary | `60,24 820x580`, `fwin-max`, `edges: 0` — flag only |
+| F11, video | `94,54 1080x700`, `fwin-max` — flag only, and NO restore rect captured |
+
+`city` was guarded in three places (`isMaximized`, `patch`, the shortcut case); `note` in none.
+So F11 on a sticky note entered a state that nothing on the note could leave.
+
+**DECISION (standing auto-approval, reversible):** refuse the state rather than add a control.
+The chrome's refusal is deliberate and old; the shortcuts were reading a different rule. One
+predicate now — `canMaximizeSection` / `maximizedGeometry` / `restorePoint`, exported from
+`desktopWindowGeometry.ts` beside `fitNewWindowRect`, so they are unit-tested rather than
+regex-ratcheted. Button, shortcut and F11 all call it; `patch` still strips the flag as a net.
+
+AFTER, live, **and only after a renderer reload** — HMR hot-updated the module while the
+`useEffect(…, [])` listener stayed the first-mount closure, so the first post-edit reading
+reproduced the OLD behaviour exactly and was voided. Shortcut on dictionary
+`60,24 820x580` -> `0,0 1264x765` -> `60,24 820x580`. F11 onto video -> `0,0 1264x765`, then
+its own button -> `94,54 1080x700` with `edges: 3` back. REFUSALS FIRE: F11 cycling onto `city`
+then `note` raised each (z 1504, 1506) and left them 680x649 and 260x220, unmaximized.
+
+MUTATION CONTROL: restored `{ max: true, min: false }` at the shortcut call site -> 1 failed,
+`expected [ 'max: true' ] to deeply equal []`; reverted byte-identical (sha256 5a737f59f0b9…).
+The guard strips comments first — a comment has already been scored as a call site here.

@@ -59,9 +59,9 @@
  * tree, so the teardown is verified, not assumed.
  *
  * R3/R4 get in-memory mutation controls (their inputs are files this process parses).
- * R1, R5, R6 and R7 are reported `unfalsified` rather than given a fake control — R1 and
- * R7 would require damaging the tree or the environment, and R5/R6 are pass-throughs of
- * another instrument's own verdict.
+ * R5, R6 and R7 are reported `unfalsified` rather than given a fake control — R7 would
+ * require damaging the environment, and R5/R6 are pass-throughs of another instrument's own
+ * verdict. R1 joined the falsified set on 2026-09-03, when its remedy became a gate.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs \
@@ -72,6 +72,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const crypto = require('node:crypto');
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const arg = (name, dflt) => {
@@ -139,6 +140,60 @@ function importedButUntracked(tracked) {
   return { specifiers, resolved, findings };
 }
 
+/**
+ * R1. What `public/` holds, what git carries of it, what .gitignore excludes — and, since
+ * 2026-09-03, whether the OTHER remedy is real.
+ *
+ * R1's own `whatWouldCloseIt` has always named two routes: "either track the blobs (they are
+ * large), or make the packaging step fetch/stage them and fail loudly when they are absent."
+ * The verdict measured only the first, so a tree that took the second route would report
+ * HIGH/OPEN forever and the next reader would chase a ghost — which is the exact rot this
+ * generator exists to prevent, arriving through the generator itself.
+ *
+ * The staging route is therefore re-derived, never trusted: the manifest is REQUIRED and its
+ * own predicate is exercised (a gate that answers "nothing missing" because it looks at
+ * nothing would otherwise read as a pass), the preflight must be wired into every packaging
+ * entry point INCLUDING `tools/package-app.cjs`, which calls electron-forge directly and does
+ * not inherit the npm script, and each asset must be present here as well as obtainable.
+ */
+function runtimeAssetGate() {
+  const manifestPath = path.join(REPO, 'tools', 'runtime-assets.manifest.cjs');
+  if (!fs.existsSync(manifestPath)) return { available: false };
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+  const m = require(manifestPath);
+  const assets = m.REQUIRED_RUNTIME_ASSETS || [];
+  const pub = path.join(REPO, 'public');
+  const pkgPath = path.join(REPO, 'package.json');
+  const scripts = fs.existsSync(pkgPath)
+    ? (JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts || {})
+    : {};
+  const appPackager = path.join(REPO, 'tools', 'package-app.cjs');
+  const CHECKER = 'check-runtime-assets.cjs';
+  const wiredInto = [
+    ...['package', 'make'].filter((s) => (scripts[s] || '').includes(CHECKER)),
+    ...(fs.existsSync(appPackager) && fs.readFileSync(appPackager, 'utf8').includes(CHECKER)
+      ? ['tools/package-app.cjs'] : []),
+  ];
+  const stagedAndWired = assets.filter((a) => {
+    if (!a.stagedBy) return false;
+    const tool = a.stagedBy.split('/').pop();
+    return (scripts.postinstall || '').includes(tool) && fs.existsSync(path.join(REPO, a.stagedBy));
+  });
+  return {
+    available: true,
+    checkerPresent: fs.existsSync(path.join(REPO, 'tools', CHECKER)),
+    requiredAssets: assets.length,
+    presentHere: assets.filter((a) => fs.existsSync(path.join(pub, a.rel))).length,
+    stagedFromNodeModules: stagedAndWired.length,
+    obtainableOnlyOutOfBand: assets.filter((a) => !a.stagedBy).map((a) => a.rel),
+    preflightWiredInto: wiredInto,
+    // Not vacuous: with nothing on disk the gate must name every asset, not zero.
+    preflightNamesAllWhenAllAbsent:
+      typeof m.missingRuntimeAssets === 'function'
+      && m.missingRuntimeAssets(() => false).length === assets.length,
+  };
+}
+
 /** R1. What `public/` holds, what git carries of it, and what .gitignore excludes. */
 function publicBlobs(tracked) {
   const pub = path.join(REPO, 'public');
@@ -161,7 +216,27 @@ function publicBlobs(tracked) {
     gitignoreLines: ignoredUnderPublic,
     referenceTreeEntries: mainEntries ? mainEntries.length : null,
     referenceTreeOnly: mainEntries ? mainEntries.filter((e) => !onDisk.includes(e)) : null,
+    gate: runtimeAssetGate(),
   };
+}
+
+/**
+ * R1's verdict, given one measurement. Extracted so the falsification below can run it over a
+ * mutated copy without touching the tree — the same in-memory shape R3 and R4 use.
+ */
+function r1Closed(r1) {
+  if (r1.pathsTrackedByGit >= r1.entriesOnDisk) return true;
+  const g = r1.gate;
+  return !!(
+    g
+    && g.available
+    && g.checkerPresent
+    && g.requiredAssets > 0
+    && g.presentHere === g.requiredAssets
+    && g.preflightNamesAllWhenAllAbsent
+    // package, make AND the direct electron-forge path. Two of three is a hole.
+    && g.preflightWiredInto.length === 3
+  );
 }
 
 /** R3. */
@@ -295,18 +370,71 @@ function packagerEnvironment() {
  * declared plate paths, and count paths claimed by more than one run. That is the hazard
  * itself; whether a given tree currently shows the damage depends on which run happened to
  * go last, which is exactly what makes it silent.
+ *
+ * ---------------------------------------------------------------------------------
+ * REWRITTEN 2026-09-03, and the reason is the same one that nearly kept R1 open: THE
+ * VERDICT COULD NOT SEE ITS OWN REMEDY.
+ *
+ * `pathsClaimedByMoreThanOneRun` counts a fact about manifests that were WRITTEN BEFORE the
+ * fix and can never be rewritten — a banked manifest is evidence, and editing one to make a
+ * gate green is the exact rot this file exists to prevent. So the old verdict was pinned at
+ * `open` by history, no matter what the tree did next. A gate that cannot close on a
+ * correct tree is not measuring the risk; it is measuring the calendar.
+ *
+ * So this now measures the harm THE RISK ITSELF NAMES, which is not "two runs share a path"
+ * — it is "the wall of pictures a reader is shown is not the wall the verdict was computed
+ * from, AND NOTHING IN THE JSON SAYS SO." Those last six words are the risk. A collision
+ * that the artifacts declare is a disclosed limitation; a collision they conceal is the
+ * defect. Three routes, all required, each reported separately so a reader can disagree:
+ *
+ *   (1) PROSPECTIVE — can a FUTURE run still collide? Answered from the artifacts, not
+ *       from a promise: every manifest carrying a `runId` must declare zero flat plate
+ *       paths, and no two namespaced runs may share one. A source ratchet on
+ *       l12-visual-matrix.cjs backs it up, read with comments STRIPPED, because this repo
+ *       has already scored a comment that merely spelled out an identifier as a caller.
+ *
+ *   (2) RETROSPECTIVE — where a collision DID happen, do the artifacts say so? For each
+ *       contested path, the on-disk bytes name exactly one surviving run; every other
+ *       claimant is a LOSER asserting a hash for pixels that are gone. A loser's damage is
+ *       disclosed when some banked atlas that indexes that path tells the reader — either
+ *       by reporting `integrity.mismatch > 0` and refusing to certify, or by recording the
+ *       loser manifest as `superseded` in its `multiRun` sources. Both routes are checked,
+ *       because crediting only one is how R1 nearly failed — but which of them actually
+ *       FIRES is published in `disclosure.routes`, and an unfired route is named in
+ *       `routesNotExercised` rather than left to be read as though it had carried weight.
+ *       On this tree only the first fires, and the reason is worth keeping: the atlas that
+ *       records `superseded` resolved those cells to the SUPERSEDING run's plates, which
+ *       are namespaced — so the contested FLAT path is not in its index at all, which is
+ *       also why its own integrity is clean. The route is real, and here it is unused.
+ *
+ *   (3) LOAD-BEARING — is the evidence the CURRENT verdict rests on intact? The newest
+ *       atlas's own integrity block must show no mismatch and nothing missing. A disclosed
+ *       loss in a superseded atlas is a footnote; the same loss under the certifying atlas
+ *       is the release risk.
+ *
+ * A path whose PNG is absent cannot be adjudicated from disk, so it is counted SILENT and
+ * listed under `unverifiable` — this fails closed. `atlasesFor` is injectable for exactly
+ * one reason: the control must be able to EXERCISE the disclosure predicate against an
+ * empty atlas set and see every contested path come back silent. A predicate that looks at
+ * nothing otherwise reads as a pass.
  */
-function plateNamespace() {
+function plateNamespace(atlasesFor) {
   const dir = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'baselines');
   if (!fs.existsSync(dir)) return { available: false };
   const files = fs.readdirSync(dir).filter((f) => /^l12-matrix-.*\.json$/.test(f));
   const owners = new Map();
+  const runIdOf = new Map();
+  let namespacedManifests = 0;
+  let flatCellsUnderARunId = 0;
   for (const f of files) {
     let m;
     try { m = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch { continue; }
     if (m.schema !== 'l12-visual-matrix/v1') continue;
+    if (m.runId) { namespacedManifests += 1; runIdOf.set(f, m.runId); }
     for (const c of m.cells || []) {
       if (!c.file) continue;
+      // A plate directly under the shot root has four path segments and no run directory.
+      if (m.runId && c.file.split('/').length === 4) flatCellsUnderARunId += 1;
       if (!owners.has(c.file)) owners.set(c.file, []);
       owners.get(c.file).push({ run: f, sha256: c.sha256 || null });
     }
@@ -315,13 +443,89 @@ function plateNamespace() {
   // A shared path where the runs recorded DIFFERENT hashes is proof one image was lost;
   // a shared path with equal hashes is the same hazard that happened not to bite.
   const destructive = shared.filter(([, l]) => new Set(l.map((x) => x.sha256)).size > 1);
+
+  // (1) Prospective. Artifact evidence first, then the source ratchet.
+  const gen = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'probes', 'l12-visual-matrix.cjs');
+  let genSrc = '';
+  try { genSrc = fs.readFileSync(gen, 'utf8'); } catch { genSrc = ''; }
+  const code = genSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\n)\s*\/\/[^\n]*/g, '$1');
+  const namespacedRunIds = new Set(runIdOf.values());
+  const generator = {
+    file: path.relative(REPO, gen).replace(/\\/g, '/'),
+    derivesShotDirFromRunId: /SHOT_DIR\s*=\s*path\.join\(\s*SHOT_ROOT\s*,\s*RUN_ID/.test(code),
+    runIdDefaultIsUnique: /RUN_ID\s*=[\s\S]{0,400}?process\.pid/.test(code),
+    manifestsCarryingARunId: namespacedManifests,
+    distinctRunIds: namespacedRunIds.size,
+    flatPlatePathsUnderARunId: flatCellsUnderARunId,
+  };
+  generator.namespaced = generator.derivesShotDirFromRunId && generator.runIdDefaultIsUnique
+    && generator.manifestsCarryingARunId > 0 && generator.distinctRunIds === generator.manifestsCarryingARunId
+    && generator.flatPlatePathsUnderARunId === 0;
+
+  // (2) Retrospective. Disk decides who survived; the atlases decide whether it was said.
+  const atlases = (atlasesFor || (() => atlasCandidates().found.map((c) => ({
+    file: path.basename(c.full), a: c.a,
+  }))))();
+  const indexOf = atlases.map((x) => ({
+    file: x.file,
+    plates: new Set((x.a.plates || []).map((p) => p.file).filter(Boolean)),
+    mismatch: (x.a.integrity && x.a.integrity.mismatch) || 0,
+    certifiable: !!x.a.certifiable,
+    superseded: new Map(((x.a.multiRun && x.a.multiRun.sources) || [])
+      .map((s) => [path.basename(s.file || ''), s.superseded || 0])),
+  }));
+  const adjudicated = destructive.map(([file, claimants]) => {
+    const abs = path.join(REPO, file);
+    let disk = null;
+    try { disk = crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex'); } catch { disk = null; }
+    if (!disk) return { file, disk: null, losers: claimants.map((c) => c.run), disclosedBy: [], verdict: 'unverifiable' };
+    const losers = claimants.filter((c) => c.sha256 !== disk).map((c) => c.run);
+    const survivor = (claimants.find((c) => c.sha256 === disk) || {}).run || null;
+    if (!losers.length) return { file, disk, survivor, losers: [], disclosedBy: [], verdict: 'no-loss' };
+    const disclosedBy = [];
+    for (const ix of indexOf) {
+      if (!ix.plates.has(file)) continue;
+      if (ix.mismatch > 0 && !ix.certifiable) disclosedBy.push(`${ix.file}#integrity-mismatch`);
+      else if (losers.some((l) => (ix.superseded.get(l) || 0) > 0)) disclosedBy.push(`${ix.file}#superseded`);
+    }
+    return { file, disk, survivor, losers, disclosedBy, verdict: disclosedBy.length ? 'disclosed' : 'silent' };
+  });
+  const silent = adjudicated.filter((x) => x.verdict === 'silent' || x.verdict === 'unverifiable');
+
+  // (3) Load-bearing. The atlas the current verdict rests on.
+  const top = atlases[0];
+  const certifying = top ? {
+    file: top.file,
+    certifiable: !!top.a.certifiable,
+    integrity: top.a.integrity
+      ? { verified: top.a.integrity.verified, missing: top.a.integrity.missing, mismatch: top.a.integrity.mismatch, state: top.a.integrity.state }
+      : null,
+    evidenceIntact: !!(top.a.integrity && top.a.integrity.mismatch === 0 && top.a.integrity.missing === 0),
+  } : { file: null, evidenceIntact: false, note: 'no atlas banked' };
+
   return {
     available: true,
     manifests: files.length,
     declaredPlatePaths: owners.size,
     pathsClaimedByMoreThanOneRun: shared.length,
     pathsWhereRunsRecordDifferentBytes: destructive.length,
-    examples: destructive.slice(0, 4).map(([f, l]) => ({ file: f, runs: l.map((x) => x.run) })),
+    generator,
+    disclosure: {
+      atlasesRead: indexOf.map((x) => x.file),
+      contested: adjudicated.length,
+      disclosed: adjudicated.filter((x) => x.verdict === 'disclosed').length,
+      noLoss: adjudicated.filter((x) => x.verdict === 'no-loss').length,
+      silent: adjudicated.filter((x) => x.verdict === 'silent').length,
+      unverifiable: adjudicated.filter((x) => x.verdict === 'unverifiable').length,
+      routes: [...new Set(adjudicated.flatMap((x) => x.disclosedBy))].sort(),
+      routesNotExercised: ['integrity-mismatch', 'superseded']
+        .filter((r) => !adjudicated.some((x) => x.disclosedBy.some((d) => d.endsWith(`#${r}`)))),
+    },
+    certifying,
+    silentCollisions: silent.map((x) => x.file),
+    examples: adjudicated.slice(0, 4).map((x) => ({
+      file: x.file, survivor: x.survivor, losers: x.losers, verdict: x.verdict, disclosedBy: x.disclosedBy,
+    })),
   };
 }
 
@@ -408,11 +612,11 @@ function build(atlasPath, vitestLog) {
       id: 'R1',
       title: 'Runtime blobs the app loads from public/ are not in git',
       severity: 'high',
-      state: r1.pathsTrackedByGit >= r1.entriesOnDisk ? 'closed' : 'open',
+      state: r1Closed(r1) ? 'closed' : 'open',
       measurement: r1,
       whyItMatters: 'A production build from a clean clone lacks them and fails at runtime with no useful diagnostic. This is how 12 anonymous ERR_FILE_NOT_FOUND stacks got into a production boot.',
-      whatWouldCloseIt: 'Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. The named-diagnostic fix landed in 96a7b579 makes the failure legible; it does not make the blobs present.',
-      falsified: false,
+      whatWouldCloseIt: 'Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. 96a7b579 made the RUNTIME failure legible without making the blobs present; a76163dd and 871cb8b4 took the second route — kuromoji, ort and the tesseract engine are staged from node_modules by postinstall, and tools/check-runtime-assets.cjs refuses to package when any of the six witness files is missing, naming the path, the feature that dies and the remedy. What is still only obtainable out of band is listed in measurement.gate.obtainableOnlyOutOfBand; the harm this risk names — a SILENT runtime failure — is what the preflight removes.',
+      falsified: null,
     },
     {
       id: 'R2',
@@ -494,10 +698,11 @@ function build(atlasPath, vitestLog) {
       title: 'Banked visual evidence has no per-run namespace, so a re-run overwrites it',
       severity: 'high',
       state: !r9.available ? 'unmeasured'
-        : r9.pathsClaimedByMoreThanOneRun ? 'open' : 'closed',
+        : (r9.silentCollisions.length || !r9.generator.namespaced || !r9.certifying.evidenceIntact)
+          ? 'open' : 'closed',
       measurement: r9,
-      whyItMatters: "Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.",
-      whatWouldCloseIt: "l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.",
+      whyItMatters: "Every certification artifact here is a JSON index over gitignored binaries. A plate was named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs wrote the same path and the later one destroyed the earlier image while its manifest kept asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates hash to the tries40 run's recorded values. The harm is the last clause, not the collision: the wall of pictures a reader is shown is then not the wall the verdict was computed from, AND NOTHING IN THE JSON SAYS SO.",
+      whatWouldCloseIt: "Three things, and the verdict now measures all three rather than counting historical path overlap — a banked manifest is evidence and will not be rewritten to make a gate green, so the old count could only ever report the calendar. (1) PROSPECTIVE: l12-visual-matrix.cjs writes plates under a per-run directory, so no future run can collide — landed at its SHOT_DIR/RUN_ID, and cross-checked here against every manifest that carries a runId. (2) RETROSPECTIVE: where a collision already happened, the artifacts must SAY so; disk names the surviving run, and each loser's damage must be declared by an atlas that indexes the path, either by reporting integrity.mismatch and refusing to certify or by recording the loser as superseded. (3) LOAD-BEARING: the newest atlas — the one the current verdict rests on — must itself show no mismatch and nothing missing. An undisclosed or unadjudicable collision keeps this open.",
       falsified: false,
     },
   ];
@@ -553,6 +758,32 @@ function controls(base) {
       && restored.findings.length === base.risks.find((r) => r.id === 'R2').measurement.findings.length,
   };
 
+  // --- R1: the staging route is only a real remedy if removing it reopens the risk. Mutate
+  // the measurement in memory (no tree write: this one has three packaging entry points and a
+  // half-applied edit to package.json is exactly the thing not to leave behind on a crash).
+  // Each leg removes ONE reason to close, so a verdict that ignored that reason reads as a pass.
+  {
+    const b1 = base.risks.find((r) => r.id === 'R1').measurement;
+    const withGate = (patch) => ({ ...b1, gate: { ...(b1.gate || {}), ...patch } });
+    const legs = {
+      unwired: r1Closed(withGate({ preflightWiredInto: ['package', 'make'] })),
+      vacuousGate: r1Closed(withGate({ preflightNamesAllWhenAllAbsent: false })),
+      checkerGone: r1Closed(withGate({ checkerPresent: false })),
+      assetAbsentHere: r1Closed(
+        withGate({ presentHere: Math.max(0, ((b1.gate || {}).requiredAssets || 1) - 1) }),
+      ),
+      noManifest: r1Closed({ ...b1, gate: { available: false } }),
+    };
+    out.r1 = {
+      kind: 'remove-each-reason-to-close/R1-must-reopen-on-every-one',
+      baseState: r1Closed(b1) ? 'closed' : 'open',
+      reopensWhen: legs,
+      // Only meaningful from a closed base — from an open one every leg is trivially open.
+      pass: r1Closed(b1) ? Object.values(legs).every((closed) => closed === false) : null,
+      note: r1Closed(b1) ? undefined : 'n/a — R1 is already open, so nothing to falsify',
+    };
+  }
+
   // --- R4: mutate the plan text in memory; the counter must move by exactly one.
   const planText = fs.readFileSync(path.join(REPO, 'src', 'LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md'), 'utf8');
   const b0 = planBullets(planText);
@@ -583,6 +814,13 @@ function controls(base) {
   // --- R9: plant a manifest that claims a plate path an existing run already claims, with
   // different bytes. The collision count must rise by exactly one and fall back on teardown.
   // A real file plant, not an in-memory one, because the check reads the directory itself.
+  //
+  // THE PLANT ALONE IS NO LONGER ENOUGH, because it no longer attacks the scored term. R9
+  // is scored on `silentCollisions`, so the plant must be shown to arrive UNDISCLOSED — a
+  // collision no atlas declares — and to reopen the verdict. And the disclosure predicate
+  // itself is EXERCISED against an empty atlas set: with nothing to read, every contested
+  // path must come back silent. A predicate that looks at nothing otherwise reads as a
+  // pass, which is precisely how R1's gate nearly shipped blind.
   const bdir = path.join(REPO, 'src', '.coordination', 'liquid-workplace', 'baselines');
   const plant = path.join(bdir, 'l12-matrix-__r9control.json');
   const b9 = base.risks.find((r) => r.id === 'R9').measurement;
@@ -602,20 +840,44 @@ function controls(base) {
     }
     const restored = plateNamespace();
     out.r9 = {
-      kind: 'plant-a-colliding-plate-path/R9-must-report-one-more-destructive-collision',
+      kind: 'plant-a-colliding-plate-path/R9-must-report-one-more-UNDISCLOSED-collision',
       base: b9.pathsWhereRunsRecordDifferentBytes,
       mutated: mutated && mutated.pathsWhereRunsRecordDifferentBytes,
       restored: restored.pathsWhereRunsRecordDifferentBytes,
+      baseSilent: b9.silentCollisions.length,
+      mutatedSilent: mutated && mutated.silentCollisions.length,
+      restoredSilent: restored.silentCollisions.length,
       teardownVerified: !fs.existsSync(plant),
       pass: !!mutated && mutated.pathsWhereRunsRecordDifferentBytes === b9.pathsWhereRunsRecordDifferentBytes + 1
         && restored.pathsWhereRunsRecordDifferentBytes === b9.pathsWhereRunsRecordDifferentBytes
+        // The scored term itself: the plant must land as a collision nobody declared.
+        && mutated.silentCollisions.length === b9.silentCollisions.length + 1
+        && restored.silentCollisions.length === b9.silentCollisions.length
         && !fs.existsSync(plant),
     };
-  } else out.r9 = { kind: 'plant-a-colliding-plate-path', pass: null, note: 'n/a — no matrix manifests to collide with' };
 
-  out.unfalsified = ['R1', 'R5', 'R6', 'R7', 'R8'];
-  out.unfalsifiedWhy = 'R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.';
-  const vals = ['r2', 'r3', 'r4', 'r9'].map((k) => out[k] && out[k].pass);
+    // Exercise the disclosure predicate. Fed an atlas set that declares nothing, every
+    // contested path must be reported silent — otherwise `disclosed` is being credited by
+    // something other than the atlases, and the verdict is blind.
+    const blind = plateNamespace(() => []);
+    out.r9disclosure = {
+      kind: 'run-the-disclosure-predicate-against-an-empty-atlas-set/every-contested-path-must-read-silent',
+      contested: blind.pathsWhereRunsRecordDifferentBytes,
+      silentWhenNothingDeclaresIt: blind.silentCollisions.length,
+      disclosedInReality: b9.disclosure.disclosed,
+      routesInReality: b9.disclosure.routes,
+      pass: blind.pathsWhereRunsRecordDifferentBytes > 0
+        && blind.silentCollisions.length === blind.pathsWhereRunsRecordDifferentBytes - blind.disclosure.noLoss
+        && b9.disclosure.disclosed > 0,
+    };
+  } else {
+    out.r9 = { kind: 'plant-a-colliding-plate-path', pass: null, note: 'n/a — no matrix manifests to collide with' };
+    out.r9disclosure = { kind: 'run-the-disclosure-predicate-against-an-empty-atlas-set', pass: null, note: 'n/a — no matrix manifests' };
+  }
+
+  out.unfalsified = ['R5', 'R6', 'R7', 'R8'];
+  out.unfalsifiedWhy = 'R7 would require changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here. R1 LEFT THIS LIST 2026-09-03: its remedy became a gate with a testable shape, so each reason to close can be removed from the measurement in memory and the verdict must reopen — no tree damage needed, which was the only reason it was here.';
+  const vals = ['r1', 'r2', 'r3', 'r4', 'r9', 'r9disclosure'].map((k) => out[k] && out[k].pass);
   out.summary = { fired: vals.filter((v) => v === true).length, failed: vals.filter((v) => v === false).length };
   return out;
 }
