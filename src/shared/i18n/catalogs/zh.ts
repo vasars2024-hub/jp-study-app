@@ -4666,6 +4666,7 @@ export const zh: Catalog = {
   'library.filter.allItems': '全部',
   'library.filter.unfiled': '未归类',
   'library.filter.all': '全部',
+  'library.filter.refine': '按语言和等级筛选',
   'library.sort.label': '排序',
   'library.sort.dateDesc': '最新',
   'library.sort.dateAsc': '最早',

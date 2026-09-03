@@ -621,6 +621,23 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
           : items.filter((it) => it.folder === active);
     return availableFilterChips(scoped, bookLevels, { lang: langFilter, level: levelFilter });
   }, [items, folders, active, bookLevels, langFilter, levelFilter]);
+
+  /**
+   * What the collapsed filter disclosure has to say out loud. A filter that is applied while
+   * its chips are tucked away is a shelf that silently hides books, so the summary carries the
+   * selection: closed and unfiltered it reads "Filter", closed and filtered it reads
+   * "Filter — Japanese · L7". Empty string means nothing is filtered.
+   *
+   * Depends on `lang`, not `t`: `t` is stable across a language change and a memo keyed on it
+   * would keep serving the old language's chip labels.
+   */
+  const activeFilterLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (langFilter !== 'all') parts.push(t(`library.inbox.lang.${langFilter}`));
+    if (levelFilter !== 'all') parts.push(`L${levelFilter}`);
+    return parts.join(' · ');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langFilter, levelFilter, lang]);
   // Deliberately not backfilled with the first visible item — see
   // resolveSelection. A drawer that re-selects something the moment you close
   // it is a drawer that cannot be closed.
@@ -1459,32 +1476,49 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
         </button>
       </div>
 
+      {/*
+        The two refine banks live behind one disclosure. They are not the dominant task on this
+        surface — opening a book is — and at rest they put ten more chips between a user and the
+        shelf. Rubric category 5 Q4 measured 13 controls scanned before a single cover, against
+        a bar of 12. Nothing is removed: <details> keeps them one click and one Enter away and
+        gives the keyboard and screen-reader semantics for free, and the summary names whatever
+        is currently filtering so a closed disclosure can never hide why books are missing.
+      */}
       {hasLevelFilters && (
-        <div className="lib-inbox-filters lq-hit-scope" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {filterOptions.langs.map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
-              onClick={() => setLangFilter(lang)}
-            >
-              {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
-            </button>
-          ))}
-          <span className="muted" style={{ fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>
-            {t('library.inbox.levelChips')}
-          </span>
-          {filterOptions.levels.map((lv) => (
-            <button
-              key={lv}
-              type="button"
-              className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
-              onClick={() => setLevelFilter(lv)}
-            >
-              {lv === 'all' ? t('library.filter.all') : `L${lv}`}
-            </button>
-          ))}
-        </div>
+        <details className="lib-filter-bar lq-hit-scope">
+          <summary className="lib-filter-summary">
+            <span>{t('library.filter.refine')}</span>
+            {activeFilterLabel && <span className="lib-filter-active">{activeFilterLabel}</span>}
+          </summary>
+          <div
+            className="lib-inbox-filters lq-hit-scope"
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 4 }}
+          >
+            {filterOptions.langs.map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                className={`lib-folder-chip${langFilter === lang ? ' active' : ''}`}
+                onClick={() => setLangFilter(lang)}
+              >
+                {lang === 'all' ? t('library.filter.all') : t(`library.inbox.lang.${lang}`)}
+              </button>
+            ))}
+            <span className="muted" style={{ fontSize: 12, alignSelf: 'center', marginLeft: 4 }}>
+              {t('library.inbox.levelChips')}
+            </span>
+            {filterOptions.levels.map((lv) => (
+              <button
+                key={lv}
+                type="button"
+                className={`lib-folder-chip${levelFilter === lv ? ' active' : ''}`}
+                onClick={() => setLevelFilter(lv)}
+              >
+                {lv === 'all' ? t('library.filter.all') : `L${lv}`}
+              </button>
+            ))}
+          </div>
+        </details>
       )}
 
       {busy && <div className="banner">{t('library.busy')}</div>}

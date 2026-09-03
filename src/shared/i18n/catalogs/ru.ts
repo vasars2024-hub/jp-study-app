@@ -5182,6 +5182,7 @@ export const ru: Catalog = {
   'library.filter.allItems': 'Все',
   'library.filter.unfiled': 'Без папки',
   'library.filter.all': 'Все',
+  'library.filter.refine': 'Фильтр по языку и уровню',
   'library.sort.label': 'Сортировка',
   'library.sort.dateDesc': 'Сначала новые',
   'library.sort.dateAsc': 'Сначала старые',

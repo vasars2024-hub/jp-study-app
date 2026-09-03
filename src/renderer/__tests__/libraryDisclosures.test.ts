@@ -1,5 +1,12 @@
 /**
- * Library's two progressive disclosures — the import routes and the watch bar.
+ * Library's three progressive disclosures — the import routes, the watch bar, and the
+ * language/level refine banks.
+ *
+ * The third was added on 2026-09-03 when L9 re-scored the surface: the two earlier folds took
+ * the scan to 11, then the inbox filter banks grew back onto the default view and Q4 measured
+ * **13** against the same bar of 12. The banks now sit behind their own collapsed `<details>`,
+ * which is why guard (4) below has a second half: the summary names whatever is currently
+ * filtering, so a closed fold can hide the administration but never a missing book.
  *
  * Rubric category 5 question 4 ("advanced tools discoverable without cluttering")
  * scored NO on Library at 17 chrome controls against a bar of 12: four import
@@ -91,11 +98,49 @@ describe('library progressive disclosures', () => {
     }
   });
 
-  it('collapses both disclosures by default — the scan count must not depend on state', () => {
-    // `<details ... open>` on either one puts the controls straight back into the
+  it('collapses all three disclosures by default — the scan count must not depend on state', () => {
+    // `<details ... open>` on any of them puts the controls straight back into the
     // default view, which is precisely what Q4 counts.
     expect(VIEW).not.toContain('<details className="lib-more" open>');
     expect(VIEW).not.toContain('<details className="watch-bar lq-hit-scope" open>');
+    expect(VIEW).not.toContain('<details className="lib-filter-bar lq-hit-scope" open>');
+    // Nor a controlled `open` — an attribute React re-asserts on every render would fight
+    // the user's own toggle, and the memory of that failure mode is why this is spelled out.
+    expect(VIEW).not.toMatch(/<details className="lib-filter-bar lq-hit-scope" open=/);
+  });
+
+  it('tucks both refine banks away without removing either chip bank or its handler', () => {
+    const details = VIEW.slice(VIEW.indexOf('<details className="lib-filter-bar lq-hit-scope">'));
+    const body = details.slice(0, details.indexOf('</details>'));
+    expect(body).not.toBe('');
+    // Both banks, both setters: the fold is a fold, not a deletion.
+    expect(body).toContain('filterOptions.langs.map');
+    expect(body).toContain('onClick={() => setLangFilter(lang)}');
+    expect(body).toContain('filterOptions.levels.map');
+    expect(body).toContain('onClick={() => setLevelFilter(lv)}');
+    // The chips themselves must stay out of the summary or the fold buys nothing.
+    const summary = body.slice(0, body.indexOf('</summary>'));
+    expect(summary).not.toContain('<button');
+  });
+
+  it('names the applied filter in the summary, so a closed fold never hides a missing book', () => {
+    const summary = VIEW.slice(VIEW.indexOf('<summary className="lib-filter-summary">'));
+    const head = summary.slice(0, summary.indexOf('</summary>'));
+    expect(head).toContain('activeFilterLabel');
+    // And the label is derived from the live selection, not a static string.
+    expect(VIEW).toContain("if (langFilter !== 'all') parts.push(t(`library.inbox.lang.${langFilter}`));");
+    expect(VIEW).toContain("if (levelFilter !== 'all') parts.push(`L${levelFilter}`);");
+    // Keyed on `lang`, not `t`: `t` is stable across a language change.
+    expect(VIEW).toContain('}, [langFilter, levelFilter, lang]);');
+  });
+
+  it('labels the refine disclosure through i18n in all four catalogues', () => {
+    expect(VIEW).toContain("t('library.filter.refine')");
+    expect(en['library.filter.refine']).toBeTruthy();
+    for (const lang of ['ja', 'zh', 'ru']) {
+      const catalogue = read(`shared/i18n/catalogs/${lang}.ts`);
+      expect(catalogue).toContain("'library.filter.refine':");
+    }
   });
 
   it('labels the disclosure through i18n in all four catalogues', () => {

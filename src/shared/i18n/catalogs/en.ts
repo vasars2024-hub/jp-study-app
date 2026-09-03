@@ -4675,6 +4675,7 @@ export const en: Catalog = {
   'library.filter.allItems': 'All items',
   'library.filter.unfiled': 'Unfiled',
   'library.filter.all': 'All',
+  'library.filter.refine': 'Filter by language and level',
   'library.sort.label': 'Sort',
   'library.sort.dateDesc': 'Newest',
   'library.sort.dateAsc': 'Oldest',

@@ -1,0 +1,245 @@
+{
+  "label": "s9-library",
+  "surface": "Library",
+  "win": "1",
+  "task": "click:.lib-folders .lib-folder-chip:nth-of-type(2) >> wait:450 >> click:.aero-library-layout-switch .lib-folder-chip:nth-of-type(2) >> wait:450",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "standard",
+  "raised": "already-on-top",
+  "base": {
+    "textRuns": 172,
+    "controlCount": 30,
+    "box": "820x580",
+    "results": 0
+  },
+  "inputCost": {
+    "clicks": 2,
+    "keystrokes": 0,
+    "total": 2
+  },
+  "latencyMs": {
+    "clickRecv": [
+      28,
+      13.6
+    ],
+    "inputRecv": [],
+    "worstRecv": 28,
+    "overBar100": 0,
+    "n": 2,
+    "clickStampUnscored": [
+      68.8,
+      16
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 68.8
+  },
+  "steps": [
+    {
+      "step": "click:.lib-folders .lib-folder-chip:nth-of-type(2)",
+      "target": {
+        "sel": ".lib-folders .lib-folder-chip:nth-of-type(2)",
+        "label": "Manga 3",
+        "disabled": false,
+        "at": "195,210"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:450",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "click:.aero-library-layout-switch .lib-folder-chip:nth-of-type(2)",
+      "target": {
+        "sel": ".aero-library-layout-switch .lib-folder-chip:nth-of-type(2)",
+        "label": "List",
+        "disabled": false,
+        "at": "492,257"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": true,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:450",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "click:.aero-library-layout-switch .lib-folder-chip:nth-of-type(1) >> wait:350 >> click:.lib-folders .lib-folder-chip:nth-of-type(1)",
+    "steps": [
+      "click:.aero-library-layout-switch .lib-folder-chip:nth-of-type(1)",
+      "wait:350",
+      "click:.lib-folders .lib-folder-chip:nth-of-type(1)"
+    ],
+    "restored": true,
+    "baseHash": "158bseh",
+    "afterHash": "158bseh",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "158bseh",
+      "after": "158bseh"
+    }
+  },
+  "stepsDriven": 2,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 2,
+      "deadEnds": 0,
+      "worstRecv": 28
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 2,
+      "deadEnds": 0,
+      "worstRecv": 25.8
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 2,
+    "standardTotal": 2
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "spatialFixity": null,
+  "spatialFixitySamples": null,
+  "spatialFixityControl": null,
+  "spatialFixityVerdict": null,
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "anchorControl": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      0.6
+    ]
+  }
+}

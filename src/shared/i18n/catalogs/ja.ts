@@ -4689,6 +4689,7 @@ export const ja: Catalog = {
   'library.filter.allItems': 'すべて',
   'library.filter.unfiled': '未整理',
   'library.filter.all': 'すべて',
+  'library.filter.refine': '言語とレベルで絞り込む',
   'library.sort.label': '並び替え',
   'library.sort.dateDesc': '新しい順',
   'library.sort.dateAsc': '古い順',
