@@ -74,10 +74,14 @@ export default function DropRouter({
         // rather than decided twice. `emptyFolder` is new and was previously a
         // silent `null` — a folder drop that imported nothing and said nothing.
         onRefused: (reasonKey, subject) => {
-          showOsToast(
-            t(reasonKey, { name: subject.name }),
-            reasonKey === 'fileDrop.toast.noDestination' ? 'warn' : 'err',
-          );
+          // `warn`, not `err`, for the refusals that are a next step rather than
+          // a failure: nothing here can open it yet, and the subtitle whose video
+          // is not in the library yet. Both are answered by one more drop, and
+          // colouring them as errors tells the user something broke when it did
+          // not. Every other refusal keeps `err`.
+          const actionable = reasonKey === 'fileDrop.toast.noDestination'
+            || reasonKey === 'fileDrop.toast.subtitleNoOwner';
+          showOsToast(t(reasonKey, { name: subject.name }), actionable ? 'warn' : 'err');
         },
       });
       if (!receipt) return null;

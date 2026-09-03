@@ -2291,3 +2291,59 @@ OTHER dirty path is still dirty. Its dry run is read-only and works while the tr
 `primary2` are dispatched concurrently and each runs ~70 minutes, so the main tree was busy for
 every minute of this turn; one dispatch ended at 10:55 and the next began the same minute. The
 window is real but brief. Whoever holds one runs the script.
+
+## 2026-09-03, primary2 — FILES-APP IS ON THE BRANCH, and the drop's refusals now say which
+
+**LANDED.** `feat/nyaa-subtitles` fast-forwarded to `2c25a500`. The window the previous turn
+described as "real but brief" opened at 01:01: `Get-ScheduledTask ClaudeRelay-*` showed one
+Running task and it was my own, so `land-files-app.ps1 -Execute` passed guard 1, guard 2
+confirmed a pure fast-forward 16 commits ahead, and the ff landed. 36 files, +2,688/−78.
+
+Its forecast was WRONG in both directions and the script survived both, which is the point of
+having written it. Collisions were **6**, not 12, and App.tsx — the one conflict it predicted —
+was not among them. Instead three files conflicted when the other tracks' uncommitted diff was
+re-applied over the new HEAD: `preload.ts` (1 hunk), `main/media.ts` (1), and
+`media/VideoCoreStudyOverlay.tsx` (4). All three are **the same in-flight feature meeting ours
+at one insertion point**, not a disagreement:
+
+- `preload.ts` — both sides appended to the same object. Kept both; the apparent `pickSubtitle`
+  duplicate was the old HEAD's ordering, not a second binding.
+- `main/media.ts` — both sides had added `media:subtitleForPath`, so the merged file registered
+  it **twice**. A second `ipcMain.handle` on one channel throws at startup, so this was the one
+  genuinely dangerous hunk. Diffed the two bodies: identical. Dropped ours, kept theirs plus our
+  `media:subtitleFallbackFont`. Verified 1 registration remains.
+- `VideoCoreStudyOverlay.tsx` — theirs removed the `!manager` early return so dual subtitles work
+  under MediaCaptions; ours added `type === 'file'` so a libass track can be the second line.
+  Merged as `!manager || event || file`, and folded our `fileCues()` fallback into their
+  `applyCues`/`cancelled` structure rather than picking a winner.
+
+Verified after: zero conflict markers in `src/`, nothing staged, all 6 files still ` M`, and
+**zero** of the 363 other dirty paths lost (compared against the script's own before-list).
+
+**COST, disclosed:** the ff rewrote 36 files under the liquid worker's running dev server
+(pid 47004), so the "Video window with JoJo 38 loaded" their handoff preserved will not have
+survived HMR. That state has to be re-driven; nothing else was disturbed.
+
+`ce7043ce` — two source ratchets in `fileTrackCueClock.test.ts` pinned punctuation the merge
+reflowed. Repinned to the behaviour-bearing substrings, verified to match the merged main-tree
+file exactly once each. Behaviour unchanged; a formatting ratchet is not a contract.
+
+`fa64bc10` — **gate 11's route told the user nothing it knew.** `attachSubtitleFile` refuses five
+distinct ways and writes a sentence for each, but `ImportHooks.onRefused` carries an i18n KEY, so
+the call site mapped all five to "Could not import {name}." The commonest by far — the video is
+not in the library yet — read as a failure rather than as the one-step fix it is.
+`NyaaSubtitleAcceptResult` gains an optional `SubtitleAttachRefusal` (`no-path`,
+`unreadable-format`, `missing-file`, `no-owner`, `duplicate`, `no-language`); additive, so every
+caller reading `ok`/`message` is untouched. Five map to new keys in all four catalogs; `no-path`
+and any unknown code fall through to the generic key on purpose. `no-owner` also becomes a `warn`
+toast rather than `err` — it is a next step, not a breakage. Both other consumers already pass
+`{ name }` (`DropRouter.tsx:78`, `ScanReviewSheet.tsx:801`), checked rather than assumed.
+Controls: deleting `reason: 'no-owner'` → 1 failed; deleting the ja `subtitleDuplicate` line →
+1 failed; both files restored byte-identical by sha256. The catalog test derives the code list
+FROM the union type, so a seventh code without a translation fails here rather than shipping.
+
+**TRAP, and it cost real work this turn.** `git checkout -- <file>` restores from the INDEX, so
+using it to undo a mutation control silently destroyed two files of *unstaged* edits — and the
+mutated run had passed anyway, because the PowerShell `-replace` pattern used `\r\n` against an
+LF file and was a no-op. A control that does not fail is not a control. Capture and restore with
+literal file copies, and assert the mutation applied before trusting the run.
