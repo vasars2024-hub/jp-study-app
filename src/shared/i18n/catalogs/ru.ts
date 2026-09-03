@@ -4253,6 +4253,7 @@ export const ru: Catalog = {
   'desktop.popOut': 'Открыть в отдельном окне',
   'desktop.minimize': 'Свернуть',
   'desktop.maximize': 'Развернуть',
+  'desktop.restoreDown': 'Восстановить размер',
   'desktop.resize': 'Изменить размер',
   'desktop.makeLiquid': 'Жидкое окно',
   'desktop.returnToStandard': 'Вернуть обычное окно',

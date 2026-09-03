@@ -3955,6 +3955,7 @@ export const ja: Catalog = {
   'desktop.popOut': '別ウィンドウで開く',
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',
+  'desktop.restoreDown': '元のサイズに戻す',
   'desktop.resize': 'サイズ変更',
   'desktop.makeLiquid': 'リキッド表示にする',
   'desktop.returnToStandard': '通常のウィンドウに戻す',

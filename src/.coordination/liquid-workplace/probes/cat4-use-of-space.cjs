@@ -1062,8 +1062,15 @@ const FWIN_RESTORE_STYLE = (surface, style) => `(function(){
 const FWIN_MAX_CLICK = (surface) => `(function(){
   var w = ${hostExpr(surface)};
   if (!w) return JSON.stringify({ refuse: 'surface not found' });
+  // CORRECTION 26. This used to match \`title === 'Maximize'\`, which is the ENGLISH string and
+  // also the string the control stops carrying the moment it IS maximized — the product now
+  // swaps it to "Restore down" with an aria-pressed, exactly as the Liquid toggle already did.
+  // A title match therefore found the button on the way in and lost it on the way back, and the
+  // restore leg silently left the window maximized. Match the STATE affordance instead: the two
+  // \`aria-pressed\` buttons in this cluster are the Liquid toggle and this one, and the Liquid
+  // one is named by class. Locale-independent and state-independent, which the title was neither.
   var b = [].slice.call(w.querySelectorAll('.fwin-btns .fwin-b')).filter(function(x){
-    return x.getAttribute('title') === 'Maximize';
+    return x.hasAttribute('aria-pressed') && !x.classList.contains('fwin-b-liquid');
   })[0];
   if (!b) {
     // CORRECTION 19, first half. The REASON a maximize is unavailable decides whether the
@@ -1082,8 +1089,14 @@ const FWIN_MAX_CLICK = (surface) => `(function(){
     var titles = chrome.map(function(x){ return x.getAttribute('title'); });
     return JSON.stringify({
       refuse: 'no Maximize button - refusing to fake it with an inline width',
+      // Same state affordance as the finder above, applied to the whole window rather than
+      // to \`.fwin-btns\` (correction 19's own point): a frameless host keeps its controls in
+      // \`.fwin-frameless-controls\`, and City really does ship Pop out / Minimize / Close and
+      // no maximize at all.
       noMaximizeAffordance: w.classList.contains('fwin-frameless')
-        && titles.indexOf('Maximize') === -1,
+        && chrome.filter(function(x){
+          return x.hasAttribute('aria-pressed') && !x.classList.contains('fwin-b-liquid');
+        }).length === 0,
       chromeButtons: chrome.length,
       chromeButtonTitles: titles,
       frameless: w.classList.contains('fwin-frameless'),

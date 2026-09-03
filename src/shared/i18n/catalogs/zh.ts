@@ -3935,6 +3935,7 @@ export const zh: Catalog = {
   'desktop.popOut': '在独立窗口中打开',
   'desktop.minimize': '最小化',
   'desktop.maximize': '最大化',
+  'desktop.restoreDown': '向下还原',
   'desktop.resize': '调整大小',
   'desktop.makeLiquid': '切换为液态窗口',
   'desktop.returnToStandard': '返回标准窗口',
