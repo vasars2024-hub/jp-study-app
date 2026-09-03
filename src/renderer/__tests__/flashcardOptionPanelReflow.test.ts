@@ -48,7 +48,13 @@ function ruleOf(selector: string): Record<string, string> {
 }
 
 const BASE = ruleOf('.auto-audio-options,\n.auto-reading-options');
-const REFLOW = ruleOf('.flash-view-decks > .auto-audio-options,\n.flash-view-decks > .auto-reading-options');
+const REFLOW_SELECTOR = [
+  '.flash-view-decks > .auto-audio-options',
+  '.flash-view-decks > .auto-reading-options',
+  '.flash-deck-prefs-body > .auto-audio-options',
+  '.flash-deck-prefs-body > .auto-reading-options',
+].join(',\n');
+const REFLOW = ruleOf(REFLOW_SELECTOR);
 
 /** `repeat(auto-fit, minmax(min(100%, <floor>), 1fr))` — the floor, in px. */
 function trackFloorPx(): number {
@@ -100,29 +106,31 @@ describe('flashcards: the deck-overview option panels use the width they are giv
 
   it('keeps whole-panel text on its own row rather than in a column', () => {
     // Lead copy, the aria-live status line and the disk row describe the panel, not one option.
-    for (const selector of [
-      '.flash-view-decks > .auto-audio-options > .muted',
-      '.flash-view-decks > .auto-reading-options > .muted',
-      '.flash-view-decks > .auto-audio-options > .auto-audio-options__report',
-      '.flash-view-decks > .auto-reading-options > .auto-reading-options__report',
-      '.flash-view-decks > .auto-audio-options > .auto-audio-options__disk',
-    ]) {
-      expect(CSS, `${selector} does not span the panel`).toContain(selector);
+    // Both hosts: the overview's own children, and the same panels once `flash.deckPreferences`
+    // folded them behind a disclosure.
+    for (const host of ['.flash-view-decks', '.flash-deck-prefs-body']) {
+      for (const selector of [
+        `${host} > .auto-audio-options > .muted`,
+        `${host} > .auto-reading-options > .muted`,
+        `${host} > .auto-audio-options > .auto-audio-options__report`,
+        `${host} > .auto-reading-options > .auto-reading-options__report`,
+        `${host} > .auto-audio-options > .auto-audio-options__disk`,
+      ]) {
+        expect(CSS, `${selector} does not span the panel`).toContain(selector);
+      }
     }
     const span = CSS.slice(CSS.indexOf('.flash-view-decks > .auto-audio-options > .muted'));
     expect(span.slice(0, span.indexOf('}'))).toContain('grid-column: 1 / -1');
   });
 
-  it('scopes the reflow to the deck overview, so single-task modes stay one column', () => {
-    // `.auto-reading-options` is also the shell of Learn, Write and Test — a prompt, its input
-    // and its verdict. Splitting those into columns is a different surface's defect.
-    const selectorLine = CSS.slice(
-      CSS.lastIndexOf('.flash-view-decks > .auto-audio-options,\n.flash-view-decks > .auto-reading-options'),
-    );
-    const head = selectorLine.slice(0, selectorLine.indexOf('{'));
-    for (const part of head.split(',')) {
-      expect(part.trim(), 'an unscoped selector would reflow Learn/Write/Test too').toMatch(
-        /^\.flash-view-decks > /,
+  it('reaches the panels by direct child, so single-task modes stay one column', () => {
+    // `.auto-reading-options` is also the shell of Learn, Write, Match and Test — a prompt, its
+    // input and its verdict — and all four render INSIDE `.flash-view-decks`. A descendant
+    // selector would split them into columns, which is a different surface's defect.
+    const head = REFLOW_SELECTOR.split(',\n');
+    for (const part of head) {
+      expect(part.trim(), 'an unscoped selector would reflow Learn/Write/Match/Test too').toMatch(
+        /^\.(flash-view-decks|flash-deck-prefs-body) > \.auto-(audio|reading)-options$/,
       );
     }
     expect(BASE['grid-template-columns']).toBeUndefined();

@@ -5977,6 +5977,7 @@ export const en: Catalog = {
   'flash.advancedEpub': 'Advanced EPUB',
   'flash.jitenVocab': 'Jiten vocab',
   'flash.moreTools': 'More tools',
+  'flash.deckPreferences': 'Card audio, readings and scheduling',
   'flash.csvTool': 'CSV tool',
   // AI Card Studio (en)
   'aiStudio.section.provider': 'Provider & API key',

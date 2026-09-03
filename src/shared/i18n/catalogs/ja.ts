@@ -5955,6 +5955,7 @@ export const ja: Catalog = {
   'flash.advancedEpub': '詳細EPUB',
   'flash.jitenVocab': 'Jiten 語彙',
   'flash.moreTools': 'その他のツール',
+  'flash.deckPreferences': 'カードの音声・読み・スケジュール',
   'flash.csvTool': 'CSVツール',
   // AI Card Studio (ja)
   'aiStudio.section.provider': 'プロバイダーと API キー',

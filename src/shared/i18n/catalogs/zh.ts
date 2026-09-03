@@ -5925,6 +5925,7 @@ export const zh: Catalog = {
   'flash.advancedEpub': '高级 EPUB',
   'flash.jitenVocab': 'Jiten 词汇',
   'flash.moreTools': '更多工具',
+  'flash.deckPreferences': '卡片音频、读音与排程',
   'flash.csvTool': 'CSV 工具',
   // AI Card Studio (zh)
   'aiStudio.section.provider': '提供商与 API 密钥',

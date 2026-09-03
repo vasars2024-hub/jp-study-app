@@ -76,7 +76,10 @@ export default function VirtualList<T>({
   itemRole,
   gridRole,
 }: VirtualListProps<T>) {
-  const [containerRef, size] = useElementSize<HTMLDivElement>();
+  // HEIGHT ONLY, and it is a performance fix, not a tidy-up: the window count below reads
+  // `size.height` and nothing here reads `size.width`, so observing width meant a full
+  // re-render of every mounted row on every frame of a window resize. See `useElementSize`.
+  const [containerRef, size] = useElementSize<HTMLDivElement>('height');
   const [scrollTop, setScrollTop] = useState(0);
   const rafRef = useRef<number | null>(null);
 
