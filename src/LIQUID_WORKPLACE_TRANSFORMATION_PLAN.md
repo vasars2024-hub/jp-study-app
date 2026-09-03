@@ -533,6 +533,31 @@ for all sixteen cells already exist and are cited per category in the scorecard 
 Bank each re-driven category as a formatted entry matching the template at `LIQUID_SCORECARD.md:27`,
 because the header grep in (1) is what any later audit will count.
 
+**RE-DRIVE, HALF ONE OF TWO — 2026-09-02 (primary), `c97b864d`. 8 of the 16 cells are banked and
+the scorecard's header grep is now 2, not 1.** Dictionary holds a COMPLETED **80/80**, every
+category with its own control that actually failed. Two categories were FAILs first and were
+re-scored inside their own fixing commits, as the rubric requires: **cat 2** (`70626d66` — the
+first keystroke into `.dict-search input` cost **118 ms** against a 100 ms bar, because `input`
+state lives in `DictionaryView` and the 3,523 px `LexiconWorkbenchResults` is its sibling and
+re-rendered on every key; memoised, now **15.9 ms**) and **cat 8** (`890c4074` — the defect was
+the INSTRUMENT: `textOf` counted an UNPAINTED empty-state host in the denominator while filtering
+messages by `painted()`, so an honest surface could not pass).
+
+The four bullets stay OPEN because gate 495 names **Video AND Dictionary**, and Video is the
+remaining half. It is the same 8 categories, same harnesses, same protocol, and the L9 baselines
+(`baselines/cat{1..8}-l9-video.json`, 2026-08-31) record the exact `--surface`/`--task`/`--win`
+arguments each one took, so nothing has to be re-derived to start.
+
+**THE TRAP THAT DECIDED A VERDICT, and the next worker must not repeat it: drive the surface into
+its REAL functional state before scoring, or the number is not a measurement.** Dictionary at rest
+— empty search box, no results — scores category 4 at dead-region **18.3% default / 53.3%
+maximized**, a two-bar FAIL. The same window, same tree, same harness, holding a real 20-entry
+lookup: **8.9% / 15.0%**, PASS. Category 1 moves the same way: 13 text runs and 11 controls at
+rest, **154 and 67** loaded. The rubric already caps an empty-harness category at 0; the point is
+that the empty run is not a lower score, it is *not a measurement*. Both runs are banked side by
+side (`cat4-l1rd-dictionary.json` at rest, `cat4-l1rd-dictionary-loaded.json` scored). Expect the
+same to be true of Video, whose canvas is empty until a clip is loaded.
+
 **Progress (2026-08-17, L0's gate having closed the same day).** Two of the eight rubric
 categories are now driven live on both reference apps, each with a control that failed:
 `.coordination/liquid-workplace/L1_SURFACE_ROLES.md` (category 3 — the four roles are
