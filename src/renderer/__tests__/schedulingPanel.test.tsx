@@ -156,6 +156,35 @@ describe('SchedulingPreferencesPanel', () => {
     expect(disabled).toContain('flash.schedule.reset');
   });
 
+  /**
+   * Both sweeps go disabled on the same condition and neither used to say so. `Reset all
+   * scheduling` carried no reason anywhere a user or a screen reader could reach, and a row of
+   * disabled buttons never explains itself — a neighbour's caption is not an explanation.
+   * Measured live on 2026-09-03 by `probes/cat8-honest-states.cjs`, which counted it among five
+   * mute pairs on this window and scored category 8 FAIL.
+   *
+   * The assertion is on the RESOLVED text of the `aria-describedby` target, not on the attribute
+   * alone: an `aria-describedby` pointing at nothing is the same silence with extra markup.
+   */
+  it('says WHY both sweeps are off, and takes the reason away once it stops being true', () => {
+    mount();
+    const [convert, reset] = buttons().filter((b) => b.disabled);
+    const describedBy = reset.getAttribute('aria-describedby');
+    expect(convert.getAttribute('aria-describedby')).toBe(describedBy);
+    expect(describedBy).toBeTruthy();
+    const hint = host.querySelector(`#${describedBy}`);
+    expect(hint?.textContent).toBe('flash.schedule.blocked');
+
+    act(() => { root.unmount(); });
+    host.remove();
+    reviewDeckCard(loadDeck()[0].id, 'good', NOW);
+    mount();
+    const live = buttons().find((b) => b.textContent === 'flash.schedule.reset');
+    expect(live?.disabled).toBe(false);
+    expect(live?.getAttribute('aria-describedby')).toBeNull();
+    expect(host.querySelector(`#${describedBy}`)).toBeNull();
+  });
+
   it('forecasts from stored due dates and counts unscheduled cards as due now', () => {
     reviewDeckCard(loadDeck()[0].id, 'good', Date.now());
     mount();

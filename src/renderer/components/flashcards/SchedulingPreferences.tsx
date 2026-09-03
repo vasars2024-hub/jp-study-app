@@ -132,14 +132,36 @@ export default function SchedulingPreferencesPanel() {
 
       <p className="muted">{t('flash.schedule.switchNote')}</p>
 
+      {/*
+        Both buttons go disabled on the same condition and neither said so: `Convert 0 scheduled
+        cards now` at least carries its zero, `Reset all scheduling` carries nothing at all, and a
+        row of disabled buttons never explains itself (a neighbour's caption is not an
+        explanation). Measured 2026-09-03 by `probes/cat8-honest-states.cjs`.
+      */}
       <div className="flash-match-actions">
-        <button type="button" onClick={convert} disabled={scheduled === 0}>
+        <button
+          type="button"
+          onClick={convert}
+          disabled={scheduled === 0}
+          aria-describedby={scheduled === 0 ? 'flash-schedule-blocked' : undefined}
+        >
           {t('flash.schedule.convert', { count: scheduled })}
         </button>
-        <button type="button" onClick={reset} disabled={scheduled === 0}>
+        <button
+          type="button"
+          onClick={reset}
+          disabled={scheduled === 0}
+          aria-describedby={scheduled === 0 ? 'flash-schedule-blocked' : undefined}
+        >
           {confirmingReset ? t('flash.schedule.resetConfirm') : t('flash.schedule.reset')}
         </button>
       </div>
+
+      {scheduled === 0 && (
+        <p className="muted" id="flash-schedule-blocked">
+          {t('flash.schedule.blocked')}
+        </p>
+      )}
 
       {confirmingReset && (
         <p className="auto-reading-options__report" aria-live="polite">
