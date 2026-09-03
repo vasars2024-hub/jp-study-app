@@ -6,12 +6,12 @@
   "main": ".vite/build/main.js",
   "private": true,
   "scripts": {
-    "prestart": "node tools/sync-ort-assets.cjs",
+    "prestart": "node tools/sync-ort-assets.cjs && node tools/sync-kuromoji-assets.cjs",
     "start": "electron-forge start",
-    "package": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge package",
-    "make": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge make",
+    "package": "node tools/check-runtime-assets.cjs && node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge package",
+    "make": "node tools/check-runtime-assets.cjs && node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && electron-forge make",
     "package:win": "node tools/package-app.cjs",
-    "postinstall": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && node tools/sync-ort-assets.cjs",
+    "postinstall": "node tools/sync-extension-mirror.cjs && node tools/patch-forge-vite.cjs && node tools/patch-packager-unzip.cjs && node tools/sync-ort-assets.cjs && node tools/sync-kuromoji-assets.cjs",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run"
