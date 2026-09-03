@@ -12583,6 +12583,14 @@ mark.lookup-mark,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* An active row paints a 16% accent tint over the panel. In a light theme that
+   composite pulled the 11px muted artist down to 4.43:1 against the 4.5 bar
+   (measured live, classic-light, cat5 Q5 — the ONLY failing run of 66). The
+   selected row gets a stronger secondary tone; hierarchy still reads because
+   the title beside it is full --text. */
+.music-row.active .music-song-artist {
+  color: color-mix(in srgb, var(--text) 40%, var(--muted));
+}
 .music-song-artist {
   font-size: 11px;
   flex-shrink: 0;
