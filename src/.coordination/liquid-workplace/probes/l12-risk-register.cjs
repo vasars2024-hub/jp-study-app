@@ -59,9 +59,9 @@
  * tree, so the teardown is verified, not assumed.
  *
  * R3/R4 get in-memory mutation controls (their inputs are files this process parses).
- * R1, R5, R6 and R7 are reported `unfalsified` rather than given a fake control — R1 and
- * R7 would require damaging the tree or the environment, and R5/R6 are pass-throughs of
- * another instrument's own verdict.
+ * R5, R6 and R7 are reported `unfalsified` rather than given a fake control — R7 would
+ * require damaging the environment, and R5/R6 are pass-throughs of another instrument's own
+ * verdict. R1 joined the falsified set on 2026-09-03, when its remedy became a gate.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs \
@@ -139,6 +139,60 @@ function importedButUntracked(tracked) {
   return { specifiers, resolved, findings };
 }
 
+/**
+ * R1. What `public/` holds, what git carries of it, what .gitignore excludes — and, since
+ * 2026-09-03, whether the OTHER remedy is real.
+ *
+ * R1's own `whatWouldCloseIt` has always named two routes: "either track the blobs (they are
+ * large), or make the packaging step fetch/stage them and fail loudly when they are absent."
+ * The verdict measured only the first, so a tree that took the second route would report
+ * HIGH/OPEN forever and the next reader would chase a ghost — which is the exact rot this
+ * generator exists to prevent, arriving through the generator itself.
+ *
+ * The staging route is therefore re-derived, never trusted: the manifest is REQUIRED and its
+ * own predicate is exercised (a gate that answers "nothing missing" because it looks at
+ * nothing would otherwise read as a pass), the preflight must be wired into every packaging
+ * entry point INCLUDING `tools/package-app.cjs`, which calls electron-forge directly and does
+ * not inherit the npm script, and each asset must be present here as well as obtainable.
+ */
+function runtimeAssetGate() {
+  const manifestPath = path.join(REPO, 'tools', 'runtime-assets.manifest.cjs');
+  if (!fs.existsSync(manifestPath)) return { available: false };
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+  const m = require(manifestPath);
+  const assets = m.REQUIRED_RUNTIME_ASSETS || [];
+  const pub = path.join(REPO, 'public');
+  const pkgPath = path.join(REPO, 'package.json');
+  const scripts = fs.existsSync(pkgPath)
+    ? (JSON.parse(fs.readFileSync(pkgPath, 'utf8')).scripts || {})
+    : {};
+  const appPackager = path.join(REPO, 'tools', 'package-app.cjs');
+  const CHECKER = 'check-runtime-assets.cjs';
+  const wiredInto = [
+    ...['package', 'make'].filter((s) => (scripts[s] || '').includes(CHECKER)),
+    ...(fs.existsSync(appPackager) && fs.readFileSync(appPackager, 'utf8').includes(CHECKER)
+      ? ['tools/package-app.cjs'] : []),
+  ];
+  const stagedAndWired = assets.filter((a) => {
+    if (!a.stagedBy) return false;
+    const tool = a.stagedBy.split('/').pop();
+    return (scripts.postinstall || '').includes(tool) && fs.existsSync(path.join(REPO, a.stagedBy));
+  });
+  return {
+    available: true,
+    checkerPresent: fs.existsSync(path.join(REPO, 'tools', CHECKER)),
+    requiredAssets: assets.length,
+    presentHere: assets.filter((a) => fs.existsSync(path.join(pub, a.rel))).length,
+    stagedFromNodeModules: stagedAndWired.length,
+    obtainableOnlyOutOfBand: assets.filter((a) => !a.stagedBy).map((a) => a.rel),
+    preflightWiredInto: wiredInto,
+    // Not vacuous: with nothing on disk the gate must name every asset, not zero.
+    preflightNamesAllWhenAllAbsent:
+      typeof m.missingRuntimeAssets === 'function'
+      && m.missingRuntimeAssets(() => false).length === assets.length,
+  };
+}
+
 /** R1. What `public/` holds, what git carries of it, and what .gitignore excludes. */
 function publicBlobs(tracked) {
   const pub = path.join(REPO, 'public');
@@ -161,7 +215,27 @@ function publicBlobs(tracked) {
     gitignoreLines: ignoredUnderPublic,
     referenceTreeEntries: mainEntries ? mainEntries.length : null,
     referenceTreeOnly: mainEntries ? mainEntries.filter((e) => !onDisk.includes(e)) : null,
+    gate: runtimeAssetGate(),
   };
+}
+
+/**
+ * R1's verdict, given one measurement. Extracted so the falsification below can run it over a
+ * mutated copy without touching the tree — the same in-memory shape R3 and R4 use.
+ */
+function r1Closed(r1) {
+  if (r1.pathsTrackedByGit >= r1.entriesOnDisk) return true;
+  const g = r1.gate;
+  return !!(
+    g
+    && g.available
+    && g.checkerPresent
+    && g.requiredAssets > 0
+    && g.presentHere === g.requiredAssets
+    && g.preflightNamesAllWhenAllAbsent
+    // package, make AND the direct electron-forge path. Two of three is a hole.
+    && g.preflightWiredInto.length === 3
+  );
 }
 
 /** R3. */
@@ -408,11 +482,11 @@ function build(atlasPath, vitestLog) {
       id: 'R1',
       title: 'Runtime blobs the app loads from public/ are not in git',
       severity: 'high',
-      state: r1.pathsTrackedByGit >= r1.entriesOnDisk ? 'closed' : 'open',
+      state: r1Closed(r1) ? 'closed' : 'open',
       measurement: r1,
       whyItMatters: 'A production build from a clean clone lacks them and fails at runtime with no useful diagnostic. This is how 12 anonymous ERR_FILE_NOT_FOUND stacks got into a production boot.',
-      whatWouldCloseIt: 'Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. The named-diagnostic fix landed in 96a7b579 makes the failure legible; it does not make the blobs present.',
-      falsified: false,
+      whatWouldCloseIt: 'Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. 96a7b579 made the RUNTIME failure legible without making the blobs present; a76163dd and 871cb8b4 took the second route — kuromoji, ort and the tesseract engine are staged from node_modules by postinstall, and tools/check-runtime-assets.cjs refuses to package when any of the six witness files is missing, naming the path, the feature that dies and the remedy. What is still only obtainable out of band is listed in measurement.gate.obtainableOnlyOutOfBand; the harm this risk names — a SILENT runtime failure — is what the preflight removes.',
+      falsified: null,
     },
     {
       id: 'R2',
@@ -553,6 +627,32 @@ function controls(base) {
       && restored.findings.length === base.risks.find((r) => r.id === 'R2').measurement.findings.length,
   };
 
+  // --- R1: the staging route is only a real remedy if removing it reopens the risk. Mutate
+  // the measurement in memory (no tree write: this one has three packaging entry points and a
+  // half-applied edit to package.json is exactly the thing not to leave behind on a crash).
+  // Each leg removes ONE reason to close, so a verdict that ignored that reason reads as a pass.
+  {
+    const b1 = base.risks.find((r) => r.id === 'R1').measurement;
+    const withGate = (patch) => ({ ...b1, gate: { ...(b1.gate || {}), ...patch } });
+    const legs = {
+      unwired: r1Closed(withGate({ preflightWiredInto: ['package', 'make'] })),
+      vacuousGate: r1Closed(withGate({ preflightNamesAllWhenAllAbsent: false })),
+      checkerGone: r1Closed(withGate({ checkerPresent: false })),
+      assetAbsentHere: r1Closed(
+        withGate({ presentHere: Math.max(0, ((b1.gate || {}).requiredAssets || 1) - 1) }),
+      ),
+      noManifest: r1Closed({ ...b1, gate: { available: false } }),
+    };
+    out.r1 = {
+      kind: 'remove-each-reason-to-close/R1-must-reopen-on-every-one',
+      baseState: r1Closed(b1) ? 'closed' : 'open',
+      reopensWhen: legs,
+      // Only meaningful from a closed base — from an open one every leg is trivially open.
+      pass: r1Closed(b1) ? Object.values(legs).every((closed) => closed === false) : null,
+      note: r1Closed(b1) ? undefined : 'n/a — R1 is already open, so nothing to falsify',
+    };
+  }
+
   // --- R4: mutate the plan text in memory; the counter must move by exactly one.
   const planText = fs.readFileSync(path.join(REPO, 'src', 'LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md'), 'utf8');
   const b0 = planBullets(planText);
@@ -613,9 +713,9 @@ function controls(base) {
     };
   } else out.r9 = { kind: 'plant-a-colliding-plate-path', pass: null, note: 'n/a — no matrix manifests to collide with' };
 
-  out.unfalsified = ['R1', 'R5', 'R6', 'R7', 'R8'];
-  out.unfalsifiedWhy = 'R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.';
-  const vals = ['r2', 'r3', 'r4', 'r9'].map((k) => out[k] && out[k].pass);
+  out.unfalsified = ['R5', 'R6', 'R7', 'R8'];
+  out.unfalsifiedWhy = 'R7 would require changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here. R1 LEFT THIS LIST 2026-09-03: its remedy became a gate with a testable shape, so each reason to close can be removed from the measurement in memory and the verdict must reopen — no tree damage needed, which was the only reason it was here.';
+  const vals = ['r1', 'r2', 'r3', 'r4', 'r9'].map((k) => out[k] && out[k].pass);
   out.summary = { fired: vals.filter((v) => v === true).length, failed: vals.filter((v) => v === false).length };
   return out;
 }

@@ -1,22 +1,22 @@
 {
   "schema": "l12-risk-register/v1",
   "bullet": "L12 bullet 4 — remaining-risk report",
-  "generatedAt": "2026-09-02T21:59:03.396Z",
-  "head": "8b10bc75",
+  "generatedAt": "2026-09-03T08:34:35.505Z",
+  "head": "871cb8b4",
   "branch": "feat/nyaa-subtitles",
   "totals": {
     "risks": 9,
-    "open": 6,
-    "closed": 3,
+    "open": 4,
+    "closed": 5,
     "unmeasured": 0,
-    "highOpen": 3
+    "highOpen": 2
   },
   "risks": [
     {
       "id": "R1",
       "title": "Runtime blobs the app loads from public/ are not in git",
       "severity": "high",
-      "state": "open",
+      "state": "closed",
       "measurement": {
         "entriesOnDisk": 7,
         "entryNames": [
@@ -56,11 +56,28 @@
           }
         ],
         "referenceTreeEntries": 7,
-        "referenceTreeOnly": []
+        "referenceTreeOnly": [],
+        "gate": {
+          "available": true,
+          "checkerPresent": true,
+          "requiredAssets": 6,
+          "presentHere": 6,
+          "stagedFromNodeModules": 4,
+          "obtainableOnlyOutOfBand": [
+            "tesseract/lang/jpn.traineddata.gz",
+            "cedict/cedict.u8"
+          ],
+          "preflightWiredInto": [
+            "package",
+            "make",
+            "tools/package-app.cjs"
+          ],
+          "preflightNamesAllWhenAllAbsent": true
+        }
       },
       "whyItMatters": "A production build from a clean clone lacks them and fails at runtime with no useful diagnostic. This is how 12 anonymous ERR_FILE_NOT_FOUND stacks got into a production boot.",
-      "whatWouldCloseIt": "Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. The named-diagnostic fix landed in 96a7b579 makes the failure legible; it does not make the blobs present.",
-      "falsified": false
+      "whatWouldCloseIt": "Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. 96a7b579 made the RUNTIME failure legible without making the blobs present; a76163dd and 871cb8b4 took the second route — kuromoji, ort and the tesseract engine are staged from node_modules by postinstall, and tools/check-runtime-assets.cjs refuses to package when any of the six witness files is missing, naming the path, the feature that dies and the remedy. What is still only obtainable out of band is listed in measurement.gate.obtainableOnlyOutOfBand; the harm this risk names — a SILENT runtime failure — is what the preflight removes.",
+      "falsified": null
     },
     {
       "id": "R2",
@@ -68,8 +85,8 @@
       "severity": "high",
       "state": "closed",
       "measurement": {
-        "specifiers": 7905,
-        "resolved": 7878,
+        "specifiers": 7916,
+        "resolved": 7889,
         "findings": []
       },
       "whyItMatters": "Dev resolves imports lazily, rollup resolves the whole graph, so this class of defect is invisible from a working tree and kills the production build on a clean checkout.",
@@ -80,61 +97,15 @@
       "id": "R3",
       "title": "Feature-parity rows are still pending",
       "severity": "medium",
-      "state": "open",
+      "state": "closed",
       "measurement": {
         "available": true,
-        "rows": 213,
+        "rows": 222,
         "tally": {
-          "both": 204,
-          "pending": 9
+          "both": 221,
+          "standard-only": 1
         },
-        "pendingRows": [
-          {
-            "surface": "city",
-            "feature": "Open the dossier from the hero, and get back out of it",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "The stage the badge claims is the stage the scene paints",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "Three dossier facts, all filled, with the banked-pages sentence agreeing with the progress bar it sits above",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "Ambient music on/off, with the volume slider disabled exactly when music is off",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "The volume number shown is the volume the slider holds",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "The scene is actually painted: every canvas has pixels and the parallax layers are all present",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "The hero affordance is inside the window and big enough to hit",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "Development-only affordances are marked as such and never mixed into the user controls",
-            "blocker": null
-          },
-          {
-            "surface": "city",
-            "feature": "Window lifecycle: pop out, minimize, maximize, close",
-            "blocker": null
-          }
-        ]
+        "pendingRows": []
       },
       "whyItMatters": "The plan's reversibility promise is only as strong as the ledger behind it; a pending row is a feature nobody has shown survives the Liquid round trip.",
       "whatWouldCloseIt": "Each pending row names its own blocker in the ledger.",
@@ -146,20 +117,15 @@
       "severity": "medium",
       "state": "open",
       "measurement": {
-        "closed": 37,
-        "open": 9,
+        "closed": 45,
+        "open": 4,
         "unknown": 0,
-        "total": 46,
+        "total": 49,
         "openTitles": [
           "Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.",
-          "Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.",
-          "Confirm the four surface roles and orientation-spine behavior.",
-          "Approve standard/Liquid entry, exit, and recovery UX.",
-          "Produce static layout studies for compact, default, and maximized states.",
-          "Validate every player feature in standard and Liquid modes.",
+          "**DEFECT S3 — the Russian second subtitle line flickers.** Observed live by the user 2026-09-02: the secondary/dual subtitle line disappears and reappears during playback. The second line is the `videoCoreStudy` offered-languages path. Likely a re-render or cue-boundary problem rather than a font one. Prove the fix with a timed capture across several cue boundaries, not a single frame.",
           "Keep review/input surfaces spatially fixed during active tasks.",
-          "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-          "Close every feature-ledger row."
+          "Use Liquid only for context, preview, scheduling detail, and session summaries."
         ]
       },
       "whyItMatters": "The release gate is the plan’s own definition of done.",
@@ -173,7 +139,7 @@
       "state": "open",
       "measurement": {
         "exit": 1,
-        "modules": 2542,
+        "modules": 2550,
         "stale": null,
         "fresh": null,
         "tail": "  test-only-module       13  (6 pending)\n\nBaseline entries that no longer occur (3) — remove them:\n  orphan-module:src/media/StudyBottomBar.tsx\n  orphan-module:src/media/StudyDocks.tsx\n  orphan-module:src/media/StudyWorkspaceCustomizer.tsx"
@@ -307,16 +273,28 @@
       "teardownVerified": true,
       "pass": true
     },
+    "r1": {
+      "kind": "remove-each-reason-to-close/R1-must-reopen-on-every-one",
+      "baseState": "closed",
+      "reopensWhen": {
+        "unwired": false,
+        "vacuousGate": false,
+        "checkerGone": false,
+        "assetAbsentHere": false,
+        "noManifest": false
+      },
+      "pass": true
+    },
     "r4": {
       "kind": "append-one-open-bullet/R4-count-must-rise-by-one",
-      "base": 9,
-      "mutated": 10,
+      "base": 4,
+      "mutated": 5,
       "pass": true
     },
     "r3": {
       "kind": "force-one-row-pending/R3-count-must-rise-or-hold-if-already-pending",
-      "base": 9,
-      "mutated": 10,
+      "base": 0,
+      "mutated": 1,
       "pass": true
     },
     "r9": {
@@ -328,15 +306,14 @@
       "pass": true
     },
     "unfalsified": [
-      "R1",
       "R5",
       "R6",
       "R7",
       "R8"
     ],
-    "unfalsifiedWhy": "R1 and R7 would require damaging the tree or changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here.",
+    "unfalsifiedWhy": "R7 would require changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here. R1 LEFT THIS LIST 2026-09-03: its remedy became a gate with a testable shape, so each reason to close can be removed from the measurement in memory and the verdict must reopen — no tree damage needed, which was the only reason it was here.",
     "summary": {
-      "fired": 4,
+      "fired": 5,
       "failed": 0
     }
   }

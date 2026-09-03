@@ -3,15 +3,15 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `feat/nyaa-subtitles` at `8b10bc75`, 2026-09-02T21:59:03.396Z.
+Branch `feat/nyaa-subtitles` at `871cb8b4`, 2026-09-03T08:34:35.505Z.
 
-**6 of 9 risks open** (3 high, 3 closed, 0 unmeasured).
+**4 of 9 risks open** (2 high, 5 closed, 0 unmeasured).
 
 | id | sev | state | risk |
 | --- | --- | --- | --- |
-| R1 | HIGH | OPEN | Runtime blobs the app loads from public/ are not in git |
+| R1 | HIGH | CLOSED | Runtime blobs the app loads from public/ are not in git |
 | R2 | HIGH | CLOSED | A source file is imported by tracked code but is itself untracked |
-| R3 | MED | OPEN | Feature-parity rows are still pending |
+| R3 | MED | CLOSED | Feature-parity rows are still pending |
 | R4 | MED | OPEN | Liquid plan bullets are still open |
 | R5 | MED | OPEN | The architecture-audit gate is red |
 | R6 | HIGH | CLOSED | The visual atlas is not certification evidence |
@@ -21,11 +21,11 @@ Branch `feat/nyaa-subtitles` at `8b10bc75`, 2026-09-02T21:59:03.396Z.
 
 ### R1 — Runtime blobs the app loads from public/ are not in git
 
-**HIGH · OPEN**
+**HIGH · CLOSED**
 
 Why it matters: A production build from a clean clone lacks them and fails at runtime with no useful diagnostic. This is how 12 anonymous ERR_FILE_NOT_FOUND stacks got into a production boot.
 
-What would close it: Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. The named-diagnostic fix landed in 96a7b579 makes the failure legible; it does not make the blobs present.
+What would close it: Either track the blobs (they are large), or make the packaging step fetch/stage them and fail loudly when they are absent. 96a7b579 made the RUNTIME failure legible without making the blobs present; a76163dd and 871cb8b4 took the second route — kuromoji, ort and the tesseract engine are staged from node_modules by postinstall, and tools/check-runtime-assets.cjs refuses to package when any of the six witness files is missing, naming the path, the feature that dies and the remedy. What is still only obtainable out of band is listed in measurement.gate.obtainableOnlyOutOfBand; the harm this risk names — a SILENT runtime failure — is what the preflight removes.
 
 ```json
 {
@@ -67,7 +67,7 @@ What would close it: Either track the blobs (they are large), or make the packag
     }
   ],
   "referenceTreeEntries": 7,
-  "referenceTreeOnly": []
+  "referenceTreeOnly": [],
 ```
 
 ### R2 — A source file is imported by tracked code but is itself untracked
@@ -80,15 +80,15 @@ What would close it: git add the resolved target, or delete the import.
 
 ```json
 {
-  "specifiers": 7905,
-  "resolved": 7878,
+  "specifiers": 7916,
+  "resolved": 7889,
   "findings": []
 }
 ```
 
 ### R3 — Feature-parity rows are still pending
 
-**MEDIUM · OPEN**
+**MEDIUM · CLOSED**
 
 Why it matters: The plan's reversibility promise is only as strong as the ledger behind it; a pending row is a feature nobody has shown survives the Liquid round trip.
 
@@ -97,44 +97,13 @@ What would close it: Each pending row names its own blocker in the ledger.
 ```json
 {
   "available": true,
-  "rows": 213,
+  "rows": 222,
   "tally": {
-    "both": 204,
-    "pending": 9
+    "both": 221,
+    "standard-only": 1
   },
-  "pendingRows": [
-    {
-      "surface": "city",
-      "feature": "Open the dossier from the hero, and get back out of it",
-      "blocker": null
-    },
-    {
-      "surface": "city",
-      "feature": "The stage the badge claims is the stage the scene paints",
-      "blocker": null
-    },
-    {
-      "surface": "city",
-      "feature": "Three dossier facts, all filled, with the banked-pages sentence agreeing with the progress bar it sits above",
-      "blocker": null
-    },
-    {
-      "surface": "city",
-      "feature": "Ambient music on/off, with the volume slider disabled exactly when music is off",
-      "blocker": null
-    },
-    {
-      "surface": "city",
-      "feature": "The volume number shown is the volume the slider holds",
-      "blocker": null
-    },
-    {
-      "surface": "city",
-      "feature": "The scene is actually painted: every canvas has pixels and the parallax layers are all present",
-      "blocker": null
-    },
-    {
-      "surface": "city",
+  "pendingRows": []
+}
 ```
 
 ### R4 — Liquid plan bullets are still open
@@ -147,20 +116,15 @@ What would close it: Close each remaining bullet against its own words with live
 
 ```json
 {
-  "closed": 37,
-  "open": 9,
+  "closed": 45,
+  "open": 4,
   "unknown": 0,
-  "total": 46,
+  "total": 49,
   "openTitles": [
     "Record performance baselines: boot, window drag, resize, theme switch, memory, and player frame stability.",
-    "Approve the definitions in §§1–4 against two representative apps: Video and Dictionary.",
-    "Confirm the four surface roles and orientation-spine behavior.",
-    "Approve standard/Liquid entry, exit, and recovery UX.",
-    "Produce static layout studies for compact, default, and maximized states.",
-    "Validate every player feature in standard and Liquid modes.",
+    "**DEFECT S3 — the Russian second subtitle line flickers.** Observed live by the user 2026-09-02: the secondary/dual subtitle line disappears and reappears during playback. The second line is the `videoCoreStudy` offered-languages path. Likely a re-render or cue-boundary problem rather than a font one. Prove the fix with a timed capture across several cue boundaries, not a single frame.",
     "Keep review/input surfaces spatially fixed during active tasks.",
-    "Use Liquid only for context, preview, scheduling detail, and session summaries.",
-    "Close every feature-ledger row."
+    "Use Liquid only for context, preview, scheduling detail, and session summaries."
   ]
 }
 ```
@@ -176,7 +140,7 @@ What would close it: Reconcile the stale baseline entries it names.
 ```json
 {
   "exit": 1,
-  "modules": 2542,
+  "modules": 2550,
   "stale": null,
   "fresh": null,
   "tail": "  test-only-module       13  (6 pending)\n\nBaseline entries that no longer occur (3) — remove them:\n  orphan-module:src/media/StudyBottomBar.tsx\n  orphan-module:src/media/StudyDocks.tsx\n  orphan-module:src/media/StudyWorkspaceCustomizer.tsx"
