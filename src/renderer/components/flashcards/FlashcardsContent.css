@@ -258,6 +258,23 @@
   text-align: center;
 }
 
+/*
+ * The comprehension PROMPT: a full sentence shown where a single word normally goes. It keeps the
+ * prompt's visual weight (still the largest thing on the card, still above .flash-sentence on the
+ * answer side) without the single-word ramp, which put a 266-character sentence at 1,870px inside
+ * a 545px viewport - a 2,017px card, 3.70 screens, with the grading row past the end of all of
+ * them. With this rule the same card measures 702px / 849px / 1.56 screens.
+ *
+ * Sits beside .flash-recall-prompt deliberately: both override a styles.css ramp at equal
+ * specificity and win on source order, which is measured, not assumed - the recall prompt computes
+ * 32px/672px live against the 22px its .flash-meaning rule would otherwise give it.
+ */
+.flash-view .flash-sentence-prompt {
+  max-width: 42rem;
+  font-size: clamp(1.375rem, 3.4vw, 2.25rem);
+  line-height: 1.5;
+}
+
 .flash-view .flash-sentence {
   max-width: 48rem;
   font-size: 1rem;

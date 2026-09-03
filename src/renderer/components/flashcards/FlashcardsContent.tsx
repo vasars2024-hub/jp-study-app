@@ -1362,7 +1362,17 @@ export function FlashcardReviewMode({ state }: { state: FlashcardsState }) {
                   ? 'flash.prompt.comprehension'
                   : 'flash.prompt.reading')}
               </span>
-              <span className="flash-word" lang="ja">
+              {/*
+                A comprehension prompt is a whole SENTENCE, so it cannot ride the single-word type
+                ramp: `.flash-review-shell .flash-word` is clamp(42px, 8vw, 64px), and measured live
+                a 266-character sentence rendered 1,870px tall in a 545px viewport. The recall
+                prompt already solves this the same way one branch above (`flash-recall-prompt`);
+                this is that pattern, not a new one.
+              */}
+              <span
+                className={`flash-word${current.promptKind === 'comprehension' ? ' flash-sentence-prompt' : ''}`}
+                lang="ja"
+              >
                 {current.promptKind === 'comprehension'
                   ? current.sentence || current.front || current.word
                   : current.word}

@@ -18,7 +18,8 @@
  *     --surface "Library" [--win main] [--label l6-library] [--out <file>] [--control] \
  *     --task "click:.chip-manga >> wait:400 >> click:.card" \
  *     [--undo "click:.chip-all"] [--result ".card"] [--compare "@.reader"] \
- *     [--churn ".music-time,.music-seek"] [--idle 1600]
+ *     [--churn ".music-time,.music-seek"] [--idle 1600] \
+ *     [--anchors ".fc-card >> .fc-actions"] [--anchor-tol 2]
  *
  * --surface takes the same two forms as the category-1, -4 and -8 harnesses, deliberately, so a
  * surface is named identically in all four: a leading `@` is a CSS SELECTOR (a section of the main
@@ -151,6 +152,25 @@ const BOTH = has('both-presentations');
 // Correction 19: the self-changing regions of this surface, as a CSS selector list. Declared by
 // the caller, PROVEN by the idle leg - never taken on trust, and never a free exclusion.
 const CHURN = arg('churn', '');
+/*
+ * L7 bullet 997, "keep review/input surfaces spatially fixed during active tasks" — the regions
+ * this surface promises NOT to move while the task runs, as ` >> `-separated CSS selectors.
+ *
+ * This is a DIFFERENT question from anything else the harness asks, and it was genuinely
+ * unmeasured before 2026-09-03. The Flashcards progress note records the card and action rects as
+ * byte-identical across a Liquid -> Standard -> Liquid PRESENTATION round trip; a presentation
+ * round trip returns to the same state by construction. The bullet is about the surface staying
+ * put while the STATE ADVANCES underneath it — reveal an answer, grade it, take the next card —
+ * which is when a grading row is actually at risk of sliding under the pointer.
+ *
+ * Rects are scored ROOT-RELATIVE. A floating window that is dragged mid-task moves every anchor
+ * in viewport space and none of them relative to the surface, and the bullet is about internal
+ * layout, not about where the user put the window.
+ */
+const ANCHORS = arg('anchors', '');
+// The bullet's own bar. An anchor that moves at all has moved, but sub-pixel rounding and
+// subpixel text metrics are not a shift a pointer can miss; 2px is the smallest honest floor.
+const ANCHOR_TOL = Number(arg('anchor-tol', '2'));
 // Long enough that a once-a-second clock is certain to tick inside the window.
 const IDLE_MS = Number(arg('idle', '1600')) || 1600;
 const SETTLE = Number(arg('settle', '600')) || 600;
@@ -433,8 +453,37 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     dialogs.push({ sel: name(dq[d]), txt: (dq[d].textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 60) });
   }
 
+  // L7 bullet 997. First PAINTED match per selector, rect taken RELATIVE to the surface root.
+  // An anchor that is absent or unpainted is recorded as absent, NOT as a shift of zero - which
+  // is the exact way a grading row that vanishes for a frame would score as perfectly stable.
+  var anchorSel = ${JSON.stringify(ANCHORS)};
+  var anchors = [];
+  if (anchorSel) {
+    var aList = anchorSel.split(' >> ');
+    for (var ai = 0; ai < aList.length; ai++) {
+      var asel = aList[ai].trim();
+      if (!asel) continue;
+      var hit = null;
+      var cand = root.querySelectorAll(asel);
+      for (var ci2 = 0; ci2 < cand.length; ci2++) {
+        var cr = cand[ci2].getBoundingClientRect();
+        if (painted(cand[ci2]) && cr.width > 0 && cr.height > 0) { hit = cand[ci2]; break; }
+      }
+      if (!hit) { anchors.push({ sel: asel, present: false }); continue; }
+      var hr = hit.getBoundingClientRect();
+      var r2 = function (n) { return Math.round(n * 100) / 100; };
+      anchors.push({
+        sel: asel, present: true,
+        x: r2(hr.left - WR.left), y: r2(hr.top - WR.top),
+        w: r2(hr.width), h: r2(hr.height),
+        vx: r2(hr.left), vy: r2(hr.top),
+      });
+    }
+  }
+
   var ae = document.activeElement;
   return JSON.stringify({
+    anchors: anchors,
     textRuns: runs,
     churnTextRuns: churnRuns,
     churnControls: churnCtrls,
@@ -622,14 +671,62 @@ const CONTROL_INJECT = (surface) => `(function(){
   inner.textContent = 'Control unreachable content';
   sc.appendChild(inner);
   host.appendChild(b); host.appendChild(dlg); host.appendChild(sc);
+
+  /*
+   * L7 bullet 997's negative control, and it has to fire DURING a step or it proves nothing.
+   * The three plants above are all present before the run starts, so an anchor measured before
+   * and after the same step sees them equally and the delta is 0 either way. This one is armed
+   * and only displaces the anchor when its button is CLICKED, which is the only shape that can
+   * falsify a per-step shift reading.
+   *
+   * It moves the REAL anchor rather than a stand-in: a control that resolves its own victim can
+   * name a different element than the question scores, which is a recorded false PASS here.
+   */
+  var anchorSel = ${JSON.stringify(ANCHORS)};
+  var shiftInfo = null;
+  if (anchorSel) {
+    var first = anchorSel.split(' >> ')[0].trim();
+    var target = null;
+    var cnd = root.querySelectorAll(first);
+    for (var z = 0; z < cnd.length; z++) {
+      var zr = cnd[z].getBoundingClientRect();
+      var vis = typeof cnd[z].checkVisibility === 'function'
+        ? cnd[z].checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) : true;
+      if (vis && zr.width > 0 && zr.height > 0) { target = cnd[z]; break; }
+    }
+    if (target) {
+      var sb = document.createElement('button');
+      sb.setAttribute('data-lqcat2-shift', '1');
+      sb.textContent = 'Control shift anchor';
+      sb.style.cssText = 'display:block;width:180px;height:34px';
+      sb.addEventListener('click', function () {
+        target.setAttribute('data-lqcat2-shifted', target.style.marginTop || '');
+        target.style.marginTop = '37px';
+      });
+      host.appendChild(sb);
+      shiftInfo = { sel: first, before: Math.round(target.getBoundingClientRect().top) };
+    } else {
+      shiftInfo = { sel: first, refuse: 'no painted match for the first anchor; cannot arm the shift control' };
+    }
+  }
+
   root.appendChild(host);
-  return JSON.stringify({ injected: true });
+  return JSON.stringify({ injected: true, shiftControl: shiftInfo });
 })()`;
 
 const CONTROL_REMOVE = `(function(){
+  // Restore the displaced anchor FIRST and report what it was put back to, so an anchor left
+  // 37px down cannot ride into the restoration leg as the surface's natural resting layout.
+  var s = document.querySelectorAll('[data-lqcat2-shifted]');
+  var unshifted = [];
+  for (var j = 0; j < s.length; j++) {
+    s[j].style.marginTop = s[j].getAttribute('data-lqcat2-shifted') || '';
+    s[j].removeAttribute('data-lqcat2-shifted');
+    unshifted.push(Math.round(s[j].getBoundingClientRect().top));
+  }
   var n = document.querySelectorAll('[data-lqcat2-control]');
   for (var i = 0; i < n.length; i++) n[i].remove();
-  return JSON.stringify({ removed: n.length })
+  return JSON.stringify({ removed: n.length, unshifted: unshifted })
 })()`;
 
 const READ = `(function(){
@@ -685,6 +782,41 @@ async function raise(surface) {
 const parseSteps = (spec) => (spec ? spec.split('>>').map((s) => s.trim()).filter(Boolean) : []);
 
 const snapOf = async (surface, churn = CHURN) => JSON.parse(await ev(SNAP(surface, churn)));
+
+/**
+ * L7 bullet 997's scoring term. Root-relative displacement of each declared anchor between two
+ * snapshots. Returns per-anchor rows plus the worst single number, which is what the bullet is
+ * scored on.
+ *
+ * A `present -> absent` transition gets its OWN verdict and is never folded into a shift of 0.
+ * The failure this measures is a region not being where the pointer left it, and a region that is
+ * not there at all is the extreme case of that, not the safe case. A `resizePx` is reported
+ * separately and UNSCORED: a card frame that grows downward around longer text has not moved its
+ * own top-left, and the bullet is about position under the pointer.
+ */
+function anchorDelta(before, after) {
+  const A = new Map((before.anchors || []).map((a) => [a.sel, a]));
+  const rows = [];
+  const r2 = (n) => Math.round(n * 100) / 100;
+  for (const b of after.anchors || []) {
+    const a = A.get(b.sel);
+    if (!a) continue;
+    if (!a.present && !b.present) { rows.push({ sel: b.sel, state: 'absent-throughout', shiftPx: null }); continue; }
+    if (a.present !== b.present) { rows.push({ sel: b.sel, state: b.present ? 'appeared' : 'vanished', shiftPx: null }); continue; }
+    const dx = r2(b.x - a.x), dy = r2(b.y - a.y), dw = r2(b.w - a.w), dh = r2(b.h - a.h);
+    rows.push({
+      sel: b.sel, state: 'present', dx, dy, dw, dh,
+      shiftPx: r2(Math.max(Math.abs(dx), Math.abs(dy))),
+      resizePx: r2(Math.max(Math.abs(dw), Math.abs(dh))),
+    });
+  }
+  return {
+    rows,
+    maxShiftPx: rows.reduce((m, r) => (r.shiftPx !== null && r.shiftPx > m ? r.shiftPx : m), 0),
+    movedOverTol: rows.filter((r) => r.shiftPx !== null && r.shiftPx > ANCHOR_TOL).map((r) => `${r.sel}:${r.shiftPx}`),
+    vanished: rows.filter((r) => r.state === 'vanished').map((r) => r.sel),
+  };
+}
 
 /**
  * Correction 4: a step is live if ANY channel moved. Reported per channel so a next worker can see
@@ -851,6 +983,9 @@ async function runTask(surface, spec) {
        * nothing else on the pane — 45 controls and 903 characters before and after.
        */
       deadEnd: r.counted === true && r.moved.any === false && r.caretOnly !== true,
+      // L7 bullet 997, measured across THIS step's own state advance. `before` is still the
+      // pre-step snapshot here; it is reassigned two lines below.
+      anchorShift: ANCHORS ? anchorDelta(before, r.after) : null,
     });
     if (r.moved.rootGone) { before = r.after; break; }
     before = r.after;
@@ -1002,6 +1137,26 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     modalTraps: modal.traps,
     dialogsClosedByEscape: modal.closedByEscape,
     cost,
+    // L7 bullet 997. Rolled up per step AND base-to-end, because the two answer different
+    // questions: a row that slides away on `reveal` and slides back on `grade` is a shift a
+    // pointer lands in the middle of, and base-to-end alone would report it as 0.
+    anchorStability: ANCHORS ? {
+      declared: ANCHORS.split(' >> ').map((s) => s.trim()).filter(Boolean),
+      tolerancePx: ANCHOR_TOL,
+      base: base.anchors,
+      end: end.anchors,
+      perStepMaxShiftPx: task.steps.map((s) => (s.anchorShift ? s.anchorShift.maxShiftPx : null)),
+      worstStepShiftPx: task.steps.reduce(
+        (m, s) => (s.anchorShift && s.anchorShift.maxShiftPx > m ? s.anchorShift.maxShiftPx : m), 0,
+      ),
+      stepsOverTol: task.steps
+        .filter((s) => s.anchorShift && s.anchorShift.movedOverTol.length)
+        .map((s) => ({ step: s.step, moved: s.anchorShift.movedOverTol })),
+      vanishedAtStep: task.steps
+        .filter((s) => s.anchorShift && s.anchorShift.vanished.length)
+        .map((s) => ({ step: s.step, vanished: s.anchorShift.vanished })),
+      baseToEnd: anchorDelta(base, end),
+    } : null,
     endHash: end.textHash,
     baseHash: base.textHash,
   };
@@ -1181,8 +1336,11 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     // restore. The real task+undo was already driven by the scored run above. Replaying TASK from
     // its post-task state manufactures a dead end on idempotent paths (for example typing the same
     // Music search twice), so the restoration leg measures the unchanged native state directly.
-    const dirty = await measure(SURFACE, 'click:[data-lqcat2-deadend]', '');
-    await ev(CONTROL_REMOVE);
+    const dirtyTask = ANCHORS
+      ? 'click:[data-lqcat2-deadend] >> click:[data-lqcat2-shift]'
+      : 'click:[data-lqcat2-deadend]';
+    const dirty = await measure(SURFACE, dirtyTask, '');
+    const rem = JSON.parse(await ev(CONTROL_REMOVE));
     const restored = await measure(SURFACE, '', '');
     const moved = {
       // (a) the handler-less button must come back as a dead end
@@ -1192,14 +1350,33 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
       // (c) the clipped overflowing box must come back as a scroll trap
       scrollTrap: !dirty.refuse && dirty.scrollTraps.length > m.scrollTraps.length,
     };
+    // (d) L7 bullet 997 - the anchor instrument must SEE a 37px displacement of the real anchor.
+    // Only asserted when anchors were declared; a run with none must not claim this control fired.
+    if (ANCHORS) {
+      moved.anchorShift = !dirty.refuse
+        && !!dirty.anchorStability
+        && dirty.anchorStability.worstStepShiftPx > ANCHOR_TOL;
+    }
     const backToBaseline = !restored.refuse
       && (!restored.undo || restored.undo.restored)
       && restored.deadEnds.length === m.deadEnds.length
       && restored.modalTraps.length === m.modalTraps.length
-      && restored.scrollTraps.length === m.scrollTraps.length;
+      && restored.scrollTraps.length === m.scrollTraps.length
+      // The displaced anchor has to come back to where the scored run found it, or the control
+      // has quietly rewritten the surface it was supposed to falsify.
+      && (!ANCHORS || !restored.anchorStability
+        || JSON.stringify(restored.anchorStability.base) === JSON.stringify(m.anchorStability.base));
     out.control = {
       moved,
       backToBaseline,
+      anchorControl: ANCHORS ? {
+        armedOn: inj.shiftControl,
+        worstStepShiftPx: dirty.refuse ? null : dirty.anchorStability.worstStepShiftPx,
+        perStep: dirty.refuse ? null : dirty.anchorStability.perStepMaxShiftPx,
+        removeReport: rem,
+        anchorsScored: m.anchorStability ? m.anchorStability.base : null,
+        anchorsRestored: restored.refuse ? null : restored.anchorStability.base,
+      } : null,
       counts: {
         base: [m.deadEnds.length, m.modalTraps.length, m.scrollTraps.length],
         dirty: dirty.refuse ? dirty.refuse : [dirty.deadEnds.length, dirty.modalTraps.length, dirty.scrollTraps.length],
