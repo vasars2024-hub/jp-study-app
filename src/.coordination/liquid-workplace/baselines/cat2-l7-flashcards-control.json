@@ -2,7 +2,7 @@
   "label": "l7-flashcards",
   "surface": "Flashcards",
   "win": "(focused)",
-  "task": "scroll:.fwin-body=2673 >> wait:400 >> click:.lib-folders.flash-folders > .lib-folder-chip:nth-child(2) >> wait:400 >> click:.lib-folders.flash-folders > .lib-folder-chip:nth-child(1) >> wait:400 >> scroll:.fwin-body=1650 >> wait:400 >> click:.flash-tabs > .flash-tab:nth-child(2) >> wait:400 >> type:.flash-search-input=yomi >> wait:400",
+  "task": "scroll:.fwin-body=1650 >> wait:400 >> click:.flash-tabs > .flash-tab:nth-child(2) >> wait:400 >> type:.flash-search-input=yomi >> wait:400",
   "strictMode": "on - latency carries the dev double-render tax; see correction 31",
   "presentation": "standard",
   "raised": "already-on-top",
@@ -13,167 +13,40 @@
     "results": 0
   },
   "inputCost": {
-    "clicks": 3,
+    "clicks": 1,
     "keystrokes": 4,
-    "total": 7
+    "total": 5
   },
   "latencyMs": {
     "clickRecv": [
-      15.5,
-      15.1,
-      13.1
+      12.3
     ],
     "inputRecv": [
-      62.3,
-      47,
-      32.1,
-      15.9
+      55.6,
+      39.8,
+      25.2,
+      11.7
     ],
-    "worstRecv": 62.3,
+    "worstRecv": 55.6,
     "overBar100": 0,
-    "n": 7,
+    "n": 5,
     "clickStampUnscored": [
-      17.5,
-      16.9,
-      14.9
+      14.4
     ],
     "inputStampUnscored": [
-      62.6,
-      47.2,
-      32.4,
-      16.2
+      56.1,
+      40,
+      25.3,
+      11.9
     ],
-    "worstStampUnscored": 62.6
+    "worstStampUnscored": 56.1
   },
   "steps": [
-    {
-      "step": "scroll:.fwin-body=2673",
-      "target": {
-        "sel": ".fwin-body",
-        "was": 0,
-        "now": 2673,
-        "range": 2673
-      },
-      "counted": false,
-      "moved": {
-        "text": false,
-        "controls": false,
-        "results": false,
-        "dialogs": false,
-        "scroll": true,
-        "focus": false,
-        "box": false,
-        "any": true
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
-    {
-      "step": "wait:400",
-      "target": null,
-      "counted": false,
-      "moved": {
-        "text": false,
-        "controls": false,
-        "results": false,
-        "dialogs": false,
-        "scroll": false,
-        "focus": false,
-        "box": false,
-        "any": false
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
-    {
-      "step": "click:.lib-folders.flash-folders > .lib-folder-chip:nth-child(2)",
-      "target": {
-        "sel": ".lib-folders.flash-folders > .lib-folder-chip:nth-child(2)",
-        "label": "Unfiled0",
-        "disabled": false,
-        "at": "197,461"
-      },
-      "counted": true,
-      "moved": {
-        "text": true,
-        "controls": true,
-        "results": false,
-        "dialogs": false,
-        "scroll": false,
-        "focus": false,
-        "box": false,
-        "any": true
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
-    {
-      "step": "wait:400",
-      "target": null,
-      "counted": false,
-      "moved": {
-        "text": false,
-        "controls": false,
-        "results": false,
-        "dialogs": false,
-        "scroll": false,
-        "focus": false,
-        "box": false,
-        "any": false
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
-    {
-      "step": "click:.lib-folders.flash-folders > .lib-folder-chip:nth-child(1)",
-      "target": {
-        "sel": ".lib-folders.flash-folders > .lib-folder-chip:nth-child(1)",
-        "label": "All0",
-        "disabled": false,
-        "at": "123,461"
-      },
-      "counted": true,
-      "moved": {
-        "text": true,
-        "controls": true,
-        "results": false,
-        "dialogs": false,
-        "scroll": false,
-        "focus": false,
-        "box": false,
-        "any": true
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
-    {
-      "step": "wait:400",
-      "target": null,
-      "counted": false,
-      "moved": {
-        "text": false,
-        "controls": false,
-        "results": false,
-        "dialogs": false,
-        "scroll": false,
-        "focus": false,
-        "box": false,
-        "any": false
-      },
-      "caretOnly": false,
-      "deadEnd": false,
-      "anchorShift": null
-    },
     {
       "step": "scroll:.fwin-body=1650",
       "target": {
         "sel": ".fwin-body",
-        "was": 2673,
+        "was": 0,
         "now": 1650,
         "range": 2673
       },
@@ -337,7 +210,7 @@
       "after": "1tsprbv"
     }
   },
-  "stepsDriven": 4,
+  "stepsDriven": 2,
   "deadEndCount": 0,
   "deadEnds": [],
   "scrollTrapCount": 0,
@@ -347,46 +220,54 @@
   "modalTrapCount": 0,
   "modalTraps": [],
   "dialogsClosedByEscape": [],
-  "costParity": {
-    "first": {
-      "presentation": "standard",
-      "box": "820x580",
-      "total": 7,
-      "deadEnds": 0,
-      "worstRecv": 62.3
-    },
-    "second": {
-      "presentation": "liquid",
-      "box": "820x580",
-      "total": 7,
-      "deadEnds": 0,
-      "worstRecv": 67.8
-    },
-    "restored": true,
-    "restoredTo": {
-      "presentation": "standard",
-      "pressed": "false",
-      "box": "820x580"
-    },
-    "liquidTotal": 7,
-    "standardTotal": 7
-  },
+  "costParity": "UNMEASURED",
   "bars": {
     "deadEnds": true,
     "modalTraps": true,
     "scrollTraps": true,
     "latency": true,
-    "costParity": true
+    "costParity": "UNMEASURED"
   },
   "spatialFixity": null,
   "spatialFixitySamples": null,
   "spatialFixityControl": null,
   "spatialFixityVerdict": null,
-  "verdict": "PASS 10/10",
+  "verdict": "UNMEASURED - costParity; drive the surface with --task or score 0, never 10",
   "failedBars": [],
-  "unmeasuredBars": [],
+  "unmeasuredBars": [
+    "costParity"
+  ],
   "notMeasuredHere": [
     "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
     "mute-pair explanation quality (rubric category 8 harness)"
-  ]
+  ],
+  "control": {
+    "moved": {
+      "deadEnd": true,
+      "modalTrap": true,
+      "scrollTrap": true
+    },
+    "backToBaseline": true,
+    "anchorControl": null,
+    "counts": {
+      "base": [
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        1,
+        1,
+        1
+      ],
+      "restored": [
+        0,
+        0,
+        0
+      ]
+    },
+    "inertClickRecvMs": [
+      2.6
+    ]
+  }
 }

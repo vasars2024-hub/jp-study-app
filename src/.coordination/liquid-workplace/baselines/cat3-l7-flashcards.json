@@ -14,13 +14,13 @@
     "image": null,
     "opacity": 1
   },
-  "regions": 191,
-  "controlsSkipped": 92,
+  "regions": 64,
+  "controlsSkipped": 68,
   "byRole": {
-    "Work": 15,
+    "Work": 9,
     "Liquid-eligible": 2,
-    "Anchor": 127,
-    "Anchor(holds work)": 47,
+    "Anchor": 48,
+    "Anchor(holds work)": 5,
     "Ambient": 0
   },
   "denseWorkOnTranslucent": 0,
@@ -28,7 +28,7 @@
   "liquidTreatedEligible": 2,
   "sharedPrimitiveEligible": 2,
   "eligibleTotal": 2,
-  "theme": "forest-night",
+  "theme": null,
   "materials": null,
   "viewport": "1264x821",
   "bars": {
@@ -40,10 +40,10 @@
   "failedBars": [],
   "control": {
     "target": {
-      "sel": "div.flash-search",
+      "sel": "fieldset.auto-reading-options",
       "path": [
         0,
-        2
+        1
       ]
     },
     "counts": {
@@ -52,28 +52,28 @@
         2,
         2,
         2,
-        15
+        9
       ],
       "oneRegionGlass": [
         1,
         2,
         2,
         2,
-        15
+        9
       ],
       "allGlass": [
-        15,
+        9,
         2,
         2,
         2,
-        15
+        9
       ],
       "restored": [
         0,
         2,
         2,
         2,
-        15
+        9
       ]
     },
     "movedOne": true,
@@ -81,9 +81,9 @@
     "returned": true,
     "oneMaterialReturned": true,
     "oneMaterial": {
-      "before": "none|rgba(0, 0, 0, 0)",
-      "immediate": "none|rgba(0, 0, 0, 0)",
-      "settled": "none|rgba(0, 0, 0, 0)"
+      "before": "none|rgb(39, 36, 51)",
+      "immediate": "none|rgb(39, 36, 51)",
+      "settled": "none|rgb(39, 36, 51)"
     },
     "allGlassReturned": true,
     "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"

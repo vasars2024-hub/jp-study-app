@@ -17,7 +17,46 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   font-size: var(--font-size-sm);
+  /* A fieldset's UA `min-inline-size` is `min-content`, so these panels refused to
+     shrink below the widest label they hold. At the 260 px window minimum
+     (`DesktopShell.tsx` MIN_W) that pushed 7 px past `.fwin-body`, which is
+     `overflow-x: hidden` — clipped with no scrollbar to reach it, the same shape
+     `.dict-search` was repaired for on 2026-08-22. Measured 2026-09-03: body
+     scrollWidth 255 against clientWidth 248, and 248 with this line. */
+  min-inline-size: 0;
   color: var(--text);
+}
+
+/*
+ * Fluid reflow, deck overview only. These panels are the tallest blocks on the
+ * Flashcards launcher and each row is a short label beside a small control, so a
+ * single column left a maximized window mostly empty: measured 2026-09-03 at
+ * 1264x773, the largest dead rectangle on the surface was 536x480 — 24.8 % of the
+ * window — and it was these two fieldsets' unused right-hand side.
+ * The `min(100%, ...)` guard is what makes this safe at the small end: auto-fit
+ * cannot ask for a track wider than the container, so a 260 px window collapses to
+ * one column instead of overflowing. 18rem was chosen against the 15 % bar, not by
+ * eye — a 26rem floor gives two columns at 1264 px and still left 442x480 dead,
+ * 18.1 %, a FAIL. At 18rem: maximized 24.8 -> 13.5 %, default 10.5 -> 5.5 %,
+ * compact 0.7 % unchanged, and the panel stack fell 3,186 -> 2,557 px maximized.
+ * Scoped to `.flash-view-decks >` on purpose: the same classes carry Learn, Write
+ * and Test, which are single-task surfaces that must not split into columns.
+ */
+.flash-view-decks > .auto-audio-options,
+.flash-view-decks > .auto-reading-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  align-items: start;
+}
+
+/* Lead text, status read-back and the disk row describe the whole panel, so they
+   stay full width rather than becoming one of its columns. */
+.flash-view-decks > .auto-audio-options > .muted,
+.flash-view-decks > .auto-reading-options > .muted,
+.flash-view-decks > .auto-audio-options > .auto-audio-options__report,
+.flash-view-decks > .auto-reading-options > .auto-reading-options__report,
+.flash-view-decks > .auto-audio-options > .auto-audio-options__disk {
+  grid-column: 1 / -1;
 }
 
 .auto-audio-options > legend,
