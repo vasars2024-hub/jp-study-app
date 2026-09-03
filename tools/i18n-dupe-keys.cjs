@@ -16,6 +16,7 @@
  * Run: node tools/i18n-dupe-keys.cjs
  */
 'use strict';
+/* eslint-disable @typescript-eslint/no-var-requires -- a .cjs build tool; `import` is not available here */
 const fs = require('node:fs');
 const path = require('node:path');
 
