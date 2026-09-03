@@ -107,3 +107,9 @@ capture — so it is closed at the end of the turn and the layout returns to its
 - Alternate routes into this surface (`player`, `music` open the same `MediaCenterView` with a
   different `initialTab`) — captured as one component here, per the census's ledger-row rule.
 - Playing-clip measurements, including player frame stability, which needs a real clip.
+  **Player frame stability is done, 2026-09-03 (backup)** — `PERF_BASELINE_RESTART.md`, its own
+  section: 1,298 decoded / **0 dropped** over 54.15 s on a real 1280x720 clip, ratio 1.00, with
+  the sensitivity control firing at 68.9 % when the same element was driven to 8x. The rest of
+  this line stands: the other playing-clip measurements are still not taken. Note the subject is
+  `#media-workspace`, NOT `.mc-video-page` — the Video section is a launcher and mounts no
+  `<video>` at all, which is why this row sat open for so long.

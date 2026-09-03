@@ -103,3 +103,9 @@ same fresh process and a restart mid-sequence invalidates whatever came before i
 > **Done — see `PERF_BASELINE_RESTART.md`** (same milestone, restart leg, 2026-08-16). Five of
 > these six rows are measured there off one cold start; player frame stability is still open.
 > **No number above was modified by that pass** — this is a pointer, not a correction.
+>
+> **Player frame stability is measured too, 2026-09-03 (backup)** — same file, its own section.
+> 1,298 decoded / **0 dropped** over 54.15 s on a real 1280x720 clip, 24.0 fps, media-to-wall
+> ratio 1.00, with the sensitivity control firing at 68.9 % dropped when the same element was
+> driven to 8x. So the sixth row above is closed and this pointer is the only place that says so;
+> the row's own text is left exactly as it was written, again because this is a pointer.

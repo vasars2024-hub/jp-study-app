@@ -137,10 +137,84 @@ have this: its `up` explicitly assigns `left`/`top` and clears `transform` befor
   minimized window. rAF is throttled in a background window; an unfocused run would report ~1000 ms
   frames and read as catastrophic jank.
 
+## Player frame stability — MEASURED 2026-09-03 (backup), the sixth axis
+
+L0's bullet names six baselines and this file recorded five. The sixth was open from 2026-08-16
+to 2026-09-03 for one reason, written in both `PERF_BASELINE.md:98` and `VIDEO_BASELINE.md:109`:
+it needs a real clip, and **a player with nothing loaded drops no frames and therefore scores
+perfectly**. Every refusal in the instrument exists to stop exactly that.
+
+Instrument: `cat7-perf.cjs --surface player --player-frames` (correction 37 — a mode on the
+existing category-7 runner, not a new probe). It reads `getVideoPlaybackQuality()` **deltas**
+from a renderer-side sampler. Not rAF: a decoder dropping half its frames still presents a
+compositor frame every 16.7 ms, so rAF scores a healthy player and a stuttering one identically.
+Cumulative ratios are not used either — the startup burst dominates them (measured on the JoJo
+clip: 203 of the first 1,950 frames, 10.4%, against a steady state of zero).
+
+Subject: `[project-gxs] Date a Live II - Kurumi Star Festival OVA [10bit BD 720p]`, opened
+through the product's own `seanime:media-workspace-open` into `#media-workspace`, 1280x720,
+direct-streamed from the sidecar. Scene: 2 desk windows (Dictionary, Video), 16,414 elements
+under the workspace root. Main process uptime 107,532 s — settled, as the rubric requires.
+
+| Axis | Reading |
+| --- | --- |
+| Decoded / dropped | **1,298 / 0** over 54.15 s of wall clock |
+| Dropped | **0.00 %**, 0 of 4 rated seconds carried a single drop |
+| Decode rate | **24.0 fps** of media time |
+| Media-to-wall ratio at rate 1 | **1.00** — the player never fell behind its own clock |
+| Corrupted frames | **0** |
+| Score | **PASS 10/10**, no findings, no voids |
+
+**Sensitivity control, and it FIRED.** A clean frame number means nothing unless the recorder can
+be shown to see a decoder that is dropping frames. The subject itself was driven to
+`playbackRate = 8` — ~192 fps asked of a 60 Hz display — and re-sampled on the same element in
+the same session: **1,164 decoded / 802 dropped = 68.9 %, 132.17 dropped per wall second against
+0.00 clean.** Then undone, measured not assumed: rate back to 1, `paused: false`, position seeked
+back to 373.15 s. Banked at `baselines/cat7-player-frames.json`.
+
+The first design used a second off-screen `<video>` on the same source as the control. **Do not
+repeat that**: it decodes the same sidecar directstream id, and running it at 8x wedged the
+stream — the next three opens mounted the library browser instead of the player. One decoder,
+one stream.
+
+### Observed beside it — DEFECT S5, and its control fires
+
+While the media workspace is mounted, this renderer stops servicing its own timers for tens of
+seconds. Three independent readings on the scored instrument: a 30 s leg returning **3 samples
+over 37.1 s**, another **3 over 41.0 s**, and the scored leg **5 over 54.2 s with a 28,756 ms gap
+between two consecutive ticks**. `/eval` itself times out through the same stretches.
+
+The discriminating series, a bare `setTimeout` recorder armed for 20 s at a 1 s interval, three
+arms on one process minutes apart:
+
+| Arm | Ticks | Longest gap |
+| --- | --- | --- |
+| workspace open, clip playing | **1** | **137,254 ms** |
+| workspace open, same clip paused | 4 | 58,547 ms |
+| **workspace closed (control)** | **11** | **1,586 ms** |
+
+So the renderer is not generally starved and the stall is not the decoder: closing the surface
+restores a 1 s cadence within 1.6 s of jitter, and pausing playback only halves the damage.
+
+Two further explanations are ruled out by measurement rather than argument. **Not background
+throttling**: `document.visibilityState` is `visible`, `document.hidden` false,
+`document.hasFocus()` true, taken while a leg was stalling. **Not the subtitle track**: it
+reproduces on this OVA as readily as on the JoJo clip with its 36,435-line ASS sidecar.
+
+One caveat is owed and it is the reason S5 is filed `open` rather than fixed: this process is
+**29.9 hours old**, so its renderer modules predate the media fixes of 2026-09-03. The three arms
+above are internally consistent on one build, which is what makes the attribution to the surface
+sound, but whether HEAD still does this needs one re-measurement on a restarted app. That is the
+first step S5 asks for.
+
+Note also that the decoder itself is unaffected: 1,298 frames at 0 dropped and a 1.00 clock ratio
+were taken *through* these stalls. That is the whole reason the video pipeline's own counters are
+the right instrument here and a main-thread recorder is not — a rAF or `setTimeout` recorder in
+this session would have reported catastrophic jank on a player that was in fact perfect.
+
 ## What is still not measured
 
 | Baseline | Status | Blocker |
 | --- | --- | --- |
-| Player frame stability | **not measured** | Needs a clip playing in `src/media/`. Not attempted in this pass. |
 | Packaged-build boot | **not measured** | Only the dev boot exists; the 106 s figure includes Vite and forge. |
 | Memory peak attribution | **observed, unexplained** | One sample; needs a second cold boot plus a bisect. |
