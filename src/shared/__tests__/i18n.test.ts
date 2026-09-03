@@ -190,6 +190,42 @@ describe('catalog hygiene', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * The same class for plain string values, which the gate above cannot see.
+   *
+   * A translation that drops `{name}` renders a grammatical sentence with the data
+   * silently gone; one that invents `{nombre}` prints the brace literally on screen.
+   * Both survive every presence-shaped check, because the value is a perfectly good
+   * non-empty string in both cases. Translations here are written a batch at a time,
+   * which is exactly when a slot goes missing from one language and nobody notices.
+   *
+   * Ratchet, not a fix: measured at 1,413 slotted English string keys, 0 dropped and
+   * 0 invented across ja/zh/ru. Values identical to English are skipped — an
+   * untranslated passthrough is a different gate's business, not a slot defect.
+   */
+  it('never drops or invents an interpolation slot in translation', () => {
+    const slotsOf = (value: string) => new Set([...value.matchAll(/\{(\w+)\}/g)].map((m) => m[1]));
+    const offenders: string[] = [];
+
+    for (const [key, enValue] of Object.entries(en)) {
+      if (typeof enValue !== 'string') continue;
+      const expected = slotsOf(enValue);
+      if (expected.size === 0) continue;
+      for (const lang of UI_LANGS) {
+        if (lang === 'en') continue;
+        const value = CATALOGS[lang][key];
+        if (typeof value !== 'string' || value === enValue) continue;
+        const actual = slotsOf(value);
+        const dropped = [...expected].filter((slot) => !actual.has(slot));
+        const invented = [...actual].filter((slot) => !expected.has(slot));
+        if (dropped.length > 0) offenders.push(`${lang}:${key} drops {${dropped.join('},{')}}`);
+        if (invented.length > 0) offenders.push(`${lang}:${key} invents {${invented.join('},{')}}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   it('never leaves a translated catalog with keys English does not have', () => {
     // A stray key in ja/zh/ru is dead weight — usually a typo of a real key,
     // which would silently fall back to English forever.
