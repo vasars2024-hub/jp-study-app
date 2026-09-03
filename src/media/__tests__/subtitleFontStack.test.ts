@@ -2,10 +2,18 @@
  * DEFECT S1 regression guard — no subtitle text path may resolve to a font without
  * Japanese coverage.
  *
- * What actually went wrong, because the plan's recorded lead was a dead end and the next
- * reader should not chase it again: there is no `SUBTITLE_FONT_STACKS` symbol anywhere in
- * the tree, nothing reads an ASS track's own `fontname`, and no libass/jassub renderer is
- * bundled. Cues are DOM text (`SubtitleCueLine` -> `.study-cue-text`), and
+ * SCOPE, corrected 2026-09-03. This file guards the **DOM** subtitle text and only that.
+ * Its original header claimed "no libass/jassub renderer is bundled", and that was WRONG:
+ * `src/media/jassub/` holds a JASSUB 2.5.6 runtime, its worker and its WASM, and the
+ * player burns ASS onto a canvas with it. The canvas half is a separate mechanism with a
+ * separate guard — `src/main/__tests__/subtitleFallbackFont.test.ts`. Retracted here
+ * rather than quietly deleted, because the claim is what stopped the canvas half being
+ * looked at for a turn.
+ *
+ * What actually went wrong on the DOM side, because the plan's recorded lead was a dead
+ * end and the next reader should not chase it again: there is no `SUBTITLE_FONT_STACKS`
+ * symbol anywhere in the tree, and nothing reads an ASS track's own `fontname`.
+ * Cues are DOM text (`SubtitleCueLine` -> `.study-cue-text`), and
  * `mediaWorkspace.css` declared no `font-family` at all, so they inherited whatever the
  * active theme set. Two themes set a stack with no Japanese face in it —
  * `theme/aero-shell.css:116` and `theme/aero-apps.css:100` both resolve to
@@ -116,5 +124,55 @@ describe('subtitle font stack (DEFECT S1)', () => {
     // and the positive half of the control, so a predicate that always returns false
     // cannot pass this test either
     expect(namesCjkFace("'Yu Gothic UI', sans-serif")).toBe(true);
+  });
+});
+
+/** Source with comments removed, so the prose explaining a symbol cannot satisfy a match. */
+function readSource(...parts: string[]): string {
+  return readFileSync(path.join(__dirname, '..', '..', ...parts), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\r\n?/g, '\n');
+}
+
+/**
+ * The canvas half must be REACHED, not merely written.
+ *
+ * `route-with-no-consumer` is a recorded failure of this repo: a path repaired, tested,
+ * probe-verified — and never called by the product. The font resolver is exactly that
+ * shape, so every link of the chain is pinned here: handler -> preload -> overlay.
+ */
+describe('libass gets a CJK face (DEFECT S1, canvas half)', () => {
+  it('registers the resolver on a channel', () => {
+    expect(readSource('main', 'media.ts')).toContain("'media:subtitleFallbackFont'");
+    expect(readSource('main', 'media.ts')).toContain('resolveSubtitleFallbackFont(');
+  });
+
+  it('exposes it on the preload bridge', () => {
+    const preload = readSource('preload.ts');
+    expect(preload).toContain('subtitleFallbackFont:');
+    expect(preload).toContain("ipcRenderer.invoke('media:subtitleFallbackFont', lang)");
+  });
+
+  it('hands the face to the libass renderer from the overlay', () => {
+    const overlay = readSource('media', 'VideoCoreStudyOverlay.tsx');
+    expect(overlay).toContain('window.api.subtitleFallbackFont(getStudyLang())');
+    expect(overlay).toContain('renderer.renderer.addFonts([objectUrl])');
+    // Applied once per renderer instance, or a `timeupdate` tick re-fetches 9 MB at 4 Hz.
+    expect(overlay).toContain('libassFontRendererRef.current === renderer');
+  });
+
+  it('still constructs libass with Roboto alone, which is why the above is needed', () => {
+    // A ratchet on the CAUSE. If vendor ever ships a CJK face in `availableFonts` this
+    // goes red and the overlay's font path can be reconsidered instead of left as cargo.
+    const vendor = readFileSync(
+      path.join(
+        __dirname, '..', '..', '..', 'vendor', 'seanime-web', 'app', '(main)',
+        '_features', 'video-core', 'video-core-subtitles.ts',
+      ),
+      'utf8',
+    ).replace(/\r\n?/g, '\n');
+    expect(vendor).toContain('const DEFAULT_FONT_NAME = "roboto medium"');
+    expect(vendor).toContain('[DEFAULT_FONT_NAME]: defaultFontUrl,');
   });
 });

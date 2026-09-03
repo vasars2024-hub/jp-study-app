@@ -765,6 +765,66 @@ export default function VideoCoreStudyOverlay({
     };
   }, [manager, onCueChange, selectedTrack, subtitleDelaySec, video]);
 
+  /**
+   * DEFECT S1's other half — give libass a face that can draw kana.
+   *
+   * The player burns ASS onto a canvas with JASSUB, constructed with
+   * `defaultFont: "roboto medium"` and `availableFonts: { "roboto medium": Roboto-Medium }`
+   * and nothing else (`video-core-subtitles.ts`; `src/media/jassub/assets/` holds that one
+   * face). Every other font libass ever sees is a container attachment. So a muxed release
+   * that ships its fonts is fine, a bare sidecar — every Jimaku or nyaa track — has no
+   * Japanese face at all, and a release whose attachments cover one style but not another
+   * renders one readable line beside boxes on the SAME frame. That last case is the user's
+   * screenshot, and nothing in the DOM can produce it.
+   *
+   * Fetched here rather than passed as bytes over IPC: the face is 9–13 MB, and a blob URL
+   * made in this document is reachable from JASSUB's worker without asking whether a custom
+   * protocol is. Applied once per renderer instance, keyed on the object itself so a
+   * renderer that gets rebuilt is re-fonted rather than silently left bare.
+   *
+   * `libassRenderer` is null until the manager's lazy init, which is the first track
+   * selection — hence the same `timeupdate` retry the file-track clock above uses.
+   */
+  const libassFontRendererRef = React.useRef<unknown>(null);
+  React.useEffect(() => {
+    if (!manager) return undefined;
+    let cancelled = false;
+    let objectUrl = '';
+
+    const apply = async (): Promise<void> => {
+      const renderer = manager.libassRenderer;
+      if (!renderer?.renderer?.addFonts) return;
+      if (libassFontRendererRef.current === renderer) return;
+      libassFontRendererRef.current = renderer;
+      try {
+        const font = await window.api.subtitleFallbackFont(getStudyLang());
+        if (cancelled || !font) return;
+        const blob = await (await fetch(font.url)).blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        await renderer.renderer.addFonts([objectUrl]);
+      } catch {
+        // A machine with no CJK face installed, or a renderer torn down mid-fetch. The
+        // subtitles still render — with the coverage they had before — and re-arming on
+        // the next renderer is the only recovery worth having here.
+        libassFontRendererRef.current = null;
+      }
+    };
+
+    const tick = (): void => { void apply(); };
+    tick();
+    manager.addEventListener('trackselected', tick);
+    manager.addEventListener('tracksloaded', tick);
+    video?.addEventListener('timeupdate', tick);
+    return () => {
+      cancelled = true;
+      manager.removeEventListener('trackselected', tick);
+      manager.removeEventListener('tracksloaded', tick);
+      video?.removeEventListener('timeupdate', tick);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [manager, video]);
+
   React.useEffect(() => {
     if (manager || !mediaCaptionsManager) return;
     let cancelled = false;

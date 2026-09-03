@@ -60,6 +60,7 @@ import type {
   MediaItem,
   MediaOpen,
   Progress,
+  SubtitleFallbackFont,
   SubtitlePick,
   YouTubeDownloadOptions,
   YomitanDictInfo,
@@ -1757,6 +1758,15 @@ const api = {
    */
   subtitleForPath: (filePath: string): Promise<SubtitlePick | null> =>
     ipcRenderer.invoke('media:subtitleForPath', filePath),
+  /**
+   * A CJK-capable system font for the libass renderer, or null when the machine has none.
+   *
+   * libass is constructed with Roboto Medium alone, so every Japanese glyph it draws that
+   * the container did not attach a font for comes out as a box. `url` is a `localfile://`
+   * URL, not bytes: the face is 9–13 MB and does not belong in an IPC message.
+   */
+  subtitleFallbackFont: (lang: string): Promise<SubtitleFallbackFont | null> =>
+    ipcRenderer.invoke('media:subtitleFallbackFont', lang),
   /** Open a file dialog and return the chosen subtitle file's text. */
   pickSubtitle: (): Promise<SubtitlePick | null> => ipcRenderer.invoke('media:pickSubtitle'),
   fetchYoutubeSubs: (

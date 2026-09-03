@@ -10,6 +10,7 @@ import type {
   MediaDownloadError,
   MediaItem,
   MediaOpen,
+  SubtitleFallbackFont,
   SubtitlePick,
   YouTubeAudioTrackReceipt,
   YouTubeDownloadOptions,
@@ -34,6 +35,7 @@ import {
 import { YOUTUBE_MEDIA_SUBTITLE_DIRECTORY } from '../shared/youtubeStorage';
 import { classifyMediaKind } from '../shared/mediaKind';
 import { clearMediaArtwork, ensureMediaArtwork } from './mediaArtwork';
+import { resolveSubtitleFallbackFont } from './subtitleFallbackFont';
 import { registerMediaMetadataIpc, runMediaMetadata } from './mediaMetadata';
 import { registerMediaDiscoveryIpc } from './mediaDiscovery';
 import { registerTranscriptionIpc } from './transcriptionJobs';
@@ -1517,6 +1519,19 @@ export function registerMediaIpc(): void {
       // workspace can open a path the media database knows nothing about.
       return pickSubtitleBeside(filePath, item?.lang ?? 'ja') ?? null;
     },
+  );
+
+  /**
+   * A CJK-capable face for the libass renderer, which ships with Roboto and nothing else.
+   *
+   * Returns null rather than a guess when the machine has none: a face that cannot draw
+   * kana is the defect, not a fallback for it. See `subtitleFallbackFont.ts` for why a
+   * font is read off the system rather than bundled.
+   */
+  ipcMain.handle(
+    'media:subtitleFallbackFont',
+    (_e, lang: string): SubtitleFallbackFont | null =>
+      resolveSubtitleFallbackFont(typeof lang === 'string' ? lang : 'ja'),
   );
 
   ipcMain.handle('media:remove', (_e, id: string) => {

@@ -181,7 +181,23 @@ declare module '@/app/(main)/_features/video-core/video-core-subtitles' {
     trackdeselected: CustomEvent;
   };
 
+  /**
+   * The libass renderer, as much of it as this app reaches.
+   *
+   * Narrower than JASSUB's real surface on purpose: `addFonts` is the only member Study OS
+   * calls, and the manager owns everything else. Null until the manager's lazy `_init()`
+   * has run, which is the first track selection — not construction.
+   */
+  export interface VideoCoreLibassRenderer {
+    renderer?: { addFonts?: (urls: string[]) => Promise<void> };
+  }
+
   export class VideoCoreSubtitleManager extends EventTarget {
+    /**
+     * Constructed with `defaultFont: "roboto medium"` and no other face, so every glyph
+     * outside Latin depends on a font the container attached. See DEFECT S1.
+     */
+    libassRenderer: VideoCoreLibassRenderer | null;
     getCues(): VideoCoreActiveCue[];
     getCuesForTrack(trackNumber: number): VideoCoreActiveCue[];
     getActiveCues(): VideoCoreActiveCue[];

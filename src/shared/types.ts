@@ -327,6 +327,20 @@ export interface SubtitlePick {
 }
 
 /**
+ * A CJK-capable system font handed to the libass subtitle renderer.
+ *
+ * libass is built with Roboto Medium and whatever the container attached, so a sidecar
+ * `.ass`/`.srt` — every Jimaku or nyaa track — has no Japanese face at all and draws
+ * boxes. `main/subtitleFallbackFont.ts` carries the measurement and the ordered choice.
+ */
+export interface SubtitleFallbackFont {
+  /** The face the file carries, for reporting. Not what libass matches on. */
+  family: string;
+  /** A `localfile://` URL. Never bytes — the face is 9–13 MB. */
+  url: string;
+}
+
+/**
  * What happened when a finished acquisition was brought into the library.
  *
  * `found` and `added` are reported separately on purpose: "0 added" means two
