@@ -2181,9 +2181,16 @@
   color: var(--mc-accent-2);
 }
 
+/* Same defect and same repair as `.mc-inspector-score-row small` above: `--mc-dim`
+   (#7f8598) is 5.2:1 on the flat `--mc-bg`, but a queue row that is hovered or
+   `.is-active` paints `rgba(255,255,255,0.035)` over a 72 %-opaque `.lq-contextual`
+   aside, and the composite measured **4.43:1 at 11px** — a category-1/category-5 FAIL
+   by 0.07 against the 4.5 body-text bar. It only exists once a track is CURRENT, which
+   is why an at-rest sweep of this surface reported a different worst run. `--mc-muted`
+   is the next step up the same scale this rail already uses, so it is a token swap. */
 .mc-track-index,
 .mc-track-queue > button > span:last-child {
-  color: var(--mc-dim);
+  color: var(--mc-muted);
   font-size: var(--mc-fs-micro, 11px);
   font-variant-numeric: tabular-nums;
 }
@@ -2206,9 +2213,10 @@
   font-size: var(--mc-fs-body, 13px);
 }
 
+/* Same tinted-row composite as `.mc-track-index` above — measured 4.43:1 at 11px. */
 .mc-track-queue small {
   margin-top: 2px;
-  color: var(--mc-dim);
+  color: var(--mc-muted);
   font-size: var(--mc-fs-micro, 11px);
 }
 
