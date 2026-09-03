@@ -38,12 +38,13 @@ let offenders: { file: string; missing: string[] }[] = [];
  * after boss-audit Finding 7, where a ~1,900-file walk paid for out of a per-case
  * budget timed out under full-suite load and read as a product regression.
  *
- * Measured on this machine 2026-09-03: 1,073 files / 14.7 MB across src/renderer,
- * src/media and src/main. Reading them is the entire cost — 11.5 s warm, ~53 s
- * cold. The two comment-stripping regexes are 8 ms and 37 ms for the whole tree
- * and the esbuild bundle of the catalogs is 587 ms, so there is nothing
- * algorithmic to remove here; the budget is generous because a fixture's is
- * allowed to be, and a walk that genuinely hangs still fails at 180 s.
+ * Measured on this machine 2026-09-03: 1,510 files / 19.5 MB across src/renderer,
+ * src/media, src/main, src/shared, src/main.ts and src/preload.ts. Reading them is
+ * the entire cost — 8.4 s warm standalone, 3.7 s under vitest's warm cache. The
+ * two comment-stripping regexes are 8 ms and 37 ms for the whole tree and the
+ * esbuild bundle of the catalogs is 587 ms, so there is nothing algorithmic to
+ * remove here; the budget is generous because a fixture's is allowed to be, and a
+ * walk that genuinely hangs still fails at 180 s.
  */
 beforeAll(() => {
   offenders = scan();
@@ -91,6 +92,26 @@ describe('every t() key the app asks for by name is defined', () => {
       const planted = scan({ dirs: [dir] });
       expect(planted).toHaveLength(1);
       expect(planted[0].missing).toEqual(['zzz.planted.definitely.missing']);
+    });
+
+    /*
+     * `src/main` is a directory and `src/main.ts` is a file, so widening the scan
+     * to reach the latter added a file-vs-directory branch. Passing a single file
+     * as the whole scan is the only thing that exercises it: if the branch were
+     * wrong the entry would silently contribute nothing, and a scan that reads
+     * nothing returns the same `[]` as a clean one.
+     */
+    it('scans an entry that is a single FILE, not only a directory', () => {
+      const fileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'i18n-missing-file-'));
+      const single = path.join(fileDir, 'Single.tsx');
+      try {
+        fs.writeFileSync(single, "export const S = () => t('zzz.planted.single.file');\n", 'utf8');
+        const found = scan({ dirs: [single] });
+        expect(found).toHaveLength(1);
+        expect(found[0].missing).toEqual(['zzz.planted.single.file']);
+      } finally {
+        fs.rmSync(fileDir, { recursive: true, force: true });
+      }
     });
 
     /*
