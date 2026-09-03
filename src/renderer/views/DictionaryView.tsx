@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { DictLang } from '../components/DictionaryResults';
 import LexiconWorkbenchResults from '../components/lexicon/LexiconWorkbenchResults';
 import NotesBrowser from '../components/lexicon/NotesBrowser';
@@ -110,11 +110,16 @@ export default function DictionaryView() {
    * the box never disagrees with what is on screen and the reader can edit the
    * word they just arrived at.
    */
-  function openRelatedWord(word: string) {
+  // `useCallback` with no deps, and it is load-bearing rather than tidiness:
+  // `LexiconWorkbenchResults` is memoised (see its export), and a fresh function
+  // identity every render would defeat that on the one prop that is not a
+  // primitive. Only the three setters are used, and React guarantees those are
+  // stable, so the empty dep list is complete rather than convenient.
+  const openRelatedWord = useCallback((word: string) => {
     setInput(word);
     setQuery(word);
     setLookupAttempt((attempt) => attempt + 1);
-  }
+  }, []);
 
   const isZh = lang === 'zh';
 
