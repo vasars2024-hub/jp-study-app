@@ -55,13 +55,13 @@ const REQUIRED_RUNTIME_ASSETS = [
     rel: 'tesseract/worker.min.js',
     feature: 'Manga OCR (the tesseract.js worker script)',
     loadedBy: 'src/renderer/ocr.ts',
-    stagedBy: null,
+    stagedBy: 'tools/sync-tesseract-assets.cjs',
   },
   {
     rel: 'tesseract/core/tesseract-core-simd-lstm.wasm.js',
     feature: 'Manga OCR (the recognition core)',
     loadedBy: 'src/renderer/ocr.ts',
-    stagedBy: null,
+    stagedBy: 'tools/sync-tesseract-assets.cjs',
   },
   {
     rel: 'tesseract/lang/jpn.traineddata.gz',

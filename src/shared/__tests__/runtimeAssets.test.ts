@@ -93,8 +93,19 @@ describe('required runtime assets', () => {
     for (const script of ['package', 'make']) {
       expect(pkg.scripts[script], `scripts.${script}`).toContain('check-runtime-assets.cjs');
     }
-    // Staged before it is required: postinstall must populate what it can.
-    expect(pkg.scripts.postinstall).toContain('sync-kuromoji-assets.cjs');
+    /*
+     * Staged before it is required. Generic rather than a list of tool names on
+     * purpose: adding a stageable asset and forgetting to run its tool leaves a
+     * clean clone broken in exactly the way this whole gate exists to prevent, and
+     * a hardcoded list would not notice.
+     */
+    for (const tool of new Set(
+      REQUIRED_RUNTIME_ASSETS.map((a) => a.stagedBy).filter((t): t is string => Boolean(t)),
+    )) {
+      const name = tool.split('/').pop() as string;
+      expect(pkg.scripts.postinstall, `postinstall must run ${name}`).toContain(name);
+      expect(pkg.scripts.prestart, `prestart must run ${name}`).toContain(name);
+    }
   });
 });
 
