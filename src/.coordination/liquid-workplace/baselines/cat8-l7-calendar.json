@@ -1,15 +1,20 @@
 {
   "label": "l7-calendar",
   "surface": "@.calendar-view",
-  "win": "main",
+  "win": "1",
   "lang": "en",
-  "storedLang": "en",
-  "theme": "forest-night",
+  "storedLang": null,
+  "theme": null,
   "rect": "782x513",
   "textRuns": 61,
-  "textHash": 1526426498,
+  "devOnlyRuns": 0,
+  "hostedTextRunsExcluded": 0,
+  "hostedWindowsExcluded": 0,
+  "wordRuns": 17,
+  "textHash": -1910610345,
   "rawKeyCount": 0,
   "rawKeys": [],
+  "rawKeysTruncated": false,
   "placeholderCount": 0,
   "placeholders": [],
   "mutePairCount": 0,
@@ -18,22 +23,33 @@
   "states": {
     "empty": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "loading": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "error": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     },
     "offline": {
       "hosts": 0,
-      "messages": []
+      "messages": [],
+      "unpaintedHosts": 0,
+      "unpainted": []
     }
   },
   "statusCandidatesNeedingEmptyProfile": [],
+  "rawKeyCatalogSize": 10227,
+  "keyShapedNonCatalog": [],
+  "rawKeyBasis": "10227 catalog keys / 107 namespaces",
   "raised": "root surface - no taskbar button",
   "languages": {
     "perLang": [
@@ -41,46 +57,150 @@
         "lang": "en",
         "htmlLang": "en",
         "textRuns": 61,
-        "textHash": 1526426498,
+        "textHash": -1910610345,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 0,
+        "diffExamples": []
       },
       {
         "lang": "ja",
         "htmlLang": "ja",
         "textRuns": 61,
-        "textHash": -390506942,
+        "textHash": 604591524,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 10,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Calendar",
+            "now": "カレンダー"
+          },
+          {
+            "i": 1,
+            "was": "Study sessions, exams, assignm",
+            "now": "学習セッション、試験、課題、リマインダーを一か所で管理。"
+          },
+          {
+            "i": 2,
+            "was": "New event",
+            "now": "新しい予定"
+          },
+          {
+            "i": 3,
+            "was": "Month",
+            "now": "月"
+          },
+          {
+            "i": 4,
+            "was": "Week",
+            "now": "週"
+          },
+          {
+            "i": 5,
+            "was": "Day",
+            "now": "日"
+          }
+        ]
       },
       {
         "lang": "zh",
         "htmlLang": "zh-Hans",
         "textRuns": 61,
-        "textHash": 1238301902,
+        "textHash": -2052054480,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 10,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Calendar",
+            "now": "日历"
+          },
+          {
+            "i": 1,
+            "was": "Study sessions, exams, assignm",
+            "now": "在一处管理学习安排、考试、作业和提醒。"
+          },
+          {
+            "i": 2,
+            "was": "New event",
+            "now": "新建日程"
+          },
+          {
+            "i": 3,
+            "was": "Month",
+            "now": "月"
+          },
+          {
+            "i": 4,
+            "was": "Week",
+            "now": "周"
+          },
+          {
+            "i": 5,
+            "was": "Day",
+            "now": "日"
+          }
+        ]
       },
       {
         "lang": "ru",
         "htmlLang": "ru",
         "textRuns": 61,
-        "textHash": 1671634679,
+        "textHash": 1805372230,
         "rawKeyCount": 0,
-        "rawKeys": []
+        "rawKeys": [],
+        "diffRuns": 10,
+        "diffExamples": [
+          {
+            "i": 0,
+            "was": "Calendar",
+            "now": "Календарь"
+          },
+          {
+            "i": 1,
+            "was": "Study sessions, exams, assignm",
+            "now": "Учебные занятия, экзамены, зад"
+          },
+          {
+            "i": 2,
+            "was": "New event",
+            "now": "Новое событие"
+          },
+          {
+            "i": 3,
+            "was": "Month",
+            "now": "Месяц"
+          },
+          {
+            "i": 4,
+            "was": "Week",
+            "now": "Неделя"
+          },
+          {
+            "i": 5,
+            "was": "Day",
+            "now": "День"
+          }
+        ]
       }
     ],
     "before": {
       "html": "en",
-      "stored": "en"
+      "stored": null
     },
     "after": {
       "html": "en",
-      "stored": "en"
+      "stored": null
     },
     "restored": true,
     "rawKeyCountMax": 0,
-    "distinctHashes": 4
+    "distinctHashes": 4,
+    "diffRunsMax": 10,
+    "baseRuns": 61,
+    "diffShare": 0.1639
   },
   "drive": {
     "click": ".cal-mode-btn:nth-child(4)",
@@ -97,19 +217,27 @@
           "messages": [
             "Nothing today.",
             "Nothing on the horizon."
-          ]
+          ],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "loading": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "error": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         },
         "offline": {
           "hosts": 0,
-          "messages": []
+          "messages": [],
+          "unpaintedHosts": 0,
+          "unpainted": []
         }
       },
       "mutePairCount": 0,
@@ -142,30 +270,5 @@
   "notMeasuredHere": [
     "dead-control count (honesty-probe A - every control driven for a side effect)",
     "fabricated-value verdict (honesty-probe B - needs an empty scratch profile)"
-  ],
-  "control": {
-    "moved": {
-      "rawKeys": true,
-      "placeholders": true,
-      "mutePairs": true
-    },
-    "backToBaseline": true,
-    "counts": {
-      "base": [
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        1,
-        1
-      ],
-      "restored": [
-        0,
-        0,
-        0
-      ]
-    }
-  }
+  ]
 }

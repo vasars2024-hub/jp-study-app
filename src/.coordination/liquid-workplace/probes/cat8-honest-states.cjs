@@ -886,8 +886,25 @@ async function langLeg() {
       await sleep(1400);
       const r = await run();
       if (r.refuse) return { refuse: `${l.tag}: ${r.refuse}` };
-      if (r.storedLang !== l.stored) {
-        return { refuse: `language did not take: asked ${l.stored}, storage says ${r.storedLang} - the previous language would have been measured twice` };
+      // Correction 37: AN ABSENT `ui-lang` IS ENGLISH, and reading it as "the switch did not
+      // take" VOIDs every profile that has never changed language. `renderer/i18n.ts:26`
+      // `readStored()` falls back to `DEFAULT_LANG` when the key is missing or unparseable, and
+      // the product writes the key only on a real change — so on a profile whose localStorage
+      // was wiped (which a restart of the dev app has done here), the FIRST tag `en` clicks an
+      // already-active control, nothing is written, and the guard fired on a leg that had in
+      // fact landed. Measured 2026-09-03: `{html:'en', ui-lang:null}` on the live app, and the
+      // Calendar cell VOIDed twice before this was read rather than assumed.
+      //
+      // The guard is still needed — correction 14's whole point is that it catches a click that
+      // hit the wrong control. So it is not relaxed, it is re-based on what the app actually
+      // renders: the effective language (stored, or the default when absent) AND the `lang`
+      // attribute the switch stamps on <html> (`applyLangAttribute`). Both must agree with the
+      // tag asked for, so a language that genuinely did not move still refuses.
+      const effectiveStored = r.storedLang === null || r.storedLang === undefined ? 'en' : r.storedLang;
+      if (effectiveStored !== l.stored || r.lang !== l.tag) {
+        return {
+          refuse: `language did not take: asked ${l.stored}/${l.tag}, storage says ${r.storedLang} (effective ${effectiveStored}) and <html lang> says ${r.lang} - the previous language would have been measured twice`,
+        };
       }
       // Correction 21: HOW MANY runs moved, not merely whether the hash did. See the bar below.
       const moved = JSON.parse(await ev(langRuns(perLang.length === 0)));
@@ -900,6 +917,16 @@ async function langLeg() {
   } finally {
     await ev(clickLang(restoreTag));
     await sleep(1400);
+    // Correction 37, second half: the leg must put back the ABSENCE of the key too. When the
+    // profile arrived with no `ui-lang` at all, clicking English restores the language but
+    // leaves `ui-lang: "en"` written — the same effective state, a different profile. The repo
+    // rule for a persisted setting is capture-patch-restore verified byte-identical, and
+    // `restored` below compares raw values, so without this the leg VOIDs itself on its own
+    // residue (measured 2026-09-03: `before {stored:null}` vs `after {stored:"en"}`).
+    if (before.stored === null || before.stored === undefined) {
+      await ev("(function(){ try { localStorage.removeItem('ui-lang'); } catch (e) {} return 'removed'; })()");
+      await sleep(200);
+    }
   }
   if (perLang.length !== tags.length) return { refuse: 'language leg did not complete all four tags' };
   const after = JSON.parse(await ev(

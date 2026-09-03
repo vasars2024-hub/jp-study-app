@@ -1,7 +1,7 @@
 {
   "label": "l7-calendar",
   "app": "calendar",
-  "win": "(focused)",
+  "win": "1",
   "raised": "already-on-top",
   "matchedBy": "title",
   "host": "fwin",
@@ -26,7 +26,7 @@
     },
     {
       "step": "visitMonth",
-      "result": "{\"month\":true,\"before\":\"August 2026\"}"
+      "result": "{\"month\":true,\"before\":\"September 2026\"}"
     },
     {
       "step": "returnDate",
@@ -46,6 +46,119 @@
     }
   ],
   "drivenRefusals": 0,
+  "settle": {
+    "afterDrive": {
+      "where": "after drive, before parity check",
+      "converged": true,
+      "reads": 2,
+      "ms": 380,
+      "signature": "218|178|14",
+      "trace": [
+        "218|178|14",
+        "218|178|14"
+      ],
+      "snapshot": {
+        "app": "calendar",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "77",
+        "chars": 218,
+        "nodes": 178,
+        "controls": 14,
+        "fields": {
+          "input0:cal-jump": "2026-09-03"
+        },
+        "scroll": [
+          "calendar-view:120,0"
+        ]
+      }
+    },
+    "afterFlipOut": {
+      "where": "flip -> liquid",
+      "converged": true,
+      "reads": 2,
+      "ms": 377,
+      "signature": "218|178|14",
+      "trace": [
+        "218|178|14",
+        "218|178|14"
+      ],
+      "snapshot": {
+        "app": "calendar",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "liquid",
+        "liquidClass": true,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "77",
+        "chars": 218,
+        "nodes": 178,
+        "controls": 14,
+        "fields": {
+          "input0:cal-jump": "2026-09-03"
+        },
+        "scroll": [
+          "calendar-view:120,0"
+        ]
+      }
+    },
+    "afterFlipBack": {
+      "where": "flip -> standard",
+      "converged": true,
+      "reads": 2,
+      "ms": 377,
+      "signature": "218|178|14",
+      "trace": [
+        "218|178|14",
+        "218|178|14"
+      ],
+      "snapshot": {
+        "app": "calendar",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "77",
+        "chars": 218,
+        "nodes": 178,
+        "controls": 14,
+        "fields": {
+          "input0:cal-jump": "2026-09-03"
+        },
+        "scroll": [
+          "calendar-view:120,0"
+        ]
+      }
+    },
+    "disabled": false,
+    "allConverged": true,
+    "unconverged": []
+  },
   "parity": {
     "standard": "5/5",
     "liquid": "5/5",
@@ -55,6 +168,63 @@
     "failing": [],
     "onlyInOne": []
   },
+  "rowEvidence": [
+    {
+      "id": "viewModes",
+      "standard": {
+        "reachable": true,
+        "evidence": "buttons=4 active=1 visited=4/4"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "buttons=4 active=1 visited=4/4"
+      }
+    },
+    {
+      "id": "monthGrid",
+      "standard": {
+        "reachable": true,
+        "evidence": "dows=7 cells=42 numbered=42"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "dows=7 cells=42 numbered=42"
+      }
+    },
+    {
+      "id": "dateTransport",
+      "standard": {
+        "reachable": true,
+        "evidence": "buttons=3 named=3 jump=true shiftedAndReturned=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "buttons=3 named=3 jump=true shiftedAndReturned=true"
+      }
+    },
+    {
+      "id": "eventComposer",
+      "standard": {
+        "reachable": true,
+        "evidence": "trigger=true complete=true closed=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "trigger=true complete=true closed=true"
+      }
+    },
+    {
+      "id": "windowLifecycle",
+      "standard": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=true"
+      }
+    }
+  ],
   "roundTrip": {
     "trip": "standard -> liquid -> standard",
     "dirtiedField": null,
@@ -70,7 +240,11 @@
         "mutation": "viewModes",
         "declaredCascade": [],
         "preBaseline": "5/5",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "active added to 1 of 1",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "4/5",
         "fellRows": [
           "viewModes"
@@ -85,7 +259,11 @@
         "mutation": "monthGrid",
         "declaredCascade": [],
         "preBaseline": "5/5",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "4/5",
         "fellRows": [
           "monthGrid"
@@ -100,7 +278,11 @@
         "mutation": "dateTransport",
         "declaredCascade": [],
         "preBaseline": "5/5",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "4/5",
         "fellRows": [
           "dateTransport"
@@ -115,7 +297,11 @@
         "mutation": "eventComposer",
         "declaredCascade": [],
         "preBaseline": "5/5",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "type stripped",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "4/5",
         "fellRows": [
           "eventComposer"
@@ -130,7 +316,11 @@
         "mutation": "windowLifecycle",
         "declaredCascade": [],
         "preBaseline": "5/5",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "4/5",
         "fellRows": [
           "windowLifecycle"
@@ -142,6 +332,9 @@
         "returned": true
       }
     ],
+    "armed": 5,
+    "declared": 5,
+    "unarmable": [],
     "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
   },
   "bars": {
