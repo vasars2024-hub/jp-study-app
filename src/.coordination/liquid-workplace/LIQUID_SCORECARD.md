@@ -1327,3 +1327,68 @@ Guard `youtubeClarityGuards.test.ts` grows an eighth case that forbids the shape
 1 · 2 · 3 · 4 · 5 · 6 · 7 · 8. That is **L8's fifth and last surface** — Resources, Scraper,
 Settings, YouTube and Music now all hold 80/80. Evidence: `baselines/cat8-l8-youtube.json`,
 `cat8-l8-youtube-control.json`.
+
+## 2026-09-02 — Dictionary — 80/80 — commit 70626d66
+
+**L1's re-drive, half one of two.** Gate 495 names Video AND Dictionary. Their previous 8/8
+was driven at `6eefff6c`, which `git rev-list --count 6eefff6c..HEAD` puts **925 commits**
+behind this HEAD — stale by the rubric's own rule, not missing. So this is a re-measurement
+with the instruments and protocols that already existed, not a first measurement. RULE C: 2
+surfaces × 8 categories = **16 cells**, `sampled-out:` **EMPTY**.
+
+State driven: a REAL lookup, not the window at rest. `食べる` typed through the product's own
+field and submitted → **20 entries**, `.dict-view` 772×3756, `.lexicon-workbench` 3,523 px
+inside an 818×545 body. This is load-bearing rather than ceremony — see cat 4 below.
+Restart before main-process measurement: not required; every category here is renderer-side.
+Instrument: the eight parameterised `cat*-*.cjs` harnesses via `jp-bridge` (pid 47004, port
+39273, `eval 1+1` → 2). **Zero new probes** (RULE 1).
+
+| # | Category                        | Score | Number measured | Negative control (must have failed) |
+| - | ------------------------------- | ----- | --------------- | ----------------------------------- |
+| 1 | Accessibility                   | 10/10 | 154 text runs, minRatio **5.35:1** (`span.muted` 12px), 0 failing, 0 unmeasurable; 67 controls, 47 below the 32 px bar **by rect** but **0 by pointer** (`.lq-hit`); 58 focusable, **0** unreachable; reduce-motion 9 → **0** durations | same process: contrast 0→2, targets-by-rect 47→49, targets-by-pointer 0→2, 2.5.8 0→1, keyboard 0→2; restored to `[0,47,0,0]`, rectDrift 0 |
+| 2 | Clunkiness                      | 10/10 | input cost **4** (1 click + 3 keys); `worstRecv` **19.6 ms** vs the 100 ms bar, `overBar100` **0**; 0 dead ends, 0 modal traps, 0 scroll traps; costParity standard **4** = liquid **4** at one geometry | deadEnd / modalTrap / scrollTrap each **0 → 1 → 0**; inert plant received in 0.4 ms; undo round trip `ditcbg` → `ditcbg` |
+| 3 | Liquid utilization              | 10/10 | `denseWorkOnTranslucent` **0**; liquid-treated eligible **2 of 2**, all backed by a shared primitive; roles Work 2 / Anchor 4 / Anchor-holds-work 2 / Ambient 0 | A blur one Work region → count moved; B force all-glass → **every** Work region failed; both restored, one-material check byte-identical |
+| 4 | Use of space                    | 10/10 | three sizes, all clean: default 820×580 dead **8.9%** · compact 260×170 **0.7%** · maximized 1264×765 **15.0%**; clipped 0 / overlaps 0 / horizontal scrollers 0 at every size; canvas 93.7 / 78.8 / 95.3% | injected must-clip box 0 → 1 → 0; art-plate exclusion proven narrow (plate hanging out 279 px did NOT raise `clipped`); backdrop plant raised overlaps 0 → 8 → 0; sub-minimum 200×140 shrink restored |
+| 5 | UI clarity                      | 10/10 | 10 of 10 questions answered YES, 66 controls painted, 0 findings, 0 voided; alt-theme axis `[null, classic-light]` | control arm fired on **Q2, Q3, Q4, Q5, Q10** — banked separately as `cat5-l1rd-dictionary-control.json` so the measurement arm did not overwrite it |
+| 6 | Feature parity + reversibility  | 10/10 | standard **7/7** = liquid **7/7**, na 0, rows agree, 0 failing, 0 only-in-one; round trip standard → liquid → standard with a dirtied INPUT: fields held, shell held, **0** diffs, box 820×580 both ways | three mutations, each fell **exactly its own row** and no other: `notesFilter` 7/7→6/7, `sourceSwitch` 7/7→6/7, `windowLifecycle`; all restored to 7/7 |
+| 7 | Performance under real load     | 10/10 | score 10, findings **[]**, voided **[]**; drag p50 **16.7** / p95 **17.1** / max 33.4 ms, over-100 **0**, closed loop (geometry identical before/after); resize p95 16.9; theme p95 16.9; main-thread max 11.4 ms vs a 500 ms bar | `--jank` sensitivity control: the SAME drag under 120 ms renderer blocks went p95 **17.1 → 100.3** and over-100 **0 → 11**. The recorder demonstrably sees the frames it reports |
+| 8 | Honest states                   | 10/10 | 164 text runs, raw i18n keys **0**, placeholders **0**, mute pairs **0**, `statesNamed` **1 of 1 observable**, `languagesDiffer` TRUE across all four languages (restored to `en`/`en`) | stock plant: rawKeys / placeholders / mutePairs each **0 → 1 → 0**. Plus the control for correction 39 — see below |
+
+Lowest category: none — every category holds a 10. Two of them only after work this turn:
+
+**Category 2 was a FAIL and is fixed in `70626d66`, the commit this entry carries.** The
+first keystroke into `.dict-search input` was received in **118 ms** (then 78.9, 38.8) against
+a 100 ms bar. The decay across three keys is the tell: render cost, not I/O. `input` state
+lives in `DictionaryView` and `LexiconWorkbenchResults` is its SIBLING, so every keystroke
+re-rendered 3,523 px of reading area. Memoised the results component and stabilised its one
+non-primitive prop. After: **[15.9, 11.8, 7.0]**, worst 19.6, over-bar **0**. Re-scored in the
+fixing commit, same task, same 820×580 geometry, base state re-established after HMR remounted
+the view.
+
+**Category 8 was a FAIL, and the defect was in the INSTRUMENT — fixed in `890c4074`.**
+`textOf` returned `hosts: found.length` (raw query count) while `messages` was filtered by
+`painted()`. `p.muted.lexicon-notes-empty` carries a real, correct, translated empty message
+but sits inside a CLOSED `details.lexicon-notes-browser`, so it sat in the denominator and
+could never reach the numerator: `0 of 1 observable`, a FAIL no product change could clear.
+The discriminating control is the reason this is a repair and not a muted bar — details
+CLOSED **plus** a PAINTED plant carrying no text still scores `hosts 1 / messages 0` → **FAIL**;
+remove the plant and reopen → `1 of 1` → PASS. `unpaintedHosts`/`unpainted` are now published
+with the excluded node's ancestor chain.
+
+**The state a category is driven in decided category 4's verdict, and this is the trap to
+carry forward.** Measured on the window AT REST (empty search box, no results) the dead region
+is default 18.3% / maximized **53.3%** — a two-bar FAIL. The same window, same tree, same
+harness, holding a real 20-entry lookup: 8.9% / **15.0%**. The rubric already says a category
+measured only on an empty harness is capped at 0; the empty run is not a worse score, it is
+**not a measurement**. Both are banked (`cat4-l1rd-dictionary.json` = at rest,
+`cat4-l1rd-dictionary-loaded.json` = scored) so the difference stays checkable. The same
+correction applies to category 1: at rest it saw 13 text runs and 11 controls, loaded it sees
+154 and 67.
+
+**Disclosed rather than rounded away:** maximized dead region is **15.0** against a bar of
+`<= 15`, and the harness rounds to 1 dp *before* comparing. It passes, but it passes AT the
+bar, not under it — anything that adds chrome at maximized will tip it.
+
+Evidence: `baselines/cat{1,2,3,5,6,7,8}-l1rd-dictionary*.json`,
+`cat4-l1rd-dictionary-loaded.json`. **sampled-out: (none)**.
+Still open for gate 495: **Video**, all eight categories, same protocol.
