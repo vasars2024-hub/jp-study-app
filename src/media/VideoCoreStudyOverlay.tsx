@@ -25,10 +25,7 @@ import type {
   MKVParser_SubtitleEvent,
   MKVParser_TrackInfo,
 } from '../../vendor/seanime/generated/types';
-import {
-  WHISPER_MODEL_SPECS,
-  type WhisperModelTier,
-} from '../shared/whisperModels';
+import type { WhisperModelTier } from '../shared/whisperModels';
 import DictionaryPopup from '../renderer/components/DictionaryPopup';
 import SubtitleCueLine from '../renderer/components/SubtitleCueLine';
 import {
@@ -36,7 +33,8 @@ import {
   lookupWordFromMouseUp,
   noteLookupPointerDown,
 } from '../renderer/wordLookup';
-import { translate } from '../renderer/translator';
+import { translateTo } from '../renderer/translator';
+import { shiftCues, shiftCuesMs } from '../shared/subtitleSync';
 import { registerCommandHandler } from '../renderer/keyboardShortcuts';
 import { t as translateUi, useT } from '../renderer/i18n';
 import { getStudyLang, setStudyLang } from '../renderer/studyEnvironment';
@@ -65,12 +63,14 @@ import {
   nextVideoCoreWhisperTrackNumber,
   normalizeVideoCoreStudyPreferences,
   PLAYER_PREFERENCES_STORAGE_KEY,
+  SUBTITLE_FONT_STACKS,
   recordVideoCoreComprehensionEvent,
   recordVideoCoreCueReplay,
   recordVideoCoreTimingAdjustment,
   resolveStudyLoopSeekSec,
   shouldSuggestVideoCoreComprehensionRescue,
   shouldSuggestVideoCoreShadowing,
+  shortLangTag,
   shouldSuggestVideoCoreTimingRepair,
   stripAssCueText,
   studyCuesFromParsedCues,
@@ -98,36 +98,57 @@ import VideoCoreMiningPanel from './VideoCoreMiningPanel';
 import VideoCoreGrammarPanel from './VideoCoreGrammarPanel';
 import VideoCoreTranscriptPanel from './VideoCoreTranscriptPanel';
 import { useCueAnalysis } from './useCueAnalysis';
-
-/**
- * How long to let the container's own tracks arrive before offering a downloaded one.
- *
- * The manager is constructed before the stream is parsed, so `getTracks()` is empty for
- * a moment on every file — including files that do carry embedded subtitles. Asking
- * immediately would mount a sidecar over a muxed track that was about to appear.
- */
-const EXTERNAL_SUBTITLE_GRACE_MS = 800;
-
-const RATE_PRESETS = [0.7, 0.75, 0.85, 0.9, 1, 1.25, 1.5] as const;
+import StudyBottomBar, { type PracticeMode } from './StudyBottomBar';
+import StudyDocks, { type BlockRenderers } from './StudyDocks';
+import {
+  AiWorkspaceBlock,
+  ListeningBlock,
+  MediaInfoBlock,
+  MiningQueueBlock,
+  mediaDisplayName,
+  StudyAppOwnedBlock,
+  StudyHudBlock,
+  type AiMode,
+} from './StudyBlocks';
+import StudyWorkspaceCustomizer from './StudyWorkspaceCustomizer';
+import { useStudyWorkspace } from './StudyWorkspaceProvider';
+import {
+  StudyDetachContext,
+  useStudyDetach,
+  type StudyDetachFrame,
+} from './useStudyDetach';
 
 /** Run-up when jumping to a transcript line. See `seekTranscriptCue`. */
 const TRANSCRIPT_LEAD_IN_SEC = 1;
 
-/** Fallback rail reservation, for the 24rem column at this workspace's 16px root. */
-const TRANSCRIPT_RAIL_PX = 25 * 16;
+/** Fallback reservation for the right dock at this workspace's 16px root. */
+const RIGHT_DOCK_PX = 25 * 16;
 
 /**
- * How much of the right edge the rail is holding, so a dictionary lookup can
+ * How much of the right edge the docked column is holding, so a dictionary lookup can
  * open beside it rather than under it.
  *
- * Measured rather than declared: the column narrows to 19rem below 1180px, and a
- * second copy of that number here is exactly how the popup ends up 80px wrong on
- * the window where the room is tightest. The gutter is the rail's own `right`.
+ * Measured rather than declared: the column narrows below 1180px, and a second copy of
+ * that number here is exactly how the popup ends up 80px wrong on the window where the
+ * room is tightest. The gutter is the dock's own `right`.
  */
-function transcriptRailInsetPx(): number {
-  const width = document.querySelector('.study-side-rail')?.getBoundingClientRect().width ?? 0;
-  return width > 0 ? Math.round(width) + 16 : TRANSCRIPT_RAIL_PX;
+function rightDockInsetPx(): number {
+  const width = document
+    .querySelector('.study-dock[data-dock="right"]:not([hidden])')
+    ?.getBoundingClientRect().width ?? 0;
+  return width > 0 ? Math.round(width) + 16 : RIGHT_DOCK_PX;
 }
+
+/**
+ * How long to let the file's own subtitle tracks register before concluding it has none.
+ *
+ * Not a guess at network or disk latency — the tracks this waits for are already in hand.
+ * `mkvMetadata.subtitleTracks` arrives with the playback info and the parser's event tracks
+ * register during the same load burst, both before the element reports it can play. This is
+ * a margin over that burst, long enough that "the list is empty" means empty rather than
+ * early, and short enough to fill a real void before the viewer has read the first line.
+ */
+const EXTERNAL_SUBTITLE_GRACE_MS = 800;
 
 type WhisperGenerationState =
   | 'idle'
@@ -155,27 +176,48 @@ type CuePopup = {
   context: string;
 };
 
-/** One enum over the two mutually exclusive stored booleans. See `setPracticeMode`. */
-type PracticeMode = 'off' | 'dictation' | 'shadowing';
-
 interface Props {
   playbackInfo: VideoCore_VideoPlaybackInfo | null;
+  /**
+   * The local file this playback was opened for, from the REQUEST rather than the reply.
+   * `playbackInfo.localFile` is optional upstream, so the external-subtitle mount below
+   * prefers this and treats the reply's field as a fallback.
+   */
+  localFilePath?: string | null;
   onManagerReady?: (managerClass: string) => void;
   onCueChange?: (event: SubtitleManagerCueChangeEvent) => void;
 }
 
 /**
- * Size and background for one subtitle line.
+ * Type and background for one subtitle line.
  *
  * At 0% the box is genuinely absent rather than a transparent rectangle — no
  * background and no padding — so the text sits on the picture the way a burned-in
  * subtitle does. The text shadow in the stylesheet is what keeps it legible over
  * a bright frame, which is why the background can be dropped entirely.
+ *
+ * Takes the whole preference object rather than one argument per knob: the secondary
+ * line differs from the primary in exactly one of them, and a positional list long
+ * enough to cover the rest is a list two callers can disagree about silently. The size
+ * override is the one parameter, because it is the one real difference.
+ *
+ * Only settings that depart from the stylesheet are emitted. `default` leaves the family
+ * unset so the sheet's own choice still applies, and the outline is dropped rather than
+ * overridden so that turning it back on needs no matching `text-shadow` value here.
  */
-function cueBoxStyle(fontSizePx: number, bgOpacity: number): React.CSSProperties {
-  const style: React.CSSProperties = { fontSize: `${fontSizePx}px` };
-  if (bgOpacity > 0) {
-    style.backgroundColor = `rgba(0, 0, 0, ${bgOpacity / 100})`;
+function cueBoxStyle(
+  preferences: VideoCoreStudyPreferences,
+  fontSizePx: number = preferences.subtitleFontSize,
+): React.CSSProperties {
+  const style: React.CSSProperties = {
+    fontSize: `${fontSizePx}px`,
+    fontWeight: preferences.subtitleFontWeight,
+  };
+  const stack = SUBTITLE_FONT_STACKS[preferences.subtitleFontFamily];
+  if (stack) style.fontFamily = stack;
+  if (!preferences.subtitleOutline) style.textShadow = 'none';
+  if (preferences.subtitleBgOpacity > 0) {
+    style.backgroundColor = `rgba(0, 0, 0, ${preferences.subtitleBgOpacity / 100})`;
     style.padding = '0.1em 0.4em';
     style.borderRadius = '0.35em';
   }
@@ -238,6 +280,7 @@ function miningSourceFromPlayback(
 
 export default function VideoCoreStudyOverlay({
   playbackInfo,
+  localFilePath,
   onManagerReady,
   onCueChange,
 }: Props): React.ReactElement {
@@ -253,7 +296,7 @@ export default function VideoCoreStudyOverlay({
   const [tracks, setTracks] = React.useState<NormalizedTrackInfo[]>([]);
   const [selectedTrack, setSelectedTrack] = React.useState<number | null>(null);
   /**
-   * What the script split removed from the downloaded track, and from which track.
+   * What the script split took out of the mounted external track, and from which styles.
    *
    * Kept as state rather than discarded because a hidden line is a *number the user is
    * owed*: the split is right far more often than not, but "the transcript is short and
@@ -284,7 +327,7 @@ export default function VideoCoreStudyOverlay({
   /** Bumped by the mine shortcut; the mining panel owns the actual export. */
   const [mineSignal, setMineSignal] = React.useState(0);
   const popupOpenOnDownRef = React.useRef(false);
-  const dockRef = React.useRef<HTMLElement | null>(null);
+  const dockRef = React.useRef<HTMLDivElement | null>(null);
   const previousCueRef = React.useRef<VideoCoreActiveCue | null>(null);
   const secondaryCuesRef = React.useRef<VideoCoreActiveCue[]>([]);
   /**
@@ -332,32 +375,55 @@ export default function VideoCoreStudyOverlay({
   const [whisperMessage, setWhisperMessage] = React.useState('');
   const [whisperProgress, setWhisperProgress] = React.useState(0);
   const [whisperError, setWhisperError] = React.useState('');
-  // Collapsed by default. The dock's job during playback is the cue loop; tracks,
-  // A–B and the Whisper pipeline are set once and then only get in the way.
-  const [controlsExpanded, setControlsExpanded] = React.useState(false);
+  /*
+    The workspace. It decides which blocks are on screen; this component decides what
+    each block renders. Everything below that used to read a preference boolean to know
+    whether to draw itself now asks the workspace instead — that is the whole point of
+    the redesign, and the reason the grammar card, the transcript and the mining form
+    can no longer all claim the picture at once.
+  */
+  const workspace = useStudyWorkspace();
+  /**
+   * Which mode the unified AI surface is showing.
+   *
+   * Chosen automatically by whatever opened it — a word click means Dictionary, a
+   * grammar span means Analysis — and changeable by hand, which is both halves of the
+   * requirement. Held here rather than inside the block so the choice survives the
+   * block being closed and reopened.
+   */
+  const [aiMode, setAiMode] = React.useState<AiMode>('analysis');
 
   const activeCue = activeCues[0] ?? null;
   // Mirrored so the keyboard listener does not have to rebind on every cue change.
   const activeCueRef = React.useRef(activeCue);
   activeCueRef.current = activeCue;
+  // Read by the detach bridge's command handler, which runs from an IPC callback rather
+  // than in render and so must not close over a stale cue list.
+  const allCuesRef = React.useRef(allCues);
+  allCuesRef.current = allCues;
   // Same reason: the three toggle commands read the current value without the command
   // registrations having to rebind every time one of the preferences changes.
   const preferencesRef = React.useRef(preferences);
   preferencesRef.current = preferences;
   /*
-    Publish the dock's height so the rest of the surface can stay off it.
+    Publish the bar's height so the rest of the surface can stay off it.
 
-    The dock is bottom-anchored and grows from one row to six when the viewer
-    expands it — from ~56px to its 22rem cap. Everything above it (the subtitle
-    line, the grammar card, the side rail) used to be positioned against a
-    constant that only described the collapsed dock, so expanding the controls
-    drew a 275px panel straight over the subtitle: measured at 644×69px of the
-    cue line covered, and the dock is a layer above it, so the line was simply
-    gone. CSS cannot ask an element how tall it is; this is that answer.
+    This measurement is the reason the old dock could not silently cover the
+    subtitle: everything above it (the cue line, the docks) is positioned against
+    `--study-dock-height` rather than a constant. It survives the redesign
+    unchanged in purpose.
+
+    What is measured is the bar LAYER — the bar plus whatever tool sheet is open —
+    not the bar alone. Both facts matter and they are different: `.study-bar` is a
+    constant 45px whether a sheet is open or not (measured in the harness, cases
+    V13–V17), so the transport never moves under the pointer; and the layer grows
+    to 163px with the More sheet open, which is exactly the height the subtitle has
+    to clear. Measuring only the bar would put a 118px sheet over the cue line,
+    which is the 644×69px defect this replaced, rebuilt out of new parts.
 
     Written on the slice rather than on `:root` so two workspaces (main window
     and pop-out) never overwrite each other's value, and removed on unmount so a
-    stale height cannot outlive the dock that produced it.
+    stale height cannot outlive the bar that produced it.
   */
   React.useEffect(() => {
     const dock = dockRef.current;
@@ -384,10 +450,64 @@ export default function VideoCoreStudyOverlay({
   }, []);
 
   const plainText = activeCue ? stripAssCueText(activeCue.text) : '';
-  const secondaryText = activeSecondaryCues
+  const trackSecondaryText = activeSecondaryCues
     .map((cue) => stripAssCueText(cue.text))
     .filter(Boolean)
     .join(' ');
+
+  /**
+   * The second line when no track can supply it.
+   *
+   * Dual subtitles used to mean "show another track", which on the common case — one
+   * release, one `.ja.srt` beside it — meant the feature did nothing at all. Translating
+   * the active cue is what makes the language control answer for itself: pick Russian and
+   * a Russian line appears whether or not the release ever shipped one.
+   *
+   * Cached by target language and cue text rather than by cue index, so a line that
+   * repeats is translated once and the cache survives seeking. A failure clears the line
+   * instead of showing an error under the subtitle: the primary is still readable, and a
+   * translator that is still loading its model is the ordinary reason for this.
+   */
+  const [secondaryTranslation, setSecondaryTranslation] = React.useState('');
+  const secondaryTranslationCacheRef = React.useRef(new Map<string, string>());
+  React.useEffect(() => {
+    const target = preferences.secondarySubLang;
+    const source = getStudyLang();
+    if (!preferences.dualSubs || trackSecondaryText || !plainText || target === source) {
+      setSecondaryTranslation('');
+      return;
+    }
+    // The language code leads so the separator is unambiguous: `target` is always a
+    // two-letter code, whatever the cue text happens to contain.
+    const key = `${target}|${plainText}`;
+    const cached = secondaryTranslationCacheRef.current.get(key);
+    if (cached !== undefined) {
+      setSecondaryTranslation(cached);
+      return;
+    }
+    let cancelled = false;
+    setSecondaryTranslation('');
+    void (async () => {
+      try {
+        const text = await translateTo(plainText, source, target);
+        if (cancelled) return;
+        secondaryTranslationCacheRef.current.set(key, text);
+        setSecondaryTranslation(text);
+      } catch {
+        if (!cancelled) setSecondaryTranslation('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    plainText,
+    preferences.dualSubs,
+    preferences.secondarySubLang,
+    trackSecondaryText,
+  ]);
+
+  const secondaryText = trackSecondaryText || secondaryTranslation;
   const miningSource = miningSourceFromPlayback(playbackInfo);
   // Whose transcript this is. A Whisper track and a downloaded track both arrive
   // here as tracks, so naming the track is the only thing that tells them apart.
@@ -558,46 +678,135 @@ export default function VideoCoreStudyOverlay({
   ]);
 
   /**
-   * The downloaded track, mounted — the workspace player's half of a subtitle the
-   * library already chose.
+   * The measured sync offset for one video file, resolved at most once per path.
    *
-   * VideoCore learns about subtitles from the container it streams, so a file whose
-   * Japanese track was *fetched* rather than muxed (Jimaku, a nyaa release, the harvest
-   * panel's attach) has no subtitle stream at all: the manager picks a default from an
-   * empty list and calls `setNoTrack()`. Measured on `The Big O - 01`, where `ffprobe`
-   * reports exactly `hevc` + `flac` while a 267-cue Jimaku track for it sits in
-   * `subtitles/<mediaId>/`. This is the player that is actually mounted — `media:open`
-   * belongs to the retired one — so without this the download reaches nothing.
+   * ## Why both subtitle paths share this
    *
-   * WHICH record is not decided here. `media:subtitleForPath` routes through
-   * `pickPlaybackSubtitle` and honours the library's `preferredSubtitleId`, exactly as
-   * `media:open` does, so the two players cannot disagree about which of several
-   * downloaded tracks is the study one.
+   * VideoCore mounts subtitles two different ways and the study surface sees exactly one
+   * of them per session — `SubtitleManager` for embedded/event tracks, `MediaCaptionsManager`
+   * for provider files, and the two effects below are gated so that only one runs. The
+   * correction was originally written inside the `SubtitleManager` branch only, which meant
+   * it never executed for a file whose subtitles VideoCore had already found beside it: the
+   * common case, and the one that was visibly nine seconds late. One resolver, called from
+   * both, is what keeps that from silently regressing again.
    *
-   * Only when the container found nothing: an embedded track is the file's own and
-   * outranks a sidecar. Re-checked after the awaits as well, because the file's own
-   * tracks can land while this is in flight.
+   * ## Why the cache holds promises rather than numbers
+   *
+   * Track selection can fire twice in a load burst (`tracksloaded` then `trackselected`).
+   * Caching the resolved number still lets both callers past the check while the first is
+   * in flight, and each spawns its own ffmpeg pass over the same file. Caching the promise
+   * means the second caller awaits the first one's work.
+   *
+   * A failure resolves to 0 rather than rejecting: an unshifted track is worth having, and
+   * the alternative is losing the subtitles over a timing correction that is a refinement.
+   */
+  const syncOffsetCacheRef = React.useRef(new Map<string, Promise<number>>());
+  const resolveSubtitleSyncOffset = React.useCallback(
+    (
+      videoPath: string | null | undefined,
+      intervals: readonly { start: number; end: number }[],
+      durationSec: number | undefined,
+    ): Promise<number> => {
+      if (!videoPath || !intervals.length) return Promise.resolve(0);
+      const cached = syncOffsetCacheRef.current.get(videoPath);
+      if (cached) return cached;
+      const pending = (async (): Promise<number> => {
+        try {
+          const estimate = await window.api.subtitleSyncOffset(
+            videoPath,
+            intervals.map((cue) => ({ start: cue.start, end: cue.end })),
+            Number.isFinite(durationSec) ? durationSec : undefined,
+          );
+          // Logged rather than silent: a track that has been moved several seconds is a
+          // surprising thing to do to someone's subtitles, and when it is ever wrong this
+          // line is the only place that says it happened.
+          console.info(
+            '[study-subtitles] sync estimate',
+            JSON.stringify({
+              offsetSec: estimate?.confident ? estimate.offsetSec : 0,
+              confident: estimate?.confident,
+              score: estimate?.score,
+            }),
+          );
+          return estimate?.confident ? estimate.offsetSec : 0;
+        } catch {
+          return 0;
+        }
+      })();
+      syncOffsetCacheRef.current.set(videoPath, pending);
+      return pending;
+    },
+    [],
+  );
+
+  /**
+   * Mount the app's own downloaded subtitle when the container carries none.
+   *
+   * ## The gap this closes
+   *
+   * Subtitle discovery downloads a track (Jimaku, OpenSubtitles) and stores it under
+   * `subtitles/<mediaId>/`. `media:open` handed that to the *retired* player; the adopted
+   * workspace opens files through the sidecar instead, and the sidecar only knows what it
+   * can parse out of the container. So for a file with no embedded subtitles the whole
+   * discovery pipeline was write-only from here: downloaded, listed in the drawer, never
+   * shown while watching, and no transcript to mine from.
+   *
+   * Measured 2026-08-06 on `The Big O - 13`: `ffprobe` reports two streams, `hevc` and
+   * `flac`, and nothing else; the manager logged `Selecting default track` over an empty
+   * list and called `setNoTrack()`. A 261-cue Jimaku track for that episode was on disk
+   * the whole time.
+   *
+   * ## Only into a void, and never over the file's own tracks
+   *
+   * It fills an empty track list and does nothing otherwise, so a file that ships its own
+   * subtitles is untouched and upstream's default-track choice always wins. The delay is
+   * what makes that check meaningful rather than a race: `mkvMetadata.subtitleTracks` and
+   * the parser's event tracks both register during the load burst, before the element can
+   * play, so a list still empty afterwards is genuinely empty rather than merely early.
+   *
+   * Mounted with the same three calls the Whisper path uses — `addEventTrack`,
+   * `onSubtitleEvents`, `selectTrack` — because a downloaded track and a generated one are
+   * the same kind of thing here, which is what `VideoCoreTranscriptPanel`'s header already
+   * says about the transcript they feed.
+   *
+   * ## Observed live
+   *
+   * Verified end to end 2026-08-06 against `The Big O - 01`, whose `.ja.srt` sits beside
+   * the video and whose container carries no subtitle stream at all (the sidecar logs
+   * `mkvparser > No subtitle tracks found for streaming`). The track mounted, cues painted
+   * on screen (`.study-cue-text` held the line beginning `それがおかしい`), the
+   * transcript filled with **267 rows against the file's 267 cues**, clicking row 120
+   * seeked the element from 190 s to 585 s — its stated 9:44 — and the mining panel carried
+   * that line into a real Anki note.
+   *
+   * An earlier draft of this comment recorded that the effect "never fires", from five runs
+   * where `window.api.subtitleForPath` was instrumented and showed zero calls. That probe
+   * was broken, not the effect: `window.api` is a frozen `contextBridge` object, so the
+   * patch silently no-op'd and the absence of calls proved nothing.
+   *
+   * ## Timing correction
+   *
+   * A track timed against a different release is worse than no track — every transcript row
+   * seeks to the wrong place and every mined card is captioned with the wrong sentence.
+   * This one is **9.05 s late**, measured. So the cues are shifted onto the audio before
+   * they are mounted, and the shift is applied to the cue times rather than to VideoCore's
+   * `subtitleDelay` because the transcript is a seek surface and has to agree with the
+   * video. `shared/subtitleSync.ts` carries the method and the gates that make it decline
+   * rather than guess.
    */
   const externalSubtitleRef = React.useRef<
     { path: string; name: string; trackNumber: number } | null
   >(null);
-  /**
-   * Bumped by the media library's own broadcast, so the effect below re-asks.
-   *
-   * Choosing a different track in the library reopens the SAME file path, so a player
-   * keyed on the path alone keeps showing the previous choice — the defect `3bc796d1`
-   * fixed on the retired player, arriving here by the same route. `decideExternalSubtitleMount`
-   * holds the rule that keeps the re-ask from fighting the first guard.
-   */
   const [mediaRevision, setMediaRevision] = React.useState(0);
   React.useEffect(
     () => window.api.onMediaChanged(() => setMediaRevision((revision) => revision + 1)),
     [],
   );
   React.useEffect(() => {
-    const localPath = playbackInfo?.localFile?.path;
+    // The request's path first — it always exists. The reply's `localFile` is optional
+    // upstream, and the fallback keeps a caller that passes no prop working as before.
+    const localPath = localFilePath || playbackInfo?.localFile?.path;
     if (!manager || !localPath) return undefined;
-
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -605,11 +814,9 @@ export default function VideoCoreStudyOverlay({
         const mounted = externalSubtitleRef.current?.path === localPath
           ? externalSubtitleRef.current
           : null;
-        // The cheap half of the rule, before the IPC: a muxed release brought its own
-        // tracks and this player has nothing to add.
-        if (manager.getTracks().some((entry) => entry.number !== (mounted?.trackNumber ?? null))) {
-          return;
-        }
+        // A container track outranks a downloaded sidecar. Our own previously mounted track is
+        // excluded so a changed library selection can replace it instead of becoming write-only.
+        if (manager.getTracks().some((track) => track.number !== mounted?.trackNumber)) return;
         let pick: { name: string; text: string } | null = null;
         try {
           pick = await window.api.subtitleForPath(localPath);
@@ -618,7 +825,7 @@ export default function VideoCoreStudyOverlay({
         }
         if (cancelled) return;
         const decision = decideExternalSubtitleMount({
-          trackNumbers: manager.getTracks().map((entry) => entry.number),
+          trackNumbers: manager.getTracks().map((track) => track.number),
           mountedTrackNumber: mounted?.trackNumber ?? null,
           mountedName: mounted?.name ?? null,
           resolvedName: pick?.name ?? null,
@@ -631,15 +838,27 @@ export default function VideoCoreStudyOverlay({
         // dual-language `.ass` is one file holding two whole tracks, and nothing above the
         // parser can see that; without the split a `简繁外挂字幕` release paints its Chinese
         // half on screen and feeds it to mining. Inert on `.srt`, `.vtt` and any
-        // single-script `.ass`, which is every case this path handled before.
+        // single-track `.ass`, which is every case this path handled before.
         const split = parseStudySubtitles(pick.text);
-        if (!split.cues.length) return;
+        const parsed = split.cues;
+        if (!parsed.length) return;
 
+        // The element's own duration is the best runtime available, and by the time the
+        // grace window has elapsed it is loaded. A failure here costs the correction, not
+        // the track: `offsetSec` is 0 unless the estimate cleared both confidence gates.
+        const offsetSec = await resolveSubtitleSyncOffset(
+          localPath,
+          parsed,
+          video?.duration,
+        );
+        if (cancelled) return;
+
+        const cues = shiftCues(parsed, offsetSec);
         const trackNumber = nextVideoCoreWhisperTrackNumber(
           manager.getTracks().map((track) => track.number),
         );
         const events = whisperCuesToVideoCoreEvents(
-          split.cues,
+          cues,
           trackNumber,
         ) as MKVParser_SubtitleEvent[];
         if (!events.length) return;
@@ -661,15 +880,8 @@ export default function VideoCoreStudyOverlay({
         try {
           await manager.addEventTrack(track);
           await manager.onSubtitleEvents(events);
-          // Nothing selected? Then this is the only track there is. Re-checked after
-          // the awaits rather than before them: the file's own tracks can land while this
-          // is in flight, and upstream's choice must outrank ours. The second case is a
-          // library choice replacing OUR previous one — the user has just answered "which
-          // of these tracks", so their answer has to become the selected one.
-          //
-          // The superseded track is left in the picker rather than removed: it is a real
-          // record the library still holds, and `SubtitleManager` exposes no removal that
-          // would not also renumber what is playing.
+          // A newly selected sidecar may replace only our earlier sidecar. A container-selected
+          // track still wins if it arrived while parsing or mounting was in flight.
           const selected = manager.getSelectedTrackNumberOrNull();
           if (selected === null || selected === mounted?.trackNumber) {
             await manager.selectTrack(trackNumber);
@@ -694,7 +906,7 @@ export default function VideoCoreStudyOverlay({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [manager, mediaRevision, playbackInfo?.localFile?.path]);
+  }, [manager, localFilePath, mediaRevision, playbackInfo?.localFile?.path]);
 
   /**
    * The cue clock for a libass **file track**, which the manager renders but never indexes.
@@ -849,11 +1061,24 @@ export default function VideoCoreStudyOverlay({
     };
   }, [manager, video]);
 
+  /**
+   * The MediaCaptions half of the same surface — and the branch that actually runs for a
+   * file whose subtitles VideoCore found beside it, which is why the timing correction is
+   * applied here too and not only in the effect above.
+   *
+   * The shift lands on the cue times rather than on a player-level delay because there is
+   * no player-level delay to reach for: `MediaCaptionsManager` exposes track selection and
+   * nothing about timing. That is also why the native caption layer is hidden in CSS while
+   * this overlay is mounted — it renders from the unshifted track and cannot be corrected,
+   * so leaving it visible would put a nine-second-late copy of every line on screen next to
+   * the corrected one.
+   */
   React.useEffect(() => {
     if (manager || !mediaCaptionsManager) return;
     let cancelled = false;
     let selectedCues: VideoCoreActiveCue[] = [];
     let lastCueSignature = '';
+    const localPath = localFilePath || playbackInfo?.localFile?.path;
 
     onManagerReady?.(mediaCaptionsManager.constructor.name);
 
@@ -891,7 +1116,16 @@ export default function VideoCoreStudyOverlay({
         return;
       }
       try {
-        const cues = await mediaCaptionCues(mediaCaptionsManager, trackNumber);
+        const raw = await mediaCaptionCues(mediaCaptionsManager, trackNumber);
+        // Measured against the audio, so the correction belongs to the file rather than to
+        // the track — a second track on the same release is late by the same amount, and
+        // the resolver's per-path cache is what stops it being measured twice.
+        const offsetSec = await resolveSubtitleSyncOffset(
+          localPath,
+          raw.map((cue) => ({ start: cue.startMs / 1000, end: cue.endMs / 1000 })),
+          video?.duration,
+        );
+        const cues = shiftCuesMs(raw, offsetSec);
         if (cancelled || mediaCaptionsManager.getSelectedTrackIndexOrNull() !== trackNumber) {
           return;
         }
@@ -937,11 +1171,13 @@ export default function VideoCoreStudyOverlay({
       video?.removeEventListener('loadeddata', syncActive);
     };
   }, [
+    localFilePath,
     manager,
     mediaCaptionsManager,
     onCueChange,
     onManagerReady,
     playbackInfo,
+    resolveSubtitleSyncOffset,
     subtitleDelaySec,
     video,
   ]);
@@ -959,27 +1195,45 @@ export default function VideoCoreStudyOverlay({
     return () => audioManager.removeEventListener('trackchanged', handleTrackChanged);
   }, [audioManager]);
 
+  /**
+   * Which track carries the second line.
+   *
+   * Prefers a track whose own language is the one the user picked, so choosing Russian
+   * on a release that ships Russian subtitles shows those subtitles rather than a
+   * machine translation of the Japanese. When no track matches, any other track will do
+   * and the language preference is honoured further down by translating instead.
+   *
+   * The candidate filter narrows to event tracks only while `SubtitleManager` is driving,
+   * because `getCuesForTrack` is the event track's own accessor. Under MediaCaptions every
+   * track is a parsed file and any of them can be read, which is what makes dual subtitles
+   * work at all on this path — the previous `!manager` early return forced the track to
+   * null and left the whole feature unreachable for a sidecar release.
+   */
   React.useEffect(() => {
-    if (!manager) {
-      setSecondaryTrack(null);
-      return;
-    }
     // `file` as well as `event`: a libass file track is a real, selectable track whose
     // cues this overlay can now read (see the file-track cue clock above). Excluding it
     // here is what made a downloaded translation — the ordinary shape of a Russian or
     // English second line — un-offerable while the same file was fine as the primary.
-    const candidates = tracks.filter(
-      (track) => (track.type === 'event' || track.type === 'file')
-        && track.number !== selectedTrack,
+    // The `!manager` allowance is MediaCaptions': there every track is a parsed file, so
+    // an early return on a null manager left dual subtitles unreachable for a sidecar.
+    const candidates = tracks.filter((track) => (
+      track.number !== selectedTrack
+      && (!manager || track.type === 'event' || track.type === 'file')
+    ));
+    const preferred = candidates.find(
+      (track) => shortLangTag(track.language) === preferences.secondarySubLang,
     );
-    setSecondaryTrack((current) =>
-      current != null && candidates.some((track) => track.number === current)
-        ? current
-        : candidates[0]?.number ?? null);
-  }, [manager, selectedTrack, tracks]);
+    setSecondaryTrack((current) => {
+      if (preferred) return preferred.number;
+      if (current != null && candidates.some((track) => track.number === current)) {
+        return current;
+      }
+      return candidates[0]?.number ?? null;
+    });
+  }, [manager, preferences.secondarySubLang, selectedTrack, tracks]);
 
   React.useEffect(() => {
-    if (!manager || !video || secondaryTrack == null) {
+    if (!video || secondaryTrack == null || (!manager && !mediaCaptionsManager)) {
       secondaryCuesRef.current = [];
       setSecondaryCues([]);
       setActiveSecondaryCues([]);
@@ -996,6 +1250,7 @@ export default function VideoCoreStudyOverlay({
       reported. The bridge covers a short gap and refuses a long one; the primary keeps
       the exact activation it always had, because the study tools read it.
     */
+    let cancelled = false;
     const syncActive = (): void => {
       setActiveSecondaryCues(
         bridgedSecondaryCuesAtTime(
@@ -1018,6 +1273,7 @@ export default function VideoCoreStudyOverlay({
      * the primary track, and applying it here would drop the very line being shown.
      */
     const fileCues = (): VideoCoreActiveCue[] => {
+      if (!manager) return [];
       if (secondaryFileCuesRef.current?.trackNumber === secondaryTrack) {
         return secondaryFileCuesRef.current.cues;
       }
@@ -1028,12 +1284,30 @@ export default function VideoCoreStudyOverlay({
       secondaryFileCuesRef.current = { trackNumber: secondaryTrack, cues: parsed };
       return parsed;
     };
-    const refreshTimeline = (): void => {
-      const cues = manager.getCuesForTrack(secondaryTrack);
-      const resolved = cues.length ? cues : fileCues();
-      secondaryCuesRef.current = resolved;
-      setSecondaryCues(resolved);
+    const applyCues = (cues: VideoCoreActiveCue[]): void => {
+      if (cancelled) return;
+      secondaryCuesRef.current = cues;
+      setSecondaryCues(cues);
       syncActive();
+    };
+    const refreshTimeline = (): void => {
+      if (manager) {
+        const cues = manager.getCuesForTrack(secondaryTrack);
+        applyCues(cues.length ? cues : fileCues());
+        return;
+      }
+      if (!mediaCaptionsManager) return;
+      // Shifted by the same measured offset as the primary: both tracks describe the same
+      // audio, so a second line left uncorrected would sit nine seconds off the first.
+      void (async () => {
+        const raw = await mediaCaptionCues(mediaCaptionsManager, secondaryTrack);
+        const offsetSec = await resolveSubtitleSyncOffset(
+          localFilePath || playbackInfo?.localFile?.path,
+          raw.map((cue) => ({ start: cue.startMs / 1000, end: cue.endMs / 1000 })),
+          video.duration,
+        );
+        applyCues(shiftCuesMs(raw, offsetSec));
+      })();
     };
     /*
       While the timeline is still empty the playback clock is the retry, because a file
@@ -1047,15 +1321,25 @@ export default function VideoCoreStudyOverlay({
       else refreshTimeline();
     };
     refreshTimeline();
-    manager.addEventListener('cuechange', refreshTimeline);
+    manager?.addEventListener('cuechange', refreshTimeline);
     video.addEventListener('timeupdate', tick);
     video.addEventListener('seeked', tick);
     return () => {
-      manager.removeEventListener('cuechange', refreshTimeline);
+      cancelled = true;
+      manager?.removeEventListener('cuechange', refreshTimeline);
       video.removeEventListener('timeupdate', tick);
       video.removeEventListener('seeked', tick);
     };
-  }, [manager, secondaryTrack, subtitleDelaySec, video]);
+  }, [
+    localFilePath,
+    manager,
+    mediaCaptionsManager,
+    playbackInfo?.localFile?.path,
+    resolveSubtitleSyncOffset,
+    secondaryTrack,
+    subtitleDelaySec,
+    video,
+  ]);
 
   React.useEffect(() => {
     setTranslation('');
@@ -1284,6 +1568,51 @@ export default function VideoCoreStudyOverlay({
   }, [changeSubtitleDelay, jumpCue, replayCue, seekBy, updatePreference]);
 
   /**
+   * Workspace commands — registered here for the same reason the `video.*` rows are.
+   *
+   * The catalog owns the ids and the (unbound) defaults; the surface that can actually
+   * carry them out owns the handlers. Registering them anywhere else would recreate the
+   * defect slice 19 fixed: a rebindable row pointing at a handler with nothing behind it.
+   *
+   * Reads the workspace through refs so this binds once rather than on every layout
+   * change — a re-registration per dispatch would be a re-registration per keystroke in
+   * customize mode.
+   */
+  const workspaceRef = React.useRef(workspace);
+  workspaceRef.current = workspace;
+  React.useEffect(() => {
+    const offs = [
+      registerCommandHandler('workspace.customize', () => {
+        const current = workspaceRef.current;
+        current.dispatch({ type: 'set-customizing', customizing: !current.customizing });
+      }),
+      registerCommandHandler('workspace.reset', () => {
+        const current = workspaceRef.current;
+        current.dispatch({ type: 'reset-workspace', workspaceId: current.workspace.id });
+      }),
+      registerCommandHandler('workspace.nextMode', () => {
+        const current = workspaceRef.current;
+        const ids = current.doc.workspaces.map((entry) => entry.id);
+        const at = ids.indexOf(current.doc.activeWorkspaceId);
+        const next = ids[(at + 1) % ids.length];
+        if (next) current.dispatch({ type: 'switch-workspace', workspaceId: next });
+      }),
+      registerCommandHandler('workspace.toggleTranscript', () => {
+        // Through the preference, not the block: the preference is what the checkbox,
+        // the panel's own close button and the persisted layout all read.
+        updatePreference('transcriptPanel', !preferencesRef.current.transcriptPanel);
+      }),
+      registerCommandHandler('workspace.toggleAi', () => {
+        workspaceRef.current.dispatch({ type: 'toggle-block', blockId: 'aiWorkspace' });
+      }),
+      registerCommandHandler('workspace.focusVideo', () => {
+        workspaceRef.current.dispatch({ type: 'dismiss-contextual' });
+      }),
+    ];
+    return () => offs.forEach((off) => off());
+  }, [updatePreference]);
+
+  /**
    * While tracking, the measured drift — not the user — supplies the delay. These
    * writes deliberately bypass `changeSubtitleDelay`, so the tracker can never
    * feed its own corrections back in as fresh evidence.
@@ -1331,14 +1660,17 @@ export default function VideoCoreStudyOverlay({
       if (!text || translationBusy) return;
       setTranslationBusy(true);
       try {
-        setTranslation(await translate(text, getStudyLang()));
+        // The chosen second-line language, not a hardcoded English. Otherwise this button
+        // stacks an English line underneath a Russian second line, three deep on a picture
+        // that is supposed to be showing one subtitle.
+        setTranslation(await translateTo(text, getStudyLang(), preferences.secondarySubLang));
       } catch {
         setTranslation(translateUi('mediaWorkspace.study.translationUnavailable'));
       } finally {
         setTranslationBusy(false);
       }
     },
-    [plainText, translationBusy],
+    [plainText, preferences.secondarySubLang, translationBusy],
   );
 
   const handleLookupMouseUp = React.useCallback(
@@ -1701,8 +2033,408 @@ export default function VideoCoreStudyOverlay({
     || whisperState === 'loading'
     || whisperState === 'transcribing';
 
+  /* ------------------------------------------------------------------------------ *
+   * Workspace wiring
+   *
+   * The preferences remain the source of truth for WHETHER a feature is on — they are
+   * persisted, shortcut-bound and shared with the settings surfaces. The workspace owns
+   * WHERE it appears. These effects are the one-way bridge between the two, so a
+   * shortcut, a checkbox and a block menu can never disagree about the transcript.
+   * ------------------------------------------------------------------------------ */
+
+  const { dispatch: workspaceDispatch, trigger: workspaceTrigger } = workspace;
+
+  React.useEffect(() => {
+    if (preferences.transcriptPanel) {
+      workspaceDispatch({ type: 'open-block', blockId: 'transcript', placement: 'right' });
+    } else {
+      workspaceDispatch({ type: 'close-block', blockId: 'transcript' });
+    }
+  }, [preferences.transcriptPanel, workspaceDispatch]);
+
+  // The grammar card follows the analysis, not the toggle: with highlighting on but no
+  // sentence analysed there is nothing for the panel to say, and an empty card taking a
+  // 24rem column is the exact failure this redesign is about.
+  const grammarPanelWanted = preferences.grammarHighlight && !!activeCue && !!plainText;
+  React.useEffect(() => {
+    if (grammarPanelWanted) {
+      workspaceDispatch({ type: 'open-block', blockId: 'grammar', placement: 'left' });
+    } else {
+      workspaceDispatch({ type: 'close-block', blockId: 'grammar' });
+    }
+  }, [grammarPanelWanted, workspaceDispatch]);
+
+  /* A running drill is priority 1 in the resolution order — it recomposes the layout. */
+  const { setActivePractice } = workspace;
+  React.useEffect(() => {
+    setActivePractice(
+      preferences.dictationMode ? 'dictation' : preferences.shadowingMode ? 'shadowing' : null,
+    );
+  }, [preferences.dictationMode, preferences.shadowingMode, setActivePractice]);
+
+  /*
+    A word lookup is what opens the dictionary block, so that the popup's position is a
+    workspace decision rather than a hardcoded corner. The popup itself is unchanged.
+  */
+  React.useEffect(() => {
+    if (popup) workspaceTrigger('word-click');
+  }, [popup, workspaceTrigger]);
+
+  /**
+   * Mine the line on screen.
+   *
+   * Two things, in this order, and the order matters: the export fires first through
+   * `mineSignal` — unchanged behaviour, and what `videoMineShortcut.test.tsx` asserts —
+   * then the card surface is brought up so the result is visible. Reversing them would
+   * make the shortcut depend on a panel having mounted.
+   */
+  const mineCurrentLine = React.useCallback((): void => {
+    if (!activeCueRef.current) return;
+    setMineSignal((value) => value + 1);
+    workspaceTrigger('mine');
+  }, [workspaceTrigger]);
+
+  /* ------------------------------------------------------------------------------ *
+   * Detached blocks
+   *
+   * A block that has been moved to its own window is fed from here and drives the
+   * player from there. Nothing below runs at all until a window is actually open —
+   * `useStudyDetach` publishes on an interval only while one exists, so the normal
+   * case (nothing detached) costs one `useState` and no IPC.
+   * ------------------------------------------------------------------------------ */
+
+  /*
+    Duration as state, updated on the two events that change it. Deliberately NOT read
+    during render from `video.duration` the way the media-info block used to: that only
+    appeared to work because the overlay re-renders constantly, and it made the block
+    depend on an element a detached window does not have.
+  */
+  const [durationSec, setDurationSec] = React.useState(0);
+  React.useEffect(() => {
+    if (!video) {
+      setDurationSec(0);
+      return undefined;
+    }
+    const read = (): void => {
+      setDurationSec(Number.isFinite(video.duration) ? video.duration : 0);
+    };
+    read();
+    video.addEventListener('loadedmetadata', read);
+    video.addEventListener('durationchange', read);
+    return () => {
+      video.removeEventListener('loadedmetadata', read);
+      video.removeEventListener('durationchange', read);
+    };
+  }, [video]);
+
+  const mediaName = React.useMemo(() => mediaDisplayName(playbackInfo), [playbackInfo]);
+
+  const detachFrame: StudyDetachFrame = {
+    mediaName,
+    episode: playbackInfo?.episode?.episodeNumber ?? null,
+    streamType: String(playbackInfo?.streamType ?? ''),
+    playbackRate: preferences.playbackRate,
+    activeIndex: activeCue?.index ?? null,
+    trackLabel: selectedTrackLabel,
+    trackCount: tracks.length,
+    audioTrackCount: audioTracks.length,
+    subtitleDelaySec,
+    studyLang,
+    analysis: cueAnalysis.state,
+    selectedAnnotation,
+    aiMode,
+    translation,
+    translationBusy,
+    miningSource,
+    mineSignal,
+  };
+
+  const detach = useStudyDetach({
+    surface: 'workspace',
+    layout: workspace.layout,
+    dispatch: workspaceDispatch,
+    frame: detachFrame,
+    cues: allCues,
+    readMedia: () => ({
+      positionSec: video?.currentTime ?? 0,
+      durationSec: video && Number.isFinite(video.duration) ? video.duration : 0,
+      paused: video ? video.paused : true,
+    }),
+    handlers: {
+      seekCue: (index) => {
+        const cue = allCuesRef.current.find((entry) => entry.index === index);
+        if (cue) seekTranscriptCue(cue);
+      },
+      togglePlay: () => {
+        if (!video) return;
+        if (video.paused) void video.play().catch(() => undefined);
+        else video.pause();
+      },
+      replayLine: () => replayCue(activeCueRef.current),
+      analyzeNow: () => cueAnalysis.analyzeNow(),
+      selectAnnotation: setSelectedAnnotation,
+      // The card opens over the player, anchored where a lookup from the grammar dock
+      // would put it — the detached panel has no coordinates in this window to offer.
+      lookup: (query, context) => setPopup({ query, x: 24, y: 96, context }),
+      setAiMode,
+      translate: () => void translateCue(),
+      mine: mineCurrentLine,
+    },
+  });
+
+  /** Track selection, over whichever manager is driving this session. */
+  const selectSubtitleTrack = React.useCallback((trackNumber: number | null): void => {
+    if (trackNumber == null) {
+      if (manager) manager.setNoTrack();
+      else mediaCaptionsManager?.setNoTrack();
+      return;
+    }
+    if (manager) void manager.selectTrack(trackNumber);
+    else void mediaCaptionsManager?.selectTrack(trackNumber);
+  }, [manager, mediaCaptionsManager]);
+
+  /*
+    Same candidate rule as the effect that picks the default: event tracks only while
+    SubtitleManager drives, any track under MediaCaptions. A stricter filter in the
+    picker than in the chooser would leave the automatically chosen track absent from
+    its own list.
+  */
+  const secondaryTrackCandidates = React.useMemo(
+    () => tracks.filter((track) => (
+      track.number !== selectedTrack && (!manager || track.type === 'event')
+    )),
+    [manager, selectedTrack, tracks],
+  );
+
+  /**
+   * What each block draws. The workspace decides which of these are on screen.
+   *
+   * Adding a Study Block is: a definition in `studyBlockRegistry.ts`, an entry here.
+   * No layout code changes — that is the "new blocks without redesigning the player"
+   * acceptance criterion, made structural.
+   */
+  const blockRenderers: BlockRenderers = {
+    grammar: (
+      <VideoCoreGrammarPanel
+        state={cueAnalysis.state}
+        lang={studyLang}
+        selectedIndex={selectedAnnotation}
+        onSelectedIndexChange={setSelectedAnnotation}
+        onAnalyzeNow={cueAnalysis.analyzeNow}
+        onLookup={(surface, context) => {
+          // Anchored to the grammar block's own edge, not the middle of the screen:
+          // the lookup was opened from that panel, and a card that appears dead-centre
+          // over the picture reads as a modal rather than as an answer.
+          const panel = document.querySelector('[data-block="grammar"]');
+          const rect = panel?.getBoundingClientRect();
+          setPopup({
+            query: surface,
+            x: rect ? rect.right + 12 : 24,
+            y: rect ? rect.top + 24 : 96,
+            context,
+          });
+        }}
+      />
+    ),
+    /*
+      One component serves `cardEditor` and `cardPreview`: the mining panel IS the card,
+      and splitting it would be two implementations of one form. `cardEditor` is the
+      block that stays mounted (see StudyDocks) because the mine shortcut reaches into
+      it; `cardPreview` is what a contextual `mine` trigger opens.
+    */
+    cardEditor: (
+      <VideoCoreMiningPanel
+        cue={activeCue}
+        displayText={plainText}
+        source={miningSource}
+        video={video}
+        subtitleDelaySec={subtitleDelaySec}
+        /*
+          The same second line that is on screen, so the card is captioned with the
+          translation the user was actually reading. Gated on `dualSubs` rather than
+          passed unconditionally: with the second line switched off there is nothing the
+          user has read and agreed with.
+        */
+        translationText={preferences.dualSubs ? secondaryText : ''}
+        mineSignal={mineSignal}
+      />
+    ),
+    transcript: (
+      <VideoCoreTranscriptPanel
+        cues={allCues}
+        activeIndex={activeCue?.index ?? null}
+        lang={studyLang}
+        trackLabel={selectedTrackLabel}
+        trackNotice={transcriptTrackNotice}
+        onSeek={seekTranscriptCue}
+        onClose={() => updatePreference('transcriptPanel', false)}
+      />
+    ),
+
+    /*
+      Dictation and shadowing used to render inside `.study-cue-overlay`, stacked under
+      the subtitle with the suggestion cards. That is why a shadowing session pushed the
+      line up the picture. They are blocks now — moved verbatim, same state, same
+      handlers — so Practice Mode can make them dominant and Watch Mode can not show
+      them at all.
+    */
+    dictation: activeCue ? (
+      <div className="study-dictation">
+        <input
+          lang="ja"
+          value={dictationInput}
+          onChange={(event) => setDictationInput(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') checkDictation();
+          }}
+          placeholder={t('mediaWorkspace.study.typeWhatYouHear')}
+          aria-label={t('mediaWorkspace.study.dictationAnswer')}
+          autoComplete="off"
+        />
+        <button type="button" disabled={!dictationInput.trim()} onClick={checkDictation}>
+          {t('mediaWorkspace.study.check')}
+        </button>
+        <button type="button" onClick={() => setDictationRevealed(true)}>
+          {t('mediaWorkspace.study.reveal')}
+        </button>
+        {dictationResult && (
+          <span className={dictationResult.exact ? 'is-correct' : ''} role="status">
+            {dictationResult.exact
+              ? t('mediaWorkspace.study.exactMatch')
+              : t('mediaWorkspace.study.matchScore', { score: dictationResult.score })}
+          </span>
+        )}
+      </div>
+    ) : null,
+
+    shadowing: activeCue ? (
+      <section
+        className="study-shadowing"
+        aria-label={t('mediaWorkspace.study.shadowPractice')}
+        data-shadow-recording={shadowRecording ? 'recording' : 'idle'}
+        data-shadow-response={shadowAudioUrl ? 'ready' : 'none'}
+      >
+        <div className="study-shadowing-copy">
+          <strong>{t('mediaWorkspace.study.shadowPractice')}</strong>
+          <span>{t('mediaWorkspace.study.shadowInstructions')}</span>
+        </div>
+        <div className="study-shadowing-actions">
+          <button type="button" onClick={() => replayCue(activeCue)}>
+            {t('mediaWorkspace.study.replayOriginal')}
+          </button>
+          {!shadowRecording ? (
+            <button type="button" onClick={() => void startShadowRecording()}>
+              {t(shadowAudioUrl
+                ? 'mediaWorkspace.study.recordAgain'
+                : 'mediaWorkspace.study.recordResponse')}
+            </button>
+          ) : (
+            <button type="button" onClick={stopShadowRecording}>
+              {t('mediaWorkspace.study.stopRecording')}
+            </button>
+          )}
+          {shadowAudioUrl && (
+            <button type="button" onClick={clearShadowRecording}>
+              {t('mediaWorkspace.study.discardResponse')}
+            </button>
+          )}
+          {shadowRecording && (
+            <span className="study-shadowing-live">
+              {t('mediaWorkspace.study.recordingLimit')}
+            </span>
+          )}
+        </div>
+        {shadowAudioUrl && (
+          <audio
+            className="study-shadowing-audio"
+            aria-label={t('mediaWorkspace.study.shadowPlayback')}
+            controls
+            preload="metadata"
+            src={shadowAudioUrl}
+          />
+        )}
+        {shadowError && (
+          <p className="study-shadowing-error" role="alert">{shadowError}</p>
+        )}
+      </section>
+    ) : null,
+
+    listening: (
+      <ListeningBlock
+        preferences={preferences}
+        updatePreference={updatePreference}
+        onReplay={() => replayCue(activeCueRef.current)}
+        cueKey={`${activeCue?.trackNumber ?? -1}:${activeCue?.index ?? -1}`}
+      />
+    ),
+
+    aiWorkspace: (
+      <AiWorkspaceBlock
+        mode={aiMode}
+        onModeChange={setAiMode}
+        hasCue={!!activeCue}
+        translation={translation}
+        translationBusy={translationBusy}
+        onTranslate={() => void translateCue()}
+        analysis={(
+          <VideoCoreGrammarPanel
+            state={cueAnalysis.state}
+            lang={studyLang}
+            selectedIndex={selectedAnnotation}
+            onSelectedIndexChange={setSelectedAnnotation}
+            onAnalyzeNow={cueAnalysis.analyzeNow}
+            onLookup={(surface, context) => setPopup({
+              query: surface,
+              x: 24,
+              y: 96,
+              context,
+            })}
+          />
+        )}
+      />
+    ),
+
+    miningQueue: <MiningQueueBlock mineSignal={mineSignal} />,
+
+    studyHud: (
+      <StudyHudBlock
+        cue={activeCue}
+        cueCount={allCues.length}
+        trackLabel={selectedTrackLabel}
+        subtitleDelaySec={subtitleDelaySec}
+        playbackRate={preferences.playbackRate}
+        source={miningSource}
+        mineSignal={mineSignal}
+      />
+    ),
+
+    mediaInfo: (
+      <MediaInfoBlock
+        name={mediaName}
+        episodeNumber={playbackInfo?.episode?.episodeNumber ?? null}
+        streamType={String(playbackInfo?.streamType ?? '')}
+        durationSec={durationSec}
+        trackCount={tracks.length}
+        audioTrackCount={audioTracks.length}
+      />
+    ),
+
+    /*
+      Real features that live elsewhere in this app. The block routes to the surface
+      that owns them; it does not grow a second implementation inside the player, and
+      the registry marks anything with no such surface `planned` so it is never offered
+      at all — see `studyBlockRegistry.ts`.
+    */
+    notes: <StudyAppOwnedBlock blockId="notes" titleKey="studyWorkspace.block.notes" />,
+    library: <StudyAppOwnedBlock blockId="library" titleKey="studyWorkspace.block.library" />,
+    statistics: (
+      <StudyAppOwnedBlock blockId="statistics" titleKey="studyWorkspace.block.statistics" />
+    ),
+    review: <StudyAppOwnedBlock blockId="review" titleKey="studyWorkspace.block.review" />,
+  };
+
   return (
-    <>
+    <StudyDetachContext.Provider value={detach}>
       <aside
         className="study-cue-overlay"
         data-study-active-cue={activeCue ? 'present' : 'none'}
@@ -1726,7 +2458,7 @@ export default function VideoCoreStudyOverlay({
               rectangle is not what a subtitle background is.
             */
             className="study-cue-text sa-palette"
-            style={cueBoxStyle(preferences.subtitleFontSize, preferences.subtitleBgOpacity)}
+            style={cueBoxStyle(preferences)}
             text={annotated ? annotated.sentence : plainText}
             annotations={annotated?.annotations}
             selectedAnnotation={selectedAnnotation}
@@ -1748,7 +2480,7 @@ export default function VideoCoreStudyOverlay({
           </span>
         )}
 
-        {activeCue && (
+        {activeCue && preferences.cueTimingReadout && (
           <span className="study-cue-timing">
             {t('mediaWorkspace.mining.cueMeta', {
               cue: activeCue.index + 1,
@@ -1762,45 +2494,16 @@ export default function VideoCoreStudyOverlay({
         {preferences.dualSubs && secondaryText && (
           <p
             className="study-cue-secondary"
+            lang={preferences.secondarySubLang}
             style={cueBoxStyle(
+              preferences,
               Math.round(preferences.subtitleFontSize * 0.8),
-              preferences.subtitleBgOpacity,
             )}
           >
             {secondaryText}
           </p>
         )}
 
-        {preferences.dictationMode && activeCue && (
-          <div className="study-dictation">
-            <input
-              lang="ja"
-              value={dictationInput}
-              onChange={(event) => setDictationInput(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') checkDictation();
-              }}
-              placeholder={t('mediaWorkspace.study.typeWhatYouHear')}
-              aria-label={t('mediaWorkspace.study.dictationAnswer')}
-              autoComplete="off"
-            />
-            <button type="button" disabled={!dictationInput.trim()} onClick={checkDictation}>
-              {t('mediaWorkspace.study.check')}
-            </button>
-            <button type="button" onClick={() => setDictationRevealed(true)}>
-              {t('mediaWorkspace.study.reveal')}
-            </button>
-            {dictationResult && (
-              <span className={dictationResult.exact ? 'is-correct' : ''} role="status">
-                {dictationResult.exact
-                  ? t('mediaWorkspace.study.exactMatch')
-                  : t('mediaWorkspace.study.matchScore', {
-                      score: dictationResult.score,
-                    })}
-              </span>
-            )}
-          </div>
-        )}
 
         {showShadowingSuggestion && activeCue && replaySignal && (
           <section
@@ -1949,526 +2652,97 @@ export default function VideoCoreStudyOverlay({
           </section>
         )}
 
-        {preferences.shadowingMode && activeCue && (
-          <section
-            className="study-shadowing"
-            aria-label={t('mediaWorkspace.study.shadowPractice')}
-            data-shadow-recording={shadowRecording ? 'recording' : 'idle'}
-            data-shadow-response={shadowAudioUrl ? 'ready' : 'none'}
-          >
-            <div className="study-shadowing-copy">
-              <strong>{t('mediaWorkspace.study.shadowPractice')}</strong>
-              <span>{t('mediaWorkspace.study.shadowInstructions')}</span>
-            </div>
-            <div className="study-shadowing-actions">
-              <button type="button" onClick={() => replayCue(activeCue)}>
-                {t('mediaWorkspace.study.replayOriginal')}
-              </button>
-              {!shadowRecording ? (
-                <button type="button" onClick={() => void startShadowRecording()}>
-                  {t(
-                    shadowAudioUrl
-                      ? 'mediaWorkspace.study.recordAgain'
-                      : 'mediaWorkspace.study.recordResponse',
-                  )}
-                </button>
-              ) : (
-                <button type="button" onClick={stopShadowRecording}>
-                  {t('mediaWorkspace.study.stopRecording')}
-                </button>
-              )}
-              {shadowAudioUrl && (
-                <button type="button" onClick={clearShadowRecording}>
-                  {t('mediaWorkspace.study.discardResponse')}
-                </button>
-              )}
-              {shadowRecording && (
-                <span className="study-shadowing-live">
-                  {t('mediaWorkspace.study.recordingLimit')}
-                </span>
-              )}
-            </div>
-            {shadowAudioUrl && (
-              <audio
-                className="study-shadowing-audio"
-                aria-label={t('mediaWorkspace.study.shadowPlayback')}
-                controls
-                preload="metadata"
-                src={shadowAudioUrl}
-              />
-            )}
-            {shadowError && (
-              <p className="study-shadowing-error" role="alert">{shadowError}</p>
-            )}
-          </section>
-        )}
 
-        {translation && <p className="study-cue-translation">{translation}</p>}
+        {/*
+          Suppressed when it would restate the second line. Both now render in the chosen
+          second-line language, so on a cue whose second line is already showing, pressing
+          Translate line otherwise paints the same sentence twice — the doubled-subtitle
+          complaint this whole change set exists to fix, reintroduced one row lower.
+        */}
+        {translation && translation !== secondaryText && (
+          <p className="study-cue-translation" lang={preferences.secondarySubLang}>
+            {translation}
+          </p>
+        )}
       </aside>
 
-      <section
-        ref={dockRef}
-        className="study-control-dock"
-        aria-label={t('mediaWorkspace.study.controls')}
-        data-study-controls={controlsExpanded ? 'expanded' : 'collapsed'}
-      >
-        {/*
-          Primary row — the cue loop, and nothing else. Everything below used to sit in
-          this same flat scroller: four rows of ~35 controls inside a 7.5rem box, so the
-          Whisper row was permanently below an invisible fold and "Furigana" carried the
-          same visual weight as a transcription pipeline.
-        */}
-        <div className="study-control-row study-control-primary">
-          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.cueNavigation')}>
-            <button
-              type="button"
-              data-study-action="previous-cue"
-              disabled={!allCues.length}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'W' })}
-              onClick={() => jumpCue(-1)}
-            >
-              {t('mediaWorkspace.study.previousLine')}
-            </button>
-            <button
-              type="button"
-              data-study-action="replay-cue"
-              disabled={!activeCue}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'R' })}
-              onClick={() => replayCue(activeCue)}
-            >
-              {t('mediaWorkspace.study.replayLine')}
-            </button>
-            <button
-              type="button"
-              data-study-action="next-cue"
-              disabled={!allCues.length}
-              title={t('mediaWorkspace.study.shortcutHint', { key: 'S' })}
-              onClick={() => jumpCue(1)}
-            >
-              {t('mediaWorkspace.study.nextLine')}
-            </button>
-          </div>
-
-          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.frameStep')}>
-            <button
-              type="button"
-              disabled={!video}
-              onClick={() => {
-                if (!video) return;
-                video.pause();
-                video.currentTime = Math.max(0, video.currentTime - 1 / 30);
-              }}
-            >
-              {t('mediaWorkspace.study.frameBack')}
-            </button>
-            <button
-              type="button"
-              disabled={!video}
-              onClick={() => {
-                if (!video) return;
-                video.pause();
-                video.currentTime = Math.min(
-                  Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER,
-                  video.currentTime + 1 / 30,
-                );
-              }}
-            >
-              {t('mediaWorkspace.study.frameForward')}
-            </button>
-          </div>
-
-          <div className="study-control-cluster" role="group" aria-label={t('mediaWorkspace.study.subtitleOffset')}>
-            <button
-              type="button"
-              title={t('mediaWorkspace.study.shortcutHint', { key: ';' })}
-              onClick={() => changeSubtitleDelay(-0.1)}
-            >
-              {t('mediaWorkspace.study.subsOffsetStep', { amount: '−0.1' })}
-            </button>
-            {/* Was silent to screen readers: the value changed with no announcement. */}
-            <output aria-label={t('mediaWorkspace.study.subtitleOffset')} aria-live="polite">
-              {subtitleDelaySec >= 0 ? '+' : ''}{subtitleDelaySec.toFixed(1)}s
-            </output>
-            <button
-              type="button"
-              title={t('mediaWorkspace.study.shortcutHint', { key: "'" })}
-              onClick={() => changeSubtitleDelay(0.1)}
-            >
-              {t('mediaWorkspace.study.subsOffsetStep', { amount: '+0.1' })}
-            </button>
-          </div>
-
-          <select
-            value={preferences.playbackRate}
-            aria-label={t('mediaWorkspace.study.playbackSpeed')}
-            onChange={(event) => updatePreference(
-              'playbackRate',
-              clampStudyPlaybackRate(Number(event.currentTarget.value)),
-            )}
-          >
-            {RATE_PRESETS.map((rate) => (
-              <option key={rate} value={rate}>{rate.toFixed(2)}x</option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            className="study-control-more"
-            data-study-action="toggle-study-controls"
-            aria-expanded={controlsExpanded}
-            onClick={() => setControlsExpanded((value) => !value)}
-          >
-            {t(controlsExpanded
-              ? 'mediaWorkspace.study.fewerControls'
-              : 'mediaWorkspace.study.moreControls')}
-          </button>
-        </div>
-
-        {controlsExpanded && (
-        <div className="study-control-advanced">
-        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.displayGroup')}>
-          <span className="study-control-legend">{t('mediaWorkspace.study.displayGroup')}</span>
-          <label><input type="checkbox" checked={preferences.primarySubs} onChange={(event) => updatePreference('primarySubs', event.currentTarget.checked)} /> {t('mediaWorkspace.study.japaneseSubs')}</label>
-          <label><input type="checkbox" checked={preferences.dualSubs} onChange={(event) => updatePreference('dualSubs', event.currentTarget.checked)} /> {t('mediaWorkspace.study.dualSubs')}</label>
-          {/*
-            The three `data-study-pref` hooks are the observable for the three toggle
-            shortcuts (`video.toggleFurigana` / `-AutoPause` / `-Loop`). Those rows ship
-            unbound, so the only way to test them is bind-then-press, and their effect is a
-            preference rather than a seek or a subtitle offset — neither of the instruments
-            the other video.* rows are proven with. Matching these boxes by their label text
-            would key the assertion to one of four UI languages.
-          */}
-          <label><input type="checkbox" data-study-pref="furigana" checked={preferences.furigana} onChange={(event) => updatePreference('furigana', event.currentTarget.checked)} /> {t('mediaWorkspace.study.furigana')}</label>
-          <label><input type="checkbox" data-study-pref="autoPause" checked={preferences.autoPause} onChange={(event) => updatePreference('autoPause', event.currentTarget.checked)} /> {t('mediaWorkspace.study.autoPause')}</label>
-          <label><input type="checkbox" data-study-pref="loopLine" checked={preferences.loopLine} onChange={(event) => {
-            updatePreference('loopLine', event.currentTarget.checked);
-            if (event.currentTarget.checked) setAbLoop(false);
-          }} /> {t('mediaWorkspace.study.loopLine')}</label>
-          <label><input type="checkbox" checked={pauseOnLookup} onChange={(event) => setPauseOnLookup(event.currentTarget.checked)} /> {t('mediaWorkspace.study.pauseOnLookup')}</label>
-          <label><input type="checkbox" data-study-pref="grammarHighlight" checked={preferences.grammarHighlight} onChange={(event) => updatePreference('grammarHighlight', event.currentTarget.checked)} /> {t('mediaWorkspace.study.grammarHighlight')}</label>
-          <label><input type="checkbox" data-study-pref="transcriptPanel" checked={preferences.transcriptPanel} onChange={(event) => updatePreference('transcriptPanel', event.currentTarget.checked)} /> {t('mediaWorkspace.study.transcript')}</label>
-        </div>
-
-        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.subtitleAppearanceGroup')}>
-          <span className="study-control-legend">{t('mediaWorkspace.study.subtitleAppearanceGroup')}</span>
-          <label className="study-control-slider">
-            {t('mediaWorkspace.study.subtitleFontSize')}
-            <input
-              type="range"
-              min={16}
-              max={48}
-              value={preferences.subtitleFontSize}
-              onChange={(event) => updatePreference('subtitleFontSize', Number(event.currentTarget.value))}
-              aria-label={t('mediaWorkspace.study.subtitleFontSize')}
-            />
-            <span>
-              {t('mediaWorkspace.study.subtitleFontSizeValue', {
-                size: preferences.subtitleFontSize,
-              })}
-            </span>
-          </label>
-          <label className="study-control-slider">
-            {t('mediaWorkspace.study.seekStep')}
-            <input
-              type="range"
-              min={1}
-              max={60}
-              value={preferences.seekStepSec}
-              onChange={(event) => updatePreference('seekStepSec', Number(event.currentTarget.value))}
-              aria-label={t('mediaWorkspace.study.seekStep')}
-            />
-            <span>{t('mediaWorkspace.study.seekStepValue', { seconds: preferences.seekStepSec })}</span>
-          </label>
-          <label className="study-control-slider">
-            {t('mediaWorkspace.study.subtitleBgOpacity')}
-            <input
-              type="range"
-              min={0}
-              max={90}
-              value={preferences.subtitleBgOpacity}
-              onChange={(event) => updatePreference('subtitleBgOpacity', Number(event.currentTarget.value))}
-              aria-label={t('mediaWorkspace.study.subtitleBgOpacity')}
-            />
-            <span>{preferences.subtitleBgOpacity}%</span>
-          </label>
-        </div>
-
-        {/*
-          Dictation and Shadowing were two checkboxes that each cleared the other on
-          change — a radio group wearing checkbox clothes. Modelled as one now, so the
-          exclusivity is announced instead of merely enforced.
-        */}
-        <div className="study-control-row" role="radiogroup" aria-label={t('mediaWorkspace.study.practiceMode')}>
-          <span className="study-control-legend">{t('mediaWorkspace.study.practiceMode')}</span>
-          {(['off', 'dictation', 'shadowing'] as const).map((mode) => (
-            <label key={mode} className="study-control-mode">
-              <input
-                type="radio"
-                name="study-practice-mode"
-                value={mode}
-                checked={practiceMode === mode}
-                onChange={() => setPracticeMode(mode)}
-              />
-              {t(mode === 'off'
-                ? 'common.off'
-                : mode === 'dictation'
-                  ? 'mediaWorkspace.study.dictation'
-                  : 'mediaWorkspace.study.shadowing')}
-            </label>
-          ))}
-          <button type="button" disabled={!activeCue || translationBusy} onClick={() => void translateCue()}>
-            {t(
-              translationBusy
-                ? 'mediaWorkspace.study.translating'
-                : 'mediaWorkspace.study.translateLine',
-            )}
-          </button>
-        </div>
-
-        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.loopGroup')}>
-          <span className="study-control-legend">{t('mediaWorkspace.study.loopGroup')}</span>
-          <button type="button" disabled={!video} onClick={() => setAbStartSec(video?.currentTime ?? null)}>
-            A {abStartSec == null ? t('mediaWorkspace.study.set') : `${abStartSec.toFixed(2)}s`}
-          </button>
-          <button type="button" disabled={!video || abStartSec == null} onClick={() => setAbEndSec(video?.currentTime ?? null)}>
-            B {abEndSec == null ? t('mediaWorkspace.study.set') : `${abEndSec.toFixed(2)}s`}
-          </button>
-          <label>
-            <input
-              type="checkbox"
-              checked={abLoop}
-              disabled={abStartSec == null || abEndSec == null || abEndSec <= abStartSec}
-              onChange={(event) => {
-                setAbLoop(event.currentTarget.checked);
-                if (event.currentTarget.checked) updatePreference('loopLine', false);
-              }}
-            />
-            {t('mediaWorkspace.study.abLoop')}
-          </label>
-          {(abStartSec != null || abEndSec != null) && (
-            <button type="button" onClick={() => {
-              setAbStartSec(null);
-              setAbEndSec(null);
-              setAbLoop(false);
-            }}>
-              {t('mediaWorkspace.study.clearAb')}
-            </button>
-          )}
-        </div>
-
-        <div className="study-control-row" role="group" aria-label={t('mediaWorkspace.study.trackGroup')}>
-          <span className="study-control-legend">{t('mediaWorkspace.study.trackGroup')}</span>
-          <label>
-            {t('mediaWorkspace.study.subtitleTrack')}
-            <select
-              value={selectedTrack ?? ''}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (!value) {
-                  if (manager) manager.setNoTrack();
-                  else mediaCaptionsManager?.setNoTrack();
-                } else if (manager) {
-                  void manager.selectTrack(Number(value));
-                } else {
-                  void mediaCaptionsManager?.selectTrack(Number(value));
-                }
-              }}
-            >
-              <option value="">{t('common.off')}</option>
-              {tracks.map((track) => (
-                <option key={track.number} value={track.number}>{trackLabel(track, t)}</option>
-              ))}
-            </select>
-          </label>
-
-          <label
-            // The control is inert until Dual subtitles is on; say so rather than
-            // leaving a greyed-out select with no explanation.
-            title={preferences.dualSubs
-              ? undefined
-              : t('mediaWorkspace.study.secondaryNeedsDual')}
-          >
-            {t('mediaWorkspace.study.secondarySubs')}
-            <select
-              value={secondaryTrack ?? ''}
-              disabled={!preferences.dualSubs}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setSecondaryTrack(value ? Number(value) : null);
-              }}
-            >
-              <option value="">{t('common.off')}</option>
-              {tracks
-                .filter((track) => track.type === 'event' && track.number !== selectedTrack)
-                .map((track) => (
-                  <option key={track.number} value={track.number}>{trackLabel(track, t)}</option>
-                ))}
-            </select>
-          </label>
-
-          {!!audioTracks.length && (
-            <label>
-              {t('mediaWorkspace.study.audioTrack')}
-              <select
-                value={selectedAudioTrack ?? ''}
-                onChange={(event) => audioManager?.selectTrack(Number(event.currentTarget.value))}
-              >
-                {audioTracks.map((track) => (
-                  <option key={track.number} value={track.number}>
-                    {track.name
-                      || track.language
-                      || t('mediaWorkspace.study.track', { number: track.number })}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-
-        <div
-          className="study-control-row study-whisper-controls"
-          role="group"
-          aria-label={t('mediaWorkspace.study.whisperGroup')}
-        >
-          <span className="study-control-legend">{t('mediaWorkspace.study.whisperGroup')}</span>
-          <label>
-            {t('mediaWorkspace.study.whisperDevice')}
-            <select
-              aria-label={t('mediaWorkspace.study.whisperDevice')}
-              value={whisperDevice}
-              disabled={whisperBusy}
-              onChange={(event) => {
-                const device = event.currentTarget.value as WhisperDevice;
-                persistWhisperDevice(device);
-              }}
-            >
-              <option value="auto">{t('mediaWorkspace.study.autoGpuCpu')}</option>
-              <option value="cpu">{t('mediaWorkspace.study.cpu')}</option>
-            </select>
-          </label>
-          <label>
-            {t('mediaWorkspace.study.whisperModel')}
-            <select
-              aria-label={t('mediaWorkspace.study.whisperModel')}
-              value={whisperModel}
-              disabled={whisperBusy}
-              onChange={(event) => {
-                const tier = event.currentTarget.value as WhisperModelTier;
-                setWhisperModel(tier);
-                setWhisperModelTier(tier);
-              }}
-            >
-              {WHISPER_MODEL_SPECS.map((model) => (
-                <option key={model.id} value={model.id}>{model.id}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t('mediaWorkspace.study.transcriptionLanguage')}
-            <select
-              aria-label={t('mediaWorkspace.study.transcriptionLanguage')}
-              value={whisperLanguage}
-              disabled={whisperBusy}
-              onChange={(event) => {
-                const language = event.currentTarget.value as 'ja' | 'zh';
-                setWhisperLanguage(language);
-                setStudyLang(language);
-              }}
-            >
-              <option value="ja">{t('mediaCenter.settings.japanese')}</option>
-              <option value="zh">{t('mediaCenter.settings.chinese')}</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={whisperBusy || !manager || !playbackInfo?.localFile?.path}
-            onClick={() => void runWhisperGeneration()}
-          >
-            {t('mediaWorkspace.study.generateSubs')}
-          </button>
-          {whisperBusy && (
-            <button type="button" onClick={stopWhisperGeneration}>
-              {t('mediaWorkspace.study.stopGeneration')}
-            </button>
-          )}
-          <output
-            className={whisperState === 'error' ? 'study-whisper-error' : ''}
-            aria-label={t('mediaWorkspace.study.whisperStatus')}
-            aria-live="polite"
-          >
-            {whisperError
-              || whisperMessage
-              || t('mediaWorkspace.study.deviceStatus', { device: whisperDevice })}
-          </output>
-          {whisperBusy && (
-            <progress
-              aria-label={t('mediaWorkspace.study.whisperProgress')}
-              max={1}
-              value={whisperProgress}
-            />
-          )}
-        </div>
-        </div>
-        )}
-      </section>
-
-      {preferences.grammarHighlight && activeCue && plainText && (
-        <VideoCoreGrammarPanel
-          state={cueAnalysis.state}
-          lang={studyLang}
-          selectedIndex={selectedAnnotation}
-          onSelectedIndexChange={setSelectedAnnotation}
-          onAnalyzeNow={cueAnalysis.analyzeNow}
-          onLookup={(surface, context) => {
-            // Anchored to the grammar panel's own edge, not the middle of the
-            // screen: the lookup was opened from that panel, and a card that
-            // appears dead-centre over the picture reads as a modal rather than
-            // as an answer to what was just clicked.
-            const panel = document.querySelector('.study-grammar-panel');
-            const rect = panel?.getBoundingClientRect();
-            setPopup({
-              query: surface,
-              x: rect ? rect.right + 12 : 24,
-              y: rect ? rect.top + 24 : 96,
-              context,
-            });
-          }}
-        />
-      )}
+      {/*
+        The bar replaces `.study-control-dock`. Every control that was in the dock's
+        four rows is inside it, moved rather than retyped, with its handler and its
+        `data-study-*` hook intact — see `StudyBottomBar`'s header for the accounting.
+      */}
+      <StudyBottomBar
+        barRef={dockRef}
+        hasCues={allCues.length > 0}
+        hasActiveCue={!!activeCue}
+        onPrevCue={() => jumpCue(-1)}
+        onReplayCue={() => replayCue(activeCue)}
+        onNextCue={() => jumpCue(1)}
+        video={video}
+        preferences={preferences}
+        updatePreference={updatePreference}
+        subtitleDelaySec={subtitleDelaySec}
+        onChangeSubtitleDelay={changeSubtitleDelay}
+        pauseOnLookup={pauseOnLookup}
+        setPauseOnLookup={setPauseOnLookup}
+        onTranslateLine={() => void translateCue()}
+        translationBusy={translationBusy}
+        onMineCurrentLine={mineCurrentLine}
+        practiceMode={practiceMode}
+        setPracticeMode={setPracticeMode}
+        abStartSec={abStartSec}
+        abEndSec={abEndSec}
+        abLoop={abLoop}
+        onSetA={() => setAbStartSec(video?.currentTime ?? null)}
+        onSetB={() => setAbEndSec(video?.currentTime ?? null)}
+        onToggleAbLoop={setAbLoop}
+        onClearAb={() => {
+          setAbStartSec(null);
+          setAbEndSec(null);
+          setAbLoop(false);
+        }}
+        tracks={tracks}
+        selectedTrack={selectedTrack}
+        onSelectTrack={selectSubtitleTrack}
+        secondaryTrack={secondaryTrack}
+        onSelectSecondaryTrack={setSecondaryTrack}
+        secondaryTrackCandidates={secondaryTrackCandidates}
+        trackLabelOf={(track) => trackLabel(track, t)}
+        audioTracks={audioTracks}
+        selectedAudioTrack={selectedAudioTrack}
+        onSelectAudioTrack={(trackNumber) => audioManager?.selectTrack(trackNumber)}
+        whisperDevice={whisperDevice}
+        onWhisperDeviceChange={persistWhisperDevice}
+        whisperModel={whisperModel}
+        onWhisperModelChange={(tier) => {
+          setWhisperModel(tier);
+          setWhisperModelTier(tier);
+        }}
+        whisperLanguage={whisperLanguage}
+        onWhisperLanguageChange={(language) => {
+          setWhisperLanguage(language);
+          setStudyLang(language);
+        }}
+        whisperBusy={whisperBusy}
+        whisperCanGenerate={!!manager && !!playbackInfo?.localFile?.path}
+        whisperState={whisperState}
+        whisperMessage={whisperMessage}
+        whisperError={whisperError}
+        whisperProgress={whisperProgress}
+        onGenerateSubtitles={() => void runWhisperGeneration()}
+        onStopGeneration={stopWhisperGeneration}
+      />
 
       {/*
-        Mining and the transcript are one column, not two panels that each
-        claimed the right edge.
-
-        As siblings they both anchored to `top: 1rem; right: 1rem`, and the rail
-        opening shoved mining left by its own width — into the grammar panel,
-        measured as a 12px collision at a 1024px window with all three up. A
-        column stacks them instead: mining takes what it needs, the transcript
-        takes the rest, and the surface spends one gutter on the pair rather
-        than two on one each.
+        The docks. Mining and the transcript used to be hardcoded into one right-hand
+        rail and the grammar card into a left column, each deciding for itself whether
+        to exist. They are now placed by the workspace, which is what makes Watch Mode
+        able to have no side column at all while keeping every one of them one action
+        away.
       */}
-      <div className="study-side-rail">
-        <VideoCoreMiningPanel
-          cue={activeCue}
-          displayText={plainText}
-          source={miningSource}
-          video={video}
-          subtitleDelaySec={subtitleDelaySec}
-          mineSignal={mineSignal}
-        />
+      <StudyDocks renderers={blockRenderers} />
 
-        {preferences.transcriptPanel && (
-          <VideoCoreTranscriptPanel
-            cues={allCues}
-            activeIndex={activeCue?.index ?? null}
-            lang={studyLang}
-            trackLabel={selectedTrackLabel}
-            trackNotice={transcriptTrackNotice}
-            onSeek={seekTranscriptCue}
-            onClose={() => updatePreference('transcriptPanel', false)}
-          />
-        )}
-      </div>
+      <StudyWorkspaceCustomizer />
 
       {popup && (
         <DictionaryPopup
@@ -2476,11 +2750,14 @@ export default function VideoCoreStudyOverlay({
           x={popup.x}
           y={popup.y}
           context={popup.context}
-          // Keep the lookup off the transcript when the rail is open.
-          rightInsetPx={preferences.transcriptPanel ? transcriptRailInsetPx() : 0}
+          // Keep the lookup off whatever is docked on the right. Asked of the LAYOUT
+          // rather than of the transcript preference: the right dock can now be held
+          // by the card editor, the AI workspace or the mining queue, and reading one
+          // block's preference would put the popup under any of the others.
+          rightInsetPx={workspace.layout.hasRightDock ? rightDockInsetPx() : 0}
           onClose={() => setPopup(null)}
         />
       )}
-    </>
+    </StudyDetachContext.Provider>
   );
 }

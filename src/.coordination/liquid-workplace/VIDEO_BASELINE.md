@@ -111,3 +111,7 @@ capture — so it is closed at the end of the turn and the layout returns to its
   loaded (JoJo 39-END RAW over the sidecar directstream) and measured in `#media-workspace`,
   which is where playback actually happens; `.mc-video-page`, the surface this file records, is
   the launcher. The rest of the playing-clip measurements stay open.
+  **Independently confirmed on feat/nyaa-subtitles the same day (backup), by a different
+  instrument:** 1,298 decoded / **0 dropped** over 54.15 s on a real 1280x720 clip, ratio 1.00,
+  sensitivity control firing at 68.9 % when the same element was driven to 8x — recorded in
+  `PERF_BASELINE_RESTART.md`. Same subject `#media-workspace`, not `.mc-video-page`.

@@ -34,11 +34,31 @@ const esbuild = require('esbuild');
 
 const ROOT = path.join(__dirname, '..');
 const CATALOGS_PATH = path.join(ROOT, 'src', 'shared', 'i18n', 'catalogs', 'all.ts');
+/*
+ * `src/main` is the DIRECTORY, so for a long time `src/main.ts` and `src/preload.ts`
+ * — two files, not covered by any of the three — went unscanned, and so did the
+ * whole of `src/shared`. That last one matters most: CLAUDE.md's i18n policy says
+ * module-level registries store translation KEYS and resolve them during render,
+ * and those registries live in `src/shared`. A key missing from one of them renders
+ * raw at the user exactly as it would from a component.
+ *
+ * Measured before widening, 2026-09-03: 437 previously-unscanned files, **0**
+ * offenders, and the two key-bearing registries (`credentialRegistry.ts` 23 keys,
+ * `assetRegistry.ts` 1) resolve every dotted string they store. So this closes the
+ * gap at zero cost rather than importing a backlog — it is a ratchet, not a fix.
+ *
+ * The catalogs themselves are skipped: they are the answer sheet, they contain no
+ * `t()` calls, and they are the four largest files in the tree.
+ */
 const SCAN_DIRS = [
   path.join('src', 'renderer'),
   path.join('src', 'media'),
   path.join('src', 'main'),
+  path.join('src', 'shared'),
+  path.join('src', 'main.ts'),
+  path.join('src', 'preload.ts'),
 ];
+const SKIP_DIRS = new Set(['__tests__', 'node_modules', 'catalogs']);
 
 /**
  * Only literal keys can be checked. `t(\`malSync.error.${code}\`)` is a template
@@ -74,7 +94,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
+      if (SKIP_DIRS.has(entry.name)) continue;
       walk(full, out);
     } else if (/\.tsx?$/.test(entry.name)) {
       out.push(full);
@@ -83,11 +103,22 @@ function walk(dir, out = []) {
   return out;
 }
 
-function scan() {
+/**
+ * `dirs` exists only so the guard that now runs this check can prove the check
+ * still fires. A scanner asserted to return `[]` against the real tree is
+ * indistinguishable from one that returns `[]` because it read nothing, and this
+ * repo has banked that exact false pass. The test points `dirs` at a fixture
+ * holding one deliberately undefined key and one real one, and asserts it finds
+ * exactly the first. Absolute paths are honoured so the fixture can live outside
+ * `src/`; the default is unchanged.
+ */
+function scan({ dirs = SCAN_DIRS } = {}) {
   const en = loadEnglish();
-  const files = SCAN_DIRS.flatMap((d) => {
-    const abs = path.join(ROOT, d);
-    return fs.existsSync(abs) ? walk(abs) : [];
+  const files = dirs.flatMap((d) => {
+    const abs = path.isAbsolute(d) ? d : path.join(ROOT, d);
+    if (!fs.existsSync(abs)) return [];
+    // An entry may be a single file: `src/main.ts` is not inside `src/main`.
+    return fs.statSync(abs).isDirectory() ? walk(abs) : [abs];
   });
 
   const offenders = [];

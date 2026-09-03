@@ -107,3 +107,9 @@ same fresh process and a restart mid-sequence invalidates whatever came before i
 > **The sixth row is done too — see `PERF_BASELINE_PLAYER.md`** (same milestone, player leg,
 > 2026-09-03). All six of L0's perf baselines are now measured. Again a pointer, not a
 > correction: no number in this file or in `PERF_BASELINE_RESTART.md` was modified by it.
+>
+> **Player frame stability is measured too, 2026-09-03 (backup)** — same file, its own section.
+> 1,298 decoded / **0 dropped** over 54.15 s on a real 1280x720 clip, 24.0 fps, media-to-wall
+> ratio 1.00, with the sensitivity control firing at 68.9 % dropped when the same element was
+> driven to 8x. So the sixth row above is closed and this pointer is the only place that says so;
+> the row's own text is left exactly as it was written, again because this is a pointer.

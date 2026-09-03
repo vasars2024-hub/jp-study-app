@@ -14,6 +14,12 @@ import {
   isCueEndTransition,
   normalizeVideoCoreStudyPreferences,
   normalizeVideoCoreResumePositions,
+  SECONDARY_SUB_LANG_LABELS,
+  SECONDARY_SUB_LANGS,
+  shortLangTag,
+  SUBTITLE_FONT_CHOICES,
+  SUBTITLE_FONT_STACKS,
+  toSubtitleFontChoice,
   nextVideoCoreWhisperTrackNumber,
   recordVideoCoreComprehensionEvent,
   recordVideoCoreCueReplay,
@@ -297,5 +303,99 @@ describe('videoCoreStudy', () => {
     expect(normalizeVideoCoreResumePositions([null, ...positions])).toEqual(positions);
     expect(resolveVideoCoreResumePosition(positions, key, 140)).toBe(125.25);
     expect(resolveVideoCoreResumePosition(positions, key, 128)).toBe(0);
+  });
+});
+
+describe('subtitle appearance and dual-subtitle language preferences', () => {
+  it('defaults the new appearance knobs and keeps the cue readout off', () => {
+    const prefs = normalizeVideoCoreStudyPreferences(null);
+    expect(prefs.subtitleFontFamily).toBe('default');
+    expect(prefs.subtitleFontWeight).toBe(600);
+    expect(prefs.subtitleOutline).toBe(true);
+    // The readout sits in the middle of the picture; it has to be asked for.
+    expect(prefs.cueTimingReadout).toBe(false);
+    expect(prefs.secondarySubLang).toBe('en');
+  });
+
+  it('keeps stored values it recognises', () => {
+    const prefs = normalizeVideoCoreStudyPreferences({
+      subtitleFontFamily: 'mincho',
+      subtitleFontWeight: 800,
+      subtitleOutline: false,
+      cueTimingReadout: true,
+      secondarySubLang: 'ru',
+    });
+    expect(prefs).toMatchObject({
+      subtitleFontFamily: 'mincho',
+      subtitleFontWeight: 800,
+      subtitleOutline: false,
+      cueTimingReadout: true,
+      secondarySubLang: 'ru',
+    });
+  });
+
+  it('falls back rather than trusting a font or language it does not offer', () => {
+    const prefs = normalizeVideoCoreStudyPreferences({
+      subtitleFontFamily: 'comic-sans',
+      secondarySubLang: 'tlh',
+    });
+    expect(prefs.subtitleFontFamily).toBe('default');
+    expect(prefs.secondarySubLang).toBe('en');
+  });
+
+  it('clamps and snaps a hand-edited weight to something a font can select', () => {
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontWeight: 637 }).subtitleFontWeight)
+      .toBe(600);
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontWeight: 5000 }).subtitleFontWeight)
+      .toBe(800);
+    expect(normalizeVideoCoreStudyPreferences({ subtitleFontWeight: 50 }).subtitleFontWeight)
+      .toBe(400);
+  });
+
+  it('narrows a raw select value the same way the normalizer does', () => {
+    expect(toSubtitleFontChoice('gothic')).toBe('gothic');
+    expect(toSubtitleFontChoice('nonsense')).toBe('default');
+  });
+
+  it('offers a stack for every font choice, each ending in a generic family', () => {
+    for (const choice of SUBTITLE_FONT_CHOICES) {
+      const stack = SUBTITLE_FONT_STACKS[choice];
+      if (choice === 'default') {
+        // Empty on purpose: it means "inherit the stylesheet", not "impose a family".
+        expect(stack).toBe('');
+        continue;
+      }
+      expect(stack).toMatch(/(sans-serif|serif)$/);
+    }
+  });
+
+  it('names every offered language in itself', () => {
+    for (const code of SECONDARY_SUB_LANGS) {
+      expect(SECONDARY_SUB_LANG_LABELS[code]).toBeTruthy();
+    }
+  });
+});
+
+describe('shortLangTag', () => {
+  it('normalizes the three spellings a track can use for one language', () => {
+    expect(shortLangTag('ja')).toBe('ja');
+    expect(shortLangTag('jpn')).toBe('ja');
+    expect(shortLangTag('ja-JP')).toBe('ja');
+    expect(shortLangTag('JA_jp')).toBe('ja');
+  });
+
+  it('maps the ISO 639-2 codes that truncation would get wrong', () => {
+    // `jpn`.slice(0, 2) is `jp`, which is not a language code and matches nothing.
+    expect(shortLangTag('jpn')).not.toBe('jp');
+    expect(shortLangTag('eng')).toBe('en');
+    expect(shortLangTag('rus')).toBe('ru');
+    expect(shortLangTag('chi')).toBe('zh');
+    expect(shortLangTag('ger')).toBe('de');
+  });
+
+  it('returns an empty tag for absent metadata rather than guessing', () => {
+    expect(shortLangTag(null)).toBe('');
+    expect(shortLangTag(undefined)).toBe('');
+    expect(shortLangTag('  ')).toBe('');
   });
 });

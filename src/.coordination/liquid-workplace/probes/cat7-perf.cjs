@@ -275,6 +275,73 @@ const LOAD_READ = `JSON.stringify(window.__lqLoad
 // so nothing here depends on the stopper having run.
 const LOAD_STOP = `(window.__lqLoadGen = (window.__lqLoadGen || 0) + 1, window.__lqLoad = null, 'stopped')`;
 
+/**
+ * `--player-frames` — L0's sixth performance axis, and the one the five others were recorded
+ * without: "boot, window drag, resize, theme switch, memory, and PLAYER FRAME STABILITY".
+ *
+ * THE INSTRUMENT IS `getVideoPlaybackQuality()`, NOT rAF, and that is not a preference. A rAF
+ * recorder samples the COMPOSITOR: a decoder dropping half its frames still presents a new
+ * compositor frame every 16.7 ms, so rAF scores a healthy player and a stuttering one
+ * identically. `totalVideoFrames`/`droppedVideoFrames` are the video pipeline's own counters and
+ * are the only ones that can tell those two apart. Both numbers are cumulative from the element's
+ * creation, so every reading here is a DELTA between two samples — a raw cumulative ratio is
+ * dominated by the startup burst (measured on this clip: 203 of the first 1,950 frames, 10.4%,
+ * while the steady state is nothing like that).
+ *
+ * The sampler runs in the RENDERER on a self-terminating timer rather than as N bridge round
+ * trips, for the same reason every other leg here does: a 1 s cadence driven over HTTP jitters by
+ * tens of milliseconds and the per-interval numbers stop being comparable. It carries the same
+ * two guards as `LOAD_ARM` — a generation id and a hard wall-clock deadline — so a run that dies
+ * mid-leg cannot leave a sampler feeding the next run's numbers.
+ *
+ * FOUR THINGS IT RECORDS SO THE READING CAN BE VOIDED RATHER THAN FLATTERED:
+ *   elementSwapped  the media chunk remounts its player; a delta across two different decoders
+ *                   is meaningless, so the element is stamped with the generation and re-checked
+ *                   on every tick (a JS property, never a data-attribute — this must not mutate
+ *                   the product's DOM).
+ *   pausedDuring    a paused player decodes nothing and drops nothing. It scores as perfect.
+ *   rateChanged     the ratio of media time to wall time only reads as a stall at a known rate.
+ *   corrupted       counted separately; a corrupt frame is not a dropped one.
+ */
+const FRAME_ARM = (sel, ms, everyMs) => `(() => {
+  const gen = (window.__lqFramesGen = (window.__lqFramesGen || 0) + 1);
+  window.__lqFrames = null;
+  const v = document.querySelector(${JSON.stringify(sel)});
+  if (!v) return 'REFUSE: no element matches ' + ${JSON.stringify(sel)};
+  if (typeof v.getVideoPlaybackQuality !== 'function') return 'REFUSE: ' + ${JSON.stringify(sel)} + ' is a <' + v.tagName.toLowerCase() + '>, not a media element with playback quality';
+  const q0 = v.getVideoPlaybackQuality();
+  const rec = {
+    gen, sel: ${JSON.stringify(sel)},
+    startedAt: performance.now(), until: performance.now() + ${ms},
+    rate: v.playbackRate, pausedAtArm: v.paused, readyState: v.readyState,
+    width: v.videoWidth, height: v.videoHeight, duration: v.duration,
+    src: String(v.currentSrc || v.src || '').slice(0, 160),
+    samples: [[0, v.currentTime, q0.totalVideoFrames, q0.droppedVideoFrames, q0.corruptedVideoFrames]],
+    elementSwapped: false, rateChanged: false, pausedDuring: false, done: false,
+  };
+  v.__lqFrameGen = gen;
+  window.__lqFrames = rec;
+  const tick = () => {
+    if (window.__lqFramesGen !== gen) return;
+    const cur = document.querySelector(${JSON.stringify(sel)});
+    if (!cur || cur.__lqFrameGen !== gen) { rec.elementSwapped = true; rec.done = true; return; }
+    if (cur.playbackRate !== rec.rate) rec.rateChanged = true;
+    if (cur.paused) rec.pausedDuring = true;
+    const q = cur.getVideoPlaybackQuality();
+    rec.samples.push([Math.round(performance.now() - rec.startedAt), cur.currentTime,
+      q.totalVideoFrames, q.droppedVideoFrames, q.corruptedVideoFrames]);
+    if (performance.now() >= rec.until) { rec.done = true; return; }
+    setTimeout(tick, ${everyMs});
+  };
+  setTimeout(tick, ${everyMs});
+  return 'armed gen=' + gen + ' ' + rec.width + 'x' + rec.height + ' rate=' + rec.rate;
+})()`;
+
+const FRAME_READ = `JSON.stringify(window.__lqFrames || null)`;
+// The generation bump is what stops it; the record is cleared here as well because, unlike
+// LOAD_ARM's loop, a superseded FRAME tick returns without touching anything at all.
+const FRAME_STOP = `(window.__lqFramesGen = (window.__lqFramesGen || 0) + 1, window.__lqFrames = null, 'stopped')`;
+
 const SPECS = {
   captures: {
     title: 'Reading',
@@ -589,27 +656,37 @@ const SPECS = {
     },
     collection: { container: '.mc-up-next', row: '.mc-media-tile' },
   },
+  /*
+   * MERGE NOTE 2026-09-03: wt/files-app carried a second, independent player spec for this
+   * same surface -- `playbackOnly`, scored with --playback, whose receipt is
+   * PERF_BASELINE_PLAYER.md. It refused a `heavy` leg on the grounds that every repeatable
+   * operation here writes a resume position and there is no restore point for it. That
+   * reasoning still holds; the spec below is kept because it is the one on the branch being
+   * landed and the one the --player-frames guard supports. The --playback path remains
+   * available to any spec that declares playbackOnly.
+   */
+  /**
+   * CORRECTION 37 — the PLAYER, which is a different surface from `video` above and is the only
+   * one L0's sixth performance axis can be measured on.
+   *
+   * `video` is the LAUNCHER: its own spec comment says so, and measured live 2026-09-03
+   * `document.querySelectorAll('video').length` is 0 while `.mc-video-page` is on screen. The
+   * decoder lives in the media-workspace host, mounted lazily with the media chunk, and the
+   * element's real path is
+   * `DIV#root < DIV.seanime-host < DIV.seanime-host-body < DIV.seanime-host-pane <
+   *  DIV#media-workspace.dark < SECTION.study-player-slice < DIV.relative x3 < VIDEO`.
+   * `#media-workspace.closest('.fwin')` is null, so the runner takes the `-Root` gesture path
+   * and no window title can be matched — hence correction 29's `@selector` form.
+   *
+   * `playerFramesOnly` because the gesture legs are the wrong question here and would be
+   * actively misleading: dragging and resizing the host WHILE a decoder is running measures the
+   * gesture against a moving scene, and the rubric already voids a leg whose scene moved.
+   */
   player: {
-    /*
-     * THE PLAYER, and it exists for exactly one row: L0's `Record performance baselines` bullet
-     * lists six numbers and five of them were taken on 2026-08-16. The sixth —
-     * `player frame stability` — is recorded open in two places (PERF_BASELINE.md:104,
-     * VIDEO_BASELINE.md:109) with the same reason: it "needs a real clip" and none was loaded.
-     *
-     * NOT the `video` spec. That one measures `.mc-video-page`, which is a LAUNCHER: its own
-     * comment records that the stage renders workspace/connecting/needs-server copy and hands
-     * playback to another surface. A clip plays inside `#media-workspace`, which REPLACES the
-     * desktop shell — no `.fwin` ancestor, so the runner takes the -Root path — and which the
-     * `video` spec's own trap notes occludes every `.fwin` on the desk while it is open.
-     *
-     * `playbackOnly`: this spec declares no `heavy` leg, and that is a refusal rather than an
-     * omission. Every repeatable operation this surface offers writes user state — seeking and
-     * playing both persist a resume position, and there is no restore point for it — so there
-     * is no honest heaviest-real-work leg here. `--playback` is the whole spec.
-     */
     title: '@#media-workspace',
     root: '#media-workspace',
-    playbackOnly: 'the player has no read-only heavy leg: every repeatable operation on it writes a resume position. Run it with --playback.',
+    playerFramesOnly: true,
+    videoSelector: '#media-workspace video',
   },
   city: {
     // Mooncap Garden is FRAMELESS: no `.fwin-title-text` for a substring to match, so it is
@@ -1195,6 +1272,16 @@ const LONG_SESSION = has('long-session');
 // session's own frame ceiling. See the PLAYBACK block for the two controls it refuses without.
 const PLAYBACK = has('playback');
 const CYCLES = Math.max(1, Number(arg('cycles', '12')) || 12);
+// Correction 37. A MODE, exactly as --long-session is: it reuses this file's refusals, its
+// bridge client, its retry policy and its scene record verbatim, and adds one instrument.
+const PLAYER_FRAMES = has('player-frames');
+const SECONDS = Math.max(10, Number(arg('seconds', '30')) || 30);
+// The control's rate. 8x on a 23.976 fps clip asks the pipeline for ~192 fps against a 60 Hz
+// display, so a recorder that can see dropped frames at all must see these.
+const CONTROL_RATE = Math.max(2, Number(arg('control-rate', '8')) || 8);
+// Overrides the spec's `videoSelector`. Its purpose is the refusal control: point it at an
+// element that decodes nothing and this mode must refuse rather than score a still picture 10/10.
+const SELECTOR = arg('selector', '');
 const spec = SPECS[SURFACE];
 if (!spec) {
   console.error(`REFUSE - --surface must be one of: ${Object.keys(SPECS).join(', ')}`);
@@ -1202,6 +1289,14 @@ if (!spec) {
 }
 if (spec.playbackOnly && !PLAYBACK) {
   console.error(`REFUSE - --surface ${SURFACE}: ${spec.playbackOnly}`);
+  process.exit(2);
+}
+if (spec.playerFramesOnly && !PLAYER_FRAMES) {
+  console.error(`REFUSE - --surface ${SURFACE} declares no gesture legs and is scored only by --player-frames. Dragging or resizing a host while its decoder runs measures a moving scene, which this runner voids anyway.`);
+  process.exit(2);
+}
+if (PLAYER_FRAMES && !spec.videoSelector && !SELECTOR) {
+  console.error(`REFUSE - --surface ${SURFACE} declares no videoSelector, so --player-frames has no subject. Pass --selector, or score --surface player.`);
   process.exit(2);
 }
 /**
@@ -1624,6 +1719,183 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     console.log(`\nCATEGORY 7 — ${SURFACE} LONG SESSION: ${score === 10 ? 'PASS 10/10' : score === 'VOID' ? 'VOID' : `${findings.length} finding(s), NOT a 10`}`);
     for (const f of findings) console.log(`  FINDING  ${f}`);
     for (const v of voided) console.log(`  VOID     ${v}`);
+    return;
+  }
+
+  /**
+   * CORRECTION 37 — `--player-frames`, L0's sixth axis, open since 2026-08-16.
+   *
+   * `PERF_BASELINE.md:104` and `VIDEO_BASELINE.md:109` both record it open with the same reason:
+   * "needs a real clip". That is the whole of the gap — the other five axes were recorded off one
+   * cold start and this one cannot be, because a player with nothing loaded drops no frames and
+   * therefore scores perfectly. Every refusal below exists to stop exactly that.
+   *
+   * THE SENSITIVITY CONTROL IS THE SUBJECT ITSELF, at `--control-rate`, and it is not optional:
+   * a clean frame reading only means something if this recorder can see a decoder that is
+   * dropping frames, and nothing else in this harness can demonstrate that. The control runs
+   * AFTER the scored arm, on the same element, in the same session, and is then undone —
+   * playbackRate back to 1 and the media position seeked back to where the control began. That
+   * restoration is measured, not assumed, and it is reported in the record.
+   *
+   * WHY NOT A SECOND OFF-SCREEN <video> ON THE SAME SOURCE, which was the first design: it
+   * decodes the SAME sidecar directstream id, and doing that at 8x wedged the stream — the next
+   * three opens mounted the library browser instead of the player. One decoder, one stream.
+   */
+  if (PLAYER_FRAMES) {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const sel = SELECTOR || spec.videoSelector;
+
+    // Deltas between consecutive samples are what this mode reports; a cumulative ratio is
+    // dominated by the startup burst and says nothing about the steady state.
+    const summarise = (rec) => {
+      const s = rec.samples;
+      const a = s[0];
+      const b = s[s.length - 1];
+      const wallS = (b[0] - a[0]) / 1000;
+      const mediaS = b[1] - a[1];
+      const decoded = b[2] - a[2];
+      const dropped = b[3] - a[3];
+      const corrupted = b[4] - a[4];
+      const intervals = [];
+      for (let i = 1; i < s.length; i++) {
+        const d = s[i][2] - s[i - 1][2];
+        const dr = s[i][3] - s[i - 1][3];
+        intervals.push({
+          atMs: s[i][0], ms: s[i][0] - s[i - 1][0], decoded: d, dropped: dr,
+          droppedPct: d > 0 ? Math.round((1000 * dr) / d) / 10 : null,
+        });
+      }
+      // Intervals with too few frames to rate are excluded from the worst-interval bar and
+      // counted separately, so a 3-frame hiccup cannot report as a 33% interval.
+      const rated = intervals.filter((i) => i.decoded >= 5);
+      const worst = rated.reduce((m, i) => (m === null || i.droppedPct > m.droppedPct ? i : m), null);
+      const r1 = (n) => (n === null || !Number.isFinite(n) ? null : Math.round(n * 10) / 10);
+      const r2 = (n) => (n === null || !Number.isFinite(n) ? null : Math.round(n * 100) / 100);
+      return {
+        sel: rec.sel, resolution: `${rec.width}x${rec.height}`, clipDurationS: r1(rec.duration),
+        src: rec.src, rate: rec.rate, samples: s.length,
+        wallS: r2(wallS), mediaS: r2(mediaS), decoded, dropped, corrupted,
+        droppedPct: decoded > 0 ? r1((100 * dropped) / decoded) : null,
+        droppedPerWallSec: wallS > 0 ? r2(dropped / wallS) : null,
+        decodedFps: mediaS > 0 ? r1(decoded / mediaS) : null,
+        // At rate 1 this is 1.00 for a player keeping up. It is the stall term: a decoder can
+        // drop nothing and still fall behind the clock, and a rAF recorder sees neither.
+        playbackRatio: wallS > 0 && rec.rate > 0 ? r2(mediaS / wallS / rec.rate) : null,
+        // The sampler's OWN cadence, recorded rather than assumed. A renderer that starves its
+        // 1 s timer still yields a valid endpoint delta — the counters are cumulative — but the
+        // per-second series stops being a series, and a reader has to be able to see that.
+        longestSampleGapMs: intervals.reduce((m, i) => Math.max(m, i.ms), 0),
+        intervalsRated: rated.length, intervalsWithDrops: rated.filter((i) => i.dropped > 0).length,
+        worstInterval: worst,
+        flags: {
+          elementSwapped: rec.elementSwapped, rateChanged: rec.rateChanged,
+          pausedAtArm: rec.pausedAtArm, pausedDuring: rec.pausedDuring, done: rec.done,
+        },
+        intervals,
+      };
+    };
+
+    /**
+     * `minSamples` differs between the two legs, and that is not a loosened bar — it is the
+     * control's own load. Measured 2026-09-03: at 8x the renderer's 1 s timer fired TWICE in
+     * 10.6 s, because a decoder asked for ~192 fps starves everything else on the thread. The
+     * scored leg is judged per-second and needs its cadence; the control is a single delta
+     * between two endpoints of cumulative counters and needs exactly two samples to be a real
+     * number. Requiring the scored leg's cadence of the control would have voided every run.
+     */
+    const runLeg = async (label, ms, everyMs, minSamples = 5) => {
+      const armed = await ev(FRAME_ARM(sel, ms, everyMs));
+      if (String(armed).startsWith('REFUSE')) throw new Error(`REFUSE (${label}) - ${armed}`);
+      step(`${label}: ${armed}, ${Math.round(ms / 1000)}s at ${everyMs}ms`);
+      await sleep(ms + 1500);
+      const raw = JSON.parse(await ev(FRAME_READ));
+      await ev(FRAME_STOP);
+      if (!raw) throw new Error(`REFUSE (${label}) - the sampler record is gone; something cleared it mid-leg`);
+      const why = `samples=${raw.samples.length} elementSwapped=${raw.elementSwapped} pausedDuring=${raw.pausedDuring} rateChanged=${raw.rateChanged} spanMs=${raw.samples.length ? raw.samples[raw.samples.length - 1][0] : 0}`;
+      if (raw.elementSwapped) throw new Error(`REFUSE (${label}) - the player element was replaced mid-leg, so the two endpoints are different decoders and their difference is not a delta. ${why}`);
+      if (!raw.done) throw new Error(`REFUSE (${label}) - the sampler never reached its deadline. A throttled renderer timer cannot produce a comparable cadence. ${why}`);
+      if (raw.samples.length < minSamples) throw new Error(`REFUSE (${label}) - fewer than ${minSamples} samples: ${why}`);
+      return summarise(raw);
+    };
+
+    // --- the scored arm, on the surface exactly as it was found -----------------------
+    const scored = await runLeg('clean', SECONDS * 1000, 1000);
+    const voided = [];
+    const findings = [];
+
+    // Refusals that only a taken reading can make. Each one is a way an ABSENT or STILL player
+    // scores as a perfect one, which is the failure this whole mode exists to prevent.
+    if (scored.decoded <= 0) {
+      throw new Error(`REFUSE - the subject decoded 0 frames across ${scored.wallS}s. A player that is not playing drops nothing and would score 10/10; there is no measurement here.`);
+    }
+    if (scored.flags.pausedAtArm || scored.flags.pausedDuring) {
+      throw new Error('REFUSE - the subject was paused during the leg. Same reason as above.');
+    }
+    if (scored.flags.elementSwapped) {
+      throw new Error('REFUSE - the player element was replaced mid-leg, so the two endpoints are different decoders and their difference is not a delta.');
+    }
+    if (scored.flags.rateChanged) throw new Error('REFUSE - playbackRate moved during the scored leg.');
+    if (!(scored.rate === 1)) throw new Error(`REFUSE - the scored leg needs rate 1, saw ${scored.rate}.`);
+    if (scored.decodedFps !== null && scored.decodedFps < 5) {
+      voided.push(`the subject decoded only ${scored.decodedFps} fps of media time, which is not a player running normally`);
+    }
+
+    // --- the sensitivity control, then put it back ------------------------------------
+    const ctBefore = Number(await ev(`document.querySelector(${JSON.stringify(sel)}).currentTime`));
+    await ev(`(function(){var v=document.querySelector(${JSON.stringify(sel)});v.playbackRate=${CONTROL_RATE};return v.playbackRate;})()`);
+    let control = null;
+    let restored = null;
+    try {
+      control = await runLeg(`control x${CONTROL_RATE}`, 6000, 500, 2);
+    } finally {
+      await ev(`(function(){var v=document.querySelector(${JSON.stringify(sel)});if(!v)return 'gone';v.playbackRate=1;v.currentTime=${ctBefore};return 'restored';})()`);
+      await sleep(2500);
+      restored = JSON.parse(await ev(`JSON.stringify((function(){var v=document.querySelector(${JSON.stringify(sel)});if(!v)return{present:false};return {present:true,rate:v.playbackRate,paused:v.paused,currentTime:Math.round(v.currentTime*100)/100,readyState:v.readyState};})())`));
+    }
+    step(`restored: ${JSON.stringify(restored)}`);
+    if (!restored.present || restored.rate !== 1) {
+      voided.push(`the control was not undone: the subject reads ${JSON.stringify(restored)} and must read rate 1 on a present element`);
+    }
+
+    // The bar the control has to clear, and it is deliberately coarse: this asks whether the
+    // recorder can see a dropping decoder AT ALL, not how much worse 8x is.
+    const cleanRate = scored.droppedPerWallSec || 0;
+    const fastRate = control ? control.droppedPerWallSec || 0 : 0;
+    const controlFired = !!control && control.decoded > 0 && fastRate >= cleanRate * 5 + 5;
+    if (!controlFired) {
+      voided.push(`CONTROL DID NOT FIRE: at ${CONTROL_RATE}x the subject dropped ${fastRate}/s against ${cleanRate}/s clean (needs >= ${Math.round((cleanRate * 5 + 5) * 100) / 100}/s). This recorder cannot demonstrate that it sees a dropping decoder, so the clean number above is not evidence of anything.`);
+    }
+
+    // --- the bars ---------------------------------------------------------------------
+    if (scored.droppedPct > 1) findings.push(`${scored.dropped} of ${scored.decoded} frames dropped over ${scored.wallS}s = ${scored.droppedPct}%, over the 1% allowance`);
+    if (scored.worstInterval && scored.worstInterval.droppedPct > 5) findings.push(`worst second dropped ${scored.worstInterval.dropped} of ${scored.worstInterval.decoded} = ${scored.worstInterval.droppedPct}% at t+${scored.worstInterval.atMs}ms, over the 5% per-second allowance`);
+    if (scored.corrupted > 0) findings.push(`${scored.corrupted} corrupted frame(s) decoded`);
+    if (scored.playbackRatio !== null && scored.playbackRatio < 0.98) findings.push(`media time advanced ${scored.mediaS}s over ${scored.wallS}s of wall clock at rate 1 = ${scored.playbackRatio}x, so the player fell behind its own clock`);
+
+    const score = voided.length ? 'VOID' : findings.length === 0 ? 10 : 0;
+    const out = {
+      surface: SURFACE, title: spec.title, root: spec.root, mode: 'player-frames',
+      at: new Date().toISOString(),
+      instrument: 'HTMLVideoElement.getVideoPlaybackQuality() deltas, renderer-side sampler at 1000 ms',
+      process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec },
+      surfaceWindow: {
+        mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
+        matched: found.matched, deskWindows: found.windows, titles: found.titles,
+        rootElements: found.rootElements,
+      },
+      legs: { scored, control, restored, controlRate: CONTROL_RATE, controlFired },
+      findings, voided, score,
+    };
+    console.log(JSON.stringify(out, null, 2));
+    const file = arg('out', path.join('src/.coordination/liquid-workplace/baselines', `cat7-${SURFACE}-frames.json`));
+    fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
+    console.log('wrote', file);
+    console.log(`\nPLAYER FRAME STABILITY — ${SURFACE}: ${score === 10 ? 'PASS 10/10' : score === 'VOID' ? 'VOID' : `${findings.length} finding(s), NOT a 10`}`);
+    console.log(`  clean    ${scored.resolution} ${scored.decoded} decoded / ${scored.dropped} dropped over ${scored.wallS}s = ${scored.droppedPct}% (${scored.decodedFps} fps, ratio ${scored.playbackRatio}, ${scored.intervalsWithDrops}/${scored.intervalsRated} seconds with a drop)`);
+    if (control) console.log(`  control  x${CONTROL_RATE}: ${control.decoded} decoded / ${control.dropped} dropped over ${control.wallS}s = ${control.droppedPct}% (${fastRate}/s vs ${cleanRate}/s clean) -> ${controlFired ? 'FIRED' : 'DID NOT FIRE'}`);
+    for (const f of findings) console.log(`  FINDING  ${f}`);
+    for (const v of voided) console.log(`  VOID     ${v}`);
+    if (score !== 10) process.exitCode = 1;
     return;
   }
 
