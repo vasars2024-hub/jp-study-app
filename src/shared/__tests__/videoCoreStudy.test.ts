@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   activeStudyCuesAtTime,
   adjacentStudyCue,
+  bridgedSecondaryCuesAtTime,
+  SECONDARY_CUE_BRIDGE_MS,
   clampStudyPlaybackRate,
   cuePlaybackEndSec,
   cuePlaybackStartSec,
@@ -72,6 +74,54 @@ describe('videoCoreStudy', () => {
     expect(activeStudyCuesAtTime(cues, 3.2, 0.25).map((cue) => cue.index)).toEqual([]);
     expect(activeStudyCuesAtTime(cues, 3.3, 0.25).map((cue) => cue.index)).toEqual([1]);
     expect(activeStudyCuesAtTime(cues, 4.75, 0.25).map((cue) => cue.index)).toEqual([]);
+  });
+
+  it('bridges the second line across a short gap and never across a long one', () => {
+    // DEFECT S3. Gap 0→1 is 1,000 ms, gap 1→2 is 1,500 ms, and the bridge is 1,200 ms.
+    // No delay here: the delayed clock is covered by the case above.
+    expect(bridgedSecondaryCuesAtTime(cues, 2.5, 0).map((cue) => cue.index)).toEqual([0]);
+    // The bridge is bounded by the GAP, not by elapsed time — the whole 1,000 ms is
+    // carried, right up to the instant the next cue takes over.
+    expect(bridgedSecondaryCuesAtTime(cues, 2.999, 0).map((cue) => cue.index)).toEqual([0]);
+    expect(bridgedSecondaryCuesAtTime(cues, 3.0, 0).map((cue) => cue.index)).toEqual([1]);
+    // 1,500 ms is longer than the bridge, so nothing is held at ANY point in it —
+    // not even at its start, which is what stops the fix becoming a second flicker.
+    expect(bridgedSecondaryCuesAtTime(cues, 4.6, 0)).toEqual([]);
+    expect(bridgedSecondaryCuesAtTime(cues, 5.9, 0)).toEqual([]);
+    // Before the first cue there is nothing to hold, and after the last one there is
+    // no successor to bound the gap, so the closing line does not stick to the screen.
+    expect(bridgedSecondaryCuesAtTime(cues, 0.5, 0)).toEqual([]);
+    expect(bridgedSecondaryCuesAtTime(cues, 7.1, 0)).toEqual([]);
+    // An active cue always outranks a bridge, and the delay still applies to both.
+    expect(bridgedSecondaryCuesAtTime(cues, 3.3, 0.25).map((cue) => cue.index)).toEqual([1]);
+    expect(bridgedSecondaryCuesAtTime(cues, 2.9, 0.25).map((cue) => cue.index)).toEqual([0]);
+  });
+
+  it('carries every simultaneous line across a bridged gap, not just one', () => {
+    const simultaneous: VideoCoreStudyCue[] = [
+      { index: 0, trackNumber: 3, text: 'a', startMs: 0, endMs: 1000 },
+      { index: 1, trackNumber: 3, text: 'b', startMs: 200, endMs: 1000 },
+      { index: 2, trackNumber: 3, text: 'c', startMs: 1600, endMs: 2000 },
+    ];
+    expect(bridgedSecondaryCuesAtTime(simultaneous, 1.2, 0).map((cue) => cue.index))
+      .toEqual([0, 1]);
+  });
+
+  it('holds the gap the measured harvest track actually has', () => {
+    // The p50 gap on `harvest-ja-mt7ed4mr-ccxg8f.ass` is 650 ms and its p90 is 3,050 ms
+    // (286 merged spans, 285 gaps). The default has to cover the first and refuse the
+    // second, or S3's fixture readings do not transfer to a real track.
+    const p50: VideoCoreStudyCue[] = [
+      { index: 0, trackNumber: 1, text: 'x', startMs: 0, endMs: 1000 },
+      { index: 1, trackNumber: 1, text: 'y', startMs: 1650, endMs: 2650 },
+    ];
+    const p90: VideoCoreStudyCue[] = [
+      { index: 0, trackNumber: 1, text: 'x', startMs: 0, endMs: 1000 },
+      { index: 1, trackNumber: 1, text: 'y', startMs: 4050, endMs: 5050 },
+    ];
+    expect(SECONDARY_CUE_BRIDGE_MS).toBe(1200);
+    expect(bridgedSecondaryCuesAtTime(p50, 1.3, 0).map((cue) => cue.index)).toEqual([0]);
+    expect(bridgedSecondaryCuesAtTime(p90, 1.3, 0)).toEqual([]);
   });
 
   it('finds adjacent cues from source time with bounded ends', () => {

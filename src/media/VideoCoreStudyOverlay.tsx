@@ -55,6 +55,7 @@ import WhisperWorker from '../renderer/whisperWorker?worker';
 import {
   activeStudyCuesAtTime,
   adjacentStudyCue,
+  bridgedSecondaryCuesAtTime,
   clampStudyPlaybackRate,
   dismissVideoCoreComprehensionSuggestion,
   dismissVideoCoreShadowingSuggestion,
@@ -984,9 +985,20 @@ export default function VideoCoreStudyOverlay({
       setActiveSecondaryCues([]);
       return;
     }
+    /*
+      DEFECT S3 — `bridgedSecondaryCuesAtTime`, not `activeStudyCuesAtTime`, and ONLY
+      here. The second line is the one element in this overlay with no box of its own:
+      the primary falls back to `study-cue-status` and the timing readout stays put,
+      while `{preferences.dualSubs && secondaryText && ...}` unmounts the `<p>` outright.
+      So every inter-cue gap in the translation track blanks the line and reflows the
+      overlay around it, and on the harvest track measured for this defect the median
+      gap is 650 ms with 82 of 285 under 400 ms — a blink, which is what the user
+      reported. The bridge covers a short gap and refuses a long one; the primary keeps
+      the exact activation it always had, because the study tools read it.
+    */
     const syncActive = (): void => {
       setActiveSecondaryCues(
-        activeStudyCuesAtTime(
+        bridgedSecondaryCuesAtTime(
           secondaryCuesRef.current,
           video.currentTime,
           subtitleDelaySec,

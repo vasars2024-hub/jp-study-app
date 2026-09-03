@@ -166,6 +166,22 @@ function overlaySource(): string {
     .replace(/\r\n?/g, '\n');
 }
 
+describe('the overlay wires the S3 second-line bridge', () => {
+  it('bridges the SECOND line and leaves the primary on exact activation', () => {
+    const source = overlaySource();
+    // The bridge is imported and used. Both this file's assertions and the overlay's
+    // own comment name the symbol, which is why `overlaySource` strips comments first —
+    // a source ratchet in this repo has already scored prose as a call site.
+    expect(source).toContain('bridgedSecondaryCuesAtTime(');
+    // Exactly one call, and it is the secondary sync. The primary's two call sites stay
+    // on `activeStudyCuesAtTime`: they feed the cue line the study tools mine and grade,
+    // so a held cue there would mean the wrong sentence.
+    expect(source.match(/bridgedSecondaryCuesAtTime\(/g)).toHaveLength(1);
+    expect(source.match(/activeStudyCuesAtTime\(/g)).toHaveLength(2);
+    expect(source).toContain('setActiveSecondaryCues(\n        bridgedSecondaryCuesAtTime(');
+  });
+});
+
 describe('the overlay wires the file-track cue clock', () => {
   it('reads the cached ASS off the manager and parses it', () => {
     const source = overlaySource();

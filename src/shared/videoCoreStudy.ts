@@ -528,6 +528,72 @@ export function activeStudyCuesAtTime(
   return active;
 }
 
+/**
+ * The longest silence the second line is allowed to sit across, in milliseconds.
+ *
+ * Measured on this repo's own harvest track (36,435 ASS dialogue lines, merged to 286
+ * covered spans): the median gap between spans is **650 ms** and 82 of the 285 gaps are
+ * under 400 ms. Every one of those blanked the translation line for a fraction of a
+ * second and brought it straight back — DEFECT S3, reported by the user as the second
+ * line "disappearing and reappearing during playback".
+ *
+ * 1,200 ms covers the median gap and every sub-second one without touching the p90 gap
+ * (3,050 ms), where a silence is long enough that a stale translation would be a lie
+ * rather than a bridge.
+ */
+export const SECONDARY_CUE_BRIDGE_MS = 1_200;
+
+/**
+ * The second line to show at `playbackTimeSec` — the active cues, or the previous ones
+ * held across a SHORT gap.
+ *
+ * Only the secondary line uses this, and the asymmetry is deliberate. The primary line is
+ * what the study tools read, mine and grade, so it must mean exactly what the track says
+ * at this instant; when it has nothing, the overlay says `Waiting for subtitle` and the
+ * box stays put. The second line is a reading aid with no such box: it is rendered
+ * conditionally, so it *unmounts* on every gap and the overlay reflows around it.
+ *
+ * The bridge is bounded by the gap, not by elapsed time. Holding "1.2 s into any gap"
+ * would blank a 3-second silence part-way through, which is a second flicker rather than
+ * a fix; here the previous cue either covers the whole gap or is never shown past its own
+ * end. A cue with no successor is never bridged, so the last line of a file does not stick
+ * to the screen for the rest of the runtime.
+ *
+ * `cues` must be sorted by `startMs`, exactly as {@link activeStudyCuesAtTime} requires —
+ * both of this function's producers guarantee it (`parseSubtitles` sorts, and the
+ * manager's `getCuesForTrack` sorts before it indexes).
+ */
+export function bridgedSecondaryCuesAtTime(
+  cues: readonly VideoCoreStudyCue[],
+  playbackTimeSec: number,
+  subtitleDelaySec: number,
+  bridgeMs: number = SECONDARY_CUE_BRIDGE_MS,
+): VideoCoreStudyCue[] {
+  const active = activeStudyCuesAtTime(cues, playbackTimeSec, subtitleDelaySec);
+  if (active.length) return active;
+  const sourceTimeMs = (playbackTimeSec - subtitleDelaySec) * 1000;
+  let previousEndMs = Number.NEGATIVE_INFINITY;
+  let previous: VideoCoreStudyCue[] = [];
+  let nextStartMs = Number.POSITIVE_INFINITY;
+  for (const cue of cues) {
+    if (cue.startMs > sourceTimeMs) {
+      nextStartMs = cue.startMs;
+      break;
+    }
+    // Simultaneous lines end together and belong on screen together, so the whole
+    // set at the latest end is carried, not just whichever one the scan saw last.
+    if (cue.endMs > previousEndMs) {
+      previousEndMs = cue.endMs;
+      previous = [cue];
+    } else if (cue.endMs === previousEndMs) {
+      previous.push(cue);
+    }
+  }
+  if (!previous.length) return [];
+  if (nextStartMs - previousEndMs > bridgeMs) return [];
+  return previous;
+}
+
 export function clampStudyPlaybackRate(value: number): number {
   if (!Number.isFinite(value)) return 1;
   return Math.max(0.25, Math.min(3, value));
