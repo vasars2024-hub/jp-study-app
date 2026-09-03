@@ -1,6 +1,6 @@
 import React from 'react';
 import type { VideoCoreActiveCue } from '@/app/(main)/_features/video-core/video-core-subtitles';
-import { stripAssCueText } from '../shared/videoCoreStudy';
+import { isTypesettingCueText, stripAssCueText } from '../shared/videoCoreStudy';
 import { resolveProfileMatch } from '../shared/profileRules';
 import { posCategoryClass } from '../shared/posCategory';
 import { getTokenizer, tokenizeSync, type JpToken } from '../renderer/tokenizer';
@@ -249,9 +249,44 @@ export default function VideoCoreTranscriptPanel({
   const [busyIndex, setBusyIndex] = React.useState<number | null>(null);
   const listRef = React.useRef<HTMLOListElement>(null);
 
-  const rows = React.useMemo(
-    () => cues.map((cue) => ({ cue, text: stripAssCueText(cue.text) })).filter((row) => row.text),
+  /**
+   * Every non-empty cue, each carrying whether it is typesetting rather than speech.
+   *
+   * Classified from the RAW text, before `stripAssCueText` deletes the brace groups the
+   * classifier reads. See `isTypesettingCueText` for the census this is built on.
+   */
+  const allRows = React.useMemo(
+    () => cues
+      .map((cue) => ({
+        cue,
+        text: stripAssCueText(cue.text),
+        typeset: isTypesettingCueText(cue.text),
+      }))
+      .filter((row) => row.text),
     [cues],
+  );
+
+  const typesetCount = React.useMemo(
+    () => allRows.reduce((total, row) => total + (row.typeset ? 1 : 0), 0),
+    [allRows],
+  );
+
+  /*
+    Signs are off by default and the switch only exists on a track that has any.
+
+    A hidden control on an SRT rail would be a lie in the other direction: nothing is being
+    withheld there, because a subtitle format with no override tags flags nothing. On the
+    measured OVA this is 2,626 rows of positioned typesetting against 430 spoken lines — the
+    column a learner scrolls, the text that gets tokenized and mined from, and six times the
+    DOM every band update is paid on.
+  */
+  const [showSigns, setShowSigns] = React.useState(false);
+
+  /** `position` is the row's place in the rail, which is what the bands are measured in. */
+  const rows = React.useMemo(
+    () => (showSigns ? allRows : allRows.filter((row) => !row.typeset))
+      .map((row, position) => ({ ...row, position })),
+    [allRows, showSigns],
   );
 
   /*
@@ -275,6 +310,27 @@ export default function VideoCoreTranscriptPanel({
   const bandAnchorRef = React.useRef<number | null>(null);
   if (activeIndex != null) bandAnchorRef.current = activeIndex;
   const bandAnchor = activeIndex ?? bandAnchorRef.current;
+
+  /*
+    The bands are measured in rail positions, not cue indices, and once signs are filtered
+    those are no longer the same number.
+
+    `rowDistance` calls ±1 `near` and ±4 `mid`. On the measured track 86 % of cues are signs,
+    so consecutive spoken lines sit ~7 cue indices apart — every neighbour would score `far`
+    and the hierarchy S5 landed would collapse to "the active row, and everything else". The
+    scan also answers the case that has no exact hit: the cue on screen may itself be a hidden
+    sign, and then the anchor is the last dialogue line before it, so the rail keeps its place
+    while typesetting plays over the picture. Cues arrive in start order, hence the break.
+  */
+  const anchorPosition = React.useMemo(() => {
+    if (bandAnchor == null) return null;
+    let position: number | null = null;
+    for (const row of rows) {
+      if (row.cue.index > bandAnchor) break;
+      position = row.position;
+    }
+    return position;
+  }, [rows, bandAnchor]);
 
   /*
     Colour-coding the whole track, without a jank spike on open.
@@ -441,6 +497,17 @@ export default function VideoCoreTranscriptPanel({
         <p className="study-transcript-notice" role="status">{trackNotice}</p>
       )}
 
+      {/* A rail shorter than its file says so, with the number. Same treatment as the
+          split notice above because it is the same kind of fact: a withheld result. */}
+      {typesetCount > 0 && !showSigns && (
+        <p className="study-transcript-notice" data-study-notice="signs-hidden" role="status">
+          {t('mediaWorkspace.study.transcriptSignsHidden', {
+            shown: rows.length,
+            hidden: typesetCount,
+          })}
+        </p>
+      )}
+
       {destination && (
         <p className="study-transcript-destination">
           <span className="study-transcript-destination-label">
@@ -471,6 +538,17 @@ export default function VideoCoreTranscriptPanel({
           />
           {t('mediaWorkspace.study.transcriptFollow')}
         </label>
+        {typesetCount > 0 && (
+          <label>
+            <input
+              type="checkbox"
+              checked={showSigns}
+              data-study-action="transcript-show-signs"
+              onChange={(event) => setShowSigns(event.currentTarget.checked)}
+            />
+            {t('mediaWorkspace.study.transcriptShowSigns')}
+          </label>
+        )}
         {/* The way back. Scrolling away suspends following, so without this the only
             route to the playhead is to hunt for it. Shown only when it does something. */}
         {!follow && activeIndex != null && (
@@ -490,9 +568,13 @@ export default function VideoCoreTranscriptPanel({
 
       {visible.length === 0 ? (
         <p className="study-transcript-empty">
+          {/* A track that is nothing but typesetting must not report itself as absent:
+              the cues are there, this panel is hiding them, and the switch is above. */}
           {t(needle
             ? 'mediaWorkspace.study.transcriptNoMatch'
-            : 'mediaWorkspace.study.transcriptEmpty')}
+            : typesetCount > 0
+              ? 'mediaWorkspace.study.transcriptOnlySigns'
+              : 'mediaWorkspace.study.transcriptEmpty')}
         </p>
       ) : (
         // `sa-palette` carries the six category hues, so a noun is the same green
@@ -509,7 +591,7 @@ export default function VideoCoreTranscriptPanel({
               // While filtering, every row is a search result rather than a position in
               // the timeline, so the distance hierarchy is suspended — fading four of
               // six matches would hide the answer the reader is looking at.
-              distance={needle ? 'mid' : rowDistance(row.cue.index, bandAnchor)}
+              distance={needle ? 'mid' : rowDistance(row.position, anchorPosition)}
               busy={busyIndex === row.cue.index}
               onSeek={onSeek}
               onTranslate={handleTranslate}
