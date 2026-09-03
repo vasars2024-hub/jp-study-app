@@ -77,6 +77,25 @@ export function EventModal({
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const isEditing = !!form.id;
 
+  /**
+   * Escape closes. Measured live 2026-09-03: it did not — this modal was a
+   * hand-rolled backdrop with no key handling at all, so a keyboard user who
+   * opened it had to tab to Cancel. Bound on the WINDOW, not the card, because
+   * focus legitimately sits inside a `<select>` or a native date picker, and a
+   * handler on the card only fires while focus is a descendant of it.
+   *
+   * `keydown`, and it does not preventDefault: a native `<select>` popup uses
+   * Escape to close itself first and that must keep working, so this is a
+   * last-resort close rather than an interceptor.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
@@ -109,9 +128,20 @@ export function EventModal({
 
   return (
     <div className="cal-modal-backdrop" onMouseDown={onClose}>
-      <div className="cal-modal" onMouseDown={(e) => e.stopPropagation()}>
+      {/*
+        `role="dialog"` + `aria-modal` + a heading it points at: without them a
+        screen reader announces a generic group and never says the rest of the
+        app is inert. The heading already existed; only the wiring was missing.
+      */}
+      <div
+        className="cal-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cal-modal-title"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="cal-modal-head">
-          <h3>{isEditing ? t('calendar.modal.editEvent') : t('calendar.newEvent')}</h3>
+          <h3 id="cal-modal-title">{isEditing ? t('calendar.modal.editEvent') : t('calendar.newEvent')}</h3>
           <button type="button" className="cbh-icon-btn" onClick={onClose} aria-label={t('common.close')}>
             <Icon name="close" size={15} />
           </button>
