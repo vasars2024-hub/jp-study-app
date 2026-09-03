@@ -122,18 +122,6 @@
     "test-only-module:src/shared/filesApp/notebookAbsorption.ts": {
       "status": "pending",
       "note": "FILES_APP_PLAN.md gate 7's evidence, at a finer grain than routeParity.ts: one row per Notebook STREAM naming the Files enumerator that indexes it and the section that still shows it. Test-only for the same reason and by the same pattern as routeParity.ts above -- shared/__tests__/filesAppNotebookAbsorption.test.ts re-derives the stream vocabulary from renderer/notebookTimeline.ts, the enumerator ids from both registries, the route from AppSection.tsx and every symbol from the named module. Marked 'pending', not 'accepted': its natural app consumer is the same per-item \"also reachable in <section>\" affordance routeParity is waiting on, plus a Files-app diagnostic for the two streams the index cannot see (plan, transcript). When either lands this entry comes out rather than being re-justified."
-    },
-    "orphan-module:src/media/StudyBottomBar.tsx": {
-      "status": "pending",
-      "note": "Last residue of boss-audit finding 1 against 9fa37b59, the build closure that committed product modules ahead of their consumer. That audit reported 15 unclassified identities at HEAD; twelve were closed by wiring real consumers and these three could not be, because their only consumer is VideoCoreStudyOverlay.tsx and that file is mid-rewrite in the shared tree (936 insertions / 662 deletions, uncommitted, owned by the study-workspace track) alongside untracked src/media/studyWorkspace.css. Wiring it here would mean committing another track's in-flight refactor. Pending, not accepted: the bar IS the replacement for .study-control-dock and is meant to render. DO NOT REMOVE THESE THREE ON THE AUDIT'S SAY-SO ALONE -- re-derived 2026-09-02: the shared tree ALREADY reports all three 'no longer occur', because the audit scans the WORKING TREE and reads the uncommitted rewrite's imports. At HEAD there are still zero importers (`git show HEAD:src/media/VideoCoreStudyOverlay.tsx | grep StudyBottomBar` is empty; the only other mentions, useStudyDetach.ts and StudyBlockMenu.tsx, are prose in comments). Removing them therefore turns architectureBaseline.test.ts green in the shared tree and RED at HEAD, and bakes another track's uncommitted refactor into a committed gate. Six consecutive handoffs mis-reported this failure as a stale baseline to clean up. The precondition is `git status --short -- src/media/VideoCoreStudyOverlay.tsx` coming back CLEAN; only then remove all three."
-    },
-    "orphan-module:src/media/StudyDocks.tsx": {
-      "status": "pending",
-      "note": "Same stranded slice as StudyBottomBar.tsx — the dock layout half. It takes a blockId -> element map from the overlay, so the overlay rewrite is the only thing that can import it. Closes with that commit."
-    },
-    "orphan-module:src/media/StudyWorkspaceCustomizer.tsx": {
-      "status": "pending",
-      "note": "Same stranded slice as StudyBottomBar.tsx — the Customize Workspace chrome. It renders null unless the overlay passes `customizing`, so it too has exactly one possible consumer. Closes with that commit."
     }
   }
 }
