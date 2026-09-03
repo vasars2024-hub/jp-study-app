@@ -1747,7 +1747,21 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
           <button className="btn primary" onClick={() => state.openEpubMining('simple')}>
             {t('flash.simpleEpubMining')}
           </button>
-          <button className="btn primary" onClick={state.startReview} disabled={saved.length === 0}>
+          {/*
+            A disabled control has to say what would enable it. Measured 2026-09-03 with
+            `probes/cat8-honest-states.cjs`: on an empty profile this window painted 10 disabled
+            controls and 5 of them carried no explanation anywhere a user or a screen reader
+            could reach — no title, no `aria-describedby`, and nothing but other buttons' captions
+            beside them. The hint is rendered, not just an attribute, because a `title` on a
+            disabled button is not reliably shown at all (pointer events are suppressed), which
+            would have been a fix only the probe could see.
+          */}
+          <button
+            className="btn primary"
+            onClick={state.startReview}
+            disabled={saved.length === 0}
+            aria-describedby={saved.length === 0 ? 'flash-review-dict-blocked' : undefined}
+          >
             {saved.length ? t('flash.reviewDictionaryCount', { count: saved.length }) : t('flash.reviewDictionary')}
           </button>
           {/*
@@ -1774,12 +1788,22 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                   {t('flash.aiCardStudio')}
                 </button>
               )}
-              <button className="btn" onClick={askAgent} disabled={saved.length === 0}>
+              <button
+                className="btn"
+                onClick={askAgent}
+                disabled={saved.length === 0}
+                aria-describedby={saved.length === 0 ? 'flash-review-dict-blocked' : undefined}
+              >
                 {t('flash.askAgent')}
               </button>
             </div>
           </details>
         </div>
+        {saved.length === 0 && (
+          <p className="muted" id="flash-review-dict-blocked">
+            {t('flash.reviewDictionary.blocked')}
+          </p>
+        )}
       </ContextualSurface>
 
       <TranscriptionCardDeckStatus />
@@ -1937,12 +1961,20 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 className="btn"
                 disabled={state.audioCandidateCount === 0 || state.audioBusy}
                 onClick={() => void state.addAudioToReviewPool()}
+                aria-describedby={
+                  state.audioCandidateCount === 0 || state.audioBusy ? 'flash-add-audio-blocked' : undefined
+                }
               >
                 <Icon name="player" size={13} />
                 {state.audioBusy
                   ? t('flash.addingAudio')
                   : t('flash.addAudioToDeck', { count: state.audioCandidateCount })}
               </button>
+              {(state.audioCandidateCount === 0 || state.audioBusy) && (
+                <p className="muted" id="flash-add-audio-blocked">
+                  {state.audioBusy ? t('flash.addAudio.blockedBusy') : t('flash.addAudio.blockedNone')}
+                </p>
+              )}
               {state.audioBusy && (
                 <button
                   type="button"
@@ -1958,11 +1990,19 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
                 className="btn primary"
                 disabled={epubReviewSessionCandidates.length === 0}
                 onClick={state.startEpubReview}
+                aria-describedby={
+                  epubReviewSessionCandidates.length === 0 ? 'flash-start-review-blocked' : undefined
+                }
               >
                 {epubReviewSessionCandidates.length
                   ? t('flash.startReviewCount', { count: epubReviewSessionCandidates.length })
                   : t('flash.startReview')}
               </button>
+              {epubReviewSessionCandidates.length === 0 && (
+                <p className="muted" id="flash-start-review-blocked">
+                  {t('flash.startReview.blocked')}
+                </p>
+              )}
             </div>
             {state.audioError && <p className="flash-audio-error" role="status">{state.audioError}</p>}
           </section>

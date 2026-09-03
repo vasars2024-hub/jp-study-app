@@ -1834,7 +1834,7 @@ different profile). Both halves proven live: the key was deleted, the run was re
 **Running total: 6 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
 `youtube`, `calendar`. Resources is at 4 of 8 and is the next to close.
 
-## 2026-09-03 · primary — Resources — 80/80 — commit `<this commit>`
+## 2026-09-03 · primary — Resources — 80/80 — commit `cefc1b49`
 
 The same four categories, same instruments, same turn, on the other half of the RULE C pair.
 With categories 1–4 from the three entries above, `resources` is the **seventh** of the 25
@@ -1871,3 +1871,39 @@ was valid and its counts are the ones in the table.
 `youtube`, `calendar`, `resources`. **18 left**, of which 17 are scorable in both presentations
 (`visualizer` and `musicwidget` offer no presentation toggle; `city` became scorable at
 `2b5a73cf`).
+
+## 2026-09-03 · primary — Flashcards: category 1 closes at 10/10, category 8 scored to an honest FAIL and then repaired
+
+Not an 80/80 entry. Flashcards was opened as the next surface after the pair above and two of
+its eight categories were driven before the turn ran out; the other six are the next slice.
+It is recorded here rather than in a handoff because one of the two found a real product
+defect and the repair shipped in `8be691be`.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10** | **101** text runs measured, 0 unmeasurable, **0 failing**, min **5.33** (`Check for new voices`, 13.3 px); 47 targets, **0** WCAG 2.5.8 failures — the 24 under 32 px are `input`s whose nearest interactive neighbour is 36 px away, and the smallest painted hit box is **32×32.5** with 0 stolen and 0 occluded; keyboard **47/47 reachable**, 0 focus hosts; motion 15 declarations over the threshold at rest, **0** under emulated `prefers-reduced-motion`, emulation taken and released | 6 axes planted, **all 6 moved** (contrast, targets by pointer, targets by rect, WCAG 2.5.8, keyboard, and the narrowness of the decorative exemption); counts `0,24,0,0,0 → 2,26,2,1,2 → 0,24,0,0`, rect drift 0 |
+| 8 | Honest states | **FAIL, then 10/10 on the repaired build** | raw keys **0**, placeholders **0**, 101 text runs, empty state named in 2 hosts (“Mine cards in EPUB mining to fill this strip.”, “No cards in this view…”) — but **mutePairCount 5 of 10 disabled controls** | control `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline: true` |
+
+**THE FINDING, and it is the reason category 8 exists.** On an empty profile this window paints
+**10** disabled controls. Five of them said nothing at all about what would enable them:
+`Review dictionary`, `Convert 0 scheduled cards now`, `Reset all scheduling`, `Add audio to 0
+cards`, `Start review`. No `title`, no `aria-describedby`, and nothing beside them but other
+buttons' captions — which correction 11 in this harness correctly refuses to read as an
+explanation, because a row of six disabled buttons would otherwise explain each other.
+
+Repaired in `8be691be`: each now points `aria-describedby` at a **rendered** hint that names the
+condition, in en/ja/zh/ru. Rendered rather than a `title`, deliberately — pointer events are
+suppressed on a disabled button, so a `title` there is not reliably shown at all and would have
+been a fix only the probe could see. Re-measured on the live build: **mutePairCount 5 → 0 with
+`disabledTotal` unchanged at 10**. The controls are still correctly disabled; they just say why.
+Pinned by one new case in `schedulingPanel.test.tsx` asserting the *resolved text* of the
+describedby target and its disappearance once a card is scheduled — an `aria-describedby`
+pointing at nothing is the same silence with extra markup — with a mutation control that turned
+it red for the intended reason.
+
+Category 8's `languagesDiffer` bar is still UNMEASURED on this surface: the `--langs` leg needs
+the Settings `ui-language` card painted, and that run is part of the next slice rather than
+something to claim now.
+
+**sampled-out for this bullet:** unchanged from the two entries above, minus `flashcards`.
+**Running total: still 7 of 25 sections at 80/80.** Flashcards is 2 of 8.
