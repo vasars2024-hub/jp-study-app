@@ -47,6 +47,16 @@ describe('Calendar Liquid regions', () => {
     expect(CSS).toContain('min-height: var(--lq-hit-target);');
   });
 
+  it('opens direct date entry without displacing the grid (L7 bullet 970)', () => {
+    // Measured live 2026-09-03: as a flow child the open field wrapped the transport row and
+    // pushed `.cal-month-grid` down 44px for the rest of the task. Anchoring it means the
+    // summary alone decides the row's height, open or closed. If this ever returns to the
+    // flow, the schedule moves out from under a user who reached for the date field.
+    expect(CSS).toContain('.cal-context-toolbar .cal-date-tools[open] > .cal-jump {');
+    expect(CSS).toContain('position: absolute;');
+    expect(CSS).toContain('.cal-context-toolbar .cal-date-tools[open] {\n  align-items: center;');
+  });
+
   it('raises the transport controls to the shared pointer floor', () => {
     // Measured from the existing rules: the mode chips are 5px/12px on a 12px face and the
     // date jump 3px/6px, both about 24px against a 32px bar.

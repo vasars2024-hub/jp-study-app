@@ -50,6 +50,28 @@
   align-items: center;
   display: flex;
   gap: var(--lq-space-2);
+  position: relative;
+}
+
+/* L7 bullet 970, "keep review/input surfaces spatially fixed during active tasks".
+ *
+ * Measured 2026-09-03, not assumed: opening this disclosure wrapped the transport row and
+ * pushed `.cal-month-grid` down 44px, where it stayed for the whole rest of the task -- the
+ * schedule a user was reading slid out from under them because they reached for the date
+ * field. The instrument's control planted 9px and read back exactly 9px, so the 44 is the
+ * surface's and not the reader's.
+ *
+ * The date jump is scheduling DETAIL, which bullet 971 sanctions as an overlay; it was never
+ * a reason to move the grid. Anchoring it over the toolbar keeps the row's height constant,
+ * so the summary alone decides the toolbar's height whether the field is open or closed.
+ * `.cal-context-toolbar` and `.cal-nav` are both `overflow: visible` (read live), so nothing
+ * clips it. The field keeps its own `min-height` hit target from the rule above. */
+.cal-context-toolbar .cal-date-tools[open] > .cal-jump {
+  position: absolute;
+  top: calc(100% + var(--lq-space-2));
+  right: 0;
+  z-index: 6;
+  box-shadow: var(--lq-liquid-shadow);
 }
 
 /* Reflow against the floating Calendar window, not the desktop viewport. `.cal-header-label`
