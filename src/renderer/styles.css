@@ -4117,7 +4117,17 @@ details.watch-bar[open] .watch-summary::after {
 }
 .watch-label {
   flex: 1;
-  min-width: 200px;
+  /*
+   * 0, not 200px. The 200px floor is left over from when `.watch-bar` was a
+   * single flex ROW and this label shared it with the action buttons, so it had
+   * to reserve room for itself. `details.watch-bar` is `display: block` now and
+   * `.watch-actions` has its own line, so the label already owns the width and
+   * the reservation only stops the bar shrinking. At a 260px window the floor
+   * made `.fwin-body` 273px of content inside a 248px box whose `overflow-x` is
+   * `hidden` -- 25px of the Library silently unreachable, and the only failing
+   * bar in rubric category 4. The label wraps instead; `code` already breaks.
+   */
+  min-width: 0;
   font-size: 13px;
 }
 .watch-label code {
