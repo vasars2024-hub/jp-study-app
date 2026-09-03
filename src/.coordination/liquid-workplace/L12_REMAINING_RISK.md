@@ -3,9 +3,9 @@
 GENERATED, not written. Re-run `node src/.coordination/liquid-workplace/probes/l12-risk-register.cjs --control`
 rather than editing this file; a hand-edit is a claim with no measurement behind it.
 
-Branch `feat/nyaa-subtitles` at `871cb8b4`, 2026-09-03T08:34:35.505Z.
+Branch `feat/nyaa-subtitles` at `4889a563`, 2026-09-03T08:46:25.657Z.
 
-**4 of 9 risks open** (2 high, 5 closed, 0 unmeasured).
+**3 of 9 risks open** (1 high, 6 closed, 0 unmeasured).
 
 | id | sev | state | risk |
 | --- | --- | --- | --- |
@@ -17,7 +17,7 @@ Branch `feat/nyaa-subtitles` at `871cb8b4`, 2026-09-03T08:34:35.505Z.
 | R6 | HIGH | CLOSED | The visual atlas is not certification evidence |
 | R7 | LOW | CLOSED | The packaging stage has never completed in this tree |
 | R8 | HIGH | OPEN | The repo's own gates are not green at this HEAD |
-| R9 | HIGH | OPEN | Banked visual evidence has no per-run namespace, so a re-run overwrites it |
+| R9 | HIGH | CLOSED | Banked visual evidence has no per-run namespace, so a re-run overwrites it |
 
 ### R1 — Runtime blobs the app loads from public/ are not in git
 
@@ -224,11 +224,11 @@ What would close it: Each red identity fixed or hunk-scope committed by its owne
 
 ### R9 — Banked visual evidence has no per-run namespace, so a re-run overwrites it
 
-**HIGH · OPEN**
+**HIGH · CLOSED**
 
-Why it matters: Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.
+Why it matters: Every certification artifact here is a JSON index over gitignored binaries. A plate was named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs wrote the same path and the later one destroyed the earlier image while its manifest kept asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates hash to the tries40 run's recorded values. The harm is the last clause, not the collision: the wall of pictures a reader is shown is then not the wall the verdict was computed from, AND NOTHING IN THE JSON SAYS SO.
 
-What would close it: l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.
+What would close it: Three things, and the verdict now measures all three rather than counting historical path overlap — a banked manifest is evidence and will not be rewritten to make a gate green, so the old count could only ever report the calendar. (1) PROSPECTIVE: l12-visual-matrix.cjs writes plates under a per-run directory, so no future run can collide — landed at its SHOT_DIR/RUN_ID, and cross-checked here against every manifest that carries a runId. (2) RETROSPECTIVE: where a collision already happened, the artifacts must SAY so; disk names the surviving run, and each loser's damage must be declared by an atlas that indexes the path, either by reporting integrity.mismatch and refusing to certify or by recording the loser as superseded. (3) LOAD-BEARING: the newest atlas — the one the current verdict rests on — must itself show no mismatch and nothing missing. An undisclosed or unadjudicable collision keeps this open.
 
 ```json
 {
@@ -237,35 +237,38 @@ What would close it: l12-visual-matrix.cjs writing plates under a per-run direct
   "declaredPlatePaths": 2604,
   "pathsClaimedByMoreThanOneRun": 22,
   "pathsWhereRunsRecordDifferentBytes": 21,
-  "examples": [
-    {
-      "file": "debug/shots/l12-matrix/agent__liquid__oled-black__normal.png",
-      "runs": [
-        "l12-matrix-normal.json",
-        "l12-matrix-tries40.json"
-      ]
-    },
-    {
-      "file": "debug/shots/l12-matrix/library__liquid__oled-black__normal.png",
-      "runs": [
-        "l12-matrix-normal.json",
-        "l12-matrix-tries40.json"
-      ]
-    },
-    {
-      "file": "debug/shots/l12-matrix/novels__liquid__oled-black__normal.png",
-      "runs": [
-        "l12-matrix-normal.json",
-        "l12-matrix-tries40.json"
-      ]
-    },
-    {
-      "file": "debug/shots/l12-matrix/dictionary__liquid__oled-black__normal.png",
-      "runs": [
-        "l12-matrix-normal.json",
-        "l12-matrix-tries40.json"
-      ]
-    }
-  ]
-}
+  "generator": {
+    "file": "src/.coordination/liquid-workplace/probes/l12-visual-matrix.cjs",
+    "derivesShotDirFromRunId": true,
+    "runIdDefaultIsUnique": true,
+    "manifestsCarryingARunId": 6,
+    "distinctRunIds": 6,
+    "flatPlatePathsUnderARunId": 0,
+    "namespaced": true
+  },
+  "disclosure": {
+    "atlasesRead": [
+      "l12-atlas-final-v2.json",
+      "l12-atlas-final.json",
+      "l12-atlas.json"
+    ],
+    "contested": 21,
+    "disclosed": 21,
+    "noLoss": 0,
+    "silent": 0,
+    "unverifiable": 0,
+    "routes": [
+      "l12-atlas.json#integrity-mismatch"
+    ],
+    "routesNotExercised": [
+      "superseded"
+    ]
+  },
+  "certifying": {
+    "file": "l12-atlas-final-v2.json",
+    "certifiable": true,
+    "integrity": {
+      "verified": 1209,
+      "missing": 0,
+      "mismatch": 0,
 ```

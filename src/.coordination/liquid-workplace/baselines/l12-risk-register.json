@@ -1,15 +1,15 @@
 {
   "schema": "l12-risk-register/v1",
   "bullet": "L12 bullet 4 — remaining-risk report",
-  "generatedAt": "2026-09-03T08:34:35.505Z",
-  "head": "871cb8b4",
+  "generatedAt": "2026-09-03T08:46:25.657Z",
+  "head": "4889a563",
   "branch": "feat/nyaa-subtitles",
   "totals": {
     "risks": 9,
-    "open": 4,
-    "closed": 5,
+    "open": 3,
+    "closed": 6,
     "unmeasured": 0,
-    "highOpen": 2
+    "highOpen": 1
   },
   "risks": [
     {
@@ -221,46 +221,101 @@
       "id": "R9",
       "title": "Banked visual evidence has no per-run namespace, so a re-run overwrites it",
       "severity": "high",
-      "state": "open",
+      "state": "closed",
       "measurement": {
         "available": true,
         "manifests": 9,
         "declaredPlatePaths": 2604,
         "pathsClaimedByMoreThanOneRun": 22,
         "pathsWhereRunsRecordDifferentBytes": 21,
+        "generator": {
+          "file": "src/.coordination/liquid-workplace/probes/l12-visual-matrix.cjs",
+          "derivesShotDirFromRunId": true,
+          "runIdDefaultIsUnique": true,
+          "manifestsCarryingARunId": 6,
+          "distinctRunIds": 6,
+          "flatPlatePathsUnderARunId": 0,
+          "namespaced": true
+        },
+        "disclosure": {
+          "atlasesRead": [
+            "l12-atlas-final-v2.json",
+            "l12-atlas-final.json",
+            "l12-atlas.json"
+          ],
+          "contested": 21,
+          "disclosed": 21,
+          "noLoss": 0,
+          "silent": 0,
+          "unverifiable": 0,
+          "routes": [
+            "l12-atlas.json#integrity-mismatch"
+          ],
+          "routesNotExercised": [
+            "superseded"
+          ]
+        },
+        "certifying": {
+          "file": "l12-atlas-final-v2.json",
+          "certifiable": true,
+          "integrity": {
+            "verified": 1209,
+            "missing": 0,
+            "mismatch": 0,
+            "state": "all-present"
+          },
+          "evidenceIntact": true
+        },
+        "silentCollisions": [],
         "examples": [
           {
             "file": "debug/shots/l12-matrix/agent__liquid__oled-black__normal.png",
-            "runs": [
-              "l12-matrix-normal.json",
-              "l12-matrix-tries40.json"
+            "survivor": "l12-matrix-tries40.json",
+            "losers": [
+              "l12-matrix-normal.json"
+            ],
+            "verdict": "disclosed",
+            "disclosedBy": [
+              "l12-atlas.json#integrity-mismatch"
             ]
           },
           {
             "file": "debug/shots/l12-matrix/library__liquid__oled-black__normal.png",
-            "runs": [
-              "l12-matrix-normal.json",
-              "l12-matrix-tries40.json"
+            "survivor": "l12-matrix-tries40.json",
+            "losers": [
+              "l12-matrix-normal.json"
+            ],
+            "verdict": "disclosed",
+            "disclosedBy": [
+              "l12-atlas.json#integrity-mismatch"
             ]
           },
           {
             "file": "debug/shots/l12-matrix/novels__liquid__oled-black__normal.png",
-            "runs": [
-              "l12-matrix-normal.json",
-              "l12-matrix-tries40.json"
+            "survivor": "l12-matrix-tries40.json",
+            "losers": [
+              "l12-matrix-normal.json"
+            ],
+            "verdict": "disclosed",
+            "disclosedBy": [
+              "l12-atlas.json#integrity-mismatch"
             ]
           },
           {
             "file": "debug/shots/l12-matrix/dictionary__liquid__oled-black__normal.png",
-            "runs": [
-              "l12-matrix-normal.json",
-              "l12-matrix-tries40.json"
+            "survivor": "l12-matrix-tries40.json",
+            "losers": [
+              "l12-matrix-normal.json"
+            ],
+            "verdict": "disclosed",
+            "disclosedBy": [
+              "l12-atlas.json#integrity-mismatch"
             ]
           }
         ]
       },
-      "whyItMatters": "Every certification artifact here is a JSON index over gitignored binaries. A plate is named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs write the same path and the later one destroys the earlier image while its manifest keeps asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates now hash to the tries40 run's recorded values. The wall of pictures a reader is shown is then not the wall the verdict was computed from, and nothing in the JSON says so.",
-      "whatWouldCloseIt": "l12-visual-matrix.cjs writing plates under a per-run directory (a run id or the manifest's own generatedAt), so no two runs can share a path. That file is bullet 1's and another worker's, so this is reported rather than repaired.",
+      "whyItMatters": "Every certification artifact here is a JSON index over gitignored binaries. A plate was named app__presentation__theme__state.png with nothing identifying the run, so two overlapping runs wrote the same path and the later one destroyed the earlier image while its manifest kept asserting a hash. Measured live: 21 of the 650-cell run's oled-black plates hash to the tries40 run's recorded values. The harm is the last clause, not the collision: the wall of pictures a reader is shown is then not the wall the verdict was computed from, AND NOTHING IN THE JSON SAYS SO.",
+      "whatWouldCloseIt": "Three things, and the verdict now measures all three rather than counting historical path overlap — a banked manifest is evidence and will not be rewritten to make a gate green, so the old count could only ever report the calendar. (1) PROSPECTIVE: l12-visual-matrix.cjs writes plates under a per-run directory, so no future run can collide — landed at its SHOT_DIR/RUN_ID, and cross-checked here against every manifest that carries a runId. (2) RETROSPECTIVE: where a collision already happened, the artifacts must SAY so; disk names the surviving run, and each loser's damage must be declared by an atlas that indexes the path, either by reporting integrity.mismatch and refusing to certify or by recording the loser as superseded. (3) LOAD-BEARING: the newest atlas — the one the current verdict rests on — must itself show no mismatch and nothing missing. An undisclosed or unadjudicable collision keeps this open.",
       "falsified": false
     }
   ],
@@ -298,11 +353,24 @@
       "pass": true
     },
     "r9": {
-      "kind": "plant-a-colliding-plate-path/R9-must-report-one-more-destructive-collision",
+      "kind": "plant-a-colliding-plate-path/R9-must-report-one-more-UNDISCLOSED-collision",
       "base": 21,
       "mutated": 22,
       "restored": 21,
+      "baseSilent": 0,
+      "mutatedSilent": 1,
+      "restoredSilent": 0,
       "teardownVerified": true,
+      "pass": true
+    },
+    "r9disclosure": {
+      "kind": "run-the-disclosure-predicate-against-an-empty-atlas-set/every-contested-path-must-read-silent",
+      "contested": 21,
+      "silentWhenNothingDeclaresIt": 21,
+      "disclosedInReality": 21,
+      "routesInReality": [
+        "l12-atlas.json#integrity-mismatch"
+      ],
       "pass": true
     },
     "unfalsified": [
@@ -313,7 +381,7 @@
     ],
     "unfalsifiedWhy": "R7 would require changing an OS setting to plant a violation; R5 and R6 are pass-throughs of another instrument’s own verdict and are falsified there, not here. R1 LEFT THIS LIST 2026-09-03: its remedy became a gate with a testable shape, so each reason to close can be removed from the measurement in memory and the verdict must reopen — no tree damage needed, which was the only reason it was here.",
     "summary": {
-      "fired": 5,
+      "fired": 6,
       "failed": 0
     }
   }
