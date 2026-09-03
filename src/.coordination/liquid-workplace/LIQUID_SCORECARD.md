@@ -1575,3 +1575,53 @@ Evidence: `baselines/cat7-video-perf.json`.
 states); cat 7 here. Dictionary is 80/80 at `c97b864d`. **Gate 495 — "the layout studies score
 80/80 against Video and Dictionary" — is CLOSED on both named surfaces**, so L1's four bullets
 close with it.
+
+## 2026-09-03 · primary — THE PLAN IS NOT FINISHED. **5 of 25 surfaces at 80/80**, and the other 20 have no entry at all
+
+The previous handoff asked this turn to settle whether the Liquid plan is finished, since all
+**52 timeline bullets** are closed (`grep -oE 'status: (closed|open|unknown)'` at `e5905467` →
+52 closed / 0 open / 0 unknown). **Bullets closed is not the plan's gate.** §12 "Definition of
+done" is, and it names the scorecard directly: *"every migrated surface holds a committed 80/80
+scorecard in `LIQUID_SCORECARD.md`"* and, first bullet, *"every current desktop app and
+supported internal suite has a rubric-approved (80/80) standard and Liquid presentation"*.
+
+**Method, so the next worker can re-run it rather than quote me.** Denominator: the 25 members
+of `DESKTOP_WIN_SECTIONS` (`src/shared/desktop.ts:23`), read out of the source, not counted by
+hand. Numerator: for each section, every `^## ` heading in this file that names it (with the
+aliases the entries actually use — `Game Arena`→`games`, `Statistics`→`stats`), resolved by its
+**LAST** heading, because this file is append-only and a surface scored 40/80 early and 80/80
+later reads as both. The raw `X/80` histogram is not the answer and misleads: 23 `80/80`
+mentions across 1,577 lines, but most are prose inside per-category entries, and `79/80` is the
+rubric's own sentence about what does not count as a pass.
+
+| resolved by last heading | sections |
+| - | - |
+| **80/80** (5) | `dictionary` (L1331, `70626d66`), `video` (L1507, `e54cdd9d`), `games` (L707, `b6e55253`), `settings` (L925), `youtube` (L1285) |
+| **no entry at all** (20) | `agent` `library` `novels` `grammar` `translate` `player` `music` `anki` `flashcards` `stats` `resources` `note` `visualizer` `musicwidget` `city` `immersion` `calendar` `reading` `scraper` `files` |
+
+Zero sections resolve to a partial score — a section either finished 80/80 or was never opened.
+So the shortfall is not repair work on scored surfaces; it is **20 unscored surfaces**.
+
+**Two corrections to what a reader of this file would otherwise conclude.**
+
+1. **`games` really is 80/80, despite the plan saying otherwise in two places.**
+   `LIQUID_WORKPLACE_TRANSFORMATION_PLAN.md` carries *"Finding 2026-08-28 (Games category 4) —
+   stays 30/80"* and *"Progress 2026-08-28 (Games category 4, compact half) — stays 30/80"*.
+   Both are **superseded, not contradictory**: `b6e55253` is dated 2026-08-28 **19:40:53 -0400**
+   and closes category 4 at 10/10 with the injected-clip control moving 0→1→0. The plan is a
+   chronological LOG, so the same surface reads 30/80 earlier in the file and 80/80 later. Do
+   not reopen Games on the strength of those two paragraphs.
+
+2. **`visualizer`, `musicwidget` and `city` cannot reach 80/80 in the shape the other 22 did,
+   and that is already a measured product fact rather than a gap.** L12's certification matrix
+   (`l12-matrix-normal.json`) records all 39 of its uncaptured cells as exactly these three
+   sections × 13 themes × liquid, because **they offer no presentation toggle of their own** —
+   so "standard AND Liquid presentation", §12's first bullet, has no second half to score on
+   them. `city` has since become the fifth Liquid host (`2b5a73cf`), which moves it into the
+   scorable set and leaves **two**. Whoever scores them must either score the standard
+   presentation alone and say so in the entry, or record the missing toggle as the finding —
+   **not** silently score 8 categories on one presentation and call it 80/80.
+
+**So the honest denominator for the remaining work is 20 surfaces, of which 18 are scorable in
+both presentations today.** That is the remaining Liquid work, and it is stated here rather than
+in a handoff so it survives the next hop.
