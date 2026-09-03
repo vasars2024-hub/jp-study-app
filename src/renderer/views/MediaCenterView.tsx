@@ -888,14 +888,10 @@ function VideoPanel({
               <strong>{t('mediaCenter.video.workspacePlayerTitle')}</strong>
               <p>{t('mediaCenter.video.workspacePlayerDetail')}</p>
               <div>
-                {/* Accent only when a source is loaded, because only then is this the dominant
-                    task. With no source this role="status" block renders INTO THE SAME grid
-                    cell as "Choose what to watch" (both land at grid-area 1/1), and that block
-                    carries the up-next shelf, so the cell is 1051px inside a 665px body. This
-                    button then centres at y=807 — below the fold, reachable only by scrolling
-                    .mc-content — while the block that owns the empty state's real action sits
-                    at y=402. A status region must not hold the page's accent over the action
-                    the user actually came for. Measured both ways at 1080x700. */}
+                {/* Accent only with a source: without one this status block shares grid-area
+                    1/1 with "Choose what to watch", whose up-next shelf makes the cell 1051px
+                    in a 665px body, dropping this button to y=807 — below the fold — while
+                    that block's own action sits at y=402. See LIQUID_SCORECARD 2026-09-03. */}
                 <button
                   type="button"
                   className={state.src ? 'mc-button mc-button-primary' : 'mc-button'}
