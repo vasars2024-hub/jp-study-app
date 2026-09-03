@@ -154,6 +154,31 @@ const CHURN = arg('churn', '');
 // Long enough that a once-a-second clock is certain to tick inside the window.
 const IDLE_MS = Number(arg('idle', '1600')) || 1600;
 const SETTLE = Number(arg('settle', '600')) || 600;
+/*
+ * L7 BULLET 970 — "Keep review/input surfaces spatially fixed during active tasks."
+ *
+ * ADDITIVE AND OPT-IN. `--fixity` names the review/input regions of this surface as a CSS
+ * selector list; without it nothing below runs and a cat2 score is byte-identical to every
+ * banked one. It deliberately does NOT feed cat2's ten points: the bullet is a separate
+ * contract, and folding it in would silently re-score six surfaces that were certified
+ * before it existed.
+ *
+ * The measurement is the bullet's own words and nothing else: sample each named region's
+ * box at rest, then after EVERY step of the surface's own dominant task, and report the
+ * worst movement. `dx`/`dy` are measured ROOT-RELATIVE so a window that is dragged is not
+ * billed to the surface; `rootDx`/`rootDy` are reported beside them so the two can never
+ * silently disagree. A region that UNMOUNTS mid-task is a stronger failure than one that
+ * moves and is counted separately (`vanished`) rather than skipped.
+ *
+ * `--fixity-control` is the required falsification: plant `position:relative; top:9px` on
+ * the first region between two samples and require the instrument to report >= 9px, then
+ * restore the EXACT original style attribute and require 0px again. The plant is verified
+ * to have applied by reading the used box back — a mutation control that silently no-ops
+ * reads as a PASS, which is a recorded false result in this repo.
+ */
+const FIXITY = arg('fixity', '');
+const FIXITY_CONTROL = has('fixity-control');
+const FIXITY_BAR_PX = Number(arg('fixity-bar', '0'));
 
 if (!SURFACE) {
   console.error('REFUSE - --surface is required; this harness names no surface of its own');
@@ -194,6 +219,74 @@ const rootExpr = (surface) => (surface.startsWith('@')
        var t = w.querySelector('.fwin-title-text, .fwin-title');
        return !!t && (t.textContent || '').indexOf(${JSON.stringify(surface)}) >= 0;
      })[0]`);
+
+/* ------------------------------------------------------- in-page: bullet 970 */
+
+/**
+ * One spatial sample of every named review/input region. Root-relative by construction, with
+ * the root's own viewport box carried alongside so a moved WINDOW is distinguishable from a
+ * moved REGION rather than assumed away.
+ *
+ * `present:false` is recorded, never dropped: a region that unmounts during the task has not
+ * stayed fixed, and a reader that only diffed the regions it found on both ends would score
+ * that as clean.
+ */
+const FIXITY_READ = (surface, sel) => `(function(){
+  var root = ${rootExpr(surface)};
+  if (!root) return JSON.stringify({ rootGone: true });
+  var RR = root.getBoundingClientRect();
+  if (!RR.width || !RR.height) return JSON.stringify({ refuse: 'surface is 0x0 - refusing to record zeros' });
+  var r2 = function(n){ return Math.round(n * 100) / 100; };
+  var out = ${JSON.stringify(sel)}.split(',').map(function(raw){
+    var s = raw.trim();
+    if (!s) return null;
+    var all = [].slice.call(root.querySelectorAll(s));
+    var el = all[0];
+    if (!el) return { sel: s, present: false, matches: 0 };
+    var b = el.getBoundingClientRect();
+    return {
+      sel: s,
+      present: true,
+      matches: all.length,
+      x: r2(b.left - RR.left), y: r2(b.top - RR.top),
+      w: r2(b.width), h: r2(b.height),
+      vx: r2(b.left), vy: r2(b.top),
+    };
+  }).filter(Boolean);
+  return JSON.stringify({ root: { x: r2(RR.left), y: r2(RR.top), w: r2(RR.width), h: r2(RR.height) }, regions: out })
+})()`;
+
+/**
+ * The negative control's plant and its exact restore. `was` is the ORIGINAL style ATTRIBUTE
+ * (null when the element carried none), so restoring cannot leave an empty `style=""` behind —
+ * 381 empty style attributes is a residue this repo has already shipped and had to withdraw.
+ */
+const FIXITY_PLANT = (surface, sel, on) => `(function(){
+  var root = ${rootExpr(surface)};
+  if (!root) return JSON.stringify({ refuse: 'root gone' });
+  var el = root.querySelector(${JSON.stringify(sel)});
+  if (!el) return JSON.stringify({ refuse: 'region not found: ' + ${JSON.stringify(sel)} });
+  var before = el.getBoundingClientRect().top;
+  if (${on ? 'true' : 'false'}) {
+    if (!el.hasAttribute('data-lq970-was')) {
+      el.setAttribute('data-lq970-was', el.getAttribute('style') === null ? '@@lq970-absent@@' : el.getAttribute('style'));
+    }
+    el.style.position = 'relative';
+    el.style.top = '9px';
+  } else {
+    var was = el.getAttribute('data-lq970-was');
+    el.removeAttribute('data-lq970-was');
+    if (was === null || was === '@@lq970-absent@@') el.removeAttribute('style');
+    else el.setAttribute('style', was);
+  }
+  var after = el.getBoundingClientRect().top;
+  return JSON.stringify({
+    applied: Math.round((after - before) * 100) / 100,
+    was: el.getAttribute('data-lq970-was'),
+    styleAttr: el.getAttribute('style'),
+    residueAttr: el.hasAttribute('data-lq970-was'),
+  })
+})()`;
 
 /* ------------------------------------------------------------------ in-page */
 
@@ -818,9 +911,75 @@ async function driveStep(surface, step, before) {
   return { ...out, refuse: `unknown step kind: ${kind}` };
 }
 
+/**
+ * Bullet 970 samples only on the surface under test, and only when `--fixity` named regions.
+ * The compare surface and the undo leg are deliberately excluded: the undo is UNMEASURED by
+ * construction (correction 13) and billing its restore steps as task movement would make every
+ * surface that returns to base look like it shifted.
+ */
+const fixityFor = (surface) => (FIXITY && surface === SURFACE ? FIXITY : '');
+const r2 = (n) => Math.round(n * 100) / 100;
+
+async function sampleFixity(surface, sel, phase) {
+  const s = JSON.parse(await ev(FIXITY_READ(surface, sel)));
+  return { phase, ...s };
+}
+
+/**
+ * The bullet's number, computed here rather than left for a reader to interpret. `dx`/`dy` are
+ * the WORST movement of each region across every sample, root-relative; `rootDx`/`rootDy` say
+ * whether the window itself moved, so a clean region inside a moved window cannot read as fixed.
+ */
+function rollUpFixity(samples) {
+  if (!samples || samples.length < 2) return { refuse: 'fewer than two samples; nothing to compare' };
+  const base = samples[0];
+  if (base.rootGone || base.refuse) return { refuse: base.refuse || 'root gone at rest' };
+  let vanished = 0;
+  let ambiguous = 0;
+  let rootDx = 0;
+  let rootDy = 0;
+  const regions = base.regions.map((b, i) => {
+    if (!b.present) { vanished += 1; return { sel: b.sel, absentAtRest: true }; }
+    if (b.matches > 1) ambiguous += 1;
+    let dx = 0; let dy = 0; let dw = 0; let dh = 0; let gone = null;
+    for (const s of samples.slice(1)) {
+      if (s.rootGone || s.refuse) { gone = s.refuse || 'root gone'; break; }
+      const c = s.regions[i];
+      if (!c || !c.present) { gone = `unmounted after step "${s.phase}"`; break; }
+      dx = Math.max(dx, Math.abs(c.x - b.x));
+      dy = Math.max(dy, Math.abs(c.y - b.y));
+      dw = Math.max(dw, Math.abs(c.w - b.w));
+      dh = Math.max(dh, Math.abs(c.h - b.h));
+    }
+    if (gone) vanished += 1;
+    return { sel: b.sel, matches: b.matches, dx: r2(dx), dy: r2(dy), dw: r2(dw), dh: r2(dh), vanished: gone };
+  });
+  for (const s of samples.slice(1)) {
+    if (s.rootGone || s.refuse || !s.root) continue;
+    rootDx = Math.max(rootDx, Math.abs(s.root.x - base.root.x));
+    rootDy = Math.max(rootDy, Math.abs(s.root.y - base.root.y));
+  }
+  const moved = regions.filter((r) => !r.absentAtRest && Math.max(r.dx || 0, r.dy || 0) > FIXITY_BAR_PX);
+  return {
+    barPx: FIXITY_BAR_PX,
+    samples: samples.length,
+    phases: samples.map((s) => s.phase),
+    regions,
+    ambiguousSelectors: ambiguous,
+    vanished,
+    rootDx: r2(rootDx),
+    rootDy: r2(rootDy),
+    maxShiftPx: r2(Math.max(0, ...regions.map((r) => Math.max(r.dx || 0, r.dy || 0)))),
+    spatiallyFixed: vanished === 0 && moved.length === 0 && r2(rootDx) === 0 && r2(rootDy) === 0,
+    movedRegions: moved,
+  };
+}
+
 async function runTask(surface, spec) {
   const steps = parseSteps(spec);
   const results = [];
+  const fsel = fixityFor(surface);
+  const fixity = fsel ? [await sampleFixity(surface, fsel, 'rest')] : null;
   let before = await snapOf(surface);
   if (before.refuse) return { refuse: before.refuse };
   for (const step of steps) {
@@ -852,10 +1011,11 @@ async function runTask(surface, spec) {
        */
       deadEnd: r.counted === true && r.moved.any === false && r.caretOnly !== true,
     });
+    if (fixity) fixity.push(await sampleFixity(surface, fsel, r.step));
     if (r.moved.rootGone) { before = r.after; break; }
     before = r.after;
   }
-  return { steps: results, last: before };
+  return { steps: results, last: before, fixity };
 }
 
 /**
@@ -1004,6 +1164,10 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     cost,
     endHash: end.textHash,
     baseHash: base.textHash,
+    // L7 bullet 970. `null` whenever `--fixity` named nothing, so every banked cat2 file that
+    // predates this leg stays comparable field for field.
+    fixity: task.fixity ? rollUpFixity(task.fixity) : null,
+    fixitySamples: task.fixity || null,
   };
 }
 
@@ -1030,6 +1194,49 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     console.error(`VOID - --churn "${CHURN}" excluded regions that never changed on their own in `
       + `either idle phase; an unearned exclusion widens the pass band: ${JSON.stringify(m.idle)}`);
     process.exit(3);
+  }
+
+  /*
+   * BULLET 970's NEGATIVE CONTROL. Runs after the measurement it must falsify, in the same
+   * process, and restores what it planted. Three assertions, all of which VOID rather than
+   * quietly score, because each has a recorded false-pass shape behind it:
+   *   applied  — the plant really moved the used box (a no-op plant reads as a clean PASS);
+   *   detected — the INSTRUMENT saw the movement (a plant the reader cannot see is not a control);
+   *   restored — the region is back at its exact rest offset with no residue.
+   */
+  let fixityControl = null;
+  if (FIXITY && FIXITY_CONTROL) {
+    const target = FIXITY.split(',')[0].trim();
+    const a = await sampleFixity(SURFACE, FIXITY, 'control-before');
+    const plant = JSON.parse(await ev(FIXITY_PLANT(SURFACE, target, true)));
+    await sleep(SETTLE);
+    const b = await sampleFixity(SURFACE, FIXITY, 'control-planted');
+    const unplant = JSON.parse(await ev(FIXITY_PLANT(SURFACE, target, false)));
+    await sleep(SETTLE);
+    const c = await sampleFixity(SURFACE, FIXITY, 'control-restored');
+    const at = (s) => (s.regions || []).find((r) => r.sel === target) || {};
+    const detected = r2(Math.abs((at(b).y ?? 0) - (at(a).y ?? 0)));
+    const residue = r2(Math.abs((at(c).y ?? 0) - (at(a).y ?? 0)));
+    const wantAttr = plant.was === '@@lq970-absent@@' ? null : plant.was;
+    fixityControl = {
+      target,
+      appliedPx: plant.applied,
+      detectedPx: detected,
+      residuePx: residue,
+      styleAttrAtRest: wantAttr,
+      styleAttrAfterRestore: unplant.styleAttr,
+      markerLeftBehind: unplant.residueAttr === true,
+      readerSaw: rollUpFixity([a, b]),
+      passes: plant.applied >= 9
+        && detected >= 9
+        && residue === 0
+        && unplant.styleAttr === wantAttr
+        && unplant.residueAttr !== true,
+    };
+    if (!fixityControl.passes) {
+      console.error(`VOID - bullet 970 control did not falsify and restore: ${JSON.stringify(fixityControl)}`);
+      process.exit(3);
+    }
   }
 
   // Correction 9: the second term is read factually and never invented.
@@ -1158,6 +1365,18 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
       ? { compare: COMPARE, thisTotal: m.cost.clicks + m.cost.keystrokes, comparePresentation: compare.presentation, compareTotal: compare.cost.clicks + compare.cost.keystrokes }
       : (presentationLeg || singlePathEvidence || costParity),
     bars,
+    // L7 bullet 970, reported BESIDE the ten points and never folded into them. `null` when
+    // --fixity named nothing.
+    spatialFixity: m.fixity,
+    spatialFixitySamples: m.fixitySamples,
+    spatialFixityControl: fixityControl,
+    spatialFixityVerdict: m.fixity
+      ? (m.fixity.refuse
+        ? `REFUSE - ${m.fixity.refuse}`
+        : (fixityControl
+          ? (m.fixity.spatiallyFixed ? 'FIXED - controlled' : 'MOVED - controlled')
+          : (m.fixity.spatiallyFixed ? 'FIXED - UNCONTROLLED, run --fixity-control' : 'MOVED - uncontrolled')))
+      : null,
     verdict: pass
       ? 'PASS 10/10'
       : (failed.length === 0
