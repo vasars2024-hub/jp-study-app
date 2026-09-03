@@ -7,7 +7,7 @@
  * form. Both shells now compose these, so Blanc never mounts `CalendarView`.
  * Nothing here may import `AppChrome`/`MenuBar`/`StatusBar`.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Icon from '../Icons';
 import { AnchorSurface, ContextualSurface } from '../liquid/LiquidSurface';
 import './calendarLiquid.css';
@@ -424,6 +424,132 @@ export function CalendarNav({ state }: { state: CalendarState }) {
   );
 }
 
+/**
+ * The month grid, as a real `role="grid"` rather than 42 inert divs.
+ *
+ * Measured 2026-09-03 by the category-1 harness: every month cell carried
+ * `onDoubleClick={() => openNew(key)}` on a bare `<div>` with no role, no
+ * `tabIndex`, no key handler and `cursor: auto`. Creating an event ON A CHOSEN
+ * DAY was therefore double-click-only, and the harness could not even see the
+ * affordance — it enumerates `button,a,input,select,[tabindex]`, so the surface
+ * scored a clean 13/13 reachable while a gesture-only control sat in 42 cells.
+ * Week and Day modes already ship a real `cal-add-inline` / `calendar.addEvent`
+ * button for the same action; Month was the one mode without a keyboard route to
+ * a specific day. (The toolbar's "New event" is reachable, so the feature was
+ * never unreachable — what was missing is the per-day entry, which is the whole
+ * point of clicking a day.)
+ *
+ * ONE tab stop, not 42. The pattern is the repo's own — `DeckWorkbenchBrowser`'s
+ * `role="grid" tabIndex={0}` with `aria-activedescendant` and a container
+ * `onKeyDown` — because making each of 42 cells focusable would trade an
+ * accessibility failure for a clunkiness one (rubric category 2 counts keystrokes
+ * to reach, and 42 stops sit between the grid and everything after it).
+ *
+ * The double-click is KEPT. This adds a route, it does not replace one.
+ */
+function MonthGrid({ state }: { state: CalendarState }) {
+  const { t, lang } = useT();
+  const { cursor, today, monthCells, occsByDay, openNew, openEdit } = state;
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  const keys = useMemo(() => monthCells.map(toKey), [monthCells]);
+  // The cursor's own day when it is on screen, else the first cell: a grid whose
+  // active descendant is a day from the month you navigated away from reads as
+  // broken, and `aria-activedescendant` pointing at a missing id announces nothing.
+  const fallbackKey = keys.includes(toKey(cursor)) ? toKey(cursor) : (keys[0] ?? null);
+  const currentKey = activeKey && keys.includes(activeKey) ? activeKey : fallbackKey;
+  const cellDomId = (key: string) => `cal-month-cell-${key}`;
+
+  const move = (delta: number) => {
+    const at = currentKey ? keys.indexOf(currentKey) : 0;
+    const next = Math.min(keys.length - 1, Math.max(0, at + delta));
+    setActiveKey(keys[next] ?? null);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    // Never swallow a chord — Ctrl/Alt/Meta belong to the shell's shortcuts.
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    switch (e.key) {
+      case 'ArrowLeft': move(-1); break;
+      case 'ArrowRight': move(1); break;
+      case 'ArrowUp': move(-7); break;
+      case 'ArrowDown': move(7); break;
+      case 'Home': move(-(keys.indexOf(currentKey ?? '') % 7)); break;
+      case 'End': move(6 - (keys.indexOf(currentKey ?? '') % 7)); break;
+      case 'Enter':
+      case ' ':
+        if (currentKey) openNew(currentKey);
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+  };
+
+  return (
+    <div
+      className="cal-month-grid"
+      role="grid"
+      tabIndex={0}
+      aria-label={t('calendar.monthGrid')}
+      aria-activedescendant={currentKey ? cellDomId(currentKey) : undefined}
+      onKeyDown={onKeyDown}
+    >
+      {/*
+        The rows are `display: contents` (`.cal-month-row` in styles.css) so the 7
+        columns stay direct items of the one `repeat(7, 1fr)` grid. Wrapping without
+        that rule turns each row into a SINGLE grid item and collapses the month into
+        one column — checked live, not assumed.
+      */}
+      <div role="row" className="cal-month-row">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+          <div key={i} role="columnheader" className="cal-month-dow muted">{d}</div>
+        ))}
+      </div>
+      {Array.from({ length: Math.ceil(monthCells.length / 7) }, (_, week) => (
+        <div key={week} role="row" className="cal-month-row">
+          {monthCells.slice(week * 7, week * 7 + 7).map((d, col) => {
+            const i = week * 7 + col;
+            const key = keys[i];
+            const inMonth = d.getMonth() === cursor.getMonth();
+            const isToday = key === toKey(today);
+            const dayEvents = occsByDay.get(key) ?? [];
+            return (
+              <div
+                key={col}
+                id={cellDomId(key)}
+                role="gridcell"
+                aria-selected={key === currentKey}
+                // The date, spelled out, plus the count — "3" alone is not a label.
+                aria-label={`${d.toLocaleDateString(LANG_TAGS[lang], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${
+                  dayEvents.length ? `, ${t('calendar.moreCount', { count: dayEvents.length })}` : ''
+                }`}
+                className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}${
+                  key === currentKey ? ' is-active' : ''
+                }`}
+                onClick={() => setActiveKey(key)}
+                onDoubleClick={() => openNew(key)}
+              >
+                <div className="cal-month-daynum">{d.getDate()}</div>
+                <div className="cal-month-events">
+                  {dayEvents.slice(0, 3).map((ev) => (
+                    <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
+                  ))}
+                  {dayEvents.length > 3 && (
+                    <div className="cal-more muted">
+                      {t('calendar.moreCount', { count: dayEvents.length - 3 })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The month / week / day / agenda body for the current mode. */
 export function CalendarBody({ state }: { state: CalendarState }) {
   const { t, lang } = useT();
@@ -431,7 +557,6 @@ export function CalendarBody({ state }: { state: CalendarState }) {
     mode,
     cursor,
     today,
-    monthCells,
     occsByDay,
     agendaToday,
     agendaUpcoming,
@@ -441,38 +566,7 @@ export function CalendarBody({ state }: { state: CalendarState }) {
   } = state;
 
   if (mode === 'month') {
-    return (
-      <div className="cal-month-grid">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-          <div key={i} className="cal-month-dow muted">{d}</div>
-        ))}
-        {monthCells.map((d, i) => {
-          const key = toKey(d);
-          const inMonth = d.getMonth() === cursor.getMonth();
-          const isToday = key === toKey(today);
-          const dayEvents = occsByDay.get(key) ?? [];
-          return (
-            <div
-              key={i}
-              className={`cal-month-cell ${inMonth ? '' : 'out'} ${isToday ? 'today' : ''}`}
-              onDoubleClick={() => openNew(key)}
-            >
-              <div className="cal-month-daynum">{d.getDate()}</div>
-              <div className="cal-month-events">
-                {dayEvents.slice(0, 3).map((ev) => (
-                  <EventChip key={`${ev.id}-${ev.occurrenceDate}`} ev={ev} onClick={() => openEdit(ev)} />
-                ))}
-                {dayEvents.length > 3 && (
-                  <div className="cal-more muted">
-                    {t('calendar.moreCount', { count: dayEvents.length - 3 })}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
+    return <MonthGrid state={state} />;
   }
 
   if (mode === 'week') {

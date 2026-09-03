@@ -5155,6 +5155,7 @@ export const zh: Catalog = {
   'calendar.today': '今天',
   'calendar.jumpToDate': '跳转到日期',
   'calendar.moreCount': '还有 {count} 项',
+  'calendar.monthGrid': '月历网格 — 方向键按天移动，Enter 在所选日期添加日程',
   'calendar.noEventsToday': '这一天没有日程。',
   'calendar.addEvent': '＋ 添加日程',
   'calendar.addInline': '＋ 添加',

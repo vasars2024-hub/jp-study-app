@@ -5698,6 +5698,7 @@ export const ru: Catalog = {
   'calendar.today': 'Сегодня',
   'calendar.jumpToDate': 'Перейти к дате',
   'calendar.moreCount': 'Ещё {count}',
+  'calendar.monthGrid': 'Сетка месяца — стрелки перемещают по дням, Enter добавляет событие в выбранный день',
   'calendar.noEventsToday': 'В этот день событий нет.',
   'calendar.addEvent': '+ Добавить событие',
   'calendar.addInline': '+ Добавить',

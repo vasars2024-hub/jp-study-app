@@ -133,3 +133,35 @@
     padding: var(--lq-space-1);
   }
 }
+
+/*
+ * Month grid: real grid semantics without a layout change.
+ *
+ * `.cal-month-grid` is one `repeat(7, 1fr)` grid whose cells were direct
+ * children. Giving it `role="grid"` needs `role="row"` wrappers, and a wrapper
+ * is ONE grid item -- which collapses the month into a single column. `display:
+ * contents` puts the seven cells back as direct items of the same grid, so the
+ * measured geometry is unchanged while the accessibility tree gains the rows it
+ * needs. Verified live rather than assumed: 42 cells, 7 columns, identical cell
+ * rects before and after.
+ */
+.cal-month-row {
+  display: contents;
+}
+
+/*
+ * The grid is ONE tab stop with a moving active descendant, so the focus ring
+ * has to be drawn on the ACTIVE CELL -- `:focus-visible` on the container would
+ * outline the whole month and tell a keyboard user nothing about where they are.
+ * Both are drawn: the container ring says the grid has focus, the cell ring says
+ * which day. `outline`, not `box-shadow`, so forced-colors keeps it.
+ */
+.cal-month-grid:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cal-month-grid:focus-visible .cal-month-cell.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
