@@ -162,6 +162,36 @@ describe('libass gets a CJK face (DEFECT S1, canvas half)', () => {
     expect(overlay).toContain('libassFontRendererRef.current === renderer');
   });
 
+  it('makes that face the DEFAULT, which is the half addFonts does not do', () => {
+    /*
+      Measured live 2026-09-03 on the nyaa ASS sidecar for JoJo 39-END, cue 18
+      (145890–149270 ms): with `addFonts` alone libass painted
+      `□□□ □□□□□□□□□□□□□□□` where `何者だ なぜブチャラティを知っている` belongs.
+      Adding the bytes only makes a face findable BY NAME. That file's styles name
+      `ＤＦＰ平成ゴシック体W7` and `思源黑体 CN Heavy`, which are not on the machine,
+      and for a family it cannot find libass substitutes its default — Roboto. So this
+      assertion, not the one above, is the one that decides whether glyphs appear.
+    */
+    const overlay = readSource('media', 'VideoCoreStudyOverlay.tsx');
+    expect(overlay).toContain('renderer.renderer.setDefaultFont?.(font.family)');
+    // Order matters: the bytes have to be in the provider before the name points at them.
+    expect(overlay.indexOf('addFonts([objectUrl])'))
+      .toBeLessThan(overlay.indexOf('setDefaultFont?.(font.family)'));
+  });
+
+  it('the vendored JASSUB worker still exposes setDefaultFont', () => {
+    // A ratchet on the MECHANISM the fix above depends on. `this.renderer` is a comlink
+    // proxy, so `renderer.renderer.anything` is truthy whether or not the worker
+    // implements it — a guard on the call site cannot catch this method going away, and
+    // the failure mode is silent tofu rather than an error.
+    const worker = readFileSync(
+      path.join(__dirname, '..', 'jassub', 'assets', 'jassub-worker.js'),
+      'utf8',
+    );
+    expect(worker).toContain('setDefaultFont(fontName)');
+    expect(worker).toContain('this._wasm.setDefaultFont(');
+  });
+
   it('still constructs libass with Roboto alone, which is why the above is needed', () => {
     // A ratchet on the CAUSE. If vendor ever ships a CJK face in `availableFonts` this
     // goes red and the overlay's font path can be reconsidered instead of left as cargo.

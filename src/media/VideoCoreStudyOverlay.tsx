@@ -812,6 +812,20 @@ export default function VideoCoreStudyOverlay({
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         await renderer.renderer.addFonts([objectUrl]);
+        if (cancelled) return;
+        /*
+          `addFonts` alone was NOT the fix, measured live on a bare nyaa ASS sidecar:
+          libass still painted every glyph as a box. Adding the bytes only makes the face
+          *findable by name*; the styles in that file name `ＤＦＰ平成ゴシック体W7`,
+          `思源黑体 CN Heavy` and friends, none of which are on the machine, and for a
+          family it cannot find libass substitutes its DEFAULT font — which the player
+          constructs as `roboto medium`, a face with no kana and no kanji. So the default
+          is the lever, not the font list. The worker exposes `setDefaultFont`, which
+          lowercases and hands the name straight to `_wasm.setDefaultFont`; the family
+          reported by the resolver is the one written into the file we just added, so
+          libass looks it up in the provider rather than falling through to Roboto again.
+        */
+        await renderer.renderer.setDefaultFont?.(font.family);
       } catch {
         // A machine with no CJK face installed, or a renderer torn down mid-fetch. The
         // subtitles still render — with the coverage they had before — and re-arming on
