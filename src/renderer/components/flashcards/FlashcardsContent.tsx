@@ -1807,11 +1807,29 @@ export function FlashcardDeckOverview({ state }: { state: FlashcardsState }) {
       </ContextualSurface>
 
       <TranscriptionCardDeckStatus />
-      <CardVoicePicker />
-      <AutoAudioPreferencesPanel />
-      <AutoReadingPreferencesPanel />
-      <SchedulingPreferencesPanel />
-      <DeckAudioExport />
+
+      {/*
+        Five preference panels used to sit open, stacked, above the deck itself. Measured
+        2026-09-03 with `probes/cat5-ui-clarity.cjs`: the overview asked a user to scan **26**
+        controls at rest against the rubric's bar of 12, and 24 of the 26 were these panels'
+        checkboxes, caps, selects and sweeps — settings, not the thing the window is for.
+        Same defect in the other instrument: the deck view was **3,186px** tall before a card
+        was ever shown. Folded behind the same `<details>` the specialist launchers already
+        use, so the semantics, keyboard path and screen-reader state come from the element
+        rather than being re-implemented. Nothing is removed, disabled or renamed, the
+        disclosure touches no stored state, and the status panel above stays open because a
+        state a user has not asked for must not be hidden behind one.
+      */}
+      <details className="flash-deck-prefs">
+        <summary className="btn">{t('flash.deckPreferences')}</summary>
+        <div className="flash-deck-prefs-body">
+          <CardVoicePicker />
+          <AutoAudioPreferencesPanel />
+          <AutoReadingPreferencesPanel />
+          <SchedulingPreferencesPanel />
+          <DeckAudioExport />
+        </div>
+      </details>
 
       {practice === 'match' && <MatchMode deck={practiceDeck} onExit={() => setPractice('none')} />}
       {practice === 'write' && <WriteMode deck={practiceDeck} onExit={() => setPractice('none')} />}

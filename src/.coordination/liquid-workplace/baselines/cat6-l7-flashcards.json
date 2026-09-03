@@ -10,22 +10,201 @@
   "driven": [
     {
       "step": "openDecks",
-      "result": "{\"clicked\":\"EPUB decks (3,218)\"}"
+      "result": "{\"clicked\":\"EPUB decks (60)\"}"
     },
     {
       "step": "search",
-      "result": "{\"query\":\"の\",\"groups\":2}"
+      "result": "{\"query\":\"の\",\"groups\":0}"
     },
     {
       "step": "clearSearch",
-      "result": "{\"cleared\":true,\"groups\":2}"
+      "result": "{\"cleared\":true,\"groups\":3}"
     },
     {
       "step": "scroll",
-      "result": "{\"scroller\":\"flash-group-body\",\"top\":240,\"range\":331582}"
+      "result": "{\"scroller\":\"fwin-body\",\"top\":240,\"range\":4424}"
     }
   ],
   "drivenRefusals": 0,
+  "settle": {
+    "afterDrive": {
+      "where": "after drive, before parity check",
+      "converged": true,
+      "reads": 2,
+      "ms": 374,
+      "signature": "4949|852|161",
+      "trace": [
+        "4949|852|161",
+        "4949|852|161"
+      ],
+      "snapshot": {
+        "app": "flashcards",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "35",
+        "chars": 4949,
+        "nodes": 852,
+        "controls": 161,
+        "fields": {
+          "select0:": "",
+          "input1:": "on",
+          "input2:": "on",
+          "input3:": "on",
+          "input4:": "on",
+          "input5:": "50",
+          "input6:": "on",
+          "input7:": "on",
+          "input8:": "on",
+          "input9:": "on",
+          "select10:": "furigana",
+          "input11:": "200",
+          "input12:": "on",
+          "input13:": "on",
+          "input14:": "36500",
+          "select15:": "all",
+          "input16:flash-search-input": "",
+          "input17:": "imported-deck",
+          "input18:": "",
+          "textarea19:deck-import-paste": "",
+          "select20:": "all",
+          "input21:": "on",
+          "select22:": "mixed"
+        },
+        "scroll": [
+          "fwin-body:240,0"
+        ]
+      }
+    },
+    "afterFlipOut": {
+      "where": "flip -> liquid",
+      "converged": true,
+      "reads": 2,
+      "ms": 376,
+      "signature": "4949|852|161",
+      "trace": [
+        "4949|852|161",
+        "4949|852|161"
+      ],
+      "snapshot": {
+        "app": "flashcards",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "liquid",
+        "liquidClass": true,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "35",
+        "chars": 4949,
+        "nodes": 852,
+        "controls": 161,
+        "fields": {
+          "select0:": "",
+          "input1:": "on",
+          "input2:": "on",
+          "input3:": "on",
+          "input4:": "on",
+          "input5:": "50",
+          "input6:": "on",
+          "input7:": "on",
+          "input8:": "on",
+          "input9:": "on",
+          "select10:": "furigana",
+          "input11:": "200",
+          "input12:": "on",
+          "input13:": "on",
+          "input14:": "36500",
+          "select15:": "all",
+          "input16:flash-search-input": "",
+          "input17:": "imported-deck",
+          "input18:": "",
+          "textarea19:deck-import-paste": "",
+          "select20:": "all",
+          "input21:": "on",
+          "select22:": "mixed"
+        },
+        "scroll": [
+          "fwin-body:309,0"
+        ]
+      }
+    },
+    "afterFlipBack": {
+      "where": "flip -> standard",
+      "converged": true,
+      "reads": 2,
+      "ms": 365,
+      "signature": "4949|852|161",
+      "trace": [
+        "4949|852|161",
+        "4949|852|161"
+      ],
+      "snapshot": {
+        "app": "flashcards",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 60,
+          "y": 24,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "35",
+        "chars": 4949,
+        "nodes": 852,
+        "controls": 161,
+        "fields": {
+          "select0:": "",
+          "input1:": "on",
+          "input2:": "on",
+          "input3:": "on",
+          "input4:": "on",
+          "input5:": "50",
+          "input6:": "on",
+          "input7:": "on",
+          "input8:": "on",
+          "input9:": "on",
+          "select10:": "furigana",
+          "input11:": "200",
+          "input12:": "on",
+          "input13:": "on",
+          "input14:": "36500",
+          "select15:": "all",
+          "input16:flash-search-input": "",
+          "input17:": "imported-deck",
+          "input18:": "",
+          "textarea19:deck-import-paste": "",
+          "select20:": "all",
+          "input21:": "on",
+          "select22:": "mixed"
+        },
+        "scroll": [
+          "fwin-body:240,0"
+        ]
+      }
+    },
+    "disabled": false,
+    "allConverged": true,
+    "unconverged": []
+  },
   "parity": {
     "standard": "8/8",
     "liquid": "8/8",
@@ -35,6 +214,96 @@
     "failing": [],
     "onlyInOne": []
   },
+  "rowEvidence": [
+    {
+      "id": "deckTabs",
+      "standard": {
+        "reachable": true,
+        "evidence": "tabs=2 active=1 activeCount=60"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "tabs=2 active=1 activeCount=60"
+      }
+    },
+    {
+      "id": "folderRail",
+      "standard": {
+        "reachable": true,
+        "evidence": "all=60 unfiled+folders=60 activeChips=1 chips=2"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "all=60 unfiled+folders=60 activeChips=1 chips=2"
+      }
+    },
+    {
+      "id": "bookGroups",
+      "standard": {
+        "reachable": true,
+        "evidence": "groups=3 badgeSum=60 expected=60 titled=3 basis=All chip"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "groups=3 badgeSum=60 expected=60 titled=3 basis=All chip"
+      }
+    },
+    {
+      "id": "virtualizedList",
+      "standard": {
+        "reachable": true,
+        "evidence": "cap=16 maxDeclared=20 ceilingProven=true | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005 | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005 | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "cap=16 maxDeclared=20 ceilingProven=true | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005 | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005 | 20cards/16rendered pitch=108 sh=2170 expected=2160 ratio=1.005"
+      }
+    },
+    {
+      "id": "cardRows",
+      "standard": {
+        "reachable": true,
+        "evidence": "rows=48 worded=48 meaning=48 removable=48"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "rows=48 worded=48 meaning=48 removable=48"
+      }
+    },
+    {
+      "id": "deckStrip",
+      "standard": {
+        "reachable": true,
+        "evidence": "stripCards=24 worded=24 withReadingOrMeaning=24"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "stripCards=24 worded=24 withReadingOrMeaning=24"
+      }
+    },
+    {
+      "id": "groupCollapse",
+      "standard": {
+        "reachable": true,
+        "evidence": "groups=3 ariaExpandedPresent=3 agreesWithMountedBody=3"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "groups=3 ariaExpandedPresent=3 agreesWithMountedBody=3"
+      }
+    },
+    {
+      "id": "windowLifecycle",
+      "standard": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=true"
+      }
+    }
+  ],
   "roundTrip": {
     "trip": "standard -> liquid -> standard",
     "dirtiedField": "flash-search-input",
@@ -50,14 +319,18 @@
         "mutation": "deckTabs",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "active added to 1 of 1",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "deckTabs"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"added-class\"]",
+        "restored": "[\"added-class\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -65,7 +338,11 @@
         "mutation": "folderRail",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "folderRail"
@@ -80,14 +357,18 @@
         "mutation": "bookGroups",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "bookGroups"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\"]",
+        "restored": "[\"detached\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -95,14 +376,18 @@
         "mutation": "virtualizedList",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "style set to \"height: 24px; position: relative;\"",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "virtualizedList"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"style\"]",
+        "restored": "[\"style\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -110,14 +395,18 @@
         "mutation": "cardRows",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "cardRows"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\"]",
+        "restored": "[\"detached\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -125,14 +414,18 @@
         "mutation": "deckStrip",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "deckStrip"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"detached\"]",
+        "restored": "[\"detached\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -140,14 +433,18 @@
         "mutation": "groupCollapse",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "aria-expanded set to \"false\"",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "groupCollapse"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"aria-expanded\"]",
+        "restored": "[\"aria-expanded\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       },
@@ -155,18 +452,25 @@
         "mutation": "windowLifecycle",
         "declaredCascade": [],
         "preBaseline": "8/8",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
         "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
         "reachable": "7/8",
         "fellRows": [
           "windowLifecycle"
         ],
         "exactlyOwnRow": true,
         "unexpectedRows": [],
-        "restored": "[\"aria-pressed\"]",
+        "restored": "[\"aria-pressed\",\"flashcards:scroll\"]",
         "afterRestore": "8/8",
         "returned": true
       }
     ],
+    "armed": 8,
+    "declared": 8,
+    "unarmable": [],
     "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
   },
   "bars": {

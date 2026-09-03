@@ -6517,6 +6517,7 @@ export const ru: Catalog = {
   'flash.advancedEpub': 'Расширенный EPUB',
   'flash.jitenVocab': 'Лексика Jiten',
   'flash.moreTools': 'Другие инструменты',
+  'flash.deckPreferences': 'Звук карточек, чтения и расписание',
   'flash.csvTool': 'Инструмент CSV',
   // AI Card Studio (ru)
   'aiStudio.section.provider': 'Провайдер и API-ключ',

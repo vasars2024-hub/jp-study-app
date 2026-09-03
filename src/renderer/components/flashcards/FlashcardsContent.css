@@ -179,7 +179,8 @@
    marker is dropped and the summary is painted as the button it already reads as, at the same
    32px pointer footprint every other control on this surface owns. Anchored, not glass: this
    is a launcher list, and Liquid is selective. */
-.flash-view .flash-more-tools > summary {
+.flash-view .flash-more-tools > summary,
+.flash-view .flash-deck-prefs > summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -188,11 +189,13 @@
   list-style: none;
 }
 
-.flash-view .flash-more-tools > summary::-webkit-details-marker {
+.flash-view .flash-more-tools > summary::-webkit-details-marker,
+.flash-view .flash-deck-prefs > summary::-webkit-details-marker {
   display: none;
 }
 
-.flash-view .flash-more-tools > summary::after {
+.flash-view .flash-more-tools > summary::after,
+.flash-view .flash-deck-prefs > summary::after {
   content: '';
   width: 0;
   height: 0;
@@ -203,7 +206,8 @@
   transition: transform 140ms ease;
 }
 
-.flash-view .flash-more-tools[open] > summary::after {
+.flash-view .flash-more-tools[open] > summary::after,
+.flash-view .flash-deck-prefs[open] > summary::after {
   transform: rotate(180deg);
 }
 
@@ -214,8 +218,21 @@
   margin-top: 8px;
 }
 
+/* The enrichment and scheduling panels, folded away. Each child is already a bordered
+   fieldset with its own legend, so the body only supplies the rhythm between them —
+   and it keeps the panels' own reflow (`autoAudio.css`) working by staying a plain
+   block rather than imposing a second grid on top of them. */
+.flash-view .flash-deck-prefs {
+  margin-bottom: var(--space-sm, 12px);
+}
+
+.flash-view .flash-deck-prefs-body {
+  margin-top: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .flash-view .flash-more-tools > summary::after {
+  .flash-view .flash-more-tools > summary::after,
+  .flash-view .flash-deck-prefs > summary::after {
     transition: none;
   }
 }
