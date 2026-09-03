@@ -6809,15 +6809,23 @@ mark.lookup-mark,
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* `align-items: stretch` + `height: 100%`: the review shell is a bounded column so the
+   grading row can sit at a position the answer's length cannot move. Against an
+   indefinite host `height: 100%` resolves to `auto` (same reasoning as
+   `.gram-view--explorer`), and the zero flex-basis on the review card keeps the row
+   stable there too -- see the review-card rule further down this sheet. */
 .flash-view.review {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  min-height: calc(100% - 120px);
+  align-items: stretch;
+  height: 100%;
   padding: 20px 24px 32px;
 }
 .flash-review-shell {
+  display: flex;
+  flex-direction: column;
   width: min(920px, 100%);
+  min-height: 0;
   margin: 0 auto;
 }
 .flash-review-top {
@@ -7008,9 +7016,23 @@ mark.lookup-mark,
   right: 0;
   left: auto;
 }
+/* The review card's box is a function of the WINDOW, never of the answer's length. A zero
+   flex-basis takes whatever the shell has left over (and, in an auto-height shell,
+   contributes nothing, so the min-height floor is the whole size); the internal scroller
+   keeps a long answer inside the card instead of pushing the grading row down the page.
+   Measured before this: revealing an answer moved the grading row on 6 of 10 sampled
+   cards, up to 88 px, because the card grew 360 -> 448/1011 px under it.
+   The centring is `safe` because a plain `center` in a scroll container clips the top of
+   anything taller than the box -- the part the reader needs most. */
 .flash-review-shell .flash-card {
+  flex: 1 1 0;
   min-height: 360px;
+  overflow-y: auto;
+  justify-content: safe center;
   padding: 40px 32px;
+}
+.flash-review-shell .flash-actions {
+  flex: 0 0 auto;
 }
 .flash-review-shell .flash-word {
   font-size: clamp(42px, 8vw, 64px);
