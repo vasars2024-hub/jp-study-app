@@ -84,9 +84,25 @@ if ($Control -or $DuringJs) {
   # an expression, /eval throws, the throw is never read, and the run reports a clean distribution
   # indistinguishable from a fast surface. It bought a false exoneration on 2026-08-25 (max 5.9 ms
   # on a call that actually cost 6,590.8 ms) and, before that, one on the leg it was written for.
+  #
+  # ...and the path branch then had to be told what a path is NOT. `Join-Path` normalises forward
+  # slashes to backslashes and THROWS a terminating "The filename, directory name, or volume label
+  # syntax is incorrect" on the result, so any inline expression carrying a regex literal or a `//`
+  # comment killed the whole run before a single sample was taken -- measured 2026-09-03, cat7's
+  # Video heavy leg died exactly here, at this line, with the failure reported against the surface.
+  # A path is one line, short, and free of the characters Windows forbids in one; anything else is
+  # JS text and must never reach Join-Path. The try/catch is the belt to that braces: a malformed
+  # candidate makes this fall back to treating the argument as text, never abort the measurement.
   $duringExpr = if ($DuringJs) {
-    $asPath = if ([System.IO.Path]::IsPathRooted($DuringJs)) { $DuringJs } else { Join-Path $repo $DuringJs }
-    if (Test-Path -LiteralPath $asPath -PathType Leaf) { Get-Content -LiteralPath $asPath -Raw } else { $DuringJs }
+    # The colon is allowed only where a drive letter puts it, so `C:\repo\probes\x.js` still
+    # resolves while `'REFUSE: no Video page'` does not.
+    $looksLikePath = $DuringJs.Length -lt 260 -and $DuringJs -notmatch '[\r\n]' -and
+      $DuringJs.IndexOfAny([char[]]'<>"|?*') -lt 0 -and
+      ($DuringJs.IndexOf(':') -lt 0 -or $DuringJs -match '^[A-Za-z]:[\\/][^:]*$')
+    $asPath = if (-not $looksLikePath) { $null }
+      elseif ([System.IO.Path]::IsPathRooted($DuringJs)) { $DuringJs }
+      else { try { Join-Path $repo $DuringJs } catch { $null } }
+    if ($asPath -and (Test-Path -LiteralPath $asPath -PathType Leaf)) { Get-Content -LiteralPath $asPath -Raw } else { $DuringJs }
   } else {
     "(() => { const t = Date.now(); while (Date.now() - t < 1500) {} return 'blocked'; })()"
   }
