@@ -624,6 +624,74 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
         };
         if (!out.control.verdict.startsWith('CONTROL FAILED')) {
           out.verdict = 'VOID - negative control did not falsify';
+        } else if (base.eligibleTotal === 0) {
+          /*
+           * CORRECTION — this branch was a false-FAIL generator, and it fired on the first
+           * surface that reached it. A surface can legitimately hold a Work region AND no
+           * contextual chrome at all: the Flashcards review is exactly that shape, and §2.3's
+           * own words ("context, preview, scheduling detail, session summaries") are what make
+           * its zero the CORRECT answer. Both eligibility bars are computed
+           * `eligibleTotal > 0 && ...`, so that zero printed `verdict: FAIL` on
+           * `contextualTreated` and `sharedPrimitives` beside a `denseWorkAnchored` pass — the
+           * bar the bullet is actually about. Measured 2026-09-03 on the live review:
+           * Work 1 / Anchor 29 / Liquid-eligible 0, two bars false for an absent denominator.
+           *
+           * The `if (!work)` branch above already forgives this, but ONLY there, and only
+           * because control C proves the walk would have counted a contextual region had one
+           * existed. Controls A and B never ask that question — they perturb material on
+           * regions that already exist — so `work` being truthy made the forgiving branch
+           * unreachable. The answer is to run the same plant here, never to widen the bars: a
+           * zero is forgiven when it has been MEASURED, and not otherwise.
+           */
+          const planted = await plantControls();
+          if (planted.refuse) throw new Error(planted.refuse);
+          const dirtyPlant = await read();
+          const removedPlant = await removePlants();
+          const afterPlant = await read();
+
+          const eligibilityFired = dirtyPlant.eligibleTotal === base.eligibleTotal + 1;
+          const sharedHeldUnderPlant = dirtyPlant.sharedPrimitiveEligible === base.sharedPrimitiveEligible;
+          const plantReturned = JSON.stringify(metricTuple(afterPlant)) === JSON.stringify(metricTuple(base));
+          const plantCleaned = removedPlant.stillMounted === 0;
+          const measuredZero = eligibilityFired && sharedHeldUnderPlant && plantReturned && plantCleaned;
+
+          out.control.eligibilityPlant = {
+            why: 'both eligibility bars read `eligibleTotal > 0 && ...`; controls A and B never'
+              + ' test whether the walk can COUNT a contextual region, so a correct zero read FAIL',
+            plantSidePx: planted.side,
+            counts: {
+              base: metricTuple(base),
+              planted: metricTuple(dirtyPlant),
+              restored: metricTuple(afterPlant),
+            },
+            eligibilityFired,
+            sharedHeldUnderPlant,
+            plantReturned,
+            plantCleaned,
+            // The low score this category must still be able to produce on THIS surface: with
+            // the nav mounted the denominator is 1 and untreated, so `sharedPrimitives` is false.
+            barsWhilePlanted: {
+              contextualTreated: dirtyPlant.eligibleTotal > 0
+                && dirtyPlant.liquidTreatedEligible === dirtyPlant.eligibleTotal,
+              sharedPrimitives: dirtyPlant.eligibleTotal > 0
+                && dirtyPlant.sharedPrimitiveEligible === dirtyPlant.eligibleTotal,
+            },
+            verdict: measuredZero
+              ? 'CONTROL FIRED AS REQUIRED - the zero denominator is a MEASURED zero'
+              : 'VOID - the eligibility plant did not fire and restore',
+          };
+
+          if (measuredZero) {
+            out.bars.contextualTreated = true;
+            out.bars.sharedPrimitives = true;
+            out.vacuousContextual = true;
+            out.verdict = Object.values(out.bars).every(Boolean) ? 'PASS 10/10' : 'FAIL';
+            out.failedBars = Object.entries(out.bars)
+              .filter(([, value]) => !value).map(([name]) => name);
+          } else {
+            // An unproven zero is worse than a failing one: it means the walk itself is silent.
+            out.verdict = 'VOID - the eligibility plant did not fire, so the zero is unmeasured';
+          }
         }
       }
     }
