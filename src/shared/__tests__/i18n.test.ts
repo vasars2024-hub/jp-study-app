@@ -35,6 +35,19 @@ describe('translate', () => {
     expect(t('storage.installedSize', 'en', {})).toBe('{size} installed');
   });
 
+  it('names the arrived file in every language, at every count', () => {
+    // The render-level receipt for the catalog gate below. The shape check proves
+    // the slot EXISTS in each form; this proves the string a user actually reads
+    // carries the filename — including at count=1 in ja/zh, whose only plural
+    // category is `other` and which therefore shipped without it.
+    for (const lang of UI_LANGS) {
+      for (const count of [1, 4]) {
+        const line = t('filesApp.watch.arrived', lang, { count, name: 'report.pdf', seconds: 3.2 });
+        expect(line, `${lang} at count=${count}`).toContain('report.pdf');
+      }
+    }
+  });
+
   it('localises numbers with the active locale', () => {
     // ru groups thousands with a space, en with a comma.
     expect(t('storage.modelCount', 'en', { count: 1234 })).toBe('1,234 models installed');
@@ -130,6 +143,51 @@ describe('catalog hygiene', () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  /**
+   * A slot a language can NEVER render, because every plural form it has omits it.
+   *
+   * `filesApp.watch.arrived` shipped in exactly this state. English put `{name}` in
+   * `one` only ("report.pdf arrived after 3 s") and counted files in `other`. ja and
+   * zh have no `one` category at all — CLDR gives them `other` alone — so their single
+   * form served count=1 too, and a Japanese or Chinese user watching a folder was never
+   * once told WHICH file arrived, which is the entire content of the notice.
+   *
+   * Neither existing gate can see this. i18n-check.cjs and the missing-key block compare
+   * the catalogs against EACH OTHER, and all four had the key with a well-formed plural
+   * object; the Russian-completeness check above only counts arms. The bug lives in which
+   * arm a slot was written into, so it is invisible to every presence-shaped check.
+   *
+   * Scored against the union of slots the key uses in ANY language, so a slot dropped from
+   * one catalog during translation is caught the same way as one the English author never
+   * wrote. A slot missing from SOME forms is deliberately not an offence — "1 file" vs
+   * "{count} files" is a legitimate copy choice; being unable to render it at all is not.
+   * Measured before this key was repaired: 278 plural-shaped keys, 2 offending rows.
+   */
+  it('never hides an interpolation slot behind a plural form a language does not have', () => {
+    const slotsOf = (form: string) => new Set([...form.matchAll(/\{(\w+)\}/g)].map((m) => m[1]));
+    const offenders: string[] = [];
+
+    for (const key of Object.keys(en)) {
+      if (!en[key] || typeof en[key] !== 'string') {
+        const union = new Set<string>();
+        for (const lang of UI_LANGS) {
+          const entry = CATALOGS[lang][key];
+          if (!entry || typeof entry !== 'object') continue;
+          for (const form of Object.values(entry)) for (const slot of slotsOf(form)) union.add(slot);
+        }
+        for (const lang of UI_LANGS) {
+          const entry = CATALOGS[lang][key];
+          if (!entry || typeof entry !== 'object') continue;
+          const forms = Object.values(entry);
+          const never = [...union].filter((slot) => forms.every((form) => !slotsOf(form).has(slot)));
+          if (never.length > 0) offenders.push(`${lang}:${key} can never render {${never.join('},{')}}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 
   it('never leaves a translated catalog with keys English does not have', () => {

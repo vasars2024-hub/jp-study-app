@@ -11984,9 +11984,9 @@ export const ru: Catalog = {
   },
   'filesApp.watch.arrived': {
     one: '{name} появился через {seconds} с',
-    few: 'Появилось {count} файла, последний через {seconds} с',
-    many: 'Появилось {count} файлов, последний через {seconds} с',
-    other: 'Появилось {count} файла, последний через {seconds} с',
+    few: 'Появилось {count} файла, последний — {name}, через {seconds} с',
+    many: 'Появилось {count} файлов, последний — {name}, через {seconds} с',
+    other: 'Появилось {count} файла, последний — {name}, через {seconds} с',
   },
   'filesApp.watch.dismiss': 'Скрыть',
   'filesApp.settings.error.emptyRoot': 'Сначала укажите папку выше.',
