@@ -219,11 +219,25 @@ against 1,014 ms, with the same ~17k-element subtree on screen. The playing clip
 tasks totalling 32,999 ms in ~22 s, the two largest 10,755 and 10,531 ms, every one `name: 'self'`
 with `containerType: window`**, so top-document JS rather than an iframe or the JASSUB worker.
 
-Recorded as a LEAD and not as a diagnosis, because it has not been tested as a cause: with the clip
-playing this surface renders **3,054 `.study-transcript-text` nodes** inside a 16,952-element host,
-against CLAUDE.md's own rule to virtualise large rendered collections. Cheapest falsification is a
-clip with a short transcript. Second candidate, equally untested: a resume/progress write on a timer
-re-rendering the library pane.
+That lead was then tested in the same turn and it is the cause. Both directions, driven through the
+product's own controls, clip playing in every arm:
+
+| Arm, clip playing throughout | Ticks | Longest gap | Transcript nodes |
+| --- | --- | --- | --- |
+| transcript CLOSED via `.study-transcript-close` | 20 | 1,014 ms | 0 (host 438 elements) |
+| transcript REOPENED via the `transcriptPanel` checkbox | 3 | **11,769 ms** | 3,031 (host ~17k) |
+
+`VideoCoreTranscriptPanel` is handed `cues={allCues}` (`VideoCoreStudyOverlay.tsx:2251`) and renders
+every cue as a row plus its own Translate button — ~3,000 nodes for a 1,500-cue episode, with no
+virtualisation and an `activeIndex` that changes on every cue boundary. The second candidate, a
+progress write re-rendering the library pane, is ruled out by arm B: the full library browser was on
+screen at 1,015 ms.
+
+**Persisted-state trap, paid for here.** `.study-transcript-close` is not a view toggle — it calls
+`updatePreference('transcriptPanel', false)` and persists to `jp-media-player-preferences-v1`.
+Reopening the clip does not bring the panel back, and neither does the customizer's `Reset layout`.
+The only restore is the `Study` category's own `[data-study-pref="transcriptPanel"]` checkbox, which
+was clicked and verified back to `checked: true` with 3,031 nodes rendered.
 
 Magnitude depends on the age of the module graph — 137 s at 29.9 hours, 11 s fresh — so quote the
 age beside the number or the two readings look like a contradiction.
