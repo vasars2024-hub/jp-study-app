@@ -288,7 +288,20 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
         latencyMs,
       };
     }
-    if (response.status !== 200) {
+    // 204 is a SUCCESSFUL login on this daemon, not a transport failure.
+    // Measured 2026-09-03 against the user's running client: a correct password
+    // answered **204 with no body**, while a wrong one answered **401** — probed
+    // twice, once with the scraper's own User-Agent, so the status is the
+    // credential's verdict and not a header artefact. Accepting only `200 Ok.`
+    // sent every correct password into the branch below, which reported
+    // "unreachable" and pointed the user at their host and port while the
+    // connection was in fact fine. Same shape as the 401 note above: the older
+    // `200 Ok.` contract is not what current qBittorrent answers.
+    //
+    // This does not weaken the check. A login is proven by the SID cookie read
+    // further down, and a 204 that carries no cookie still fails there with
+    // "Login succeeded but qBittorrent set no session cookie."
+    if (response.status !== 200 && response.status !== 204) {
       return {
         ok: false,
         cookie: '',
@@ -297,7 +310,9 @@ async function login(config: ScraperQbittorrentSettings, password: string): Prom
         latencyMs,
       };
     }
-    if (response.body.trim() !== 'Ok.') {
+    // Only a 200 carries the legacy body contract; a 204 has no body by
+    // definition, so requiring `Ok.` of it would reject every success.
+    if (response.status === 200 && response.body.trim() !== 'Ok.') {
       return {
         ok: false,
         cookie: '',

@@ -178,7 +178,11 @@ describe('the overlay wires the S3 second-line bridge', () => {
     // so a held cue there would mean the wrong sentence.
     expect(source.match(/bridgedSecondaryCuesAtTime\(/g)).toHaveLength(1);
     expect(source.match(/activeStudyCuesAtTime\(/g)).toHaveLength(2);
-    expect(source).toContain('setActiveSecondaryCues(\n        bridgedSecondaryCuesAtTime(');
+    // The `stableCueList` wrap arrived with DEFECT S5 on 2026-09-03 and changed nothing
+    // about which function computes the answer, which is all this line is pinning. Matched
+    // on the two names in order rather than on the exact indentation, so the next change to
+    // this expression's shape does not read as a regression of the bridge.
+    expect(source).toMatch(/setActiveSecondaryCues\(\s*stableCueList\(bridgedSecondaryCuesAtTime\(/);
   });
 });
 
