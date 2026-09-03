@@ -1671,7 +1671,7 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
                   )}
                   {it.kind === 'manga' && (
                     <button
-                      className="card-cover-btn"
+                      className="card-cover-btn lq-hit-placed"
                       title={t('library.card.setCoverTitle')}
                       onClick={(e) => void openCoverMenu(e, it.id)}
                     >
