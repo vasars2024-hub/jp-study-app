@@ -813,8 +813,11 @@ function VideoPanel({
               video here made Video's default view cross the clarity bar at 13 visible
               controls; once a source is loaded the stage entries disappear, so this action
               returns here contextually and the replace-video flow remains one click away. */}
+          {/* Secondary by the comment directly above: a control that "returns here
+              contextually" so a replace-video flow stays one click away is by definition not
+              this page's dominant task, and accent is the one signal that says it is. */}
           {state.src && (
-            <button type="button" className="mc-button mc-button-primary" onClick={() => void state.openFile()}>
+            <button type="button" className="mc-button" onClick={() => void state.openFile()}>
               <Icon name="folder-open" size={13} /> {t('mediaCenter.action.openVideo')}
             </button>
           )}
@@ -885,9 +888,17 @@ function VideoPanel({
               <strong>{t('mediaCenter.video.workspacePlayerTitle')}</strong>
               <p>{t('mediaCenter.video.workspacePlayerDetail')}</p>
               <div>
+                {/* Accent only when a source is loaded, because only then is this the dominant
+                    task. With no source this role="status" block renders INTO THE SAME grid
+                    cell as "Choose what to watch" (both land at grid-area 1/1), and that block
+                    carries the up-next shelf, so the cell is 1051px inside a 665px body. This
+                    button then centres at y=807 — below the fold, reachable only by scrolling
+                    .mc-content — while the block that owns the empty state's real action sits
+                    at y=402. A status region must not hold the page's accent over the action
+                    the user actually came for. Measured both ways at 1080x700. */}
                 <button
                   type="button"
-                  className="mc-button mc-button-primary"
+                  className={state.src ? 'mc-button mc-button-primary' : 'mc-button'}
                   onClick={() => onOpenSeanime(current ? { localFilePath: current.path } : undefined)}
                 >
                   <Icon name="player" size={13} /> {t('mediaCenter.video.openInWorkspace')}
@@ -958,7 +969,10 @@ function VideoPanel({
                   <span><strong>{current.vocabularyCount ?? '—'}</strong><small>{t('mediaCenter.video.vocabulary')}</small></span>
                   <span><strong>{current.rating?.toFixed(1) ?? '—'}</strong><small>{t('mediaCenter.video.malScore')}</small></span>
                 </div>
-                <button type="button" className="mc-button mc-button-primary mc-wide" onClick={() => {
+                {/* Secondary: the inspector rail is a contextual tool surface, and this is a
+                    follow-on to a source that is already loaded. It keeps mc-wide, its icon,
+                    its label and its handler — only the accent fill moves. */}
+                <button type="button" className="mc-button mc-wide" onClick={() => {
                   dispatchMediaStudyAction(current, 'analyze-japanese');
                   onStudy();
                 }}>
