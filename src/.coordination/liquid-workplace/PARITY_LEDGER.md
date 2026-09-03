@@ -1884,3 +1884,51 @@ authoring the spec and running `cat6 --app files` live is the next slice, not th
 
 The plan's per-app table (line 328) assigns City a Liquid design. `standard-only` would
 contradict it; `pending` is the vocabulary's own word for "no Liquid destination yet".
+
+## 2026-09-03 (primary2) — `files` lands at 8/8, `silent` 43 → 19, and the ledger stops citing files nobody can read
+
+Commits: `cf447daa` (files spec + rows + cat6 diagnostics), `981d0ce6` (manga/games/settings
+transcription), `3f0c9030` (tools relocated into `probes/`), `5b09db90` (plan tag).
+
+**files — PASS 10/10.** 8/8 reachable in BOTH presentations, `na` 0, parity equal, round trip
+0 diffs, 8 of 8 mutations armed and each flipping exactly its own row and returning. Ledger
+213 → 221 rows, 24 → 25 apps, 0 duplicate `app|feature` keys. Writer self-control 3/3 fired
+against this very run. Live on pid 42468 / port 39274, husk-checked.
+
+**Its first two runs VOIDed, and that is the transferable part.** The `search` row scored the
+DRIVER's `dirtyField` mark. `dirtyField()` runs ONCE before the FIRST drive; the control loop
+RE-DRIVES before each mutation. Measured: `withMark=1 cleared=46 narrowed=true` when scored,
+`withMark=46 cleared=46 narrowed=false` on every control baseline — so the row was already
+false when its own mutation ran, could not fall, and the VOID discarded seven proved rows.
+**A row may not depend on state another part of the harness owns and only guarantees once.**
+Repaired by making it bring its own subject: `restoreSearch` cuts a 4-char token off the first
+listed row's `.fa-cell-name`, and the question got stricter with it — SELECTION, `1 < queried
+< unfiltered`, not shrinkage, which a matcher that empties the list on any input would fail.
+Live: probe `62/8` from `62/80 (78%) — stalled 9 days`, 45 → 1.
+
+**cat6 now names its own VOIDs.** It published `fellRows: []` and nothing else, so "did not
+falsify" could not be told from three causes — own row already false, own row `na`, or the
+mutation hitting an element the row does not read. Only the last is an instrument bug. It
+emits `ownRowBefore → ownRowAfter`, a `whyNotFalsified` sentence, and both full row maps; it
+named the cause in one line on the next run, after an hour spent on the previous one.
+
+**controlCoverage 43 silent → 19** (named 158 → 178, none-declared 19 → 23),
+`silentByCause.b2WaveNotTranscribed` **0**, `b2WaveApps` empty. manga's 7: three qualifying
+PASS receipts, resolved BY CONTENT — `_pr5-manga` predates the `pageTransport: ['pageRender']`
+declaration and measured a different surface (7/7 → 6/7 vs manga3/4's 7/7 → 5/7), so a receipt
+must declare the cascades the spec declares NOW; manga3/manga4 then agree field-for-field and
+the clause names both. games (10) + settings (7) were **never missing a receipt** — the glob
+was pinned to `_pr[0-9]+-` and theirs are `_pb1-`/`_pb2-`. The prefix is a label, not evidence.
+Five controls fired, ledger byte-untouched after each; the fifth is the cascade parser's own —
+its first draft was line-anchored and returned `{}` for `translate` and `video`, whose cascades
+are inline, i.e. **a filter that fails open**, now brace-balanced and verified against all four
+declarations that exist.
+
+**Audit-trail defect, fixed:** `controlCoverage.reason` in the TRACKED ledger named
+`debug/_p2g-notwritten.cjs` as the authority for its own numbers, and `debug/` is gitignored.
+Both writers are now `probes/l6-ledger-coverage.cjs` and `probes/l6-control-transcribe.cjs`,
+reproducing identical figures from there; the debug copies are DELETED, not mirrored.
+
+**Where b2 stands:** 212/221 `both`, 9 `pending` (all city — no Liquid destination yet), 2
+specs with no rows (`vn`, human-blocked and re-checked this turn: 0 VN localStorage keys;
+`notebook`, no subject on this branch). Nothing recoverable by counting remains.
