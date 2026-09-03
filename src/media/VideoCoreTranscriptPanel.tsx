@@ -128,6 +128,26 @@ function timestamp(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/**
+ * How far a row is from the line being spoken, as a band rather than a number.
+ *
+ * This is the hierarchy the redesign asks for — active line large, neighbours readable,
+ * distant lines faded, past lines receding — and it is computed here rather than in CSS
+ * because CSS cannot express "two rows either side of the active one" over a list whose
+ * active index moves. `near` is ±1 and `mid` is ±4, chosen so a 24-minute episode's
+ * typical 3–5 s cues put roughly ten seconds of context at full readability.
+ */
+export type RowDistance = 'active' | 'near' | 'mid' | 'far' | 'past';
+
+export function rowDistance(index: number, activeIndex: number | null): RowDistance {
+  if (activeIndex == null) return 'mid';
+  const delta = index - activeIndex;
+  if (delta === 0) return 'active';
+  if (delta < 0) return delta >= -1 ? 'near' : 'past';
+  if (delta <= 1) return 'near';
+  return delta <= 4 ? 'mid' : 'far';
+}
+
 interface RowProps {
   cue: VideoCoreActiveCue;
   text: string;
@@ -135,6 +155,8 @@ interface RowProps {
   tokens?: readonly JpToken[];
   translation?: string;
   active: boolean;
+  /** Emphasis band. See `rowDistance`. */
+  distance: RowDistance;
   busy: boolean;
   onSeek: (cue: VideoCoreActiveCue) => void;
   onTranslate: (cue: VideoCoreActiveCue, text: string) => void;
@@ -147,6 +169,7 @@ const TranscriptRow = React.memo(function TranscriptRow({
   tokens,
   translation,
   active,
+  distance,
   busy,
   onSeek,
   onTranslate,
@@ -157,6 +180,10 @@ const TranscriptRow = React.memo(function TranscriptRow({
       className={`study-transcript-row${active ? ' is-active' : ''}`}
       data-cue-index={cue.index}
       data-active={active ? 'true' : 'false'}
+      data-distance={distance}
+      // Announced as the current line rather than merely styled as it: a screen reader
+      // following along has no access to the size and opacity that carry this visually.
+      aria-current={active ? 'true' : undefined}
     >
       <button
         type="button"
@@ -180,13 +207,19 @@ const TranscriptRow = React.memo(function TranscriptRow({
         </span>
       </button>
       {/* Only when it says something the line does not already: an all-kana cue
-          would otherwise render twice, identically. */}
-      {tokens && readingLine(tokens) !== text && (
+          would otherwise render twice, identically. Distant rows drop it — a reading
+          gloss on a line nobody is looking at is the noise this redesign is removing. */}
+      {tokens && distance !== 'far' && distance !== 'past' && readingLine(tokens) !== text && (
         <p className="study-transcript-reading" lang="ja">{readingLine(tokens)}</p>
       )}
       {translation ? (
         <p className="study-transcript-translation">{translation}</p>
       ) : (
+        /*
+          Revealed on the active row, on hover and on keyboard focus — never printed
+          down every row. "Avoid placing every action on every row" is the rule, and a
+          focus-visible reveal is what keeps that from becoming hover-only.
+        */
         <button
           type="button"
           className="study-transcript-translate"
@@ -220,6 +253,28 @@ export default function VideoCoreTranscriptPanel({
     () => cues.map((cue) => ({ cue, text: stripAssCueText(cue.text) })).filter((row) => row.text),
     [cues],
   );
+
+  /*
+    The playhead does not stop existing between two lines, and the bands must not either.
+
+    `activeIndex` is `activeCue?.index ?? null`, so it drops to null in every gap between
+    cues — and `rowDistance(i, null)` is `'mid'` for EVERY row. That made each cue end and
+    each cue start rewrite `data-distance` on the whole column: measured live 2026-09-03 on a
+    2,650-row track as a single MutationObserver batch of 2,650 mutations, 2,647 of them
+    `data-distance`, against exactly one `class` / `data-active` / `aria-current`. Twice per
+    spoken line the panel re-rendered all 2,650 memoized rows with their ~47 token spans, and
+    the renderer stopped servicing its own timers for up to 24.9 s with the clip playing.
+    Defect S5 in the transformation plan; the same track paused, or filtered so the banding is
+    suspended, holds ~1 s. It is the attribute rewrite, not the row count — 68 % of these rows
+    with banding off measured 2,115 ms against 24,952 ms.
+
+    So the anchor is the last line that WAS spoken. `active` below still comes from the real
+    `activeIndex`, so the highlight clears in the gap; only the emphasis hierarchy persists,
+    which is what a reader following along wants anyway.
+  */
+  const bandAnchorRef = React.useRef<number | null>(null);
+  if (activeIndex != null) bandAnchorRef.current = activeIndex;
+  const bandAnchor = activeIndex ?? bandAnchorRef.current;
 
   /*
     Colour-coding the whole track, without a jank spike on open.
@@ -268,16 +323,86 @@ export default function VideoCoreTranscriptPanel({
     [rows, needle],
   );
 
+  /**
+   * Whether the scroll about to happen is ours.
+   *
+   * Manual scrolling has to suspend auto-follow, and the only signal a `scroll` event
+   * carries is that the list moved — it cannot say who moved it. So the follow effect
+   * marks its own scrolls, and the handler ignores exactly those. Without the mark,
+   * following playback would immediately switch following off.
+   */
+  const programmaticScrollRef = React.useRef(0);
+
+  /**
+   * The scroller's own geometry, as of the last scroll we judged.
+   *
+   * The 250 ms mark above answers "did WE scroll". It cannot answer the other way a
+   * `scroll` event arrives without anyone scrolling: the list REFLOWED underneath a
+   * fixed `scrollTop`. Measured live 2026-09-02 against the presentation switch —
+   * `listScrollTop` 3693 → 4552 and `followChecked` true → false, with the panel box
+   * identical at 384x517 in both — so Make Liquid silently switched auto-follow off
+   * while a clip was playing, and the reader's only clue was that the transcript
+   * stopped moving. Lazy furigana tokenisation, a detach/re-dock and an OS window
+   * resize all produce the same event from the same cause.
+   *
+   * A user gesture never changes `scrollHeight` or `clientHeight`; a reflow almost
+   * always changes one. That is the whole discriminator, and it needs no
+   * `ResizeObserver` — which would also have been wrong here, since it does not fire
+   * at all in an unfocused window and this panel is watched while a video plays.
+   *
+   * The baseline is refreshed on every programmatic scroll too, i.e. once per cue
+   * during playback, so a geometry change that arrives with no scroll event of its own
+   * cannot make the NEXT real gesture look like a reflow.
+   */
+  const listMetricsRef = React.useRef<{ scrollHeight: number; clientHeight: number } | null>(null);
+
+  const recordListMetrics = React.useCallback((): void => {
+    const list = listRef.current;
+    if (!list) return;
+    listMetricsRef.current = { scrollHeight: list.scrollHeight, clientHeight: list.clientHeight };
+  }, []);
+
+  const scrollToActive = React.useCallback((): void => {
+    if (activeIndex == null) return;
+    const node = listRef.current?.querySelector(`[data-cue-index="${activeIndex}"]`);
+    // Feature-detected rather than assumed: this runs in an effect, so a host
+    // without it (jsdom, and any non-DOM renderer) would not merely fail to
+    // scroll — the throw would tear the whole panel out of the tree.
+    if (typeof node?.scrollIntoView !== 'function') return;
+    programmaticScrollRef.current = Date.now();
+    recordListMetrics();
+    node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [activeIndex, recordListMetrics]);
+
   // Following playback while filtering would fight the reader — they are
   // looking at a subset on purpose, and yanking it to the playhead undoes that.
   React.useEffect(() => {
     if (!follow || needle || activeIndex == null) return;
-    const node = listRef.current?.querySelector(`[data-cue-index="${activeIndex}"]`);
-    // Feature-detected rather than assumed: this runs in an effect, so a host
-    // without it (jsdom, and any non-DOM renderer) would not merely fail to
-    // scroll — the throw would tear the whole rail out of the tree.
-    if (typeof node?.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex, follow, needle]);
+    scrollToActive();
+  }, [activeIndex, follow, needle, scrollToActive]);
+
+  const handleScroll = React.useCallback((): void => {
+    const list = listRef.current;
+    const previous = listMetricsRef.current;
+    if (list && previous) {
+      const reflowed = list.scrollHeight !== previous.scrollHeight
+        || list.clientHeight !== previous.clientHeight;
+      recordListMetrics();
+      if (reflowed) {
+        // A layout change is not a user scrolling away. Following stays on, and the
+        // active line is pulled back into view, because a reflow is exactly when it
+        // has been pushed out of it.
+        if (follow) scrollToActive();
+        return;
+      }
+    } else {
+      recordListMetrics();
+    }
+    // 250 ms covers a smooth scroll's own event burst. A longer window would swallow a
+    // real wheel gesture that lands right after one.
+    if (Date.now() - programmaticScrollRef.current < 250) return;
+    setFollow(false);
+  }, [follow, recordListMetrics, scrollToActive]);
 
   const handleTranslate = React.useCallback(
     (cue: VideoCoreActiveCue, text: string): void => {
@@ -346,6 +471,21 @@ export default function VideoCoreTranscriptPanel({
           />
           {t('mediaWorkspace.study.transcriptFollow')}
         </label>
+        {/* The way back. Scrolling away suspends following, so without this the only
+            route to the playhead is to hunt for it. Shown only when it does something. */}
+        {!follow && activeIndex != null && (
+          <button
+            type="button"
+            className="study-transcript-jump"
+            data-study-action="transcript-jump-to-current"
+            onClick={() => {
+              setFollow(true);
+              scrollToActive();
+            }}
+          >
+            {t('studyWorkspace.transcript.jumpToCurrent')}
+          </button>
+        )}
       </div>
 
       {visible.length === 0 ? (
@@ -357,7 +497,7 @@ export default function VideoCoreTranscriptPanel({
       ) : (
         // `sa-palette` carries the six category hues, so a noun is the same green
         // here as in the analysis panel's legend.
-        <ol className="study-transcript-list sa-palette" ref={listRef}>
+        <ol className="study-transcript-list sa-palette" ref={listRef} onScroll={handleScroll}>
           {visible.map((row) => (
             <TranscriptRow
               key={row.cue.index}
@@ -366,6 +506,10 @@ export default function VideoCoreTranscriptPanel({
               tokens={tokenRows[row.cue.index]}
               translation={translations[row.cue.index]}
               active={row.cue.index === activeIndex}
+              // While filtering, every row is a search result rather than a position in
+              // the timeline, so the distance hierarchy is suspended — fading four of
+              // six matches would hide the answer the reader is looking at.
+              distance={needle ? 'mid' : rowDistance(row.cue.index, bandAnchor)}
               busy={busyIndex === row.cue.index}
               onSeek={onSeek}
               onTranslate={handleTranslate}
