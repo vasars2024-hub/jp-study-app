@@ -1,85 +1,194 @@
 {
   "label": "l7-flashcards",
   "surface": "Flashcards",
-  "win": "(focused)",
-  "theme": "forest-night",
+  "win": "1",
+  "theme": null,
   "presentation": "standard",
   "box": "820x580",
+  "deferredVisibilityOwners": 0,
   "parserSelfTest": {
     "ok": true,
     "why": "channels scaled 0..1 -> 0..255",
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 342,
+    "measured": 101,
     "unmeasurable": 0,
-    "minRatio": 5.01,
-    "minOwner": "span.flash-strip-meaning \"ケイジ\" 12px",
+    "minRatio": 5.33,
+    "minOwner": "button \"Check for new voices\" 13.3px",
     "failingCount": 0,
     "worst": [],
-    "inactiveSkipped": 0,
-    "inactiveWorst": []
+    "inactiveSkipped": 9,
+    "decorativeSkipped": 0,
+    "decorativeWorst": [],
+    "inactiveWorst": [
+      {
+        "el": "button",
+        "text": "Convert 0 scheduled card",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      },
+      {
+        "el": "button",
+        "text": "Reset all scheduling",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      },
+      {
+        "el": "button",
+        "text": "Start learning",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      },
+      {
+        "el": "button",
+        "text": "Start writing",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      },
+      {
+        "el": "button",
+        "text": "Start a match round",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      },
+      {
+        "el": "button",
+        "text": "Take a test",
+        "px": 13.3,
+        "large": false,
+        "ratio": 2.71,
+        "bar": 4.5,
+        "inactive": true,
+        "decorative": false
+      }
+    ]
   },
   "targets": {
-    "total": 99,
+    "total": 47,
     "smallest": "input 13px",
     "smallestPx": 13,
-    "under32Count": 6,
+    "under32Count": 24,
     "under32": [
       {
         "el": "input",
         "min": 13,
-        "nearest": 193.1
+        "nearest": 36
       },
       {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
+        "el": "input",
+        "min": 13,
+        "nearest": 36
       },
       {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
+        "el": "input",
+        "min": 13,
+        "nearest": 36
       },
       {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
+        "el": "input",
+        "min": 13,
+        "nearest": 36
       },
       {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
+        "el": "input",
+        "min": 13,
+        "nearest": 36
       },
       {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
+        "el": "input",
+        "min": 13,
+        "nearest": 36
+      },
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 36
+      },
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 36
+      },
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 36
+      },
+      {
+        "el": "input",
+        "min": 13,
+        "nearest": 36
       }
     ],
     "wcag258FailCount": 0,
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 99,
+    "controls": 47,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
     "focusHosts": [],
     "roving": []
   },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
   "raised": "already-on-top",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 57,
+    "beforeOverThreshold": 15,
     "beforeLongest": {
-      "el": "span.cover-level-badge",
-      "dur": 0.2
+      "el": "div.fwin-bar",
+      "dur": 0.14
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 57,
+    "afterOverThreshold": 15,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
@@ -87,10 +196,11 @@
     "title": "Flashcards",
     "floor": 32,
     "presentation": "standard",
-    "theme": "forest-night",
+    "theme": null,
     "box": "820x580",
-    "controls": 99,
-    "measured": 99,
+    "deferredVisibilityOwners": 0,
+    "controls": 42,
+    "measured": 42,
     "belowFloorByRect": 5,
     "belowFloorByHit": 0,
     "belowFloor": [],
@@ -114,15 +224,90 @@
     "worstShrunkBy": 0,
     "occludedCount": 0,
     "occluded": [],
-    "disabledCount": 0,
-    "disabled": [],
-    "disclosedForRun": 0,
+    "disabledCount": 10,
+    "disabled": [
+      {
+        "el": "button.btn.primary",
+        "rect": "139x35"
+      },
+      {
+        "el": "button.btn",
+        "rect": "117x35"
+      },
+      {
+        "el": "button",
+        "rect": "200x23"
+      },
+      {
+        "el": "button",
+        "rect": "132x23"
+      },
+      {
+        "el": "button",
+        "rect": "160x44"
+      },
+      {
+        "el": "button",
+        "rect": "160x44"
+      },
+      {
+        "el": "button",
+        "rect": "160x44"
+      },
+      {
+        "el": "button",
+        "rect": "160x44"
+      }
+    ],
+    "disclosedForRun": 1,
     "disclosuresRestored": true,
     "scrollLeaks": [
-      "div.fwin-body 0,0 -> 1493,0",
-      "div.flash-group-body.flash-group-body-vlist 0,0 -> 1458,0",
-      "div.flash-group-body.flash-group-body-vlist 0,0 -> 1458,0"
+      "div.fwin-body 0,0 -> 2160,0"
     ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
     "scrollRestore": {
       "put": 0,
       "cleared": 0
@@ -143,37 +328,7 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
-  "control": {
-    "moved": {
-      "contrast": true,
-      "targetsByPointer": true,
-      "targetsByRect": true,
-      "wcag258": true,
-      "keyboard": true
-    },
-    "backToBaseline": true,
-    "rectDrift": 0,
-    "counts": {
-      "base": [
-        0,
-        6,
-        0,
-        0,
-        0
-      ],
-      "dirty": [
-        1,
-        8,
-        2,
-        1,
-        58
-      ],
-      "restored": [
-        0,
-        6,
-        0,
-        0
-      ]
-    }
+  "ariaRestored": {
+    "skipped": "nothing was opened"
   }
 }
