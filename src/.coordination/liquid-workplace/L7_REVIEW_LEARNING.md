@@ -1035,3 +1035,58 @@ and absent game progress all restore.
 
 **Games is 8 of 8 categories / 80/80.** Fix/evidence commit `b6e55253`; scorecard and receipts:
 `LIQUID_SCORECARD.md`, `cat{1,2,3,4,5,6,8}-l7-games*.json`, and `cat7-games-perf{,-control}.json`.
+
+## 2026-09-03 (primary2) — bullets 970 and 971 close; one product defect, and one surface is gone
+
+**RULE C pair: Calendar and Games, and both are 8/8 at 10/10** — re-derived mechanically from
+the banked receipts this turn, not inherited (`cat{1,2,3,4,5,6,8}-l7-{calendar,games}.json` +
+`cat7-{calendar,games}-perf.json`, verdict field read by `node -e`). Densest is Games (113
+nodes, 15 games, a timed answer loop); most different is Calendar (a 42-cell month grid whose
+whole subject is scheduling). `sampled-out:` Flashcards (60/80 — cat7 and cat8 open, and this
+profile has **0 decks**, so its review loop is not measurable here), Anki (externally PARKED),
+Statistics (70/80 — cat8 blocked by the `anki:getIntervals` false success), Notebook (below).
+
+**Notebook is NOT a surface any more, and L7's own order still lists it.** Files-app gate 8
+deleted the section. Three independent confirmations: `grep -c notebook DesktopShell.tsx` = 0;
+`App.tsx:108` says so in its own comment ("Gate 8 deleted the Notebook section"); and the live
+start menu lists **22** app tiles with no Notebook among them. Its banked 80/80 (2026-08-28)
+certified a surface that no longer ships. Not withdrawn — it was true when measured — but it
+cannot be one of L7's six, so the order is now **Flashcards → Anki → Statistics → Calendar →
+Games**, five.
+
+**Bullet 970 — "Keep review/input surfaces spatially fixed during active tasks" — had never
+been measured against its own words**, by anything. None of the eight categories samples a
+region's box ACROSS a task. `--fixity` on cat2 does (commit `50f99f30`, RULE 1: a mode on the
+harness that already drives tasks, not a 114th probe).
+
+**Calendar FAILED it, and the fix is `8abce3a4`.** `.cal-month-grid` sits at y=167 root-relative
+at rest; click "Jump to date" and it is at **211 — 44px down** — and stays there through the
+next two steps (previous month, Today). rootDx/rootDy **0**, so the window did not move: the
+grid did. Cause: `[open]` made the date field a flow sibling in a `flex-wrap: wrap` transport,
+the row wrapped, the toolbar grew 38→82px. **The 2026-08-28 cat5 repair introduced it** — the
+disclosure that moved Q4 from 0/9 to 1/8 is the thing that shoves the grid. Anchoring the field
+over the toolbar: **44 → 0px at all seven samples**, `spatiallyFixed true`, undo restored.
+
+**Games PASSED it unmodified.** `.game-stage` and `.game-launch-panel` both dx/dy **0** across
+the same disclosure gesture; the panel grows **dh 40** and displaces nothing, because it opens
+*below* the stage. So the defect is not "disclosures reflow" — it is **a disclosure above a work
+region displaces it**, which is the shape to look for on the remaining surfaces.
+
+**Control, on both, and it still discriminates AFTER the fix rather than going blind:** a planted
+`position:relative; top:9px` moved the used box 9px and the reader reported exactly **9px**;
+removal left residue **0px**, the exact original style attribute (null → null) and no marker.
+
+**Bullet 971 — "Use Liquid only for context, preview, scheduling detail, and session
+summaries."** Enumerated live per region, not inferred. Calendar: **2** Liquid-eligible, 2/2
+treated, 2/2 shared-primitive-backed, dense-Work-on-translucent **0**, 1 Work region — and read
+live from the DOM this turn, those two are `HEADER.lq-contextual.view-head` (context) and
+`DIV.lq-contextual.cal-toolbar` (scheduling detail), with `.cal-month-grid` NOT contextual and
+the one input (`.cal-jump`) inside `AnchorSurface bare`. Games: **6/6**, 6/6 shared, dense **0**,
+1 Work region — header, 15-game nav, game/difficulty header, material coverage, seen coverage,
+post-round detail: context and session summary throughout, with gameplay, answer inputs, HUD and
+timing on the opaque work pane. **0 Liquid-treated regions hold an input on either surface.**
+
+Trap banked: this enumeration reads **1 translucent node on both surfaces in Standard AND in
+Liquid** if you write your own alpha reader — `getComputedStyle().backgroundColor` resolves the
+Liquid material to an opaque `rgb()`, so a hand-rolled alpha check finds only an ordinary
+`.btn.small`. cat3's measured classifier is the instrument; do not re-invent it.
