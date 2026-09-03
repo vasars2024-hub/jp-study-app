@@ -201,11 +201,32 @@ throttling**: `document.visibilityState` is `visible`, `document.hidden` false,
 `document.hasFocus()` true, taken while a leg was stalling. **Not the subtitle track**: it
 reproduces on this OVA as readily as on the JoJo clip with its 36,435-line ASS sidecar.
 
-One caveat is owed and it is the reason S5 is filed `open` rather than fixed: this process is
-**29.9 hours old**, so its renderer modules predate the media fixes of 2026-09-03. The three arms
-above are internally consistent on one build, which is what makes the attribution to the surface
-sound, but whether HEAD still does this needs one re-measurement on a restarted app. That is the
-first step S5 asks for.
+A caveat was owed — this process is **29.9 hours old**, so its renderer modules predated the media
+fixes of 2026-09-03 — and it was answered in the same turn rather than handed on. `/reload` on the
+bridge re-executed every renderer module from the Vite dev server (main is untouched and still old;
+S5 is a renderer-thread symptom, so this is the half that matters), and the arms were re-taken with
+the surface driven through its own controls:
+
+| Arm, freshly loaded modules | Ticks | Longest gap |
+| --- | --- | --- |
+| workspace closed | 20 | 1,014 ms |
+| host open via `.seanime-host-launcher`, full library browser, **no clip** | 20 | 1,015 ms |
+| same host, **OVA playing** | 7 | **10,966 ms** |
+
+So the mounted surface is exonerated: the no-clip arm is indistinguishable from closed, at 1,015
+against 1,014 ms, with the same ~17k-element subtree on screen. The playing clip is the term. A
+`PerformanceObserver({entryTypes:['longtask']})` over the same window gives the shape — **35 long
+tasks totalling 32,999 ms in ~22 s, the two largest 10,755 and 10,531 ms, every one `name: 'self'`
+with `containerType: window`**, so top-document JS rather than an iframe or the JASSUB worker.
+
+Recorded as a LEAD and not as a diagnosis, because it has not been tested as a cause: with the clip
+playing this surface renders **3,054 `.study-transcript-text` nodes** inside a 16,952-element host,
+against CLAUDE.md's own rule to virtualise large rendered collections. Cheapest falsification is a
+clip with a short transcript. Second candidate, equally untested: a resume/progress write on a timer
+re-rendering the library pane.
+
+Magnitude depends on the age of the module graph — 137 s at 29.9 hours, 11 s fresh — so quote the
+age beside the number or the two readings look like a contradiction.
 
 Note also that the decoder itself is unaffected: 1,298 frames at 0 dropped and a 1.00 clock ratio
 were taken *through* these stalls. That is the whole reason the video pipeline's own counters are
