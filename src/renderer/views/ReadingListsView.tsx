@@ -30,7 +30,15 @@
  *     different things and say so. A write that main refuses leaves the document
  *     exactly as it was and reports it; it never optimistically redraws.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
@@ -302,6 +310,43 @@ let rowRenders = 0;
  */
 export function readingRowRendersForTesting(): number {
   return rowRenders;
+}
+
+interface ReadingListReturnState {
+  scrollTop: number;
+  selected: string[];
+  anchor: string | null;
+}
+
+/**
+ * §11.1's *"Back works"* — where the list you left is remembered.
+ *
+ * MODULE-LEVEL on purpose. Opening a book navigates the app away and UNMOUNTS
+ * this view, so component state is gone by the time the user comes back; a
+ * `useRef` or a `useState` here would remember nothing across the only journey
+ * the rule is about.
+ *
+ * NOT persisted, equally on purpose. A scroll offset is a session affordance,
+ * not a setting: writing it to `localStorage` would add a key with no restore
+ * point (trap 1) to remember where someone was three days ago, and restoring a
+ * stale offset into a list that has since changed length is worse than starting
+ * at the top.
+ */
+const READING_LIST_RETURN = new Map<string, ReadingListReturnState>();
+
+/**
+ * The two halves are written by different events at different times — the scroll
+ * as it happens, the selection on the way out — so they merge rather than
+ * replace. A plain `set` from either writer would erase the other's half.
+ */
+function rememberReturn(listId: string, patch: Partial<ReadingListReturnState>): void {
+  const held = READING_LIST_RETURN.get(listId) ?? { scrollTop: 0, selected: [], anchor: null };
+  READING_LIST_RETURN.set(listId, { ...held, ...patch });
+}
+
+/** The map is process-global, so a test that does not clear it leaks into the next. */
+export function resetReadingListReturnForTesting(): void {
+  READING_LIST_RETURN.clear();
 }
 
 /**
@@ -619,6 +664,13 @@ export default function ReadingListsView({
   // typed anything about yet, which reads as "this list is empty". A SELECTION
   // that survives it is worse: the bulk bar would then act on rows from a list
   // the user has already left.
+  //
+  // §11.1's "Back works" does NOT contradict this and must not be read as
+  // undoing it: what is remembered is keyed BY LIST, so leaving A for B still
+  // arrives at B with B's own state (usually none), and the bulk bar can never
+  // hold a row from a list that is not on screen. The restore below runs after
+  // this effect, deliberately — both queue in one commit and the later write
+  // wins.
   useEffect(() => {
     setFilter('');
     setSelected(new Set());
@@ -627,6 +679,88 @@ export default function ReadingListsView({
     setPicking(false);
     setPickFilter('');
     setLibraryNote(null);
+  }, [listId]);
+
+  /**
+   * §11.1: *"Back works. Opening a book from a list and coming back returns to
+   * the list at the same scroll position and selection."*
+   *
+   * `liveRef` is written during RENDER so the capture below can read the values
+   * as of the last render of the list being left. Reading `selected` from the
+   * effect's own closure would capture whatever the dependency array pinned,
+   * and putting `selected` in the dependencies would re-run the capture on every
+   * click instead of on the way out.
+   */
+  const liveRef = useRef({ selected, anchor });
+  liveRef.current = { selected, anchor };
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const restoredForRef = useRef<string | null>(null);
+  const selectionRestoredForRef = useRef<string | null>(null);
+
+  /**
+   * Capture the SELECTION on the way OUT — in a cleanup, not on every change.
+   *
+   * The cleanup for list A runs BEFORE the effect body for list B, and before
+   * the clearing effect above has written its empty set, so `liveRef.current`
+   * still holds A's selection here. Capturing continuously would store A's
+   * selection under B's key on the render where `listId` changed and A's state
+   * had not been cleared yet.
+   *
+   * The SCROLL is not captured here. It cannot be: `detailRef.current` is
+   * already `null` by the time a passive cleanup runs on unmount, and on mount
+   * the ref is null anyway because the first render is the loading state. It is
+   * written by the container's own `onScroll` instead, as it happens.
+   */
+  useEffect(() => {
+    if (!listId) return undefined;
+    const leaving = listId;
+    return () => {
+      rememberReturn(leaving, {
+        selected: [...liveRef.current.selected],
+        anchor: liveRef.current.anchor,
+      });
+    };
+  }, [listId]);
+
+  /**
+   * Restore the SELECTION, once per arrival.
+   *
+   * The `alive` filter is DEFENCE IN DEPTH and is knowingly unfalsifiable from a
+   * test: a mutation that deletes it scores GREEN, because `selectedIds` below
+   * already derives the actionable list through `rows`, and the select-all
+   * checkbox reads `selected.has` over `visibleRows` — so no surface can show a
+   * dead id whether it is filtered here or not. It is kept because restoring
+   * ids into state that the state can never shed is the kind of thing that stops
+   * being harmless the moment a new consumer reads `selected` directly. Do not
+   * spend another run trying to make it fail.
+   *
+   * `document` IS a dependency, and the ref guard is what makes that safe: the
+   * first render of a visit has no document at all (the store loads after
+   * mount), so an effect keyed on `listId` alone runs exactly once, finds
+   * nothing, and never gets a second chance. Without the guard it would instead
+   * re-select on every store broadcast, and a user who deselected a row would
+   * have it come back the next time anything anywhere wrote.
+   */
+  useEffect(() => {
+    if (!listId) {
+      selectionRestoredForRef.current = null;
+      return;
+    }
+    if (selectionRestoredForRef.current === listId) return;
+    const list = document?.lists.find((candidate) => candidate.id === listId);
+    if (!list) return;
+    selectionRestoredForRef.current = listId;
+    const held = READING_LIST_RETURN.get(listId);
+    if (!held || held.selected.length === 0) return;
+    const alive = new Set(list.entries.map((entry) => entry.id));
+    const kept = held.selected.filter((id) => alive.has(id));
+    if (kept.length === 0) return;
+    setSelected(new Set(kept));
+    setAnchor(held.anchor && alive.has(held.anchor) ? held.anchor : null);
+  }, [listId, document]);
+
+  useEffect(() => {
+    if (!listId) restoredForRef.current = null;
   }, [listId]);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -763,6 +897,30 @@ export default function ReadingListsView({
     // body means the next Tab starts at the top of the page, not at the row.
     node.querySelector('button')?.focus();
   }, [focusEntryId, rows, visibleRows]);
+
+  /**
+   * §11.1's "Back works", scroll half. Once per arrival, and only once the rows
+   * are actually there — the document loads after the first render, so applying
+   * it any earlier writes a `scrollTop` onto a container that has nothing to
+   * scroll and the browser silently clamps it to 0.
+   *
+   * A LAYOUT effect: on a plain effect the list paints at the top and then
+   * jumps, which reads worse than not restoring at all.
+   */
+  useLayoutEffect(() => {
+    if (!listId || rows.length === 0) return;
+    if (restoredForRef.current === listId) return;
+    restoredForRef.current = listId;
+    // Row 8's arrival scrolls to a NAMED entry and outranks this: the caller
+    // asked for a specific row, and a remembered offset would fight it.
+    if (focusEntryId || !detailRef.current) return;
+    // Written UNCONDITIONALLY, including the 0. Grid and detail are both a
+    // `div.rlv`, so React reconciles them to the SAME host node and the browser
+    // keeps its scroll offset across the switch — a list with nothing remembered
+    // would otherwise open at wherever the PREVIOUS list was left. Measured:
+    // A at 300 → grid → B opened at 300.
+    detailRef.current.scrollTop = READING_LIST_RETURN.get(listId)?.scrollTop ?? 0;
+  }, [listId, rows.length, focusEntryId]);
 
   /**
    * §11.4's bulk selection, derived rather than stored, so it can never name a
@@ -1992,10 +2150,20 @@ export default function ReadingListsView({
 
     return (
       <div
+        ref={detailRef}
         className="rlv"
         data-surface="reading-lists"
         data-mode="detail"
         data-density={density}
+        /*
+          §11.1's "Back works", scroll half — recorded AS IT HAPPENS rather than
+          on the way out. By the time a passive cleanup runs on unmount React has
+          already detached `detailRef`, so there is nothing left to read; and on
+          the way in the ref is null too, because the first render of a visit is
+          the loading state. A write per scroll event into a module Map is the
+          cheapest thing here by a wide margin — no state, no re-render.
+        */
+        onScroll={(event) => rememberReturn(list.id, { scrollTop: event.currentTarget.scrollTop })}
         /**
          * §11.4's `/`. Bound on the view rather than the document: a global
          * listener would steal the key from every other window in this shell,
