@@ -1203,6 +1203,115 @@ widget shows. Either take an explicit option and leave the default alone, or
 change both together and re-run `readingListWidgets.test.tsx` — a silent
 re-ordering of the "Next up" widget is a behaviour change nobody asked for.
 
+### 9.5 — 2026-09-04, P5 §5.3 CLOSED. Next up, by best-fit difficulty for pools.
+
+`a510e4f9` (pure core) `97b8610c` (the Next up button on the list detail).
+
+**WHAT WAS ACTUALLY MISSING, derived before rebuilding.** `nextUpReadingRow` has
+existed since P4 and §11.2's widget ships it. Its gap against §5.3 was exactly the
+half the previous turn predicted: it did state-priority (`reading` → `owned` →
+`wanted`) then list order, and had no notion of difficulty at all. Nothing was
+rewritten; the ranking was added INSIDE the winning state band.
+
+**Scoped to `pool`, and to nothing else.** A pool is explicitly unordered — the
+user dropped twenty books in a bag and the app is supposed to hand back the one
+to read now. For every other kind the arrangement IS the answer: `ordered` is the
+user's sequence, `tiered` already sorts by tier, `challenge` is a set with a date.
+Four kinds are asserted unchanged.
+
+**The rank, four components in order.** Measured before unmeasured; distance from
+the reader's tier; **easier wins an exact tie** (a book one tier below is always
+readable, one above may simply not be, and when the app chooses on the user's
+behalf it takes the readable one); then list order, which `sort` preserves. An
+unmeasured work is never PREFERRED and never EXCLUDED — §7's `difficultyMax` call,
+for the same reason: excluding it makes a fresh import invisible for as long as
+enrichment takes.
+
+**The widget trap was taken by the first branch.** Both inputs are OPTIONAL and
+the default is byte-for-byte the shipped behaviour, so a caller opts in by having
+the levels to opt in with. `readingListWidgets.test.tsx` + the view + a11y suites
+= **109 passed, unchanged**.
+
+**No new scale, no new field.** The tier is `getUserLevel()` — the same reader the
+Reading Finder builds its level band from — and the per-work level is
+`effectiveLevelEstimate` over the bound library items, the one L1–L7 scale §7's
+`difficultyMax` already rides. `getUserLevel` is guarded: a throw would take the
+whole list detail down for one button, and falling back to `null` turns the fit
+off and leaves list order.
+
+**The button routes through `openRow`**, the same handler a row click uses, so the
+queue inherits §11.1 whole — bound to the reader, `owned` promoted to `reading`,
+unbound `wanted` to acquisition. A second navigation path here would be a second
+answer to "where does a book open". The title is IN the label: a button that opens
+a reader without saying which book is one the user must press to find out.
+
+**Evidence.** 4 + 5 tests. **7/7 core mutants RED and 4/4 caller mutants RED**,
+each with an inert SENTINEL that correctly stayed GREEN. The caller mutants are
+the ones that matter: a pure core fed an empty map ranks nothing, passes every
+unit test, and ships a button that silently offers the first row forever.
+
+### 9.6 — 2026-09-04, P5 §5.12 CLOSED. The timeline. **P5 IS 5 OF 5.**
+
+`67a15812` (pure core) `48bad532` (the panel, mounted twice).
+
+**IT READS THE ENTRIES, NOT THE EVENT LOG — deliberately against §5.12's own
+wording.** §5.12 says "straight from the event log". The log is capped and
+compacted, so a year-in-review built on it silently loses the START of the year,
+which is precisely the half a year view exists to show, and it would lose it
+without saying so. `finishedAt` is on the entry, `normalizeReadingEntry` repairs a
+dateless finish back to `owned`, and entries are never compacted.
+`recentReadingFinishes` made the same call for the same reason.
+
+**Fan-out counts once, at the EARLIEST tick.** §4 ticks the same book on every
+list it is on; unscoped, a book on three lists would paint three squares and the
+year total would read three books for one read. The later timestamps are the
+fan-out, not a second reading.
+
+**The zone is an argument, not a `Date` call inside the core.** `offsetMinutes` is
+minutes to ADD to UTC, which is `-new Date().getTimezoneOffset()` at the call
+site. A calendar computed with local getters inside a pure function gives one
+answer on a CI box and another on the user's machine.
+
+**Empty days are `<span>`s, not buttons.** A year is 365 cells and all but a
+handful are empty; making them focusable puts 365 tab stops between the year
+picker and the next control, which is §11.4's keyboard row failing on this panel
+alone. A live day is a real button that says its date and its count.
+
+**Honest states, all three.** `elsewhere` is reported, so a panel showing 3 books
+does not hide the other 40. The current year is offered in the picker even when
+empty, so "nothing yet this year" is answerable. Nothing-ever-finished is a
+sentence saying what would fill it, and a `null` document renders nothing at all
+because loading belongs to the host.
+
+**Evidence. 12 + 8 tests. 12/12 core mutants RED, 11/11 panel mutants RED**, each
+with an inert SENTINEL that stayed GREEN. **TWO panel mutants were GREEN on the
+first pass and both were real gaps, not rounding:**
+
+1. **A dropped `offsetMinutes` scored GREEN.** Every fixture was mid-day UTC — by
+   design, so the suite would be zone-independent — and a mid-day fixture *cannot
+   see* the zone. The fix stubs `getTimezoneOffset` at −540 and +300 and asserts
+   the same instant lands on two different days. Writing it against the real clock
+   would pass vacuously on a UTC build box.
+2. **A `listId` that never reached the core scored GREEN.** The scoping test read
+   only the per-row list-name chip, which is driven by the PROP. A panel that
+   passed `listId` to the label and `null` to `readingTimeline` hid the chip and
+   still drew the other list's day. Fixed by adding a second list on a second day
+   and asserting the grid, not the chip.
+
+**Mounted twice, one implementation** — unscoped under the grid ("what did I read
+this year") and scoped on the list detail ("per list") — so the two can never
+disagree about what counts as a finish.
+
+**Exact next slice: §11.1 row 8's `MangaReader` wiring, the moment that path goes
+clean in the MAIN tree.** Checked again this turn (17:47): still ` M` from another
+track, six turns running. One import plus
+`<ReadingListMembership itemId={item.id} />` beside the title, exactly as
+`NovelReader.tsx:2986`. The path is `src/renderer/views/MangaReader.tsx` —
+`components/MangaReader.tsx` does not exist and checking it exits 0 with silence.
+Editing it here blocks `relay-mergeback` until that path goes clean. After that,
+P5 has nothing open and the track's remaining surface is §11.3 reminders and
+§11.4's residual rows.
+
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
 Kept only so the entry above has its subject.
