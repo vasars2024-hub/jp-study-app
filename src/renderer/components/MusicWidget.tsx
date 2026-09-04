@@ -10,6 +10,7 @@ import { loadVizSettings, onVizSettingsChanged } from '../visualizerSettings';
 import { loadMusicWidgetSettings, onMusicWidgetSettingsChanged, toggleShowLyrics } from '../musicWidgetSettings';
 import { openSectionSurface } from '../sectionSurface';
 import { useT } from '../i18n';
+import './musicWidgetLiquid.css';
 
 // Mini-player desktop widget: a live little version of the Music app.
 // Responsive — a slim bar when small, a full grid with big album art when
@@ -141,8 +142,17 @@ export default function MusicWidget() {
   // Repeat is a three-way cycle, not a toggle, so it keeps the Music app's own
   // "Repeat: {mode}" name, which already states the state it is in.
   const playLabel = t(ps.playing ? 'music.controls.pause' : 'music.controls.play');
+  // L9 category 3, measured 2026-09-04 on the live 430x190 window: the widget had NO
+  // Liquid-eligible region at all, so the presentation flip changed nothing below the
+  // title bar. The transport cluster is the surface's contextual chrome — the one thing
+  // §2.3 reserves Liquid for — so it becomes a named `toolbar` on the shared primitive.
+  // The name is the region's, not a control's; every button keeps its own.
   const controls = (
-    <div className="mwidget-controls">
+    <div
+      className="mwidget-controls lq-contextual"
+      role="toolbar"
+      aria-label={t('music.controls.transport')}
+    >
       <button
         className={`mwidget-btn ${ps.shuffle ? 'on' : ''}`}
         title={t('music.controls.shuffle')}
@@ -207,21 +217,14 @@ export default function MusicWidget() {
       >
         <Icon name="caption" size={13} />
       </button>
-      <div className="mwidget-vol" title={t('music.controls.volume')}>
-        <Icon name="volume" size={13} />
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={ps.volume}
-          onChange={(e) => player.setVolume(Number(e.target.value))}
-          aria-label={t('music.controls.volume')}
-        />
-      </div>
     </div>
   );
 
+  // The two precision inputs — seek and volume — share ONE stable plate instead of floating
+  // on the album tint with the visualizer animating behind them at 0.35 opacity. §2.3 keeps
+  // dense work on an anchor in BOTH presentations, so this plate does not follow the flip;
+  // only the toolbar above does. Volume moved here from the button cluster for the same
+  // reason: a slider inside a translucent contextual region is work inside glass.
   const progress = (
     <div className="mwidget-progress">
       <span className="mwidget-time">{fmt(ps.time)}</span>
@@ -236,6 +239,18 @@ export default function MusicWidget() {
         aria-label={t('a11y.slider.trackPosition')}
       />
       <span className="mwidget-time">{fmt(ps.duration)}</span>
+      <div className="mwidget-vol" title={t('music.controls.volume')}>
+        <Icon name="volume" size={13} />
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={ps.volume}
+          onChange={(e) => player.setVolume(Number(e.target.value))}
+          aria-label={t('music.controls.volume')}
+        />
+      </div>
     </div>
   );
 

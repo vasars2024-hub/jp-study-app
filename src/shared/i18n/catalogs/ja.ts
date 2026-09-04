@@ -5274,6 +5274,7 @@ export const ja: Catalog = {
   'music.controls.play': '再生',
   'music.controls.pause': '一時停止',
   'music.controls.lyrics': '歌詞',
+  'music.controls.transport': '再生コントロール',
   'music.widget.empty': '再生中の曲はありません',
   'music.controls.openWidget': 'ミニプレーヤーウィジェットを開く',
 

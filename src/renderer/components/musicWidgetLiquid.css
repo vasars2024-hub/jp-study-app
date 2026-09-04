@@ -1,0 +1,76 @@
+/* Music widget — L9 category 3. The stage stays ambient; the precision controls get ground.
+
+   MEASURED BEFORE THIS FILE EXISTED, on the live 430x190 desktop window (bridge 39273,
+   pid 6756, 2026-09-04): cat3 scored FAIL on all three bars. `eligibleTotal` was 0 — the
+   widget owned no contextual region, so `data-presentation` flipped standard <-> liquid and
+   NOTHING below the title bar changed; the body's only paint was the component's hand-rolled
+   `rgba(12, 11, 16, 0.72)`, identical in both. And `denseWorkOnTranslucent` was 2:
+   `.mwidget-progress` and `.mwidget-vol`, both inheriting that 0.72 alpha, i.e. a seek bar
+   and a volume slider read against an album tint with the visualizer animating behind them.
+
+   The split this file draws is the plan's own: the tinted stage and the visualizer stay
+   AMBIENT, the transport cluster is the one CONTEXTUAL region (transport chrome is what
+   §2.3 reserves Liquid for), and the two sliders sit on an ANCHOR that does not follow the
+   presentation flip, because §2.3 keeps dense work anchored in both. */
+
+/* The contextual region. `lq-contextual` supplies the shared primitive — including its
+   32px `--lq-hit-target` floor on every descendant control, which this widget's 13px icon
+   buttons did not previously reach. Geometry stays the compact row the widget already had. */
+.mwidget-controls.lq-contextual {
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+
+/* Standard keeps the widget's own dark chrome and paints nothing extra; only Liquid hands
+   the material to the theme, exactly as the visualizer's edge dock does. The trip back is a
+   cascade with no component state, so it cannot lose anything. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .mwidget-controls.lq-contextual {
+  background: var(--lq-liquid-bg);
+  border-color: var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  color: var(--lq-liquid-text);
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .mwidget-controls.lq-contextual
+  .mwidget-btn {
+  color: var(--lq-liquid-text);
+}
+
+/* THE ANCHOR. Alpha is deliberately above the 0.95 the role classifier treats as opaque,
+   and it is the same in both presentations: a scrubber whose backing dissolves when the
+   window goes Liquid is exactly the "universal glass" outcome the plan calls a failure.
+   The colour is the widget's own dark palette rather than a theme token on purpose — this
+   trinket paints white-on-dark in every theme, like the visualizer canvas it sits over, and
+   a theme-owned light plate here would put 0.82-white text on a light ground. */
+.mwidget-progress {
+  background: rgba(9, 8, 13, 0.96);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.mwidget-vol {
+  flex: 0 0 auto;
+}
+
+/* CATEGORY 1, measured on the same window right after the primitive landed. The shared
+   `.lq-contextual` rule gave every button the 32px floor VERTICALLY and nothing horizontally:
+   the icon buttons measured 27x32 (hit walk 27.5) and the play button 29x32. A floor that
+   holds in one axis only is not a hit target, so the same token supplies the width. */
+.mwidget-btn {
+  min-width: var(--lq-hit-target);
+}
+
+/* The two sliders were 4px and 3px TALL: with a range input the painted track IS the element
+   box, so the whole pointer target was 16.5px on the hit walk against a 32px floor — the seek
+   bar of a music player, and the hardest control in the widget to hit. The box grows to the
+   token; the PAINT does not, because `accent-color` styles Chromium's own track and thumb and
+   replacing the track with `::-webkit-slider-runnable-track` would throw that away.
+   The root class carries the selector because `styles.css` already declares `height: 4px` at
+   the same (0,2,1) specificity and this sheet is not guaranteed to load after it — the first
+   attempt measured an unchanged 250x4 for exactly that reason. */
+.mwidget .mwidget-progress input[type='range'],
+.mwidget .mwidget-vol input[type='range'] {
+  height: var(--lq-hit-target);
+  background: transparent;
+}

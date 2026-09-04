@@ -5792,6 +5792,7 @@ export const ru: Catalog = {
   'music.controls.play': 'Воспроизвести',
   'music.controls.pause': 'Пауза',
   'music.controls.lyrics': 'Текст песни',
+  'music.controls.transport': 'Управление воспроизведением',
   'music.widget.empty': 'Ничего не воспроизводится',
   'music.controls.openWidget': 'Открыть виджет мини-плеера',
 
