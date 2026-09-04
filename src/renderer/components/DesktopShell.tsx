@@ -3978,12 +3978,22 @@ const FloatingWindow = memo(function FloatingWindow({
     el.addEventListener('pointerup', up);
   };
 
+  // `data-maximizable` below publishes `canMaximizeSection`, which is a deliberate product
+  // refusal for `note` and `city`: maximizing suppresses window drag and all three resize
+  // handles, and neither of those two bars renders a control that could clear the state, so
+  // the window would be trapped. Until now that decision was only inferrable from the ABSENCE
+  // of a button, and anything reading the DOM had to guess whether a missing Maximize was
+  // intentional or lost. Rubric category 4's harness guessed with `.fwin-frameless`, which
+  // catches `city` and misses `note` — the note then failed `allThreeSizes` for honouring a
+  // documented refusal. Declared, the refusal is legible: a window that SHOULD be maximizable
+  // still reads `true`, so a missing button on it is still a defect and cannot be laundered.
   return (
     <section
       ref={winRef}
       className={`fwin ${focused ? 'focused' : ''} ${isNote ? 'fwin-note' : ''} ${isVisualizer ? 'fwin-viz' : ''} ${isGarden ? 'fwin-frameless' : ''} ${isMaximized ? 'fwin-max' : ''} ${liquid ? 'fwin-liquid' : ''} ${animPhase ? `fwin-anim-${animPhase}` : ''}`}
       data-section={win.section}
       data-presentation={liquid ? 'liquid' : 'standard'}
+      data-maximizable={canMaximize ? 'true' : 'false'}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >

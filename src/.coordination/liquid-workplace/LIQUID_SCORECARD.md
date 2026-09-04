@@ -2412,3 +2412,146 @@ are what actually run.
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` still has 1 of 8 banked —
 cat2 remains VOID until FINDING A's recorder repair lands, which is the next slice.
+
+---
+
+## 2026-09-04 · primary — `note` categories 2 and 3 close at 10/10, and category 3's instrument was scoring an EMPTY WALK
+
+Both cells were driven this turn against the live app (bridge 39273, pid 6756, one window, the
+note alone on the desk at 260×220). Neither number was inherited.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 2 | Clunkiness | **10/10** | 28 keystrokes / 0 clicks; `worstRecv` **13.0 ms**, `overBar100` **0** of 28, `sharedPaintSamples` **0**, `framesObserved` 28; deadEnds **0**, modalTraps **0**, scrollTraps **0**; costParity standard **28** = liquid **28**, 260×220 in both, `restored: true` to standard | 3 axes planted, all 3 moved `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline true`, inert click 0.3 ms |
+| 3 | Liquid utilization | **10/10** | `regions` **1**, `Work` **1**, `controlsSkipped` **0**, `denseWorkOnTranslucent` **0**, `eligibleTotal` 0; window's own paint under Liquid `alpha 0.72 / blur(8px) saturate(1.25)` | controls **A and B both real** — "CONTROL FAILED AS REQUIRED"; plus the eligibility plant `0→1→0` proving the zero denominator is a MEASURED zero |
+
+Evidence: `baselines/cat2-s11-note-r3.json`, `cat2-s11-note-r3-control.json`,
+`cat3-s11-note-r2.json` (and `cat3-s11-note.json`, the pre-repair run, kept as the finding).
+
+**FINDING A is CLOSED by `9ad79b92`, and this is the run that proves it on the surface that
+raised it.** The previous entry left cat2 VOID pending that recorder repair. Re-driven at the
+default 40 ms spacing the repaired instrument now *refuses* rather than scoring —
+`UNSCOREABLE - 6 of 28 samples shared a paint (busiest frame held 4)` — which is the whole point
+of the repair. Re-driven at `--key-spacing 150` every keystroke gets its own frame
+(`framesObserved 28`, `sharedPaintSamples 0`) and the surface scores on real per-event latency.
+The old 480.1 ms `worstRecv` was the harness's delivery rate; the true worst is **13.0 ms**.
+
+**FINDING C — category 3 scored `note` 10/10 on a walk that found NOTHING, and would have
+scored an identical 10 on a note that put its editing surface on glass.**
+
+`l1-surface-roles.js:104` lists `textarea` in `CONTROL_SEL`, and the walk skips a control before
+it ever reaches the area floor. `.fwin-body-note` holds exactly **one** child — a 258×185
+`textarea.desk-note-text`, **80% of the window**. So the first run returned `regions: 0`,
+`controlsSkipped: 1`, `byRole` all zero, `vacuousContextual: true`, all three bars true for an
+absent denominator, and `PASS 10/10`. It could not even run its own controls: with no runtime
+Work region, controls A and B have nothing to perturb, so it fell back to the plant substitute.
+That is the "empty harness" cap the rubric puts at 0, reached silently.
+
+Repair (this commit): a MULTI-LINE EDITOR is the work, not the chrome. `EDITOR_SEL =
+'textarea,[contenteditable="true"]'` is exempted from the `CONTROL_SEL` skip, and `classify()`
+counts the element itself as a form (`querySelectorAll` is descendants-only, so a region that IS
+the editor read `forms: 0` and fell through to Ambient). Deliberately narrow: a single-line
+`input` stays chrome however wide it is — that is `label.mc-global-search`, the 290×30 search
+field whose false promotion is why `CONTROL_SEL` exists at all. The area floor is unchanged, so
+a small composer still never reaches the walk.
+
+After the repair, same surface, same presentation: `regions` **0 → 1**, `Work` **0 → 1**,
+`controlsSkipped` **1 → 0**, and controls A and B run for real instead of the plant fallback.
+
+**The product was innocent and that is measured, not assumed.** `textarea.desk-note-text`
+computes `background-color: rgb(255, 243, 163)` — fully opaque — in **both** presentations
+(standard, and Liquid with the frame at `alpha 0.72`), and `.fwin-body-note` is opaque
+`rgb(26, 24, 35)` under Liquid. `denseWorkOnTranslucent` is therefore a real 0. The defect was
+entirely in the instrument; no note CSS was changed.
+
+**Trap for the next worker.** `--key-spacing` defaults to 40 ms and that is not enough on this
+machine with a second Electron instance resident: 6 of 28 samples still shared a frame. Read the
+`UNSCOREABLE` string as an instruction, not a failure, and widen the spacing until
+`sharedPaintSamples` is 0. Do not exempt typed tasks.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **3 of 8** banked
+(cat1, cat2, cat3). Next: cat4 use-of-space on a 260×220 surface.
+
+---
+
+## 2026-09-04 · primary — `note` category 4 closes at 10/10, on a product change that makes a refusal LEGIBLE
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 4 | Use of space | **10/10** | 2 of 2 reachable sizes, both `restored: true` — default **260×220** (clipped 0, overlaps 0, hScrollers 0, dead **0%**, chrome **14.9%**, canvas **83.4%**) and compact **260×170** (0/0/0, dead **0%**, chrome **19.3%**, canvas **78.8%**); `contentGrowsNotChrome` **true** on the named pair `compact → default`; sub-minimum shrink to **200×140** clipped 0 / overlaps 0 / hScrollers 0, restored | 3 plants, each `0 → 1 → 0` with `removalProven: true` — injected clip, art-plate exclusion, backdrop exclusion; the pager leg records `applicable: false` with its reason rather than a score |
+
+Evidence: `baselines/cat4-s11-note.json` (the FAIL, kept as the finding),
+`cat4-s11-note-r2.json` (the pass).
+
+**FINDING D — category 4 failed the note for HONOURING a documented product refusal.**
+
+First run: `verdict FAIL`, `failedBars ["allThreeSizes"]`, because the maximized leg refused —
+`no Maximize button - refusing to fake it with an inline width`, `noMaximizeAffordance: false`,
+`chromeButtons: 2` (`Make Liquid`, `Delete note`), `frameless: false`.
+
+That refusal is correct and the product is right. `canMaximizeSection`
+(`src/renderer/desktopWindowGeometry.ts:36`) returns false for **`note` and `city`**, for a
+reason the source already states and that re-derives live: **the shell suppresses window drag
+and all three resize handles while maximized** (`DesktopShell.tsx`, the handles are inside
+`{!isMaximized && (…)}`), and neither of those two bars renders a control that could clear the
+state — so a maximized note would be trapped, unmovable and unresizable. That is CLAUDE.md's
+"every enable flow needs a recovery path" invariant being honoured by refusing the state, and
+the note loses nothing: **all three resize handles are ungated**, so it takes any size by drag.
+
+The instrument was the defect. Its exoneration read `w.classList.contains('fwin-frameless')`,
+which is a PROXY for the predicate and catches only one of its two members — `city` is
+frameless, `note` is framed. Its own comment names the real rule ("DesktopShell forces
+`max: false` for section 'city'") and then tests a class name instead.
+
+**Repair — the product now publishes the decision, so nothing has to guess.**
+`data-maximizable={canMaximize ? 'true' : 'false'}` on the `.fwin` element, beside
+`data-section`. The harness reads that instead of the class name, and **keeps its button scan
+as a second conjunct** — that half is the load-bearing one: a window that declares `true` and
+ships no Maximize still fails, which is the accidental-loss case correction 19 refused to
+launder, and this must not launder it either. `city` is unaffected: it declared `false` before
+via the class and declares `false` now via the predicate.
+
+After: `sizesExpected` **3 → 2**, `sizesRan` 2, `noMaximizeAffordance` **false → true**,
+`allThreeSizes` **false → true**, all seven bars true, `PASS 10/10`.
+
+Guard `src/renderer/__tests__/desktopWindowMaximizableAttr.test.ts`, 5 tests, comments stripped
+before every assertion (this file's prose names the attribute it forbids, and DesktopShell's
+does too). Mutation control: `data-maximizable={'true'}` → **1 of 5 RED**, restored and verified
+byte-identical by sha256, green again.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **4 of 8** banked
+(cat1, cat2, cat3, cat4). Next: cat5 UI clarity, then 6, 7, 8 — four cells from an 80/80 entry.
+
+---
+
+## 2026-09-04 · primary — `note` cat5 is VOID, and the reason is an ORDERING rule the next worker needs before anything else
+
+Driven, not skipped. `baselines/cat5-s11-note-m.json` (measurement) and `cat5-s11-note.json`
+(control). The control is valid on its own — "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10"
+— so the instrument is proven; the measurement is what VOIDs.
+
+Q1 YES (1 entry point, 1 primary input `textarea.desk-note-text`, 0 accent buttons).
+Q2 YES (title `Sticky note` from `span.fwin-title`, 1 way back). Q3 YES (primary action inside
+the body viewport at rest). **Q4 NO. Q5, Q7, Q8, Q9 VOID.**
+
+**CAT6 MUST RUN BEFORE CAT5, AND THE LABELS MUST MATCH.** Q7/Q8/Q9 are MEASURE questions that
+read a category-6 baseline at `baselines/cat6-<label>.json`. Run cat6 with `--label
+cat5-s11-note-m` first, or cat5 VOIDs three questions no matter how good the surface is. This is
+not a defect in either harness and it is not written down anywhere else.
+
+**Q5's theme axis did not move** — `theme=null` and `theme=classic-light` both report
+`minRatio 11.11`, so the swap never reached the paint and contrast stability measured nothing.
+That is the recorded `theme-swap-is-a-transition` trap: `getComputedStyle` immediately after a
+theme change returns the OLD colour. Settle before reading.
+
+**FINDING E (open, deliberately not repaired this turn) — Q4 fails the note for having no
+advanced tools to hide.** Bar: `>=1 collapsed disclosure AND <=12 controls scanned in the
+default state`. The note measures `collapsedDisclosures: 0`, `scannedControls: 1`. It clears the
+clutter half by a factor of twelve and fails the conjunct that asks for *something to disclose*.
+That is the **third** cell in this family on this one surface — cat3's empty walk, cat4's absent
+Maximize, and now this — and the shape is identical each time: a bar whose denominator a
+correct minimal surface makes zero. The other two were repaired this turn; this one is NOT,
+because the honest fix must still fail a surface that genuinely BURIES its tools, and getting
+that discriminator wrong laundered is worse than a VOID. It is the next turn's opening slice.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` holds at **4 of 8**.
