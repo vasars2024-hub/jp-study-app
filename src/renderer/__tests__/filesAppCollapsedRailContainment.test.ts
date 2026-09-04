@@ -91,6 +91,22 @@ describe('files app — the collapsed rail contains its own controls', () => {
     }
   });
 
+  it('the empty-state sentences wrap instead of hanging out of a 48px column', () => {
+    // The rules above contain CONTROLS. What was still overflowing after them is a SENTENCE:
+    // measured live 2026-09-04, `.fa-tree` sat at scrollWidth 59 / clientWidth 52 and
+    // `scrollLeft = 500` moved it to 7 — a real unreachable region under `overflow-x: hidden`,
+    // not a rounding artefact. It came from two paragraphs whose longest word is wider than a
+    // 48px line: "No saved searches of your own yet." at 57/48 and "Nothing pinned yet." at
+    // 55/48, both computing `overflow-wrap: normal`. After: tree 52/52, maxScroll 0, and all
+    // three rail sections 48/48.
+    const empty = ruleOf(`${COLLAPSED} .fa-collections-empty`);
+    // `anywhere`, not `break-word`. Both break the run; only `anywhere` also lowers the
+    // element's min-content contribution, and the min-content width is what the ancestor's
+    // scroll area is computed from — with `break-word` the paragraph wraps and `.fa-tree`
+    // still reports 59.
+    expect(empty['overflow-wrap']).toBe('anywhere');
+  });
+
   it('the containment is scoped to the collapsed rail and does not reach the expanded one', () => {
     // The expanded rail is 232px and these labels fit; ellipsizing them there would be damage,
     // not repair. Every rule this file pins carries the attribute selector.

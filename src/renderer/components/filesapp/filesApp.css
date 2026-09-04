@@ -206,6 +206,39 @@
   white-space: nowrap;
 }
 
+/*
+ * AND THE LAST 7px OF IT, which the two rules above did not reach — because
+ * they contain CONTROLS, and the thing still overflowing is a sentence.
+ *
+ * Measured live 2026-09-04, after the leaf repair had already taken `.fa-tree`
+ * from `scrollWidth 172 / clientWidth 52` down to **59 / 52**. Those 7px are
+ * real and unreachable, not a rounding artefact: `scrollLeft = 500` moved the
+ * tree to **7** under `overflow-x: hidden`, and the discriminator matters,
+ * because a box can report `scrollWidth > clientWidth` and then refuse to
+ * scroll at all. No descendant's right EDGE passed the content edge (max 270
+ * against 270) — the overflow is inside two boxes, not past them:
+ *
+ *   p.fa-collections-empty.fa-smart-empty  "No saved searches of your own yet."  57 / 48
+ *   p.fa-collections-empty                 "Nothing pinned yet."                 55 / 48
+ *
+ * Both computed `overflow-wrap: normal`, so in a 48px content box "searches"
+ * and "Nothing" are single unbreakable runs wider than the line and each one
+ * hangs out by its own excess. The folders section's own copy happens to fit
+ * ("folders" is short enough) and measured a clean 48 / 48 — which is exactly
+ * why this is keyed on the shared class rather than on the two that fail
+ * today: the same sentence is longer in ja, zh and ru.
+ *
+ * `anywhere` rather than `break-word` deliberately. Both break the run, but
+ * only `anywhere` also lowers the element's min-content contribution, and the
+ * min-content width is what the ancestor's scroll area is computed from — with
+ * `break-word` the paragraph wraps and `.fa-tree` still reports 59. Wrapping
+ * rather than clipping keeps the sentence readable, which an empty state has
+ * to be; hiding it would answer the measurement and lose the message.
+ */
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-empty {
+  overflow-wrap: anywhere;
+}
+
 /* The action row is already `flex-wrap: wrap`; wrapping only helps once its
    children can be narrower than their text, which is what the rule above buys.
    Stretched so each action still owns a full 48px-wide pointer target rather
