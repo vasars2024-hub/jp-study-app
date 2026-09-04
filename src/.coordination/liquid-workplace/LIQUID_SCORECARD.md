@@ -4078,3 +4078,37 @@ from `f9b51119` `9706610c` `4db9cc55`, cat2/cat7/cat8 from `c631f2bd`, and cat5 
 `cat7-perf.cjs`". That was true when it was written and is not now** — `c858089a` added it. I
 opened the file to write one and found it already there, swept live against this profile's 39
 conversations. Check the file, not the handoff.
+
+## 2026-09-04 · primary — ROUTING: the 8 surfaces still open, and which of them are already scaffolded
+
+Not a scored cell. Two turns in a row have now said the same thing — `agent` and `scraper` were
+both cheap **because their cat6 app spec and cat7 `SPECS` entry already existed**, so the turn
+went to measurement instead of scaffolding. That is worth deriving once and writing down instead
+of each turn discovering it at the moment it runs a harness.
+
+**Denominator, re-derived this turn rather than quoted.** The 25 members of
+`DESKTOP_WIN_SECTIONS` (`src/shared/desktop.ts`), each resolved by its **LAST** `^## ` heading in
+this file (append-only, so an early partial and a later 80/80 both match). **17 of 25 are at
+80/80** — `agent` joined them at `80be7b26`. The eight still open, with their scaffolding read
+straight out of the two probe files:
+
+| surface | cat6 spec in `l6-parity.js` | cat7 `SPECS` in `cat7-perf.cjs` | note |
+| - | - | - | - |
+| `novels` | YES | YES | fully scaffolded |
+| `city` | YES | YES | fully scaffolded |
+| `immersion` | YES | YES | fully scaffolded |
+| `reading` | YES | YES | **both are named `captures`, not `reading`** |
+| `translate` | YES | no | needs a cat7 `SPECS` entry |
+| `files` | YES | no | needs a cat7 `SPECS` entry; `files` cat4 is already a recorded FAIL |
+| `player` | no | YES | needs a cat6 app spec |
+| `anki` | no | no | needs both — the most expensive of the eight to open |
+
+`reading`'s aliasing is the trap here: a worker looking for `reading:` in either probe file finds
+nothing and concludes it must scaffold one, when `captures:` is the entry and it is complete.
+
+**So the cheapest next surface is one of `novels` / `city` / `immersion` / `reading`, and `anki`
+is the one to leave for last.** Two live constraints to carry in before choosing: `immersion`'s
+own cat7 spec records that clicking a site card navigates an embedded browser to a real site on
+the user's connection, which is a side effect the score never needs — its load is a rail scroll,
+and cat2's dominant task must not be a card click either. And every category is capped at 0 on an
+empty harness, so check each candidate has real content before spending a run on it.
