@@ -1030,6 +1030,65 @@ track (checked twice, 15:47 and 16:02), and editing it here blocks
 `<ReadingListMembership itemId={item.id} />` beside the title, exactly as in
 `NovelReader.tsx:2982`. **Do it the first turn the path is clean.**
 
+**2026-09-04, `primary2`, same turn. P5 OPENS: §8 export ships.**
+
+- `48cc35fe` — `readingListExport.ts`: message, Markdown, CSV. The gate is §8's
+  own words — *"the round trip is the point"* — so the test feeds
+  `readingListToMessage`'s output back through `parseReadingList` AND
+  re-imports it through `applyReadingListImport`, on the §2.1 example.
+
+  **It caught its own first draft.** The author was separated with an em dash;
+  `splitAuthor` DELIBERATELY refuses to split a dash (`readingListParser.ts:358`
+  — *"'Title - Author' and 'Author - Title' look identical"*), so the author
+  round-tripped welded onto the title. Of the three markers the parser reads
+  (` by X`, `【X】`, `X著`), `【X】` is the only one natural in every script, so
+  it needs no decision about the connector word's language. One separator across
+  message and Markdown.
+
+  Markdown is NOT a round-trip format and the test SAYS so: `AUTHOR_MARKERS`'s
+  bracket rule is end-anchored and a checklist row carries `· _state_` after the
+  title. The title portion does round-trip. Both halves pinned.
+
+  **12 of 12 mutants RED.** Three read GREEN first, all real: the raw-line
+  fallback (a dangling `workId` made the row silently ABSENT), `includeSourceUrl`
+  in Markdown (one anchor matching two call sites, so NOT APPLIED rather than
+  passing), and *"entry order not sorted"* — the fixture reversed the array AND
+  rewrote every `order` to match, so the two agreed again.
+
+- `6e46b6c6` — the control that calls it, in the detail header. **Clipboard, not
+  a file dialog:** §8's first bullet is *"pasteable straight back into LINE,
+  Discord, or a forum"*, and a native save dialog is a modal nothing automated
+  can drive. A file save can be added beside it later; the format code is pure.
+
+  Three ways this would have claimed a copy that did not happen, all now tested:
+  `await navigator.clipboard?.writeText(t)` **resolves** on a host with no
+  clipboard; `writeFailure` renders a FIXED string and ignores its value, so an
+  export failure through it reports a failed document write; and a `select` that
+  keeps its value fires once and then looks dead.
+
+- `530adf2d` — "Markdown" and "CSV" baselined as untranslated in ja/zh/ru. Six
+  lines, nothing reordered. **The gate fires one language at a time**, so ja+zh
+  looked complete and ru came back on the re-run.
+
+**FULL GATES at `530adf2d`, tree clean:** `npx vitest run` **EXIT 0 — 1,076
+files passed / 1 skipped; 13,874 tests, 13,868 passed / 6 skipped.** `i18n-check`
+EXIT 0 at **12,477** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit`
+EXIT 0, "Nothing new", 6 pending. eslint **0 errors** on every touched path.
+
+**Exact next slice: P5's remaining four — pace, next-up, smart lists (§7),
+timeline.** `readingChallengePace` and `nextUpReadingRow` already EXIST as pure
+functions in `readingListViews.ts` and are consumed by §11.2's widgets, so start
+by deriving what is actually missing rather than rebuilding them: §7's
+`SmartListQuery` and its three presets (Abandoned / Ready to read / Author
+sweep) have no module at all and are the real gap. Model it on
+`readingListExport.ts` — pure, tested against the mutation layer's own
+documents, with a caller in the same turn so it is not another route with no
+consumer.
+
+TRAP for §7: `difficultyMax` needs a difficulty source, and §5's note at plan
+line 506 parks that with the smart-list work. Decide it against the tree before
+writing the type — do not invent a field.
+
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
 Kept only so the entry above has its subject.
