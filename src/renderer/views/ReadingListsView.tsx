@@ -38,6 +38,12 @@ import { Button, Select } from '../components/ui';
 import { useT } from '../i18n';
 import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readingListsClient';
 import { useReadingListsDocument } from '../readingListsDocument';
+import {
+  READING_LIST_DENSITIES,
+  loadReadingListDensity,
+  saveReadingListDensity,
+  type ReadingListDensity,
+} from '../readingListsDensity';
 import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
 import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
@@ -304,6 +310,20 @@ export default function ReadingListsView({
   const [pickFilter, setPickFilter] = useState('');
   /** The title of the book the last add declined as already present, or `null`. */
   const [libraryNote, setLibraryNote] = useState<string | null>(null);
+  /**
+   * §11.4's density row. Read from storage ONCE, lazily — a bare
+   * `useState(loadReadingListDensity())` calls into `localStorage` on every
+   * render of a view that re-renders on every store broadcast.
+   */
+  const [density, setDensityState] = useState<ReadingListDensity>(loadReadingListDensity);
+  /** Set when the preference applied but could not be persisted (§11.4 honest states). */
+  const [densityUnsaved, setDensityUnsaved] = useState(false);
+  const setDensity = useCallback((next: ReadingListDensity) => {
+    setDensityState(next);
+    // The mode applies either way; only the promise that it survives a restart
+    // is retracted, and it is retracted in words rather than silently.
+    setDensityUnsaved(!saveReadingListDensity(next));
+  }, []);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const filterFieldRef = useRef<HTMLInputElement | null>(null);
 
@@ -868,7 +888,7 @@ export default function ReadingListsView({
 
   if (!document) {
     return (
-      <div className="rlv" data-surface="reading-lists" data-mode="loading">
+      <div className="rlv" data-surface="reading-lists" data-mode="loading" data-density={density}>
         {loadFailure ? (
           <div className="rlv__state rlv__state--error" role="alert">
             <p>{t('readingLists.view.loadFailed')}</p>
@@ -978,9 +998,36 @@ export default function ReadingListsView({
     </div>
   );
 
+  /**
+   * §11.4's density control, rendered in BOTH headers because it is one
+   * preference over one surface — the grid of cards and the list of rows are
+   * the same navigation, and a mode that applied to only half of it would read
+   * as a bug the first time the user went back.
+   *
+   * A `<select>` rather than a two-state button: the two modes are named, and a
+   * button labelled "Compact" is ambiguous about whether it reports the current
+   * mode or the one it would switch to.
+   */
+  const densityControl = (
+    <Select
+      aria-label={t('readingLists.view.density.label')}
+      value={density}
+      onChange={(event) => setDensity(event.target.value as ReadingListDensity)}
+      options={READING_LIST_DENSITIES.map((value) => ({
+        value,
+        label: t(`readingLists.view.density.${value}`),
+      }))}
+    />
+  );
+
   const notices = (
     <>
       {healthNotice}
+      {densityUnsaved ? (
+        <div className="rlv__notice rlv__notice--warn" role="status">
+          {t('readingLists.view.density.unsaved')}
+        </div>
+      ) : null}
       {writeFailure ? (
         <div className="rlv__notice rlv__notice--error" role="alert">
           {t('readingLists.view.writeFailed')}
@@ -1088,6 +1135,7 @@ export default function ReadingListsView({
         className="rlv"
         data-surface="reading-lists"
         data-mode="detail"
+        data-density={density}
         /**
          * §11.4's `/`. Bound on the view rather than the document: a global
          * listener would steal the key from every other window in this shell,
@@ -1119,6 +1167,7 @@ export default function ReadingListsView({
             </span>
           ) : null}
           <span className="rlv__spacer" />
+          {densityControl}
           <Button size="sm" onClick={() => setPasting((open) => !open)}>
             {t('readingLists.view.paste')}
           </Button>
@@ -1326,10 +1375,11 @@ export default function ReadingListsView({
   }
 
   return (
-    <div className="rlv" data-surface="reading-lists" data-mode="grid">
+    <div className="rlv" data-surface="reading-lists" data-mode="grid" data-density={density}>
       <header className="rlv__head">
         <h2 className="rlv__title">{t('readingLists.view.title')}</h2>
         <span className="rlv__spacer" />
+        {densityControl}
         <Select
           aria-label={t('readingLists.view.sort.label')}
           value={sort}

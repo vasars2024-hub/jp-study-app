@@ -929,3 +929,105 @@ describe('ReadingListsView', () => {
     });
   });
 });
+
+/**
+ * §11.4's density row, on the real component.
+ *
+ * `readingListsDensity.test.ts` proves the preference round-trips and that the
+ * stylesheet touches no hit target. What only the mounted view can prove is the
+ * three things that make it a feature rather than a stored string: the
+ * attribute the sheet selects on is actually on the surface, the control moves
+ * it, and it is the SAME preference in the grid and in a list — a mode that
+ * applied to only half the surface reads as a bug the first time you go back.
+ */
+describe('ReadingListsView — density (§11.4)', () => {
+  function surface(): HTMLElement | null {
+    return host.querySelector<HTMLElement>('.rlv');
+  }
+
+  function densitySelect(): HTMLSelectElement {
+    const found = [...host.querySelectorAll<HTMLSelectElement>('select')].find(
+      (node) => node.getAttribute('aria-label') === 'Density',
+    );
+    expect(found, 'no control labelled Density').toBeTruthy();
+    return found as HTMLSelectElement;
+  }
+
+  async function choose(node: HTMLSelectElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype,
+      'value',
+    )?.set;
+    await act(async () => {
+      setter?.call(node, value);
+      node.dispatchEvent(new window.Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  beforeEach(() => {
+    window.localStorage.removeItem('jp-reading-lists-density-v1');
+  });
+
+  it('marks the surface with the mode the stylesheet selects on', async () => {
+    const { document } = seeded();
+    installBridge(new FakeStore(document));
+    await render();
+
+    // Not "some attribute": the exact one `[data-density='compact']` matches.
+    expect(surface()?.getAttribute('data-density')).toBe('comfortable');
+    await choose(densitySelect(), 'compact');
+    expect(surface()?.getAttribute('data-density')).toBe('compact');
+  });
+
+  it('offers the control in the detail view too, over the same preference', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await choose(densitySelect(), 'compact');
+    expect(surface()?.getAttribute('data-density')).toBe('compact');
+
+    // Back to the grid. The grid must not be comfortable while the list it came
+    // from is compact — one preference, one surface. A `button`-only lookup,
+    // never `byText`: that helper scans `div` too and returns the wrapper.
+    await click(
+      [...host.querySelectorAll('button')].find(
+        (node) => node.textContent?.trim() === 'All lists',
+      ) ?? null,
+    );
+    expect(surface()?.getAttribute('data-mode')).toBe('grid');
+    expect(surface()?.getAttribute('data-density')).toBe('compact');
+  });
+
+  it('survives a remount, which is the only reason it is persisted at all', async () => {
+    const { document } = seeded();
+    installBridge(new FakeStore(document));
+    await render();
+    await choose(densitySelect(), 'compact');
+
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    resetReadingListsClientForTesting();
+    installBridge(new FakeStore(seeded().document));
+    await render();
+
+    expect(surface()?.getAttribute('data-density')).toBe('compact');
+    expect(densitySelect().value).toBe('compact');
+  });
+
+  it('does not touch the rows themselves — compact is a stylesheet, not a filter', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    const before = rows().length;
+    await choose(densitySelect(), 'compact');
+    // The trap this catches is a "compact" that hides secondary rows to look
+    // denser. Two entries seeded, two entries visible, in both modes.
+    expect(rows()).toHaveLength(before);
+    expect(host.textContent).toContain('Kino no Tabi');
+    expect(host.textContent).toContain('コンビニ人間');
+  });
+});

@@ -12365,6 +12365,11 @@ export const ru: Catalog = {
   'readingLists.view.sort.recent': 'По изменению',
   'readingLists.view.sort.name': 'По названию',
   'readingLists.view.sort.progress': 'По прогрессу',
+  'readingLists.view.density.label': 'Плотность',
+  'readingLists.view.density.comfortable': 'Свободная',
+  'readingLists.view.density.compact': 'Компактная',
+  'readingLists.view.density.unsaved':
+    'Эта плотность работает сейчас, но её не удалось сохранить — при следующем запуске всё вернётся к прежнему.',
   'readingLists.view.paste': 'Вставить сообщение',
   'readingLists.view.pasteLabel': 'Вставьте сообщение, в котором перечислены книги',
   'readingLists.view.pastePlaceholder': '1. Норвежский лес\n2. コンビニ人間\n3. …',

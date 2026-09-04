@@ -561,3 +561,59 @@
     transition: none;
   }
 }
+
+/* ------------------------------------------------------- density (§11.4) -- */
+
+/*
+ * COMPACT DOES NOT SHRINK A HIT TARGET, AND THAT IS THE WHOLE DESIGN.
+ *
+ * The obvious compact mode is "make the rows shorter", and it is wrong here:
+ * `.rlv__row-open` is 34px because the accessibility walk's floor IS 32 and it
+ * steps in halves, so a control sized to exactly its floor is knife-edge (see
+ * `.rlv__selectall`, and `lq-hit-gives-nothing-at-exactly-32`). A density mode
+ * that took rows to 28px would trade a pass on this row of §11.4 for a fail on
+ * the accessibility row two bullets above it.
+ *
+ * So compact spends the SPACE BETWEEN and AROUND the targets, which is free:
+ *
+ *   comfortable  34 button + 4+4 padding + 1+1 border = 44, + 4 gap = 48/row
+ *   compact      34 button + 1+1 padding + 1+1 border = 38, + 2 gap = 40/row
+ *
+ * 17% more rows on one screen, and every pointer target is the size it was.
+ * `readingListsDensity.test.ts` asserts exactly that: the button floors are
+ * IDENTICAL in both modes and only the surrounding metrics move.
+ */
+
+.rlv[data-density='compact'] .rlv__rows {
+  gap: 2px;
+}
+
+.rlv[data-density='compact'] .rlv__row {
+  padding: 1px;
+}
+
+/* The secondary line is the first thing to go quiet, not the first thing to be
+   hidden: a 300-book list still has to tell you which of them you own. */
+.rlv[data-density='compact'] .rlv__row-where {
+  font-size: 0.8em;
+}
+
+/* Cards: narrower tracks fit more per row, and the cover mosaic is what makes a
+   card tall, so it is what compact trims. The 170px floor keeps the same
+   `min(…, 100%)` guard as the comfortable track — a bare floor wider than the
+   212px pane clips the cards with no scrollbar to reach them. */
+.rlv[data-density='compact'] .rlv__grid,
+.rlv[data-density='compact'] .rlv__skeleton {
+  grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlv[data-density='compact'] .rlv__card-open {
+  gap: 4px;
+  padding: var(--lq-space-2, 8px);
+}
+
+.rlv[data-density='compact'] .rlv__mosaic,
+.rlv[data-density='compact'] .rlv__skeleton-mosaic {
+  aspect-ratio: 5 / 2;
+}

@@ -11916,6 +11916,11 @@ export const en: Catalog = {
   'readingLists.view.sort.recent': 'Recently changed',
   'readingLists.view.sort.name': 'Name',
   'readingLists.view.sort.progress': 'Progress',
+  'readingLists.view.density.label': 'Density',
+  'readingLists.view.density.comfortable': 'Comfortable',
+  'readingLists.view.density.compact': 'Compact',
+  'readingLists.view.density.unsaved':
+    'That density is on for now, but it could not be saved, so the next launch starts over.',
   'readingLists.view.paste': 'Paste a message',
   'readingLists.view.pasteLabel': 'Paste the message that has the books in it',
   'readingLists.view.pastePlaceholder': '1. Kino no Tabi\n2. コンビニ人間\n3. …',
