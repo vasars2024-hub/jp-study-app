@@ -3201,3 +3201,32 @@ exactly this) is the missing half. The full recipe, ~3 minutes:
 A scratch profile is a FIRST RUN, so it lands on the consent gate with the shell unmounted —
 hiding the node reveals nothing. Record the DECLINE instead (`jp-telemetry-consent` = `no`,
 no network call) and complete the tour (`jp-study.onboarding.v1.completedAt`), then reload.
+
+## 2026-09-04 · backup — `grammar` category 2 is NOT closed, and five failed drives say exactly why
+
+No score. Recorded so the next worker does not spend the same five attempts. `cat2` is the
+one harness whose `--task` cannot be lifted from another surface, and Grammar breaks the
+usual shape in three ways:
+
+1. **`--undo` must restore FOCUS, not just the filter.** `clear:.gram-search` alone
+   round-trips the text but not the selected point, so a task that clicks any row returns
+   `VOID - undo did not restore the surface` with a changed `textHash`. The one drive that
+   completed did so only because it clicked the row that was ALREADY focused — which then
+   scored its own single dead end (`moved.any: false`). That dead end is an **instrument
+   artifact, not a product defect**: after a filter, `focused` falls back to `list[0]`, so
+   the detail already shows what was clicked. Do not bank it as a finding.
+2. **`nth-of-type` cannot address a row.** `VirtualList` gives every `.gram-x-row` its own
+   unclassed wrapper `div`, so each row is `:nth-of-type(1)` of its own parent and
+   `.gram-x-row:nth-of-type(4)` matches **0**. `.gram-x-row:not(.focused)` addresses the
+   right element and is the selector to use.
+3. **…and that selector then fails `centre resolves to null`** at 820x580, because the
+   first non-focused row of a filtered list falls below the visible body. The drive needs a
+   `scroll:` step, or a filter term that leaves the target on screen.
+
+Measured before the VOID, and true as far as it goes: `modalTraps` 0, `scrollTraps` 0,
+`latency` within bar, `openDialogs` 0. `costParity` UNMEASURED — it needs `--compare`.
+**Four bars true is not 10/10 and this is not scored.** Next drive to try, in one line:
+
+    --task "type:.gram-search=ば >> wait:600 >> scroll:.gram-x-list=0 >> click:.gram-x-row:not(.focused) .gram-x-row-main"
+
+State restored: filter cleared, 17 rows, 0 dialogs open.
