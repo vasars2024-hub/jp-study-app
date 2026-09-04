@@ -85,6 +85,15 @@ import type {
   AgentSpendSnapshotPayload,
 } from '../shared/agentSpendBridge';
 import type {
+  ReadingListEvent,
+  ReadingListsDocument,
+} from '../shared/readingLists';
+import type {
+  ReadingListsEventsResult,
+  ReadingListsResult,
+  ReadingListsSnapshot,
+} from '../shared/readingListsBridge';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -1249,6 +1258,14 @@ declare global {
       agentSpendSetBudget(budgetUsd: number | null): Promise<AgentSpendResult>;
       agentSpendClear(): Promise<AgentSpendResult>;
       onAgentSpendChanged(cb: (snapshot: AgentSpendSnapshotPayload) => void): () => void;
+      readingListsLoad(): Promise<ReadingListsResult>;
+      readingListsWrite(
+        baseRevision: number,
+        document: ReadingListsDocument,
+        events?: Omit<ReadingListEvent, 'revision'>[],
+      ): Promise<ReadingListsResult>;
+      readingListsEvents(limit?: number): Promise<ReadingListsEventsResult>;
+      onReadingListsChanged(cb: (snapshot: ReadingListsSnapshot) => void): () => void;
       onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionLeaseAcquire(
         request: AgentExecutionLeaseAcquireRequest,

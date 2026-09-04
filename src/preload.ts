@@ -159,6 +159,15 @@ import type {
   AgentSpendSnapshotPayload,
 } from './shared/agentSpendBridge';
 import type {
+  ReadingListEvent,
+  ReadingListsDocument,
+} from './shared/readingLists';
+import type {
+  ReadingListsEventsResult,
+  ReadingListsResult,
+  ReadingListsSnapshot,
+} from './shared/readingListsBridge';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -2110,6 +2119,24 @@ const api = {
     const handler = (_event: unknown, snapshot: AgentSpendSnapshotPayload): void => cb(snapshot);
     ipcRenderer.on('agentSpend:changed', handler);
     return () => ipcRenderer.removeListener('agentSpend:changed', handler);
+  },
+  // Reading Lists. The write is compare-and-swap rather than a save, because the
+  // library window, the reader window and a desktop widget are different
+  // renderers and main writes too — `shared/readingListsBridge.ts` says why.
+  readingListsLoad: (): Promise<ReadingListsResult> =>
+    ipcRenderer.invoke('readingLists:load'),
+  readingListsWrite: (
+    baseRevision: number,
+    document: ReadingListsDocument,
+    events?: Omit<ReadingListEvent, 'revision'>[],
+  ): Promise<ReadingListsResult> =>
+    ipcRenderer.invoke('readingLists:write', { baseRevision, document, events }),
+  readingListsEvents: (limit?: number): Promise<ReadingListsEventsResult> =>
+    ipcRenderer.invoke('readingLists:events', { limit }),
+  onReadingListsChanged: (cb: (snapshot: ReadingListsSnapshot) => void): (() => void) => {
+    const handler = (_event: unknown, snapshot: ReadingListsSnapshot): void => cb(snapshot);
+    ipcRenderer.on('readingLists:changed', handler);
+    return () => ipcRenderer.removeListener('readingLists:changed', handler);
   },
   onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
     const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);
