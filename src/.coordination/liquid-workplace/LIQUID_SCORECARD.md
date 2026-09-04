@@ -3232,3 +3232,55 @@ Baseline `baselines/cat3-files.json` — a new path, force-added past `.gitignor
 **`files` is 2 of 8 categories run: cat1 FAIL (three real rows, entry above), cat3 10/10.
 Running total unchanged at 14 of 25 sections at 80/80 — a section closes at 8 of 8.
 89 category cells remain.**
+
+---
+
+## 2026-09-04 · primary2 — `files` cat4 = FAIL on three bars, and the default size is now clean
+
+Same window and same session as the cat3 entry above (bridge 39273, pid 13316, `@.fwin:has(.fa-shell)`).
+Commit `7ce76225`. Three sizes driven and each restored; `sizesRan 3 of 3`, `refusedLegs []`,
+`visibleAtEveryRead: true`.
+
+| size | box | clipped | overlaps | hScroll | hiddenOverflowX | dead % | chrome % |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| default | 820x580 | 0 | 0 | 0 | **0** (was 1) | 9 | 44.3 |
+| compact | 260x170 | **5** | 0 | 0 | **1** | 0.4 | 39.2 |
+| maximized | 1264x773 | 0 | 0 | 0 | **0** (was 1) | **17.4** | 39.6 |
+
+**Verdict FAIL**, `failedBars: clipped, horizontal, deadRegion`. Controls all fired and all
+restored: injected clip 0 → 1 → 0 with `removalProven`; the art-plate exclusion caught its plant
+as a plate (`clippedDidNotRise`, `namedInArtPlateClips`); the backdrop exclusion moved overlaps
+0 → **13** → 0 and refused to excuse an inert-but-painted plant as backdrop; sub-minimum shrink
+to 200x140 reported 6 clipped and restored. The pager leg was `applicable: false` — no proven
+pager on its last page, stated rather than scored.
+
+**The `horizontal` bar is FIXED at two of three sizes and the fix is in this turn.** `div.fa-tree
+59>52` was the residue of yesterday's containment repair. It was **verified reachable-or-not
+before anything was touched**: `scrollLeft = 500` moved the tree to **7**, so those px were real
+hidden content under `overflow-x: hidden`, not a `scrollWidth` artefact — a box can report
+`scrollWidth > clientWidth` and then refuse to scroll, and that is the discriminator. Bisected by
+hiding children one at a time (max movement 2px, so not one control), it was two empty-state
+SENTENCES at `overflow-wrap: normal`, 57/48 and 55/48. Now 52/52, maxScroll 0.
+
+**A rejected first attempt, recorded because it looked right and was not:** `min-width: 0` on the
+three rail sections and two row wrappers, on the flex `min-width: auto` theory. It APPLIED —
+computed `0px` on all five — and moved nothing. It was removed rather than kept as defence.
+
+**Two things the previous reading got wrong, both instrument, both now known.** (1) The FIRST
+cat4 run reported `maximized` at box **820x580** with numbers identical to default; the maximize
+click had not taken, and an unmaximized "maximized" leg is not a measurement. It maximized on the
+next run to 1264x773. Treat a maximized box equal to the default box as a failed drive, not a
+result. (2) The same run's `sizes[]` said maximized dead **9%** while its own
+`deadRegionPctBySize` said **17.4%** — the two disagreed because they came from different legs of
+a run whose maximize had failed. 17.4% is the real figure.
+
+**What remains for `files` cat4, in the order I would take it:**
+
+1. `deadRegion` at **maximized, 17.4%** — the only bar failing at a size the user actually gets
+   by clicking maximize. Dead box at default was `245x382 at grid 28,12`, basis "visible surface".
+2. `clipped` **5** at compact **260x170**, plus one `hiddenOverflowX` still there at that size
+   only. 260x170 is below anything the window can be dragged to, so weigh whether the compact leg
+   is a real user state here before spending on it — but say so with a number, do not assume.
+
+**`files` is 3 of 8 categories run: cat1 FAIL, cat3 10/10, cat4 FAIL on 3 bars. Running total
+unchanged at 14 of 25 sections at 80/80. 88 category cells remain.**
