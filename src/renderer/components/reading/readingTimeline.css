@@ -1,0 +1,198 @@
+/*
+  P5 5.12's year calendar. Every token here is declared in
+  theme/liquid-tokens.css - L2's language, not a second palette.
+
+  Day cells are 12px and are NOT hit targets in the 32px sense: a year is 365 of
+  them and a 32px grid is 12,000px wide. What carries the accessible affordance
+  is the accessible name on each live cell plus the day panel it opens, which is
+  built out of ordinary 34px controls like the smart-list chips beside it.
+*/
+
+.rlt {
+  margin-top: var(--lq-space-4, 16px);
+  padding-top: var(--lq-space-3, 12px);
+  border-top: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+}
+
+.rlt__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlt__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+}
+
+.rlt__count {
+  margin: 0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlt__elsewhere {
+  margin: 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlt__empty {
+  margin: var(--lq-space-2, 8px) 0 0;
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlt__year {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlt__year-label {
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlt__year-select {
+  min-height: 34px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  font-variant-numeric: tabular-nums;
+}
+
+.rlt__months {
+  list-style: none;
+  margin: var(--lq-space-3, 12px) 0 0;
+  padding: 0;
+  display: grid;
+  /* Wraps to one column in a narrow window rather than scrolling sideways. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlt__month {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  min-width: 0;
+}
+
+.rlt__month-name {
+  flex: 0 0 5.5rem;
+  font-size: 11px;
+  text-transform: capitalize;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlt__days {
+  display: grid;
+  /* 31 columns fixed, so every month lines up under the one above it and the
+     shape of the year is readable down a column. */
+  grid-template-columns: repeat(31, 1fr);
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rlt__day {
+  aspect-ratio: 1;
+  border: 0;
+  padding: 0;
+  border-radius: 2px;
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.04));
+}
+
+.rlt__day--live {
+  cursor: pointer;
+  background: var(--lq-accent, #ff2e4d);
+}
+
+.rlt__day--live[data-heat='1'] {
+  opacity: 0.35;
+}
+
+.rlt__day--live[data-heat='2'] {
+  opacity: 0.55;
+}
+
+.rlt__day--live[data-heat='3'] {
+  opacity: 0.78;
+}
+
+.rlt__day--live[data-heat='4'] {
+  opacity: 1;
+}
+
+.rlt__day--live[aria-expanded='true'] {
+  outline: 2px solid var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  outline-offset: 1px;
+}
+
+.rlt__day-panel {
+  margin-top: var(--lq-space-3, 12px);
+  padding: var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+}
+
+.rlt__day-head {
+  margin: 0 0 var(--lq-space-2, 8px);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+}
+
+.rlt__day-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1, 4px);
+}
+
+.rlt__finish {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-2, 8px);
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid transparent;
+  border-radius: var(--lq-work-radius, 8px);
+  background: transparent;
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  text-align: left;
+  cursor: pointer;
+}
+
+.rlt__finish:hover {
+  border-color: var(--lq-work-border, rgba(255, 255, 255, 0.14));
+}
+
+.rlt__finish-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlt__finish-list {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}

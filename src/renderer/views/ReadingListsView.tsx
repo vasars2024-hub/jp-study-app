@@ -35,6 +35,7 @@ import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
 import ReadingSmartLists from '../components/reading/ReadingSmartLists';
+import ReadingTimeline from '../components/reading/ReadingTimeline';
 import { Button, Select } from '../components/ui';
 import { useT } from '../i18n';
 import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readingListsClient';
@@ -2508,6 +2509,18 @@ export default function ReadingListsView({
             if (fresh) adopt(fresh.document);
           }}
         />
+        {/*
+          P5 §5.12's per-list half — *"Finishes on a calendar, PER LIST"*. Below
+          the rows, because the rows are what the user came for and a year grid
+          above them would push the list itself off the first screen.
+        */}
+        <ReadingTimeline
+          document={document}
+          items={items}
+          listId={list.id}
+          onOpenBook={onOpenBook}
+          onFindWork={onFindWork}
+        />
       </div>
     );
   }
@@ -2754,6 +2767,18 @@ export default function ReadingListsView({
         onFindWork={onFindWork}
         onSaveQuery={saveSmartQuery}
         onRemoveSaved={removeSmartQuery}
+      />
+      {/*
+        P5 §5.12, unscoped on the grid: this is the "what did I read this year"
+        half. The per-list half is the same component with `listId` set, on the
+        detail below — one implementation, so the two can never disagree about
+        what counts as a finish.
+      */}
+      <ReadingTimeline
+        document={document}
+        items={items}
+        onOpenBook={onOpenBook}
+        onFindWork={onFindWork}
       />
     </div>
   );
