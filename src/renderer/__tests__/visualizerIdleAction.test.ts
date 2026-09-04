@@ -15,6 +15,14 @@ const settingsApp = readFileSync(
   resolve(__dirname, '..', 'components', 'settings', 'SettingsApp.tsx'),
   'utf8',
 );
+const dockCss = readFileSync(
+  resolve(__dirname, '..', 'components', 'visualizer', 'visualizerWidgetLiquid.css'),
+  'utf8',
+).replace(/\/\*[\s\S]*?\*\//g, '');
+const sharedSurfaces = readFileSync(
+  resolve(__dirname, '..', 'theme', 'liquid-surfaces.css'),
+  'utf8',
+).replace(/\/\*[\s\S]*?\*\//g, '');
 
 describe('Visualizer idle recovery action', () => {
   it('uses the shared localized Music command and a real Study OS navigation action', () => {
@@ -41,6 +49,55 @@ describe('Visualizer idle recovery action', () => {
     // same temporary guided exemption as the Agent's explicit settings handoff.
     expect(settingsApp).toContain("navigate(d.page, d.settingId, { guided: true })");
     expect(settingsApp).toContain('setGuidedPage(options?.guided ? next : null)');
+  });
+
+  it('anchors the dock to the stage against the shared role class it shares an element with', () => {
+    /*
+     * `ContextualSurface` renders `lq-contextual viz-widget-dock`, and
+     * `theme/liquid-surfaces.css` declares `position: relative` on `.lq-contextual`
+     * at the SAME (0,1,0) specificity from a sheet that loads later — the collision
+     * `components/liquid/readingCanvas.css` records for `.lq-anchor`/`.lq-liquid`.
+     *
+     * Measured live through the debug bridge before the fix: the dock computed
+     * `position: relative`, so `right/bottom: 8px` became a relative OFFSET rather
+     * than an anchor and moved the dock UP and LEFT out of the stage — rect
+     * (121,110) 78x42 against a `.viz-widget` parent at (129,118) 378x165, i.e.
+     * painted on `.fwin-bar` and 8px off the window's left edge onto the desktop.
+     * Both dock buttons were then occluded: the hit walk read 29.5x29.5 on a 32x32
+     * rect with blockers `div.fwin-bar` and `section.fwin.fwin-viz`. After the
+     * child combinator: `position: absolute`, rect (421,233), inside the parent,
+     * and both buttons 32.5x32.5.
+     *
+     * `toMatch(/position:\s*absolute/)` passed the whole time it was broken — a
+     * declaration existing is not a declaration winning — so this reads both files.
+     */
+    const roleBlocks = [...sharedSurfaces.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, selector]) => selector.split(',').some((s) => s.trim() === '.lq-contextual'))
+      .map(([, , body]) => body)
+      .join('\n');
+    // The premise, asserted rather than assumed.
+    expect(roleBlocks, '.lq-contextual no longer sets position').toMatch(
+      /(^|[;\s])position\s*:/m,
+    );
+
+    const winners = [...dockCss.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
+      ([, selector, body]) =>
+        selector.split(',').some((s) => s.trim().endsWith('.viz-widget-dock')) &&
+        /(^|[;\s])position\s*:/m.test(body),
+    );
+    expect(winners.length, 'nothing declares position for .viz-widget-dock').toBeGreaterThan(0);
+    for (const [, selector] of winners) {
+      for (const one of selector
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.endsWith('.viz-widget-dock'))) {
+        // Named, not counted: a failure here has to say which rule lost.
+        expect({ selector: one, beatsRoleClass: (one.match(/\./g) ?? []).length > 1 }).toEqual({
+          selector: one,
+          beatsRoleClass: true,
+        });
+      }
+    }
   });
 
   it('keeps the reused label complete in every shared locale', () => {
