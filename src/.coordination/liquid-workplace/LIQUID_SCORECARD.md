@@ -3985,3 +3985,96 @@ the other session is landing its Q4 disclosure. Whoever writes that entry owns t
 
 `sampled-out:` for this bullet — `library` `novels` `translate` `player` `anki` `flashcards`
 `stats` `resources` `city` `immersion` `calendar` `reading`.
+
+## 2026-09-04 · primary (the SECOND session) — `agent` cat5 closes at 10/10, and cat8 is re-run to clear the flag the first session left
+
+Commit `e08bcfd0`. This is the other half of the double-dispatch the entry above documents: the
+relay started `primary` twice, at 18:27:55 and 18:27:57 EDT, and both sessions worked `agent` in
+the same tree for an hour. That entry is written from the first session's side; this one is
+written from the second's, and the two agree on the facts. **I am the session it names as
+"landing cat5 Q4", and its `--langs` leg through ja/zh/ru at ~18:36 and its 78-conversation cycle
+at 18:41 are what put HMR resets and a lost view mode into the middle of my runs.** Neither of us
+lost a measurement to it that its own guard did not catch first.
+
+`sampled-out:` for this bullet — unchanged from the entry above.
+
+### Category 5 — 9/10 → PASS 10/10, and the three controls that went were not the work
+
+    scanned 15 -> 13 -> 12   bar <=12    collapsedDisclosures 5   behindDisclosure 3
+    every other question unmoved; Q3 still YES at button.agent-action inside the viewport
+
+Q4's remedy was named in the previous entry as "model select + 2 suggestion controls behind ONE
+disclosure", with a warning that landing exactly on 12 has no margin. That framing was half
+right. **Two of the three reductions are not disclosures at all**, and the difference matters
+because only one of the three shrinks with the surface's own data:
+
+- **The provider select joins the budgets inside the one composer disclosure**, relabelled
+  `agent.execute.modelAndLimits`. It was loose above a `<details>` that already held the request
+  budgets — the same class of tool, one row apart. Which provider is SELECTED is not hidden by
+  this: `.agent-cloud-notice` names it immediately below, in both the local and the cloud branch
+  and in Simple mode too. The state stays on screen; only the knob tucks away. **−1.**
+- **The suggestion strip became a real `<ul>`/`<li>`.** This is the one that matters and it is
+  not a disclosure: `repeatingRow` drops a control inside an `li` because "repeated instances of
+  one kind of thing are scanned as a group", and these are N instances of one kind where **N
+  grows with how much context the conversation carries**. Before, the census was 13 + N. Now it
+  is 13, at any N. The baseline's 15 was measured at N=2 and my runs at N=1, which is exactly why
+  the raw 15 → 12 is not a subtraction anyone should do by eye. **−N, published as −1 here.**
+- **The explanation language stopped being a control.** It was a `<select>` seeded from the UI
+  language and forgotten on every remount — a preference wearing a control's clothes. It now
+  lives in `AgentContextSuggestionSettings` beside the six source switches, persists, and the
+  strip prints *Explained in English* where the select used to be: state where a knob was. **−1.**
+
+Two candidates were deliberately NOT touched, for the reason the previous entry gives: `Attach
+files` is a composer affordance and not an advanced tool, and `Clear history` is a destructive
+action whose visibility is a safety property. So the answer really is 12 against a bar of 12, and
+the margin argument is answered by the `<ul>`, not by a third hiding place.
+
+Control: the full `--control` run moved **all five** plants — `Q2 Q3 Q4 Q5 Q10` — with Q4's
+planted census at **34** against the bar of 12. `plantResidue 0`, `storeIdentical true`, restored
+to `standard` at `820x580`.
+
+The schema addition is additive and needs no version bump: `normalizeAgentContextSuggestionPreferences`
+is total, so a blob stored before the field existed reads back as `'ui'`, which is the behaviour it
+already had. Mutation control on the new list test: dropping the `<li>` is RED, restoring it GREEN,
+and the file was restored from a copy and verified by SHA256 rather than by `git checkout --`.
+
+### Category 8 — RE-RUN, and it holds: PASS 10/10
+
+The entry above flags cat8 for a re-run "once the other session commits, because it scores
+rendered text and that session is adding i18n keys". It has committed; this is that re-run, at
+`e08bcfd0`, same instrument and same `--surface "@.agent-root" --langs --control`:
+
+    rawKeyCount 0   placeholderCount 0   mutePairCount 0   statesNamed "1 of 1 observable"
+    textRuns 157 -> 165    distinctHashes 4    diffRunsMax 118 of 165 (71.5%)   restored true
+
+**The eight new text runs are the change, and none of them is a raw key**: the strip's
+*Explained in English* line, the relabelled summary, and the settings row with its five options.
+`before`/`after` both `{html:'en', stored:null}`. Control: rawKeys / placeholders / mutePairs all
+`0 → 1 → 0`, `backToBaseline` true. **The flag is cleared.**
+
+### Category 2 — an independent second measurement, NOT a second cell
+
+I drove cat2 before I knew the other session had it, on a **different dominant task** — composing
+a prompt rather than finding a past conversation. Recorded because two independent tasks agreeing
+is worth more than the run cost, and because the numbers differ:
+
+    task type into the composer, 6 keystrokes / 0 clicks   deadEnds 0  modalTraps 0  scrollTraps 0
+    worstRecv 87.9 ms   overBar100 0   sharedPaintSamples 0   busiestFrame 1 of 6 frames
+    costParity standard 6 (87.9 ms) == liquid 6 (86.3 ms), restored to standard 820x580
+
+Same verdict, PASS 10/10, same control (`deadEnd`/`modalTrap`/`scrollTrap` `0 → 1 → 0`,
+`backToBaseline` true, inert-click floor 0.4 ms). **The cell is the other session's; this is
+corroboration.** Trap, and it is the recorded `/type` one in a new place: the unspaced burst put
+**6 of 6 samples in one paint** and returned `UNSCOREABLE`, exactly as their `--key-spacing 40`
+did at 2 of 9. Spacing the DSL steps with `wait:180` between single characters gave 6 events in 6
+frames. A typed task on this surface is unscoreable at default pacing, both ways in.
+
+### Where `agent` stands, and a correction to the last handoff
+
+**8 of 8 at 10/10 — `agent` is the seventeenth surface at 80/80**, counting cat1/cat3/cat4/cat6
+from `f9b51119` `9706610c` `4db9cc55`, cat2/cat7/cat8 from `c631f2bd`, and cat5 from `e08bcfd0`.
+
+**Correction: the last handoff says "cat7 needs a new SPECS entry — `agent` is absent from
+`cat7-perf.cjs`". That was true when it was written and is not now** — `c858089a` added it. I
+opened the file to write one and found it already there, swept live against this profile's 39
+conversations. Check the file, not the handoff.
