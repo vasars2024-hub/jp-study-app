@@ -101,6 +101,48 @@
   white-space: nowrap;
 }
 
+/* ------------------------------------------------- collapsed rail ---------- */
+/*
+ * THE ONE RAIL IN THE APP THAT NEVER GOT THE COLLAPSED CONTRACT. The scaffold
+ * collapses its rail below `wide` (1120px of scaffold, `LIQUID_BREAKPOINTS`),
+ * and the Files window's own default 820x580 measures 782 — `medium` — so this
+ * is the state the app opens in, not an edge case. `liquid-controls.css` treats
+ * `.lq-rail-item` for exactly this: hide the label, floor the target at
+ * `--lq-hit-target`, move the name to the accessible name. The Files tree is
+ * not a `.lq-rail-item`, so it got none of it. Measured live 2026-09-03 before
+ * this rule: 32 `.fa-tree-node` at rect 24x32 and pointer 24.5x32.5 against the
+ * 32px bar, with the label clipped to one or two characters plus an ellipsis —
+ * illegible AND under the floor, and 11 of them read `occluded` because the
+ * 52px track cannot hold them.
+ *
+ * The label is NOT hidden the way `.lq-rail-item` hides its own. That contract
+ * assumes an icon underneath, and these nodes have none: a smart folder and a
+ * favorite carry a name and nothing else, so hiding the name leaves a column of
+ * blank 32px buttons — a worse surface than the one being repaired. What is
+ * wrong here is the WIDTH, so the width is what changes. The collapsed track
+ * goes 52 -> 72px for this app only, which puts the node at 44px: over the
+ * floor, and roughly twice the legible text. `title` on the component carries
+ * the full name for a pointer user; the accessible name was never at risk
+ * because the label stays rendered.
+ *
+ * 20px is what this costs the canvas at `medium`. The alternative measured on
+ * the live surface was forcing the rail open, which reads
+ * `232px 214px 320px` — a six-column file list in 214px.
+ */
+.fa-shell[data-rail-collapsed='true'] {
+  --lq-rail-width-collapsed: 72px;
+}
+
+.lq-scaffold[data-rail-collapsed='true'] .fa-tree {
+  padding: var(--lq-space-1);
+}
+
+.lq-scaffold[data-rail-collapsed='true'] .fa-tree-node {
+  gap: var(--lq-space-1);
+  min-width: var(--lq-hit-target);
+  padding: 0 var(--lq-space-1);
+}
+
 /* Kept legible rather than decorative: this number is the gate-1 reading. */
 .fa-tree-count {
   flex: none;
@@ -485,6 +527,14 @@
   align-items: center;
   gap: var(--lq-space-3);
   padding: 0 var(--lq-space-3);
+  /* MEASURED AND REJECTED, 2026-09-03, so it is not tried again. `box-sizing:
+     border-box` puts the 1px rule inside this height, so the row has 31px of
+     content and the 32px checkbox in it reads pointer height 31. Growing the
+     row to `calc(var(--lq-hit-target) + 1px)` fixed that one control and cost
+     24: an odd row height puts the centred checkbox on a half-pixel, and the
+     pointer walk then reports its region as not covering its own rect —
+     `stolenCount` went 1 -> 24, and `stolen` is half of the same bar. 32px
+     stays. The one remaining sub-floor row is at the scroller's clip edge. */
   height: 32px;
   border-bottom: 1px solid var(--lq-work-border);
   cursor: default;
@@ -503,9 +553,29 @@
   place-items: center;
 }
 
+/* The floor is on the control's OWN box, not a `.lq-hit` overlay: an input is a
+   replaced element, so `::after` generates no box and a scope covering it would
+   read as fixed while leaving it under the bar (`liquid-controls.css`, §hit-area
+   floor). Measured 2026-09-03 on this surface: 24 of these at 18px rect / 18.5px
+   pointer against the 32px bar — the largest single family under the floor, and
+   it gates BULK DELETE, so it is the worst one to make a user aim at.
+
+   Growing it inflates no chrome, which is the usual objection: `.fa-row` already
+   reserves `var(--lq-hit-target)` for this column (see `grid-template-columns`),
+   so the cell was 32px wide all along and only the glyph inside it was small.
+   Nothing in the row shifts. */
+/* MARGIN 0 IS LOAD-BEARING, and it is the second half of the same repair. The
+   rule above took the rect to 32x32 and the POINTER region stayed at 28.5x28:
+   `<input>` carries a UA `margin: 3px 3px 3px 4px`, so a 32px box needs 39x38
+   inside a cell that is exactly `var(--lq-hit-target)` wide and a row that is
+   exactly 32px tall — and `.fa-cell` is `overflow: hidden`. The right 4px and
+   the bottom 3px were being clipped away, which layout does not report and
+   `getBoundingClientRect()` cannot see. Measured on the live surface: rect
+   32x32, hit 28.5x28, still under the bar the previous commit claimed. */
 .fa-bulk-check {
-  width: 18px;
-  height: 18px;
+  width: var(--lq-hit-target);
+  height: var(--lq-hit-target);
+  margin: 0;
   accent-color: var(--accent);
 }
 

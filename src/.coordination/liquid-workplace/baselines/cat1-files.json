@@ -1,0 +1,368 @@
+{
+  "label": "p2-files",
+  "surface": "@.fwin:has(.fa-shell)",
+  "win": "(focused)",
+  "theme": null,
+  "presentation": "standard",
+  "box": "820x580",
+  "deferredVisibilityOwners": 0,
+  "parserSelfTest": {
+    "ok": true,
+    "why": "channels scaled 0..1 -> 0..255",
+    "parsed": "222,125,128"
+  },
+  "text": {
+    "measured": 214,
+    "unmeasurable": 0,
+    "minRatio": 4.65,
+    "minOwner": "span.fa-tree-count \"32\" 14px",
+    "failingCount": 0,
+    "worst": [],
+    "inactiveSkipped": 0,
+    "decorativeSkipped": 2,
+    "decorativeWorst": [],
+    "inactiveWorst": []
+  },
+  "targets": {
+    "total": 103,
+    "smallest": "button.fwin-b 24px",
+    "smallestPx": 24,
+    "under32Count": 8,
+    "under32": [
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fwin-b",
+        "min": 24,
+        "nearest": 32
+      },
+      {
+        "el": "button.fa-view-mode-button",
+        "min": 28,
+        "nearest": 45.8
+      },
+      {
+        "el": "button.fa-view-mode-button",
+        "min": 28,
+        "nearest": 44.1
+      },
+      {
+        "el": "button.fa-cell",
+        "min": 30.92,
+        "nearest": 45.8
+      }
+    ],
+    "wcag258FailCount": 0,
+    "wcag258Fails": []
+  },
+  "keyboard": {
+    "controls": 103,
+    "unreachableCount": 0,
+    "unreachable": [],
+    "focusHostCount": 0,
+    "focusHosts": [],
+    "roving": []
+  },
+  "deferredRestore": {
+    "repaired": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "verified": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "delayed": {
+      "owners": 0,
+      "drift": 0,
+      "remaining": 0,
+      "disconnected": 0
+    },
+    "restored": true
+  },
+  "raised": "root surface - no taskbar button",
+  "ariaDisclosed": {
+    "clicked": 0,
+    "sel": []
+  },
+  "motion": {
+    "emulationTook": true,
+    "emulationReleased": true,
+    "beforeOverThreshold": 43,
+    "beforeLongest": {
+      "el": "div.lq-scaffold-toolbar",
+      "dur": 0.24
+    },
+    "duringOverThreshold": 0,
+    "duringLongest": null,
+    "afterOverThreshold": 43,
+    "motionDurationToken": "0.140s",
+    "reduceMotionClass": false
+  },
+  "hit": {
+    "title": ".fwin:has(.fa-shell)",
+    "floor": 32,
+    "presentation": "standard",
+    "theme": null,
+    "box": "820x580",
+    "deferredVisibilityOwners": 0,
+    "controls": 103,
+    "measured": 78,
+    "belowFloorByRect": 8,
+    "belowFloorByHit": 4,
+    "belowFloor": [
+      {
+        "sel": "button.fa-tree-node",
+        "n": 1,
+        "rect": "48x32",
+        "hit": "48.5x26.5",
+        "hitMin": 26.5,
+        "blockers": [
+          "div.fa-tree",
+          "div.fa-tree"
+        ]
+      },
+      {
+        "sel": "button.fa-cell.fa-cell-size",
+        "n": 1,
+        "rect": "31x32",
+        "hit": "31.5x32.5",
+        "hitMin": 31.5,
+        "blockers": [
+          "div.fa-row.fa-head",
+          "div.fa-row.fa-head"
+        ]
+      },
+      {
+        "sel": "div.fa-row",
+        "n": 1,
+        "rect": "364x32",
+        "hit": "52.5x31.5",
+        "hitMin": 31.5,
+        "blockers": [
+          "button.fa-cell.fa-cell-kind",
+          "div.fa-row"
+        ]
+      },
+      {
+        "sel": "input.fa-bulk-check",
+        "n": 1,
+        "rect": "32x32",
+        "hit": "32.5x31",
+        "hitMin": 31,
+        "blockers": [
+          "div.fa-row",
+          "div.fa-row"
+        ]
+      }
+    ],
+    "smallestHit": {
+      "el": "button.fa-tree-node",
+      "rect": "48x32",
+      "rectMin": 32,
+      "hit": "48.5x26.5",
+      "hitMin": 26.5,
+      "shrunk": true,
+      "shrunkBy": 5,
+      "blockers": [
+        "div.fa-tree",
+        "div.fa-tree",
+        "div.fa-tree",
+        "div.fa-tree"
+      ]
+    },
+    "stolenCount": 1,
+    "stolen": [
+      {
+        "sel": "button.fa-tree-node",
+        "n": 1,
+        "rect": "48x32",
+        "hit": "48.5x26.5",
+        "shrunkBy": 5,
+        "blockers": [
+          "div.fa-tree",
+          "div.fa-tree"
+        ]
+      }
+    ],
+    "worstShrunkBy": 5,
+    "occludedCount": 25,
+    "occluded": [
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.fa-status"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.fa-status"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-desktop"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-desktop"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-desktop"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-desktop"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-desktop"
+      },
+      {
+        "el": "button.fa-tree-node",
+        "rect": "48x32",
+        "by": "div.os-taskbar.os-taskbar-full"
+      }
+    ],
+    "disabledCount": 0,
+    "disabled": [],
+    "disclosedForRun": 0,
+    "disclosuresRestored": true,
+    "scrollLeaks": [
+      "div.fa-tree 0,0 -> 0,15",
+      "div.fa-rows 0,0 -> 567,0"
+    ],
+    "deferredRestore": {
+      "first": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      },
+      "second": {
+        "repaired": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "verified": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "delayed": {
+          "owners": 0,
+          "drift": 0,
+          "remaining": 0,
+          "disconnected": 0
+        },
+        "restored": true
+      }
+    },
+    "scrollRestore": {
+      "put": 0,
+      "cleared": 0
+    },
+    "stable": true,
+    "firstRun": {
+      "belowFloorByHit": 4,
+      "stolenCount": 1,
+      "occludedCount": 25
+    }
+  },
+  "bars": {
+    "contrast": true,
+    "targets32": false,
+    "wcag258": true,
+    "keyboard": true,
+    "motion": true
+  },
+  "verdict": "FAIL",
+  "failedBars": [
+    "targets32"
+  ],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true,
+      "decorativeExemptionIsNarrow": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "plantCaughtByPointer": 2,
+    "pointerCountDelta": 1,
+    "pointerOccludedDelta": 2,
+    "counts": {
+      "base": [
+        0,
+        8,
+        0,
+        0,
+        4
+      ],
+      "dirty": [
+        2,
+        10,
+        2,
+        1,
+        5
+      ],
+      "restored": [
+        0,
+        8,
+        0,
+        0
+      ]
+    }
+  },
+  "ariaRestored": {
+    "skipped": "nothing was opened"
+  }
+}
