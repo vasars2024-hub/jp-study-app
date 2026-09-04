@@ -139,6 +139,41 @@ export interface ReadingListTarget {
   by?: number;
 }
 
+/**
+ * §7's `format`. `book` and `manga` are `LibraryKind` verbatim; `vn` is derived
+ * from `externalIds.vndb`, which is the only visual-novel identity this model
+ * holds — visual novels are not importable as library items.
+ */
+export type ReadingWorkFormat = 'book' | 'manga' | 'vn';
+
+/**
+ * §7's saved query. Lives HERE, in the model, rather than beside the evaluator,
+ * because §1 puts it on the list (`query?: SmartListQuery`) and a persisted
+ * field has to be normalizable by the same total pass every other field is. The
+ * evaluator re-exports it, so callers can keep importing it from one place.
+ *
+ * `untouchedSince` and `progressBelow` are beyond §7's literal shape and are
+ * explained where they are evaluated (`readingListSmartLists.ts`): §7 defines
+ * Abandoned as "started, <90 %, untouched 30 days" while offering only
+ * `startedBefore`, and started-at and touched-at are different facts.
+ */
+export interface SmartListQuery {
+  format?: readonly ReadingWorkFormat[];
+  state?: readonly ReadingEntryState[];
+  /** L1–L7 cap. Unknown-level works pass unless `requireKnownDifficulty`. */
+  difficultyMax?: number;
+  requireKnownDifficulty?: boolean;
+  /** Epoch ms. */
+  startedBefore?: number;
+  /** Epoch ms. */
+  untouchedSince?: number;
+  /** 0..1. */
+  progressBelow?: number;
+  notOnList?: readonly string[];
+  authorIs?: string;
+  ownedOnly?: boolean;
+}
+
 export interface ReadingList {
   id: string;
   name: string;
@@ -149,6 +184,14 @@ export interface ReadingList {
   archivedAt?: number;
   /** `challenge` only. */
   target?: ReadingListTarget;
+  /**
+   * `smart` only: the saved query, re-evaluated on read (§1, §7).
+   *
+   * A smart list carries NO entries — its membership is derived — so a `smart`
+   * list with a `query` and an empty `entries` array is the normal shape, not a
+   * damaged one.
+   */
+  query?: SmartListQuery;
   sourceUrl?: string;
   entries: ReadingListEntry[];
   imports: ReadingListImport[];
@@ -422,6 +465,96 @@ function normalizeTarget(value: unknown): ReadingListTarget | undefined {
   return target.count === undefined && target.by === undefined ? undefined : target;
 }
 
+const WORK_FORMATS = new Set<ReadingWorkFormat>(['book', 'manga', 'vn']);
+
+/**
+ * §7's saved query, repaired rather than trusted.
+ *
+ * Total like every other normalizer here, and lossy in one direction only: an
+ * unrecognised format or state is DROPPED from its array rather than passed
+ * through. A query is a filter, so an unknown term is one the evaluator cannot
+ * satisfy — carried through it would silently return nothing and read as an
+ * empty library. Dropping it widens the answer, which is visibly wrong instead
+ * of invisibly wrong.
+ *
+ * An array that empties out is removed entirely, because `state: []` and no
+ * `state` at all mean the same thing to the evaluator and only one of them
+ * survives a round trip.
+ *
+ * Returns `undefined` for a query with nothing left in it: a `smart` list whose
+ * saved query is `{}` matches the whole library, which is not a question anyone
+ * asked, and the surface can offer to rebuild it instead.
+ */
+export function normalizeSmartListQuery(value: unknown): SmartListQuery | undefined {
+  if (!isRecord(value)) return undefined;
+  const query: SmartListQuery = {};
+  let any = false;
+
+  const formats = arr(value.format)
+    .map((entry) => (typeof entry === 'string' ? entry : ''))
+    .filter((entry): entry is ReadingWorkFormat => WORK_FORMATS.has(entry as ReadingWorkFormat));
+  if (formats.length) {
+    query.format = [...new Set(formats)];
+    any = true;
+  }
+
+  const states = arr(value.state)
+    .map((entry) => (typeof entry === 'string' ? entry : ''))
+    .filter((entry): entry is ReadingEntryState => ENTRY_STATES.has(entry as ReadingEntryState));
+  if (states.length) {
+    query.state = [...new Set(states)];
+    any = true;
+  }
+
+  const difficultyMax = num(value.difficultyMax);
+  if (difficultyMax !== undefined) {
+    // Clamped to the tier scale it is a cap on. A saved 0 would match nothing
+    // and a saved 40 would match everything, and both read as a broken list.
+    query.difficultyMax = Math.min(7, Math.max(1, Math.trunc(difficultyMax)));
+    any = true;
+  }
+  if (value.requireKnownDifficulty === true) {
+    query.requireKnownDifficulty = true;
+    any = true;
+  }
+
+  const startedBefore = num(value.startedBefore);
+  if (startedBefore !== undefined) {
+    query.startedBefore = startedBefore;
+    any = true;
+  }
+  const untouchedSince = num(value.untouchedSince);
+  if (untouchedSince !== undefined) {
+    query.untouchedSince = untouchedSince;
+    any = true;
+  }
+  const progressBelow = num(value.progressBelow);
+  if (progressBelow !== undefined) {
+    query.progressBelow = Math.min(1, Math.max(0, progressBelow));
+    any = true;
+  }
+
+  const notOnList = arr(value.notOnList)
+    .map((entry) => str(entry))
+    .filter((entry): entry is string => Boolean(entry));
+  if (notOnList.length) {
+    query.notOnList = [...new Set(notOnList)];
+    any = true;
+  }
+
+  const authorIs = str(value.authorIs);
+  if (authorIs) {
+    query.authorIs = authorIs;
+    any = true;
+  }
+  if (value.ownedOnly === true) {
+    query.ownedOnly = true;
+    any = true;
+  }
+
+  return any ? query : undefined;
+}
+
 export function normalizeReadingList(value: unknown): ReadingList | null {
   if (!isRecord(value)) return null;
   const id = str(value.id);
@@ -449,6 +582,15 @@ export function normalizeReadingList(value: unknown): ReadingList | null {
   if (archivedAt !== undefined) list.archivedAt = archivedAt;
   const target = normalizeTarget(value.target);
   if (target) list.target = target;
+  /*
+    Kept only on a `smart` list. A query on a hand-written `pool` would be saved
+    and never evaluated — a field that is present, plausible and inert, which is
+    the shape a later reader mistakes for a working feature.
+  */
+  if (list.kind === 'smart') {
+    const query = normalizeSmartListQuery(value.query);
+    if (query) list.query = query;
+  }
   const sourceUrl = str(value.sourceUrl);
   if (sourceUrl) list.sourceUrl = sourceUrl;
 

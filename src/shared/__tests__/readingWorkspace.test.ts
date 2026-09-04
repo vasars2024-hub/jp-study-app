@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   READING_WORKSPACE_SCHEMA_VERSION,
+  READING_WORKSPACE_SECTIONS,
   defaultReadingWorkspaceRoute,
+  normalizeReadingWorkspaceSection,
   normalizeReadingWorkspaceEntry,
   normalizeReadingWorkspaceLibrary,
   normalizeReadingWorkspaceRoute,
@@ -68,6 +70,67 @@ describe('Reading workspace routes', () => {
     };
     expect(normalizeReadingWorkspaceRoute(serializeReadingWorkspaceRoute(route))).toEqual(route);
     expect(normalizeRouteFromReadingIpc('reading-finder')).toMatchObject({ section: 'discover' });
+  });
+
+  it('can name EVERY section in the union, not just the ones with an alias', () => {
+    // The defect this exists for: `lists` was added to the union and to
+    // `readingWorkspaceSurfaceForSection`, but not to SECTION_ALIASES — the only
+    // table `normalizeReadingWorkspaceSection` reads. Every route naming it
+    // normalized to null, so §11.2's widget headers and §11.3's reminders (five
+    // live call sites) published nothing at all, silently.
+    //
+    // Written over the union rather than as `expect(...'lists'...)` so the NEXT
+    // section added is caught the same way instead of shipping dead too.
+    for (const section of READING_WORKSPACE_SECTIONS) {
+      expect(normalizeReadingWorkspaceSection(section), section).toBe(section);
+      expect(normalizeReadingWorkspaceRoute({ section, intent: 'browse' }), section)
+        .toMatchObject({ section });
+      // And through the serialized deep-link form, which is the path `os:open`
+      // takes — an alias could satisfy the object form and still lose the URL.
+      expect(
+        normalizeReadingWorkspaceRoute(
+          serializeReadingWorkspaceRoute({
+            version: READING_WORKSPACE_SCHEMA_VERSION,
+            section,
+            intent: 'browse',
+          }),
+        ),
+        section,
+      ).toMatchObject({ section });
+    }
+  });
+
+  it('round-trips §11.1 row 8 — the list AND the entry it scrolls to', () => {
+    const route = {
+      version: READING_WORKSPACE_SCHEMA_VERSION,
+      section: 'lists' as const,
+      intent: 'browse' as const,
+      listId: 'list-7',
+      entryId: 'entry-42',
+    };
+    expect(normalizeReadingWorkspaceRoute(serializeReadingWorkspaceRoute(route))).toEqual(route);
+    // Through the object form too, which is the one the reader strip publishes.
+    expect(normalizeReadingWorkspaceRoute(route)).toEqual(route);
+  });
+
+  it('drops an entryId that names no list, rather than carrying a row nobody can find', () => {
+    const orphan = normalizeReadingWorkspaceRoute({
+      section: 'lists',
+      intent: 'browse',
+      entryId: 'entry-42',
+    });
+    expect(orphan).not.toBeNull();
+    expect(orphan).not.toHaveProperty('entryId');
+    // The control: the SAME entryId survives once a list names it, so the drop
+    // above is the rule firing and not the field being unwired.
+    expect(
+      normalizeReadingWorkspaceRoute({
+        section: 'lists',
+        intent: 'browse',
+        listId: 'list-7',
+        entryId: 'entry-42',
+      }),
+    ).toHaveProperty('entryId', 'entry-42');
   });
 
   it('rejects a future schema instead of guessing', () => {

@@ -34,6 +34,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
+import ReadingSmartLists from '../components/reading/ReadingSmartLists';
 import { Button, Select } from '../components/ui';
 import { useT } from '../i18n';
 import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readingListsClient';
@@ -46,7 +47,11 @@ import {
 } from '../readingListsDensity';
 import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
-import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
+import type {
+  ReadingEntryState,
+  ReadingListEntry,
+  SmartListQuery,
+} from '../../shared/readingLists';
 import { READING_LIST_EXAMPLE_MESSAGE } from '../../shared/readingListParser';
 import {
   addLibraryItemToReadingList,
@@ -63,6 +68,7 @@ import {
   restoreReadingListEntries,
   restoreReadingListEntry,
   restoreReadingWorkSuggestion,
+  saveSmartReadingList,
   setReadingEntryState,
   setReadingEntryStates,
   undoReadingListMove,
@@ -81,6 +87,10 @@ import {
   type ReadingListSort,
   type ReadingListSummary,
 } from '../../shared/readingListViews';
+import {
+  readingListExport,
+  type ReadingListExportFormat,
+} from '../../shared/readingListExport';
 import './readingLists.css';
 
 const STATE_KEYS: Record<ReadingEntryState, string> = {
@@ -244,6 +254,12 @@ interface ReadingRowProps {
   /** The cover to draw, already resolved to a URL or a fallback data image. */
   coverImage: string;
   selected: boolean;
+  /**
+   * §11.1 row 8's arrival mark. A primitive, so the memo still holds for the
+   * 499 rows that did not move, and separate from `selected` because arriving
+   * at a row is not the same as ticking it for a bulk action.
+   */
+  focused: boolean;
   actions: ReadingRowActions;
   t: ReturnType<typeof useT>['t'];
   /**
@@ -300,6 +316,7 @@ const ReadingRow = memo(function ReadingRow({
   author,
   coverImage,
   selected,
+  focused,
   actions,
   t,
 }: ReadingRowProps) {
@@ -308,6 +325,15 @@ const ReadingRow = memo(function ReadingRow({
     <li
       className="rlv__row"
       data-state={state}
+      /*
+        §11.1 row 8's scroll target. An attribute rather than a ref map: the
+        rows are `memo`'d and a ref callback per row would take a new identity
+        on every render of the parent, which re-runs 500 detach/attach pairs
+        for a one-row change — the exact cost `ReadingRowProps` was flattened
+        to avoid.
+      */
+      data-entry-id={entryId}
+      data-focused={focused ? 'true' : undefined}
       /*
         §11.4's drag and drop. The dragged id is held in the VIEW, not in
         `dataTransfer`: jsdom implements no `DataTransfer`, so a payload put
@@ -489,6 +515,14 @@ export interface ReadingListsViewProps {
   onShowInLibrary?: (item: LibraryItem) => void;
   /** Deep link. When the list is gone the view falls back to the grid. */
   initialListId?: string | null;
+  /**
+   * §11.1 row 8: the entry the deep link scrolls to and selects.
+   *
+   * Only meaningful with `initialListId`. An entry that is not on the open list
+   * is ignored in silence rather than falling back to the top — a scroll that
+   * lands somewhere arbitrary is worse than not scrolling.
+   */
+  initialEntryId?: string | null;
 }
 
 export default function ReadingListsView({
@@ -496,12 +530,22 @@ export default function ReadingListsView({
   onFindWork,
   onShowInLibrary,
   initialListId = null,
+  initialEntryId = null,
 }: ReadingListsViewProps) {
   const { t, lang } = useT();
   // One subscription, shared with §11.2's widgets: four copies of a load effect
   // is four chances to disagree about what "not loaded yet" looks like.
   const { document, failure: loadFailure, health, adopt, reload } = useReadingListsDocument();
   const [writeFailure, setWriteFailure] = useState<string | null>(null);
+  /**
+   * P5 §8's receipt. What was copied and how much of it, or why it was not.
+   *
+   * Its own state rather than a reuse of `writeFailure`: that notice renders a
+   * FIXED string (`readingLists.view.writeFailed`) and ignores the value it was
+   * given, so an export failure routed through it would report a failed WRITE —
+   * a different thing, about the document rather than the clipboard.
+   */
+  const [exported, setExported] = useState<{ message: string; failed: boolean } | null>(null);
   // Dismissal is per detected-at, not a bare boolean: a SECOND recovery, later in
   // the same session, is a new fact and has to be announced again.
   const [healthDismissedAt, setHealthDismissedAt] = useState<number | null>(null);
@@ -594,6 +638,50 @@ export default function ReadingListsView({
     () => (query ? rows.filter((row) => row.title.toLowerCase().includes(query)) : rows),
     [query, rows],
   );
+
+  /**
+   * §11.1 row 8's arrival. `focusEntryId` outlives the scroll so the row stays
+   * marked — landing on a 200-row list with nothing highlighted is the same as
+   * not having scrolled.
+   *
+   * NOT folded into `selected`: that set is what the bulk actions send, so
+   * ticking a row on arrival would arm "Remove" against a book the user only
+   * asked to see.
+   */
+  const [focusEntryId, setFocusEntryId] = useState<string | null>(initialEntryId);
+  const rowsRef = useRef<HTMLUListElement | null>(null);
+  const focusAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    focusAppliedRef.current = null;
+    setFocusEntryId(initialEntryId);
+  }, [initialEntryId]);
+
+  useEffect(() => {
+    if (!focusEntryId || focusAppliedRef.current === focusEntryId) return;
+    // The entry must be on the OPEN list. A stale route names a row that is not
+    // here, and scrolling to the top instead would claim to have found it.
+    if (!rows.some((row) => row.entry.id === focusEntryId)) return;
+    // The same trap §11.1 row 4's reveal hit: a filter left over from earlier
+    // hides the row the route named, so the scroll finds no node and the deep
+    // link reads as broken. Clear it and let the next render carry the scroll.
+    if (!visibleRows.some((row) => row.entry.id === focusEntryId)) {
+      setFilter('');
+      return;
+    }
+    const node = Array.from(rowsRef.current?.children ?? []).find(
+      (child) => child.getAttribute('data-entry-id') === focusEntryId,
+    );
+    if (!node) return;
+    focusAppliedRef.current = focusEntryId;
+    // jsdom implements no `scrollIntoView`; without the guard every test that
+    // deep-links a row throws instead of asserting the landing.
+    if (typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ block: 'center' });
+    }
+    // Move the keyboard to where the eye went. Arriving with focus still on the
+    // body means the next Tab starts at the top of the page, not at the row.
+    node.querySelector('button')?.focus();
+  }, [focusEntryId, rows, visibleRows]);
 
   /**
    * §11.4's bulk selection, derived rather than stored, so it can never name a
@@ -715,6 +803,43 @@ export default function ReadingListsView({
       onOpenBook(item);
     },
     [itemsById, list, onFindWork, onOpenBook, write],
+  );
+
+  /**
+   * P5 §8. Renders the open list and puts it on the clipboard.
+   *
+   * The result is REPORTED, both ways. A copy that silently failed — no
+   * clipboard permission, a host without the API — is indistinguishable from
+   * one that worked until the user pastes into a chat and sends nothing, so
+   * the failure has to say so where the user is looking.
+   *
+   * `lang` is the dependency rather than `t`, per the i18n rule: `t`'s identity
+   * is stable by design, so depending on it goes silently stale after a switch.
+   */
+  const copyExport = useCallback(
+    async (format: ReadingListExportFormat) => {
+      if (!list || !document) return;
+      const text = readingListExport(format, list, document.works);
+      try {
+        // Optional-chained: a host without the API returns undefined rather
+        // than throwing, and awaiting undefined resolves — which would report a
+        // copy that never happened. The explicit check is what makes it honest.
+        const write = navigator.clipboard?.writeText;
+        if (!write) throw new Error('no clipboard');
+        await navigator.clipboard.writeText(text);
+      } catch {
+        setExported({ message: t('readingLists.view.export.failed'), failed: true });
+        return;
+      }
+      setExported({
+        message: t('readingLists.view.export.copied', { count: list.entries.length }),
+        failed: false,
+      });
+    },
+    // `lang`, deliberately, and NOT `t` — see the doc comment. No disable
+    // comment: `react-hooks/exhaustive-deps` is not configured in this repo, so
+    // one is itself a lint ERROR ("Definition for rule ... was not found").
+    [list, document, lang],
   );
 
   const showSource = useCallback((entryId: string) => {
@@ -1026,6 +1151,53 @@ export default function ReadingListsView({
       });
     },
     [document, list, t, write],
+  );
+
+  /** P5 §7: keep the open question as a `smart` list. */
+  const saveSmartQuery = useCallback(
+    (name: string, query: SmartListQuery) => {
+      void write((current) =>
+        saveSmartReadingList(current, { name, query }, createReadingListsMutationContext()),
+      );
+    },
+    [write],
+  );
+
+  /**
+   * Removing a saved question, with the same undo every other destructive
+   * action here carries (§11.4). It reuses `deleteReadingList`/`restoreReadingList`
+   * rather than a smart-specific pair: a smart list IS a list, and a second
+   * delete path would be a second answer to what deleting one means.
+   */
+  const removeSmartQuery = useCallback(
+    (targetId: string, name: string) => {
+      const held: { removed: RemovedReadingList | null; index: number } = {
+        removed: null,
+        index: 0,
+      };
+      void write(
+        (current) => {
+          held.index = current.lists.findIndex((candidate) => candidate.id === targetId);
+          const mutation = deleteReadingList(current, targetId, createReadingListsMutationContext());
+          held.removed = mutation.removed;
+          return mutation;
+        },
+        () => {
+          const captured = held.removed;
+          const at = held.index;
+          if (!captured) return null;
+          return {
+            message: t('readingLists.smart.removed', { name }),
+            run: () => {
+              void write((current) =>
+                restoreReadingList(current, captured, at, createReadingListsMutationContext()),
+              );
+            },
+          };
+        },
+      );
+    },
+    [t, write],
   );
 
   const removeList = useCallback(
@@ -1620,6 +1792,18 @@ export default function ReadingListsView({
           {t('readingLists.view.writeFailed')}
         </div>
       ) : null}
+      {exported ? (
+        <div
+          className={`rlv__notice rlv__notice--${exported.failed ? 'error' : 'undo'}`}
+          role="status"
+          data-testid="rlv-export-note"
+        >
+          <span>{exported.message}</span>
+          <Button size="sm" variant="ghost" onClick={() => setExported(null)}>
+            {t('readingLists.view.drop.dismiss')}
+          </Button>
+        </div>
+      ) : null}
       {dropFailure ? (
         <div className="rlv__notice rlv__notice--warn" role="status" data-testid="rlv-drop-note">
           <span>{dropFailure}</span>
@@ -1787,6 +1971,31 @@ export default function ReadingListsView({
           <Button size="sm" onClick={() => setPicking((open) => !open)}>
             {t('readingLists.view.library.add')}
           </Button>
+          {/*
+            P5 §8. The clipboard and NOT a file dialog: §8's first bullet is
+            "pasteable straight back into LINE, Discord, or a forum", which is a
+            paste, and a native save dialog is a modal no automated check can
+            drive and one more thing to cancel out of. A file save can be added
+            later beside this without moving the format code, which is pure.
+          */}
+          <label className="rlv__export">
+            <span className="rlv__export-label">{t('readingLists.view.export.label')}</span>
+            <select
+              className="rlv__export-select ui-focusable"
+              aria-label={t('readingLists.view.export.label')}
+              value=""
+              onChange={(event) => {
+                const format = event.target.value;
+                event.target.value = '';
+                if (format) void copyExport(format as ReadingListExportFormat);
+              }}
+            >
+              <option value="">{t('readingLists.view.export.pick')}</option>
+              <option value="message">{t('readingLists.view.export.message')}</option>
+              <option value="markdown">{t('readingLists.view.export.markdown')}</option>
+              <option value="csv">{t('readingLists.view.export.csv')}</option>
+            </select>
+          </label>
           <Button size="sm" variant="danger" onClick={() => summary && removeList(summary)}>
             {t('readingLists.view.deleteList')}
           </Button>
@@ -2129,6 +2338,7 @@ export default function ReadingListsView({
               <p className="rlv__hint">{t('readingLists.view.rowReorder')}</p>
             ) : null}
             <ul
+              ref={rowsRef}
               className="rlv__rows"
               aria-label={t('readingLists.view.rowsLabel', { name: list.name })}
             >
@@ -2151,6 +2361,7 @@ export default function ReadingListsView({
                     row.title,
                   )}
                   selected={selected.has(row.entry.id)}
+                  focused={focusEntryId === row.entry.id}
                   actions={rowActions}
                   t={t}
                   lang={lang}
@@ -2411,6 +2622,20 @@ export default function ReadingListsView({
           ))}
         </ul>
       )}
+      {/*
+        P5 §7. Below the grid because it ANSWERS questions about what is already
+        in the lists — a panel offering "Abandoned" above a user's own lists
+        would be the app leading with a judgement. It renders nothing at all
+        until there is at least one work to ask about.
+      */}
+      <ReadingSmartLists
+        document={document}
+        items={items}
+        onOpenBook={onOpenBook}
+        onFindWork={onFindWork}
+        onSaveQuery={saveSmartQuery}
+        onRemoveSaved={removeSmartQuery}
+      />
     </div>
   );
 }

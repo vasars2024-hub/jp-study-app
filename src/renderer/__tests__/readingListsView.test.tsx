@@ -137,11 +137,12 @@ function installBridge(
   };
 }
 
-async function render(initialListId: string | null = null) {
+async function render(initialListId: string | null = null, initialEntryId: string | null = null) {
   await act(async () => {
     root.render(
       <ReadingListsView
         initialListId={initialListId}
+        initialEntryId={initialEntryId}
         onOpenBook={(item) => opened.push(item)}
         onFindWork={(title) => sought.push(title)}
       />,
@@ -235,6 +236,79 @@ describe('ReadingListsView', () => {
     expect(host.textContent).toContain('From a friend');
     // Two entries, neither finished, and neither abandoned: 0 of 2.
     expect(host.textContent).toContain('0 of 2 finished');
+  });
+
+  /**
+   * P5 §7's panel is reached from HERE, and a component that works standalone
+   * while the view never renders it is the same dead route as a module with no
+   * caller. So: the panel is on the grid, its presets are real, and it is NOT on
+   * the detail — the detail is one list, and a question about all of them there
+   * would answer about books the open list does not contain.
+   */
+  it('renders the smart-list panel on the grid', async () => {
+    const { document } = seeded();
+    installBridge(new FakeStore(document));
+    await render();
+    const panel = host.querySelector('[data-testid="rlv-smart-lists"]');
+    expect(panel).not.toBeNull();
+    expect([...panel!.querySelectorAll('.rlsm__chip')].map((n) => n.textContent)).toEqual([
+      'Abandoned',
+      'Ready to read',
+      'Author sweep',
+    ]);
+  });
+
+  /**
+   * The write half of §7. A panel test with a spy proves the button is wired to
+   * a callback; only this proves the callback reaches the STORE — and that the
+   * saved list does not then appear in the grid as a card reading "0 of 0
+   * finished", which is what `summarizeReadingLists` now excludes.
+   *
+   * Note the query here answers ZERO rows: `seeded()`'s entries are `wanted`,
+   * and Ready to read wants `owned`. Saving is offered anyway, on purpose — a
+   * question is worth keeping before it has an answer, and a Save control that
+   * appeared and vanished with the row count would move for reasons the user
+   * cannot see.
+   */
+  it('saves a smart list through the store and keeps it out of the card grid', async () => {
+    const { document } = seeded();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render();
+
+    const cardsBefore = host.querySelectorAll('.rlv__card').length;
+    const readyChip = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__chip')].find(
+      (node) => node.textContent === 'Ready to read',
+    );
+    await click(readyChip);
+    const save = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__save button')].at(-1);
+    expect(save?.textContent).toBe('Save');
+    await click(save);
+
+    const stored = store.document.lists.filter((entry) => entry.kind === 'smart');
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.name).toBe('Ready to read');
+    expect(stored[0]?.query).toMatchObject({ ownedOnly: true, difficultyMax: 4 });
+    expect(stored[0]?.entries).toEqual([]);
+
+    // It came back as a chip, not as a card.
+    expect(host.querySelectorAll('.rlv__card')).toHaveLength(cardsBefore);
+    expect(host.querySelectorAll('.rlsm__chip[data-saved="true"]')).toHaveLength(1);
+  });
+
+  /**
+   * A SEPARATE mount, deliberately. `render()` re-renders the same root and the
+   * view holds `listId` in state seeded from the prop, so calling it twice never
+   * leaves the grid — an in-test navigation here asserted nothing and read as a
+   * product defect on the first run.
+   */
+  it('does not render the smart-list panel on a list detail', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+    // The detail really is open, so the absence below is about the panel.
+    expect(rows()).toHaveLength(2);
+    expect(host.querySelector('[data-testid="rlv-smart-lists"]')).toBeNull();
   });
 
   it('opens the library item for a bound row and routes an unbound row to acquisition', async () => {
@@ -1913,5 +1987,238 @@ describe('ReadingListsView — §11.1 click-through', () => {
         (line) => (line as HTMLElement).dataset.produced,
       ),
     ).toEqual(['true']);
+  });
+});
+
+describe('ReadingListsView — §11.1 row 8, landing on one entry', () => {
+  /** jsdom implements no `scrollIntoView`; this is both the stub and the probe. */
+  let scrolled: Element[];
+  let restoreScroll: (() => void) | null = null;
+
+  beforeEach(() => {
+    scrolled = [];
+    const proto = window.Element.prototype as unknown as Record<string, unknown>;
+    const had = Object.prototype.hasOwnProperty.call(proto, 'scrollIntoView');
+    const previous = proto.scrollIntoView;
+    proto.scrollIntoView = function stub(this: Element) {
+      scrolled.push(this);
+    };
+    restoreScroll = () => {
+      if (had) proto.scrollIntoView = previous;
+      else delete proto.scrollIntoView;
+    };
+  });
+
+  afterEach(() => {
+    restoreScroll?.();
+    restoreScroll = null;
+  });
+
+  function entryIds(document: ReadingListsDocument, listId: string): string[] {
+    const list = document.lists.find((candidate) => candidate.id === listId);
+    if (!list) throw new Error('the seeded list is missing');
+    return list.entries.map((entry) => entry.id);
+  }
+
+  it('scrolls to the named entry, marks it, and puts the keyboard on it', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    const [first, second] = entryIds(document, listId);
+    await render(listId, second);
+
+    const marked = rows().filter((row) => row.dataset.focused === 'true');
+    expect(marked).toHaveLength(1);
+    expect(marked[0].dataset.entryId).toBe(second);
+    // The scroll was actually requested, on that row and not on the list.
+    expect(scrolled).toEqual([marked[0]]);
+    // Arriving with focus on the body means the next Tab starts at the top of
+    // the page rather than at the row the user asked for.
+    expect(marked[0].contains(window.document.activeElement)).toBe(true);
+
+    // The control: the OTHER row is present and untouched, so the mark above is
+    // a choice between two rows and not the only row there was.
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0].dataset.entryId).toBe(first);
+    expect(rows()[0].dataset.focused).toBeUndefined();
+  });
+
+  it('clears a filter that would hide the entry it was sent to', async () => {
+    // The trap §11.1 row 4's reveal hit as well: `resolveSelection` and every
+    // row lookup run over the FILTERED rows, so a filter left over from earlier
+    // hides the row the route named and the deep link silently does nothing.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    const [, second] = entryIds(document, listId);
+    await render(listId);
+
+    await typeInto(filterField(), 'kino');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].dataset.entryId).not.toBe(second);
+
+    // Now arrive at the hidden entry, exactly as the reader strip does.
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          initialEntryId={second}
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(filterField()?.value).toBe('');
+    expect(rows()).toHaveLength(2);
+    const marked = rows().filter((row) => row.dataset.focused === 'true');
+    expect(marked.map((row) => row.dataset.entryId)).toEqual([second]);
+    expect(scrolled).toEqual([marked[0]]);
+  });
+
+  it('marks nothing for an entry that is not on this list, and keeps the filter', async () => {
+    // A stale route names a row that is not here. Landing on the top instead
+    // would claim to have found it.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId, 'entry-from-another-list');
+
+    expect(rows()).toHaveLength(2);
+    expect(rows().some((row) => row.dataset.focused === 'true')).toBe(false);
+    expect(scrolled).toEqual([]);
+
+    // The half that only a filter can show. Without the membership guard the
+    // effect falls through to the "hidden by the filter" branch and CLEARS the
+    // user's filter — for a row that was never here. Nothing is marked either
+    // way, so the mark alone cannot tell the two apart, and a mutation control
+    // deleting the guard read GREEN until this was added.
+    await typeInto(filterField(), 'kino');
+    expect(rows()).toHaveLength(1);
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          initialEntryId="another-stale-entry"
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(filterField()?.value).toBe('kino');
+    expect(rows()).toHaveLength(1);
+    expect(scrolled).toEqual([]);
+  });
+});
+
+describe('ReadingListsView — P5 §8, copying a list out', () => {
+  let written: string[];
+  let clipboardFails: boolean;
+  let restoreClipboard: (() => void) | null = null;
+
+  beforeEach(() => {
+    written = [];
+    clipboardFails = false;
+    const had = Object.prototype.hasOwnProperty.call(window.navigator, 'clipboard');
+    const previous = Object.getOwnPropertyDescriptor(window.navigator, 'clipboard');
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          if (clipboardFails) throw new Error('denied');
+          written.push(text);
+        },
+      },
+    });
+    restoreClipboard = () => {
+      if (had && previous) Object.defineProperty(window.navigator, 'clipboard', previous);
+      else delete (window.navigator as unknown as { clipboard?: unknown }).clipboard;
+    };
+  });
+
+  afterEach(() => {
+    restoreClipboard?.();
+    restoreClipboard = null;
+  });
+
+  function exportSelect(): HTMLSelectElement | null {
+    return host.querySelector<HTMLSelectElement>('.rlv__export-select');
+  }
+
+  async function pick(format: string) {
+    const select = exportSelect();
+    expect(select).not.toBeNull();
+    await act(async () => {
+      select!.value = format;
+      select!.dispatchEvent(new window.Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('puts the real rendered list on the clipboard and says how much', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await pick('message');
+    expect(written).toHaveLength(1);
+    // The actual export, not a placeholder: both seeded titles, numbered.
+    expect(written[0]).toContain('1. Kino no Tabi');
+    expect(written[0]).toContain('2. コンビニ人間');
+    expect(host.querySelector('[data-testid="rlv-export-note"]')?.textContent).toContain('2 books');
+
+    // The select returns to its prompt, so picking the same format twice works.
+    expect(exportSelect()?.value).toBe('');
+  });
+
+  it('copies a different format when a different one is picked', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await pick('csv');
+    expect(written[0].split('\r\n')[0]).toBe('"position","title","author","state","finished"');
+    await pick('markdown');
+    expect(written[1].split('\n')[0]).toBe('# From a friend');
+    // The control that the format is READ rather than ignored: three picks,
+    // three different strings.
+    expect(new Set(written).size).toBe(2);
+  });
+
+  it('says nothing was copied when the clipboard refuses', async () => {
+    // A silent failure is indistinguishable from success until the user pastes
+    // into a chat and sends nothing.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    clipboardFails = true;
+    await pick('message');
+    expect(written).toHaveLength(0);
+    const note = host.querySelector('[data-testid="rlv-export-note"]');
+    expect(note?.textContent).toContain('Nothing was copied');
+    expect(note?.className).toContain('rlv__notice--error');
+  });
+
+  it('reports a host with no clipboard API rather than claiming a copy', async () => {
+    // `await undefined` resolves, so an unguarded optional call reports success
+    // on a host that has no clipboard at all.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    delete (window.navigator as unknown as { clipboard?: unknown }).clipboard;
+    await pick('message');
+    expect(host.querySelector('[data-testid="rlv-export-note"]')?.textContent).toContain(
+      'Nothing was copied',
+    );
   });
 });

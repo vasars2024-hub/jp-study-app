@@ -16,9 +16,11 @@ import {
   nextUpReadingRow,
   readingChallengePace,
   readingListRows,
+  readingListsForItem,
   readingWorksByAuthor,
   reorderEntryIds,
   recentReadingFinishes,
+  savedSmartLists,
   sortReadingListEntries,
   sortReadingListSummaries,
   summarizeReadingList,
@@ -501,5 +503,171 @@ describe('readingWorksByAuthor — §11.1, the other works by one author', () =>
     expect(first.map((row) => row.listName)).toEqual(['Reading now', 'Someday']);
     // Distinct entry ids, so a caller can key on them without collisions.
     expect(new Set(first.map((row) => row.entryId)).size).toBe(2);
+  });
+});
+
+describe('readingListsForItem — §11.1 row 8, the "on 2 lists" line in the reader', () => {
+  /**
+   * One item (`li7`) bound to `w0`, which sits on three lists — one of them
+   * archived. `w2` is bound to a DIFFERENT item and must never leak in.
+   */
+  function document(patch: Partial<ReadingListsDocument> = {}): ReadingListsDocument {
+    const works: ReadingWorkRef[] = [
+      work({ id: 'w0', titleRaw: 'Convenience Store Woman', boundItemIds: ['li7'] }),
+      work({ id: 'w1', titleRaw: 'Earthlings' }),
+      work({ id: 'w2', titleRaw: 'Kafka on the Shore', boundItemIds: ['li8'] }),
+    ];
+    const listOf = (
+      id: string,
+      name: string,
+      pairs: [string, ReadingEntryState][],
+      extra: Partial<ReadingList> = {},
+    ): ReadingList => ({
+      id,
+      name,
+      kind: 'pool',
+      createdAt: NOW,
+      updatedAt: NOW,
+      entries: pairs.map(([workId, state], index) => ({
+        id: id + '_e' + index,
+        workId,
+        order: index,
+        addedAt: NOW + index,
+        state,
+      })),
+      imports: [],
+      ...extra,
+    });
+    return {
+      schemaVersion: 1,
+      revision: 1,
+      works,
+      lists: [
+        listOf('lA', 'Reading now', [['w1', 'wanted'], ['w0', 'reading']]),
+        listOf('lB', 'Book club', [['w0', 'owned'], ['w2', 'wanted']]),
+        listOf('lC', 'Retired', [['w0', 'finished']], { archivedAt: NOW }),
+      ],
+      ...patch,
+    } as unknown as ReadingListsDocument;
+  }
+
+  it('names every list the item is on, with the entry the route scrolls to', () => {
+    const rows = readingListsForItem(document(), 'li7');
+    expect(rows.map((row) => row.listId)).toEqual(['lA', 'lB', 'lC']);
+    expect(rows.map((row) => row.listName)).toEqual(['Reading now', 'Book club', 'Retired']);
+    // The ENTRY, not the list top — that is what row 8 promises to scroll to.
+    expect(rows.map((row) => row.entryId)).toEqual(['lA_e1', 'lB_e0', 'lC_e0']);
+    // Per-list state, because the same book can be `reading` here and `owned` there.
+    expect(rows.map((row) => row.state)).toEqual(['reading', 'owned', 'finished']);
+    // Flagged, not dropped: the caller decides whether an archive counts.
+    expect(rows.map((row) => row.listArchived)).toEqual([false, false, true]);
+    expect(rows.every((row) => row.workId === 'w0')).toBe(true);
+    expect(rows.every((row) => row.title === 'Convenience Store Woman')).toBe(true);
+  });
+
+  it('never leaks a list reached only through another item', () => {
+    // `w2` is on `lB` too. Asking about `li7` must not pick `lB`'s OTHER entry.
+    const rows = readingListsForItem(document(), 'li7');
+    expect(rows.map((row) => row.entryId)).not.toContain('lB_e1');
+    // And an item bound to nothing is silence, not the whole document.
+    expect(readingListsForItem(document(), 'li-unknown')).toEqual([]);
+  });
+
+  it('refuses a blank id against a document the store never normalized', () => {
+    // Written against an UNNORMALIZED document on purpose. `normalizeWork`
+    // strips `''` out of `boundItemIds` (readingLists.ts:317), so asserting the
+    // blank guard on a normalized document tests nothing — it would pass with
+    // the guard deleted. Here `w1` claims `''`, and without the guard a reader
+    // whose item id has not loaded yet lights up "on 1 list".
+    const base = document();
+    const unnormalized = {
+      ...base,
+      works: base.works.map((candidate) =>
+        candidate.id === 'w1' ? { ...candidate, boundItemIds: [''] } : candidate,
+      ),
+    } as unknown as ReadingListsDocument;
+    expect(readingListsForItem(unnormalized, '')).toEqual([]);
+    // The control on the control: `w1` IS reachable, so the empty result above
+    // is the guard firing and not a fixture with nothing in it.
+    expect(readingListsForItem(unnormalized, 'li7').map((row) => row.listId)).toEqual([
+      'lA',
+      'lB',
+      'lC',
+    ]);
+  });
+
+  it('counts BOTH works when two of them claim the same item, in the list order', () => {
+    // A repairable state, not an impossible one. `workForItem` takes the first
+    // match and would report one list where the user is really on two.
+    //
+    // `lA_e9` is APPENDED to the array but carries `order: -1`, so the user
+    // dragged it to the top. The rows must come out in the user's order, not the
+    // array's — the list detail draws it sorted, and a strip that disagrees
+    // scrolls to the wrong row of the two.
+    const base = document();
+    const twoClaims = {
+      ...base,
+      works: [...base.works, work({ id: 'w1b', titleRaw: 'Earthlings', boundItemIds: ['li7'] })],
+      lists: [
+        {
+          ...base.lists[0],
+          entries: [
+            ...base.lists[0].entries,
+            { id: 'lA_e9', workId: 'w1b', order: -1, addedAt: NOW, state: 'wanted' as const },
+          ],
+        },
+        base.lists[1],
+        base.lists[2],
+      ],
+    } as unknown as ReadingListsDocument;
+    const rows = readingListsForItem(twoClaims, 'li7');
+    expect(rows.map((row) => row.entryId)).toEqual(['lA_e9', 'lA_e1', 'lB_e0', 'lC_e0']);
+    expect(new Set(rows.map((row) => row.workId))).toEqual(new Set(['w0', 'w1b']));
+  });
+});
+
+describe('smart lists are not entry-list cards', () => {
+  /** One ordinary list, one smart, one smart-but-unanswerable, one archived smart. */
+  const doc = {
+    schemaVersion: 1,
+    revision: 1,
+    works: [],
+    lists: [
+      { id: 'l-pool', name: 'Pool', kind: 'pool', createdAt: 1, updatedAt: 1, entries: [], imports: [] },
+      {
+        id: 'l-smart',
+        name: 'Light reading',
+        kind: 'smart',
+        createdAt: 1,
+        updatedAt: 1,
+        query: { ownedOnly: true },
+        entries: [],
+        imports: [],
+      },
+      // A hand-edited file can hold this; saveSmartReadingList cannot make it.
+      { id: 'l-bare', name: 'Bare', kind: 'smart', createdAt: 1, updatedAt: 1, entries: [], imports: [] },
+      {
+        id: 'l-gone',
+        name: 'Retired',
+        kind: 'smart',
+        createdAt: 1,
+        updatedAt: 1,
+        archivedAt: 2,
+        query: { ownedOnly: true },
+        entries: [],
+        imports: [],
+      },
+    ],
+  } as unknown as ReadingListsDocument;
+
+  it('summarizeReadingLists leaves every smart list out', () => {
+    // Otherwise each would draw "0 of 0 finished" over an empty bar, which is
+    // its NORMAL shape rather than a damaged one.
+    expect(summarizeReadingLists(doc).map((s) => s.listId)).toEqual(['l-pool']);
+  });
+
+  it('savedSmartLists returns the answerable ones only', () => {
+    expect(savedSmartLists(doc).map((entry) => entry.listId)).toEqual(['l-smart']);
+    expect(savedSmartLists(doc)[0]?.query).toEqual({ ownedOnly: true });
   });
 });

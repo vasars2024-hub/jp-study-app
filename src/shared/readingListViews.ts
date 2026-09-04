@@ -21,6 +21,7 @@ import type {
   ReadingListsDocument,
   ReadingListTarget,
   ReadingWorkRef,
+  SmartListQuery,
 } from './readingLists';
 // The SAME normaliser `readingListMatching` compares authors with. Two author
 // normalisers is two answers to "is this the same person", and the surface and
@@ -264,6 +265,75 @@ export function readingWorksByAuthor(
   return out;
 }
 
+/** One line of §11.1's *"the 'on 2 lists' line in the reader"*. */
+export interface ReadingListMembershipRow {
+  listId: string;
+  listName: string;
+  listArchived: boolean;
+  /** What the route scrolls to. §11.1 row 8 lands on the ENTRY, not the list top. */
+  entryId: string;
+  workId: string;
+  title: string;
+  state: ReadingEntryState;
+}
+
+/**
+ * §11.1 row 8: *"the 'on 2 lists' line in the reader → the list detail, scrolled
+ * to this entry"*.
+ *
+ * Pure, and living here rather than in a reader, because §10.2 forbids list
+ * logic inside `NovelReader.tsx` (130 KB) and `MangaReader.tsx` (87 KB). The
+ * readers get a component fed by this; they never learn what a list is.
+ *
+ * Scans EVERY work that binds the item, not `workForItem`'s first match. Two
+ * works claiming one item is a repairable state rather than an impossible one
+ * (a merge, or a bind that raced an unbind), and in that state the first match
+ * shows FEWER lists than the user is really on — a line reading "on 1 list"
+ * over two lists is worse than no line at all. Counting all of them can only
+ * over-report a real membership, never invent one.
+ *
+ * Archived lists are RETURNED, flagged, not dropped: this function cannot know
+ * whether its caller is the reader strip (which hides them) or a diagnostic
+ * (which must not).
+ *
+ * The blank guard is NOT decoration. `normalizeWork` strips `''` out of
+ * `boundItemIds` (`readingLists.ts:317`), so a document that came through the
+ * store can never match one — but this takes a `ReadingListsDocument`, and a
+ * caller holding an unnormalized one (a preview, a fixture, a migration in
+ * flight) would otherwise have every blank-bound work answer to an item that
+ * has not loaded yet. `readingListViews.test.ts` falsifies it against exactly
+ * that document rather than against a normalized one, where it cannot fail.
+ */
+export function readingListsForItem(
+  document: ReadingListsDocument,
+  itemId: string,
+): ReadingListMembershipRow[] {
+  if (!itemId) return [];
+  const works = new Map(
+    document.works
+      .filter((work) => work.boundItemIds.includes(itemId))
+      .map((work) => [work.id, work]),
+  );
+  if (works.size === 0) return [];
+  const out: ReadingListMembershipRow[] = [];
+  for (const list of document.lists) {
+    for (const entry of sortReadingListEntries(list)) {
+      const work = works.get(entry.workId);
+      if (!work) continue;
+      out.push({
+        listId: list.id,
+        listName: list.name,
+        listArchived: Boolean(list.archivedAt),
+        entryId: entry.id,
+        workId: work.id,
+        title: work.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '',
+        state: entry.state,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * The row §11.2's "Next up" widget offers, and the one the list detail
  * highlights.
@@ -414,8 +484,47 @@ export function sortReadingListSummaries(
   return [...summaries].sort(compare);
 }
 
+/**
+ * Every list a card can honestly be drawn for.
+ *
+ * `smart` lists are EXCLUDED, and that is the point of the filter rather than an
+ * oversight. P5 §7 stores a smart list as a saved query with no entries — that
+ * is its normal shape, not a damaged one — so a summary of it reads "0 of 0
+ * finished" over an empty progress bar and its detail opens on nothing. Every
+ * caller here draws entry counts, so every caller would draw that same lie.
+ * `ReadingSmartLists` renders saved queries instead, with their live counts.
+ *
+ * Safe to narrow rather than a behaviour change: nothing has ever produced a
+ * `smart` list until `saveSmartReadingList`, so no stored document has one.
+ */
 export function summarizeReadingLists(document: ReadingListsDocument): ReadingListSummary[] {
-  return document.lists.map((list) => summarizeReadingList(list, document.works));
+  return document.lists
+    .filter((list) => list.kind !== 'smart')
+    .map((list) => summarizeReadingList(list, document.works));
+}
+
+/** The saved queries §7's panel offers beside its three presets. */
+export interface SavedSmartList {
+  listId: string;
+  name: string;
+  query: SmartListQuery;
+}
+
+/**
+ * A `smart` list without a `query` is unanswerable and is left out.
+ *
+ * It should be unreachable — `saveSmartReadingList` refuses an empty query and
+ * `normalizeReadingList` drops one it cannot repair — but a hand-edited file can
+ * still hold `{"kind":"smart"}`, and a chip that derives nothing looks exactly
+ * like a query that matches nothing.
+ */
+export function savedSmartLists(document: ReadingListsDocument): SavedSmartList[] {
+  const out: SavedSmartList[] = [];
+  for (const list of document.lists) {
+    if (list.kind !== 'smart' || !list.query || list.archivedAt !== undefined) continue;
+    out.push({ listId: list.id, name: list.name, query: list.query });
+  }
+  return out;
 }
 
 /**

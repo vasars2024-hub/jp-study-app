@@ -98,6 +98,9 @@ import { AGENT_NAVIGATION_SECTION_LABEL_KEYS } from '../../shared/agentNavigatio
 import { useT } from '../i18n';
 import { KNOWN_LANGS } from '../../shared/langs';
 import { recordEpubPageRead } from '../readingGardenProgress';
+// §11.1 row 8. A read-only cross-reference — §10.2 keeps list LOGIC out of this
+// file, so the reader hands it an item id and renders whatever comes back.
+import ReadingListMembership from '../components/reading/ReadingListMembership';
 
 interface Props {
   item: LibraryItem;
@@ -2977,6 +2980,10 @@ export default function NovelReader({ item, onClose }: Props) {
           </button>
         )}
         <div className="reader-title">{title}</div>
+        {/* §11.1 row 8, beside the title because that is what it is about.
+            Renders NOTHING when the book is on no list, which is most books —
+            an "on 0 lists" chip in a reading surface is noise. */}
+        <ReadingListMembership itemId={item.id} />
         <div className="reader-controls">
           {!linkView && (
             <>

@@ -1,0 +1,154 @@
+/*
+  P5 §7's panel, under the list grid. Every token here is declared in
+  theme/liquid-tokens.css — L2's language, not a second palette.
+
+  The chips sit at 34px rather than the 32px floor on purpose. The hit-target
+  walk steps in 2.5px and scores a box flush against its own container under the
+  floor, so a control measured at exactly 32 is knife-edge; 34 is off it.
+*/
+
+.rlsm {
+  margin-top: var(--lq-space-4, 16px);
+  padding-top: var(--lq-space-3, 12px);
+  border-top: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+}
+
+.rlsm__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+}
+
+.rlsm__lede {
+  margin: var(--lq-space-1, 4px) 0 var(--lq-space-2, 8px);
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlsm__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlsm__chip {
+  min-height: 34px;
+  padding: 0 var(--lq-space-3, 12px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rlsm__chip:hover {
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+  border-color: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.24));
+}
+
+/*
+  The active chip is marked by a border and a raised ground as well as by the
+  accent, so the state survives a colour-blind reading and a high-contrast
+  theme. `aria-pressed` carries it for a screen reader independently.
+*/
+.rlsm__chip[data-active='true'] {
+  border-color: var(--accent, #b3243a);
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.07));
+  color: var(--accent-text-on-wash, var(--lq-work-text, rgba(255, 255, 255, 0.92)));
+}
+
+.rlsm__answer {
+  margin-top: var(--lq-space-3, 12px);
+}
+
+.rlsm__hint,
+.rlsm__empty,
+.rlsm__count {
+  margin: 0 0 var(--lq-space-2, 8px);
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlsm__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-1, 4px);
+  /*
+    A tall answer scrolls inside the panel instead of pushing the grid off
+    screen. §11.4's 500-entry row: the list is a flex column of plain rows, so
+    the scroller is the only thing that has to hold that many.
+  */
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.rlsm__row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  min-height: 34px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  font-size: 12px;
+}
+
+.rlsm__row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+}
+
+.rlsm__row-state,
+.rlsm__row-level {
+  flex: 0 0 auto;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlsm__row-level[data-unrated='true'] {
+  font-style: italic;
+}
+
+/*
+  A saved chip is marked by a dashed leading edge as well as by its position,
+  so "mine" and "built in" are distinguishable without relying on order.
+*/
+.rlsm__chip--saved {
+  border-left-style: dashed;
+  border-left-width: 2px;
+}
+
+.rlsm__save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  margin-top: var(--lq-space-3, 12px);
+}
+
+.rlsm__save-label {
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlsm__save-field {
+  min-height: 34px;
+  min-width: 160px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  font: inherit;
+  font-size: 12px;
+}

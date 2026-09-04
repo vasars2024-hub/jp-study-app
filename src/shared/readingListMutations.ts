@@ -27,6 +27,7 @@
 
 import {
   normalizeReadingListsDocument,
+  normalizeSmartListQuery,
   type ReadingEntryState,
   type ReadingFinishSource,
   type ReadingList,
@@ -37,6 +38,7 @@ import {
   type ReadingListTarget,
   type ReadingListsDocument,
   type ReadingWorkRef,
+  type SmartListQuery,
 } from './readingLists';
 import {
   READING_LIST_PARSER_VERSION,
@@ -159,9 +161,60 @@ export function createReadingList(
   };
 }
 
+/**
+ * §7: save a question as a list.
+ *
+ * A verb of its own rather than `createReadingList({ kind: 'smart' })`, because
+ * a `smart` list without a query is the one shape that cannot work — it would
+ * sit in the grid deriving nothing and offering no way to say what it meant.
+ * Refuses a query that normalizes to nothing (`{}` matches the whole library,
+ * which is not a question anyone asked) and says so by returning a null id,
+ * exactly as `addReadingListEntry` refuses a blank title.
+ *
+ * The list is created with NO entries, deliberately. A smart list that also
+ * stored a snapshot would have two answers to "what is on it" and would go
+ * stale the first time a book was finished.
+ */
+export function saveSmartReadingList(
+  document: ReadingListsDocument,
+  input: { name: string; query: SmartListQuery; description?: string },
+  context: ReadingListsMutationContext,
+): ReadingListsMutation & { listId: string | null } {
+  const query = normalizeSmartListQuery(input.query);
+  if (!input.name.trim() || !query) return { ...unchanged(document), listId: null };
+
+  const id = context.mintId('rl');
+  const list: ReadingList = {
+    id,
+    name: input.name.trim(),
+    kind: 'smart',
+    createdAt: context.now,
+    updatedAt: context.now,
+    query,
+    entries: [],
+    imports: [],
+  };
+  if (input.description?.trim()) list.description = input.description.trim();
+  return {
+    listId: id,
+    document: { ...document, lists: [...document.lists, list] },
+    events: [
+      {
+        at: context.now,
+        kind: 'list-created',
+        listId: id,
+        // Structural only — never the query's `authorIs`, which is user prose.
+        detail: { kind: 'smart', terms: Object.keys(query).length },
+      },
+    ],
+  };
+}
+
 export interface UpdateReadingListPatch {
   name?: string;
   kind?: ReadingListKind;
+  /** `smart` only. `null` clears it; a query that normalizes to nothing is refused. */
+  query?: SmartListQuery | null;
   description?: string | null;
   sourceUrl?: string | null;
   target?: ReadingListTarget | null;
@@ -187,6 +240,30 @@ export function updateReadingList(
   if (patch.kind !== undefined && patch.kind !== current.kind) {
     next.kind = patch.kind;
     changed.push('kind');
+    // A list that stops being smart stops having a query. Leaving it behind
+    // would persist a filter nothing evaluates, which `normalizeReadingList`
+    // would then strip on the next load — so the in-memory document and the
+    // reloaded one would disagree about the same list.
+    if (patch.kind !== 'smart' && next.query) {
+      delete next.query;
+      changed.push('query');
+    }
+  }
+  if (patch.query !== undefined) {
+    const value = patch.query === null ? undefined : normalizeSmartListQuery(patch.query);
+    if (value) {
+      next.query = value;
+      // Saving a query onto a list makes it smart; the alternative is a query
+      // that is stored and never read, which is worse than refusing.
+      if (next.kind !== 'smart') {
+        next.kind = 'smart';
+        changed.push('kind');
+      }
+      changed.push('query');
+    } else if (patch.query === null && next.query) {
+      delete next.query;
+      changed.push('query');
+    }
   }
   if (patch.description !== undefined) {
     const value = patch.description?.trim() || undefined;

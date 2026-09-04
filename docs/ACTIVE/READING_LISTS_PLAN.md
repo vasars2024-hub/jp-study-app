@@ -957,6 +957,211 @@ is committed HEAD and not somebody's uncommitted conversions:** `npx vitest run`
 `i18n-check` EXIT 0 at 12,466 keys. `i18n-hardcoded-check` EXIT 0.
 `architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
 
+**2026-09-04, `primary2`. §11.1 CLOSES 8 of 8. §11 CLOSES 19 of 19. P4 is DONE.**
+
+- `ed946667` — `readingListsForItem`, row 8's pure core. Scans EVERY work binding
+  the item rather than `workForItem`'s first match: two works claiming one item
+  is repairable, not impossible, and the first match then reports FEWER lists
+  than the user is on. Archived lists come back FLAGGED — the derivation cannot
+  know if its caller is the reader strip or a diagnostic.
+
+  An `itemId.trim()` was written and then REMOVED: no test could falsify it, and
+  untestable defensive code reads as covered. The blank guard that stayed is
+  falsified against an UNNORMALIZED document, because `normalizeWork` strips
+  `''` out of `boundItemIds` (`readingLists.ts:317`) and the assertion passes
+  with the guard deleted on a normalized one. **9 of 9 mutants RED.**
+
+- `421bdff1` — **A DEFECT FOUND BY NEEDING A ROUTE. `section: 'lists'` was
+  unreachable, and five live call sites had been publishing nothing.**
+
+  `lists` is in `READING_WORKSPACE_SECTIONS` and `readingWorkspaceSurfaceForSection`
+  maps it to a real surface, but `SECTION_ALIASES` — the ONLY table
+  `normalizeReadingWorkspaceSection` reads — never got the key. So every route
+  naming it normalized to `null` and `resolveReadingWorkspaceOpenRequest`
+  dropped the `os:open` before `DesktopShell` could publish it. Dead:
+  `ReadingReminderHost.tsx:106/:118/:119` (§11.3's "open the list") and
+  `widgets/readingLists.tsx:61/:128` (§11.2's "click the header → list detail").
+  **Both sections were closed as passing**, and §11.2's is the one the user named
+  in their own words.
+
+  The test is written over the SECTION union, through both the object form and
+  the serialized deep-link form, so the next section added is caught the same
+  way instead of shipping dead too. Deleting the one alias line turns 3 of 13 RED.
+
+  Also adds row 8's `entryId` to the route, dropped when no `listId` names a
+  list — an entry id alone names a row in an unnamed list.
+
+- `906e68b0` — **row 8 itself.** `ReadingListMembership` is read-only: §10.2
+  keeps list logic out of the two reader files, so the reader hands it an item
+  id and renders what comes back. **Nothing** renders for a book on no list —
+  an "on 0 lists" chip is noise, not an empty state. Archived lists are dropped
+  HERE, at the caller that knows. The landing scrolls, marks `data-focused`, and
+  moves the keyboard into the row; it CLEARS a filter that would hide that row
+  and does NOT clear it for an entry that is not on the list at all.
+
+  **9 of 10 mutants RED.** Two read GREEN first. *"a stale entry id still
+  scrolls"* was a REAL gap: without the membership guard the effect falls
+  through and clears the user's filter for a row that was never there, and
+  nothing is marked either way, so the mark alone cannot tell the two apart —
+  the test now sets a filter and it is RED. *"itemId guard removed"* stays GREEN
+  and is NOT a gap: `itemId ?? ''` is caught by the core's own blank guard,
+  which has its own RED mutant. Recorded rather than counted.
+
+  The component test drives `resolveReadingWorkspaceOpenRequest`, the function
+  `DesktopShell` runs — not the event detail. Reading the detail passes on a
+  route the resolver rejects, which is how the five call sites above shipped dead.
+
+**TWO TRAPS:**
+
+1. **`addReadingListEntry` mints a NEW work on every call**
+   (`readingListMutations.ts:762` — `workFromParsed` then
+   `works: [...next.works, work]`). It never reuses one by title. Adding one
+   book to three lists by hand gives THREE works, so a fixture binding only
+   `works.find(...)` answers "on 1 list" and reads as the strip being broken.
+2. **A whole-file `String.replace` mutation script hits the wrong function.**
+   The first version of `mutate-row8-core.cjs` mutated `readingWorksByAuthor`,
+   which sits ABOVE `readingListsForItem` and shares almost every anchor line;
+   six of nine landed there and four still read RED off the author tests. Scope
+   every mutation to the target function's own text span.
+
+**`MangaReader.tsx` IS NOT WIRED.** It is ` M` in the main tree from another
+track (checked twice, 15:47 and 16:02), and editing it here blocks
+`relay-mergeback` until that path goes clean. The change is one import and one
+`<ReadingListMembership itemId={item.id} />` beside the title, exactly as in
+`NovelReader.tsx:2982`. **Do it the first turn the path is clean.**
+
+**2026-09-04, `primary2`, same turn. P5 OPENS: §8 export ships.**
+
+- `48cc35fe` — `readingListExport.ts`: message, Markdown, CSV. The gate is §8's
+  own words — *"the round trip is the point"* — so the test feeds
+  `readingListToMessage`'s output back through `parseReadingList` AND
+  re-imports it through `applyReadingListImport`, on the §2.1 example.
+
+  **It caught its own first draft.** The author was separated with an em dash;
+  `splitAuthor` DELIBERATELY refuses to split a dash (`readingListParser.ts:358`
+  — *"'Title - Author' and 'Author - Title' look identical"*), so the author
+  round-tripped welded onto the title. Of the three markers the parser reads
+  (` by X`, `【X】`, `X著`), `【X】` is the only one natural in every script, so
+  it needs no decision about the connector word's language. One separator across
+  message and Markdown.
+
+  Markdown is NOT a round-trip format and the test SAYS so: `AUTHOR_MARKERS`'s
+  bracket rule is end-anchored and a checklist row carries `· _state_` after the
+  title. The title portion does round-trip. Both halves pinned.
+
+  **12 of 12 mutants RED.** Three read GREEN first, all real: the raw-line
+  fallback (a dangling `workId` made the row silently ABSENT), `includeSourceUrl`
+  in Markdown (one anchor matching two call sites, so NOT APPLIED rather than
+  passing), and *"entry order not sorted"* — the fixture reversed the array AND
+  rewrote every `order` to match, so the two agreed again.
+
+- `6e46b6c6` — the control that calls it, in the detail header. **Clipboard, not
+  a file dialog:** §8's first bullet is *"pasteable straight back into LINE,
+  Discord, or a forum"*, and a native save dialog is a modal nothing automated
+  can drive. A file save can be added beside it later; the format code is pure.
+
+  Three ways this would have claimed a copy that did not happen, all now tested:
+  `await navigator.clipboard?.writeText(t)` **resolves** on a host with no
+  clipboard; `writeFailure` renders a FIXED string and ignores its value, so an
+  export failure through it reports a failed document write; and a `select` that
+  keeps its value fires once and then looks dead.
+
+- `530adf2d` — "Markdown" and "CSV" baselined as untranslated in ja/zh/ru. Six
+  lines, nothing reordered. **The gate fires one language at a time**, so ja+zh
+  looked complete and ru came back on the re-run.
+
+**FULL GATES at `530adf2d`, tree clean:** `npx vitest run` **EXIT 0 — 1,076
+files passed / 1 skipped; 13,874 tests, 13,868 passed / 6 skipped.** `i18n-check`
+EXIT 0 at **12,477** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit`
+EXIT 0, "Nothing new", 6 pending. eslint **0 errors** on every touched path.
+
+### 9.3 — 2026-09-04, P5 §7 CLOSED. Smart lists, both halves.
+
+`322e1cef` `03343403` `a9d1c274` `9b9695ff`.
+
+**The three parked decisions, settled against the tree rather than invented.**
+
+- **`difficultyMax` rides the EXISTING L1–L7 `LevelTier`** from
+  `effectiveLevelEstimate()` (`libraryLevel.ts:13`) — measured from known-word
+  ratio in `inboxMeta.ts:58`, already shown to the user as `LIBRARY_LEVEL_CHIPS`,
+  and already on the card contract as `ReadingWorkspaceEntry.level`. No new
+  field, no new scale. Rejected, with reasons: `lexiconDifficulty.ts` (passage
+  scoped, never persisted per item — one filter would re-parse every book),
+  `jiten.ts`'s own `difficultyMax` (remote query param, foreign 0–5 scale),
+  `novels.ts`'s `Difficulty` strings (hand-authored, catalogue-only, absent from
+  anything imported).
+- **An unmeasured work PASSES the cap.** `levelSortKey`'s missing-level sentinel
+  is **99**, so the obvious `level <= max` silently drops every book the
+  enricher has not reached — and a fresh import has no level for hours, while
+  "Ready to read" exists to surface owned books. `requireKnownDifficulty` is the
+  strict reading. The row then SAYS "Not rated yet", or the band reads as
+  verified for every row in it.
+- **`untouchedSince` and `progressBelow` are added, additively.** §7 defines
+  Abandoned as *"started, <90 %, untouched 30 days"* and offers only
+  `startedBefore`. Started-at and touched-at are different facts — a book begun
+  a year ago and read this morning is not abandoned — so collapsing them would
+  ship a preset that lies. Everything §7 names keeps its name.
+
+**FINDING, and the reason §7 was more than a module.** `smart` has been in
+`ReadingListKind` since P0 and is accepted by `createReadingList` and
+`updateReadingList`, but nothing ever produced one, nothing rendered one, and
+`query` did not exist on `ReadingList` at all. **A value in the union that no
+route can reach** — the same defect class as `421bdff1`'s `section: 'lists'`,
+found the same way: by asking what actually consumes the value, not whether it
+compiles.
+
+`SmartListQuery` therefore lives on the MODEL, beside every other persisted
+field, and goes through the same total normalization pass. That pass is lossy in
+one direction only: an unrecognised format or state is **dropped from its
+array** rather than carried through, because a query is a filter and an unknown
+term returns nothing and reads as an empty library. Dropping it widens the
+answer, which is visibly wrong instead of invisibly wrong. An array that empties
+is removed (`state: []` and no `state` are the same to the evaluator, and only
+one survives a round trip); a query with nothing left is `undefined`, because
+`{}` matches the whole library.
+
+`summarizeReadingLists` now **excludes** smart lists. A smart list stores a
+query and no entries — its normal shape — so a card for one reads "0 of 0
+finished" over an empty bar. Safe to narrow: nothing produced one until
+`saveSmartReadingList`, so no stored document has one.
+
+Save is offered on a preset with a real query **even when it matches nothing**:
+a question is worth keeping before it has an answer, and a control that appeared
+and vanished with the row count would move for reasons the user cannot see.
+
+**Evidence.** 36 + 15 + 2 + 2 tests. **24 of 24 scoped mutants RED** across four
+files. Every mutation was confined to its target function's own line span with a
+disk sentinel and a SHA256 restore — `saveSmartReadingList` sits directly above
+`updateReadingList` and shares anchor lines with it, which is the sibling-function
+trap exactly. One mutant was **SKIPPED rather than guessed** (`kind: 'smart'`
+occurs twice inside its own function) and re-run RED with a unique anchor.
+
+**FULL GATES at `9b9695ff`, tree clean:** `npx vitest run` **EXIT 0 — 1,078 files
+passed / 1 skipped; 13,935 tests, 13,929 passed / 6 skipped.** `i18n-check` EXIT 0
+at **12,497** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit` EXIT 0,
+"Nothing new", 6 pending. eslint **0 errors** on every touched path.
+
+**Exact next slice: P5's remaining three — pace, next-up, timeline.**
+`readingChallengePace` and `nextUpReadingRow` already EXIST as pure functions in
+`readingListViews.ts` and are consumed by §11.2's widgets, so **derive what is
+actually missing before rebuilding them** — §5.4's projection ("at your rate over
+the last 30 days, this list finishes 2026-11-14") is the part with no module, and
+it needs a rate source: check what the app already measures for pages and
+characters read rather than inventing one, the way `difficultyMax` was settled
+above. The timeline (§5's year-in-review shape) can read `recentReadingFinishes`,
+which exists.
+
+**TRAP for the pace slice.** `readingChallengePace` takes a `ReadingListTarget`
+and answers ahead/behind in BOOKS. §5.4 asks for a projected finish DATE, which
+is a different function over a different input — do not widen the existing one
+into both, or a challenge list and a pool list will disagree about what "pace"
+means. And a projection with fewer than N finishes is a guess: say so on screen
+rather than printing a confident date off two data points.
+
+### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
+
+Kept only so the entry above has its subject.
+
 **Exact next slice: §11.1's LAST row, row 8** — *the "on 2 lists" line in the
 reader*. Trap §10.2 forbids list LOGIC in `NovelReader.tsx` (130 KB) and
 `MangaReader.tsx` (87 KB), so this is a READ-ONLY touch-point: a small component
