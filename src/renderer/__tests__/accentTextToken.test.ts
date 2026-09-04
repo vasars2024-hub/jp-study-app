@@ -445,7 +445,7 @@ describe('--accent-text-on-wash', () => {
     expect(washShare, 'the wash share is unreadable — the recipe shape changed').not.toBeNull();
     expect(opaqueShare, 'the opaque share is unreadable — the recipe shape changed').not.toBeNull();
     expect(
-      washShare! < opaqueShare!,
+      (washShare ?? Infinity) < (opaqueShare ?? -Infinity),
       `wash ${washShare} vs opaque ${opaqueShare}: the whole reason this token exists is that an ` +
         'accent-tinted ground needs LESS accent in its foreground, not the same or more',
     ).toBe(true);
