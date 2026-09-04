@@ -1075,19 +1075,88 @@ files passed / 1 skipped; 13,874 tests, 13,868 passed / 6 skipped.** `i18n-check
 EXIT 0 at **12,477** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit`
 EXIT 0, "Nothing new", 6 pending. eslint **0 errors** on every touched path.
 
-**Exact next slice: P5's remaining four — pace, next-up, smart lists (§7),
-timeline.** `readingChallengePace` and `nextUpReadingRow` already EXIST as pure
-functions in `readingListViews.ts` and are consumed by §11.2's widgets, so start
-by deriving what is actually missing rather than rebuilding them: §7's
-`SmartListQuery` and its three presets (Abandoned / Ready to read / Author
-sweep) have no module at all and are the real gap. Model it on
-`readingListExport.ts` — pure, tested against the mutation layer's own
-documents, with a caller in the same turn so it is not another route with no
-consumer.
+### 9.3 — 2026-09-04, P5 §7 CLOSED. Smart lists, both halves.
 
-TRAP for §7: `difficultyMax` needs a difficulty source, and §5's note at plan
-line 506 parks that with the smart-list work. Decide it against the tree before
-writing the type — do not invent a field.
+`322e1cef` `03343403` `a9d1c274` `9b9695ff`.
+
+**The three parked decisions, settled against the tree rather than invented.**
+
+- **`difficultyMax` rides the EXISTING L1–L7 `LevelTier`** from
+  `effectiveLevelEstimate()` (`libraryLevel.ts:13`) — measured from known-word
+  ratio in `inboxMeta.ts:58`, already shown to the user as `LIBRARY_LEVEL_CHIPS`,
+  and already on the card contract as `ReadingWorkspaceEntry.level`. No new
+  field, no new scale. Rejected, with reasons: `lexiconDifficulty.ts` (passage
+  scoped, never persisted per item — one filter would re-parse every book),
+  `jiten.ts`'s own `difficultyMax` (remote query param, foreign 0–5 scale),
+  `novels.ts`'s `Difficulty` strings (hand-authored, catalogue-only, absent from
+  anything imported).
+- **An unmeasured work PASSES the cap.** `levelSortKey`'s missing-level sentinel
+  is **99**, so the obvious `level <= max` silently drops every book the
+  enricher has not reached — and a fresh import has no level for hours, while
+  "Ready to read" exists to surface owned books. `requireKnownDifficulty` is the
+  strict reading. The row then SAYS "Not rated yet", or the band reads as
+  verified for every row in it.
+- **`untouchedSince` and `progressBelow` are added, additively.** §7 defines
+  Abandoned as *"started, <90 %, untouched 30 days"* and offers only
+  `startedBefore`. Started-at and touched-at are different facts — a book begun
+  a year ago and read this morning is not abandoned — so collapsing them would
+  ship a preset that lies. Everything §7 names keeps its name.
+
+**FINDING, and the reason §7 was more than a module.** `smart` has been in
+`ReadingListKind` since P0 and is accepted by `createReadingList` and
+`updateReadingList`, but nothing ever produced one, nothing rendered one, and
+`query` did not exist on `ReadingList` at all. **A value in the union that no
+route can reach** — the same defect class as `421bdff1`'s `section: 'lists'`,
+found the same way: by asking what actually consumes the value, not whether it
+compiles.
+
+`SmartListQuery` therefore lives on the MODEL, beside every other persisted
+field, and goes through the same total normalization pass. That pass is lossy in
+one direction only: an unrecognised format or state is **dropped from its
+array** rather than carried through, because a query is a filter and an unknown
+term returns nothing and reads as an empty library. Dropping it widens the
+answer, which is visibly wrong instead of invisibly wrong. An array that empties
+is removed (`state: []` and no `state` are the same to the evaluator, and only
+one survives a round trip); a query with nothing left is `undefined`, because
+`{}` matches the whole library.
+
+`summarizeReadingLists` now **excludes** smart lists. A smart list stores a
+query and no entries — its normal shape — so a card for one reads "0 of 0
+finished" over an empty bar. Safe to narrow: nothing produced one until
+`saveSmartReadingList`, so no stored document has one.
+
+Save is offered on a preset with a real query **even when it matches nothing**:
+a question is worth keeping before it has an answer, and a control that appeared
+and vanished with the row count would move for reasons the user cannot see.
+
+**Evidence.** 36 + 15 + 2 + 2 tests. **24 of 24 scoped mutants RED** across four
+files. Every mutation was confined to its target function's own line span with a
+disk sentinel and a SHA256 restore — `saveSmartReadingList` sits directly above
+`updateReadingList` and shares anchor lines with it, which is the sibling-function
+trap exactly. One mutant was **SKIPPED rather than guessed** (`kind: 'smart'`
+occurs twice inside its own function) and re-run RED with a unique anchor.
+
+**FULL GATES at `9b9695ff`, tree clean:** `npx vitest run` **EXIT 0 — 1,078 files
+passed / 1 skipped; 13,935 tests, 13,929 passed / 6 skipped.** `i18n-check` EXIT 0
+at **12,497** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit` EXIT 0,
+"Nothing new", 6 pending. eslint **0 errors** on every touched path.
+
+**Exact next slice: P5's remaining three — pace, next-up, timeline.**
+`readingChallengePace` and `nextUpReadingRow` already EXIST as pure functions in
+`readingListViews.ts` and are consumed by §11.2's widgets, so **derive what is
+actually missing before rebuilding them** — §5.4's projection ("at your rate over
+the last 30 days, this list finishes 2026-11-14") is the part with no module, and
+it needs a rate source: check what the app already measures for pages and
+characters read rather than inventing one, the way `difficultyMax` was settled
+above. The timeline (§5's year-in-review shape) can read `recentReadingFinishes`,
+which exists.
+
+**TRAP for the pace slice.** `readingChallengePace` takes a `ReadingListTarget`
+and answers ahead/behind in BOOKS. §5.4 asks for a projected finish DATE, which
+is a different function over a different input — do not widen the existing one
+into both, or a challenge list and a pool list will disagree about what "pace"
+means. And a projection with fewer than N finishes is a guess: say so on screen
+rather than printing a confident date off two data points.
 
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
