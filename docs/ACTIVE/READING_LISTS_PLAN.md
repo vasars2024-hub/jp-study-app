@@ -855,6 +855,80 @@ it), drop a library item onto a list card, drop a `.txt` onto the lists view.
 Then **§11.1's click-through table, row by row** — four of its eight rows still
 have no test naming them, and that has now been deferred for four turns.
 
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4 CLOSES at 9 of 9.
+§11.1 goes 3 of 8 rows to 6 of 8. P4 owes §11.1 rows 4 and 8.**
+
+`8ec4ee24`, `9ddc89a5`, `16fc0811`. 26 mutation controls across the three, every
+one sentinel-checked as APPLIED before its verdict was read; **26 of 26 RED**.
+
+- `8ec4ee24` — **§11.4's drag-and-drop remainder, all three clauses.** Between
+  lists (a rail of the other lists, mounted on `dragstart` and gone on
+  `dragend`), a library book onto a list card, a `.txt` onto the view.
+
+  **The library half needed NO change to the library.** `LibraryView` has set
+  `app/lib-item` on all four of its drag sources (1273, 1584, 1624, 1846) and
+  read it back at 464 since long before this view existed. Joining that type was
+  the whole integration; minting a second one would have been two contracts for
+  one drag.
+
+  **THE GUARD THAT DECIDES WHETHER ANY OF IT WORKS: every `dragover` test is
+  written against `dataTransfer.types`, never `getData`.** The HTML model puts
+  the data store in *protected* mode during `dragover`, where `getData` returns
+  `''` for every type no matter what the drag holds. A guard written on `getData`
+  never cancels `dragover`, Chromium then refuses every drop — and jsdom, which
+  has no protected mode either, reports the whole feature green.
+
+  A dropped file lands in the §2.5 preview, never straight into the list: a file
+  is a paste through a different door, and it would otherwise be the one intake
+  path that skips the preview. In the grid there is no list to import into, so
+  the FILE NAMES the list it creates.
+
+- `9ddc89a5` — **§11.1 rows 2 and 7.** Row 2 was not implemented at all:
+  `openRow` opened the book and wrote nothing. It promotes `owned → reading`
+  now, and **only** from `owned` — `finished`, `abandoned` and `skipped` are
+  decisions, and opening a book you abandoned to check one line is not a
+  decision to resume it. No undo toast, deliberately: it would fire on the app's
+  most common gesture, and the row's own state Select is the reversal, in view.
+
+  Row 7's highlight is derived from `sourceRef.lineIndex`, **never** by matching
+  `rawLine` back into the text. The fixture is a message naming the same title
+  on lines 2 and 4 with the entry from line 4; the matching mutant marks line 2.
+  Matching would also silently mark nothing after §2.4's re-parse.
+
+- `16fc0811` — **§11.1 row 6.** `authorRaw` has been on the work since P0 and
+  the parser writes it (`readingListMutations.ts:343`); **nothing in
+  `src/renderer` had ever read it.** `readingWorksByAuthor` is a pure function
+  in `readingListViews.ts`, not a hook, because §11.2's widgets and P5's smart
+  lists want the same answer. Across EVERY list — a list-scoped version answers
+  "none" for the ordinary one-book-per-list case and reads like a broken link.
+  Same normaliser as `readingListMatching`, so two spellings are one person; a
+  BLANK author matches nothing, or every authorless work comes back.
+
+**Two findings of the "it read green" kind, both kept as tests:**
+
+1. `addLibraryItemToReadingList` binds through `boundItemIds`, not an `itemId`
+   field. An assertion on `work.itemId` reads `undefined` and would have passed
+   as `toBeUndefined()`. The row must be BOUND, not merely titled the same, or
+   §3's matcher has to find its own book back.
+2. The parser rejects a bare `Delta\nEcho` — 0 titles, "2 lines were ignored".
+   A file-drop fixture has to be list-SHAPED (`1. Delta`), or the preview opens
+   empty and the test proves only that a panel appeared.
+
+**Gates at `16fc0811`, from a worktree with `git status --short` EMPTY, so this
+is committed HEAD and not somebody's uncommitted conversions:** `npx vitest run`
+**EXIT 0 — 1,073 files passed / 1 skipped; 13,827 tests passed / 6 skipped**.
+`i18n-check` EXIT 0 at **12,465** keys. `i18n-hardcoded-check` EXIT 0.
+`architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
+
+**Exact next slice: §11.1's last two rows.** Row 4 — *an entry's cover → the
+library item detail* — needs a per-row cover thumbnail (rows have none today;
+only list cards carry the mosaic) and a route into `LibraryView`'s detail
+drawer, which `ReadingWorkspaceView.tsx:207` mounts as `<LibraryView
+onOpen={onOpenBook} />` with no item-selection prop. Row 8 — *the "on 2 lists"
+line in the reader* — is the one that touches a reader; trap §10.2 forbids list
+LOGIC in `NovelReader.tsx`/`MangaReader.tsx`, and a read-only touch-point fed by
+`readingWorksByAuthor`'s sibling query is the shape that respects it.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
