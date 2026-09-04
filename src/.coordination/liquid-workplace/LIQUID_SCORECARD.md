@@ -3901,3 +3901,87 @@ easier one.
 
 `agent` stands at **4 of 8 at 10/10**, cat5 at 9/10, and **cat2, cat7 and cat8 unscored**. cat7
 will need a new `SPECS` entry — `agent` is absent from `cat7-perf.cjs`.
+
+## 2026-09-04 · primary — `agent` cat2, cat7 and cat8 all PASS 10/10; 7 of 8, and the turn ends by YIELDING the surface
+
+Commit `c858089a` (the cat7 `SPECS` entry, the only code this needed). cat2 and cat8 took **zero
+harness lines and zero product lines** — the surface simply passes them.
+
+**READ THIS BEFORE QUOTING THE THREE CELLS. A SECOND `primary` SESSION WAS EDITING THIS SURFACE
+UNDERNEATH ALL THREE RUNS.** The relay double-dispatched `primary` at 18:27:55 and 18:27:57 EDT
+(`~\.claude-runs\logs\20260904-182755-run-primary.log` and `-182757-`, from two ticks at
+`-182729-` and `-182733-`), so two sessions shared this tree. The other one is landing cat5 Q4 —
+`AgentWorkspaceShell.tsx` 18:33:09, `AgentContextSuggestions.tsx` and the four catalogs through
+18:42:50, `baselines/cat5-l17-agent-q4.json` written 18:44:04. Its hot updates and its four
+`page reload`s are what killed **two cat7 attempts** ("surface not found", "no visible non-zero
+`.fwin` titled") and one cat2 attempt, each of which reads exactly like a dead surface and is not
+one. Every surviving run's own stability guard held, which is the whole reason they are recorded:
+
+    cat2  undo baseHash === afterHash (qubmeo), both presentations, so nothing remounted mid-run
+    cat8  before/after {html:'en', stored:null}; textRuns 157 identical in all four languages
+    cat7  scene_before === scene_after on every leg (3 fwins / 934 elements); ceiling clean x3
+
+**One cell needs re-running when the other session commits, and it is cat8.** It scores rendered
+text, and that session ADDED i18n keys; a key missing from one catalog renders as a raw key and
+would take `rawKeyCount` off 0. cat2 and cat7 do not read the composer's control inventory at all
+— cat2's task is the rail's search-and-select and cat7's load is conversation switching — so
+neither is sensitive to the disclosure Q4 is building.
+
+**And the traffic went both ways, said plainly: my cat8 `--langs` leg put the whole app into ja,
+zh and ru between roughly 18:36 and 18:37:24, and cat7 cycled 78 conversations at 18:41.** Any
+measurement the other session took in those windows is mine to have disturbed, not theirs to
+explain.
+
+### Category 2 — PASS 10/10
+
+    inputCost  1 click + 8 keystrokes = 9      deadEnds 0   modalTraps 0   scrollTraps 0
+    worstRecv  56.3 ms   overBar100 0   sharedPaintSamples 0   busiestFrame 1 of 9 frames
+    costParity standard 9 == liquid 9, restored to standard      base 155 text runs / 98 controls
+
+Dominant task: **find a past conversation and open it** — type into the history filter, then
+select a result. Sending a prompt is the heavier flow and is deliberately not it: that is a
+network call on the user's own provider key, the same exclusion `immersion` and the new cat7 spec
+both record. Control: deadEnd / modalTrap / scrollTrap all `0 -> 1 -> 0`, `backToBaseline` true.
+
+**Two recipe facts, both paid for.** The rail is 39 rows in a 333px port, so the first
+`:not(.is-selected)` entry is usually ABOVE the fold and `click:` correctly refuses it at
+`centre resolves to null` — `scroll:.agent-rail-list=0` first, which is an uncounted restore
+primitive and does not bill the task. And the default `--key-spacing 40` put **2 of 9 samples in
+one paint** here and returned `UNSCOREABLE`; 110 gives 9 events in 9 frames.
+
+### Category 8 — PASS 10/10 (re-run cat8 after the other session commits)
+
+    rawKeyCount 0   placeholderCount 0   mutePairCount 0   statesNamed "1 of 1 observable"
+    langs  4 distinct hashes, diffRuns 110 of 157 (70.1%) in each of ja/zh/ru, restored true
+
+`loading`, `error` and `offline` are `notObservable` and correctly EXCLUDED from the denominator
+rather than scored either way. Control: rawKeys / placeholders / mutePairs `0 -> 1 -> 0`.
+
+**`--surface "Agent"` CANNOT be used with `--langs` on this surface, and the harness's own
+correction 15 says why: a title-named surface stops being findable the moment its window title is
+translated.** The leg VOIDed on `ja: surface not found` and — correctly — restored English on the
+way out. `--surface "@.agent-root"` is the selector form and is language-independent; it is also
+the root cat1 scored, so the two cells now describe the same box. The `--langs` leg additionally
+needs **Settings open on Appearance**: it refuses rather than click a bare `.sp-seg-btn`, which
+also matches the Subtitle & transcription segment. `os:open` raises Settings when another `.fwin`
+is stacked over it and a plain coordinate click would land on the window in front.
+
+### Category 7 — PASS 10/10
+
+    ceiling p50 8.3 / p95 8.4 (120 Hz this session; L0's 10.0 is provenance, not the bar)
+    drag    p50 8.3 / p95 8.5 / max 25.0   over100 0   mainMax 3.4
+    resize  p50 8.3 / p95 8.5 / max 16.8   over100 0   mainMax 3.7
+    theme   painted 55.9 ms apply / 83 ms restore      heavy main p50 2.2 / p95 3.9 / max 34.8
+    idle    main p50 2.0 / p95 3.3 / max 10.1          bar 500 ms      RSS 116.2 -> 124.5 MB
+    JANK CONTROL  p95 8.5 -> 116.7, over100 0 -> 10 — the recorder sees the frames it claims to
+
+`heavyProof`: **39 conversations x2 = 78 selections, restored to `agent-f5cc72be`.** The spec's two
+traps are in the commit message and in the file; the short one is that a rail row captured at arm
+time is DETACHED after the first click, so the load must re-query every tick or it reports 78
+ticks having driven nothing.
+
+**`agent` now stands at 7 of 8 at 10/10. cat5 is the only cell left and it is NOT mine to take** —
+the other session is landing its Q4 disclosure. Whoever writes that entry owns the cat5 row.
+
+`sampled-out:` for this bullet — `library` `novels` `translate` `player` `anki` `flashcards`
+`stats` `resources` `city` `immersion` `calendar` `reading`.
