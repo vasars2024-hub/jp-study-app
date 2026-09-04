@@ -448,7 +448,7 @@ are a follow-up, and `reorderReadingListEntries` already exists for the last one
   `attemptLimit` 1 → the retry test RED by name, restored, sha256 `A900F813`.
   `readingListsClient.ts` stops being a `test-only-module`; the pending baseline
   entry moves up to this flow, which **P4 §6 mounts verbatim**.
-- `dd7c1e8f` — **the third clause: a mutation test per parser RULE**, not per
+- `9d603e58` — **the third clause: a mutation test per parser RULE**, not per
   defect. `readingListParserMutations.test.ts` is a real mutation harness: 26
   rows, each breaking one rule *in the parser's own source*, transpiling it in
   memory (the parser's single import is `import type`, so a mutant needs no temp
