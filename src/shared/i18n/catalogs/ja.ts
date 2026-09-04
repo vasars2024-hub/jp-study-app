@@ -11375,7 +11375,31 @@ export const ja: Catalog = {
   'readingLists.view.rowRemove': '「{title}」をこのリストから削除',
   'readingLists.view.suggestion': 'これは「{title}」ですか？',
   'readingLists.view.suggestionNo': 'いいえ',
+  'readingLists.view.bulk.label': '選択したすべてに実行',
+  'readingLists.view.bulk.select': '「{title}」を選択',
+  'readingLists.view.bulk.selectAll': '表示中をすべて選択',
+  'readingLists.view.bulk.count': {
+    other: '{count} 件を選択中',
+  },
+  'readingLists.view.bulk.finish': '読了にする',
+  'readingLists.view.bulk.remove': '削除',
+  'readingLists.view.bulk.clear': '解除',
+  'readingLists.view.bulk.moveLabel': '選択を別のリストへ移動',
+  'readingLists.view.bulk.movePick': '移動先…',
+  'readingLists.view.bulk.moveNone': '移動先になる別のリストがまだありません。',
+  'readingLists.view.bulk.skipped': {
+    other: '{count} 件はすでにそのリストにあるため、ここに残りました。',
+  },
   'readingLists.view.undo.action': '元に戻す',
+  'readingLists.view.undo.bulkFinished': {
+    other: '{count} 件を読了にしました。',
+  },
+  'readingLists.view.undo.bulkRemoved': {
+    other: '{count} 件をこのリストから削除しました。',
+  },
+  'readingLists.view.undo.bulkMoved': {
+    other: '{count} 件を「{name}」へ移動しました。',
+  },
   'readingLists.view.undo.listDeleted': '「{name}」を削除しました。',
   'readingLists.view.undo.entryRemoved': '「{title}」をこのリストから削除しました。',
   'readingLists.view.undo.suggestionDismissed': '「{title}」の候補を却下しました。',

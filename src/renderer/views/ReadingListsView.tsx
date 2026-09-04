@@ -40,17 +40,24 @@ import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readin
 import { useReadingListsDocument } from '../readingListsDocument';
 import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
-import type { ReadingEntryState } from '../../shared/readingLists';
+import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
 import {
   createReadingList,
   createReadingListsMutationContext,
   deleteReadingList,
   dismissReadingWorkSuggestion,
+  moveReadingListEntries,
+  removeReadingListEntries,
   removeReadingListEntry,
+  restoreReadingEntryStates,
   restoreReadingList,
+  restoreReadingListEntries,
   restoreReadingListEntry,
   restoreReadingWorkSuggestion,
   setReadingEntryState,
+  setReadingEntryStates,
+  undoReadingListMove,
+  type MovedReadingEntry,
   type RemovedReadingEntry,
   type RemovedReadingList,
 } from '../../shared/readingListMutations';
@@ -122,6 +129,9 @@ export default function ReadingListsView({
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoSlot | null>(null);
   const [filter, setFilter] = useState('');
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const [moveSkipped, setMoveSkipped] = useState(0);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const filterFieldRef = useRef<HTMLInputElement | null>(null);
 
@@ -130,8 +140,15 @@ export default function ReadingListsView({
   }, [naming]);
 
   // A filter that survives navigation would hide rows in a list the user has not
-  // typed anything about yet, which reads as "this list is empty".
-  useEffect(() => setFilter(''), [listId]);
+  // typed anything about yet, which reads as "this list is empty". A SELECTION
+  // that survives it is worse: the bulk bar would then act on rows from a list
+  // the user has already left.
+  useEffect(() => {
+    setFilter('');
+    setSelected(new Set());
+    setAnchor(null);
+    setMoveSkipped(0);
+  }, [listId]);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
@@ -159,6 +176,62 @@ export default function ReadingListsView({
   const visibleRows = useMemo(
     () => (query ? rows.filter((row) => row.title.toLowerCase().includes(query)) : rows),
     [query, rows],
+  );
+
+  /**
+   * §11.4's bulk selection, derived rather than stored, so it can never name a
+   * row that is no longer there.
+   *
+   * The selection set is the raw record of what was ticked; this is the list the
+   * bulk actions actually send. Filtering it through `rows` prunes an entry the
+   * user removed one at a time, an entry another window removed, and an entry a
+   * re-parse replaced — none of which the set itself would ever hear about.
+   * It is taken from `rows`, not `visibleRows`: a selection made and then filtered
+   * out of sight is still a selection, and silently shrinking it under the filter
+   * would make "Remove" remove fewer rows than the count on the button.
+   */
+  const selectedIds = useMemo(
+    () => rows.filter((row) => selected.has(row.entry.id)).map((row) => row.entry.id),
+    [rows, selected],
+  );
+
+  /** Move destinations. Archived lists are still destinations — they are lists. */
+  const otherLists = useMemo(
+    () => (document?.lists ?? []).filter((candidate) => candidate.id !== listId),
+    [document, listId],
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    setAnchor(null);
+  }, []);
+
+  /**
+   * A shift-range spans the rows the user can SEE. Ranging over `rows` instead
+   * would sweep in filtered-out entries between the two clicks — rows that were
+   * never on screen, selected by a gesture that looks like it selected four.
+   */
+  const toggleSelected = useCallback(
+    (entryId: string, range: boolean) => {
+      setMoveSkipped(0);
+      const next = new Set(selected);
+      const ids = visibleRows.map((row) => row.entry.id);
+      const from = anchor === null ? -1 : ids.indexOf(anchor);
+      const to = ids.indexOf(entryId);
+      if (range && from >= 0 && to >= 0) {
+        const [lo, hi] = from <= to ? [from, to] : [to, from];
+        for (let index = lo; index <= hi; index += 1) next.add(ids[index]);
+        // The anchor stays put, so a second shift-click re-ranges from the same
+        // origin rather than from wherever the last one landed.
+        setSelected(next);
+        return;
+      }
+      if (next.has(entryId)) next.delete(entryId);
+      else next.add(entryId);
+      setSelected(next);
+      setAnchor(entryId);
+    },
+    [anchor, selected, visibleRows],
   );
 
   /**
@@ -341,6 +414,135 @@ export default function ReadingListsView({
     [t, write],
   );
 
+  /**
+   * The three bulk verbs. Each is ONE write with ONE undo, which is the whole
+   * point of §11.4's row: forty single writes would be forty compare-and-swap
+   * round trips and thirty-nine undo slots the user can never reach.
+   *
+   * Each captures its inverse payload inside the mutator, because a CAS retry
+   * re-runs it against the document main handed back — so what to undo is only
+   * known after the write that actually landed.
+   */
+  const bulkFinish = useCallback(() => {
+    if (!list || !selectedIds.length) return;
+    const targetList = list.id;
+    const ids = selectedIds;
+    const held: { previous: ReadingListEntry[] } = { previous: [] };
+    void write(
+      (current) => {
+        const mutation = setReadingEntryStates(
+          current,
+          targetList,
+          ids,
+          'finished',
+          createReadingListsMutationContext(),
+        );
+        held.previous = mutation.previous;
+        return mutation;
+      },
+      () => {
+        const captured = held.previous;
+        if (!captured.length) return null;
+        return {
+          message: t('readingLists.view.undo.bulkFinished', { count: captured.length }),
+          run: () => {
+            void write((current) =>
+              restoreReadingEntryStates(
+                current,
+                targetList,
+                captured,
+                createReadingListsMutationContext(),
+              ),
+            );
+          },
+        };
+      },
+    );
+    clearSelection();
+  }, [clearSelection, list, selectedIds, t, write]);
+
+  const bulkRemove = useCallback(() => {
+    if (!list || !selectedIds.length) return;
+    const ids = selectedIds;
+    const targetList = list.id;
+    const held: { removed: RemovedReadingEntry[] } = { removed: [] };
+    void write(
+      (current) => {
+        const mutation = removeReadingListEntries(
+          current,
+          targetList,
+          ids,
+          createReadingListsMutationContext(),
+        );
+        held.removed = mutation.removed;
+        return mutation;
+      },
+      () => {
+        const captured = held.removed;
+        if (!captured.length) return null;
+        return {
+          message: t('readingLists.view.undo.bulkRemoved', { count: captured.length }),
+          run: () => {
+            void write((current) =>
+              restoreReadingListEntries(current, captured, createReadingListsMutationContext()),
+            );
+          },
+        };
+      },
+    );
+    clearSelection();
+  }, [clearSelection, list, selectedIds, t, write]);
+
+  const bulkMove = useCallback(
+    (toListId: string) => {
+      if (!list || !selectedIds.length || !toListId) return;
+      const fromList = list.id;
+      const ids = selectedIds;
+      const name =
+        document?.lists.find((candidate) => candidate.id === toListId)?.name ?? toListId;
+      const held: { moved: MovedReadingEntry[]; skipped: number } = { moved: [], skipped: 0 };
+      void write(
+        (current) => {
+          const mutation = moveReadingListEntries(
+            current,
+            fromList,
+            toListId,
+            ids,
+            createReadingListsMutationContext(),
+          );
+          held.moved = mutation.moved;
+          held.skipped = mutation.skipped.length;
+          return mutation;
+        },
+        () => {
+          const captured = held.moved;
+          if (!captured.length) return null;
+          return {
+            message: t('readingLists.view.undo.bulkMoved', { count: captured.length, name }),
+            run: () => {
+              void write((current) =>
+                undoReadingListMove(
+                  current,
+                  fromList,
+                  toListId,
+                  captured,
+                  createReadingListsMutationContext(),
+                ),
+              );
+            },
+          };
+        },
+      ).then(() => {
+        // The skip is not a failure and it is not silent: a move of four that
+        // moved three has to say which number is which, or the count on the
+        // button and the count in the list disagree with no explanation.
+        setMoveSkipped(held.skipped);
+      });
+      clearSelection();
+    },
+    [clearSelection, document, list, selectedIds, t, write],
+  );
+
   if (!document) {
     return (
       <div className="rlv" data-surface="reading-lists">
@@ -489,8 +691,65 @@ export default function ReadingListsView({
                 })}
               </span>
             ) : null}
+            <label className="rlv__selectall">
+              <input
+                type="checkbox"
+                checked={
+                  visibleRows.length > 0 && visibleRows.every((row) => selected.has(row.entry.id))
+                }
+                onChange={(event) => {
+                  setMoveSkipped(0);
+                  const next = new Set(selected);
+                  for (const row of visibleRows) {
+                    if (event.target.checked) next.add(row.entry.id);
+                    else next.delete(row.entry.id);
+                  }
+                  setSelected(next);
+                  setAnchor(null);
+                }}
+              />
+              <span>{t('readingLists.view.bulk.selectAll')}</span>
+            </label>
           </div>
         )}
+        {selectedIds.length > 0 ? (
+          <div className="rlv__bulk" role="group" aria-label={t('readingLists.view.bulk.label')}>
+            <span className="rlv__bulk-count" role="status">
+              {t('readingLists.view.bulk.count', { count: selectedIds.length })}
+            </span>
+            <Button size="sm" onClick={bulkFinish}>
+              {t('readingLists.view.bulk.finish')}
+            </Button>
+            {otherLists.length > 0 ? (
+              <Select
+                className="rlv__bulk-move"
+                aria-label={t('readingLists.view.bulk.moveLabel')}
+                value=""
+                onChange={(event) => bulkMove(event.target.value)}
+                options={[
+                  { value: '', label: t('readingLists.view.bulk.movePick') },
+                  ...otherLists.map((candidate) => ({
+                    value: candidate.id,
+                    label: candidate.name,
+                  })),
+                ]}
+              />
+            ) : (
+              <span className="rlv__bulk-note">{t('readingLists.view.bulk.moveNone')}</span>
+            )}
+            <Button size="sm" variant="danger" onClick={bulkRemove}>
+              {t('readingLists.view.bulk.remove')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>
+              {t('readingLists.view.bulk.clear')}
+            </Button>
+          </div>
+        ) : null}
+        {moveSkipped > 0 ? (
+          <p className="rlv__notice" role="status">
+            {t('readingLists.view.bulk.skipped', { count: moveSkipped })}
+          </p>
+        ) : null}
         {rows.length === 0 ? (
           <p className="rlv__state">{t('readingLists.view.emptyList')}</p>
         ) : visibleRows.length === 0 ? (
@@ -502,6 +761,21 @@ export default function ReadingListsView({
               const suggested = row.suggestion ? row.work?.suggestion : undefined;
               return (
                 <li key={row.entry.id} className="rlv__row" data-state={row.entry.state}>
+                  {/*
+                    `onClick` rather than `onChange`, with `readOnly` to keep the
+                    input controlled without React's warning: the shift key is on
+                    the mouse event, and a checkbox's change event does not carry
+                    it on every host. Space on a focused box still fires click, so
+                    the keyboard path is the same one.
+                  */}
+                  <input
+                    type="checkbox"
+                    className="rlv__row-pick"
+                    checked={selected.has(row.entry.id)}
+                    readOnly
+                    aria-label={t('readingLists.view.bulk.select', { title: row.title })}
+                    onClick={(event) => toggleSelected(row.entry.id, event.shiftKey)}
+                  />
                   <button
                     type="button"
                     className="rlv__row-open ui-focusable"

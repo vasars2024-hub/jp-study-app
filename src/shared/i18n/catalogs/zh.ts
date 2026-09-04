@@ -11254,7 +11254,31 @@ export const zh: Catalog = {
   'readingLists.view.rowRemove': '把“{title}”从这个书单移除',
   'readingLists.view.suggestion': '这是“{title}”吗？',
   'readingLists.view.suggestionNo': '不是',
+  'readingLists.view.bulk.label': '对所选项执行',
+  'readingLists.view.bulk.select': '选择《{title}》',
+  'readingLists.view.bulk.selectAll': '全选当前显示',
+  'readingLists.view.bulk.count': {
+    other: '已选 {count} 项',
+  },
+  'readingLists.view.bulk.finish': '标记为已读完',
+  'readingLists.view.bulk.remove': '移除',
+  'readingLists.view.bulk.clear': '取消选择',
+  'readingLists.view.bulk.moveLabel': '将所选项移到另一个列表',
+  'readingLists.view.bulk.movePick': '移动到…',
+  'readingLists.view.bulk.moveNone': '暂时没有其他列表可移动到。',
+  'readingLists.view.bulk.skipped': {
+    other: '{count} 项已在该列表中，因此留在这里。',
+  },
   'readingLists.view.undo.action': '撤销',
+  'readingLists.view.undo.bulkFinished': {
+    other: '已将 {count} 项标记为读完。',
+  },
+  'readingLists.view.undo.bulkRemoved': {
+    other: '已从该列表移除 {count} 项。',
+  },
+  'readingLists.view.undo.bulkMoved': {
+    other: '已将 {count} 项移到《{name}》。',
+  },
   'readingLists.view.undo.listDeleted': '已删除“{name}”。',
   'readingLists.view.undo.entryRemoved': '已把“{title}”从这个书单移除。',
   'readingLists.view.undo.suggestionDismissed': '已忽略“{title}”的匹配建议。',

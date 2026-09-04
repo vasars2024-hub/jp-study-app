@@ -381,4 +381,176 @@ describe('ReadingListsView', () => {
     await click(byText('Undo'));
     expect(host.querySelector('.rlv__row-triage')).not.toBeNull();
   });
+
+  describe('bulk selection (§11.4)', () => {
+    /** Five titles, so a shift-range has an inside as well as two ends. */
+    function seededFive(): { document: ReadingListsDocument; listId: string } {
+      const base = seeded();
+      let current = base.document;
+      for (const title of ['Three', 'Four', 'Five']) {
+        current = addReadingListEntry(
+          current,
+          base.listId,
+          { title },
+          createReadingListsMutationContext(1_700_000_000_010),
+        ).document;
+      }
+      return { document: sealReadingListsDocument(current), listId: base.listId };
+    }
+
+    function picks(): HTMLInputElement[] {
+      return [...host.querySelectorAll<HTMLInputElement>('.rlv__row-pick')];
+    }
+
+    async function shiftClick(node: Element | null) {
+      expect(node).not.toBeNull();
+      await act(async () => {
+        (node as HTMLElement).dispatchEvent(
+          new window.MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }),
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    }
+
+    it('shift-click selects the whole range between the two clicks', async () => {
+      const { document, listId } = seededFive();
+      installBridge(new FakeStore(document));
+      await render(listId);
+      expect(rows()).toHaveLength(5);
+
+      await click(picks()[1]);
+      await shiftClick(picks()[3]);
+
+      expect(picks().map((box) => box.checked)).toEqual([false, true, true, true, false]);
+      expect(byText('3 selected')).not.toBeNull();
+    });
+
+    it('a range spans only the rows on screen, never the ones the filter hid', async () => {
+      const { document, listId } = seededFive();
+      installBridge(new FakeStore(document));
+      await render(listId);
+
+      // Leaves rows 1, 3 and 5 (the two seeded titles are neither "Three" nor
+      // "Five"), so a range across them would sweep in "Four" if it ranged over
+      // the unfiltered list.
+      await typeInto(filterField(), 'e');
+      const shown = rows().map((row) => row.querySelector('.rlv__row-title')?.textContent);
+      expect(shown).toEqual(['Three', 'Five']);
+
+      await click(picks()[0]);
+      await shiftClick(picks()[1]);
+      expect(byText('2 selected')).not.toBeNull();
+
+      await typeInto(filterField(), '');
+      // Still exactly two, and they are the two that were on screen.
+      expect(picks().map((box) => box.checked)).toEqual([false, false, true, false, true]);
+    });
+
+    it('marks a selection finished in ONE write, and one undo puts all of them back', async () => {
+      const { document, listId } = seededFive();
+      const store = new FakeStore(document);
+      installBridge(store);
+      await render(listId);
+
+      const states = () => rows().map((row) => row.getAttribute('data-state'));
+      // The first row is `owned` — it is the bound one. Captured rather than
+      // written out, because the undo has to restore THAT, not a uniform default.
+      const original = states();
+      expect(original[0]).toBe('owned');
+
+      await click(picks()[0]);
+      await shiftClick(picks()[2]);
+      const before = store.writes;
+      await click(byText('Mark finished'));
+
+      expect(store.writes).toBe(before + 1);
+      expect(states()).toEqual(['finished', 'finished', 'finished', 'wanted', 'wanted']);
+      // The selection is spent, so the bar is gone rather than offering to do it again.
+      expect(byText('3 selected')).toBeNull();
+
+      await click(byText('Undo'));
+      expect(states()).toEqual(original);
+    });
+
+    it('removes a selection in one write and restores the original row order on undo', async () => {
+      const { document, listId } = seededFive();
+      const store = new FakeStore(document);
+      installBridge(store);
+      await render(listId);
+      const titles = () =>
+        rows().map((row) => row.querySelector('.rlv__row-title')?.textContent);
+      const original = titles();
+
+      await click(picks()[0]);
+      await shiftClick(picks()[1]);
+      const before = store.writes;
+      await click(byText('Remove'));
+
+      expect(store.writes).toBe(before + 1);
+      expect(rows()).toHaveLength(3);
+
+      await click(byText('Undo'));
+      expect(titles()).toEqual(original);
+    });
+
+    it('moves a selection to another list and names what it refused to move', async () => {
+      const base = seededFive();
+      const second = createReadingList(
+        base.document,
+        { name: 'Later' },
+        createReadingListsMutationContext(1_700_000_000_020),
+      );
+      const store = new FakeStore(sealReadingListsDocument(second.document));
+      installBridge(store);
+      await render(base.listId);
+
+      await click(picks()[0]);
+      await click(picks()[1]);
+      const select = host.querySelector<HTMLSelectElement>('.rlv__bulk-move');
+      expect(select).not.toBeNull();
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(
+          window.HTMLSelectElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(select, second.listId);
+        select?.dispatchEvent(new window.Event('change', { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(rows()).toHaveLength(3);
+      expect(store.document.lists.find((l) => l.id === second.listId)?.entries).toHaveLength(2);
+
+      await click(byText('Undo'));
+      expect(rows()).toHaveLength(5);
+      expect(store.document.lists.find((l) => l.id === second.listId)?.entries).toHaveLength(0);
+    });
+
+    it('offers no move target — and says so — when this is the only list', async () => {
+      const { document, listId } = seededFive();
+      installBridge(new FakeStore(document));
+      await render(listId);
+      await click(picks()[0]);
+      expect(host.querySelector('.rlv__bulk-move')).toBeNull();
+      expect(byText('No other list to move these to yet.')).not.toBeNull();
+    });
+
+    it('drops a selected row from the selection when it is removed one at a time', async () => {
+      const { document, listId } = seededFive();
+      installBridge(new FakeStore(document));
+      await render(listId);
+
+      await click(picks()[0]);
+      await shiftClick(picks()[2]);
+      expect(byText('3 selected')).not.toBeNull();
+
+      // The single-row trash button on the middle row of the selection.
+      await click(rows()[1].querySelector('.ui-btn--ghost'));
+      expect(rows()).toHaveLength(4);
+      // Two, not three: the count cannot name a row that is no longer there.
+      expect(byText('2 selected')).not.toBeNull();
+    });
+  });
 });

@@ -124,6 +124,59 @@
   font-size: 0.9em;
 }
 
+/* ---------------------------------------------- bulk selection (§11.4) -- */
+
+.rlv__selectall {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  /*
+    34, not 32. The accessibility walk's floor IS 32 and it steps in halves, so a
+    control sized to exactly its floor is knife-edge — a row of them has already
+    been scored under the bar by rounding alone.
+  */
+  min-height: 34px;
+  padding-inline: 4px;
+  font-size: 0.9em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rlv__bulk {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border-radius: var(--lq-radius-2, 10px);
+  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.18));
+  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__bulk-count {
+  font-weight: 600;
+}
+
+.rlv__bulk-note {
+  color: var(--lq-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+.rlv__bulk-move {
+  min-height: 34px;
+}
+
+.rlv__row-pick {
+  /*
+    The tick box itself is ~13px on every platform; the reachable target is the
+    box plus this margin, which is what the walk measures on an <input>.
+  */
+  width: 18px;
+  height: 34px;
+  margin: 0 2px;
+  cursor: pointer;
+}
+
 /* --------------------------------------------------------------- the grid -- */
 
 .rlv__grid {
@@ -240,7 +293,7 @@
 
 .rlv__row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--lq-space-2, 8px);
   padding: 4px;
