@@ -507,6 +507,41 @@
 }
 
 /*
+  P5 §8's copy control. A label wrapping a select, so the visible words ARE the
+  accessible name and there is no second string to keep in step.
+
+  `min-height` on the select, not on the label: the hit target is the control
+  the pointer lands on, and a padded label around a 20px select measures 32
+  while offering 20.
+*/
+.rlv__export {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lq-space-1, 4px);
+}
+
+.rlv__export-label {
+  /* The words stay in the accessibility tree; the select's own text is enough
+     on screen in a header that already has five controls competing. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.rlv__export-select {
+  min-height: 32px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: inherit;
+  font: inherit;
+}
+
+/*
   §11.1 row 8's arrival mark. The row a deep link scrolled to stays marked until
   the user leaves the list: an unmarked landing on a 200-row list is the same as
   not having scrolled, because nothing says which row was meant.

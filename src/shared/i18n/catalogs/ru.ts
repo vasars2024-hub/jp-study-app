@@ -12398,6 +12398,18 @@ export const ru: Catalog = {
     many: 'Выбрано {count}',
     other: 'Выбрано {count}',
   },
+  'readingLists.view.export.label': 'Скопировать список',
+  'readingLists.view.export.pick': 'Скопировать как…',
+  'readingLists.view.export.message': 'Сообщение',
+  'readingLists.view.export.markdown': 'Markdown',
+  'readingLists.view.export.csv': 'CSV',
+  'readingLists.view.export.copied': {
+    one: 'Скопирована {count} книга в буфер обмена.',
+    few: 'Скопировано {count} книги в буфер обмена.',
+    many: 'Скопировано {count} книг в буфер обмена.',
+    other: 'Скопировано {count} книг в буфер обмена.',
+  },
+  'readingLists.view.export.failed': 'Ничего не скопировано — у этого окна нет доступа к буферу обмена.',
   'readingLists.membership.count': {
     one: 'В {count} списке',
     few: 'В {count} списках',

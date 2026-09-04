@@ -2044,3 +2044,108 @@ describe('ReadingListsView — §11.1 row 8, landing on one entry', () => {
     expect(scrolled).toEqual([]);
   });
 });
+
+describe('ReadingListsView — P5 §8, copying a list out', () => {
+  let written: string[];
+  let clipboardFails: boolean;
+  let restoreClipboard: (() => void) | null = null;
+
+  beforeEach(() => {
+    written = [];
+    clipboardFails = false;
+    const had = Object.prototype.hasOwnProperty.call(window.navigator, 'clipboard');
+    const previous = Object.getOwnPropertyDescriptor(window.navigator, 'clipboard');
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          if (clipboardFails) throw new Error('denied');
+          written.push(text);
+        },
+      },
+    });
+    restoreClipboard = () => {
+      if (had && previous) Object.defineProperty(window.navigator, 'clipboard', previous);
+      else delete (window.navigator as unknown as { clipboard?: unknown }).clipboard;
+    };
+  });
+
+  afterEach(() => {
+    restoreClipboard?.();
+    restoreClipboard = null;
+  });
+
+  function exportSelect(): HTMLSelectElement | null {
+    return host.querySelector<HTMLSelectElement>('.rlv__export-select');
+  }
+
+  async function pick(format: string) {
+    const select = exportSelect();
+    expect(select).not.toBeNull();
+    await act(async () => {
+      select!.value = format;
+      select!.dispatchEvent(new window.Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('puts the real rendered list on the clipboard and says how much', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await pick('message');
+    expect(written).toHaveLength(1);
+    // The actual export, not a placeholder: both seeded titles, numbered.
+    expect(written[0]).toContain('1. Kino no Tabi');
+    expect(written[0]).toContain('2. コンビニ人間');
+    expect(host.querySelector('[data-testid="rlv-export-note"]')?.textContent).toContain('2 books');
+
+    // The select returns to its prompt, so picking the same format twice works.
+    expect(exportSelect()?.value).toBe('');
+  });
+
+  it('copies a different format when a different one is picked', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await pick('csv');
+    expect(written[0].split('\r\n')[0]).toBe('"position","title","author","state","finished"');
+    await pick('markdown');
+    expect(written[1].split('\n')[0]).toBe('# From a friend');
+    // The control that the format is READ rather than ignored: three picks,
+    // three different strings.
+    expect(new Set(written).size).toBe(2);
+  });
+
+  it('says nothing was copied when the clipboard refuses', async () => {
+    // A silent failure is indistinguishable from success until the user pastes
+    // into a chat and sends nothing.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    clipboardFails = true;
+    await pick('message');
+    expect(written).toHaveLength(0);
+    const note = host.querySelector('[data-testid="rlv-export-note"]');
+    expect(note?.textContent).toContain('Nothing was copied');
+    expect(note?.className).toContain('rlv__notice--error');
+  });
+
+  it('reports a host with no clipboard API rather than claiming a copy', async () => {
+    // `await undefined` resolves, so an unguarded optional call reports success
+    // on a host that has no clipboard at all.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    delete (window.navigator as unknown as { clipboard?: unknown }).clipboard;
+    await pick('message');
+    expect(host.querySelector('[data-testid="rlv-export-note"]')?.textContent).toContain(
+      'Nothing was copied',
+    );
+  });
+});

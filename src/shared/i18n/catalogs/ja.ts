@@ -11429,6 +11429,15 @@ export const ja: Catalog = {
   'readingLists.view.bulk.count': {
     other: '{count} 件を選択中',
   },
+  'readingLists.view.export.label': 'このリストをコピー',
+  'readingLists.view.export.pick': '形式を選んでコピー…',
+  'readingLists.view.export.message': 'メッセージ',
+  'readingLists.view.export.markdown': 'Markdown',
+  'readingLists.view.export.csv': 'CSV',
+  'readingLists.view.export.copied': {
+    other: '{count} 冊をクリップボードにコピーしました。',
+  },
+  'readingLists.view.export.failed': 'コピーできませんでした — このウィンドウはクリップボードにアクセスできません。',
   'readingLists.membership.count': {
     other: '{count} 件のリストに登録',
   },

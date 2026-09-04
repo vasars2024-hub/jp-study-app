@@ -11308,6 +11308,15 @@ export const zh: Catalog = {
   'readingLists.view.bulk.count': {
     other: '已选 {count} 项',
   },
+  'readingLists.view.export.label': '复制此列表',
+  'readingLists.view.export.pick': '复制为…',
+  'readingLists.view.export.message': '消息',
+  'readingLists.view.export.markdown': 'Markdown',
+  'readingLists.view.export.csv': 'CSV',
+  'readingLists.view.export.copied': {
+    other: '已将 {count} 本书复制到剪贴板。',
+  },
+  'readingLists.view.export.failed': '未能复制 — 此窗口无法访问剪贴板。',
   'readingLists.membership.count': {
     other: '在 {count} 个列表中',
   },

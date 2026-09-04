@@ -11947,6 +11947,16 @@ export const en: Catalog = {
     one: '{count} selected',
     other: '{count} selected',
   },
+  'readingLists.view.export.label': 'Copy this list',
+  'readingLists.view.export.pick': 'Copy as…',
+  'readingLists.view.export.message': 'Message',
+  'readingLists.view.export.markdown': 'Markdown',
+  'readingLists.view.export.csv': 'CSV',
+  'readingLists.view.export.copied': {
+    one: 'Copied {count} book to the clipboard.',
+    other: 'Copied {count} books to the clipboard.',
+  },
+  'readingLists.view.export.failed': 'Nothing was copied — this window has no clipboard access.',
   'readingLists.membership.count': {
     one: 'On {count} list',
     other: 'On {count} lists',

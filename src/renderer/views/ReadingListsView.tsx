@@ -81,6 +81,10 @@ import {
   type ReadingListSort,
   type ReadingListSummary,
 } from '../../shared/readingListViews';
+import {
+  readingListExport,
+  type ReadingListExportFormat,
+} from '../../shared/readingListExport';
 import './readingLists.css';
 
 const STATE_KEYS: Record<ReadingEntryState, string> = {
@@ -527,6 +531,15 @@ export default function ReadingListsView({
   // is four chances to disagree about what "not loaded yet" looks like.
   const { document, failure: loadFailure, health, adopt, reload } = useReadingListsDocument();
   const [writeFailure, setWriteFailure] = useState<string | null>(null);
+  /**
+   * P5 §8's receipt. What was copied and how much of it, or why it was not.
+   *
+   * Its own state rather than a reuse of `writeFailure`: that notice renders a
+   * FIXED string (`readingLists.view.writeFailed`) and ignores the value it was
+   * given, so an export failure routed through it would report a failed WRITE —
+   * a different thing, about the document rather than the clipboard.
+   */
+  const [exported, setExported] = useState<{ message: string; failed: boolean } | null>(null);
   // Dismissal is per detected-at, not a bare boolean: a SECOND recovery, later in
   // the same session, is a new fact and has to be announced again.
   const [healthDismissedAt, setHealthDismissedAt] = useState<number | null>(null);
@@ -784,6 +797,43 @@ export default function ReadingListsView({
       onOpenBook(item);
     },
     [itemsById, list, onFindWork, onOpenBook, write],
+  );
+
+  /**
+   * P5 §8. Renders the open list and puts it on the clipboard.
+   *
+   * The result is REPORTED, both ways. A copy that silently failed — no
+   * clipboard permission, a host without the API — is indistinguishable from
+   * one that worked until the user pastes into a chat and sends nothing, so
+   * the failure has to say so where the user is looking.
+   *
+   * `lang` is the dependency rather than `t`, per the i18n rule: `t`'s identity
+   * is stable by design, so depending on it goes silently stale after a switch.
+   */
+  const copyExport = useCallback(
+    async (format: ReadingListExportFormat) => {
+      if (!list || !document) return;
+      const text = readingListExport(format, list, document.works);
+      try {
+        // Optional-chained: a host without the API returns undefined rather
+        // than throwing, and awaiting undefined resolves — which would report a
+        // copy that never happened. The explicit check is what makes it honest.
+        const write = navigator.clipboard?.writeText;
+        if (!write) throw new Error('no clipboard');
+        await navigator.clipboard.writeText(text);
+      } catch {
+        setExported({ message: t('readingLists.view.export.failed'), failed: true });
+        return;
+      }
+      setExported({
+        message: t('readingLists.view.export.copied', { count: list.entries.length }),
+        failed: false,
+      });
+    },
+    // `lang`, deliberately, and NOT `t` — see the doc comment. No disable
+    // comment: `react-hooks/exhaustive-deps` is not configured in this repo, so
+    // one is itself a lint ERROR ("Definition for rule ... was not found").
+    [list, document, lang],
   );
 
   const showSource = useCallback((entryId: string) => {
@@ -1689,6 +1739,18 @@ export default function ReadingListsView({
           {t('readingLists.view.writeFailed')}
         </div>
       ) : null}
+      {exported ? (
+        <div
+          className={`rlv__notice rlv__notice--${exported.failed ? 'error' : 'undo'}`}
+          role="status"
+          data-testid="rlv-export-note"
+        >
+          <span>{exported.message}</span>
+          <Button size="sm" variant="ghost" onClick={() => setExported(null)}>
+            {t('readingLists.view.drop.dismiss')}
+          </Button>
+        </div>
+      ) : null}
       {dropFailure ? (
         <div className="rlv__notice rlv__notice--warn" role="status" data-testid="rlv-drop-note">
           <span>{dropFailure}</span>
@@ -1856,6 +1918,31 @@ export default function ReadingListsView({
           <Button size="sm" onClick={() => setPicking((open) => !open)}>
             {t('readingLists.view.library.add')}
           </Button>
+          {/*
+            P5 §8. The clipboard and NOT a file dialog: §8's first bullet is
+            "pasteable straight back into LINE, Discord, or a forum", which is a
+            paste, and a native save dialog is a modal no automated check can
+            drive and one more thing to cancel out of. A file save can be added
+            later beside this without moving the format code, which is pure.
+          */}
+          <label className="rlv__export">
+            <span className="rlv__export-label">{t('readingLists.view.export.label')}</span>
+            <select
+              className="rlv__export-select ui-focusable"
+              aria-label={t('readingLists.view.export.label')}
+              value=""
+              onChange={(event) => {
+                const format = event.target.value;
+                event.target.value = '';
+                if (format) void copyExport(format as ReadingListExportFormat);
+              }}
+            >
+              <option value="">{t('readingLists.view.export.pick')}</option>
+              <option value="message">{t('readingLists.view.export.message')}</option>
+              <option value="markdown">{t('readingLists.view.export.markdown')}</option>
+              <option value="csv">{t('readingLists.view.export.csv')}</option>
+            </select>
+          </label>
           <Button size="sm" variant="danger" onClick={() => summary && removeList(summary)}>
             {t('readingLists.view.deleteList')}
           </Button>
