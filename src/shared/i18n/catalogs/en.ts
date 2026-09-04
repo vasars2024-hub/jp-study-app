@@ -11941,6 +11941,8 @@ export const en: Catalog = {
   'readingLists.smart.remove': 'Remove this question',
   'readingLists.smart.saved': 'Saved “{name}”.',
   'readingLists.smart.removed': 'Removed “{name}”.',
+  'readingLists.view.projection.at': 'At your recent pace, done around {date}.',
+  'readingLists.view.projection.rough': 'Maybe around {date} — too little reading yet to be sure.',
   'readingLists.view.sort.label': 'Order lists by',
   'readingLists.view.sort.recent': 'Recently changed',
   'readingLists.view.sort.name': 'Name',

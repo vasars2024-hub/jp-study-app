@@ -12394,6 +12394,8 @@ export const ru: Catalog = {
   'readingLists.smart.remove': 'Удалить этот запрос',
   'readingLists.smart.saved': '«{name}» сохранён.',
   'readingLists.smart.removed': '«{name}» удалён.',
+  'readingLists.view.projection.at': 'При нынешнем темпе — примерно к {date}.',
+  'readingLists.view.projection.rough': 'Возможно, к {date} — пока прочитано слишком мало для точности.',
   'readingLists.view.sort.label': 'Порядок списков',
   'readingLists.view.sort.recent': 'По изменению',
   'readingLists.view.sort.name': 'По названию',

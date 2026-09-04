@@ -39,6 +39,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+  P5 §5.4's projected finish. Quieter than the count it sits beside — a
+  projection is the softest claim on this header and should not read as a
+  deadline. The provisional form is italic as well as differently worded, so the
+  uncertainty survives a screenshot with the sentence cropped.
+*/
+.rlv__projection {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+.rlv__projection[data-provisional='true'] {
+  font-style: italic;
+  opacity: 0.6;
+}
+
 .rlv__lede {
   margin: 0;
   opacity: 0.7;

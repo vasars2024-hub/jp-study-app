@@ -11300,6 +11300,8 @@ export const zh: Catalog = {
   'readingLists.smart.remove': '删除这个条件',
   'readingLists.smart.saved': '已保存“{name}”。',
   'readingLists.smart.removed': '已删除“{name}”。',
+  'readingLists.view.projection.at': '按你最近的速度，大约 {date} 读完。',
+  'readingLists.view.projection.rough': '大概 {date} 吧 —— 目前读得还太少，说不准。',
   'readingLists.view.sort.label': '书单排序方式',
   'readingLists.view.sort.recent': '最近更新',
   'readingLists.view.sort.name': '名称',
