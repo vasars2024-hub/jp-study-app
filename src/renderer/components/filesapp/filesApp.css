@@ -606,7 +606,22 @@
      24: an odd row height puts the centred checkbox on a half-pixel, and the
      pointer walk then reports its region as not covering its own rect —
      `stolenCount` went 1 -> 24, and `stolen` is half of the same bar. 32px
-     stays. The one remaining sub-floor row is at the scroller's clip edge. */
+     stays.
+
+     RE-TESTED 2026-09-04 against a BETTER instrument and the rejection holds.
+     The walk now bisects its boundary to 0.05px instead of stepping at 0.5px,
+     which is exactly the half-pixel resolution the paragraph above blames — so
+     the experiment was worth repeating rather than inheriting. It was not the
+     resolution: at 33px, `stolenCount` 0 -> **23**, every one a `div.fa-row`
+     short by 0.5px, and `input.fa-bulk-check` only went 30.55 -> 31.05, still
+     under the floor. One control gained half a pixel and 23 rows lost one.
+
+     The last line of the original note IS withdrawn, though: it said the one
+     remaining sub-floor row sat at the scroller's clip edge. It did not. That
+     row was `button.fa-tree-node` and it was the hit walk centring in a
+     horizontal-only scroller (`49755620`); with that fixed the row does not
+     exist. The three that remain are listed in LIQUID_SCORECARD.md and the
+     smallest is genuinely 1.45px short of the box it renders. */
   height: 32px;
   border-bottom: 1px solid var(--lq-work-border);
   cursor: default;
