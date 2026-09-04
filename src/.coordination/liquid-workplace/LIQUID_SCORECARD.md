@@ -2420,3 +2420,37 @@ byte-identical by sha256, green again.
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **4 of 8** banked
 (cat1, cat2, cat3, cat4). Next: cat5 UI clarity, then 6, 7, 8 — four cells from an 80/80 entry.
+
+---
+
+## 2026-09-04 · primary — `note` cat5 is VOID, and the reason is an ORDERING rule the next worker needs before anything else
+
+Driven, not skipped. `baselines/cat5-s11-note-m.json` (measurement) and `cat5-s11-note.json`
+(control). The control is valid on its own — "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10"
+— so the instrument is proven; the measurement is what VOIDs.
+
+Q1 YES (1 entry point, 1 primary input `textarea.desk-note-text`, 0 accent buttons).
+Q2 YES (title `Sticky note` from `span.fwin-title`, 1 way back). Q3 YES (primary action inside
+the body viewport at rest). **Q4 NO. Q5, Q7, Q8, Q9 VOID.**
+
+**CAT6 MUST RUN BEFORE CAT5, AND THE LABELS MUST MATCH.** Q7/Q8/Q9 are MEASURE questions that
+read a category-6 baseline at `baselines/cat6-<label>.json`. Run cat6 with `--label
+cat5-s11-note-m` first, or cat5 VOIDs three questions no matter how good the surface is. This is
+not a defect in either harness and it is not written down anywhere else.
+
+**Q5's theme axis did not move** — `theme=null` and `theme=classic-light` both report
+`minRatio 11.11`, so the swap never reached the paint and contrast stability measured nothing.
+That is the recorded `theme-swap-is-a-transition` trap: `getComputedStyle` immediately after a
+theme change returns the OLD colour. Settle before reading.
+
+**FINDING E (open, deliberately not repaired this turn) — Q4 fails the note for having no
+advanced tools to hide.** Bar: `>=1 collapsed disclosure AND <=12 controls scanned in the
+default state`. The note measures `collapsedDisclosures: 0`, `scannedControls: 1`. It clears the
+clutter half by a factor of twelve and fails the conjunct that asks for *something to disclose*.
+That is the **third** cell in this family on this one surface — cat3's empty walk, cat4's absent
+Maximize, and now this — and the shape is identical each time: a bar whose denominator a
+correct minimal surface makes zero. The other two were repaired this turn; this one is NOT,
+because the honest fix must still fail a surface that genuinely BURIES its tools, and getting
+that discriminator wrong laundered is worse than a VOID. It is the next turn's opening slice.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` holds at **4 of 8**.
