@@ -11739,4 +11739,41 @@ export const en: Catalog = {
   'filesApp.delete.undoRestored': 'The record was restored.',
   'filesApp.delete.undoExpired': 'The Undo window has expired; the record remains removed.',
   'filesApp.delete.undoFailed': 'The record could not be restored. It remains removed.',
+
+  // Reading lists — the mandatory paste preview (§2.5).
+  'readingLists.preview.title': 'Check this list before adding it',
+  'readingLists.preview.lede': 'Nothing is added to “{list}” until you press Add. Edit a title, or untick anything that is not a book.',
+  'readingLists.preview.selectedCount': {
+    one: '{count} of {total} selected',
+    other: '{count} of {total} selected',
+  },
+  'readingLists.preview.undo': 'Undo',
+  'readingLists.preview.confirm': {
+    one: 'Add {count} book to {list}',
+    other: 'Add {count} books to {list}',
+  },
+  'readingLists.preview.triageCount': {
+    one: '{count} entry needs a look',
+    other: '{count} entries need a look',
+  },
+  'readingLists.preview.triageJump': 'Show me',
+  'readingLists.preview.blockedEmpty': 'Nothing is selected, so there is nothing to add.',
+  'readingLists.preview.blockedBlank': {
+    one: '{count} selected entry has an empty title.',
+    other: '{count} selected entries have empty titles.',
+  },
+  'readingLists.preview.noneFound': 'No titles were found in this message.',
+  'readingLists.preview.droppedCount': {
+    one: '{count} line was ignored',
+    other: '{count} lines were ignored',
+  },
+  'readingLists.preview.includeRow': 'Include “{title}”',
+  'readingLists.preview.titleField': 'Title',
+  'readingLists.preview.authorField': 'Author',
+  'readingLists.preview.authorPlaceholder': 'Author (optional)',
+  'readingLists.preview.fromLine': 'From: {line}',
+  'readingLists.preview.revert': 'Revert',
+  'readingLists.preview.triage.authorAmbiguous': 'The author was corrected mid-line — check it.',
+  'readingLists.preview.triage.veryShort': 'Very short — this may not be a title.',
+  'readingLists.preview.triage.veryLong': 'Very long — this may be a sentence, not a title.',
 };

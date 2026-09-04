@@ -1,0 +1,196 @@
+/**
+ * The paste preview sheet (§2.5).
+ *
+ * Built on L2's **Work** tokens, not the Liquid ones, and that is a decision
+ * rather than an oversight: the transformation plan's own non-negotiable says
+ * reading, editing, forms and tables stay on stable opaque anchors, and this
+ * sheet is a dense editable table over text the user is being asked to verify.
+ * Glass behind a title field is exactly the case the plan calls a failure.
+ *
+ * Own file rather than `styles.css`, which is permanently contended by other
+ * tracks, so this ships without a merge conflict.
+ */
+
+.rl-preview .ui-dialog__body {
+  padding: 0;
+}
+
+.rl-preview__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-3, 12px);
+  padding: var(--lq-space-4, 16px);
+  max-height: min(62vh, 640px);
+  overflow: auto;
+}
+
+.rl-preview__lede {
+  margin: 0;
+  color: var(--lq-work-text-muted, #9aa0ab);
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: var(--lq-measure, 68ch);
+}
+
+/* -------------------------------------------------------- triage strip -- */
+
+.rl-preview__triage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-3, 12px);
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border: 1px solid var(--lq-work-border, #2b2f38);
+  border-left: 3px solid var(--accent, #b3242b);
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg-raised, #1a1d23);
+  font-size: 12.5px;
+}
+
+.rl-preview__blocked {
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border: 1px solid var(--danger-border, #6d2126);
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--danger-bg, rgba(140, 30, 36, 0.18));
+  color: var(--lq-work-text, #e6e8ec);
+  font-size: 12.5px;
+}
+
+.rl-preview__empty {
+  margin: 0;
+  padding: var(--lq-space-5, 20px) 0;
+  text-align: center;
+  color: var(--lq-work-text-muted, #9aa0ab);
+}
+
+/* ---------------------------------------------------------------- rows -- */
+
+.rl-preview__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+}
+
+.rl-preview__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--lq-space-3, 12px);
+  padding: var(--lq-space-3, 12px);
+  border: 1px solid var(--lq-work-border, #2b2f38);
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, #15171c);
+}
+
+/* A dropped row stays legible — it is a decision the user can reverse, not
+   deleted content. Fading it to invisible was the first draft and made the
+   "put it back" affordance unfindable. */
+.rl-preview__row.is-dropped {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+.rl-preview__row.is-triage {
+  border-left: 3px solid var(--accent, #b3242b);
+}
+
+.rl-preview__row.is-blank {
+  border-color: var(--danger-border, #6d2126);
+}
+
+.rl-preview__include {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding-top: 6px;
+}
+
+.rl-preview__include input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.rl-preview__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rl-preview__title,
+.rl-preview__author {
+  width: 100%;
+  min-width: 0;
+}
+
+.rl-preview__title {
+  font-size: 13.5px;
+}
+
+.rl-preview__author {
+  font-size: 12px;
+}
+
+.rl-preview__raw,
+.rl-preview__reason {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--lq-work-text-muted, #9aa0ab);
+  overflow-wrap: anywhere;
+}
+
+.rl-preview__reason {
+  color: var(--accent-soft, #d98b8f);
+}
+
+/* ------------------------------------------------ dropped-line disclosure -- */
+
+.rl-preview__dropped {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rl-preview__droppedList {
+  list-style: none;
+  margin: 0;
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border: 1px dashed var(--lq-work-border, #2b2f38);
+  border-radius: var(--lq-work-radius, 8px);
+  color: var(--lq-work-text-muted, #9aa0ab);
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------- footer -- */
+
+.rl-preview__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lq-space-3, 12px);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.rl-preview__count {
+  color: var(--lq-work-text-muted, #9aa0ab);
+  font-size: 12px;
+}
+
+.rl-preview__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
