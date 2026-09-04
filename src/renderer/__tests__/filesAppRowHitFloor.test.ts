@@ -55,16 +55,24 @@ function ruleOf(selector: string): Record<string, string> {
 }
 
 describe('files list — the 32px pointer floor', () => {
-  it('floors every flexible column at the hit target, so no sort button can collapse', () => {
+  it('gives the size column a share wide enough to aim at', () => {
     const row = ruleOf('.fa-row');
     const tracks = row['grid-template-columns'];
     expect(tracks, '.fa-row declares no grid-template-columns').toBeTruthy();
-    // The regression this catches is literally `minmax(0, 0.8fr)` coming back on the size
-    // column — 30.92px wide live, the only row of cat1 whose own rect was under the floor.
-    expect(tracks).not.toMatch(/minmax\(\s*0/);
-    const flexible = tracks.match(/minmax\(/g) ?? [];
-    expect(flexible.length, 'five flexible columns are declared').toBe(5);
-    expect(tracks.match(/minmax\(\s*var\(--lq-hit-target\)/g)?.length).toBe(5);
+    const fr = [...tracks.matchAll(/([\d.]+)fr/g)].map((m) => Number(m[1]));
+    expect(fr, 'five flexible columns are declared').toHaveLength(5);
+    // The regression this catches is `0.8fr` coming back on the SIZE column — the
+    // fourth flexible track, 30.92px wide live at 820x580 and the only cat1 row whose
+    // own rect was under the floor. The assertion is on the share, not on the literal:
+    // 276px of row over the total, times this track's share, must clear the 32px bar
+    // with the margin `1fr` gives it (36.3px measured).
+    const total = fr.reduce((a, b) => a + b, 0);
+    const sizeShare = fr[3];
+    expect(sizeShare).toBeGreaterThanOrEqual(1);
+    expect((276 * sizeShare) / total).toBeGreaterThan(32);
+    // And NOT a `var(--lq-hit-target)` floor: that fixed cat1 and cost cat4's compact
+    // leg two horizontal scrollers, because it puts a 248px minimum on a 212px canvas.
+    expect(tracks).not.toMatch(/minmax\(\s*var\(--lq-hit-target\)/);
   });
 
   it('separates rows with an inset shadow, so a 32px control in one lands on a whole pixel', () => {

@@ -11155,6 +11155,22 @@ export const ja: Catalog = {
   'filesApp.state.empty': 'まだ何もありません。',
   'filesApp.state.noMatches': '検索に一致する項目がありません。',
   'filesApp.state.noSelection': '項目を選ぶと詳細が表示されます。',
+  'filesApp.summary.title': 'このフォルダー',
+  'filesApp.summary.shown': '表示中',
+  'filesApp.summary.totalSize': '合計サイズ',
+  'filesApp.summary.otherKinds': 'その他の種類',
+  'filesApp.summary.itemCount': {
+    other: '{count} 件',
+  },
+  'filesApp.summary.kindCount': {
+    other: 'ほか {count} 種類',
+  },
+  'filesApp.summary.sizePartial': {
+    other: '{size} · サイズ不明 {count} 件',
+  },
+  'filesApp.summary.broken': {
+    other: '{count} 件の項目が失われたファイルを指しています。',
+  },
   'filesApp.state.error': 'インデックスを読み込めませんでした。',
   'filesApp.state.unavailable': 'Files はデスクトップ版が必要です。このビルドにはインデックスがありません。',
   'filesApp.state.partial': '読み込めなかったストアがあるため、その件数は 0 と表示されます: {sources}',

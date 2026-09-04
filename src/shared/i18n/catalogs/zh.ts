@@ -11047,6 +11047,22 @@ export const zh: Catalog = {
   'filesApp.state.empty': '这里还没有内容。',
   'filesApp.state.noMatches': '没有匹配的搜索结果。',
   'filesApp.state.noSelection': '选择一个项目以查看详情。',
+  'filesApp.summary.title': '此文件夹',
+  'filesApp.summary.shown': '已显示',
+  'filesApp.summary.totalSize': '总大小',
+  'filesApp.summary.otherKinds': '其他类型',
+  'filesApp.summary.itemCount': {
+    other: '{count} 项',
+  },
+  'filesApp.summary.kindCount': {
+    other: '另有 {count} 种类型',
+  },
+  'filesApp.summary.sizePartial': {
+    other: '{size} · {count} 项大小未知',
+  },
+  'filesApp.summary.broken': {
+    other: '{count} 项指向已丢失的文件。',
+  },
   'filesApp.state.error': '无法读取索引。',
   'filesApp.state.unavailable': 'Files 需要桌面版应用；此版本没有索引。',
   'filesApp.state.partial': '部分存储无法读取，其计数显示为 0：{sources}',

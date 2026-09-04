@@ -24,6 +24,7 @@
  *    the root node clears it. Same window either way (gate 5's shape).
  */
 import {
+  Fragment,
   Suspense,
   lazy,
   useCallback,
@@ -35,6 +36,7 @@ import {
 } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { summarizeFolder } from './folderSummary';
 import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
 import VirtualList from '../VirtualList';
@@ -2008,6 +2010,23 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
   })();
 
+  /**
+   * What the inspector says when nothing is selected — rubric category 4.
+   *
+   * Measured live 2026-09-04 at maximized (1264x773): the inspector was a 320px
+   * column holding ONE 43px sentence, and its empty remainder was the surface's
+   * largest dead rectangle at **316x572, 17.4% of the viewport** against a 15%
+   * bar. The sentence stays (it is the honest answer to "why is this empty"),
+   * but a fixed column that earns nothing until the user clicks is exactly what
+   * this category is for.
+   *
+   * Everything here is derived from `visible` — the rows actually on screen
+   * under the current scope, search and filters — so it can never disagree with
+   * the list beside it. The counting rules live in `folderSummary.ts` with
+   * their own suite; see that file for why `sizeBytes: null` is not zero.
+   */
+  const folderSummary = useMemo(() => summarizeFolder(visible), [visible]);
+
   const inspector = selected && mineability ? (
     <div className="fa-details">
       <h2 className="fa-details-title">{selected.name}</h2>
@@ -2138,7 +2157,52 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       ) : null}
     </div>
   ) : (
-    <p className="fa-state">{t('filesApp.state.noSelection')}</p>
+    <div className="fa-details fa-details-summary">
+      <h2 className="fa-details-title">{scopeLabel ?? t('filesApp.summary.title')}</h2>
+      <dl className="fa-details-list">
+        <dt>{t('filesApp.summary.shown')}</dt>
+        <dd>{t('filesApp.summary.itemCount', { count: visible.length })}</dd>
+        <dt>{t('filesApp.summary.totalSize')}</dt>
+        <dd>
+          {/* `formatSize(null, …)` rather than a literal em dash: `format.ts`
+              owns that decision ("a store with no size and a genuinely empty
+              file must not print the same") and a second copy of the glyph is
+              exactly the drift that file was extracted to stop. */}
+          {folderSummary.sizedCount === 0
+            ? formatSize(null, t, lang)
+            : folderSummary.unsizedCount === 0
+              ? formatSize(folderSummary.bytes, t, lang)
+              : t('filesApp.summary.sizePartial', {
+                  size: formatSize(folderSummary.bytes, t, lang),
+                  count: folderSummary.unsizedCount,
+                })}
+        </dd>
+        {folderSummary.kinds.map(([kind, count]) => (
+          <Fragment key={kind}>
+            <dt>{t(`filesApp.kind.${kind}`)}</dt>
+            <dd>{t('filesApp.summary.itemCount', { count })}</dd>
+          </Fragment>
+        ))}
+        {folderSummary.kindsTotal > folderSummary.kinds.length ? (
+          <>
+            <dt>{t('filesApp.summary.otherKinds')}</dt>
+            <dd>
+              {t('filesApp.summary.kindCount', {
+                count: folderSummary.kindsTotal - folderSummary.kinds.length,
+              })}
+            </dd>
+          </>
+        ) : null}
+      </dl>
+      {folderSummary.broken > 0 ? (
+        <p className="fa-details-note fa-summary-broken">
+          {t('filesApp.summary.broken', { count: folderSummary.broken })}
+        </p>
+      ) : null}
+      {/* The original empty state, kept verbatim and kept LAST: the summary
+          answers "what is in here", this answers "why is there nothing else". */}
+      <p className="fa-state">{t('filesApp.state.noSelection')}</p>
+    </div>
   );
 
   /* ---------------------------- dock ---------------------------- */

@@ -11637,6 +11637,26 @@ export const en: Catalog = {
   'filesApp.state.empty': 'Nothing here yet.',
   'filesApp.state.noMatches': 'Nothing matches that search.',
   'filesApp.state.noSelection': 'Select an item to see its details.',
+  'filesApp.summary.title': 'This folder',
+  'filesApp.summary.shown': 'Shown',
+  'filesApp.summary.totalSize': 'Total size',
+  'filesApp.summary.otherKinds': 'Other kinds',
+  'filesApp.summary.itemCount': {
+    one: '{count} item',
+    other: '{count} items',
+  },
+  'filesApp.summary.kindCount': {
+    one: '{count} more kind',
+    other: '{count} more kinds',
+  },
+  'filesApp.summary.sizePartial': {
+    one: '{size} · {count} with no size',
+    other: '{size} · {count} with no size',
+  },
+  'filesApp.summary.broken': {
+    one: '{count} item points at a file that is gone.',
+    other: '{count} items point at files that are gone.',
+  },
   'filesApp.state.error': 'The index could not be read.',
   'filesApp.state.unavailable': 'The Files app needs the desktop app; this build has no index.',
   'filesApp.state.partial': 'Some stores could not be read, so their counts show 0: {sources}',

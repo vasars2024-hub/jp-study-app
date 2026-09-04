@@ -628,18 +628,22 @@
 
 .fa-row {
   display: grid;
-  /* NO COLUMN COLLAPSES BELOW THE HIT TARGET. Every header cell is a SORT
-     BUTTON, so a track that can shrink to 0 is a control that can shrink to 0.
-     Measured live 2026-09-04 at the default 820x580: `minmax(0, 0.8fr)` gave
-     `button.fa-cell-size` a rect of **30.92px** and a pointer region of 31.92
-     — the one row of `files` cat1 whose own RECT was under the 32px floor.
-     With the floor it is 32.00 / 33.01. The cost is 0.5px off `fa-cell-name`
-     and nothing else: `scrollWidth === clientWidth` on `.fa-list`, `.fa-rows`
-     and `.fa-shell` before and after, so this buys no horizontal overflow —
-     which matters, because cat4's `horizontal` bar was repaired the same day
-     and this rule must not undo it. The compact VIEW overrides this line with
-     its own three-column template. */
-  grid-template-columns: var(--lq-hit-target) minmax(var(--lq-hit-target), 3fr) minmax(var(--lq-hit-target), 1fr) minmax(var(--lq-hit-target), 1.2fr) minmax(var(--lq-hit-target), 0.8fr) minmax(var(--lq-hit-target), 1.4fr);
+  /* THE SIZE COLUMN IS A SORT BUTTON AND IT WAS 30.92 PX WIDE. Measured live
+     2026-09-04 at the default 820x580: `0.8fr` of a 7.4fr / 276px row gave
+     `button.fa-cell.fa-cell-size` a rect of 30.92 and a pointer region of
+     31.92 — the one row of `files` cat1 whose own RECT was under the 32px
+     floor. At `1fr` it is 36.3 / 37.3.
+
+     REBALANCED RATHER THAN FLOORED. The floor LANDED first, as `1ba0545f`, and
+     is reverted here, so it is not tried a third time. `minmax(var(--lq-hit-target),
+     Nfr)` on all five tracks fixed cat1 identically and read clean at the
+     default size — and then cost 248px of MINIMUM row width against the 212px
+     the canvas gives at the 260x170 window `DesktopShell.tsx`'s `MIN_W`/`MIN_H`
+     actually allow. cat4's compact leg went from 0 horizontal scrollers to 2
+     (`div.lq-scaffold-canvas 240>212`, `div.fa-rows 240>202`). A ratio costs
+     nothing at any width. The compact VIEW overrides this line with its own
+     three-column template. */
+  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr);
   align-items: center;
   gap: var(--lq-space-3);
   padding: 0 var(--lq-space-3);
@@ -859,6 +863,24 @@
 .fa-details-note {
   margin: var(--lq-space-2) 0 0;
   color: var(--lq-liquid-text-muted);
+}
+
+/* The no-selection inspector is the SAME panel as the item inspector, not a
+   second kind of thing, so it inherits `.fa-details` and adds nothing but the
+   two corrections below. `.fa-state` carries its own `--lq-space-4` because it
+   is normally the only child of a bare pane; nested inside a panel that is
+   already padded it lands 16px out of line with the `dl` above it. */
+.fa-details-summary .fa-state {
+  padding: 0;
+}
+
+/* Same rule as `.fa-view-notice` and `.fa-folder-notice[data-tone='error']`:
+   this stylesheet says "wrong" with WEIGHT rather than with a hue, so it
+   survives a theme with no danger colour of its own. A broken link is a fact
+   about the folder, so it must not read as muted like the note beneath it. */
+.fa-summary-broken {
+  color: var(--lq-liquid-text);
+  font-weight: 600;
 }
 
 /* A scope is a filter someone asked for, so it reads as a dismissible note
