@@ -2347,3 +2347,31 @@ using it to undo a mutation control silently destroyed two files of *unstaged* e
 mutated run had passed anyway, because the PowerShell `-replace` pattern used `\r\n` against an
 LF file and was a no-op. A control that does not fail is not a control. Capture and restore with
 literal file copies, and assert the mutation applied before trusting the run.
+
+### 2026-09-04 — primary2, `wt/files-app` — gate 37's last caveat is cleared
+
+Gate 37 is the "all gates pass" meta-gate, and every prior run of it carried the same
+honest caveat: **the tree was not green**, so the gate closed on a set-difference against
+a red baseline rather than on a clean run. That caveat no longer applies.
+
+**`npx vitest run` at `8a5f29fa`, in this clean worktree (= HEAD, nothing uncommitted):
+`Test Files 1053 passed | 1 skipped (1054)`, `Tests 13552 passed | 6 skipped (13558)`,
+EXIT 0. Zero failures — not "zero new failures".** The last known red,
+`detachedStudyBlockPresentation.test.ts`, was a merge collision between this branch and
+`feat/nyaa-subtitles` (both fixed the same row, differently); resolved this turn in
+`34792ef4` keeping the version that also asserts the `popout`/`reader` refusals, so the
+row still proves the detached refusal did not leak.
+
+`node tools/i18n-check.cjs` EXIT 0 at **12,292** English keys, all translated in ja/zh/ru.
+`node tools/architecture-audit.cjs` EXIT 0, "Nothing new", 7 known pending.
+
+**Count, with its method: 37 of 37 gates carry `<!-- status: closed -->` and 0 carry
+`status: open`, counted inside the `## Gates` section (lines 405–1010) of this file.**
+Document-wide greps are misleading here and should not be quoted — `grep -cE '^[0-9]+\. '`
+over the whole file returns 83, because the plan has since grown other numbered lists, and
+a whole-file `status: closed` grep returns 38.
+
+**files-app is DONE and needs no further slices.** What it still needs is to reach the
+integration branch: `git rev-list --left-right --count feat/nyaa-subtitles...wt/files-app`
+read `2 11` at the time of writing, so eleven commits are unmerged. Do not merge by hand —
+`ClaudeRelayMergeback` owns that and refuses while a main-tree dispatch is running.
