@@ -3039,52 +3039,43 @@ this ledger has carried since `visualizer` opened. The running figure is the one
 line has been computed from, so it is the one continued here, and the discrepancy is left
 visible rather than quietly re-based.)
 
-## 2026-09-04 · primary2 — `files` opens at category 1 with a **FAIL**, and the failing term is the INSTRUMENT
+## 2026-09-04 · primary2 — `files` cat1 RE-RUN: a duplicate I should have caught first, and the one number it adds
 
-First rubric cell ever taken on the Files app — the 25th `DESKTOP_WIN_SECTIONS` entry and the
-newest surface in the tree. `cat1-accessibility.cjs --surface Files --win 1 --label files`.
-Baseline `baselines/cat1-files.json`.
+**RETRACTION, in the first line, because it is the point of this entry.** I ran
+`cat1-accessibility.cjs` on `files` and wrote it up as "the first rubric cell ever taken on the
+Files app". **It is not.** The 2026-09-03 entry above (`0fc0e616`, baseline banked at
+`ff866dfd`) had already run it, landed two product repairs off it — the bulk checkbox's UA
+margin and the collapsed rail's 52 → 72 px track — and recorded the same verdict. My run
+reproduced it exactly: **FAIL on `targets32` alone**, 103 controls, 78 measured, the same four
+rows at 26.5 / 31.5 / 31.5 / 31.0. Reproducing a result a day later is worth something, but it
+is not a new cell, and the `--out` path I passed **overwrote the tracked baseline that entry
+cites**. Restored from HEAD; the banked file is `ff866dfd`'s, not mine. The cheap check I
+skipped: `git log -- baselines/cat1-<surface>.json` before pointing `--out` at it.
 
-**Verdict FAIL, one bar: `targets32`.** The other four bars pass — contrast, WCAG 2.5.8
-(`wcag258FailCount 0`), keyboard (`unreachable 0`), motion. Surface: 820x580 window, root
-`.lq-scaffold fa-shell` (it is built on the L2 primitive, as required), 396 elements, **103
-controls, 78 measured**, rail collapsed at a 782px scaffold, grid `72px 374px 320px`.
+**The one thing that is new, and it is a number rather than an adjective.** The earlier entry
+called the four remaining rows "single instances at the scroller's clip edge". That is now
+measured rather than described: of the **32** `.fa-tree-node` in `.lq-scaffold-rail` (a 399 px
+viewport over **1,657 px** of content), **11 are fully visible, exactly 1 is partially clipped
+at 27 px, and 20 are scrolled out**. That single partial node is the 26.5 px the walk scores.
+So the `.fa-tree-node` row is the fold of a scroller — one per scrolling list, in every
+scrolling list in this app — and instrument fact (a) above already accounts for the other three.
 
-**The four controls under the 32px hit floor, and what each one actually is:**
+**Which makes the repair the HARNESS's, and it is not a tail-of-turn change.** A control clipped
+only by a SCROLLABLE ancestor should be scrolled into view and RE-MEASURED, and excluded only if
+it then clears the floor — proven, never asserted. This exception LOOSENS a bar, which is the
+direction that can hide a genuinely unreachable control, so it needs its own control before it
+lands. Until then `files` cat1 stays FAIL, which is the honest state and matches the entry above.
 
-| control | rect | hit | blocker |
-| --- | --- | --- | --- |
-| `button.fa-tree-node` | 48x32 | 48.5x**26.5** | `div.fa-tree` |
-| `button.fa-cell.fa-cell-size` | 31x32 | 31.5x32.5 | `div.fa-row.fa-head` |
-| `div.fa-row` | 364x32 | 52.5x**31.5** | `button.fa-cell.fa-cell-kind` |
-| `input.fa-bulk-check` | 32x32 | 32.5x**31.0** | `div.fa-row` |
+**Three findings raised during this run and WITHDRAWN before publication.** (1) "the Files rail
+overflows the window — 18 of 32 nodes below the frame, no scrollbar" — false; I had compared
+node rects to the WINDOW's bottom instead of the SCROLLER's, and the ancestor walk found the
+scaffold constraining the rail to 401 px via its own `40px 401px 56px` grid. (2) "the 72 px
+collapsed-rail override is not applying, the track is still 52 px" — false; the shell computes
+`--lq-rail-width-collapsed: 72px` and `grid-template-columns: 72px 374px 320px`, and the 52 px
+I read was `.fa-tree`'s own box inside the 72 px track. (3) "the Music widget's empty-state
+Open Music button is dead" — false; two `.click()`s did nothing, but with the `os:open` bus
+instrumented it fired once with `detail: "music"` and opened the window. All three are the same
+mistake in three costumes: reading a child's box, or an unfocused window, as the thing itself.
 
-Three of the four sit at **31.0–31.5** against a floor of 32 — inside the band this repo has
-already written up twice (`hit-walk-step-caps-at-31-5`, and `.lq-hit` giving nothing at exactly
-32, because `max(100%, 32px)` is a floor and not a margin). The recorded lesson on those is
-explicit: the CSS "fix" for one of them cost 24 stolen rows. They are not touched here.
-
-**The fourth was measured, not assumed, and it is the fold of a scroller.** `.lq-scaffold-rail`
-is a real scroller — 399px viewport against 1,657px of content — and of its **32** `.fa-tree-node`
-children, **11 are fully visible, exactly 1 is partially clipped at 27px, and 20 are scrolled
-out**. That single partial node is the 26.5px the walk scored. It is reachable the moment the
-rail scrolls, and every scrolling list in this app has exactly one such row at its fold.
-
-**So the failing term is the harness, and the fix belongs there — but it LOOSENS a bar, which is
-the dangerous direction and is why it is not being done in the tail of a turn.** The correct
-shape: a control clipped only by a SCROLLABLE ancestor must be scrolled into view and
-re-measured, and excluded only if it then clears the floor — proven, never asserted. A blanket
-"ignore clipped controls" exception would hide a genuinely unreachable control, which is the one
-thing this bar exists to catch.
-
-**Two findings raised during this run and WITHDRAWN before publication**, recorded because the
-withdrawals are the useful part: (1) "the rail overflows the window, 18 of 32 nodes below the
-frame" — false; the ancestor walk found `.lq-scaffold-rail` constrained to 401px by the
-scaffold's own `40px 401px 56px` grid and scrolling correctly. Comparing node rects to the
-WINDOW's bottom instead of the SCROLLER's is what produced it. (2) "the 72px collapsed-rail
-override is not applying, the track is still 52px" — false; the shell computes
-`--lq-rail-width-collapsed: 72px` and `grid-template-columns: 72px 374px 320px`. The 52px read
-was `.fa-tree`'s own box inside the 72px track, not the track.
-
-**Running total unchanged: 14 of 25 sections at 80/80.** `files` has **0 of 8** banked — cat1 is
-measured and FAILING, which is a cell taken, not a cell closed. **90 category cells remain.**
+**Running total unchanged: 14 of 25 sections at 80/80.** `files` is **7 of 8 categories UNRUN**
+with cat1 measured and FAILING. **90 category cells remain.**
