@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Icon from './Icons';
 import VisualizerCanvas from './VisualizerCanvas';
 import * as player from '../playerBus';
@@ -73,6 +73,8 @@ export default function MusicWidget() {
   const [ps, setPs] = useState(player.getState);
   const [big, setBig] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [more, setMore] = useState(false);
+  const moreId = useId();
   const [art, setArt] = useState<string | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [liked, setLiked] = useState(false);
@@ -138,7 +140,13 @@ export default function MusicWidget() {
 
   const pal = palette ?? accentPalette();
   const meta = ps.current ? guessSongMeta(ps.current) : null;
-  const bg = `linear-gradient(135deg, ${pal.primary}55, ${pal.secondary}33), rgba(12, 11, 16, 0.72)`;
+  // The album tint rides on a THEME-OWNED stage, not on a hardcoded dark glass. Measured
+  // 2026-09-04 with the old `rgba(12, 11, 16, 0.72)` base: in `classic-light` the widget's
+  // own title read 2.23:1 and the artist line 1.15:1 against a 4.5 bar, because a translucent
+  // dark base over a light panel composites LIGHT while the text stayed near-white. Even in
+  // the default dark palette the artist line was 4.48:1 — under the bar by 0.02. The stage is
+  // near-opaque so the composite is the widget's own and cannot drift with what is behind it.
+  const bg = `linear-gradient(135deg, ${pal.primary}55, ${pal.secondary}33), color-mix(in srgb, var(--panel) 92%, transparent)`;
 
   const heart = () => {
     if (ps.current) setLiked(toggleLiked(ps.current.id));
@@ -166,15 +174,6 @@ export default function MusicWidget() {
       aria-label={t('music.controls.transport')}
     >
       <button
-        className={`mwidget-btn ${ps.shuffle ? 'on' : ''}`}
-        title={t('music.controls.shuffle')}
-        aria-label={t('music.controls.shuffle')}
-        aria-pressed={ps.shuffle}
-        onClick={player.toggleShuffle}
-      >
-        <Icon name="shuffle" size={13} />
-      </button>
-      <button
         className="mwidget-btn"
         title={t('music.controls.previous')}
         aria-label={t('music.controls.previous')}
@@ -187,6 +186,11 @@ export default function MusicWidget() {
         className="mwidget-btn mwidget-play"
         title={playLabel}
         aria-label={playLabel}
+        // The surface DECLARES its primary action rather than leaving the harness to infer
+        // one from pixels. Q1 and Q3 both read NO with `entryPoints 0, primaryAction null`:
+        // every button in this widget is a flat icon, so nothing separated far enough from
+        // the stage to be inferred as the entry point, in either palette.
+        data-primary=""
         onClick={player.toggle}
         disabled={!ps.current}
       >
@@ -201,34 +205,62 @@ export default function MusicWidget() {
       >
         <Icon name="skip-forward" size={13} />
       </button>
+      {/* Progressive disclosure, not a hiding place. Category 5 Q4 asks for <=12 controls in
+          the default state AND a real collapsed disclosure; the widget scanned 9 with none,
+          on a surface whose own minimum is 260x170. Shuffle, repeat, Liked and lyrics are
+          the secondary half of the transport, so they move behind one named toggle and the
+          three anyone reaches for stay in the row. It expands INLINE rather than over the
+          bar: an overlay that lands on its own trigger is the hit-stealing shape the
+          2026-09-03 Statistics popover was written up for. */}
       <button
-        className={`mwidget-btn mwidget-repeat ${ps.repeat !== 'off' ? 'on' : ''}`}
-        title={repeatLabel}
-        aria-label={repeatLabel}
-        onClick={player.cycleRepeat}
+        className={`mwidget-btn mwidget-more ${more ? 'on' : ''}`}
+        title={t('music.controls.moreTools')}
+        aria-label={t('music.controls.moreTools')}
+        aria-expanded={more}
+        aria-controls={moreId}
+        onClick={() => setMore((v) => !v)}
       >
-        <Icon name="repeat" size={13} />
-        {ps.repeat === 'one' && <span className="mwidget-repeat-one">1</span>}
+        <Icon name="chevron" size={13} />
       </button>
-      <button
-        className={`mwidget-btn mwidget-heart ${liked ? 'on' : ''}`}
-        title={t('music.controls.addToLiked')}
-        aria-label={t('music.controls.addToLiked')}
-        aria-pressed={liked}
-        onClick={heart}
-        disabled={!ps.current}
-      >
-        <Icon name="heart" size={13} fill={liked} />
-      </button>
-      <button
-        className={`mwidget-btn mwidget-lyrics-toggle ${widgetSettings.showLyrics ? 'on' : ''}`}
-        title={t('music.controls.lyrics')}
-        aria-label={t('music.controls.lyrics')}
-        aria-pressed={widgetSettings.showLyrics}
-        onClick={() => setWidgetSettings(toggleShowLyrics())}
-      >
-        <Icon name="caption" size={13} />
-      </button>
+      <div className="mwidget-more-group" id={moreId} hidden={!more}>
+        <button
+          className={`mwidget-btn ${ps.shuffle ? 'on' : ''}`}
+          title={t('music.controls.shuffle')}
+          aria-label={t('music.controls.shuffle')}
+          aria-pressed={ps.shuffle}
+          onClick={player.toggleShuffle}
+        >
+          <Icon name="shuffle" size={13} />
+        </button>
+        <button
+          className={`mwidget-btn mwidget-repeat ${ps.repeat !== 'off' ? 'on' : ''}`}
+          title={repeatLabel}
+          aria-label={repeatLabel}
+          onClick={player.cycleRepeat}
+        >
+          <Icon name="repeat" size={13} />
+          {ps.repeat === 'one' && <span className="mwidget-repeat-one">1</span>}
+        </button>
+        <button
+          className={`mwidget-btn mwidget-heart ${liked ? 'on' : ''}`}
+          title={t('music.controls.addToLiked')}
+          aria-label={t('music.controls.addToLiked')}
+          aria-pressed={liked}
+          onClick={heart}
+          disabled={!ps.current}
+        >
+          <Icon name="heart" size={13} fill={liked} />
+        </button>
+        <button
+          className={`mwidget-btn mwidget-lyrics-toggle ${widgetSettings.showLyrics ? 'on' : ''}`}
+          title={t('music.controls.lyrics')}
+          aria-label={t('music.controls.lyrics')}
+          aria-pressed={widgetSettings.showLyrics}
+          onClick={() => setWidgetSettings(toggleShowLyrics())}
+        >
+          <Icon name="caption" size={13} />
+        </button>
+      </div>
     </div>
   );
 

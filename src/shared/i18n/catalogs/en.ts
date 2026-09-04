@@ -5278,6 +5278,7 @@ export const en: Catalog = {
   'music.controls.pause': 'Pause',
   'music.controls.lyrics': 'Lyrics',
   'music.controls.transport': 'Playback controls',
+  'music.controls.moreTools': 'More controls',
   'music.widget.empty': 'Nothing playing',
   'music.controls.openWidget': 'Open the mini-player widget',
 

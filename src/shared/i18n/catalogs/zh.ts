@@ -5248,6 +5248,7 @@ export const zh: Catalog = {
   'music.controls.pause': '暂停',
   'music.controls.lyrics': '歌词',
   'music.controls.transport': '播放控制',
+  'music.controls.moreTools': '更多控件',
   'music.widget.empty': '当前没有播放',
   'music.controls.openWidget': '打开迷你播放器小组件',
 

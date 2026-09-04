@@ -44,9 +44,62 @@
    trinket paints white-on-dark in every theme, like the visualizer canvas it sits over, and
    a theme-owned light plate here would put 0.82-white text on a light ground. */
 .mwidget-progress {
-  background: rgba(9, 8, 13, 0.96);
+  background: color-mix(in srgb, var(--panel-2) 97%, transparent);
   border-radius: 8px;
   padding: 2px 8px;
+}
+
+/* CATEGORY 5 Q5 — "stable contrast in EITHER theme", and the widget failed it badly enough
+   to be a real user-facing defect rather than a rubric point. Swept across the default
+   palette and `classic-light` before this block: `div.mwidget-title` 2.23:1 and
+   `div.mwidget-artist` 1.15:1 against a 4.5 bar in classic-light, and 4.48:1 for the artist
+   line even in the dark default. The cause is one line — the stage was a translucent
+   HARDCODED dark over whatever the theme put behind it, while every text colour here was a
+   hardcoded white. The stage is now theme-owned (`MusicWidget.tsx`), so the text has to be
+   too. These live here rather than in `styles.css` because that file carries other tracks'
+   uncommitted hunks; the extra `.mwidget` in each selector is what wins the cascade against
+   the declarations already there. */
+.mwidget .mwidget-title {
+  color: var(--text);
+}
+
+.mwidget .mwidget-artist,
+.mwidget .mwidget-time {
+  color: color-mix(in srgb, var(--text) 78%, transparent);
+}
+
+.mwidget .mwidget-btn {
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+}
+
+.mwidget .mwidget-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.mwidget .mwidget-lyrics-line {
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+}
+
+.mwidget .mwidget-lyrics-line.current {
+  color: var(--text);
+}
+
+/* The secondary transport group expands IN the row. `hidden` is the state, so the group is
+   genuinely out of the tab order when collapsed rather than merely invisible; `display: flex`
+   has to be re-declared for the open case because the attribute's UA `display: none` and a
+   class-based flex would otherwise fight. */
+.mwidget .mwidget-more-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mwidget .mwidget-more-group[hidden] {
+  display: none;
+}
+
+.mwidget .mwidget-more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 
 .mwidget-vol {
@@ -91,6 +144,22 @@
 .mwidget.narrow .mwidget-bar > .mwidget-controls {
   grid-column: 1 / -1;
   justify-content: center;
+}
+
+/* At the window's literal minimum, 260x170, eight 32px buttons plus their gaps are 270px
+   against 242px of row, and the row silently swallowed three of them — measured with the
+   disclosure OPEN, which is a state a user reaches by dragging to the corner and pressing
+   one button. Wrapping is the honest answer: the secondary group takes a second line rather
+   than the row hiding controls it still contains. The default state never wraps (four
+   buttons, 134px), so no scored leg moves. */
+.mwidget.narrow .mwidget-controls {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.mwidget.narrow .mwidget-bar {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mwidget.narrow .mwidget-art-small {

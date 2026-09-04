@@ -1531,8 +1531,29 @@
             const buttons = bar ? qa(bar, 'button') : [];
             return { ok: !!bar && bar.getAttribute('role') === 'toolbar'
                 && !!(bar.getAttribute('aria-label') || '').trim()
-                && buttons.length >= 7 && named.length === buttons.length,
+                && buttons.length >= 8 && named.length === buttons.length,
               ev: `toolbar=${!!bar} role=${bar && bar.getAttribute('role')} named="${bar && bar.getAttribute('aria-label')}" buttons=${buttons.length} withName=${named.length}` };
+          },
+        },
+        {
+          /**
+           * The four secondary transport toggles sit behind a disclosure (category 5 Q4), so
+           * "reachable" has to be asserted rather than assumed: the toggle must declare a
+           * real `aria-expanded` boolean, must point at a region that exists, and that region
+           * must still HOLD its four controls while collapsed. A disclosure whose contents are
+           * unmounted when shut is a feature that is gone, not tucked.
+           */
+          id: 'secondaryDisclosure',
+          f: (w) => {
+            const tog = q(w, '.mwidget-more');
+            const expanded = tog && tog.getAttribute('aria-expanded');
+            const id = tog && tog.getAttribute('aria-controls');
+            const region = id ? w.querySelector(`[id="${id}"]`) : null;
+            const held = region ? qa(region, 'button').length : 0;
+            return { ok: !!tog && (expanded === 'true' || expanded === 'false')
+                && !!(tog.getAttribute('aria-label') || '').trim()
+                && !!region && held >= 4,
+              ev: `toggle=${!!tog} ariaExpanded=${expanded} label="${tog ? tog.getAttribute('aria-label') : ''}" region=${!!region} controlsHeld=${held}` };
           },
         },
         {
@@ -1573,6 +1594,7 @@
       ],
       mutations: {
         transportToolbar: (w) => stripAttr(q(w, '.mwidget-controls'), 'role', 'no transport toolbar'),
+        secondaryDisclosure: (w) => stripAttr(q(w, '.mwidget-more'), 'aria-expanded', 'no secondary disclosure'),
         seekControl: (w) => stripAttr(q(w, '.mwidget-progress input[type="range"]'), 'aria-label', 'no seek slider'),
         volumeControl: (w) => stripAttr(q(w, '.mwidget-vol input[type="range"]'), 'aria-label', 'no volume slider'),
         // The now-playing identity has two shapes, so the mutation has to attack whichever
