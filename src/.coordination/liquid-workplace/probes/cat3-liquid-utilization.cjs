@@ -444,8 +444,17 @@ async function restoreAllGlass(before) {
  *
  * The style is scoped to the own body by ATTRIBUTE rather than by selector, for the reason
  * CORRECTION 33 records: `.fwin-body` on a shell root matches a nested window's body.
+ *
+ * CORRECTION 36, 2026-09-04 (primary), measured on `scraper`: the own-body chain is NOT the
+ * only ground. Marking it alone left `marked: 1` and moved the count by ZERO, because the
+ * Scraper grounds its own interior — `div.scr-shell`, `section.scr-card` and `div.lq-anchor`
+ * each paint opaque, so two Work regions with `ownAlpha: 0` survived on BORROWED ground the
+ * control had never touched, and the leg VOIDed a surface with no defect. E now marks every
+ * ancestor of every Work region up to the window, the window and the regions themselves still
+ * excluded. That is strictly MORE falsifying, which is the only safe direction for a control
+ * to be corrected in: it can no longer pass by failing to reach the ground it is attacking.
  */
-async function injectUnground() {
+async function injectUnground(workPaths) {
   return JSON.parse(await ev(`(function(){
     var root = ${ROOT_EXPR};
     if (!root) return JSON.stringify({ refuse: 'surface disappeared before control E' });
@@ -455,11 +464,26 @@ async function injectUnground() {
     var body = (${OWN_BODY_EXPR})(root);
     if (!body) return JSON.stringify({ refuse: 'surface exposes no own body to unground' });
     var marked = [];
+    var seen = [];
+    var add = function(n){ if (n && seen.indexOf(n) < 0) { seen.push(n); marked.push(n); } };
     var node = body;
     // Every painting ancestor BETWEEN the regions and the window, the window excluded: the
     // window's own material is the product's and is what a real ungrounded region falls
     // through to.
-    while (node && node !== root) { marked.push(node); node = node.parentElement; }
+    while (node && node !== root) { add(node); node = node.parentElement; }
+    // And every ancestor of every Work region, for the same reason and with the same two
+    // exclusions. A region's OWN background is never touched, so a region that survives here
+    // survives on its own paint — which is exactly what the runner then asserts.
+    var resolve = (${RESOLVE_PATH});
+    var paths = ${JSON.stringify(workPaths || [])};
+    var unresolved = 0;
+    for (var i = 0; i < paths.length; i += 1) {
+      var region = resolve(root, paths[i]);
+      if (!region) { unresolved += 1; continue; }
+      var up = region.parentElement;
+      while (up && up !== root) { add(up); up = up.parentElement; }
+    }
+    if (unresolved > 0) return JSON.stringify({ refuse: unresolved + ' Work path(s) no longer resolve before control E' });
     if (marked.length === 0) return JSON.stringify({ refuse: 'own body is the surface root; nothing to unground' });
     var before = document.querySelectorAll('[data-lq-cat3-control-unground]').length;
     if (before > 0) return JSON.stringify({ refuse: 'a prior unground attribute is still on the tree' });
@@ -662,7 +686,10 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
         const dirtyAll = await read();
         const allRestored = await restoreAllGlass(all.before);
 
-        const ung = await injectUnground();
+        const workPaths = base.detail
+          .filter((row) => row.role === 'Work' && Array.isArray(row.path))
+          .map((row) => row.path);
+        const ung = await injectUnground(workPaths);
         if (ung.refuse) throw new Error(ung.refuse);
         const dirtyUnground = await read();
         const ungRestored = await restoreUnground();

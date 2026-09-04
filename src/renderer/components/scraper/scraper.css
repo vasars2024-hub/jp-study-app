@@ -5238,6 +5238,22 @@
     justify-content: center;
   }
 
+  /* Same 52px rail, same reason as the drawer tier above, and measured here too:
+     at 260x170 `nav.scr-rail` reported scrollWidth 70 in a 51px client box under
+     `overflow: hidden`, which is the "Idle"/"Running" run and nothing else. Kept
+     for a reader rather than removed — `.sr-only` in `theme/a11y.css`. */
+  .scr-rail .scr-rail-state-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
   .scr-search {
     flex-basis: 140px;
   }
@@ -5424,6 +5440,46 @@
   /* A range beside its number field and unit has a 167px min-content. */
   .scr-field-control {
     flex-wrap: wrap;
+  }
+
+  /* The tier above reflowed the SHELL and stopped at `.scr-main`, so the pane
+     itself still scrolled sideways: measured 2026-09-04 at the window's own
+     260x170 minimum, `main.scr-main` wanted 366px in 150. Bisected by hiding one
+     `.scr-page` child at a time, the floor came from a chain of intrinsic minimums
+     rather than one rule — `.scr-grid`'s 300px track, `.scr-dashboard-quick`'s
+     `repeat(3, minmax(110px, 1fr))`, `.scr-tile-row`'s 150px tiles, a 337px
+     `.scr-health-row`, and `.scr-card-body` floored at its widest empty state.
+     Each grid item's automatic minimum is its min-content, so the floors add up
+     through every level and only a definite column at each one stops them.
+     Nothing is hidden here: 366 -> 150 with `clipped` still 0. */
+  .scr-page,
+  .scr-dashboard-quick,
+  .scr-tile-row,
+  .scr-card-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scr-page > *,
+  .scr-grid > *,
+  .scr-card > *,
+  .scr-card-body > *,
+  .scr-health-main {
+    min-width: 0;
+  }
+
+  .scr-health-row {
+    flex-wrap: wrap;
+  }
+
+  /* 24px of padding each side leaves 68px of the 116px box for the hero copy. */
+  .scr-dashboard-hero-copy {
+    padding: var(--space-md);
+  }
+
+  /* At 118px of text column an unbreakable token is wider than its line, and a
+     dashboard is full of ids, hosts and profile names. */
+  .scr-main {
+    overflow-wrap: anywhere;
   }
 }
 

@@ -209,6 +209,33 @@ describe('Scraper narrow tier — reflow without losing a route', () => {
     ).toBe(true);
   });
 
+  /**
+   * The 460px tier reflowed the shell and stopped at `.scr-main`. Measured live at
+   * 260x170 — the window's own MIN_W/MIN_H — the pane still wanted 366px in 150,
+   * from a chain of intrinsic minimums rather than one rule. What is pinned is the
+   * definite column at each level that stops them propagating.
+   */
+  it('gives the narrowest tier a definite column at every level that floored the pane', () => {
+    const narrow = tierBody(cssSource(), 460);
+    expect(narrow, 'the narrowest tier exists').not.toBe('');
+    for (const sel of ['.scr-page', '.scr-dashboard-quick', '.scr-tile-row', '.scr-card-body']) {
+      expect(narrow.includes(`${sel},\n`) || narrow.includes(`${sel} {`), `${sel} is sized`).toBe(
+        true,
+      );
+    }
+    expect(
+      /\.scr-page,\s*\n\s*\.scr-dashboard-quick,\s*\n\s*\.scr-tile-row,\s*\n\s*\.scr-card-body \{[^}]*grid-template-columns: minmax\(0, 1fr\);/s.test(
+        narrow,
+      ),
+      'the four floored grids take a definite column',
+    ).toBe(true);
+    expect(narrow, 'grid items stop carrying their min-content up').toContain('min-width: 0;');
+    // Both 52px rails clip the status run; the 700px tier is the other one.
+    expect(tierBody(cssSource(), 700), 'the 700px rail clips its status run').toContain(
+      '.scr-rail .scr-rail-state-text',
+    );
+  });
+
   it('gives the status text a hook a container query can reach', () => {
     const nav = readFileSync(
       join(__dirname, '..', 'components', 'scraper', 'ScraperNav.tsx'),
