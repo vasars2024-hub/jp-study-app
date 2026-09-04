@@ -1,0 +1,279 @@
+/*
+ * Reading Lists §6 — the grid and the detail.
+ *
+ * L2's Work tokens, not Liquid glass. The transformation plan keeps reading,
+ * editing and tables on stable opaque anchors, and a list of books with editable
+ * state chips is exactly that: the user is deciding things here, not passing
+ * through. Liquid treatment is reserved for the notice strip, which is temporary
+ * and contextual and disappears again.
+ */
+
+.rlv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-3, 12px);
+  padding: var(--lq-space-4, 16px);
+  min-height: 0;
+  overflow: auto;
+}
+
+.rlv__head {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.rlv__spacer {
+  flex: 1 1 auto;
+}
+
+.rlv__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.rlv__count {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.rlv__lede {
+  margin: 0;
+  opacity: 0.7;
+  max-width: 62ch;
+}
+
+.rlv__state {
+  padding: var(--lq-space-4, 16px);
+  opacity: 0.75;
+}
+
+.rlv__state--error {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  opacity: 1;
+}
+
+.rlv__notice {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border-radius: var(--lq-radius-2, 10px);
+  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
+  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__notice--error {
+  border-color: var(--danger, #d9534f);
+}
+
+.rlv__new,
+.rlv__paste-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.rlv__new-field,
+.rlv__paste-field {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--lq-radius-2, 10px);
+  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.18));
+  background: var(--lq-surface-1, rgba(0, 0, 0, 0.18));
+  color: inherit;
+  font: inherit;
+}
+
+.rlv__paste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlv__paste-field {
+  resize: vertical;
+  width: 100%;
+}
+
+.rlv__paste-label {
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- the grid -- */
+
+.rlv__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--lq-space-3, 12px);
+}
+
+.rlv__card {
+  min-width: 0;
+}
+
+.rlv__card[data-archived='true'] {
+  opacity: 0.6;
+}
+
+.rlv__card-open {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  /* A card is one hit target, and it is a large one: §11.4's traversal walks
+     cards, not the four things inside a card. */
+  min-height: 44px;
+  padding: var(--lq-space-3, 12px);
+  text-align: left;
+  border-radius: var(--lq-radius-3, 14px);
+  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
+  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rlv__card-open:hover {
+  background: var(--lq-surface-3, rgba(255, 255, 255, 0.09));
+}
+
+.rlv__mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--lq-radius-2, 10px);
+  overflow: hidden;
+}
+
+/* One cover fills the frame; two to four tile it. The single-tile case is the
+   common one for a freshly pasted list, and a lone tile in a 2x2 grid reads as
+   three missing covers rather than as one book. */
+.rlv__mosaic-tile:only-child {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.rlv__mosaic-tile {
+  background-size: cover;
+  background-position: center;
+  min-height: 24px;
+}
+
+.rlv__card-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rlv__card-progress,
+.rlv__card-triage,
+.rlv__card-archived {
+  font-size: 0.85em;
+  opacity: 0.78;
+  font-variant-numeric: tabular-nums;
+}
+
+.rlv__bar {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--lq-surface-3, rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+}
+
+.rlv__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--lq-accent, #6ea8fe);
+}
+
+/* -------------------------------------------------------------- the detail -- */
+
+.rlv__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rlv__row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  padding: 4px;
+  border-radius: var(--lq-radius-2, 10px);
+  border: 1px solid transparent;
+}
+
+.rlv__row:hover {
+  border-color: var(--lq-border-weak, rgba(255, 255, 255, 0.14));
+  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+}
+
+.rlv__row[data-state='finished'] .rlv__row-title,
+.rlv__row[data-state='abandoned'] .rlv__row-title,
+.rlv__row[data-state='skipped'] .rlv__row-title {
+  opacity: 0.7;
+}
+
+.rlv__row-open {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lq-space-2, 8px);
+  min-width: 0;
+  min-height: 34px;
+  padding: 4px 8px;
+  text-align: left;
+  border: 0;
+  border-radius: var(--lq-radius-2, 10px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rlv__row-title {
+  overflow-wrap: anywhere;
+}
+
+.rlv__row-where {
+  margin-left: auto;
+  font-size: 0.85em;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.rlv__row-state {
+  min-height: 32px;
+}
+
+.rlv__row-triage {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 0.9em;
+  border-radius: var(--lq-radius-2, 10px);
+  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rlv__card-open,
+  .rlv__row-open {
+    transition: none;
+  }
+}
