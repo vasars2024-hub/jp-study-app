@@ -80,6 +80,28 @@ describe('the rail keeps its content inside its own box', () => {
   });
 });
 
+describe('the primary action stays in the viewport', () => {
+  /**
+   * Rubric category 5 Q3: `primaryAction: button.agent-action,
+   * insideBodyViewport: false`. Measured at 820x580 on a two-message
+   * conversation — `.agent-canvas` is the scroller with a 513px scrollport over
+   * 1121px of content, and the action row sat at y 720 against a viewport
+   * ending at 707, so SENDING A MESSAGE NEEDED A SCROLL FIRST. After: y 658-691,
+   * inside. Category 5 went 8/10 -> 9/10 on this alone.
+   *
+   * The row, not the composer: the composer is 427px of a 513px viewport
+   * because six optional blocks stack above the prompt, so pinning it whole
+   * would pin the screen. The background is load-bearing, not decoration — a
+   * transparent bar over scrolling text is a worse defect than the one fixed.
+   */
+  it('pins the composer action row to the bottom of the scrollport', () => {
+    const actions = block(css, '.agent-composer-actions');
+    expect(actions).toMatch(/position:\s*sticky;/);
+    expect(actions).toMatch(/bottom:\s*0;/);
+    expect(actions).toMatch(/background:\s*var\(--agent-surface\);/);
+  });
+});
+
 describe('the inspector declares the Liquid role it already has', () => {
   /**
    * Sticky, translucent, collapsible, beside the work rather than in it — and

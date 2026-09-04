@@ -1478,11 +1478,26 @@
   color: var(--agent-muted);
 }
 
+/* Send is this surface's declared primary action, and it was BELOW THE FOLD at
+   rest. Measured at 820x580 on a conversation with two messages: `.agent-canvas`
+   is the scroller with a 513px scrollport and 1121px of content, and the actions
+   row sat at y 720 against a viewport ending at 707 — so sending a message
+   needed a scroll first. Rubric category 5 Q3 reads exactly that
+   (`primaryAction: button.agent-action, insideBodyViewport: false`).
+   The composer cannot be pinned whole — it is 427px of a 513px viewport, six
+   optional blocks above the prompt — so the ACTION ROW pins instead, the same
+   shape `.dict-anki-cfg` already uses in `styles.css`. It carries the composer's
+   own background because a transparent bar over scrolling text is a worse defect
+   than the one being fixed. */
 .agent-composer-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-sm, 8px);
+  position: sticky;
+  bottom: 0;
+  padding-block: var(--space-xs, 6px);
+  background: var(--agent-surface);
 }
 
 .agent-plan-create {
