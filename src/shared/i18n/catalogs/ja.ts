@@ -11429,6 +11429,10 @@ export const ja: Catalog = {
   'readingLists.view.bulk.count': {
     other: '{count} 件を選択中',
   },
+  'readingLists.membership.count': {
+    other: '{count} 件のリストに登録',
+  },
+  'readingLists.membership.openHint': '「{name}」をこの本の位置で開く',
   'readingLists.view.bulk.finish': '読了にする',
   'readingLists.view.bulk.remove': '削除',
   'readingLists.view.bulk.clear': '解除',

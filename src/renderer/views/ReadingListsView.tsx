@@ -244,6 +244,12 @@ interface ReadingRowProps {
   /** The cover to draw, already resolved to a URL or a fallback data image. */
   coverImage: string;
   selected: boolean;
+  /**
+   * §11.1 row 8's arrival mark. A primitive, so the memo still holds for the
+   * 499 rows that did not move, and separate from `selected` because arriving
+   * at a row is not the same as ticking it for a bulk action.
+   */
+  focused: boolean;
   actions: ReadingRowActions;
   t: ReturnType<typeof useT>['t'];
   /**
@@ -300,6 +306,7 @@ const ReadingRow = memo(function ReadingRow({
   author,
   coverImage,
   selected,
+  focused,
   actions,
   t,
 }: ReadingRowProps) {
@@ -308,6 +315,15 @@ const ReadingRow = memo(function ReadingRow({
     <li
       className="rlv__row"
       data-state={state}
+      /*
+        §11.1 row 8's scroll target. An attribute rather than a ref map: the
+        rows are `memo`'d and a ref callback per row would take a new identity
+        on every render of the parent, which re-runs 500 detach/attach pairs
+        for a one-row change — the exact cost `ReadingRowProps` was flattened
+        to avoid.
+      */
+      data-entry-id={entryId}
+      data-focused={focused ? 'true' : undefined}
       /*
         §11.4's drag and drop. The dragged id is held in the VIEW, not in
         `dataTransfer`: jsdom implements no `DataTransfer`, so a payload put
@@ -489,6 +505,14 @@ export interface ReadingListsViewProps {
   onShowInLibrary?: (item: LibraryItem) => void;
   /** Deep link. When the list is gone the view falls back to the grid. */
   initialListId?: string | null;
+  /**
+   * §11.1 row 8: the entry the deep link scrolls to and selects.
+   *
+   * Only meaningful with `initialListId`. An entry that is not on the open list
+   * is ignored in silence rather than falling back to the top — a scroll that
+   * lands somewhere arbitrary is worse than not scrolling.
+   */
+  initialEntryId?: string | null;
 }
 
 export default function ReadingListsView({
@@ -496,6 +520,7 @@ export default function ReadingListsView({
   onFindWork,
   onShowInLibrary,
   initialListId = null,
+  initialEntryId = null,
 }: ReadingListsViewProps) {
   const { t, lang } = useT();
   // One subscription, shared with §11.2's widgets: four copies of a load effect
@@ -594,6 +619,50 @@ export default function ReadingListsView({
     () => (query ? rows.filter((row) => row.title.toLowerCase().includes(query)) : rows),
     [query, rows],
   );
+
+  /**
+   * §11.1 row 8's arrival. `focusEntryId` outlives the scroll so the row stays
+   * marked — landing on a 200-row list with nothing highlighted is the same as
+   * not having scrolled.
+   *
+   * NOT folded into `selected`: that set is what the bulk actions send, so
+   * ticking a row on arrival would arm "Remove" against a book the user only
+   * asked to see.
+   */
+  const [focusEntryId, setFocusEntryId] = useState<string | null>(initialEntryId);
+  const rowsRef = useRef<HTMLUListElement | null>(null);
+  const focusAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    focusAppliedRef.current = null;
+    setFocusEntryId(initialEntryId);
+  }, [initialEntryId]);
+
+  useEffect(() => {
+    if (!focusEntryId || focusAppliedRef.current === focusEntryId) return;
+    // The entry must be on the OPEN list. A stale route names a row that is not
+    // here, and scrolling to the top instead would claim to have found it.
+    if (!rows.some((row) => row.entry.id === focusEntryId)) return;
+    // The same trap §11.1 row 4's reveal hit: a filter left over from earlier
+    // hides the row the route named, so the scroll finds no node and the deep
+    // link reads as broken. Clear it and let the next render carry the scroll.
+    if (!visibleRows.some((row) => row.entry.id === focusEntryId)) {
+      setFilter('');
+      return;
+    }
+    const node = Array.from(rowsRef.current?.children ?? []).find(
+      (child) => child.getAttribute('data-entry-id') === focusEntryId,
+    );
+    if (!node) return;
+    focusAppliedRef.current = focusEntryId;
+    // jsdom implements no `scrollIntoView`; without the guard every test that
+    // deep-links a row throws instead of asserting the landing.
+    if (typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ block: 'center' });
+    }
+    // Move the keyboard to where the eye went. Arriving with focus still on the
+    // body means the next Tab starts at the top of the page, not at the row.
+    node.querySelector('button')?.focus();
+  }, [focusEntryId, rows, visibleRows]);
 
   /**
    * §11.4's bulk selection, derived rather than stored, so it can never name a
@@ -2129,6 +2198,7 @@ export default function ReadingListsView({
               <p className="rlv__hint">{t('readingLists.view.rowReorder')}</p>
             ) : null}
             <ul
+              ref={rowsRef}
               className="rlv__rows"
               aria-label={t('readingLists.view.rowsLabel', { name: list.name })}
             >
@@ -2151,6 +2221,7 @@ export default function ReadingListsView({
                     row.title,
                   )}
                   selected={selected.has(row.entry.id)}
+                  focused={focusEntryId === row.entry.id}
                   actions={rowActions}
                   t={t}
                   lang={lang}

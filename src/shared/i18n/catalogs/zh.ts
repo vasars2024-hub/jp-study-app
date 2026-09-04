@@ -11308,6 +11308,10 @@ export const zh: Catalog = {
   'readingLists.view.bulk.count': {
     other: '已选 {count} 项',
   },
+  'readingLists.membership.count': {
+    other: '在 {count} 个列表中',
+  },
+  'readingLists.membership.openHint': '在此书的位置打开“{name}”',
   'readingLists.view.bulk.finish': '标记为已读完',
   'readingLists.view.bulk.remove': '移除',
   'readingLists.view.bulk.clear': '取消选择',

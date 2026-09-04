@@ -11947,6 +11947,11 @@ export const en: Catalog = {
     one: '{count} selected',
     other: '{count} selected',
   },
+  'readingLists.membership.count': {
+    one: 'On {count} list',
+    other: 'On {count} lists',
+  },
+  'readingLists.membership.openHint': 'Open “{name}” at this book',
   'readingLists.view.bulk.finish': 'Mark finished',
   'readingLists.view.bulk.remove': 'Remove',
   'readingLists.view.bulk.clear': 'Clear',

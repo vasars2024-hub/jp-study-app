@@ -1,0 +1,45 @@
+/*
+  §11.1 row 8's reader strip. One line, low contrast against the page, because
+  it is a cross-reference beside a book and not a control the reader competes
+  with. Every token here is declared in theme/liquid-tokens.css.
+*/
+
+.rlm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlm__lists {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-1, 4px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+  `min-height` rather than padding alone: the hit-target floor is measured on
+  the rendered box, and a text button in a 12px strip lands at ~16px without it.
+  32px is the floor every other control on these surfaces is held to.
+*/
+.rlm__link {
+  min-height: 32px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rlm__link:hover {
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+  border-color: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.24));
+}

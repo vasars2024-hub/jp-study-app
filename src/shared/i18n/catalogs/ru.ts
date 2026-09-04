@@ -12398,6 +12398,13 @@ export const ru: Catalog = {
     many: 'Выбрано {count}',
     other: 'Выбрано {count}',
   },
+  'readingLists.membership.count': {
+    one: 'В {count} списке',
+    few: 'В {count} списках',
+    many: 'В {count} списках',
+    other: 'В {count} списках',
+  },
+  'readingLists.membership.openHint': 'Открыть «{name}» на этой книге',
   'readingLists.view.bulk.finish': 'Отметить прочитанным',
   'readingLists.view.bulk.remove': 'Убрать',
   'readingLists.view.bulk.clear': 'Снять выбор',

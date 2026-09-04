@@ -506,6 +506,21 @@
   background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
 }
 
+/*
+  §11.1 row 8's arrival mark. The row a deep link scrolled to stays marked until
+  the user leaves the list: an unmarked landing on a 200-row list is the same as
+  not having scrolled, because nothing says which row was meant.
+
+  Border and background only, and it deliberately outranks `:hover` by coming
+  after it — the pointer is very often already resting over the row the scroll
+  just brought under it, and the hover treatment would otherwise be the only
+  thing visible.
+*/
+.rlv__row[data-focused='true'] {
+  border-color: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.24));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+}
+
 .rlv__row[data-state='finished'] .rlv__row-title,
 .rlv__row[data-state='abandoned'] .rlv__row-title,
 .rlv__row[data-state='skipped'] .rlv__row-title {

@@ -137,11 +137,12 @@ function installBridge(
   };
 }
 
-async function render(initialListId: string | null = null) {
+async function render(initialListId: string | null = null, initialEntryId: string | null = null) {
   await act(async () => {
     root.render(
       <ReadingListsView
         initialListId={initialListId}
+        initialEntryId={initialEntryId}
         onOpenBook={(item) => opened.push(item)}
         onFindWork={(title) => sought.push(title)}
       />,
@@ -1913,5 +1914,133 @@ describe('ReadingListsView — §11.1 click-through', () => {
         (line) => (line as HTMLElement).dataset.produced,
       ),
     ).toEqual(['true']);
+  });
+});
+
+describe('ReadingListsView — §11.1 row 8, landing on one entry', () => {
+  /** jsdom implements no `scrollIntoView`; this is both the stub and the probe. */
+  let scrolled: Element[];
+  let restoreScroll: (() => void) | null = null;
+
+  beforeEach(() => {
+    scrolled = [];
+    const proto = window.Element.prototype as unknown as Record<string, unknown>;
+    const had = Object.prototype.hasOwnProperty.call(proto, 'scrollIntoView');
+    const previous = proto.scrollIntoView;
+    proto.scrollIntoView = function stub(this: Element) {
+      scrolled.push(this);
+    };
+    restoreScroll = () => {
+      if (had) proto.scrollIntoView = previous;
+      else delete proto.scrollIntoView;
+    };
+  });
+
+  afterEach(() => {
+    restoreScroll?.();
+    restoreScroll = null;
+  });
+
+  function entryIds(document: ReadingListsDocument, listId: string): string[] {
+    const list = document.lists.find((candidate) => candidate.id === listId);
+    if (!list) throw new Error('the seeded list is missing');
+    return list.entries.map((entry) => entry.id);
+  }
+
+  it('scrolls to the named entry, marks it, and puts the keyboard on it', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    const [first, second] = entryIds(document, listId);
+    await render(listId, second);
+
+    const marked = rows().filter((row) => row.dataset.focused === 'true');
+    expect(marked).toHaveLength(1);
+    expect(marked[0].dataset.entryId).toBe(second);
+    // The scroll was actually requested, on that row and not on the list.
+    expect(scrolled).toEqual([marked[0]]);
+    // Arriving with focus on the body means the next Tab starts at the top of
+    // the page rather than at the row the user asked for.
+    expect(marked[0].contains(window.document.activeElement)).toBe(true);
+
+    // The control: the OTHER row is present and untouched, so the mark above is
+    // a choice between two rows and not the only row there was.
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0].dataset.entryId).toBe(first);
+    expect(rows()[0].dataset.focused).toBeUndefined();
+  });
+
+  it('clears a filter that would hide the entry it was sent to', async () => {
+    // The trap §11.1 row 4's reveal hit as well: `resolveSelection` and every
+    // row lookup run over the FILTERED rows, so a filter left over from earlier
+    // hides the row the route named and the deep link silently does nothing.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    const [, second] = entryIds(document, listId);
+    await render(listId);
+
+    await typeInto(filterField(), 'kino');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].dataset.entryId).not.toBe(second);
+
+    // Now arrive at the hidden entry, exactly as the reader strip does.
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          initialEntryId={second}
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(filterField()?.value).toBe('');
+    expect(rows()).toHaveLength(2);
+    const marked = rows().filter((row) => row.dataset.focused === 'true');
+    expect(marked.map((row) => row.dataset.entryId)).toEqual([second]);
+    expect(scrolled).toEqual([marked[0]]);
+  });
+
+  it('marks nothing for an entry that is not on this list, and keeps the filter', async () => {
+    // A stale route names a row that is not here. Landing on the top instead
+    // would claim to have found it.
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId, 'entry-from-another-list');
+
+    expect(rows()).toHaveLength(2);
+    expect(rows().some((row) => row.dataset.focused === 'true')).toBe(false);
+    expect(scrolled).toEqual([]);
+
+    // The half that only a filter can show. Without the membership guard the
+    // effect falls through to the "hidden by the filter" branch and CLEARS the
+    // user's filter — for a row that was never here. Nothing is marked either
+    // way, so the mark alone cannot tell the two apart, and a mutation control
+    // deleting the guard read GREEN until this was added.
+    await typeInto(filterField(), 'kino');
+    expect(rows()).toHaveLength(1);
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          initialEntryId="another-stale-entry"
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(filterField()?.value).toBe('kino');
+    expect(rows()).toHaveLength(1);
+    expect(scrolled).toEqual([]);
   });
 });

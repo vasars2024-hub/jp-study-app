@@ -76,6 +76,14 @@ export default function ReadingWorkspaceView({
   /** The list a deep link named, so a widget header lands on that list's detail. */
   const [routedListId, setRoutedListId] = useState<string | null>(null);
   /**
+   * §11.1 row 8's scroll target, kept beside `routedListId` and reset with it.
+   *
+   * Cleared whenever a route names a list WITHOUT an entry, so a second deep
+   * link to the same list plainly lands on the top rather than silently
+   * re-scrolling to the row the previous one asked for.
+   */
+  const [routedEntryId, setRoutedEntryId] = useState<string | null>(null);
+  /**
    * §11.1's *"an entry's cover → the library item detail"*.
    *
    * An OBJECT rather than a bare id, so asking for the same book twice — cover,
@@ -92,7 +100,10 @@ export default function ReadingWorkspaceView({
     const generation = routeGenerationRef.current + 1;
     routeGenerationRef.current = generation;
     setSection(route.section);
-    if (route.listId) setRoutedListId(route.listId);
+    if (route.listId) {
+      setRoutedListId(route.listId);
+      setRoutedEntryId(route.entryId ?? null);
+    }
 
     // Resolve identity against the current library record instead of persisting
     // a second copy in the handoff. Progress and import metadata therefore stay
@@ -226,6 +237,7 @@ export default function ReadingWorkspaceView({
             <ReadingListsView
               key={routedListId ?? 'all'}
               initialListId={routedListId}
+              initialEntryId={routedEntryId}
               onOpenBook={onOpenBook}
               // §11.1's acquisition path, and the reason it is a real one here:
               // Discover is a sibling tab of this very workspace, so "find this"
