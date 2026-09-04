@@ -34,7 +34,17 @@
   color: var(--text);
 }
 
-.viz-widget-dock {
+/* CHILD COMBINATOR, and it is load-bearing rather than tidy. `ContextualSurface` renders
+   `lq-contextual viz-widget-dock`, and `theme/liquid-surfaces.css` declares
+   `position: relative` on `.lq-contextual` at the SAME (0,1,0) specificity while loading
+   later — the collision `components/liquid/readingCanvas.css` already records for
+   `.lq-anchor`. Measured live before this rule existed: the dock computed
+   `position: relative`, so `right/bottom: 8px` became a relative OFFSET instead of an
+   anchor and shifted the dock UP and LEFT out of the stage — rect (121,110) 78x42 against
+   a `.viz-widget` parent at (129,118), i.e. sitting on `.fwin-bar` and 8px off the window's
+   left edge onto the desktop. Both dock buttons were then genuinely occluded (hit walk
+   29.5x29.5 on a 32x32 rect, blockers `div.fwin-bar` and `section.fwin.fwin-viz`). */
+.viz-widget > .viz-widget-dock {
   position: absolute;
   right: 8px;
   bottom: 8px;

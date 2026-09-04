@@ -71,6 +71,7 @@ describe('the detached Study Block declares a presentation instead of leaving it
       // reason it was refused before. Its pop-out and reader refusals are what
       // this row is actually for, so they take its place rather than the row
       // being deleted: the point is that the DETACHED refusal did not leak.
+      // The policy itself is asserted in `liquidWindowPresentation.test.ts`.
       ['visualizer', 'desktop', true],
       ['visualizer', 'popout', false],
       ['visualizer', 'reader', false],
