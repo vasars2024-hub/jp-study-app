@@ -510,9 +510,51 @@ two-line message is a sentence, not a list). A short fixture parses to ZERO
 entries, so every assertion then passes vacuously against an empty list. This
 suite read as a broken binder until the parse itself was dumped.
 
-**Exact next slice: P3, §4 the completion detector.** In main on the
-`library:setProgress` path, never in a reader. The negative control — scrub to
-end does NOT tick — ships in the same commit as the rule.
+**2026-09-04, `primary2`. P3 CLOSED, all three done-when clauses (`1479861e`).**
+4 of 6 phases (P0, P1, P2, P3).
+
+- `shared/readingFinishDetector.ts` (pure) + `main/readingFinishWatcher.ts`
+  (store, CAS, broadcast), wired at `library:setProgress`. No reader was touched
+  — trap 2 holds.
+- **The dwell needs no new state.** The previous save is already on the
+  `LibraryItem` (`progress` + `lastReadAt`) and main reads it immediately before
+  overwriting it, so that pair IS §4.1's two consecutive saves. It survives a
+  restart, which an in-memory dwell map would not.
+- **§4.1's "location parses to the final part" is not directly derivable** —
+  there is no part COUNT in the tree (`LibraryItem` has `pageCount` for manga and
+  no book equivalent). Implemented as `FINAL_PART_FRACTION`: the location parses
+  AND sits at the end of the part it names. With the whole-book `percent`, "end
+  of a part" and "98.5 % of the book" can only both hold at the end of the last
+  one, while a stale `percent` of 0.99 against `p:3:0.4` is rejected — which is
+  the case the clause exists for. Recorded as a decision, not an omission.
+- `percent` is deliberately NOT in the position signature: it is a derived
+  display number and drifts between two saves at one location, which would make
+  the dwell unreachable rather than strict.
+- **DEFECT FOUND AND FIXED in `applyReadingListImport`.** Work dedup was scoped
+  to the LIST, so the same book on two lists minted two work records — and §1's
+  own rationale for works living beside lists is that the cross-list finish is
+  only free with one record to tick. P2 bound one copy, P3's fan-out ticked one
+  copy, and the second list silently never moved. Works now dedup across the
+  DOCUMENT (duplicate ENTRIES stay per-list), and an entry whose work is already
+  bound starts `owned` instead of telling §5.2's shopping list to buy a book
+  already in the library.
+- CONTROLS, **two, because the first was caught by another rule and that is
+  recorded rather than hidden**: removing only the `held` guard → 1 RED (the
+  detector's first-save case) while the watcher's scrub control stayed GREEN,
+  caught by the `dwellMs` guard. Removing BOTH — the naive `percent >= 0.98`
+  detector trap 4 names — → **4 RED including both negative controls by name**.
+  Restored, sha256 `B0A40476`.
+- Clause 3, "manual always does", was already met by P1's
+  `setReadingEntryState(..., 'finished', 'manual')` and §4.5's un-finish; both
+  re-derived green this turn rather than assumed.
+
+**Exact next slice: P4, §6 surfaces + §11 IN FULL.** §11 is a GATE on P4, not
+polish — the user named it. Click-through rides `onOpenBook` (already threaded
+through `App.tsx` 712/770/799/820/905), widgets register in
+`renderer/widgets/registry.tsx` like any other, reminders reuse
+`main/buddyScheduler.ts` and are OFF by default at most one a day. New strings
+go in the already-wired `shared/i18n/catalogs/{en,ja,zh,ru}.ts`, never a new
+module (trap 5).
 
 ---
 
