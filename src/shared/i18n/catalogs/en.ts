@@ -11260,6 +11260,7 @@ export const en: Catalog = {
   'filesApp.details.location': 'Location',
   'filesApp.details.source': 'Indexed by',
 
+  'filesApp.toolbar.label': 'File tools',
   'filesApp.search.label': 'Search everything',
   'filesApp.search.placeholder': 'Search name, kind or provenance',
   'filesApp.sort.label': 'Sort by',
@@ -11349,6 +11350,7 @@ export const en: Catalog = {
     other: '{count} items in this folder are no longer in the library.',
   },
   'filesApp.collections.nameLabel': 'Folder name',
+  'filesApp.collections.actionsLabel': 'Folder actions',
   'filesApp.collections.rename': 'Rename',
   'filesApp.collections.renameSave': 'Save',
   'filesApp.collections.renameCancel': 'Cancel',

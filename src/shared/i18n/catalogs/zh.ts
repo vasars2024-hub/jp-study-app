@@ -10705,6 +10705,7 @@ export const zh: Catalog = {
   'filesApp.details.location': '位置',
   'filesApp.details.source': '索引来源',
 
+  'filesApp.toolbar.label': '文件工具',
   'filesApp.search.label': '搜索全部',
   'filesApp.search.placeholder': '按名称、类型或来源搜索',
   'filesApp.sort.label': '排序方式',
@@ -10790,6 +10791,7 @@ export const zh: Catalog = {
     other: '此文件夹中的 {count} 个项目已不在库里。',
   },
   'filesApp.collections.nameLabel': '文件夹名称',
+  'filesApp.collections.actionsLabel': '文件夹操作',
   'filesApp.collections.rename': '重命名',
   'filesApp.collections.renameSave': '保存',
   'filesApp.collections.renameCancel': '取消',

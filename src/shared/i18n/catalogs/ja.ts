@@ -10798,6 +10798,7 @@ export const ja: Catalog = {
   'filesApp.details.location': '場所',
   'filesApp.details.source': 'インデックス元',
 
+  'filesApp.toolbar.label': 'ファイルツール',
   'filesApp.search.label': 'すべてを検索',
   'filesApp.search.placeholder': '名前・種類・出所で検索',
   'filesApp.sort.label': '並び替え',
@@ -10883,6 +10884,7 @@ export const ja: Catalog = {
     other: 'このフォルダーの {count} 件は、ライブラリにもうありません。',
   },
   'filesApp.collections.nameLabel': 'フォルダー名',
+  'filesApp.collections.actionsLabel': 'フォルダー操作',
   'filesApp.collections.rename': '名前を変更',
   'filesApp.collections.renameSave': '保存',
   'filesApp.collections.renameCancel': 'キャンセル',

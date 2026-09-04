@@ -1384,7 +1384,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             selected, derived or not — a control that vanishes on a derived
             folder cannot say why it refused, and the gate asks for a named
             message rather than an absence. */}
-        <div className="fa-folder-actions" role="group" aria-label={t('filesApp.collections.heading')}>
+        {/* `role="group"` labelled "My folders" was two things wrong at once: `group` is
+            generic enough to cover a fieldset, so nothing downstream could tell this cluster
+            of three commands from a form; and the name it borrowed described the folder LIST
+            above rather than the actions themselves. It is a toolbar, inside the scaffold rail
+            (`data-lq-role="liquid"`), and it now says so — see the note on `.fa-toolbar`. */}
+        <div
+          className="fa-folder-actions"
+          role="toolbar"
+          aria-label={t('filesApp.collections.actionsLabel')}
+        >
           <button
             type="button"
             className="fa-action fa-folder-rename"
@@ -1489,8 +1498,18 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         })
       : null;
 
+  // L9 category 3, measured live 2026-09-04 on the 820x580 window in Liquid: this strip and
+  // `.fa-folder-actions` below were the surface's only two `denseWorkOnTranslucent` regions.
+  // Neither is dense work — this one is 703x38 and holds a search field, a sort control, a view
+  // toggle and four buttons — but an undeclared `<div>` has no runtime evidence that it is
+  // chrome, so the walk classified both by content and §2.3's "dense work on glass" bar failed
+  // on the app's own toolbar. The role is the honest declaration and it is what the scaffold
+  // already assumes: `.lq-scaffold-toolbar` around it carries `data-lq-role="liquid"`, so once
+  // this says `toolbar` it is contextual chrome on a shared Liquid primitive, which is exactly
+  // what §2.3 reserves Liquid for. Same shape and same reasoning as `MusicWidget`'s transport
+  // cluster. The name is the region's; every control inside keeps its own.
   const toolbar = (
-    <div className="fa-toolbar">
+    <div className="fa-toolbar" role="toolbar" aria-label={t('filesApp.toolbar.label')}>
       {/* Search, sort and refresh act on the item list. On a panel scope there
           is no list for them to act on, and a control that is present and does
           nothing is a worse answer than one that is absent. */}

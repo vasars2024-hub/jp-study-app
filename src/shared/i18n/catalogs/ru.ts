@@ -11673,6 +11673,7 @@ export const ru: Catalog = {
   'filesApp.details.location': 'Расположение',
   'filesApp.details.source': 'Источник индекса',
 
+  'filesApp.toolbar.label': 'Инструменты файлов',
   'filesApp.search.label': 'Искать везде',
   'filesApp.search.placeholder': 'Поиск по названию, типу или происхождению',
   'filesApp.sort.label': 'Сортировать по',
@@ -11761,6 +11762,7 @@ export const ru: Catalog = {
     other: '{count} элемента из этой папки больше нет в библиотеке.',
   },
   'filesApp.collections.nameLabel': 'Имя папки',
+  'filesApp.collections.actionsLabel': 'Действия с папкой',
   'filesApp.collections.rename': 'Переименовать',
   'filesApp.collections.renameSave': 'Сохранить',
   'filesApp.collections.renameCancel': 'Отмена',
