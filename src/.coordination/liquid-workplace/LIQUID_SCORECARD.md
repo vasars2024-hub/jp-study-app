@@ -2370,3 +2370,53 @@ machine with a second Electron instance resident: 6 of 28 samples still shared a
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **3 of 8** banked
 (cat1, cat2, cat3). Next: cat4 use-of-space on a 260×220 surface.
+
+---
+
+## 2026-09-04 · primary — `note` category 4 closes at 10/10, on a product change that makes a refusal LEGIBLE
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 4 | Use of space | **10/10** | 2 of 2 reachable sizes, both `restored: true` — default **260×220** (clipped 0, overlaps 0, hScrollers 0, dead **0%**, chrome **14.9%**, canvas **83.4%**) and compact **260×170** (0/0/0, dead **0%**, chrome **19.3%**, canvas **78.8%**); `contentGrowsNotChrome` **true** on the named pair `compact → default`; sub-minimum shrink to **200×140** clipped 0 / overlaps 0 / hScrollers 0, restored | 3 plants, each `0 → 1 → 0` with `removalProven: true` — injected clip, art-plate exclusion, backdrop exclusion; the pager leg records `applicable: false` with its reason rather than a score |
+
+Evidence: `baselines/cat4-s11-note.json` (the FAIL, kept as the finding),
+`cat4-s11-note-r2.json` (the pass).
+
+**FINDING D — category 4 failed the note for HONOURING a documented product refusal.**
+
+First run: `verdict FAIL`, `failedBars ["allThreeSizes"]`, because the maximized leg refused —
+`no Maximize button - refusing to fake it with an inline width`, `noMaximizeAffordance: false`,
+`chromeButtons: 2` (`Make Liquid`, `Delete note`), `frameless: false`.
+
+That refusal is correct and the product is right. `canMaximizeSection`
+(`src/renderer/desktopWindowGeometry.ts:36`) returns false for **`note` and `city`**, for a
+reason the source already states and that re-derives live: **the shell suppresses window drag
+and all three resize handles while maximized** (`DesktopShell.tsx`, the handles are inside
+`{!isMaximized && (…)}`), and neither of those two bars renders a control that could clear the
+state — so a maximized note would be trapped, unmovable and unresizable. That is CLAUDE.md's
+"every enable flow needs a recovery path" invariant being honoured by refusing the state, and
+the note loses nothing: **all three resize handles are ungated**, so it takes any size by drag.
+
+The instrument was the defect. Its exoneration read `w.classList.contains('fwin-frameless')`,
+which is a PROXY for the predicate and catches only one of its two members — `city` is
+frameless, `note` is framed. Its own comment names the real rule ("DesktopShell forces
+`max: false` for section 'city'") and then tests a class name instead.
+
+**Repair — the product now publishes the decision, so nothing has to guess.**
+`data-maximizable={canMaximize ? 'true' : 'false'}` on the `.fwin` element, beside
+`data-section`. The harness reads that instead of the class name, and **keeps its button scan
+as a second conjunct** — that half is the load-bearing one: a window that declares `true` and
+ships no Maximize still fails, which is the accidental-loss case correction 19 refused to
+launder, and this must not launder it either. `city` is unaffected: it declared `false` before
+via the class and declares `false` now via the predicate.
+
+After: `sizesExpected` **3 → 2**, `sizesRan` 2, `noMaximizeAffordance` **false → true**,
+`allThreeSizes` **false → true**, all seven bars true, `PASS 10/10`.
+
+Guard `src/renderer/__tests__/desktopWindowMaximizableAttr.test.ts`, 5 tests, comments stripped
+before every assertion (this file's prose names the attribute it forbids, and DesktopShell's
+does too). Mutation control: `data-maximizable={'true'}` → **1 of 5 RED**, restored and verified
+byte-identical by sha256, green again.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **4 of 8** banked
+(cat1, cat2, cat3, cat4). Next: cat5 UI clarity, then 6, 7, 8 — four cells from an 80/80 entry.

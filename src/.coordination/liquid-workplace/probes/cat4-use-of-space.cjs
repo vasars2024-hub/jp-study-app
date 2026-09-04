@@ -1096,17 +1096,29 @@ const FWIN_MAX_CLICK = (surface) => `(function(){
     var titles = chrome.map(function(x){ return x.getAttribute('title'); });
     return JSON.stringify({
       refuse: 'no Maximize button - refusing to fake it with an inline width',
-      // Same state affordance as the finder above, applied to the whole window rather than
-      // to \`.fwin-btns\` (correction 19's own point): a frameless host keeps its controls in
-      // \`.fwin-frameless-controls\`, and City really does ship Pop out / Minimize / Close and
-      // no maximize at all.
-      noMaximizeAffordance: w.classList.contains('fwin-frameless')
+      // CORRECTION 19, THIRD PART (2026-09-04, primary). \`.fwin-frameless\` was a PROXY for the
+      // product's refusal and it caught only one of the two sections that own it. The predicate
+      // is \`canMaximizeSection\` (\`desktopWindowGeometry.ts\`), which returns false for \`city\`
+      // AND for \`note\`, both for the same measured reason: maximizing suppresses window drag
+      // and all three resize handles, and neither bar renders a control that could clear the
+      // state. The sticky note is FRAMED, so the old test read \`noMaximizeAffordance: false\`
+      // and failed the surface on \`allThreeSizes\` for honouring a documented refusal -
+      // instrument, not art. The product now publishes the decision as \`data-maximizable\`, so
+      // this reads the product instead of guessing from a class name.
+      //
+      // BOTH conjuncts are kept and neither is redundant. The attribute is the product's INTENT;
+      // the button scan is the FACT. A window that declares \`true\` and ships no Maximize still
+      // fails, which is the accidental-loss case correction 19 refused to launder. A window that
+      // declares \`false\` and somehow ships one also fails, because then the leg is drivable and
+      // this branch is never reached.
+      noMaximizeAffordance: w.getAttribute('data-maximizable') === 'false'
         && chrome.filter(function(x){
           return x.hasAttribute('aria-pressed') && !x.classList.contains('fwin-b-liquid');
         }).length === 0,
       chromeButtons: chrome.length,
       chromeButtonTitles: titles,
       frameless: w.classList.contains('fwin-frameless'),
+      declaredMaximizable: w.getAttribute('data-maximizable'),
     });
   }
   var was = w.classList.contains('fwin-max');
