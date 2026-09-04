@@ -36,14 +36,11 @@ import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
 import { Button, Select } from '../components/ui';
 import { useT } from '../i18n';
-import {
-  applyReadingListsMutation,
-  latestReadingListsSnapshot,
-  loadReadingLists,
-  onReadingListsChanged,
-} from '../readingListsClient';
+import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readingListsClient';
+import { useReadingListsDocument } from '../readingListsDocument';
+import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
-import type { ReadingEntryState, ReadingListsDocument } from '../../shared/readingLists';
+import type { ReadingEntryState } from '../../shared/readingLists';
 import {
   createReadingList,
   createReadingListsMutationContext,
@@ -111,10 +108,11 @@ export default function ReadingListsView({
   initialListId = null,
 }: ReadingListsViewProps) {
   const { t } = useT();
-  const [document, setDocument] = useState<ReadingListsDocument | null>(null);
-  const [loadFailure, setLoadFailure] = useState<string | null>(null);
+  // One subscription, shared with §11.2's widgets: four copies of a load effect
+  // is four chances to disagree about what "not loaded yet" looks like.
+  const { document, failure: loadFailure, adopt, reload } = useReadingListsDocument();
   const [writeFailure, setWriteFailure] = useState<string | null>(null);
-  const [items, setItems] = useState<LibraryItem[]>([]);
+  const items = useLibraryItems();
   const [listId, setListId] = useState<string | null>(initialListId);
   const [sort, setSort] = useState<ReadingListSort>('recent');
   const [naming, setNaming] = useState(false);
@@ -123,42 +121,7 @@ export default function ReadingListsView({
   const [pasteText, setPasteText] = useState('');
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoSlot | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    setLoadFailure(null);
-    void loadReadingLists().then((result) => {
-      if (!live) return;
-      if (result.ok) setDocument(result.snapshot.document);
-      else setLoadFailure(result.code);
-    });
-    // Main pushes after any change it did not answer directly — another window's
-    // write, or the completion detector ticking a book with no renderer involved.
-    const stop = onReadingListsChanged((snapshot) => {
-      if (live) setDocument(snapshot.document);
-    });
-    return () => {
-      live = false;
-      stop();
-    };
-  }, [reloadToken]);
-
-  useEffect(() => {
-    let live = true;
-    const accept = (value: unknown) => {
-      if (live) setItems(Array.isArray(value) ? (value as LibraryItem[]) : []);
-    };
-    // Guarded exactly as `useReadingFinder` guards it: a preload without the
-    // method must leave the covers empty, not take the surface down.
-    void Promise.resolve(window.api?.listLibrary?.())
-      .then(accept)
-      .catch(() => accept([]));
-    return () => {
-      live = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (naming) nameFieldRef.current?.focus();
@@ -198,10 +161,10 @@ export default function ReadingListsView({
         setWriteFailure(result.code);
         return;
       }
-      setDocument(result.snapshot.document);
+      adopt(result.snapshot.document);
       if (result.changed) setUndo(undoSlot?.() ?? null);
     },
-    [document],
+    [adopt, document],
   );
 
   const openRow = useCallback(
@@ -345,8 +308,7 @@ export default function ReadingListsView({
             <Button
               variant="primary"
               onClick={() => {
-                setDocument(null);
-                setReloadToken((token) => token + 1);
+                reload();
               }}
             >
               {t('readingLists.view.retry')}
@@ -513,7 +475,7 @@ export default function ReadingListsView({
             // closes on a successful import and the list behind it still reads
             // empty — a landed write that looks like a silent failure.
             const fresh = latestReadingListsSnapshot();
-            if (fresh) setDocument(fresh.document);
+            if (fresh) adopt(fresh.document);
           }}
         />
       </div>

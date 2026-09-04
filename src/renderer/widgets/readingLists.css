@@ -1,0 +1,202 @@
+/*
+ * Reading Lists §11.2 widgets.
+ *
+ * Colocated rather than appended to `styles.css`: the base widget classes
+ * (`.wgt`, `.wgt-btn`, `.wgt-progress`) are reused from there unchanged, so only
+ * the four widgets' own layout lives here. A widget must never be taller than
+ * its frame — `.widget-body` clips rather than scrolls — so everything below
+ * either shrinks or truncates, and nothing relies on the frame growing.
+ */
+
+.wgt-rl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wgt-rl-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wgt-rl-link {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button.wgt-rl-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.wgt-select {
+  max-width: 45%;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85em;
+}
+
+.wgt-rl-mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wgt-rl-cover {
+  display: block;
+  min-height: 20px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 6px;
+}
+
+/* One cover fills the frame; two to four tile it. A lone tile in a 2x2 grid
+   reads as three missing covers rather than as one book. */
+.wgt-rl-mosaic > .wgt-rl-cover:only-child {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.wgt-rl-count {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.wgt-rl-pace {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 0.9em;
+}
+
+.wgt-rl-empty {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.wgt-rl-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wgt-rl-next:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wgt-rl-next-label {
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.wgt-rl-next-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* The "Next up" widget is one button and nothing else — §11.2 calls it
+   deliberately dumb, and a second control inside it would make it a list. */
+.wgt-rl-oneshot {
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wgt-rl-oneshot > .wgt-rl-cover {
+  flex: 1 1 auto;
+  min-height: 40px;
+}
+
+.wgt-rl-read {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.wgt-rl-finishes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 2px;
+}
+
+.wgt-rl-finish {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wgt-rl-finish:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.wgt-rl-finish-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wgt-rl-finish-date {
+  font-size: 0.82em;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
