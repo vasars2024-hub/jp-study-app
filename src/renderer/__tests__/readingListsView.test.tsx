@@ -17,8 +17,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import ReadingListsView from '../views/ReadingListsView';
+import ReadingListsView, { readingRowRendersForTesting } from '../views/ReadingListsView';
 import { resetReadingListsClientForTesting } from '../readingListsClient';
+import { getUiLang, setUiLang } from '../i18n';
 import {
   addReadingListEntry,
   bindReadingWork,
@@ -34,6 +35,9 @@ let host: HTMLDivElement;
 let root: Root;
 let opened: LibraryItem[];
 let sought: string[];
+
+/** The ja catalog's `readingLists.view.rowOpen`, asserted rather than "not English". */
+const JA_ROW_OPEN = '開く';
 
 const ITEM: LibraryItem = {
   id: 'item-1',
@@ -535,6 +539,94 @@ describe('ReadingListsView', () => {
       await click(picks()[0]);
       expect(host.querySelector('.rlv__bulk-move')).toBeNull();
       expect(byText('No other list to move these to yet.')).not.toBeNull();
+    });
+
+    it('does not re-render 500 rows when ONE entry changes state', async () => {
+      /*
+        §11.4: "A 500-entry list scrolls without jank; the list view must not
+        re-render every row when one entry's state changes."
+
+        The second clause is the cause of the first, and it is the one that can be
+        measured deterministically. A frame-time assertion in jsdom would be noise;
+        a render count is the mechanism, so that is what this asserts. What it does
+        NOT claim is a painted frame budget — nothing here has been on a screen.
+      */
+      const base = seeded();
+      let current = base.document;
+      for (let index = 0; index < 498; index += 1) {
+        current = addReadingListEntry(
+          current,
+          base.listId,
+          { title: `Book ${index}` },
+          createReadingListsMutationContext(1_700_000_100_000 + index),
+        ).document;
+      }
+      const store = new FakeStore(sealReadingListsDocument(current));
+      installBridge(store);
+      await render(base.listId);
+      expect(rows()).toHaveLength(500);
+
+      const before = readingRowRendersForTesting();
+      const select = rows()[7].querySelector<HTMLSelectElement>('.rlv__row-state');
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(
+          window.HTMLSelectElement.prototype,
+          'value',
+        )?.set;
+        setter?.call(select, 'finished');
+        select?.dispatchEvent(new window.Event('change', { bubbles: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(rows()[7].getAttribute('data-state')).toBe('finished');
+      // One row moved, so one row repaints. Not 500.
+      expect(readingRowRendersForTesting() - before).toBe(1);
+    });
+
+    it('repaints memoized rows on a language switch, which `t` alone cannot do', async () => {
+      /*
+        The trap CLAUDE.md names as the #1 review item for new i18n code, here in
+        its memo form: `t`'s identity is STABLE by design, so a shallow-compared
+        row that took `t` alone would keep English forever after a switch —
+        silently, with no error and no failing key-count gate. The `lang` prop is
+        unused in the row body and exists only to break that tie; this is the test
+        that makes it load-bearing rather than decorative.
+      */
+      const { document, listId } = seeded();
+      installBridge(new FakeStore(document));
+      await render(listId);
+      const label = () => rows()[0].querySelector('.rlv__row-where')?.textContent;
+      expect(label()).toBe('Open');
+
+      const before = readingRowRendersForTesting();
+      try {
+        await act(async () => {
+          setUiLang('ja');
+          // The catalog is a dynamic import of a 12,000-key module, so this waits
+          // on the switch actually LANDING rather than on a fixed number of turns.
+          // A fixed six microtask turns read 0 repaints on a correct component and
+          // looked exactly like the defect this test is for.
+          for (let turn = 0; turn < 200 && getUiLang() !== 'ja'; turn += 1) {
+            await new Promise((done) => setTimeout(done, 5));
+          }
+          expect(getUiLang()).toBe('ja');
+        });
+
+        expect(readingRowRendersForTesting() - before).toBe(rows().length);
+        expect(label()).toBe(JA_ROW_OPEN);
+      } finally {
+        // `finally`, because the language is module state shared by every test in
+        // this file: leaving it on ja after a failure fails the NEXT test too, and
+        // a mutation control then reads two RED where one is real.
+        await act(async () => {
+          setUiLang('en');
+          for (let turn = 0; turn < 200 && getUiLang() !== 'en'; turn += 1) {
+            await new Promise((done) => setTimeout(done, 5));
+          }
+        });
+      }
+      expect(label()).toBe('Open');
     });
 
     it('drops a selected row from the selection when it is removed one at a time', async () => {

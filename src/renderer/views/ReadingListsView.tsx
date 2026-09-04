@@ -30,7 +30,7 @@
  *     different things and say so. A write that main refuses leaves the document
  *     exactly as it was and reports it; it never optimistically redraws.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
@@ -94,6 +94,161 @@ interface UndoSlot {
   run: () => void;
 }
 
+/**
+ * Everything a row can do, addressed by entry id rather than by row object.
+ *
+ * By id because this object has to be identity-STABLE for the life of the view
+ * (§11.4's performance row), and a callback that closes over a row closes over
+ * the document that produced it. The implementations read the current handlers
+ * out of a ref, so the façade never changes and a row never re-renders because
+ * its callbacks were rebuilt.
+ */
+interface ReadingRowActions {
+  open: (entryId: string) => void;
+  toggleFinished: (entryId: string) => void;
+  remove: (entryId: string) => void;
+  setState: (entryId: string, state: ReadingEntryState) => void;
+  dismissSuggestion: (entryId: string) => void;
+  pick: (entryId: string, range: boolean) => void;
+}
+
+interface ReadingRowProps {
+  entryId: string;
+  state: ReadingEntryState;
+  title: string;
+  /** §11.1: `null` is the acquisition destination, not a missing one. */
+  item: LibraryItem | undefined;
+  /** The suggested item's title, already resolved — the row never reads a map. */
+  suggestedTitle: string | null;
+  selected: boolean;
+  actions: ReadingRowActions;
+  t: ReturnType<typeof useT>['t'];
+  /**
+   * Present ONLY so a language switch repaints the rows.
+   *
+   * `t`'s identity is stable by design, so a memoized row that took `t` alone
+   * would keep the old language's strings forever after a switch, silently and
+   * without an error. This prop is unused in the body on purpose.
+   */
+  lang: ReturnType<typeof useT>['lang'];
+}
+
+let rowRenders = 0;
+
+/**
+ * The instrument for §11.4's performance row, and the only honest one available
+ * from a test: a re-render leaves the same DOM node behind, so nothing in the
+ * document can tell you whether 1 row re-rendered or 500 did.
+ *
+ * Incrementing in a render body is a side effect in render; it is a counter, and
+ * a StrictMode double-render doubles both halves of the delta the test asserts.
+ */
+export function readingRowRendersForTesting(): number {
+  return rowRenders;
+}
+
+/**
+ * §11.4: "the list view must not re-render every row when one entry's state
+ * changes."
+ *
+ * `memo` with the DEFAULT shallow compare, and every prop above is a primitive
+ * or an identity-stable object for exactly that reason.
+ *
+ * **The trap, measured rather than reasoned about.** The obvious shape is to
+ * pass the whole `entry`, and the mutation layer really does map entries and
+ * replace only the one it changed — so entry identity looks like it survives.
+ * It does not: `applyReadingListsMutation` runs `normalizeReadingListsDocument`
+ * over its base before mutating, which rebuilds EVERY entry object. Passing
+ * `entry` scored 500 of 500 rows re-rendering on a one-row change. `entryId` and
+ * `state` are the two fields this component actually reads, and they are
+ * primitives, so the compare is true for the 499 rows that did not move.
+ *
+ * A custom comparator would have worked too and is the worse answer — it is
+ * where `lang` gets forgotten, and `t`'s identity is stable by design, so the
+ * rows would silently keep the old language's strings after a switch.
+ */
+const ReadingRow = memo(function ReadingRow({
+  entryId,
+  state,
+  title,
+  item,
+  suggestedTitle,
+  selected,
+  actions,
+  t,
+}: ReadingRowProps) {
+  rowRenders += 1;
+  return (
+    <li className="rlv__row" data-state={state}>
+      {/*
+        `onClick` rather than `onChange`, with `readOnly` to keep the input
+        controlled without React's warning: the shift key is on the mouse event,
+        and a checkbox's change event does not carry it on every host. Space on a
+        focused box still fires click, so the keyboard path is the same one.
+      */}
+      <input
+        type="checkbox"
+        className="rlv__row-pick"
+        checked={selected}
+        readOnly
+        aria-label={t('readingLists.view.bulk.select', { title })}
+        onClick={(event) => actions.pick(entryId, event.shiftKey)}
+      />
+      <button
+        type="button"
+        className="rlv__row-open ui-focusable"
+        onClick={() => actions.open(entryId)}
+        /**
+         * §11.4's row keys. `Enter` is left to the button's own activation —
+         * that is what "Enter opens" already means — and only the two keys the
+         * plan reassigns are intercepted. Space MUST be prevented or the browser
+         * fires the click as well and the row both ticks and opens the reader.
+         */
+        onKeyDown={(event) => {
+          if (event.key === ' ' || event.key === 'Spacebar') {
+            event.preventDefault();
+            actions.toggleFinished(entryId);
+          } else if (event.key === 'Delete') {
+            event.preventDefault();
+            actions.remove(entryId);
+          }
+        }}
+      >
+        <span className="rlv__row-title">{title}</span>
+        <span className="rlv__row-where">
+          {item ? t('readingLists.view.rowOpen') : t('readingLists.view.rowFind')}
+        </span>
+      </button>
+      <Select
+        className="rlv__row-state"
+        aria-label={t('readingLists.view.rowState', { title })}
+        value={state}
+        onChange={(event) => actions.setState(entryId, event.target.value as ReadingEntryState)}
+        options={READING_ENTRY_STATES.map((state) => ({
+          value: state,
+          label: t(STATE_KEYS[state]),
+        }))}
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-label={t('readingLists.view.rowRemove', { title })}
+        onClick={() => actions.remove(entryId)}
+      >
+        <Icon name="trash" />
+      </Button>
+      {suggestedTitle !== null ? (
+        <p className="rlv__row-triage">
+          <span>{t('readingLists.view.suggestion', { title: suggestedTitle })}</span>
+          <Button size="sm" onClick={() => actions.dismissSuggestion(entryId)}>
+            {t('readingLists.view.suggestionNo')}
+          </Button>
+        </p>
+      ) : null}
+    </li>
+  );
+});
+
 export interface ReadingListsViewProps {
   /** §11.1's click-through. The same callback every other reading surface takes. */
   onOpenBook: (item: LibraryItem) => void;
@@ -114,7 +269,7 @@ export default function ReadingListsView({
   onFindWork,
   initialListId = null,
 }: ReadingListsViewProps) {
-  const { t } = useT();
+  const { t, lang } = useT();
   // One subscription, shared with §11.2's widgets: four copies of a load effect
   // is four chances to disagree about what "not loaded yet" looks like.
   const { document, failure: loadFailure, adopt, reload } = useReadingListsDocument();
@@ -413,6 +568,66 @@ export default function ReadingListsView({
     },
     [t, write],
   );
+
+  /**
+   * The one mutable cell in this component, and the reason §11.4's performance
+   * row is met at all.
+   *
+   * Assigned during render rather than in an effect: a click that arrives
+   * between a render and its effects must reach the handlers built from the
+   * document that is on screen, not the previous one. Nothing reads it during
+   * render, so a double-render under StrictMode is a second identical write.
+   */
+  const live = useRef({
+    rows,
+    openRow,
+    toggleFinished,
+    removeRow,
+    changeState,
+    dismissSuggestion,
+    toggleSelected,
+  });
+  live.current = {
+    rows,
+    openRow,
+    toggleFinished,
+    removeRow,
+    changeState,
+    dismissSuggestion,
+    toggleSelected,
+  };
+
+  /**
+   * Built ONCE, deliberately — this is the prop that would otherwise change on
+   * every keystroke in the filter field and re-render all 500 rows with it.
+   */
+  const rowActions = useMemo<ReadingRowActions>(() => {
+    const find = (entryId: string) =>
+      live.current.rows.find((candidate) => candidate.entry.id === entryId);
+    return {
+      open: (entryId) => {
+        const row = find(entryId);
+        if (row) live.current.openRow(row);
+      },
+      toggleFinished: (entryId) => {
+        const row = find(entryId);
+        if (row) live.current.toggleFinished(row);
+      },
+      remove: (entryId) => {
+        const row = find(entryId);
+        if (row) live.current.removeRow(row);
+      },
+      setState: (entryId, state) => {
+        const row = find(entryId);
+        if (row) live.current.changeState(row, state);
+      },
+      dismissSuggestion: (entryId) => {
+        const row = find(entryId);
+        if (row) live.current.dismissSuggestion(row);
+      },
+      pick: (entryId, range) => live.current.toggleSelected(entryId, range),
+    };
+  }, []);
 
   /**
    * The three bulk verbs. Each is ONE write with ONE undo, which is the whole
@@ -757,86 +972,22 @@ export default function ReadingListsView({
         ) : (
           <ul className="rlv__rows">
             {visibleRows.map((row) => {
-              const item = row.itemId ? itemsById.get(row.itemId) : undefined;
               const suggested = row.suggestion ? row.work?.suggestion : undefined;
               return (
-                <li key={row.entry.id} className="rlv__row" data-state={row.entry.state}>
-                  {/*
-                    `onClick` rather than `onChange`, with `readOnly` to keep the
-                    input controlled without React's warning: the shift key is on
-                    the mouse event, and a checkbox's change event does not carry
-                    it on every host. Space on a focused box still fires click, so
-                    the keyboard path is the same one.
-                  */}
-                  <input
-                    type="checkbox"
-                    className="rlv__row-pick"
-                    checked={selected.has(row.entry.id)}
-                    readOnly
-                    aria-label={t('readingLists.view.bulk.select', { title: row.title })}
-                    onClick={(event) => toggleSelected(row.entry.id, event.shiftKey)}
-                  />
-                  <button
-                    type="button"
-                    className="rlv__row-open ui-focusable"
-                    onClick={() => openRow(row)}
-                    /**
-                     * §11.4's row keys. `Enter` is left to the button's own
-                     * activation — that is what "Enter opens" already means — and
-                     * only the two keys the plan reassigns are intercepted. Space
-                     * MUST be prevented or the browser fires the click as well and
-                     * the row both ticks and opens the reader.
-                     */
-                    onKeyDown={(event) => {
-                      if (event.key === ' ' || event.key === 'Spacebar') {
-                        event.preventDefault();
-                        toggleFinished(row);
-                      } else if (event.key === 'Delete') {
-                        event.preventDefault();
-                        removeRow(row);
-                      }
-                    }}
-                  >
-                    <span className="rlv__row-title">{row.title}</span>
-                    <span className="rlv__row-where">
-                      {item
-                        ? t('readingLists.view.rowOpen')
-                        : t('readingLists.view.rowFind')}
-                    </span>
-                  </button>
-                  <Select
-                    className="rlv__row-state"
-                    aria-label={t('readingLists.view.rowState', { title: row.title })}
-                    value={row.entry.state}
-                    onChange={(event) =>
-                      changeState(row, event.target.value as ReadingEntryState)
-                    }
-                    options={READING_ENTRY_STATES.map((state) => ({
-                      value: state,
-                      label: t(STATE_KEYS[state]),
-                    }))}
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t('readingLists.view.rowRemove', { title: row.title })}
-                    onClick={() => removeRow(row)}
-                  >
-                    <Icon name="trash" />
-                  </Button>
-                  {suggested ? (
-                    <p className="rlv__row-triage">
-                      <span>
-                        {t('readingLists.view.suggestion', {
-                          title: itemsById.get(suggested.itemId)?.title ?? suggested.itemId,
-                        })}
-                      </span>
-                      <Button size="sm" onClick={() => dismissSuggestion(row)}>
-                        {t('readingLists.view.suggestionNo')}
-                      </Button>
-                    </p>
-                  ) : null}
-                </li>
+                <ReadingRow
+                  key={row.entry.id}
+                  entryId={row.entry.id}
+                  state={row.entry.state}
+                  title={row.title}
+                  item={row.itemId ? itemsById.get(row.itemId) : undefined}
+                  suggestedTitle={
+                    suggested ? (itemsById.get(suggested.itemId)?.title ?? suggested.itemId) : null
+                  }
+                  selected={selected.has(row.entry.id)}
+                  actions={rowActions}
+                  t={t}
+                  lang={lang}
+                />
               );
             })}
           </ul>
