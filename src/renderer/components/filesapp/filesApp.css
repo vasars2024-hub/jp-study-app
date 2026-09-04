@@ -628,7 +628,18 @@
 
 .fa-row {
   display: grid;
-  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  /* NO COLUMN COLLAPSES BELOW THE HIT TARGET. Every header cell is a SORT
+     BUTTON, so a track that can shrink to 0 is a control that can shrink to 0.
+     Measured live 2026-09-04 at the default 820x580: `minmax(0, 0.8fr)` gave
+     `button.fa-cell-size` a rect of **30.92px** and a pointer region of 31.92
+     — the one row of `files` cat1 whose own RECT was under the 32px floor.
+     With the floor it is 32.00 / 33.01. The cost is 0.5px off `fa-cell-name`
+     and nothing else: `scrollWidth === clientWidth` on `.fa-list`, `.fa-rows`
+     and `.fa-shell` before and after, so this buys no horizontal overflow —
+     which matters, because cat4's `horizontal` bar was repaired the same day
+     and this rule must not undo it. The compact VIEW overrides this line with
+     its own three-column template. */
+  grid-template-columns: var(--lq-hit-target) minmax(var(--lq-hit-target), 3fr) minmax(var(--lq-hit-target), 1fr) minmax(var(--lq-hit-target), 1.2fr) minmax(var(--lq-hit-target), 0.8fr) minmax(var(--lq-hit-target), 1.4fr);
   align-items: center;
   gap: var(--lq-space-3);
   padding: 0 var(--lq-space-3);
@@ -656,7 +667,18 @@
      exist. The three that remain are listed in LIQUID_SCORECARD.md and the
      smallest is genuinely 1.45px short of the box it renders. */
   height: 32px;
-  border-bottom: 1px solid var(--lq-work-border);
+  /* THE SEPARATOR IS AN INSET SHADOW, NOT A BORDER, and that is the third
+     attempt at the paragraph above — the one that does not move the row.
+     `border-bottom` is inside `box-sizing: border-box`, so a 32px row has a
+     31px CONTENT box, and `align-items: center` then puts every 32px control
+     in the row on a HALF-PIXEL. Measured live 2026-09-04 off pid 13316:
+     `.fa-bulk-check` sat at [273.5, 305.5] inside a row at [274, 306], and its
+     own `.fa-cell-select` parent won `elementFromPoint` 0.3px inside it. An
+     inset shadow paints the identical 1px rule and consumes no height: the
+     same checkbox reads [274, 306], integral, at every scroll offset tested
+     (0/1/9/12). The row's outer height is unchanged at 32px, so nothing above
+     or below it shifts — this is not the rejected 33px experiment. */
+  box-shadow: inset 0 -1px 0 var(--lq-work-border);
   cursor: default;
 }
 
@@ -730,6 +752,20 @@
   z-index: 1;
   background: var(--lq-work-bg-raised);
   font-weight: 600;
+  /* ONE PIXEL, AND IT IS THE FIRST ROW'S. `z-index: 1` makes this header paint
+     ABOVE the list, and Chromium's hit rect for a box starts ~1px above the box
+     itself — reproduced 2026-09-04 on a throwaway stack of four plain 32px divs
+     on `document.body`, every one reading `up 16.96 / down 15.01`, so it is the
+     engine and not this stylesheet. Rows absorb that harmlessly: each takes a px
+     from the row above and loses one to the row below, and reads 32.02. The
+     FIRST row has no row above it — it has a later-painted sticky header, which
+     keeps the overlap and leaves the row at **31.06**, under the 32px floor,
+     along with its own `.fa-bulk-check`. That was two of the three rows failing
+     `files` cat1. One pixel of separation puts them at 32.02 with nothing else
+     moved (`.fa-head .fa-cell` stays 33.01, row 1 stays 32.02). The margin is on
+     the header rather than padding inside `.fa-rows` deliberately: `.fa-rows` is
+     the VirtualList viewport and its padding is inside the windowing math. */
+  margin-bottom: 1px;
 }
 
 .fa-head .fa-cell {
