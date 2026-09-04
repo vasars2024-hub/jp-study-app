@@ -149,7 +149,7 @@
 .scr-compact-tabs button.is-active {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-main {
@@ -197,7 +197,7 @@
   height: 26px;
   border-radius: var(--radius-sm);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   flex: none;
 }
 
@@ -412,7 +412,7 @@
   height: 27px;
   border-radius: var(--radius-sm);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   flex: none;
 }
 
@@ -488,9 +488,22 @@
   color: var(--text);
 }
 
+/* The ACTIVE rail item is the one text run on this surface that paints the accent over the
+   accent's own wash, so it is the one that moves when the palette does. Measured live at
+   820x580: `span.scr-rail-label` reading "History" was 4.74:1 on the dark default — already
+   the worst run of 65 — and **2.74:1 on classic-light**, against a 4.5 bar. A single-theme
+   reading cannot see this: the dark cell passes.
+
+   The token is `--accent-text-on-wash`, NOT `--accent-text`: the ground here is the accent's
+   own 16% wash, which tints the surface towards the foreground, and `--accent-text`'s 30%
+   share still lands at **4.28:1** on soft-sepia + amber. Swept 81 cells live on this exact
+   element; the derivation and the share table are at the token's declaration in `styles.css`.
+   The WASH keeps `--accent-weak` and its own hue — the fix is the foreground, not the
+   identity. Eleven more rules in this file paint the accent on that same wash and move with
+   it; every one of the 54 light cells fails at the plain `var(--accent)` they all shipped. */
 .scr-rail-item.is-active {
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   font-weight: 500;
 }
 
@@ -916,7 +929,7 @@
   height: 38px;
   border-radius: var(--radius-md);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-dashboard-quick-card strong {
@@ -1920,7 +1933,7 @@
 
 .scr-export-format-strip button.is-active {
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-export-format-strip button > span {
@@ -3092,7 +3105,7 @@
   padding: 2px 6px;
   border-radius: var(--radius-pill);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   font-size: var(--font-size-2xs);
 }
 
@@ -3677,7 +3690,7 @@
 .scr-pill--accent {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-pill--outline {
@@ -4233,7 +4246,7 @@
   padding: 2px 5px;
   border-radius: var(--radius-pill);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   font-size: 9px;
   text-transform: uppercase;
 }
@@ -4357,7 +4370,7 @@
 .scr-calendar-strip span.has-job {
   border-color: var(--accent);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-rule-layout {
@@ -4830,7 +4843,7 @@
 .scr-tool-preset-row button.is-active {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
 }
 
 .scr-tool-controls {
@@ -4909,7 +4922,7 @@
   height: 24px;
   border-radius: var(--radius-pill);
   background: var(--accent-weak);
-  color: var(--accent);
+  color: var(--accent-text-on-wash);
   font-size: var(--font-size-2xs);
 }
 
