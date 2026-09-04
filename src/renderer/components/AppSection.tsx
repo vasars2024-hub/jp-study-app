@@ -30,6 +30,15 @@ const YouTubePlaylistsView = lazy(() => import('../views/YouTubePlaylistsView'))
 const SettingsApp = lazy(() => import('./settings/SettingsApp'));
 const FilesApp = lazy(() => import('./filesapp/FilesApp'));
 
+function openVisualizerSettings(): void {
+  openSectionSurface('settings');
+  window.setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('settings:navigate', {
+      detail: { page: 'visualizer', settingId: 'visualizer' },
+    }));
+  }, 80);
+}
+
 // The section → view mapping. Shared by the in-desktop FloatingWindow
 // (DesktopShell) and the pop-out window (App) so an app renders identically
 // whether it lives on the fake desktop or in its own OS window. Notes stay
@@ -162,6 +171,7 @@ export function VisualizerWidget() {
       // mounts no DesktopShell — so a bare `os:open` dispatch was a dead button
       // in the pop-out. `openSectionSurface` falls back to main's pop-out route.
       onOpenMusic={() => openSectionSurface('music')}
+      onOpenSettings={openVisualizerSettings}
     />
   );
 }

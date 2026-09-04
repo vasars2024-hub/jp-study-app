@@ -57,10 +57,9 @@ export interface PresentableWin {
  * contextual tools, a temporary inspector — that a presentation flip could hand
  * to `--lq-*` instead of one hardcoded palette". Sticky notes have one (the
  * compact colour edge palette the Note contract requires) and so they present,
- * although their paper stays conventional by default. The visualizer trinket has
- * none: it is a 380x200 canvas and a bar, with no disclosed surface of its own,
- * so a flip there would be a class name and no material change — inert glass,
- * which §2 calls a failure rather than a maximum.
+ * although their paper stays conventional by default. The visualizer now has one
+ * too: the focus/keyboard edge dock that routes to Music and the full settings.
+ * Its canvas stays fixed while only that contextual dock takes the Liquid role.
  *
  * `city` MOVED to presentable 2026-09-02 (L12 b2). It was refused for being
  * frameless, and frameless was the wrong reason: the Mooncap garden discloses a
@@ -98,6 +97,11 @@ export function canPresentLiquid(
   host: LiquidPresentationHost = 'desktop',
 ): boolean {
   if (section === 'note') return host === 'desktop';
+  // Visualizer remains an explicitly desktop-only trinket. Its edge dock makes a
+  // real desktop presentation possible, but it still has no supported detach or
+  // reader route; admitting those hosts would promise a lifecycle the product
+  // deliberately does not expose.
+  if (section === 'visualizer') return host === 'desktop';
   // A detached Study Block refuses on the SECTION test above, applied to the
   // host rather than to one section: it is one panel and a three-element bar,
   // with no disclosed surface of its own — the visualizer's shape, and the
@@ -107,7 +111,7 @@ export function canPresentLiquid(
   // DECISION and `DetachedStudyBlock` says so in the DOM; see the note there
   // on why that host declares `standard` where the other three declare nothing.
   if (host === 'detached') return false;
-  return section !== 'visualizer';
+  return true;
 }
 
 /**

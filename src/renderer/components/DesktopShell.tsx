@@ -3807,8 +3807,9 @@ const FloatingWindow = memo(function FloatingWindow({
   // reported "3 of 25 surfaces offer no Liquid presentation", but
   // `canPresentLiquid` is TRUE for `musicwidget` and the bar below renders its
   // toggle. As of 2026-09-02 it is true for `city` as well — the garden's
-  // frameless cluster below renders the identical control — so `visualizer`
-  // is the one section left that refuses, and the atlas figure is 24 of 25.
+  // frameless cluster below renders the identical control. Visualizer joined
+  // once its focus/keyboard edge dock gave that presentation a real contextual
+  // region; it remains desktop-only, like Note, so detach limits stay honest.
   // (Written this way round on purpose: `liquidWindowSnapshotFidelity.test.ts`
   // names every call site of that predicate in this file by regex, and the
   // regex reads comments too — a comment spelling the call out was scored as a
@@ -4061,6 +4062,7 @@ const FloatingWindow = memo(function FloatingWindow({
             <button
               className="fwin-b lq-hit fwin-close"
               style={noteInk}
+              aria-label={isNote ? t('desktop.deleteNote') : t('common.close')}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
             >
@@ -4105,6 +4107,7 @@ const FloatingWindow = memo(function FloatingWindow({
             </button>
             <button
               className="fwin-b lq-hit fwin-close"
+              aria-label={t('common.close')}
               title={t('common.close')}
               onClick={onClose}
             >

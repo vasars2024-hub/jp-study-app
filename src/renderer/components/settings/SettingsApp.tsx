@@ -156,7 +156,11 @@ export default function SettingsApp(props: SettingsWallProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const navigate = useCallback((next: SettingsPageId, settingId?: string) => {
+  const navigate = useCallback((
+    next: SettingsPageId,
+    settingId?: string,
+    options?: { guided?: boolean },
+  ) => {
     /**
      * Gate 8 / decision 1. `memory` is no longer a Settings page: memory and
      * statistics moved to the Files app, which is now their only home.
@@ -172,8 +176,12 @@ export default function SettingsApp(props: SettingsWallProps) {
       if (!(settingId && openFilesAppForSystemCard(settingId))) openFilesAppForMemory();
       return;
     }
-    setGuidedPage(null);
-    setGuidedControlId(null);
+    // An explicit cross-surface route is allowed to land on an advanced page without
+    // changing the user's global Advanced preference. Keep that destination guided until
+    // they navigate away; otherwise the guard below immediately bounces a valid deep link
+    // back Home and the originating control is functionally dead.
+    setGuidedPage(options?.guided ? next : null);
+    setGuidedControlId(options?.guided ? settingId ?? null : null);
     setPage(next);
     pushRecentPage(next);
     setFocusSettingId(settingId ?? null);
@@ -205,7 +213,7 @@ export default function SettingsApp(props: SettingsWallProps) {
     const onNav = (ev: Event) => {
       const d = (ev as CustomEvent<{ page?: SettingsPageId; settingId?: string }>).detail;
       if (!d?.page) return;
-      navigate(d.page, d.settingId);
+      navigate(d.page, d.settingId, { guided: true });
     };
     window.addEventListener('settings:navigate', onNav);
     return () => window.removeEventListener('settings:navigate', onNav);

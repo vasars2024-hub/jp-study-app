@@ -1439,6 +1439,143 @@
     },
 
     /**
+     * VISUALIZER — the canvas is the stable anchor; its two navigation routes occupy the
+     * contextual edge dock. No setting is changed by this spec: the Settings route is the
+     * reversible way to reach every mode, colour and analyser control, while Music is the
+     * honest recovery route for an idle visualizer.
+     */
+    visualizer: {
+      titleRe: /Visualizer|ビジュアライザー|可视化|Визуализатор/i,
+      rootSel: '.viz-widget',
+      features: [
+        {
+          id: 'visualizationCanvas',
+          f: (w) => {
+            const root = q(w, '.viz-widget');
+            const canvas = q(w, '.viz-widget-canvas');
+            const rr = root && root.getBoundingClientRect();
+            const cr = canvas && canvas.getBoundingClientRect();
+            const covered = !!rr && !!cr && cr.width >= rr.width * 0.95 && cr.height >= rr.height * 0.95;
+            return { ok: !!canvas && covered,
+              ev: `canvas=${!!canvas} root=${rr ? `${Math.round(rr.width)}x${Math.round(rr.height)}` : 'absent'} canvasBox=${cr ? `${Math.round(cr.width)}x${Math.round(cr.height)}` : 'absent'} covered=${covered}` };
+          },
+        },
+        {
+          id: 'musicRoute',
+          f: (w) => {
+            const action = q(w, '[data-viz-action="music"]');
+            const label = action && action.getAttribute('aria-label');
+            return { ok: !!action && !action.disabled && !!(label || '').trim(),
+              ev: `control=${!!action} enabled=${!!action && !action.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'settingsRoute',
+          f: (w) => {
+            const action = q(w, '[data-viz-action="settings"]');
+            const label = action && action.getAttribute('aria-label');
+            return { ok: !!action && !action.disabled && !!(label || '').trim(),
+              ev: `control=${!!action} enabled=${!!action && !action.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'contextualDock',
+          f: (w) => {
+            const dock = q(w, '.viz-widget-dock');
+            const actions = dock ? qa(dock, 'button') : [];
+            return { ok: !!dock && dock.getAttribute('data-lq-role') === 'contextual'
+                && dock.getAttribute('role') === 'toolbar'
+                && !!(dock.getAttribute('aria-label') || '').trim() && actions.length === 2,
+              ev: `dock=${!!dock} role=${dock && dock.getAttribute('data-lq-role')} toolbar=${dock && dock.getAttribute('role')} named=${!!dock && !!(dock.getAttribute('aria-label') || '').trim()} actions=${actions.length}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      mutations: {
+        visualizationCanvas: (w) => detach(q(w, '.viz-widget-canvas'), 'no visualizer canvas'),
+        musicRoute: (w) => stripAttr(q(w, '[data-viz-action="music"]'), 'aria-label', 'no Music route'),
+        settingsRoute: (w) => stripAttr(q(w, '[data-viz-action="settings"]'), 'aria-label', 'no Settings route'),
+        contextualDock: (w) => stripAttr(q(w, '.viz-widget-dock'), 'data-lq-role', 'no edge dock'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
+     * STICKY NOTE — the deliberately smallest desktop surface. Its colour has two honest
+     * representations: standard paints the note itself, while Liquid adds the contextual
+     * five-colour edge palette. The row checks the selected colour survives both rather than
+     * pretending the two presentations must have byte-identical chrome.
+     *
+     * Delete is inventoried but never driven: closing a note is the product's delete action.
+     * The generic dirty-field leg safely exercises the editor and restores the exact text.
+     */
+    note: {
+      titleRe: /Sticky note|付箋|便签|Заметк/i,
+      rootSel: '.desk-note-text',
+      probeInput: (w) => q(w, '.desk-note-text'),
+      features: [
+        {
+          id: 'editor',
+          f: (w) => {
+            const editor = q(w, '.desk-note-text');
+            return {
+              ok: !!editor && !editor.disabled && !editor.readOnly
+                && (editor.getAttribute('placeholder') || '').trim().length > 0,
+              ev: `textarea=${!!editor} enabled=${!!editor && !editor.disabled && !editor.readOnly} placeholder=${!!editor && (editor.getAttribute('placeholder') || '').trim().length > 0}`,
+            };
+          },
+        },
+        {
+          id: 'colorState',
+          f: (w) => {
+            const editor = q(w, '.desk-note-text');
+            const color = editor ? editor.style.background : '';
+            const liquid = w.getAttribute('data-presentation') === 'liquid';
+            const palette = qa(w, '.desk-note-color');
+            const pressed = palette.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const bar = q(w, '.fwin-bar');
+            const represented = liquid
+              ? palette.length === 5 && pressed.length === 1 && pressed[0].style.background === color
+              : palette.length === 0 && !!bar && bar.style.background === color;
+            return {
+              ok: !!color && represented,
+              ev: `presentation=${liquid ? 'liquid' : 'standard'} color=${color || 'absent'} palette=${palette.length} selected=${pressed.length} represented=${represented}`,
+            };
+          },
+        },
+        {
+          id: 'deleteRoute',
+          f: (w) => {
+            const close = q(w, '.fwin-close');
+            // The visible multiplication glyph is not a deletion warning. The authored
+            // accessible name is what makes this destructive route honest; title alone loses
+            // to the glyph in the accessible-name algorithm and would be announced as "times".
+            const label = close && close.getAttribute('aria-label');
+            return { ok: !!close && !close.disabled && !!label,
+              ev: `control=${!!close} enabled=${!!close && !close.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'resizeGeometry',
+          f: (w) => {
+            const handles = qa(w, '.fwin-edge-r,.fwin-edge-b,.fwin-resize');
+            const maximizable = w.getAttribute('data-maximizable');
+            return { ok: handles.length === 3 && maximizable === 'false',
+              ev: `resizeHandles=${handles.length}/3 dataMaximizable=${maximizable}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      mutations: {
+        editor: (w) => stripAttr(q(w, '.desk-note-text'), 'placeholder', 'no note editor'),
+        colorState: (w) => stripAttr(q(w, '.desk-note-text'), 'style', 'no note editor'),
+        deleteRoute: (w) => stripAttr(q(w, '.fwin-close'), 'aria-label', 'no delete control'),
+        resizeGeometry: (w) => removeClassAll([q(w, '.fwin-resize')], 'fwin-resize'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
      * STATISTICS — populated local reading and watching evidence. Sync and reset are inventoried
      * but never driven: both write user data. The scroll leg is the reversible state carried
      * through the presentation round trip; every feature row cross-checks rendered values with
@@ -6512,7 +6649,13 @@
         ev: `chromeButtons=${chrome.length}/3 liquidToggle=absent presentation=${pres} liquidClass=${w.classList.contains('fwin-liquid')}`,
       };
     }
-    const need = reader || workspace ? 1 : popout ? 3 : 4;
+    // A sticky note deliberately has only Delete and the presentation toggle. It is not
+    // minimizable (there is no taskbar identity to restore from), not maximizable (the product
+    // publishes that refusal through data-maximizable=false), and not detachable. Counting it
+    // against a general app window's four controls would turn those three explicit refusals
+    // into a lifecycle defect. The two controls it does own remain fully asserted here.
+    const note = w.classList.contains('fwin-note');
+    const need = reader || workspace ? 1 : popout ? 3 : note ? 2 : 4;
     return {
       ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
       ev: `chromeButtons=${chrome.length}/${need} liquidAriaPressed=${pressed}`,
@@ -6640,9 +6783,9 @@
   /**
    * Trap 8's FOURTH host, added 2026-08-31 for L9's City surface (correction 24).
    *
-   * `canPresentLiquid` (`liquidWindowPresentation.ts:72`) refuses sections `city` and
-   * `visualizer` outright — "the frameless garden and visualizer trinkets have no
-   * conventional chrome to swap". So a `.fwin` can be a real, complete window and still
+   * `canPresentLiquid` formerly refused sections `city` and `visualizer` outright. Both now
+   * own real contextual regions, but the general rule remains: a `.fwin` can be a real,
+   * complete window and still
    * have NO Liquid destination, and the harness must not treat that as chromeless (it has
    * chrome: Pop out, Minimize, Close) nor as a broken `fwin` (it renders 3 buttons, not 4,
    * and no toggle, so `lifecycle` would score a correct window false and `toggleLiquid`

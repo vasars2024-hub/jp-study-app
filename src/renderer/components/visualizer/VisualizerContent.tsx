@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import VisualizerCanvas from '../VisualizerCanvas';
 import Icon from '../Icons';
+import { ContextualSurface } from '../liquid/LiquidSurface';
 import { useT } from '../../i18n';
 import { isPlaying as isMusicPlaying, onPlayingChanged } from '../../audioBus';
 import {
@@ -21,6 +22,7 @@ import {
   saveVizSettings,
   type VizSettings,
 } from '../../visualizerSettings';
+import './visualizerWidgetLiquid.css';
 
 export type { VizSettings };
 
@@ -61,13 +63,16 @@ export function VizStage({
   playing,
   classes = OS_VIZ_CLASSES,
   onOpenMusic,
+  onOpenSettings,
 }: {
   settings: VizSettings;
   playing: boolean;
   classes?: VizStageClasses;
   onOpenMusic?: () => void;
+  onOpenSettings?: () => void;
 }) {
   const { t } = useT();
+  const settingsLabel = `${t('settings.nav.visualizer')} — ${t('settings.visualizer.options')}`;
   const hint = (
     <>
       <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
@@ -77,9 +82,39 @@ export function VizStage({
   return (
     <div className={classes.root}>
       <VisualizerCanvas className={classes.canvas} settings={settings} idleBaseline />
-      {!playing && (onOpenMusic
-        ? <button type="button" className={classes.hint} onClick={onOpenMusic}>{hint}</button>
-        : <span className={classes.hint}>{hint}</span>)}
+      {!playing && <span className={classes.hint}>{hint}</span>}
+      {(onOpenMusic || onOpenSettings) && (
+        <ContextualSurface
+          className="viz-widget-dock"
+          role="toolbar"
+          aria-label={t('settings.nav.visualizer')}
+        >
+          {onOpenMusic && (
+            <button
+              type="button"
+              className="viz-widget-action lq-hit"
+              data-viz-action="music"
+              title={t('commands.nav.open.music')}
+              aria-label={t('commands.nav.open.music')}
+              onClick={onOpenMusic}
+            >
+              <Icon name="music" size={14} />
+            </button>
+          )}
+          {onOpenSettings && (
+            <button
+              type="button"
+              className="viz-widget-action lq-hit"
+              data-viz-action="settings"
+              title={settingsLabel}
+              aria-label={settingsLabel}
+              onClick={onOpenSettings}
+            >
+              <Icon name="settings" size={14} />
+            </button>
+          )}
+        </ContextualSurface>
+      )}
     </div>
   );
 }

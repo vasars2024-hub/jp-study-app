@@ -287,6 +287,31 @@ const PROBE = `(function(){
     if (STATUS.test(s)) statusCandidates.push({ text: s, el: name(t.parentElement) });
   }
 
+  /*
+   * A native input placeholder is painted text, even though TreeWalker cannot see it because
+   * it is an attribute rather than a text node. On a deliberately minimal editor it is also
+   * the empty-state message. Count it only while the field is actually empty, so a hidden
+   * placeholder behind user content does not earn either the text or state bar. This is a
+   * form-control rule, not a sticky-note selector; every surface gets the same accounting.
+   */
+  var emptyFormPrompts = [];
+  var promptControls = rq('input[placeholder],textarea[placeholder]');
+  for (var pi = 0; pi < promptControls.length; pi++) {
+    var pe = promptControls[pi];
+    var ps = (pe.getAttribute('placeholder') || '').trim();
+    if (!painted(pe) || String(pe.value || '').length > 0 || !ps) continue;
+    textRuns++;
+    if (/\\p{L}/u.test(ps)) wordRuns++;
+    textAcc.push(ps);
+    var ptoks = ps.split(/\\s+/);
+    for (var pti = 0; pti < ptoks.length; pti++) {
+      if (KEY.test(ptoks[pti])) rawKeys.push({ token: ptoks[pti], el: name(pe), source: 'placeholder' });
+    }
+    if (PLACEHOLDER.test(ps)) placeholders.push({ text: ps.slice(0, 80), el: name(pe), source: 'placeholder' });
+    if (STATUS.test(ps)) statusCandidates.push({ text: ps, el: name(pe), source: 'placeholder' });
+    emptyFormPrompts.push({ el: name(pe), message: ps, named: weigh(ps) >= 12 && !KEY.test(ps) });
+  }
+
   // MUTE PAIRS: a control the user cannot act on AND cannot find out why. Disabled is honest only
   // when the surface says what would enable it, so an explanation is looked for in the control's
   // own accessible name extras, its title, its aria-describedby target, and the text of its
@@ -378,6 +403,13 @@ const PROBE = `(function(){
     error: textOf('[class*="error"],[class*="err"],[role="alert"]'),
     offline: textOf('[class*="offline"],[class*="unreachable"],[class*="disconnected"]')
   };
+  if (emptyFormPrompts.length) {
+    states.empty.hosts += emptyFormPrompts.length;
+    states.empty.messages = states.empty.messages.concat(
+      emptyFormPrompts.filter(function(p){ return p.named; }).map(function(p){ return p.message; })
+    );
+    states.empty.formPrompts = emptyFormPrompts;
+  }
 
   var joined = textAcc.join('\\u0000');
   var hash = 0;
@@ -846,6 +878,20 @@ const langRuns = (isBase) => `(function(){
     // population than the per-language ones compares positions that are not the same run.
     if (t.parentElement.closest('[data-dev-only]')) continue;
     acc.push(s);
+  }
+  // Keep this population byte-for-byte aligned with PROBE: an empty native field paints
+  // its placeholder even though TreeWalker cannot see attribute text. Without this half,
+  // the per-language hashes moved while diffRuns stayed zero on a fully translated note.
+  var promptControls = [].slice.call(r.querySelectorAll('input[placeholder],textarea[placeholder]'));
+  for (var p = 0; p < promptControls.length; p++) {
+    var pe = promptControls[p];
+    if (String(pe.value || '').length > 0) continue;
+    if (typeof pe.checkVisibility === 'function'
+      && !pe.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })) continue;
+    if (r.classList.contains('os-desktop') && pe.closest('.fwin')) continue;
+    if (pe.closest('[data-dev-only]')) continue;
+    var ps = (pe.getAttribute('placeholder') || '').trim();
+    if (ps) acc.push(ps);
   }
   if (${isBase ? 'true' : 'false'}) { window.__cat8LangBase = acc; return JSON.stringify({ diffRuns: 0, examples: [] }); }
   var base = window.__cat8LangBase || [];

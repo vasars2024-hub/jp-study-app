@@ -253,8 +253,8 @@ async function raise(titleRe) {
 /**
  * ---------------------------------------------------------------- the no-Liquid host
  *
- * Correction 24, 2026-08-31. `canPresentLiquid` refuses sections `city` and `visualizer`
- * outright, so those windows render no Make Liquid control and there is no
+ * Correction 24, 2026-08-31. `canPresentLiquid` formerly refused sections `city` and
+ * `visualizer` outright, so those windows rendered no Make Liquid control and there was no
  * Standard -> Liquid -> Standard trip to take. Left alone this file threw on the first
  * `flip()` and category 6 was simply unreachable on L9's second RULE C surface.
  *
@@ -267,7 +267,8 @@ async function raise(titleRe) {
  *      one other window must render the control and this one must not. With no such
  *      neighbour the run REFUSES, because then the absence is equally explained by an app
  *      that renders the affordance nowhere — which is a defect, and is exactly the shape
- *      of the 2026-08-17 visualizer finding.
+ *      of the 2026-08-17 visualizer finding. Both sections now own real contextual regions,
+ *      but this path remains the guard for any deliberately standard-only host.
  *   2. `roundTripHeld` — measured over the reversible transition this window ACTUALLY has,
  *      minimize -> restore, driven from its taskbar button. The rubric names geometry,
  *      focus, z-order and taskbar identity as part of the trip, and all of them survive

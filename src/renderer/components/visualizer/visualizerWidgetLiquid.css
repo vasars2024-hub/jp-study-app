@@ -1,0 +1,67 @@
+/* Visualizer's stable canvas owns the window. The two routes sit in one compact edge dock:
+   quiet while the ambient surface is idle, fully visible on pointer or keyboard focus. */
+.viz-widget-dock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(16, 15, 21, 0.82);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.28);
+  opacity: 0.42;
+  transform: translateY(2px);
+  transition:
+    opacity var(--lq-motion-enter) var(--lq-ease-enter),
+    transform var(--lq-motion-move) var(--lq-ease-move);
+}
+
+.fwin-viz:hover .viz-widget-dock,
+.fwin-viz.focused .viz-widget-dock,
+.viz-widget-dock:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.viz-widget-action {
+  width: var(--lq-hit-target);
+  height: var(--lq-hit-target);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.viz-widget-action:hover,
+.viz-widget-action:focus-visible {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* The shared contextual primitive supplies the theme-owned material only after opt-in.
+   Keep this compact dock's geometry while inheriting that material and motion. */
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .viz-widget-dock.lq-contextual {
+  padding: var(--lq-space-1);
+  border-radius: var(--lq-liquid-radius);
+}
+
+:is(.fwin.fwin-liquid, .popout-root.popout-liquid) .viz-widget-action {
+  color: var(--lq-liquid-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-widget-dock {
+    transform: none;
+  }
+}
+
+:root.reduce-motion .viz-widget-dock {
+  transform: none;
+}
