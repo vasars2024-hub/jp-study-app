@@ -105,6 +105,29 @@ function cssSource(): string {
   return readFileSync(join(__dirname, '..', 'components', 'scraper', 'scraper.css'), 'utf8');
 }
 
+/**
+ * The body of one `@container scr-shell (max-width: Npx)` tier, comments stripped.
+ * Comments are removed because prose about a declaration reads exactly like the
+ * declaration to a text guard, and both tiers here are explained in prose that
+ * names the other tier's rules.
+ */
+function tierBody(css: string, maxWidth: number): string {
+  const header = `@container scr-shell (max-width: ${maxWidth}px) {`;
+  const start = css.indexOf(header);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let i = start + header.length - 1; i < css.length; i += 1) {
+    if (css[i] === '{') depth += 1;
+    else if (css[i] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return css.slice(start + header.length, i).replace(/\/\*[\s\S]*?\*\//g, '');
+      }
+    }
+  }
+  return '';
+}
+
 describe('Scraper narrow tier — reflow without losing a route', () => {
   it('hides only top-bar actions that duplicate a rail page', async () => {
     const host = await mount();
@@ -146,5 +169,53 @@ describe('Scraper narrow tier — reflow without losing a route', () => {
     // The height floor cannot live inside that tier: a container never matches its
     // own query, and `.scr-shell` is the container.
     expect(/\.scr-shell \{[^}]*min-height: 420px;/s.test(css), 'shell carries the height floor').toBe(true);
+  });
+
+  /**
+   * The 1100px tier narrows the rail column to 52px when the drawer opens, but
+   * `.is-collapsed` is a component state the drawer does not set and the
+   * label-hiding lived only in the 700px tier. Measured live at 820x580 with the
+   * drawer open: 17 rail buttons at rect 152x32 with 44px hit-testable, labels
+   * sliced mid-word ("D." "Di" "Hi" "Memo 554 M"). jsdom has no container queries,
+   * so the tier is read as text — that is what the live fix depends on.
+   */
+  it('collapses the rail itself wherever it collapses the rail column', () => {
+    const css = cssSource();
+    const drawerTier = tierBody(css, 1100);
+    expect(drawerTier, 'the drawer tier exists').not.toBe('');
+    expect(drawerTier, 'that tier is the one that narrows the column').toContain(
+      'grid-template-columns: 52px minmax(0, 1fr);',
+    );
+    for (const part of ['label', 'dot', 'group-label', 'tasks', 'metric']) {
+      expect(
+        drawerTier.includes(`.scr-shell.is-drawer-open .scr-rail .scr-rail-${part}`),
+        `the 52px rail hides .scr-rail-${part}`,
+      ).toBe(true);
+    }
+    expect(
+      /\.scr-shell\.is-drawer-open \.scr-rail \.scr-rail-item \{[^}]*justify-content: center;/s.test(
+        drawerTier,
+      ),
+      'the icon-only rail centres its icons',
+    ).toBe(true);
+    // The status text is clipped rather than removed: a bare coloured dot would be
+    // colour-alone signalling, which is why the component uses `sr-only` for the
+    // same state and why this must not become `display: none`.
+    expect(
+      /\.scr-shell\.is-drawer-open \.scr-rail \.scr-rail-state-text \{[^}]*clip: rect\(0, 0, 0, 0\);/s.test(
+        drawerTier,
+      ),
+      'the running/idle state stays announced',
+    ).toBe(true);
+  });
+
+  it('gives the status text a hook a container query can reach', () => {
+    const nav = readFileSync(
+      join(__dirname, '..', 'components', 'scraper', 'ScraperNav.tsx'),
+      'utf8',
+    ).replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    // Unconditional: the class the tier hides by cannot depend on `railCollapsed`,
+    // which is false in exactly the case that needed fixing.
+    expect(nav).toContain('`scr-rail-state-text${ctl.railCollapsed ? \' sr-only\' : \'\'}`');
   });
 });
