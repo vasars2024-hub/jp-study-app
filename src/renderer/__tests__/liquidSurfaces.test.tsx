@@ -276,9 +276,17 @@ describe('liquid surface primitives — the contextual role is inert until a win
     const floor = blocks.find((b) => /min-height:\s*var\(--lq-hit-target\)/.test(b.declarations));
     expect(floor).toBeDefined();
     expect(floor!.selector).toMatch(/\.lq-contextual :where\(/);
-    const focus = blocks.find((b) => /outline:\s*2px solid var\(--focus-ring\)/.test(b.declarations));
-    expect(focus).toBeDefined();
+    // Matched by what the rule DOES, not by its literal text. This assertion used
+    // to pin `outline: 2px solid var(--focus-ring)` exactly — and `--focus-ring` is
+    // declared nowhere, so it was pinning a declaration the browser discarded
+    // whole (`7bea52d4`). A guard that spells out the broken value keeps it.
+    const focus = blocks.find((b) => /outline:\s*var\(--focus-ring-width\)/.test(b.declarations));
+    expect(focus, 'a :focus-visible rule built from the --focus-ring-* tokens').toBeDefined();
     expect(focus!.selector).toMatch(/\.lq-contextual :focus-visible/);
+    // The width and offset come from tokens too, or high contrast's 3px ring
+    // (`a11y.css`) never reaches a Liquid surface.
+    expect(focus!.declarations).toMatch(/var\(--focus-ring-color\)/);
+    expect(focus!.declarations).toMatch(/outline-offset:\s*var\(--focus-ring-offset\)/);
   });
 
   it('renders the class and role marker, and is NOT the liquid class', () => {
