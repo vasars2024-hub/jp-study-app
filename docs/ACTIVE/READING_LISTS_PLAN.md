@@ -652,6 +652,58 @@ these four commits.
 click-through table is largely satisfied by P4b and §11.2; audit it row by row against the
 table rather than assuming, then §11.4's eight pass/fail rows.
 
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4: bulk selection and
+performance CLOSED. P4 owes §11.1's audit and five §11.4 rows.**
+
+Counted against §11.4's own nine bullets: **keyboard** (`816a68c1`), **bulk
+selection** and **performance** are closed; **undo** is closed for every
+destructive act that exists (remove entry, delete list, dismiss suggestion, and
+all three bulk verbs) and still owes the re-parse; **drag and drop**, **real
+empty states**, **loading/error states**, **accessibility** and **density** are
+open. So **3 of 9 closed, 1 partial, 5 open.**
+
+- `f55e002a` — the three bulk verbs in the mutation layer. Finish and remove are
+  FOLDS over the single-entry mutations, so what "finished" means stays in one
+  place; move is not a fold, and carries the entry whole (same id, workId, state,
+  dates) because re-adding it would mint a new work and reset the state. A work
+  already on the target is skipped and NAMED. 43/43, five mutation controls.
+- `a9fa1550` — the bulk bar. The selection is **derived through the live rows**
+  before it is used, so an entry removed by another window falls out of the count
+  on its own. A **shift-range spans only the rows on screen**; ranging over the
+  unfiltered list selects entries that were never visible. 18/18, three controls.
+- `e5ad2963` — §11.4's performance row: one row repaints on a one-row change,
+  not 500. 20/20, two controls.
+
+**Two traps, both of which cost a run here:**
+
+1. **`applyReadingListsMutation` normalizes its base**, which rebuilds every
+   entry object — so `memo` on `row.entry` identity NEVER bites and scored 500 of
+   500 rows re-rendering. Pass `entryId` and `state`; they are primitives.
+2. **The two bulk undos replay their captured indices in OPPOSITE directions.**
+   The removal fold captures each index against the array as it stood at that
+   step (two adjacent rows both capture 0) and unwinds BACKWARDS; the move takes
+   all its indices from one snapshot, so they are simultaneous and re-insert in
+   ASCENDING order. I wrote the move backwards first; only a whole-array
+   assertion caught it.
+
+Smaller: `setUiLang` is a dynamic import of a 12,000-key module, so a fixed
+microtask wait reads 0 repaints on a CORRECT component — poll `getUiLang()`. And
+a `perl -0pi` whose pattern carried a Japanese literal double-encoded six
+characters elsewhere in the file; grep for mojibake after any scripted non-ASCII
+edit.
+
+Gates at `e5ad2963`: `npx vitest run` EXIT 0, **1064 passed | 1 skipped, 13,705
+tests**; `i18n-check.cjs` EXIT 0 at **12,410** keys; `architecture-audit.cjs`
+EXIT 0 "Nothing new"; eslint 0 errors on every touched path.
+
+**Exact next slice: §11.4's empty/loading/error states**, which is the cheapest
+remaining row and the one a new user hits first — the grid's "No lists yet" is
+the bare string the plan forbids and should be the paste box itself with §2.1's
+example as the hint, and the detail's load state should be skeleton rows. Then
+density, then drag-and-drop (`reorderReadingListEntries` already exists and has
+no consumer). §11.1's click-through table still needs auditing row by row rather
+than assuming — four of its eight rows have no test naming them.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
