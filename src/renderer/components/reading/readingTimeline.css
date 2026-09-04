@@ -115,9 +115,14 @@
   background: var(--lq-work-bg, rgba(255, 255, 255, 0.04));
 }
 
+/*
+  `--accent`, NOT `--lq-accent`: there is no such Liquid token, and the guard in
+  liquidTokenNamesResolve.test.ts catches exactly that invention. The sibling
+  sheet readingLists.css reaches for `--accent` in four places for the same job.
+*/
 .rlt__day--live {
   cursor: pointer;
-  background: var(--lq-accent, #ff2e4d);
+  background: var(--accent, #ff2e4d);
 }
 
 .rlt__day--live[data-heat='1'] {
