@@ -55,6 +55,8 @@ import {
   type ReadingListDensity,
 } from '../readingListsDensity';
 import { useLibraryItems } from '../widgets/hooks';
+import { stageReadingWorkspaceRouteForPopout } from '../readingWorkspaceNavigation';
+import { READING_WORKSPACE_SCHEMA_VERSION } from '../../shared/readingWorkspace';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
 import type {
   ReadingEntryState,
@@ -614,6 +616,38 @@ export default function ReadingListsView({
   const [healthDismissedAt, setHealthDismissedAt] = useState<number | null>(null);
   const items = useLibraryItems();
   const [listId, setListId] = useState<string | null>(initialListId);
+  /**
+   * §11.1's last row — *"Middle-click / Ctrl-click opens in a pop-out wherever
+   * the app already supports it"*.
+   *
+   * The app supports pop-outs for SECTIONS (`?popout=<section>`, one window per
+   * section), not for individual books, so the gesture belongs to a list CARD
+   * and opens the Reading section already routed to that list. Ctrl-clicking a
+   * row would have to invent a per-book window, which is a second navigation
+   * model §11.1 explicitly forbids.
+   *
+   * Falls back to opening in-window whenever the hand-off cannot be staged or
+   * main refuses the window. A gesture that suppressed the normal open and then
+   * failed silently would be exactly the dead end this row exists to remove.
+   */
+  const openListPoppedOut = useCallback((targetListId: string): void => {
+    const staged = stageReadingWorkspaceRouteForPopout({
+      version: READING_WORKSPACE_SCHEMA_VERSION,
+      section: 'lists',
+      intent: 'browse',
+      listId: targetListId,
+    });
+    if (!staged) {
+      setListId(targetListId);
+      return;
+    }
+    const popOut = window.api?.popOut;
+    if (typeof popOut !== 'function') {
+      setListId(targetListId);
+      return;
+    }
+    void Promise.resolve(popOut('reading')).catch(() => setListId(targetListId));
+  }, []);
   const [sort, setSort] = useState<ReadingListSort>('recent');
   const [naming, setNaming] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -2864,7 +2898,26 @@ export default function ReadingListsView({
               <button
                 type="button"
                 className="rlv__card-open ui-focusable"
-                onClick={() => setListId(summary.listId)}
+                onClick={(event) => {
+                  // `metaKey` as well as `ctrlKey`: this shell runs on macOS
+                  // too, where Cmd-click is the same gesture.
+                  if (event.ctrlKey || event.metaKey) {
+                    event.preventDefault();
+                    openListPoppedOut(summary.listId);
+                    return;
+                  }
+                  setListId(summary.listId);
+                }}
+                /*
+                  Middle-click does not raise `click` on a button in Chromium —
+                  only `auxclick`. Handling it here rather than in `onClick` is
+                  why the middle half of this row works at all.
+                */
+                onAuxClick={(event) => {
+                  if (event.button !== 1) return;
+                  event.preventDefault();
+                  openListPoppedOut(summary.listId);
+                }}
               >
                 <span className="rlv__mosaic" aria-hidden="true">
                   {(summary.coverItemIds.length > 0

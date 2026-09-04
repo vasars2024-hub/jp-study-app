@@ -24,8 +24,10 @@ import {
 } from '../readingPassageHandoffClient';
 import {
   consumePendingReadingWorkspaceRoute,
+  consumeStagedPopoutReadingWorkspaceRoute,
   readingWorkspaceHostForSection,
   subscribeReadingWorkspaceRoutes,
+  subscribeStagedPopoutReadingWorkspaceRoutes,
 } from '../readingWorkspaceNavigation';
 import './readingWorkspace.css';
 
@@ -121,11 +123,22 @@ export default function ReadingWorkspaceView({
   useEffect(() => {
     const host = readingWorkspaceHostForSection(initialSection);
     const unsubscribe = subscribeReadingWorkspaceRoutes(host, applyRoute);
-    const pending = consumePendingReadingWorkspaceRoute(host);
+    /*
+     * §11.1's Ctrl-click pop-out. Both halves, for the same reason the lens
+     * handoff below needs both: the mount claim serves the COLD open, where
+     * main created this window after the route was staged, and the
+     * subscription serves every later gesture, because `popOut` focuses the
+     * window that already exists instead of remounting it. In a desktop
+     * window both are inert by construction — see `isPopoutWindow`.
+     */
+    const unsubscribeStaged = subscribeStagedPopoutReadingWorkspaceRoutes(host, applyRoute);
+    const pending = consumePendingReadingWorkspaceRoute(host)
+      ?? consumeStagedPopoutReadingWorkspaceRoute(host);
     if (pending) applyRoute(pending);
     return () => {
       routeGenerationRef.current += 1;
       unsubscribe();
+      unsubscribeStaged();
     };
   }, [applyRoute, initialSection]);
 
