@@ -12,9 +12,16 @@ vi.mock('../i18n', () => ({
 }));
 
 vi.mock('../views/ReadingFinderView', () => ({
-  default: ({ mode }: { mode?: string }) => createElement('div', {
+  default: ({ mode, initialQuery }: { mode?: string; initialQuery?: string }) => createElement('div', {
     'data-surface': 'finder',
     'data-mode': mode,
+    'data-query': initialQuery ?? '',
+  }),
+}));
+vi.mock('../views/ReadingListsView', () => ({
+  default: ({ onFindWork }: { onFindWork: (title: string) => void }) => createElement('button', {
+    'data-surface': 'lists',
+    onClick: () => onFindWork('コンビニ人間'),
   }),
 }));
 vi.mock('../views/LibraryView', () => ({
@@ -84,6 +91,7 @@ describe('ReadingWorkspaceView', () => {
       'settings.nav.home',
       'palette.section.reading',
       'palette.section.library',
+      'readingLists.view.title',
       'reading.continue.title',
       'novelsView.plan',
       'library.aero.toolbar.import',
@@ -96,18 +104,36 @@ describe('ReadingWorkspaceView', () => {
     }
   });
 
-  it('lands the Reading compatibility entry on Discover inside one eight-destination shell', async () => {
+  it('lands the Reading compatibility entry on Discover inside one nine-destination shell', async () => {
     await render();
 
-    // Eight since the lens passage lane landed: Captures is the destination
+    // Eight since the lens passage lane landed — Captures is the destination
     // `resolveReadingLensWorkflow`'s `reading` target had been routing to for
-    // its whole life with nothing there to receive it.
-    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(8);
+    // its whole life with nothing there to receive it — and nine since Reading
+    // Lists P4b mounted §6's surface as a sibling of Library.
+    expect(host.querySelectorAll('[role="tab"]')).toHaveLength(9);
     expect(host.querySelector('[role="tablist"]')?.classList.contains('lq-contextual')).toBe(true);
     expect(host.querySelector('[role="tablist"]')?.getAttribute('data-lq-role')).toBe('contextual');
     expect(tab('captures')).not.toBeNull();
     expect(tab('discover').getAttribute('aria-selected')).toBe('true');
     expect(host.querySelector('[data-surface="finder"]')).not.toBeNull();
+  });
+
+  it('carries a list row title into Discover instead of dropping the user in an empty box', async () => {
+    await render();
+
+    await act(async () => tab('lists').click());
+    const lists = host.querySelector<HTMLButtonElement>('[data-surface="lists"]');
+    expect(lists).not.toBeNull();
+
+    // §11.1's acquisition path, end to end: the unbound row asks, the workspace
+    // switches tab, and the title arrives with it. A tab switch that lost the
+    // title would leave a search box the user has to retype into.
+    await act(async () => lists?.click());
+    expect(host.querySelector('[data-reading-section="discover"]')).not.toBeNull();
+    expect(host.querySelector('[data-surface="finder"]')?.getAttribute('data-query')).toBe(
+      'コンビニ人間',
+    );
   });
 
   it('lands the Novels compatibility entry on Plan', async () => {

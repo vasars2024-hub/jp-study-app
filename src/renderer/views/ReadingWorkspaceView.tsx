@@ -33,11 +33,13 @@ const ReadingFinderView = lazy(() => import('./ReadingFinderView'));
 const LibraryView = lazy(() => import('./LibraryView'));
 const NovelsView = lazy(() => import('./NovelsView'));
 const ReadingCapturesView = lazy(() => import('./ReadingCapturesView'));
+const ReadingListsView = lazy(() => import('./ReadingListsView'));
 
 const SECTION_LABEL_KEYS: Record<ReadingWorkspaceSection, string> = {
   home: 'settings.nav.home',
   discover: 'palette.section.reading',
   library: 'palette.section.library',
+  lists: 'readingLists.view.title',
   captures: 'reading.captures.title',
   continue: 'reading.continue.title',
   plan: 'novelsView.plan',
@@ -49,6 +51,7 @@ const SECTION_ICONS: Record<ReadingWorkspaceSection, Parameters<typeof Icon>[0][
   home: 'app',
   discover: 'search',
   library: 'library',
+  lists: 'clipboard',
   captures: 'scan',
   continue: 'bookmark',
   plan: 'calendar',
@@ -68,6 +71,8 @@ export default function ReadingWorkspaceView({
   const { t } = useT();
   const [section, setSection] = useState(initialSection);
   const [passage, setPassage] = useState<ReadingPassageHandoff | null>(null);
+  /** What Reading Lists asked Discover to look for. Empty until it does. */
+  const [finderQuery, setFinderQuery] = useState('');
   const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const routeGenerationRef = useRef(0);
 
@@ -201,6 +206,20 @@ export default function ReadingWorkspaceView({
             <ReadingFinderView
               onOpenBook={onOpenBook}
               mode={section === 'continue' ? 'continue' : section === 'home' ? 'home' : 'discover'}
+              initialQuery={section === 'discover' ? finderQuery : undefined}
+            />
+          ) : null}
+          {surface === 'lists' ? (
+            <ReadingListsView
+              onOpenBook={onOpenBook}
+              // §11.1's acquisition path, and the reason it is a real one here:
+              // Discover is a sibling tab of this very workspace, so "find this"
+              // is a tab switch carrying the title rather than a new window and
+              // a search box the user has to retype into.
+              onFindWork={(title) => {
+                setFinderQuery(title);
+                setSection('discover');
+              }}
             />
           ) : null}
           {surface === 'novels' ? <NovelsView mode={section as 'plan' | 'imports' | 'sources'} /> : null}

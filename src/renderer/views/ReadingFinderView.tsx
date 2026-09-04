@@ -11,6 +11,7 @@
 // components/reading/ReadingFinderContent.tsx so Blanc can render the same
 // finder without this file's AppChrome (see BLANC_REFINEMENT_PLAN.md Pillar 0).
 
+import { useEffect, useRef } from 'react';
 import { AppChrome, StatusBarField, StatusBarSpacer, type MenuBarMenu, useAeroMaterials } from '../components/ui';
 import {
   ALL_LEVELS,
@@ -30,14 +31,35 @@ export type ReadingFinderMode = 'home' | 'discover' | 'continue';
 export default function ReadingFinderView({
   onOpenBook,
   mode = 'discover',
+  initialQuery,
 }: {
   onOpenBook: (item: LibraryItem) => void;
   mode?: ReadingFinderMode;
+  /**
+   * A search this surface was opened FOR — Reading Lists' "Find this" hands the
+   * title over rather than dropping the user into an empty box (§11.1). It seeds
+   * the field once per distinct value; typing afterwards is never overwritten.
+   */
+  initialQuery?: string;
 }) {
   const { t } = useT();
   const aero = useAeroMaterials();
   const state = useReadingFinder();
   const { query, setQuery, levels, list, continueReading, selected, setSelected, surpriseMe, resetFilters, showAdult, setShowAdult } = state;
+
+  /**
+   * Seeded here rather than inside `useReadingFinder`, so Blanc's panel — which
+   * shares the hook — keeps its own signature and is not made to carry a prop
+   * only Study OS passes. Once per distinct value: pressing "Find this" twice on
+   * one title must not wipe the refinement the first press led to.
+   */
+  const seeded = useRef(initialQuery ?? '');
+  useEffect(() => {
+    const seed = initialQuery ?? '';
+    if (!seed || seed === seeded.current) return;
+    seeded.current = seed;
+    setQuery(seed);
+  }, [initialQuery, setQuery]);
 
   const menus: MenuBarMenu[] = mode === 'discover' ? [
     {

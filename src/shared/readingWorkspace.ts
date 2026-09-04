@@ -25,6 +25,7 @@ export const READING_WORKSPACE_SECTIONS = [
   'home',
   'discover',
   'library',
+  'lists',
   'captures',
   'continue',
   'plan',
@@ -40,12 +41,13 @@ export type ReadingWorkspaceSection = (typeof READING_WORKSPACE_SECTIONS)[number
  * desktop aliases from growing their own, contradictory navigation rules
  * while the destination-specific workspace panels converge incrementally.
  */
-export type ReadingWorkspaceSurface = 'finder' | 'library' | 'novels' | 'captures';
+export type ReadingWorkspaceSurface = 'finder' | 'library' | 'novels' | 'captures' | 'lists';
 
 export function readingWorkspaceSurfaceForSection(
   section: ReadingWorkspaceSection,
 ): ReadingWorkspaceSurface {
   if (section === 'library') return 'library';
+  if (section === 'lists') return 'lists';
   if (section === 'captures') return 'captures';
   if (section === 'plan' || section === 'imports' || section === 'sources') return 'novels';
   return 'finder';
