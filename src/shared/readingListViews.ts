@@ -21,6 +21,7 @@ import type {
   ReadingListsDocument,
   ReadingListTarget,
   ReadingWorkRef,
+  SmartListQuery,
 } from './readingLists';
 // The SAME normaliser `readingListMatching` compares authors with. Two author
 // normalisers is two answers to "is this the same person", and the surface and
@@ -483,8 +484,47 @@ export function sortReadingListSummaries(
   return [...summaries].sort(compare);
 }
 
+/**
+ * Every list a card can honestly be drawn for.
+ *
+ * `smart` lists are EXCLUDED, and that is the point of the filter rather than an
+ * oversight. P5 §7 stores a smart list as a saved query with no entries — that
+ * is its normal shape, not a damaged one — so a summary of it reads "0 of 0
+ * finished" over an empty progress bar and its detail opens on nothing. Every
+ * caller here draws entry counts, so every caller would draw that same lie.
+ * `ReadingSmartLists` renders saved queries instead, with their live counts.
+ *
+ * Safe to narrow rather than a behaviour change: nothing has ever produced a
+ * `smart` list until `saveSmartReadingList`, so no stored document has one.
+ */
 export function summarizeReadingLists(document: ReadingListsDocument): ReadingListSummary[] {
-  return document.lists.map((list) => summarizeReadingList(list, document.works));
+  return document.lists
+    .filter((list) => list.kind !== 'smart')
+    .map((list) => summarizeReadingList(list, document.works));
+}
+
+/** The saved queries §7's panel offers beside its three presets. */
+export interface SavedSmartList {
+  listId: string;
+  name: string;
+  query: SmartListQuery;
+}
+
+/**
+ * A `smart` list without a `query` is unanswerable and is left out.
+ *
+ * It should be unreachable — `saveSmartReadingList` refuses an empty query and
+ * `normalizeReadingList` drops one it cannot repair — but a hand-edited file can
+ * still hold `{"kind":"smart"}`, and a chip that derives nothing looks exactly
+ * like a query that matches nothing.
+ */
+export function savedSmartLists(document: ReadingListsDocument): SavedSmartList[] {
+  const out: SavedSmartList[] = [];
+  for (const list of document.lists) {
+    if (list.kind !== 'smart' || !list.query || list.archivedAt !== undefined) continue;
+    out.push({ listId: list.id, name: list.name, query: list.query });
+  }
+  return out;
 }
 
 /**

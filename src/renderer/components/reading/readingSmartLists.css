@@ -118,3 +118,37 @@
 .rlsm__row-level[data-unrated='true'] {
   font-style: italic;
 }
+
+/*
+  A saved chip is marked by a dashed leading edge as well as by its position,
+  so "mine" and "built in" are distinguishable without relying on order.
+*/
+.rlsm__chip--saved {
+  border-left-style: dashed;
+  border-left-width: 2px;
+}
+
+.rlsm__save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  margin-top: var(--lq-space-3, 12px);
+}
+
+.rlsm__save-label {
+  font-size: 12px;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.62));
+}
+
+.rlsm__save-field {
+  min-height: 34px;
+  min-width: 160px;
+  padding: 0 var(--lq-space-2, 8px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  border-radius: var(--lq-work-radius, 8px);
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  color: var(--lq-work-text, rgba(255, 255, 255, 0.88));
+  font: inherit;
+  font-size: 12px;
+}

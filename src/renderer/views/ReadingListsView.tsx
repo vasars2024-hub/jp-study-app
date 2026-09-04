@@ -47,7 +47,11 @@ import {
 } from '../readingListsDensity';
 import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
-import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
+import type {
+  ReadingEntryState,
+  ReadingListEntry,
+  SmartListQuery,
+} from '../../shared/readingLists';
 import { READING_LIST_EXAMPLE_MESSAGE } from '../../shared/readingListParser';
 import {
   addLibraryItemToReadingList,
@@ -64,6 +68,7 @@ import {
   restoreReadingListEntries,
   restoreReadingListEntry,
   restoreReadingWorkSuggestion,
+  saveSmartReadingList,
   setReadingEntryState,
   setReadingEntryStates,
   undoReadingListMove,
@@ -1146,6 +1151,53 @@ export default function ReadingListsView({
       });
     },
     [document, list, t, write],
+  );
+
+  /** P5 §7: keep the open question as a `smart` list. */
+  const saveSmartQuery = useCallback(
+    (name: string, query: SmartListQuery) => {
+      void write((current) =>
+        saveSmartReadingList(current, { name, query }, createReadingListsMutationContext()),
+      );
+    },
+    [write],
+  );
+
+  /**
+   * Removing a saved question, with the same undo every other destructive
+   * action here carries (§11.4). It reuses `deleteReadingList`/`restoreReadingList`
+   * rather than a smart-specific pair: a smart list IS a list, and a second
+   * delete path would be a second answer to what deleting one means.
+   */
+  const removeSmartQuery = useCallback(
+    (targetId: string, name: string) => {
+      const held: { removed: RemovedReadingList | null; index: number } = {
+        removed: null,
+        index: 0,
+      };
+      void write(
+        (current) => {
+          held.index = current.lists.findIndex((candidate) => candidate.id === targetId);
+          const mutation = deleteReadingList(current, targetId, createReadingListsMutationContext());
+          held.removed = mutation.removed;
+          return mutation;
+        },
+        () => {
+          const captured = held.removed;
+          const at = held.index;
+          if (!captured) return null;
+          return {
+            message: t('readingLists.smart.removed', { name }),
+            run: () => {
+              void write((current) =>
+                restoreReadingList(current, captured, at, createReadingListsMutationContext()),
+              );
+            },
+          };
+        },
+      );
+    },
+    [t, write],
   );
 
   const removeList = useCallback(
@@ -2581,6 +2633,8 @@ export default function ReadingListsView({
         items={items}
         onOpenBook={onOpenBook}
         onFindWork={onFindWork}
+        onSaveQuery={saveSmartQuery}
+        onRemoveSaved={removeSmartQuery}
       />
     </div>
   );

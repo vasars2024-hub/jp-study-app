@@ -109,6 +109,8 @@ async function render(
   handlers: {
     onOpenBook?: (item: LibraryItem) => void;
     onFindWork?: (title: string) => void;
+    onSaveQuery?: (name: string, query: unknown) => void;
+    onRemoveSaved?: (listId: string, name: string) => void;
   } = {},
 ) {
   await act(async () => {
@@ -118,6 +120,8 @@ async function render(
         items={items}
         onOpenBook={handlers.onOpenBook ?? (() => undefined)}
         onFindWork={handlers.onFindWork ?? (() => undefined)}
+        {...(handlers.onSaveQuery ? { onSaveQuery: handlers.onSaveQuery } : {})}
+        {...(handlers.onRemoveSaved ? { onRemoveSaved: handlers.onRemoveSaved } : {})}
       />,
     );
     await Promise.resolve();
@@ -245,6 +249,111 @@ describe('ReadingSmartLists — P5 §7', () => {
     expect(onOpenBook).toHaveBeenCalledTimes(1);
     expect(onOpenBook.mock.calls[0]?.[0]?.id).toBe('it-stale');
     expect(onFindWork).not.toHaveBeenCalled();
+  });
+
+  it('saves the open question under the preset name when the field is left blank', async () => {
+    const { document, items } = seeded();
+    const onSaveQuery = vi.fn();
+    await render(document, items, { onSaveQuery });
+    await press('Ready to read');
+    const save = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__save button')].at(-1);
+    expect(save?.textContent).toBe('Save');
+    await act(async () => {
+      save?.click();
+      await Promise.resolve();
+    });
+    expect(onSaveQuery).toHaveBeenCalledTimes(1);
+    const [name, query] = onSaveQuery.mock.calls[0];
+    expect(name).toBe('Ready to read');
+    // The query saved is the one that produced the rows on screen.
+    expect(query).toMatchObject({ state: ['owned'], ownedOnly: true, difficultyMax: 4 });
+    // Saving closes the answer, so the panel does not read as a pending edit.
+    expect(host.querySelector('.rlsm__answer')).toBeNull();
+  });
+
+  it('a typed name wins, and whitespace alone cannot mint a nameless list', async () => {
+    const { document, items } = seeded();
+    const onSaveQuery = vi.fn();
+    await render(document, items, { onSaveQuery });
+    await press('Ready to read');
+    const field = host.querySelector<HTMLInputElement>('#rlsm-save-name');
+    expect(field).not.toBeNull();
+    await act(async () => {
+      // React tracks the DOM value, so a bare `.value =` is not seen as a change.
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      setter?.call(field, '  Light reading ');
+      field!.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const save = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__save button')].at(-1);
+    await act(async () => {
+      save?.click();
+      await Promise.resolve();
+    });
+    expect(onSaveQuery.mock.calls[0]?.[0]).toBe('Light reading');
+  });
+
+  it('offers no Save where the host supplies no write path', async () => {
+    const { document, items } = seeded();
+    await render(document, items);
+    await press('Ready to read');
+    // A control that is present and does nothing is what §11.1 forbids.
+    expect(host.querySelector('.rlsm__save')).toBeNull();
+  });
+
+  it('offers no Save for a preset with no query to save', async () => {
+    const { document, items } = seeded();
+    await render(document, items, { onSaveQuery: vi.fn() });
+    // Author sweep with nothing finished builds no query at all.
+    await press('Author sweep');
+    expect(host.querySelector('.rlsm__save')).toBeNull();
+  });
+
+  it('a saved question becomes a chip that answers, and can be removed', async () => {
+    const { document, items } = seeded();
+    const onRemoveSaved = vi.fn();
+    const withSaved: ReadingListsDocument = {
+      ...document,
+      lists: [
+        ...document.lists,
+        {
+          id: 'l-smart',
+          name: 'Light reading',
+          kind: 'smart',
+          createdAt: 1,
+          updatedAt: 1,
+          query: { state: ['owned'], ownedOnly: true, difficultyMax: 2 },
+          entries: [],
+          imports: [],
+        },
+      ],
+    };
+    await render(withSaved, items, { onRemoveSaved, onSaveQuery: vi.fn() });
+    expect(chips().map((node) => node.textContent)).toEqual([
+      'Abandoned',
+      'Ready to read',
+      'Author sweep',
+      'Light reading',
+    ]);
+
+    await press('Light reading');
+    // L2 or easier, owned, and it evaluates the SAVED query — the L3 stalled
+    // book and the L7 one are both out.
+    expect(rowTitles()).toEqual(['Fresh book']);
+    // Saving is a preset affordance; an already-saved question offers removal.
+    expect(host.querySelector('#rlsm-save-name')).toBeNull();
+
+    const remove = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__save button')].at(-1);
+    expect(remove?.textContent).toBe('Remove this question');
+    await act(async () => {
+      remove?.click();
+      await Promise.resolve();
+    });
+    expect(onRemoveSaved).toHaveBeenCalledWith('l-smart', 'Light reading');
+    expect(host.querySelector('.rlsm__answer')).toBeNull();
   });
 
   it('a book with no file routes to acquisition instead of dead-ending', async () => {

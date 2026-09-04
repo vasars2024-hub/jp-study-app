@@ -259,6 +259,44 @@ describe('ReadingListsView', () => {
   });
 
   /**
+   * The write half of §7. A panel test with a spy proves the button is wired to
+   * a callback; only this proves the callback reaches the STORE — and that the
+   * saved list does not then appear in the grid as a card reading "0 of 0
+   * finished", which is what `summarizeReadingLists` now excludes.
+   *
+   * Note the query here answers ZERO rows: `seeded()`'s entries are `wanted`,
+   * and Ready to read wants `owned`. Saving is offered anyway, on purpose — a
+   * question is worth keeping before it has an answer, and a Save control that
+   * appeared and vanished with the row count would move for reasons the user
+   * cannot see.
+   */
+  it('saves a smart list through the store and keeps it out of the card grid', async () => {
+    const { document } = seeded();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render();
+
+    const cardsBefore = host.querySelectorAll('.rlv__card').length;
+    const readyChip = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__chip')].find(
+      (node) => node.textContent === 'Ready to read',
+    );
+    await click(readyChip);
+    const save = [...host.querySelectorAll<HTMLButtonElement>('.rlsm__save button')].at(-1);
+    expect(save?.textContent).toBe('Save');
+    await click(save);
+
+    const stored = store.document.lists.filter((entry) => entry.kind === 'smart');
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.name).toBe('Ready to read');
+    expect(stored[0]?.query).toMatchObject({ ownedOnly: true, difficultyMax: 4 });
+    expect(stored[0]?.entries).toEqual([]);
+
+    // It came back as a chip, not as a card.
+    expect(host.querySelectorAll('.rlv__card')).toHaveLength(cardsBefore);
+    expect(host.querySelectorAll('.rlsm__chip[data-saved="true"]')).toHaveLength(1);
+  });
+
+  /**
    * A SEPARATE mount, deliberately. `render()` re-renders the same root and the
    * view holds `listId` in state seeded from the prop, so calling it twice never
    * leaves the grid — an in-test navigation here asserted nothing and read as a

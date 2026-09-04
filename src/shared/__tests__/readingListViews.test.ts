@@ -20,6 +20,7 @@ import {
   readingWorksByAuthor,
   reorderEntryIds,
   recentReadingFinishes,
+  savedSmartLists,
   sortReadingListEntries,
   sortReadingListSummaries,
   summarizeReadingList,
@@ -622,5 +623,51 @@ describe('readingListsForItem — §11.1 row 8, the "on 2 lists" line in the rea
     const rows = readingListsForItem(twoClaims, 'li7');
     expect(rows.map((row) => row.entryId)).toEqual(['lA_e9', 'lA_e1', 'lB_e0', 'lC_e0']);
     expect(new Set(rows.map((row) => row.workId))).toEqual(new Set(['w0', 'w1b']));
+  });
+});
+
+describe('smart lists are not entry-list cards', () => {
+  /** One ordinary list, one smart, one smart-but-unanswerable, one archived smart. */
+  const doc = {
+    schemaVersion: 1,
+    revision: 1,
+    works: [],
+    lists: [
+      { id: 'l-pool', name: 'Pool', kind: 'pool', createdAt: 1, updatedAt: 1, entries: [], imports: [] },
+      {
+        id: 'l-smart',
+        name: 'Light reading',
+        kind: 'smart',
+        createdAt: 1,
+        updatedAt: 1,
+        query: { ownedOnly: true },
+        entries: [],
+        imports: [],
+      },
+      // A hand-edited file can hold this; saveSmartReadingList cannot make it.
+      { id: 'l-bare', name: 'Bare', kind: 'smart', createdAt: 1, updatedAt: 1, entries: [], imports: [] },
+      {
+        id: 'l-gone',
+        name: 'Retired',
+        kind: 'smart',
+        createdAt: 1,
+        updatedAt: 1,
+        archivedAt: 2,
+        query: { ownedOnly: true },
+        entries: [],
+        imports: [],
+      },
+    ],
+  } as unknown as ReadingListsDocument;
+
+  it('summarizeReadingLists leaves every smart list out', () => {
+    // Otherwise each would draw "0 of 0 finished" over an empty bar, which is
+    // its NORMAL shape rather than a damaged one.
+    expect(summarizeReadingLists(doc).map((s) => s.listId)).toEqual(['l-pool']);
+  });
+
+  it('savedSmartLists returns the answerable ones only', () => {
+    expect(savedSmartLists(doc).map((entry) => entry.listId)).toEqual(['l-smart']);
+    expect(savedSmartLists(doc)[0]?.query).toEqual({ ownedOnly: true });
   });
 });
