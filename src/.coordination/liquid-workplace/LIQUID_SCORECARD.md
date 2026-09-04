@@ -2174,3 +2174,79 @@ it. Saying which cells predate the fix is the point.
 `youtube`, `calendar`, `resources`, `flashcards`, `library`, `music`, `stats`. **14 left**, of
 which 13 are scorable in both presentations (`visualizer` and `musicwidget` offer no
 presentation toggle).
+
+## 2026-09-03 · primary — Sticky note — category 1 CLOSES at 10/10, and two measured defects the rest of the surface waits on
+
+`note` is the second half of the RULE C pair `stats` (densest) + `note` (most different), opened
+by backup at `2372c8c0`. It is the smallest surface in the plan: a title bar with two glyphs and
+one `<textarea>`, 260×220, `@.fwin.fwin-note`. **It does NOT close this turn and is not claimed
+at 80/80** — one category is banked, two product repairs landed, and the remaining seven are
+blocked behind a category-2 instrument defect argued below.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10**, re-derived AFTER the repair | **3** text runs, 0 unmeasurable, **0 failing**, min **11.11** (`span.fwin-title-text "Sticky note"`, 12.5 px) — the same sweep read min **1.20** before the repair, on the `◇` glyph, one failing run of three; 3 targets by rect, smallest `button.fwin-b` **24 px**, 2 under the 32 px floor by rect and **0** WCAG 2.5.8 failures; 3 controls hit-tested, **0 below the floor by hit box**, `stolenCount` **0**, `occludedCount` **0**; keyboard **3/3** reachable; motion **4** declarations over threshold at rest → **0** under emulated `prefers-reduced-motion` → 4 after | 6 axes planted, all 6 moved (`0,2,0,0,0 → 2,4,2,1,2 → 0,2,0,0`), `rectDrift 0`, back to baseline |
+| 2 | Clunkiness | **OPEN** — 2 of 5 bars failed, one repaired, one is the instrument | scroll traps **1 → 0** (repaired, `e58ff32e`); dead ends **0**, modal traps **0**, cost parity Liquid **28** = Standard **28**, 260×220 both, restored to standard. `latency` reported `worstRecv 480.1 ms` / **13 of 28 over the 100 ms bar** and that figure is NOT a property of this surface — see below | `--control` not yet run; the score is therefore VOID rather than any number |
+| 3–8 | — | not driven | — | — |
+
+Evidence: `baselines/cat1-s11-note.json`, `cat1-s11-note-control.json`, `cat2-s11-note.json`.
+
+**REPAIR 1 — `8cd44b3e`, the Make Liquid glyph painted 1.2:1 on the note's own yellow bar.**
+A note paints its title bar in one of five pastel `NOTE_COLORS`, so `.fwin-title` and
+`.fwin-close` each carried their own copy of `isNote && !liquid ? { color: '#3a3320' }`. The
+Liquid toggle sits BETWEEN them and carried none, so it inherited `.fwin-b`'s near-white:
+measured **1.20:1** against a 4.5 bar while its two neighbours in the same bar sat at 11.11:1.
+Two copies were two chances for a third control to be missed; the predicate is now one `noteInk`
+const applied at all three sites. cat1 min **1.20 → 11.11**.
+
+**REPAIR 2 — `e58ff32e`, 4 px of the note body could never be scrolled to.** A textarea is
+`inline-block`, so its line box reserves descender space below it, and `.fwin-body-note` is
+`overflow: hidden`. Body scrollHeight **189** against clientHeight **185**. `display: block` →
+**185 / 185**.
+
+**FINDING A — the category-2 latency instrument cannot measure a TYPED task, on any surface.**
+
+`cat2-clunkiness.cjs`'s recorder stamps `recvAt` at the event and `paintAt` in a
+`requestAnimationFrame` callback. `/type` delivers characters faster than a frame, so every
+keystroke's rAF callback fires in the SAME tick — one shared `paintAt`. Each sample is therefore
+`burst_end − keystroke_time`, which is why the 28 samples are a monotonically DECREASING ramp
+(480.1, 428.7, 376.3 … 5.8) rather than a scatter. Measured directly, with an independent
+recorder counting rAF ticks:
+
+| surface | keystrokes | burst | frames painted DURING the burst | max frame gap |
+| --- | --- | --- | --- | --- |
+| sticky note | 28 | 470.3 ms | **0** | 479.8 ms |
+| Settings search (**control**) | 28 | 175.7 ms | **0** | 190.7 ms |
+
+The control is the point: a surface nobody suspects produces the identical zero. So `overBar100:
+13` is an artifact of the harness's own delivery rate, and any surface whose dominant task is
+typing FAILS this bar for free. **Fix the instrument, not the art.** The repair, and the exact
+next slice: record `framesSincePrevEvent` per sample in `ARM`, and when a run's input samples
+share one paint, report `inputRecv` as `UNSCOREABLE — n input events shared one paint` instead
+of scoring it. Do not simply exempt typed tasks; that would hide FINDING B.
+
+**FINDING B — one keystroke in a sticky note costs 5.1× more when other windows are open.**
+
+Spaced 400 ms apart so each keystroke gets its own frame, event → next paint, same recorder:
+
+| desk | samples (ms) | p50 |
+| --- | --- | --- |
+| note + Settings 960×680 + Statistics | 71.2, 59.6, 57.0, 57.2, 59.8, 55.4 | **58.3** |
+| note alone | 11.8, 12.3, 9.9, 12.1, 10.5, 10.7 | **11.4** |
+| Settings search field, same desk (**control**) | 8.6, 7.0, 8.8, 8.5, 11.0, 8.7 | **8.6** |
+
+The cause is read from source and is not note-specific: `FloatingWindow` IS wrapped in `memo`
+(`DesktopShell.tsx:3705`) and its handlers come from a stable `winHandlerCache`, **but every
+window is given `children` as a fresh JSX element on each shell render** (`:2862`), so the memo
+never holds for ANY window. A keystroke into a note re-renders the whole of Settings and the
+whole of Statistics. It scales with how many windows the user has open — the more they do, the
+slower typing gets — and it is a category-7 defect on every desktop surface, not just this one.
+Not repaired this turn: the fix is to memoize each window's body per section, which is a real
+slice and would not have fit in this turn's tail with verification.
+
+**Traps.** (a) `cat1-accessibility.cjs` prints its report and writes NOTHING without `--out`.
+(b) `src/renderer/styles.css` carries another track's uncommitted work; the CSS repair landed as
+a HEAD+edit blob through `git apply --cached` of the single hunk. (c) Closing a note DELETES it —
+never use the close button to tidy up after a probe.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` has 1 of 8 categories banked.
