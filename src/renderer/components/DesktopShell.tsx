@@ -685,10 +685,10 @@ export default function DesktopShell({
 }: DesktopShellProps) {
   // A secondary shell is pinned; the main shell follows the active desktop.
   const pinnedDesktop = secondary ? (pinnedDesktopProp ?? DESKTOP_STUDY) : null;
-  // No useMemo/useCallback here caches a translated string, so `t` alone is
-  // enough — every call site below reads it fresh at render time, unlike the
-  // CommandPalette/SettingsSearch memos that needed `lang` as an explicit dep.
-  const { t } = useT();
+  // `lang` is here for exactly one consumer: `noteBodyCache` below caches a
+  // translated placeholder, so it is rebuilt per language rather than per render.
+  // Every other call site reads `t` fresh at render time and needs nothing more.
+  const { t, lang } = useT();
   const material = useAppMaterialSet();
   const wired = material === 'wired';
   // Which Start panel to build. Aero and Wired share the two-column secret-OS
@@ -2533,10 +2533,9 @@ export default function DesktopShell({
    * memo above actually hit. `t()` is not involved — `AppSection` calls `useT()`
    * itself, so a language change still re-renders it through context.
    *
-   * The `note` and `settings` bodies are NOT cached: their children depend on
-   * live state (note text/colour, the whole wallpaper prop set). Those two
-   * windows still re-render on every shell render, which is the honest limit of
-   * this fix and costs one textarea or one settings pane, not an `AppSection`.
+   * The `note` and `settings` bodies were the honest limit that used to be
+   * recorded here. They are cached now too — see the two blocks below — because
+   * the limit turned out to be expensive rather than theoretical.
    */
   const openBookRef = useRef(onOpenBook);
   openBookRef.current = onOpenBook;
@@ -2546,6 +2545,99 @@ export default function DesktopShell({
       <AppSection section={section} onOpenBook={stableOpenBook} />
     )),
   ).current;
+
+  /**
+   * The desktop Settings body, stabilised the same way `appSectionCache` is.
+   *
+   * Measured before this change, one keystroke to the next paint with keystrokes
+   * spaced 400 ms so each gets its own frame: a sticky note with Settings and
+   * Statistics also open ran 58.3 ms p50, the same note alone 11.4 ms. Statistics
+   * is an `AppSection` and was already reference-stable, so the difference was
+   * being paid by an unrelated wallpaper pane rebuilding on every keystroke.
+   *
+   * Seventeen props split cleanly. Three are live state and are exactly the memo's
+   * dependencies; the rest are callbacks and go through a ref for the same reason
+   * `winActionsRef` does — they are plain declarations recreated every render, so
+   * closing over them directly would freeze the first render's copies.
+   */
+  const wallActionsRef = useRef({
+    setPreset, applyUserWall, removeUserWall, chooseImage, chooseVideo,
+    chooseFolderSlideshow, slideshowStep, setSlideshowOptions, clearWall, resetDesktop, open,
+  });
+  wallActionsRef.current = {
+    setPreset, applyUserWall, removeUserWall, chooseImage, chooseVideo,
+    chooseFolderSlideshow, slideshowStep, setSlideshowOptions, clearWall, resetDesktop, open,
+  };
+  const wallHandlers = useRef({
+    onWallPreset: (id: string) => wallActionsRef.current.setPreset(id),
+    onWallUser: (id: string) => void wallActionsRef.current.applyUserWall(id),
+    onWallUserRemove: (id: string) => wallActionsRef.current.removeUserWall(id),
+    onWallImage: () => void wallActionsRef.current.chooseImage(),
+    onWallVideo: () => void wallActionsRef.current.chooseVideo(),
+    onWallFolder: () => void wallActionsRef.current.chooseFolderSlideshow(),
+    onWallSlideshowNext: () => wallActionsRef.current.slideshowStep(1),
+    onWallSlideshowPrev: () => wallActionsRef.current.slideshowStep(-1),
+    onWallSlideshowOptions: (opts: { intervalSec?: number; shuffle?: boolean }) =>
+      wallActionsRef.current.setSlideshowOptions(opts),
+    onWallClear: () => void wallActionsRef.current.clearWall(),
+    onReset: () => void wallActionsRef.current.resetDesktop(),
+    onOpenVisualizer: () => wallActionsRef.current.open('visualizer'),
+    onOpenMusicWidget: () => wallActionsRef.current.open('musicwidget'),
+  }).current;
+  const desktopSettingsBody = useMemo(
+    () => (
+      <DesktopSettings
+        wall={wall}
+        wallPreset={wall.id ?? ''}
+        presets={WALLPAPERS}
+        userWallpapers={userWalls}
+        userWallThumbs={userWallThumbs}
+        {...wallHandlers}
+      />
+    ),
+    [wall, userWalls, userWallThumbs, wallHandlers],
+  );
+
+  /**
+   * One sticky note's body and its colour handler, both keyed by window id.
+   *
+   * The note being typed in genuinely has to re-render, and it does: its stamp is
+   * the note record itself, so `setNotes` rebuilds exactly the note that changed.
+   * What this stops is every OTHER note rebuilding with it, and `onNoteColor`
+   * arriving as a freshly-allocated arrow — that one prop alone was enough to make
+   * `FloatingWindow`'s `memo()` miss on every note on the desk.
+   */
+  const noteColorCache = useRef(
+    createRenderIdentityCache<string, null, (color: string) => void>((id) => (color: string) =>
+      setNotes((current) => ({ ...current, [id]: { text: '', ...current[id], color } })),
+    ),
+  ).current;
+  // The cache itself is rebuilt per language, not per render: its stamp is the note
+  // record, so a bare ref would hold a placeholder translated at first mount and a
+  // language switch would never reach it. This is the `lang`-not-`t` rule with a cache
+  // in place of a memo.
+  const noteBodyCache = useMemo(
+    () =>
+      createRenderIdentityCache<string, NoteData | undefined, ReactNode>((id, note) => (
+        <textarea
+          className="desk-note-text"
+          style={{ background: note?.color ?? NOTE_COLORS[0] }}
+          placeholder={t('desktop.notePlaceholder')}
+          value={note?.text ?? ''}
+          onChange={(e) =>
+            setNotes((n) => ({ ...n, [id]: { color: NOTE_COLORS[0], ...n[id], text: e.target.value } }))
+          }
+        />
+      )),
+    [lang],
+  );
+  // Same pruning contract `winHandlerCache` has: a closed note must not keep its body
+  // and its colour setter alive in a Map for the life of the session.
+  useEffect(() => {
+    const live = wins.filter((w) => w.section === 'note').map((w) => w.id);
+    noteColorCache.prune(live);
+    noteBodyCache.prune(live);
+  }, [wins, noteColorCache, noteBodyCache]);
 
   const visibleWidgets = widgets.filter((w) => !w.hidden);
   const hiddenWidgets = widgets.filter((w) => w.hidden);
@@ -2852,46 +2944,14 @@ export default function DesktopShell({
           hidden={!!w.min}
           deskRef={deskRef}
           noteColor={w.section === 'note' ? notes[w.id]?.color : undefined}
-          onNoteColor={w.section === 'note'
-            ? (color) => setNotes((current) => ({
-                ...current,
-                [w.id]: { text: '', ...current[w.id], color },
-              }))
-            : undefined}
+          onNoteColor={w.section === 'note' ? noteColorCache.get(w.id, null) : undefined}
           {...winHandlerCache.get(w.id, w.section)}
         >
-          {w.section === 'note' ? (
-            <textarea
-              className="desk-note-text"
-              style={{ background: notes[w.id]?.color ?? NOTE_COLORS[0] }}
-              placeholder={t('desktop.notePlaceholder')}
-              value={notes[w.id]?.text ?? ''}
-              onChange={(e) => setNotes((n) => ({ ...n, [w.id]: { color: NOTE_COLORS[0], ...n[w.id], text: e.target.value } }))}
-            />
-          ) : w.section === 'settings' ? (
-            <DesktopSettings
-              wall={wall}
-              wallPreset={wall.id ?? ''}
-              presets={WALLPAPERS}
-              userWallpapers={userWalls}
-              userWallThumbs={userWallThumbs}
-              onWallPreset={setPreset}
-              onWallUser={(id) => void applyUserWall(id)}
-              onWallUserRemove={removeUserWall}
-              onWallImage={() => void chooseImage()}
-              onWallVideo={() => void chooseVideo()}
-              onWallFolder={() => void chooseFolderSlideshow()}
-              onWallSlideshowNext={() => slideshowStep(1)}
-              onWallSlideshowPrev={() => slideshowStep(-1)}
-              onWallSlideshowOptions={setSlideshowOptions}
-              onWallClear={() => void clearWall()}
-              onReset={resetDesktop}
-              onOpenVisualizer={() => open('visualizer')}
-              onOpenMusicWidget={() => open('musicwidget')}
-            />
-          ) : (
-            appSectionCache.get(w.section, null)
-          )}
+          {w.section === 'note'
+            ? noteBodyCache.get(w.id, notes[w.id])
+            : w.section === 'settings'
+              ? desktopSettingsBody
+              : appSectionCache.get(w.section, null)}
         </FloatingWindow>
       ))}
 
