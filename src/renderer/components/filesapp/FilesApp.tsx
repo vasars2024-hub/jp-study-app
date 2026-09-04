@@ -1131,10 +1131,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---------------- gate 19: saved searches ---------------- */}
       <div className="fa-smart">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.smart.heading')}</h3>
+          {/* `title` on every rail label the collapsed rail ellipsizes. The
+              accessible name is unchanged — the text stays in the DOM — but a
+              pointer user in the 72px rail otherwise reads two characters. */}
+          <h3 className="fa-collections-title" title={t('filesApp.smart.heading')}>
+            {t('filesApp.smart.heading')}
+          </h3>
           <button
             type="button"
             className="fa-smart-save"
+            title={t('filesApp.smart.save')}
             onClick={() => {
               // Refused HERE as well as in the model, so the name editor never
               // opens on a view that cannot produce a search worth saving.
@@ -1219,7 +1225,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---------------- gate 18: Favorites ---------------- */}
       <div className="fa-favorites">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.favorites.heading')}</h3>
+          <h3 className="fa-collections-title" title={t('filesApp.favorites.heading')}>
+            {t('filesApp.favorites.heading')}
+          </h3>
           {/* Pinning a LOCATION is the gate's second half, and this is where a
               user would look for it: on the folder they are standing in. */}
           {scopeAsFavorite ? (
@@ -1285,8 +1293,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---- gate 16: the only folders in this tree the user writes ---- */}
       <div className="fa-collections">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.collections.heading')}</h3>
-          <button type="button" className="fa-collections-new" onClick={onNewFolder}>
+          <h3 className="fa-collections-title" title={t('filesApp.collections.heading')}>
+            {t('filesApp.collections.heading')}
+          </h3>
+          <button
+            type="button"
+            className="fa-collections-new"
+            title={t('filesApp.collections.new')}
+            onClick={onNewFolder}
+          >
             {t('filesApp.collections.new')}
           </button>
         </div>
@@ -1370,13 +1385,23 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             folder cannot say why it refused, and the gate asks for a named
             message rather than an absence. */}
         <div className="fa-folder-actions" role="group" aria-label={t('filesApp.collections.heading')}>
-          <button type="button" className="fa-action fa-folder-rename" onClick={onStartRename}>
+          <button
+            type="button"
+            className="fa-action fa-folder-rename"
+            title={t('filesApp.collections.rename')}
+            onClick={onStartRename}
+          >
             {t('filesApp.collections.rename')}
           </button>
-          <button type="button" className="fa-action fa-folder-delete" onClick={onRequestDelete}>
+          <button
+            type="button"
+            className="fa-action fa-folder-delete"
+            title={t('filesApp.collections.delete')}
+            onClick={onRequestDelete}
+          >
             {t('filesApp.collections.delete')}
           </button>
-          <label className="fa-folder-move">
+          <label className="fa-folder-move" title={t('filesApp.collections.moveTo')}>
             <span className="fa-visually-hidden">{t('filesApp.collections.moveTo')}</span>
             <select
               value={

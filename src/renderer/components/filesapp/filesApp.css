@@ -50,6 +50,16 @@
   gap: 1px;
   padding: var(--lq-space-2);
   overflow-y: auto;
+  /* Declaring ONE axis makes the other compute to `auto`, not `visible` — so
+     `overflow-y: auto` alone silently made this a horizontal scroller too.
+     Measured live 2026-09-04 in the collapsed rail: `scrollWidth 172` against
+     `clientWidth 52`, i.e. 120px of sideways scroll with no scrollbar and
+     nothing in it but the clipped halves of five overflowing controls (the
+     rule further down contains those). Every label here ellipsizes, so this
+     tree never has anywhere to go sideways and saying so is the honest
+     declaration. It also stops this element shadowing `.lq-scaffold-rail` —
+     the REAL vertical scroller — for anything that resolves a scroll parent. */
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -141,6 +151,68 @@
   gap: var(--lq-space-1);
   min-width: var(--lq-hit-target);
   padding: 0 var(--lq-space-1);
+}
+
+/*
+ * THE OTHER HALF OF THAT REPAIR, AND IT WAS MISSED. The rule above contains
+ * `.fa-tree-node`, which shrinks because `.fa-tree-label` sits in a flex row
+ * with an ellipsis. Every OTHER control in the rail — the two section headings
+ * and their buttons, and the selected folder's action row — has an intrinsic
+ * min-content width and no containment at all, so in the 52px content box of a
+ * collapsed rail they simply paint past its right edge.
+ *
+ * Measured live 2026-09-04 in the state the app opens in (window 820x580 ->
+ * scaffold 782 -> `medium` -> rail collapsed), against the rail's own right
+ * edge, not the window's: FIVE controls over, worst 105px —
+ *   button.fa-smart-save          "Save this search"   108px wide, 105px over
+ *   button.fa-collections-new     "New folder"          46px wide,  33px over
+ *   button.fa-action.fa-folder-delete "Delete folder"   90px wide,  25px over
+ *   label.fa-folder-move + its select                   77px wide,  12px over
+ * They are chopped mid-word by `.fa-tree`'s own overflow, and that clip is why
+ * `.fa-tree` reported `scrollWidth 172` against `clientWidth 52` — a 120px
+ * horizontal scroll region with no scrollbar and nothing in it but the halves
+ * of these labels. `.lq-scaffold-rail` itself measured 60/60: it is not the
+ * rail that overflows, it is these five controls inside it.
+ *
+ * The fix follows the contract the tree nodes already use rather than inventing
+ * a second one: keep the control, contain it, ellipsize it, and put the full
+ * text in `title` for a pointer user. The accessible name is unaffected — the
+ * text stays in the DOM and an ellipsis is a paint, not a truncation. Hiding
+ * these or moving them out of the rail was rejected for the reason the Files
+ * plan states outright: a capability that the collapsed state cannot reach is a
+ * regression, and these are the only route to saving a search, creating a
+ * folder, and renaming/deleting/moving one.
+ *
+ * The heads stack instead of sitting `space-between`, because a 52px row cannot
+ * hold a heading and a button side by side without both becoming one glyph.
+ */
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--lq-space-1);
+  padding: 0;
+}
+
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-title,
+.lq-scaffold[data-rail-collapsed='true'] .fa-smart-save,
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-new,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-actions .fa-action,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-move,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-move select {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The action row is already `flex-wrap: wrap`; wrapping only helps once its
+   children can be narrower than their text, which is what the rule above buys.
+   Stretched so each action still owns a full 48px-wide pointer target rather
+   than shrinking to its ellipsis. */
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-actions {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* Kept legible rather than decorative: this number is the gate-1 reading. */
