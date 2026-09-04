@@ -726,6 +726,81 @@ export function finishReadingWorkEverywhere(
 }
 
 /**
+ * §3.1 late binding: a library item turned out to BE this work.
+ *
+ * Two effects, and they are separable on purpose. The work always records the
+ * item and the confidence, because knowing which file is this book is useful
+ * even when the entry is already `reading`. The ENTRIES only move `wanted` →
+ * `owned`, because every other state is one the user or a reader put them in and
+ * an import is not entitled to overwrite it — un-owning a book you abandoned, or
+ * resetting a half-read one to `owned`, is exactly the kind of silent damage a
+ * background matcher must not be able to do.
+ *
+ * `confidence` is the caller's already-thresholded score. This function does not
+ * re-decide it; `readingListMatch.ts` owns that and only `accept` gets here.
+ */
+export function bindReadingWorkToItem(
+  document: ReadingListsDocument,
+  workId: string,
+  itemId: string,
+  confidence: number,
+  context: ReadingListsMutationContext,
+): ReadingListsMutation & { bound: boolean; owned: number } {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work) return { ...unchanged(document), bound: false, owned: 0 };
+
+  const alreadyBound = work.boundItemIds.includes(itemId);
+  // A re-run must not append the same id twice or rewrite an equal confidence:
+  // §3.1 runs this on EVERY import, so a no-op has to stay a no-op or the
+  // document's revision climbs forever and every window re-renders for nothing.
+  const confidenceMoved = Math.abs(work.bindConfidence - confidence) > 1e-9;
+  if (alreadyBound && !confidenceMoved) {
+    return { ...unchanged(document), bound: false, owned: 0 };
+  }
+
+  const events: PendingReadingListEvent[] = [
+    {
+      at: context.now,
+      kind: 'work-bound',
+      workId,
+      detail: { itemId, confidence, wasBound: alreadyBound },
+    },
+  ];
+
+  const works = document.works.map((entry) =>
+    entry.id === workId
+      ? {
+          ...entry,
+          boundItemIds: alreadyBound ? entry.boundItemIds : [...entry.boundItemIds, itemId],
+          bindConfidence: Math.max(entry.bindConfidence, confidence),
+        }
+      : entry,
+  );
+
+  let owned = 0;
+  const lists = document.lists.map((list) => {
+    let touched = false;
+    const entries = list.entries.map((entry) => {
+      if (entry.workId !== workId || entry.state !== 'wanted') return entry;
+      touched = true;
+      owned += 1;
+      events.push({
+        at: context.now,
+        kind: 'entry-updated',
+        listId: list.id,
+        entryId: entry.id,
+        workId,
+        detail: { from: 'wanted', to: 'owned', by: 'late-bind', itemId },
+      });
+      return { ...entry, state: 'owned' as const };
+    });
+    return touched ? { ...list, updatedAt: context.now, entries } : list;
+  });
+
+  return { document: { ...document, works, lists }, events, bound: true, owned };
+}
+
+/**
  * Drag-to-reorder (§11.4). Ids not named keep their relative order behind the
  * named ones rather than being dropped — a reorder that loses an entry because
  * the surface was filtered is a data-loss bug wearing a UI bug's clothes.

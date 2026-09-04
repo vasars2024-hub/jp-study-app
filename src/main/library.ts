@@ -11,6 +11,9 @@ import { extractReadableFromUrl } from './readabilityExtract';
 import { fetchReadingContent, type FetchReadingOptions } from './readingFetch';
 import { mt } from './i18n';
 import { extractEpubTitleFromOpf } from './epubMeta';
+import { bindReadingListsToItems } from './readingListsBinder';
+import { broadcastReadingLists } from './readingListsIpc';
+import { getReadingListsStore } from './readingListsStore';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -132,8 +135,44 @@ function readDb(): LibraryItem[] {
     return [];
   }
 }
+/**
+ * The one place an item becomes real. Reading Lists §3.1 hangs off this.
+ *
+ * Every one of the ~18 write sites below funnels through here, so diffing the
+ * incoming set against what is on disk yields exactly "items that are new",
+ * whichever importer produced them — manual add, folder scan, provider chapter,
+ * scraper landing, and every route added after this line was written. The
+ * alternative the plan explicitly rejects is a call in each importer, which is
+ * the version that silently does not work for the seventh one.
+ *
+ * The diff costs one extra read of a JSON file this function is about to
+ * rewrite anyway, and only on paths that already do archive extraction or disk
+ * copies. Update-shaped writes produce an empty diff and return immediately.
+ */
 function writeDb(items: LibraryItem[]): void {
+  const previous = new Set(readDb().map((item) => item.id));
   fs.writeFileSync(dbPath(), JSON.stringify(items, null, 2), 'utf-8');
+  const added = items.filter((item) => !previous.has(item.id));
+  if (added.length) notifyLibraryItemsAdded(added);
+}
+
+/**
+ * Late-binds new items onto `wanted` reading-list entries.
+ *
+ * Guarded and swallowing by design: an item on disk is real whether or not a
+ * list ticked, and a matcher fault must not be able to fail the import that
+ * carried it. The next import runs the same pass over the same works, so a
+ * skipped run costs latency and never correctness.
+ */
+function notifyLibraryItemsAdded(added: readonly LibraryItem[]): void {
+  try {
+    bindReadingListsToItems(
+      added.map((item) => ({ id: item.id, title: item.title })),
+      { store: getReadingListsStore(), broadcast: broadcastReadingLists },
+    );
+  } catch {
+    // See above. Nothing here is recoverable at this depth and nothing here is load-bearing.
+  }
 }
 
 function readConfig(): Config {
