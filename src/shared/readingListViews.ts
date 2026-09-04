@@ -1,0 +1,244 @@
+/**
+ * Reading Lists P4 — what §6's two surfaces need to draw, as pure functions.
+ *
+ * `docs/ACTIVE/READING_LISTS_PLAN.md` §6 asks for a grid of list cards ("mosaic
+ * cover, N/M finished") and a detail view of rows with state chips and a triage
+ * strip. Both are derivations over `ReadingListsDocument`, and both are needed by
+ * more than one caller — the view, the widgets in §11.2, and P5's smart lists —
+ * so they live here rather than inside a component, in the shape P1b established
+ * for the mutation layer.
+ *
+ * Nothing here reads the DOM, the store, or `Date.now`. A summary is a function
+ * of the document and nothing else, which is what makes the counts testable and
+ * what keeps two surfaces from disagreeing about what "finished" means.
+ */
+
+import type {
+  ReadingEntryState,
+  ReadingList,
+  ReadingListEntry,
+  ReadingListKind,
+  ReadingListsDocument,
+  ReadingWorkRef,
+} from './readingLists';
+
+/** Every state, in the order a surface should show them. Chips read left to right. */
+export const READING_ENTRY_STATES: readonly ReadingEntryState[] = [
+  'reading',
+  'wanted',
+  'owned',
+  'finished',
+  'abandoned',
+  'skipped',
+] as const;
+
+/**
+ * States that count toward "done" and states that count at all.
+ *
+ * `skipped` and `abandoned` are deliberately OUT of the denominator: §5.9 makes
+ * abandoned first-class precisely so a book put down on purpose stays out of the
+ * pace maths, and a progress bar that a deliberate abandonment drags down is the
+ * shame column that clause exists to remove. A list of ten where two were
+ * abandoned and eight finished reads 8/8, not 8/10.
+ */
+const DONE_STATES: ReadonlySet<ReadingEntryState> = new Set<ReadingEntryState>(['finished']);
+const EXCLUDED_FROM_PROGRESS: ReadonlySet<ReadingEntryState> = new Set<ReadingEntryState>([
+  'abandoned',
+  'skipped',
+]);
+
+export type ReadingStateCounts = Record<ReadingEntryState, number>;
+
+export interface ReadingListSummary {
+  listId: string;
+  name: string;
+  kind: ReadingListKind;
+  archived: boolean;
+  /** Every entry, including the ones outside the progress denominator. */
+  total: number;
+  finished: number;
+  /** `total` minus abandoned and skipped. The denominator `progress` uses. */
+  counted: number;
+  byState: ReadingStateCounts;
+  /** 0..1. Exactly 0 for an empty list — never NaN, which renders as "NaN%". */
+  progress: number;
+  /**
+   * Library item ids for §5.10's 2×2 mosaic, in list order, at most four.
+   *
+   * Item ids rather than cover paths: the cover a library item shows is the
+   * library's business and changes when a better one is found, so resolving it
+   * here would freeze one answer into two surfaces.
+   */
+  coverItemIds: string[];
+  /** Works offering a binding the user has not answered — §6's triage strip. */
+  triage: number;
+  updatedAt: number;
+}
+
+function emptyCounts(): ReadingStateCounts {
+  return {
+    wanted: 0,
+    owned: 0,
+    reading: 0,
+    finished: 0,
+    abandoned: 0,
+    skipped: 0,
+  };
+}
+
+/** A suggestion is live only while nothing is bound and the user has not said no. */
+export function hasLiveSuggestion(work: ReadingWorkRef | undefined): boolean {
+  if (!work?.suggestion) return false;
+  if (work.suggestion.dismissedAt !== undefined) return false;
+  return work.boundItemIds.length === 0;
+}
+
+export function summarizeReadingList(
+  list: ReadingList,
+  works: readonly ReadingWorkRef[],
+): ReadingListSummary {
+  const byId = new Map(works.map((work) => [work.id, work]));
+  const byState = emptyCounts();
+  const coverItemIds: string[] = [];
+  // Counted once per WORK, not per entry: a work is what carries the suggestion,
+  // and a book listed twice must not make the triage strip claim two decisions.
+  const triaged = new Set<string>();
+
+  const ordered = sortReadingListEntries(list);
+  for (const entry of ordered) {
+    // A state outside the union can only arrive from a hand-edited file; it is
+    // still an entry and still belongs in `total`, so it is counted there and
+    // simply has no chip.
+    if (entry.state in byState) byState[entry.state] += 1;
+    const work = byId.get(entry.workId);
+    if (!work) continue;
+    if (hasLiveSuggestion(work)) triaged.add(work.id);
+    if (coverItemIds.length < 4) {
+      const itemId = work.boundItemIds[0];
+      if (itemId && !coverItemIds.includes(itemId)) coverItemIds.push(itemId);
+    }
+  }
+
+  const total = list.entries.length;
+  let counted = 0;
+  let finished = 0;
+  for (const state of READING_ENTRY_STATES) {
+    if (EXCLUDED_FROM_PROGRESS.has(state)) continue;
+    counted += byState[state];
+    if (DONE_STATES.has(state)) finished += byState[state];
+  }
+
+  return {
+    listId: list.id,
+    name: list.name,
+    kind: list.kind,
+    archived: list.archivedAt !== undefined,
+    total,
+    finished,
+    counted,
+    byState,
+    progress: counted > 0 ? finished / counted : 0,
+    coverItemIds,
+    triage: triaged.size,
+    updatedAt: list.updatedAt,
+  };
+}
+
+/**
+ * Entries in the order the detail view draws them.
+ *
+ * `order` is the user's own arrangement (§11.4's drag-to-reorder writes it), so
+ * it wins outright. `addedAt` then `id` break ties, because two entries that
+ * share an order — which an import racing a reorder can produce — must still
+ * come out in a STABLE sequence: a list that reshuffles itself between renders
+ * is indistinguishable from data loss to the person watching it.
+ */
+export function sortReadingListEntries(list: ReadingList): ReadingListEntry[] {
+  return [...list.entries].sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    if (a.addedAt !== b.addedAt) return a.addedAt - b.addedAt;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+}
+
+/** One drawn row: the entry, the work behind it, and what the row can do. */
+export interface ReadingListRow {
+  entry: ReadingListEntry;
+  work: ReadingWorkRef | undefined;
+  /** What the row shows as its name. Never blank — falls back to the raw line. */
+  title: string;
+  /**
+   * The library item this row opens, when there is one.
+   *
+   * §11.1: every row goes somewhere real. A row with no bound item is NOT dead —
+   * it routes to the acquisition path instead — so this being `null` is a
+   * destination, not a missing one.
+   */
+  itemId: string | null;
+  suggestion: boolean;
+}
+
+export function readingListRows(
+  list: ReadingList,
+  works: readonly ReadingWorkRef[],
+): ReadingListRow[] {
+  const byId = new Map(works.map((work) => [work.id, work]));
+  return sortReadingListEntries(list).map((entry) => {
+    const work = byId.get(entry.workId);
+    const title = work?.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '';
+    return {
+      entry,
+      work,
+      title,
+      itemId: work?.boundItemIds[0] ?? null,
+      suggestion: hasLiveSuggestion(work),
+    };
+  });
+}
+
+export type ReadingListSort = 'recent' | 'name' | 'progress';
+
+/**
+ * Card order for the grid.
+ *
+ * Archived lists sink to the bottom under every sort rather than disappearing:
+ * §11.4 requires undo on every destructive action, and a list you cannot see is
+ * a list you cannot restore.
+ */
+export function sortReadingListSummaries(
+  summaries: readonly ReadingListSummary[],
+  sort: ReadingListSort,
+): ReadingListSummary[] {
+  const compare = (a: ReadingListSummary, b: ReadingListSummary): number => {
+    if (a.archived !== b.archived) return a.archived ? 1 : -1;
+    switch (sort) {
+      case 'name':
+        return a.name.localeCompare(b.name) || a.listId.localeCompare(b.listId);
+      case 'progress':
+        return b.progress - a.progress || a.name.localeCompare(b.name);
+      default:
+        return b.updatedAt - a.updatedAt || a.name.localeCompare(b.name);
+    }
+  };
+  return [...summaries].sort(compare);
+}
+
+export function summarizeReadingLists(document: ReadingListsDocument): ReadingListSummary[] {
+  return document.lists.map((list) => summarizeReadingList(list, document.works));
+}
+
+/**
+ * The one number the desktop badge and §11.2's widgets both want: how many
+ * decisions are waiting for the user across every list.
+ */
+export function totalReadingTriage(document: ReadingListsDocument): number {
+  const triaged = new Set<string>();
+  for (const list of document.lists) {
+    if (list.archivedAt !== undefined) continue;
+    for (const entry of list.entries) {
+      const work = document.works.find((candidate) => candidate.id === entry.workId);
+      if (hasLiveSuggestion(work)) triaged.add(entry.workId);
+    }
+  }
+  return triaged.size;
+}
