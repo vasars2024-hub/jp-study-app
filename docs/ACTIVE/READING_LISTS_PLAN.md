@@ -611,6 +611,47 @@ holds it PENDING as a route with no consumer, and that entry's own escape clause
 says to re-key it to accepted the moment a P4 surface renders it. §11 is the
 larger half of P4 and it is a gate.
 
+**2026-09-04, `backup`. §11.2 and §11.3 are BOTH CLOSED. P4 now owes only §11.1 and §11.4.**
+
+Opened as interrupted-work recovery: `primary` was killed at 02:58:39 with §11.2 complete
+and uncommitted — its last file was written at 02:58:38, one second before. Re-derived,
+finished, gated, `d4f9bd4d`.
+
+- `d4f9bd4d` — **§11.2, four widgets on the real `WIDGETS` registry.** The gap the interrupt
+  left: `widgets.readingLists.noFinishes` was called and existed in NO catalog.
+  `i18n-check.cjs` compares catalogs against each other, so a key missing from **all four**
+  is green on every gate and surfaces only as a raw dotted string — on the empty state a new
+  user sees first. Fixed, plus a guard that reads every `t('...')` call site out of the
+  widget source and demands four languages. **Control: deleting the en key → 2 RED.**
+- `ca0093b5` — **§11.3's scheduler, in main.** Decisions pure in
+  `shared/readingListReminders.ts`, because §11.3's clauses are RATE clauses and a rate rule
+  proven through a live timer is proven once, slowly. **Seven mutation controls, seven RED**,
+  each by the name of its rule: one-a-day, first-run, the 10 % stalled floor, the weekly pace
+  cap, the pace comparison, read-today silence, silenced-kinds. Fired-state is PERSISTED —
+  in memory it would mean "one per LAUNCH". `readingListsBinding.ts` now NAMES what bound
+  (`boundWorks`) rather than counting it; a count cannot say which book turned up.
+- `38c8e910` — **the notification.** Mounted inside `ToastHost`, the one place every shell
+  already mounts exactly once (App.tsx renders it in ten branches). Not a toast: a stalled
+  book offers three answers and `ToastHost`'s toast carries one. Tests assert EFFECTS —
+  finished writes `finished`, abandoned writes `abandoned`, Never again reaches main and
+  writes no document, Continue on an UNBOUND entry routes to the list.
+- `400c4af3` — **the settings card.** Every kind is off by default, so this is the only route
+  in; without it the feature is correct, silent and unreachable. A silenced kind reads as OFF
+  and says why (its enable flag is still true in main), and turning it on clears the silence
+  in the same call.
+
+**Trap, paid here:** `window.api.readingListsWrite` is POSITIONAL —
+`(baseRevision, document, events)`. An object-shaped stub recorded `undefined` and both
+effect assertions read as PASSES until the document was dereferenced.
+
+**Not mine, in the shared tree:** `i18n-hardcoded-check.cjs` reports
+`SeanimeDevPanel.tsx` 18 → 21. It is another track's uncommitted change and is in none of
+these four commits.
+
+**Exact next slice: §11.4, starting with keyboard + undo on `ReadingListsView`.** §11.1's
+click-through table is largely satisfied by P4b and §11.2; audit it row by row against the
+table rather than assuming, then §11.4's eight pass/fail rows.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
