@@ -183,6 +183,55 @@
   font-weight: 600;
 }
 
+/* ------------------------------------------------ real empty states (§11.4) -- */
+
+.rlv__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+  /* The lede and the example are prose; the fields under them are not, so the
+     measure is on the block rather than on the sheet. */
+  max-width: var(--lq-measure, 72ch);
+}
+
+.rlv__empty-lede {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.rlv__empty-why {
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+.rlv__example {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px dashed var(--lq-work-border, rgba(255, 255, 255, 0.18));
+}
+
+.rlv__example-label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.rlv__example-text {
+  margin: 0;
+  max-width: 100%;
+  /* `pre-wrap`, not `pre`: the sample's third line is long, and a `pre` would
+     add a horizontal scroller to an empty state — the exact unreachable-content
+     failure the files-app rail was fixed for. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
 /*
  * §11.4's filter strip. `flex-wrap` rather than a fixed two-column row: the count
  * is a whole sentence in every language and a narrow list window must be allowed

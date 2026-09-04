@@ -41,6 +41,7 @@ import { useReadingListsDocument } from '../readingListsDocument';
 import { useLibraryItems } from '../widgets/hooks';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
 import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
+import { READING_LIST_EXAMPLE_MESSAGE } from '../../shared/readingListParser';
 import {
   createReadingList,
   createReadingListsMutationContext,
@@ -450,6 +451,42 @@ export default function ReadingListsView({
     });
   }, [draftName, write]);
 
+  /**
+   * §11.4's "no list yet → the paste box itself".
+   *
+   * One action, not two. Making the user create an empty list and *then* find
+   * the paste control is the two-step the clause is objecting to, so this mints
+   * the list and hands the text straight to the same preview sheet a paste from
+   * inside a list opens — the triage strip, the dropped-lines disclosure and the
+   * per-row edit are identical, because it is literally the same component.
+   *
+   * Both writes are sequenced rather than folded into one mutation: the preview
+   * sheet needs a real `listId` to import against, and it only exists after the
+   * first write is acknowledged.
+   */
+  const createListWithPaste = useCallback(
+    (name: string, text: string) => {
+      const trimmedName = name.trim();
+      const trimmedText = text.trim();
+      if (!trimmedName || !trimmedText) return;
+      const made: { listId: string | null } = { listId: null };
+      void write((current) => {
+        const mutation = createReadingList(
+          current,
+          { name: trimmedName },
+          createReadingListsMutationContext(),
+        );
+        made.listId = mutation.listId;
+        return mutation;
+      }).then(() => {
+        if (!made.listId) return;
+        setListId(made.listId);
+        setPreviewText(text);
+      });
+    },
+    [write],
+  );
+
   const removeList = useCallback(
     (summary: ReadingListSummary) => {
       const held: { removed: RemovedReadingList | null; index: number } = {
@@ -851,6 +888,36 @@ export default function ReadingListsView({
     </div>
   ) : null;
 
+  /**
+   * §11.4's *with the §2.1 example shown as a hint*.
+   *
+   * The text is `READING_LIST_EXAMPLE_MESSAGE`, imported from the parser rather
+   * than retyped here — it is the exact input §2.1's acceptance test pins the
+   * output of, so what the user is shown cannot drift from what the parser is
+   * proven to do with it. It is untranslated on purpose: it is sample input, not
+   * chrome, and what it demonstrates *is* the mixed EN/JA shape.
+   *
+   * The button matters as much as the sample. A hint you have to retype is a
+   * hint nobody uses, and this one fills the box with something the preview
+   * sheet is guaranteed to have an interesting answer for — five entries, one
+   * flagged for triage, one volume range, one URL kept off the entries.
+   */
+  const exampleHint = (
+    <div className="rlv__example">
+      <p className="rlv__example-label">{t('readingLists.view.empty.exampleLabel')}</p>
+      <pre className="rlv__example-text">{READING_LIST_EXAMPLE_MESSAGE}</pre>
+      <Button
+        size="sm"
+        onClick={() => {
+          setPasteText(READING_LIST_EXAMPLE_MESSAGE);
+          setPasting(true);
+        }}
+      >
+        {t('readingLists.view.empty.useExample')}
+      </Button>
+    </div>
+  );
+
   const notices = (
     <>
       {healthNotice}
@@ -1036,7 +1103,32 @@ export default function ReadingListsView({
           </p>
         ) : null}
         {rows.length === 0 ? (
-          <p className="rlv__state">{t('readingLists.view.emptyList')}</p>
+          /**
+           * §11.4: *Empty list → "paste a message or add from your library".
+           * Never a bare "No items".*
+           *
+           * The copy names ONE route, not two, and that is deliberate rather
+           * than a shortened sentence: no surface in this app can add a library
+           * item to a reading list — `addReadingListEntry` has no renderer
+           * caller outside the paste flow. Printing the clause's second half
+           * would be an empty state pointing at a control that does not exist,
+           * which is worse than the bare "No items" it replaces. The route is
+           * the next slice; the copy grows when the control does.
+           */
+          <div className="rlv__empty" data-testid="rlv-empty-list">
+            <p className="rlv__empty-lede">{t('readingLists.view.empty.list')}</p>
+            <div className="rlv__paste-actions">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setPasting(true);
+                }}
+              >
+                {t('readingLists.view.paste')}
+              </Button>
+            </div>
+            {exampleHint}
+          </div>
         ) : visibleRows.length === 0 ? (
           <p className="rlv__state">{t('readingLists.view.filterEmpty', { query: filter.trim() })}</p>
         ) : (
@@ -1137,7 +1229,69 @@ export default function ReadingListsView({
         </form>
       ) : null}
       {summaries.length === 0 ? (
-        <p className="rlv__state">{t('readingLists.view.emptyGrid')}</p>
+        /**
+         * §11.4: *No list yet → the paste box itself, with the §2.1 example
+         * shown as a hint.* Not a sentence telling the user where the paste box
+         * is; the paste box.
+         */
+        <form
+          className="rlv__empty"
+          data-testid="rlv-empty-grid"
+          onSubmit={(event) => {
+            event.preventDefault();
+            createListWithPaste(draftName, pasteText);
+          }}
+        >
+          <p className="rlv__empty-lede">{t('readingLists.view.empty.grid')}</p>
+          <label className="rlv__paste-label" htmlFor="rlv-empty-name">
+            {t('readingLists.view.empty.nameLabel')}
+          </label>
+          <input
+            id="rlv-empty-name"
+            className="rlv__new-field ui-focusable"
+            value={draftName}
+            placeholder={t('readingLists.view.newListPlaceholder')}
+            onChange={(event) => setDraftName(event.target.value)}
+          />
+          <label className="rlv__paste-label" htmlFor="rlv-empty-paste">
+            {t('readingLists.view.pasteLabel')}
+          </label>
+          <textarea
+            id="rlv-empty-paste"
+            className="rlv__paste-field ui-focusable"
+            rows={6}
+            value={pasteText}
+            placeholder={t('readingLists.view.pastePlaceholder')}
+            onChange={(event) => setPasteText(event.target.value)}
+          />
+          <div className="rlv__paste-actions">
+            {/*
+              An explicit `onClick` rather than `type="submit"`, with the form's
+              `onSubmit` kept for Enter inside the name field. Two named paths to
+              one callback: implicit form submission from a button click is a
+              behaviour jsdom does not perform, so a submit-only button makes the
+              mouse path structurally untestable — the suite would pass on a
+              button that does nothing.
+            */}
+            <Button
+              variant="primary"
+              disabled={!draftName.trim() || !pasteText.trim()}
+              onClick={() => createListWithPaste(draftName, pasteText)}
+            >
+              {t('readingLists.view.empty.submit')}
+            </Button>
+            {/* Disabled buttons are the "why is nothing happening" state, so the
+                reason is on screen rather than only in a tooltip. */}
+            {!draftName.trim() || !pasteText.trim() ? (
+              <span className="rlv__empty-why" role="status">
+                {!draftName.trim()
+                  ? t('readingLists.view.empty.needName')
+                  : t('readingLists.view.empty.needText')}
+              </span>
+            ) : null}
+          </div>
+          {exampleHint}
+        </form>
       ) : (
         <ul className="rlv__grid">
           {summaries.map((summary) => (

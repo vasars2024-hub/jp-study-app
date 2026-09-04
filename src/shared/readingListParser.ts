@@ -31,6 +31,34 @@ import type { ReadingVolumeRange } from './readingLists';
 /** Bumped whenever a rule changes, so a stored import records what produced it. */
 export const READING_LIST_PARSER_VERSION = '1';
 
+/**
+ * §2.1's worked example, verbatim.
+ *
+ * It lives here rather than in the test that asserts it, because §11.4 asks the
+ * empty state to show this example as a hint — and a hint hand-copied into a UI
+ * string is a hint that drifts from the parser the first time either side is
+ * edited. Both the acceptance test and the empty state import this constant, so
+ * the sample a user is shown is provably the exact input §2.1 pins the output
+ * of. `readingListsView.test.tsx` asserts the identity.
+ *
+ * Deliberately NOT translated, and it is not an oversight. It is sample INPUT,
+ * not chrome — CLAUDE.md's i18n scope rule excludes study content — and what it
+ * demonstrates is that a mixed EN/JA message with numbers, bullets, prose, an
+ * inline author correction, a volume range and a stray URL all parse. A ja/zh/ru
+ * rewrite would destroy the thing being demonstrated. Only the label around it
+ * goes through `t()`.
+ */
+export const READING_LIST_EXAMPLE_MESSAGE = [
+  'yo these are the ones i said',
+  '',
+  '1. Kino no Tabi',
+  '2. 君の膵臓をたべたい',
+  '3. Convenience Store Woman (コンビニ人間) — Murakami? no, Sayaka Murata',
+  '- ハリー・ポッター 1〜3巻',
+  'also 「夜は短し歩けよ乙女」 if u can find it lol',
+  'https://example.com/list/1234',
+].join('\n');
+
 export type ReadingListSegmentation =
   | 'numbered'
   | 'bulleted'

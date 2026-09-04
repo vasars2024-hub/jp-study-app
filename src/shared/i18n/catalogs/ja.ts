@@ -11321,9 +11321,15 @@ export const ja: Catalog = {
   'readingLists.view.health.reset':
     '読書リストのファイルを読み込めず、戻れる控えもなかったため、空の状態で始めています。読み込めなかったファイルはディスク上に残っており、削除されていません。',
   'readingLists.view.health.dismiss': '閉じる',
-  'readingLists.view.emptyGrid':
-    'リストがまだありません。作成してから、メッセージを貼り付けてください。',
-  'readingLists.view.emptyList': 'このリストは空です。メッセージを貼り付けて追加してください。',
+  'readingLists.view.empty.grid':
+    'リストがまだありません。名前を付けて、送られてきたメッセージを貼り付けてください。保存する前に、何が見つかったかを確認できます。',
+  'readingLists.view.empty.list': 'このリストにはまだ何もありません。メッセージを貼り付けて追加してください。',
+  'readingLists.view.empty.nameLabel': 'リストの名前',
+  'readingLists.view.empty.submit': 'メッセージを読み取る',
+  'readingLists.view.empty.needName': 'まずリストに名前を付けてください。',
+  'readingLists.view.empty.needText': 'リストにしたいメッセージを貼り付けてください。',
+  'readingLists.view.empty.exampleLabel': 'こんなメッセージが使えます:',
+  'readingLists.view.empty.useExample': 'これで試す',
   'readingLists.view.newList': '新しいリスト',
   'readingLists.view.newListPlaceholder': 'リスト名',
   'readingLists.view.create': '作成',

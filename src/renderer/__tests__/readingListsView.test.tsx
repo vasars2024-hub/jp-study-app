@@ -19,6 +19,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import ReadingListsView, { readingRowRendersForTesting } from '../views/ReadingListsView';
 import { resetReadingListsClientForTesting } from '../readingListsClient';
+import { READING_LIST_EXAMPLE_MESSAGE } from '../../shared/readingListParser';
 import { getUiLang, setUiLang } from '../i18n';
 import {
   addReadingListEntry,
@@ -301,6 +302,100 @@ describe('ReadingListsView', () => {
     // The negative control for the two tests below: a healthy read shows NO
     // recovery notice, so the notice is not simply always rendered.
     expect(host.querySelector('[data-health]')).toBeNull();
+  });
+
+  /**
+   * §11.4's *real empty states*: the no-list case is the paste box itself with
+   * the §2.1 example as a hint, and neither case is a bare sentence.
+   */
+  describe('empty states (§11.4)', () => {
+    it('makes the empty grid the paste box, not a sentence about one', async () => {
+      installBridge(new FakeStore(sealReadingListsDocument(emptyReadingListsDocument())));
+      await render();
+      const empty = host.querySelector('[data-testid="rlv-empty-grid"]');
+      expect(empty).not.toBeNull();
+      // A real field for each half of the one action, in the empty state itself.
+      expect(empty?.querySelector('#rlv-empty-name')).not.toBeNull();
+      expect(empty?.querySelector('#rlv-empty-paste')).not.toBeNull();
+      expect(host.querySelector('.rlv__grid')).toBeNull();
+    });
+
+    it('shows §2.1’s example verbatim — the same string the parser test pins', async () => {
+      installBridge(new FakeStore(sealReadingListsDocument(emptyReadingListsDocument())));
+      await render();
+      const sample = host.querySelector<HTMLElement>('.rlv__example-text');
+      // Identity, not "contains a Japanese title". If the hint and the acceptance
+      // fixture ever diverge, the app is showing a sample it cannot vouch for.
+      expect(sample?.textContent).toBe(READING_LIST_EXAMPLE_MESSAGE);
+      expect(READING_LIST_EXAMPLE_MESSAGE).toContain('コンビニ人間');
+    });
+
+    it('fills the box from the hint, and one submit mints the list AND opens the preview', async () => {
+      const store = new FakeStore(sealReadingListsDocument(emptyReadingListsDocument()));
+      installBridge(store);
+      await render();
+
+      await click(byText('Try it with this'));
+      const field = host.querySelector<HTMLTextAreaElement>('#rlv-empty-paste');
+      expect(field?.value).toBe(READING_LIST_EXAMPLE_MESSAGE);
+
+      // The name is required and says so, rather than silently doing nothing.
+      /**
+       * Queried by selector, NOT `byText`. `byText` scans `button, span, p, div`
+       * in document order and `.rlv__paste-actions` wraps exactly this one
+       * button — so once the "needs a name" span disappears the DIV's trimmed
+       * text is also "Read the message" and `byText` returns the wrapper.
+       * Clicking a div does nothing, silently, and the test reads as a product
+       * defect. Measured: it returned `tag: "DIV"`.
+       */
+      const submit = () =>
+        host.querySelector<HTMLButtonElement>('[data-testid="rlv-empty-grid"] .rlv__paste-actions button');
+      expect(host.textContent).toContain('Give the list a name first');
+      expect(submit()?.disabled).toBe(true);
+
+      await typeInto(host.querySelector<HTMLInputElement>('#rlv-empty-name'), 'From a friend');
+      expect(submit()?.disabled).toBe(false);
+      await click(submit());
+
+      // One write created the list...
+      expect(store.writes).toBe(1);
+      expect(store.document.lists).toHaveLength(1);
+      expect(store.document.lists[0]?.name).toBe('From a friend');
+      // ...and the surface is now inside it with the preview sheet standing, so
+      // the user reaches triage in one action rather than create-then-find-paste.
+      expect(host.querySelector('[data-mode="detail"]')).not.toBeNull();
+      expect(host.querySelector('.rl-preview')).not.toBeNull();
+    });
+
+    it('never shows a bare “No items”, and offers a route out of an empty list', async () => {
+      const context = createReadingListsMutationContext(1_700_000_000_000);
+      const made = createReadingList(emptyReadingListsDocument(), { name: 'Empty' }, context);
+      installBridge(new FakeStore(sealReadingListsDocument(made.document)));
+      await render(made.listId);
+      const empty = host.querySelector<HTMLElement>('[data-testid="rlv-empty-list"]');
+      expect(empty).not.toBeNull();
+      expect(empty?.textContent).toContain('Nothing in this list yet');
+      // The route is a real control that opens the paste form, not prose — and
+      // it is the EMPTY STATE's own button, not the one in the header, which
+      // `byText` would have matched first because it comes earlier in the DOM.
+      await click(empty?.querySelector('.rlv__paste-actions button') ?? null);
+      expect(host.querySelector('#rlv-paste')).not.toBeNull();
+    });
+
+    /**
+     * The clause's copy reads "paste a message or add from your library". The
+     * second route does not exist — `addReadingListEntry` has no renderer caller
+     * outside the paste flow — so the empty state deliberately does not offer
+     * it. This test pins that as a decision rather than an oversight, and it is
+     * the test that must be DELETED when the library route lands.
+     */
+    it('does not advertise a library route the app cannot perform yet', async () => {
+      const context = createReadingListsMutationContext(1_700_000_000_000);
+      const made = createReadingList(emptyReadingListsDocument(), { name: 'Empty' }, context);
+      installBridge(new FakeStore(sealReadingListsDocument(made.document)));
+      await render(made.listId);
+      expect(host.textContent).not.toContain('from your library');
+    });
   });
 
   /**

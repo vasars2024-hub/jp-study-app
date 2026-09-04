@@ -11830,8 +11830,15 @@ export const en: Catalog = {
   'readingLists.view.health.reset':
     'Your reading-lists file could not be read and there was no earlier copy to fall back on, so this is starting empty. The unreadable file is still on disk and has not been deleted.',
   'readingLists.view.health.dismiss': 'Dismiss',
-  'readingLists.view.emptyGrid': 'No lists yet. Make one, then paste a message into it.',
-  'readingLists.view.emptyList': 'This list is empty. Paste a message to fill it.',
+  'readingLists.view.empty.grid':
+    'No lists yet. Name one and paste the message someone sent you — you will see what it found before anything is saved.',
+  'readingLists.view.empty.list': 'Nothing in this list yet. Paste a message to fill it.',
+  'readingLists.view.empty.nameLabel': 'Call this list',
+  'readingLists.view.empty.submit': 'Read the message',
+  'readingLists.view.empty.needName': 'Give the list a name first.',
+  'readingLists.view.empty.needText': 'Paste the message you want turned into a list.',
+  'readingLists.view.empty.exampleLabel': 'A message like this works:',
+  'readingLists.view.empty.useExample': 'Try it with this',
   'readingLists.view.newList': 'New list',
   'readingLists.view.newListPlaceholder': 'List name',
   'readingLists.view.create': 'Create',

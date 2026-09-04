@@ -11201,8 +11201,15 @@ export const zh: Catalog = {
   'readingLists.view.health.reset':
     '无法读取你的阅读清单文件，也没有更早的副本可以回退，因此从空白开始。无法读取的文件仍在磁盘上，并未被删除。',
   'readingLists.view.health.dismiss': '关闭',
-  'readingLists.view.emptyGrid': '还没有书单。先新建一个，再把消息粘贴进去。',
-  'readingLists.view.emptyList': '这个书单是空的。粘贴一段消息来填充它。',
+  'readingLists.view.empty.grid':
+    '还没有书单。取个名字，再把别人发给你的消息粘贴进来——保存之前你可以先看看识别出了什么。',
+  'readingLists.view.empty.list': '这个书单里还什么都没有。粘贴一段消息来填充它。',
+  'readingLists.view.empty.nameLabel': '书单名称',
+  'readingLists.view.empty.submit': '读取这段消息',
+  'readingLists.view.empty.needName': '请先给书单取个名字。',
+  'readingLists.view.empty.needText': '请粘贴你想变成书单的消息。',
+  'readingLists.view.empty.exampleLabel': '这样的消息就可以：',
+  'readingLists.view.empty.useExample': '用它试试',
   'readingLists.view.newList': '新建书单',
   'readingLists.view.newListPlaceholder': '书单名称',
   'readingLists.view.create': '创建',

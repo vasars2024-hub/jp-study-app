@@ -12270,8 +12270,15 @@ export const ru: Catalog = {
   'readingLists.view.health.reset':
     'Файл со списками чтения не читается, и запасной копии не было, поэтому всё начинается с пустого места. Нечитаемый файл остался на диске и не удалён.',
   'readingLists.view.health.dismiss': 'Закрыть',
-  'readingLists.view.emptyGrid': 'Списков пока нет. Создайте один и вставьте в него сообщение.',
-  'readingLists.view.emptyList': 'Список пуст. Вставьте сообщение, чтобы его заполнить.',
+  'readingLists.view.empty.grid':
+    'Списков пока нет. Придумайте название и вставьте сообщение, которое вам прислали, — вы увидите, что нашлось, ещё до сохранения.',
+  'readingLists.view.empty.list': 'В этом списке пока ничего нет. Вставьте сообщение, чтобы его заполнить.',
+  'readingLists.view.empty.nameLabel': 'Название списка',
+  'readingLists.view.empty.submit': 'Разобрать сообщение',
+  'readingLists.view.empty.needName': 'Сначала дайте списку название.',
+  'readingLists.view.empty.needText': 'Вставьте сообщение, которое нужно превратить в список.',
+  'readingLists.view.empty.exampleLabel': 'Подойдёт такое сообщение:',
+  'readingLists.view.empty.useExample': 'Попробовать на нём',
   'readingLists.view.newList': 'Новый список',
   'readingLists.view.newListPlaceholder': 'Название списка',
   'readingLists.view.create': 'Создать',
