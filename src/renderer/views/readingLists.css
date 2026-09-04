@@ -62,9 +62,9 @@
   align-items: center;
   gap: var(--lq-space-2, 8px);
   padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
-  border-radius: var(--lq-radius-2, 10px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
 }
 
 .rlv__notice--error {
@@ -161,9 +161,9 @@
   flex: 1 1 220px;
   min-width: 0;
   padding: 6px 10px;
-  border-radius: var(--lq-radius-2, 10px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.18));
-  background: var(--lq-surface-1, rgba(0, 0, 0, 0.18));
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg, rgba(0, 0, 0, 0.18));
   color: inherit;
   font: inherit;
 }
@@ -196,7 +196,7 @@
 }
 
 .rlv__filter-count {
-  color: var(--lq-text-muted, rgba(255, 255, 255, 0.66));
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
   font-size: 0.9em;
 }
 
@@ -224,9 +224,9 @@
   gap: var(--lq-space-2, 8px);
   flex-wrap: wrap;
   padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
-  border-radius: var(--lq-radius-2, 10px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.18));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
 }
 
 .rlv__bulk-count {
@@ -234,7 +234,7 @@
 }
 
 .rlv__bulk-note {
-  color: var(--lq-text-muted, rgba(255, 255, 255, 0.66));
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
   font-size: 0.9em;
 }
 
@@ -300,16 +300,16 @@
   min-height: 44px;
   padding: var(--lq-space-3, 12px);
   text-align: left;
-  border-radius: var(--lq-radius-3, 14px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
 
 .rlv__card-open:hover {
-  background: var(--lq-surface-3, rgba(255, 255, 255, 0.09));
+  background: var(--lq-anchor-bg-raised, rgba(255, 255, 255, 0.09));
 }
 
 .rlv__mosaic {
@@ -317,7 +317,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 2px;
   aspect-ratio: 3 / 2;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
 
@@ -352,14 +352,14 @@
   display: block;
   height: 4px;
   border-radius: 999px;
-  background: var(--lq-surface-3, rgba(255, 255, 255, 0.12));
+  background: var(--lq-anchor-bg-raised, rgba(255, 255, 255, 0.12));
   overflow: hidden;
 }
 
 .rlv__bar-fill {
   display: block;
   height: 100%;
-  background: var(--lq-accent, #6ea8fe);
+  background: var(--accent, #ff2e4d);
 }
 
 /* -------------------------------------------------------------- the detail -- */
@@ -379,13 +379,13 @@
   align-items: center;
   gap: var(--lq-space-2, 8px);
   padding: 4px;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   border: 1px solid transparent;
 }
 
 .rlv__row:hover {
-  border-color: var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+  border-color: var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
 }
 
 .rlv__row[data-state='finished'] .rlv__row-title,
@@ -403,7 +403,7 @@
   padding: 4px 8px;
   text-align: left;
   border: 0;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -433,8 +433,8 @@
   margin: 0;
   padding: 4px 8px;
   font-size: 0.9em;
-  border-radius: var(--lq-radius-2, 10px);
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-md, 10px);
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
 }
 
 @media (prefers-reduced-motion: reduce) {
