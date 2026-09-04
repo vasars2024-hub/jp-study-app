@@ -102,6 +102,17 @@
   // reported `label.mc-global-search` (a 290x30 search field) as a dense-work region on
   // glass. Controls are category 1's business; category 3 scores regions.
   const CONTROL_SEL = 'input,textarea,select,button,label,summary,a';
+  // CORRECTION 34 (2026-09-04, primary): a MULTI-LINE EDITOR is the work, not the chrome.
+  // Measured on the sticky note, whose `.fwin-body` holds exactly one child, a 258x185
+  // `textarea.desk-note-text` at 80% of the window: `textarea` is in CONTROL_SEL, so the walk
+  // skipped it, returned `regions: 0`, and every bar passed vacuously for a scored 10/10 on an
+  // empty walk. That is the "empty harness" false pass the rubric caps at 0, and it would score
+  // an identical 10 on a note that HAD put its editing surface on glass. The discriminator is
+  // HTML's own and is deliberately narrow: `textarea` and `[contenteditable="true"]` are the
+  // multi-line editing elements. A single-line `input` stays chrome however wide it is — that is
+  // exactly `label.mc-global-search` above, and promoting it is the failure this rule was
+  // written for. The area floor still applies, so a small composer never reaches the walk.
+  const EDITOR_SEL = 'textarea,[contenteditable="true"]';
   // Navigation / transport / inspector landmarks. §2.3 makes these the regions Liquid is
   // FOR, so they are never "dense work" however many buttons or list rows they contain —
   // the first run scored `aside.mc-sidebar` and `header.mc-topbar` as dense work on that
@@ -158,7 +169,10 @@
 
   const classify = (el) => {
     const text = (el.textContent || '').trim().length;
-    const forms = el.querySelectorAll('input,textarea,select,[contenteditable="true"]').length;
+    // Correction 34: `querySelectorAll` is descendants-only, so a region that IS the editor
+    // counted `forms: 0` and fell through to Ambient. Count the element itself too.
+    const forms = el.querySelectorAll('input,textarea,select,[contenteditable="true"]').length
+      + (el.matches(EDITOR_SEL) ? 1 : 0);
     const rows = el.querySelectorAll('table,tr,.dict-entry,.card,article').length;
     const items = el.querySelectorAll('li').length;
     const focusables = [...el.querySelectorAll(FOCUSABLE)].filter((n) => {
@@ -222,7 +236,7 @@
       for (const c of el.children) {
         const b = c.getBoundingClientRect();
         if (b.width < 8 || b.height < 8) continue;
-        if (c.matches(CONTROL_SEL)) { controlsSkipped += 1; walk(c, d + 1); continue; }
+        if (c.matches(CONTROL_SEL) && !c.matches(EDITOR_SEL)) { controlsSkipped += 1; walk(c, d + 1); continue; }
         const areaPct = ((b.width * Math.min(b.height, wr.height)) / winArea) * 100;
         if (areaPct >= ARG.minAreaPct) {
           const cls = classify(c);

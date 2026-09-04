@@ -2311,3 +2311,62 @@ are what actually run.
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` still has 1 of 8 banked —
 cat2 remains VOID until FINDING A's recorder repair lands, which is the next slice.
+
+---
+
+## 2026-09-04 · primary — `note` categories 2 and 3 close at 10/10, and category 3's instrument was scoring an EMPTY WALK
+
+Both cells were driven this turn against the live app (bridge 39273, pid 6756, one window, the
+note alone on the desk at 260×220). Neither number was inherited.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 2 | Clunkiness | **10/10** | 28 keystrokes / 0 clicks; `worstRecv` **13.0 ms**, `overBar100` **0** of 28, `sharedPaintSamples` **0**, `framesObserved` 28; deadEnds **0**, modalTraps **0**, scrollTraps **0**; costParity standard **28** = liquid **28**, 260×220 in both, `restored: true` to standard | 3 axes planted, all 3 moved `0,0,0 → 1,1,1 → 0,0,0`, `backToBaseline true`, inert click 0.3 ms |
+| 3 | Liquid utilization | **10/10** | `regions` **1**, `Work` **1**, `controlsSkipped` **0**, `denseWorkOnTranslucent` **0**, `eligibleTotal` 0; window's own paint under Liquid `alpha 0.72 / blur(8px) saturate(1.25)` | controls **A and B both real** — "CONTROL FAILED AS REQUIRED"; plus the eligibility plant `0→1→0` proving the zero denominator is a MEASURED zero |
+
+Evidence: `baselines/cat2-s11-note-r3.json`, `cat2-s11-note-r3-control.json`,
+`cat3-s11-note-r2.json` (and `cat3-s11-note.json`, the pre-repair run, kept as the finding).
+
+**FINDING A is CLOSED by `9ad79b92`, and this is the run that proves it on the surface that
+raised it.** The previous entry left cat2 VOID pending that recorder repair. Re-driven at the
+default 40 ms spacing the repaired instrument now *refuses* rather than scoring —
+`UNSCOREABLE - 6 of 28 samples shared a paint (busiest frame held 4)` — which is the whole point
+of the repair. Re-driven at `--key-spacing 150` every keystroke gets its own frame
+(`framesObserved 28`, `sharedPaintSamples 0`) and the surface scores on real per-event latency.
+The old 480.1 ms `worstRecv` was the harness's delivery rate; the true worst is **13.0 ms**.
+
+**FINDING C — category 3 scored `note` 10/10 on a walk that found NOTHING, and would have
+scored an identical 10 on a note that put its editing surface on glass.**
+
+`l1-surface-roles.js:104` lists `textarea` in `CONTROL_SEL`, and the walk skips a control before
+it ever reaches the area floor. `.fwin-body-note` holds exactly **one** child — a 258×185
+`textarea.desk-note-text`, **80% of the window**. So the first run returned `regions: 0`,
+`controlsSkipped: 1`, `byRole` all zero, `vacuousContextual: true`, all three bars true for an
+absent denominator, and `PASS 10/10`. It could not even run its own controls: with no runtime
+Work region, controls A and B have nothing to perturb, so it fell back to the plant substitute.
+That is the "empty harness" cap the rubric puts at 0, reached silently.
+
+Repair (this commit): a MULTI-LINE EDITOR is the work, not the chrome. `EDITOR_SEL =
+'textarea,[contenteditable="true"]'` is exempted from the `CONTROL_SEL` skip, and `classify()`
+counts the element itself as a form (`querySelectorAll` is descendants-only, so a region that IS
+the editor read `forms: 0` and fell through to Ambient). Deliberately narrow: a single-line
+`input` stays chrome however wide it is — that is `label.mc-global-search`, the 290×30 search
+field whose false promotion is why `CONTROL_SEL` exists at all. The area floor is unchanged, so
+a small composer still never reaches the walk.
+
+After the repair, same surface, same presentation: `regions` **0 → 1**, `Work` **0 → 1**,
+`controlsSkipped` **1 → 0**, and controls A and B run for real instead of the plant fallback.
+
+**The product was innocent and that is measured, not assumed.** `textarea.desk-note-text`
+computes `background-color: rgb(255, 243, 163)` — fully opaque — in **both** presentations
+(standard, and Liquid with the frame at `alpha 0.72`), and `.fwin-body-note` is opaque
+`rgb(26, 24, 35)` under Liquid. `denseWorkOnTranslucent` is therefore a real 0. The defect was
+entirely in the instrument; no note CSS was changed.
+
+**Trap for the next worker.** `--key-spacing` defaults to 40 ms and that is not enough on this
+machine with a second Electron instance resident: 6 of 28 samples still shared a frame. Read the
+`UNSCOREABLE` string as an instruction, not a failure, and widen the spacing until
+`sharedPaintSamples` is 0. Do not exempt typed tasks.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` now has **3 of 8** banked
+(cat1, cat2, cat3). Next: cat4 use-of-space on a 260×220 surface.
