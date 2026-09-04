@@ -2091,6 +2091,8 @@ export const ru: Catalog = {
   'settings.visualizer.style.spectrum': 'Спектр',
   'settings.visualizer.style.wave': 'Волна',
   'settings.visualizer.style.particles': 'Частицы',
+  'settings.visualizer.style.xpClassic': 'XP Classic',
+  'settings.visualizer.style.vistaAero': 'Vista Aero',
   'settings.visualizer.freq.full': 'Весь трек',
   'settings.visualizer.freq.bass': 'Только бас',
   'settings.visualizer.color.accent': 'Акцент',

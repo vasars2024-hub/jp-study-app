@@ -1924,6 +1924,8 @@ export const ja: Catalog = {
   'settings.visualizer.style.spectrum': 'スペクトラム',
   'settings.visualizer.style.wave': '波形',
   'settings.visualizer.style.particles': 'パーティクル',
+  'settings.visualizer.style.xpClassic': 'XP Classic',
+  'settings.visualizer.style.vistaAero': 'Vista Aero',
   'settings.visualizer.freq.full': '曲全体',
   'settings.visualizer.freq.bass': '低音のみ',
   'settings.visualizer.color.accent': 'アクセント',

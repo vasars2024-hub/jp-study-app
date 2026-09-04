@@ -9,10 +9,21 @@ const VIZ_MODES: { id: VizMode; labelKey: string }[] = [
   { id: 'widget', labelKey: 'settings.visualizer.mode.widget' },
   { id: 'both', labelKey: 'settings.visualizer.mode.both' },
 ];
+/*
+  All five of `VizStyle`, and the last two are not new work: `VisualizerCanvas.tsx`
+  has drawn them since it shipped and Blanc has always offered them. Listing three
+  here meant Study OS could not represent its own persisted state -- `viz.style` is
+  validated against all five in `visualizerSettings.ts`, so a user who picked XP
+  Classic in Blanc came back to a style row where NO button was `primary` and the
+  only way out was to pick a different style. Proper names stay untranslated in all
+  four catalogs, the precedent being `settings.reader.theme.wired`.
+*/
 const VIZ_STYLES: { id: VizStyle; labelKey: string }[] = [
   { id: 'spectrum', labelKey: 'settings.visualizer.style.spectrum' },
   { id: 'wave', labelKey: 'settings.visualizer.style.wave' },
   { id: 'particles', labelKey: 'settings.visualizer.style.particles' },
+  { id: 'xp-classic', labelKey: 'settings.visualizer.style.xpClassic' },
+  { id: 'vista-aero', labelKey: 'settings.visualizer.style.vistaAero' },
 ];
 const VIZ_FREQ: { id: FreqTarget; labelKey: string }[] = [
   { id: 'full', labelKey: 'settings.visualizer.freq.full' },

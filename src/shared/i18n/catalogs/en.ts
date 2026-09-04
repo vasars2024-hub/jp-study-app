@@ -2060,6 +2060,8 @@ export const en: Catalog = {
   'settings.visualizer.style.spectrum': 'Spectrum',
   'settings.visualizer.style.wave': 'Waveform',
   'settings.visualizer.style.particles': 'Particles',
+  'settings.visualizer.style.xpClassic': 'XP Classic',
+  'settings.visualizer.style.vistaAero': 'Vista Aero',
   'settings.visualizer.freq.full': 'Whole track',
   'settings.visualizer.freq.bass': 'Bass only',
   'settings.visualizer.color.accent': 'Accent',

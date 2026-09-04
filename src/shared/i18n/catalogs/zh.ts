@@ -1912,6 +1912,8 @@ export const zh: Catalog = {
   'settings.visualizer.style.spectrum': '频谱',
   'settings.visualizer.style.wave': '波形',
   'settings.visualizer.style.particles': '粒子',
+  'settings.visualizer.style.xpClassic': 'XP Classic',
+  'settings.visualizer.style.vistaAero': 'Vista Aero',
   'settings.visualizer.freq.full': '整首曲目',
   'settings.visualizer.freq.bass': '仅低音',
   'settings.visualizer.color.accent': '强调色',
