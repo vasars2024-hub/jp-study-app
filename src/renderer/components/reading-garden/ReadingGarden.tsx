@@ -1084,6 +1084,18 @@ export default function ReadingGarden({
               <p>{organismObservation}</p>
             </div>
             <div className="reading-garden-info-copy">
+              {/* The garden's honest EMPTY state, and it is a real one: with no page ever
+                  read the dossier otherwise says only "0 / 50 pages banked", which reads
+                  as stalled progress rather than as "you have not started". Category 8
+                  scored the surface `0 of 0 observable` for exactly that - the state was
+                  being lived and never named. The class is what makes it observable and it
+                  is conditional on the real number, so a garden with any page read has no
+                  empty host at all. */}
+              {sceneProgress.pagesRead === 0 && (
+                <em className="reading-garden-info-empty">
+                  {t("mooncap.info.nothingRead")}
+                </em>
+              )}
               {!mature && (
                 <strong>
                   {t("mooncap.info.bankedProgress", {

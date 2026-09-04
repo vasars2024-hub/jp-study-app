@@ -9010,6 +9010,7 @@ export const zh: Catalog = {
     other: '距阶段 {phase} 还需 {count} 页 EPUB。',
   },
   'mooncap.info.evolvedToday': '今日进化已完成',
+  'mooncap.info.nothingRead': '尚未阅读任何内容。在任意书籍中读完页面后，月菇便会开始生长。',
   'mooncap.info.ariaGarden': '月菇阅读花园。蘑菇阶段 {stage} / {max}。',
   'mooncap.info.musicLabel': '花园音乐',
   'mooncap.info.musicOn': '开',

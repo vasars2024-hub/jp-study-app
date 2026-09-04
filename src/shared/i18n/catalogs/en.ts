@@ -9489,6 +9489,7 @@ export const en: Catalog = {
     other: '{count} EPUB pages until phase {phase}.',
   },
   'mooncap.info.evolvedToday': 'One evolution completed today',
+  'mooncap.info.nothingRead': 'Nothing read yet. Finish pages in any book and the mooncap starts to grow.',
   'mooncap.info.ariaGarden': 'Mooncap reading garden. Mushroom stage {stage} of {max}.',
   'mooncap.info.musicLabel': 'Garden music',
   'mooncap.info.musicOn': 'On',

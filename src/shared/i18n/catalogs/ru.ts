@@ -9904,6 +9904,7 @@ export const ru: Catalog = {
     other: '{count} страницы EPUB до фазы {phase}.',
   },
   'mooncap.info.evolvedToday': 'Сегодняшняя эволюция уже завершена',
+  'mooncap.info.nothingRead': 'Пока ничего не прочитано. Дочитайте страницы в любой книге, и лунная шляпка начнёт расти.',
   'mooncap.info.ariaGarden': 'Сад чтения Лунной шляпки. Стадия гриба {stage} из {max}.',
   'mooncap.info.musicLabel': 'Музыка сада',
   'mooncap.info.musicOn': 'Вкл',

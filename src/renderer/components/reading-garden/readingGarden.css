@@ -1202,6 +1202,17 @@
   letter-spacing: 0.025em;
 }
 
+/* The empty state leads the copy block, so it is the first thing read and it is legible
+ * rather than decorative — the `.62` eyebrow family this file uses elsewhere is for labels,
+ * not for the one sentence that tells a new user why nothing is happening. */
+.reading-garden-info-empty {
+  color: rgba(214, 240, 234, 0.86);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.45;
+}
+
 /* The dossier is contextual by design and takes the Liquid material - it floats over a live
  * canvas. This block is the one thing inside it that is NOT reading: a toggle pair and a range
  * input, i.e. a form. §2.3's rule is that forms sit on a stable anchor, and category 3 measured
