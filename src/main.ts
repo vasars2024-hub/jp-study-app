@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot } from './main/library';
+import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerDictionaryIpc, initYomitan } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
 import { registerYtPlaylistsIpc } from './main/ytPlaylists';
@@ -1644,6 +1645,7 @@ app.whenReady().then(async () => {
   registerMediaProtocol();
   registerLocalFileProtocol();
   registerLibraryIpc();
+  registerReadingListsIpc();
   registerDictionaryIpc();
   registerDiagnosticsIpc();
   registerShellIpc();
