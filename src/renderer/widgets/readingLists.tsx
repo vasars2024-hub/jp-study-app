@@ -26,6 +26,7 @@
 import { useCallback, useMemo } from 'react';
 import Icon from '../components/Icons';
 import { useT } from '../i18n';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import { useReadingListsDocument } from '../readingListsDocument';
 import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
 import { useLibraryItems } from './hooks';
@@ -346,7 +347,10 @@ export function ReadingChallengePaceWidget({ settings, setSettings }: WidgetProp
 /* ------------------------------------------------------------ 4. finished -- */
 
 export function ReadingRecentlyFinishedWidget({ size }: WidgetProps) {
-  const { t } = useT();
+  // `lang`, not just `t`: the finish dates below are formatted through
+  // `LANG_TAGS[lang]`, and a bare `toLocaleDateString()` takes the OS locale —
+  // so a Japanese UI on an English machine prints English dates.
+  const { t, lang } = useT();
   const { document, failure } = useReadingListsDocument();
 
   // One row is ~30px inside `.widget-body`'s padding and the frame's title bar.
@@ -378,7 +382,7 @@ export function ReadingRecentlyFinishedWidget({ size }: WidgetProps) {
           >
             <span className="wgt-rl-finish-title">{record.title}</span>
             <span className="wgt-rl-finish-date">
-              {new Date(record.finishedAt).toLocaleDateString()}
+              {new Date(record.finishedAt).toLocaleDateString(LANG_TAGS[lang])}
             </span>
           </button>
         </li>
