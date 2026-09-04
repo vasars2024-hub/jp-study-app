@@ -91,6 +91,8 @@ import {
   readingListExport,
   type ReadingListExportFormat,
 } from '../../shared/readingListExport';
+import { projectReadingListFinish } from '../../shared/readingListProjection';
+import { LANG_TAGS } from '../../shared/i18n/core';
 import './readingLists.css';
 
 const STATE_KEYS: Record<ReadingEntryState, string> = {
@@ -101,6 +103,17 @@ const STATE_KEYS: Record<ReadingEntryState, string> = {
   abandoned: 'readingLists.entryState.abandoned',
   skipped: 'readingLists.entryState.skipped',
 };
+
+/**
+ * A projected day, in the UI language.
+ *
+ * `LANG_TAGS[lang]` and never a bare `toLocaleDateString()`: the bare call takes
+ * the OS locale, so a Japanese UI on an English machine prints English dates.
+ * The widget's finish dates already go through the same tag.
+ */
+function formatProjectionDay(at: number, lang: string): string {
+  return new Date(at).toLocaleDateString(LANG_TAGS[lang as keyof typeof LANG_TAGS] ?? 'en');
+}
 
 const SORTS: ReadingListSort[] = ['recent', 'name', 'progress'];
 const SORT_KEYS: Record<ReadingListSort, string> = {
@@ -620,6 +633,18 @@ export default function ReadingListsView({
 
   const list = useMemo(
     () => document?.lists.find((candidate) => candidate.id === listId) ?? null,
+    [document, listId],
+  );
+
+  /**
+   * P5 §5.4's projected finish for the open list.
+   *
+   * `Date.now()` inside the memo, so the date does not drift between the two
+   * renders of one visit, and NOT in the dependencies — a projection that
+   * recomputed on every render would recompute on every keystroke in the filter.
+   */
+  const projection = useMemo(
+    () => (document && listId ? projectReadingListFinish(document, listId, Date.now()) : null),
     [document, listId],
   );
 
@@ -1961,6 +1986,23 @@ export default function ReadingListsView({
                 finished: summary.finished,
                 counted: summary.counted,
               })}
+            </span>
+          ) : null}
+          {/*
+            P5 §5.4. Rendered only where there is an honest answer — no reading
+            behind it means no date, and the alternative is a line reading
+            "finishes never". `provisional` is shown as its own sentence rather
+            than as a footnote on the date: §5.4's whole risk is that a
+            confident date off two finishes reads exactly like one off forty.
+          */}
+          {projection?.finishesAt && projection.remaining > 0 ? (
+            <span className="rlv__projection" data-provisional={projection.provisional}>
+              {t(
+                projection.provisional
+                  ? 'readingLists.view.projection.rough'
+                  : 'readingLists.view.projection.at',
+                { date: formatProjectionDay(projection.finishesAt, lang) },
+              )}
             </span>
           ) : null}
           <span className="rlv__spacer" />

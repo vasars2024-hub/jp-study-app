@@ -245,6 +245,43 @@ describe('ReadingListsView', () => {
    * the detail — the detail is one list, and a question about all of them there
    * would answer about books the open list does not contain.
    */
+  /**
+   * P5 §5.4's caller. `seeded()` has no finishes at all, so the honest answer is
+   * NO LINE — a projection off zero reading would otherwise render "finishes
+   * never", which is the failure the module returns null for.
+   */
+  it('shows no projected finish for a list with no reading behind it', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+    expect(host.querySelector('.rlv__projection')).toBeNull();
+  });
+
+  it('projects a finish date once there are finishes, and marks a thin sample', async () => {
+    const { document, listId } = seeded();
+    const now = Date.now();
+    const day = 86_400_000;
+    // One finish inside the window: enough to compute a date, well under the
+    // floor of three, so the sentence must be the hedged one.
+    const read: ReadingListsDocument = {
+      ...document,
+      lists: document.lists.map((list) => ({
+        ...list,
+        entries: list.entries.map((entry, i) =>
+          i === 0
+            ? { ...entry, state: 'finished' as const, finishedAt: now - 3 * day }
+            : entry,
+        ),
+      })),
+    };
+    installBridge(new FakeStore(read));
+    await render(listId);
+    const line = host.querySelector('.rlv__projection');
+    expect(line).not.toBeNull();
+    expect(line?.getAttribute('data-provisional')).toBe('true');
+    expect(line?.textContent).toContain('too little reading yet');
+  });
+
   it('renders the smart-list panel on the grid', async () => {
     const { document } = seeded();
     installBridge(new FakeStore(document));

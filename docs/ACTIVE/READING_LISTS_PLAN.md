@@ -1141,22 +1141,67 @@ passed / 1 skipped; 13,935 tests, 13,929 passed / 6 skipped.** `i18n-check` EXIT
 at **12,497** keys. `i18n-hardcoded-check` EXIT 0. `architecture-audit` EXIT 0,
 "Nothing new", 6 pending. eslint **0 errors** on every touched path.
 
-**Exact next slice: P5's remaining three — pace, next-up, timeline.**
-`readingChallengePace` and `nextUpReadingRow` already EXIST as pure functions in
-`readingListViews.ts` and are consumed by §11.2's widgets, so **derive what is
-actually missing before rebuilding them** — §5.4's projection ("at your rate over
-the last 30 days, this list finishes 2026-11-14") is the part with no module, and
-it needs a rate source: check what the app already measures for pages and
-characters read rather than inventing one, the way `difficultyMax` was settled
-above. The timeline (§5's year-in-review shape) can read `recentReadingFinishes`,
-which exists.
+### 9.4 — 2026-09-04, P5 §5.4 CLOSED. The projected finish date.
 
-**TRAP for the pace slice.** `readingChallengePace` takes a `ReadingListTarget`
-and answers ahead/behind in BOOKS. §5.4 asks for a projected finish DATE, which
-is a different function over a different input — do not widen the existing one
-into both, or a challenge list and a pool list will disagree about what "pace"
-means. And a projection with fewer than N finishes is a guess: say so on screen
-rather than printing a confident date off two data points.
+`57fdf10b` (pure core) `c23bf067` (the caller on the list header).
+
+**THE RATE SOURCE, settled against the tree.** Four candidates exist and only one
+can answer a book-scoped dated question:
+
+- **`ReadingListEntry.finishedAt`** — main-persisted in `reading-lists.json`,
+  book-scoped, dated, and *guaranteed present*: `normalizeReadingEntry` repairs a
+  `finished` entry with no timestamp back to `owned` (`readingLists.ts:435`), so a
+  dateless finish cannot reach the function. **This is the source. Zero new fields.**
+- `renderer/stats.ts`'s `days` map — a richer chars/seconds series, **rejected
+  twice over**: it is `localStorage` (`jp-study-stats-v1-<lang>`) with no restore
+  point, which is trap 1 at the top of this plan, and its only exported reader
+  truncates to 14 days.
+- `userData/immersion/metrics.json` — durable and unbounded, but counts **web
+  pages**. A book read in `NovelReader` contributes nothing, so a book list
+  projected from it would *slow down* as the user read more books.
+- `readingGardenProgress` — a lifetime page scalar with no day axis.
+
+**A NEW function, not a widening of `readingChallengePace`.** That one measures
+the list against a target date the USER SET, on a straight line from `createdAt`,
+and returns `null` without one — it reads no history at all. This measures the
+rate actually achieved and needs no target. Merging them would make a challenge
+list and a pool list disagree about what "pace" means, and the challenge widget
+would move when a book on an unrelated list was finished.
+
+**What it refuses to say** is the part that matters. A rate of zero projects to
+infinity, so `finishesAt` is `null` — "never" is not a date, and the header
+renders no line at all. Under **three** observed finishes it is `provisional` and
+the flag travels WITH the number, so a surface cannot print one without the
+other; on screen that is a differently-worded sentence *and* italic, because
+§5.4's whole risk is that a confident date off two finishes reads exactly like
+one off forty. A finished list answers `now`, not `null`, so "already done" and
+"we cannot say" stay distinguishable. `abandoned`/`skipped` are out of
+`remaining` per §5.9. The rate spans EVERY list and de-duplicates per **work** —
+a book finished elsewhere is still an evening spent reading, and §4's fan-out
+would otherwise multiply a reader's apparent rate by how tidily they file.
+
+**Evidence.** 10 + 2 tests. **7 of 7 real mutants RED**, plus an inert SENTINEL
+mutation that correctly stayed GREEN — so a RED verdict here means the test
+noticed the change rather than the file failing to compile. One mutant was GREEN
+on the first pass (dropping the `state !== 'finished'` check while keeping
+`finishedAt`) and **that gap was closed by its own test rather than reported as
+6 of 7**: `setReadingEntryState` deletes `finishedAt` on un-finish, so the shape
+is unreachable through the product but reachable by a hand edit.
+
+**Exact next slice: P5's remaining two — next-up and the timeline.**
+`nextUpReadingRow` already EXISTS in `readingListViews.ts` and is consumed by
+§11.2's widget, so **derive what is actually missing before rebuilding it** — the
+plausible gap is §5.3's *"by best-fit difficulty for pools"*, which the current
+implementation does not do (it is state-priority then list order). The level
+source for that is already settled and shipped: `SmartListRow.level` /
+`smartListFactsFromItem` in `readingListSmartLists.ts`, on the L1–L7 tier scale.
+The timeline (§5's year-in-review shape) can read `recentReadingFinishes`, which
+exists and is already de-duplicated per work.
+
+**TRAP for next-up.** Widening `nextUpReadingRow` changes what §11.2's shipped
+widget shows. Either take an explicit option and leave the default alone, or
+change both together and re-run `readingListWidgets.test.tsx` — a silent
+re-ordering of the "Next up" widget is a behaviour change nobody asked for.
 
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 

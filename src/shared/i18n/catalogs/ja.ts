@@ -11420,6 +11420,8 @@ export const ja: Catalog = {
   'readingLists.smart.remove': 'この条件を削除',
   'readingLists.smart.saved': '「{name}」を保存しました。',
   'readingLists.smart.removed': '「{name}」を削除しました。',
+  'readingLists.view.projection.at': '最近のペースなら{date}ごろに読み終わります。',
+  'readingLists.view.projection.rough': '{date}ごろかもしれません（まだ判断できるほど読んでいません）。',
   'readingLists.view.sort.label': 'リストの並び順',
   'readingLists.view.sort.recent': '最近の更新順',
   'readingLists.view.sort.name': '名前順',
