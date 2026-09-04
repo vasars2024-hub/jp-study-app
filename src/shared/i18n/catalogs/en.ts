@@ -2042,6 +2042,8 @@ export const en: Catalog = {
   'settings.memory.agentHistory.cleared': 'Agent operation history deleted.',
   'settings.memory.quickTitle': 'Quick clear',
   'settings.memory.quickDesc': 'Common wipe actions. Full domain list is above.',
+  // Visualizer widget — the idle (empty) state (en)
+  'visualizer.idle.nothingPlaying': 'Nothing is playing',
   // Settings > Visualizer (en)
   'settings.visualizer.enableAria': 'Enable music visualizer',
   'settings.visualizer.on': 'On',

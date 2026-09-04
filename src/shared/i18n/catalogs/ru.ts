@@ -2073,6 +2073,8 @@ export const ru: Catalog = {
   'settings.memory.agentHistory.cleared': 'История действий агента удалена.',
   'settings.memory.quickTitle': 'Быстрая очистка',
   'settings.memory.quickDesc': 'Частые действия очистки. Полный список доменов выше.',
+  // Виджет визуализатора — состояние простоя (пустое) (ru)
+  'visualizer.idle.nothingPlaying': 'Ничего не воспроизводится',
   // Settings > Visualizer (ru)
   'settings.visualizer.enableAria': 'Включить музыкальный визуализатор',
   'settings.visualizer.on': 'Вкл.',

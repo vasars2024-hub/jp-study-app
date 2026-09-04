@@ -12,6 +12,15 @@
   max-width: calc(100% - 24px);
   transform: translate(-50%, -50%);
   pointer-events: none;
+  /* The state line and the route STACK inside the one control, so the idle state stays a
+     single positioned box for cat4's overlap measurement instead of becoming two positioned
+     siblings. Measured at both scored sizes after the change: default 380x200 puts the box at
+     21..55 from the stage top against a dock at 115..157; compact 260x170, 21..55 against
+     87..129. Clear at both. */
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  line-height: 1.25;
 }
 
 /* The interactive form. `lq-hit-placed` gives the pointer its 32px without growing the
@@ -25,6 +34,10 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+.viz-widget > .viz-widget-hint > .viz-widget-hint-route {
+  white-space: nowrap;
 }
 
 .viz-widget > button.viz-widget-hint-action:hover,

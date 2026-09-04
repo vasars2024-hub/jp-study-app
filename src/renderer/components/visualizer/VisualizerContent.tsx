@@ -73,10 +73,17 @@ export function VizStage({
 }) {
   const { t } = useT();
   const settingsLabel = `${t('settings.nav.visualizer')} — ${t('settings.visualizer.options')}`;
+  /* Two runs, one control. The route alone ("Open Music") is a label, not a state: a blank
+     stage never said WHY it is blank, so category 8 found no observable state on this surface
+     at all and could not score it. The condition is named first and the route stays exactly
+     where cat5 put it — same single `data-primary` button, same `commands.nav.open.music`. */
   const hint = (
     <>
-      <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-      {t('commands.nav.open.music')}
+      <span className="viz-widget-hint-state">{t('visualizer.idle.nothingPlaying')}</span>
+      <span className="viz-widget-hint-route">
+        <Icon name="music" size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+        {t('commands.nav.open.music')}
+      </span>
     </>
   );
   return (
@@ -93,14 +100,14 @@ export function VizStage({
         (onOpenMusic ? (
           <button
             type="button"
-            className={`${classes.hint} viz-widget-hint-action lq-hit-placed`}
+            className={`${classes.hint} viz-widget-empty viz-widget-hint-action lq-hit-placed`}
             data-primary
             onClick={onOpenMusic}
           >
             {hint}
           </button>
         ) : (
-          <span className={classes.hint}>{hint}</span>
+          <span className={`${classes.hint} viz-widget-empty`}>{hint}</span>
         ))}
       {(onOpenMusic || onOpenSettings) && (
         <ContextualSurface

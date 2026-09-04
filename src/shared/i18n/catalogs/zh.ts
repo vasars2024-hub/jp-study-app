@@ -1894,6 +1894,8 @@ export const zh: Catalog = {
   'settings.memory.agentHistory.cleared': '已删除助手操作历史。',
   'settings.memory.quickTitle': '快速清除',
   'settings.memory.quickDesc': '常用清除操作。完整域列表见上方。',
+  // 可视化组件的空闲（空）状态 (zh)
+  'visualizer.idle.nothingPlaying': '当前没有播放任何内容',
   // Settings > Visualizer (zh)
   'settings.visualizer.enableAria': '启用音乐可视化器',
   'settings.visualizer.on': '开',

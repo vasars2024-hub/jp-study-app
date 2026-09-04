@@ -2780,3 +2780,41 @@ Evidence: `cat7-s11-visualizer.json`.
 
 **Running total: 12 of 25 sections at 80/80.** `visualizer` is **7 of 8**; only cat8 is unrun.
 **100 category cells remain.**
+
+## 2026-09-04 · backup — Visualizer category 8 closes at 10/10, and the surface closes at 80/80
+
+Category 8's first run was **UNMEASURED, not a pass**: `statesObservable: []`, `statesNamed
+"0 of 0 observable"`. That is correction 9 doing its job — a surface with no observable state
+cannot be scored 10 — and it named a real product gap rather than an instrument one. The idle
+stage painted the ROUTE ("Open Music") and never the STATE, so a blank canvas never said why it
+was blank.
+
+Repair, in the shared component so both shells declare it: the control names the condition
+first and keeps cat5's single `data-primary` button and its `commands.nav.open.music` route,
+stacked inside one positioned box so cat4's overlap measurement still sees one element. New key
+`visualizer.idle.nothingPlaying` in all four catalogs.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 8 | Honest states | **10/10** — rawKeys **0** in all four languages (`rawKeyCountMax 0`), placeholders **0**, mute pairs **0**, `statesNamed` **1 of 1 observable** with the real message `"Nothing is playingOpen Music"` and `unpaintedHosts 0`. Language leg: 4 distinct hashes over 6 base runs, `diffShare` **0.333** against a 1% floor, `diffRunsMax` 2, `restored true`. |
+
+Control (`--control`): rawKeys, placeholders and mutePairs all MOVED and returned —
+`[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`.
+
+**Re-verified after the change, because it touched a scored box.** cat4 (the one at real risk —
+the idle control grew from 86×17 to 131×45): **PASS 10/10** again, clipped/overlaps/horizontal/
+dead all 0 at default, compact and maximized, dead region 0% at all three. cat1: **PASS 10/10**
+again. cat5: **PASS 10/10** again — the added state line does not cost the surface its clarity
+score. Measured overlap by hand at default 380×200: hint box (124,24) 131×45 against a dock at
+(292,115) 78×42 — clear, and the CSS comment carries the compact numbers.
+
+Evidence: `cat8-s11-visualizer.json`, `cat8-s11-visualizer-control.json`,
+`cat4-s11-visualizer-r2.json`, `cat1-s11-visualizer-r3.json`, `cat5-s11-visualizer-r2.json`.
+
+**`visualizer` is 8 of 8 — the section closes at 80/80. Running total: 13 of 25 sections.
+99 category cells remain.**
+
+One trap for the next surface: `cat5-ui-clarity.cjs` resolves its category-6 dependency as
+`baselines/cat6-<LABEL>.json`, so a re-run under a different `--label` VOIDs on
+`Q7/Q8/Q9 is MEASURE — no category-6 baseline`. That is not a regression in the surface; it is
+the label. This surface's label for cat5 is `s11-visualizer`.

@@ -30,7 +30,13 @@ describe('Visualizer idle recovery action', () => {
     expect(content).not.toContain('play a song in Music');
     expect(content).toContain('data-viz-action="music"');
     expect(content).toContain('onClick={onOpenMusic}');
-    expect(content).toContain('<span className={classes.hint}>{hint}</span>');
+    expect(content).toContain('<span className={`${classes.hint} viz-widget-empty`}>{hint}</span>');
+    // The route alone is a label, not a state. Category 8 found NO observable state on this
+    // surface — a blank stage never said why it is blank — so the condition is named first and
+    // the route keeps cat5's single `data-primary` control. Both shells declare the state, so
+    // the marker sits on the shared component and not in Study OS's class map.
+    expect(content).toContain("t('visualizer.idle.nothingPlaying')");
+    expect(content).toContain('viz-widget-empty viz-widget-hint-action');
     // Was `new CustomEvent('os:open', …)` until L9's Music-widget slice. That
     // dispatch is real on the desktop and a DEAD BUTTON inside
     // `?popout=visualizer`/`?popout=musicwidget`, which mount no DesktopShell.
@@ -114,7 +120,8 @@ describe('Visualizer idle recovery action', () => {
   });
 
   it('keeps the reused label complete in every shared locale', () => {
-    const key = 'commands.nav.open.music' as const;
-    for (const catalog of [en, ja, zh, ru]) expect(catalog[key]).toBeTruthy();
+    for (const key of ['commands.nav.open.music', 'visualizer.idle.nothingPlaying'] as const) {
+      for (const catalog of [en, ja, zh, ru]) expect(catalog[key], `${key}`).toBeTruthy();
+    }
   });
 });

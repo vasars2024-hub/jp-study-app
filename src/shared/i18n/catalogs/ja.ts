@@ -1906,6 +1906,8 @@ export const ja: Catalog = {
   'settings.memory.agentHistory.cleared': 'エージェント操作履歴を削除しました。',
   'settings.memory.quickTitle': 'クイッククリア',
   'settings.memory.quickDesc': 'よく使う削除操作。完全な一覧は上にあります。',
+  // Settings > Visualizer (ja) の前に：ビジュアライザーの待機（空）状態
+  'visualizer.idle.nothingPlaying': '再生中の曲はありません',
   // Settings > Visualizer (ja)
   'settings.visualizer.enableAria': 'ミュージックビジュアライザーを有効にする',
   'settings.visualizer.on': 'オン',
