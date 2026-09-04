@@ -11,8 +11,11 @@
  * "not on glass" — it sits on whatever its nearest painting ancestor is. Scoring the element's
  * own `background-color` alone reports 0 dense-work-on-glass for a fully translucent window,
  * which is the exact false pass this category exists to catch. So `backingOf()` walks up until
- * it meets an opaque paint (alpha >= 0.95) and reports translucent if ANY link in that chain
- * blurs the backdrop or paints at partial alpha.
+ * it meets an opaque paint (alpha >= 0.95). It returns two answers, not one: `translucent`
+ * ("does this carry Liquid material", which stops at the first partial paint and scores the
+ * eligible/treated term) and `grounded` ("is there opaque ground under the text", which
+ * treats a partial paint as inconclusive and scores the dense-work term). See CORRECTION 35
+ * at `backingOf` for the measurement that separated them.
  *
  * ALPHA PARSING. Chrome resolves this app's `color-mix()` to `color(srgb r g b / a)` and can
  * emit `rgb(r g b / a)` / `oklab(... / a)`. A parser matching only `rgba(...)` reads every mixed
@@ -77,23 +80,86 @@
     };
   };
 
-  /** Walks up to the first opaque paint. Translucent if anything on the way blurs or part-paints. */
+  /**
+   * Walks up to the first opaque paint and answers TWO different questions, because the
+   * rubric asks two and they are not the same question.
+   *
+   * `translucent` — "does this region carry Liquid material?". It stops at the first partial
+   * paint, blur or `opacity`, which is the right test for the ELIGIBLE/treated term: a
+   * contextual region at alpha 0.72 over an opaque panel really is glassy, you see the panel
+   * through it. Unchanged, and every banked `liquidTreatedEligible` still means what it meant.
+   *
+   * `grounded` — "is there opaque ground under this region's text?", which is what the
+   * dense-work bar is actually about (§2.3: reading and tables stay on stable anchors).
+   * CORRECTION 35 (2026-09-04, primary): these were the SAME term, and that produced a false
+   * FAIL on `grammar`. `.gram-x-row.focused` paints a 16% selection tint —
+   * `color(srgb 1 0.42 0.51 / 0.16)` — and the old walk stopped there and called the row
+   * "dense work on translucent". Measured in Liquid presentation on the live surface, the
+   * chain under it is `div.gram-x-row=0.16 -> (5 transparent divs) -> div.fwin-body=rgb(26,24,35)
+   * -> section.fwin=0.72+blur`: `.fwin-body` is FULLY OPAQUE with no blur and no `opacity`, so
+   * the desktop is nowhere near that text and the tint composites over a solid plate. The
+   * product code was correct; forcing it opaque would have meant `color-mix(... , var(--panel))`
+   * hardcoding one shell's ground into a row every theme remaps, which the plan forbids.
+   * So a partial paint is now INCONCLUSIVE for grounding and the walk continues; only a
+   * `backdrop-filter`, an `opacity < 1`, or running out of chain without meeting an opaque
+   * paint means ungrounded. A hand-rolled translucent stage with no blur over a translucent
+   * window is still caught, because the walk then reaches the window's own blur.
+   *
+   * This relaxation is NOT self-certifying: control E in `cat3-liquid-utilization.cjs` strips
+   * the opaque ground out from under the surface and requires every Work region to be counted
+   * again. Controls A and B both inject `backdrop-filter`, so neither of them exercises this
+   * branch — that is exactly why E had to be added alongside the change.
+   */
   const backingOf = (el, stopAt) => {
     const chain = [];
     let node = el;
     let translucent = false;
     let reason = null;
+    let grounded = null;
+    let groundedReason = null;
+    const settleGround = (value, why) => {
+      if (grounded === null) { grounded = value; groundedReason = why; }
+    };
     while (node && node !== stopAt.parentElement) {
       const p = paintOf(node);
-      chain.push(`${node.tagName.toLowerCase()}.${String(node.className || '').split(' ')[0]}=${p.alpha}${p.backdrop ? '+blur' : ''}`);
-      if (p.backdrop) { translucent = true; reason = `backdrop-filter on ${chain[chain.length - 1]}`; break; }
-      if (p.opacity < 1) { translucent = true; reason = `opacity ${p.opacity} on ${chain[chain.length - 1]}`; break; }
-      if (p.alpha === null) { reason = `unparsed paint on ${chain[chain.length - 1]}`; break; }
-      if (p.alpha >= TRANSLUCENT_MAX) { reason = `opaque at ${chain[chain.length - 1]}`; break; }
-      if (p.alpha > 0) { translucent = true; reason = `alpha ${p.alpha} on ${chain[chain.length - 1]}`; break; }
+      const link = `${node.tagName.toLowerCase()}.${String(node.className || '').split(' ')[0]}=${p.alpha}${p.backdrop ? '+blur' : ''}`;
+      chain.push(link);
+      if (p.backdrop) {
+        translucent = true; reason = `backdrop-filter on ${link}`;
+        settleGround(false, `backdrop-filter on ${link}`);
+        break;
+      }
+      if (p.opacity < 1) {
+        translucent = true; reason = `opacity ${p.opacity} on ${link}`;
+        settleGround(false, `opacity ${p.opacity} on ${link}`);
+        break;
+      }
+      if (p.alpha === null) {
+        // An unrecognised paint cannot be PROVEN opaque, and this walk never guesses in the
+        // direction that passes a bar. It counts as ungrounded and says so by name.
+        reason = `unparsed paint on ${link}`;
+        settleGround(false, `unparsed paint on ${link}`);
+        break;
+      }
+      if (p.alpha >= TRANSLUCENT_MAX) {
+        reason = `opaque at ${link}`;
+        settleGround(true, `opaque ground at ${link}`);
+        break;
+      }
+      if (p.alpha > 0) {
+        // Decides `translucent` once, and only `translucent`. Grounding keeps walking.
+        if (!translucent) { translucent = true; reason = `alpha ${p.alpha} on ${link}`; }
+      }
       node = node.parentElement;
     }
-    return { translucent, reason, chain: chain.slice(-4) };
+    // Ran off the top of the surface without ever meeting an opaque paint: nothing backs it.
+    if (grounded === null) {
+      grounded = false;
+      groundedReason = `no opaque paint from ${chain[0] || '(empty chain)'} up to the surface root`;
+    }
+    return {
+      translucent, reason, grounded, groundedReason, chain: chain.slice(-4),
+    };
   };
 
   const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"]),summary,details';
@@ -255,6 +321,8 @@
             ownBackdrop: own.backdrop,
             translucentBacking: back.translucent,
             backingReason: back.reason,
+            grounded: back.grounded,
+            groundedReason: back.groundedReason,
           });
         }
         walk(c, d + 1);
@@ -271,7 +339,9 @@
     }
     const work = regions.filter((r) => r.role === 'Work');
     const eligible = regions.filter((r) => r.role === 'Liquid-eligible');
-    const denseOnGlass = work.filter((r) => r.translucentBacking);
+    // CORRECTION 35: the dense-work bar is scored on GROUNDING, not on whether the region
+    // tints itself. `translucentBacking` still drives the eligible/treated term below.
+    const denseOnGlass = work.filter((r) => !r.grounded);
     for (const r of regions) delete r.el;
     return {
       surface,
@@ -288,7 +358,7 @@
         Ambient: regions.filter((r) => r.role === 'Ambient').length,
       },
       denseWorkOnTranslucent: denseOnGlass.length,
-      denseWorkOnTranslucentList: denseOnGlass.map((r) => `${r.sel} (${r.backingReason})`),
+      denseWorkOnTranslucentList: denseOnGlass.map((r) => `${r.sel} (${r.groundedReason})`),
       liquidTreatedEligible: eligible.filter((r) => r.translucentBacking || r.ownBackdrop).length,
       sharedPrimitiveEligible: eligible.filter((r) => r.sharedPrimitive).length,
       eligibleTotal: eligible.length,

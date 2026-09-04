@@ -30,10 +30,14 @@
  *   liquidTreatedEligible / eligibleTotal must be N/N, and the same N/N must be backed by a
  *                              shared Liquid primitive rather than a local translucent copy.
  *
- * `--control` runs both falsifications in the same process and restores them before returning:
+ * `--control` runs three falsifications in the same process and restores them before returning:
  *   A. blur the first runtime Work region (0 must increase);
- *   B. make the whole runtime surface deliberately all-glass (every Work region must fail).
- * The all-glass control is a temporary attribute plus stylesheet, not a surface-specific node.
+ *   B. make the whole runtime surface deliberately all-glass (every Work region must fail);
+ *   E. strip the opaque paint off the surface's own body chain, injecting NO blur (every Work
+ *      region must fail again, this time purely for want of ground).
+ * The all-glass and unground controls are a temporary attribute plus stylesheet, not a
+ * surface-specific node. E exists because A and B both work through `backdrop-filter` and so
+ * neither one exercises the grounding branch that `l1-surface-roles.js` CORRECTION 35 relaxed.
  *
  * A surface with NO runtime Work region cannot be perturbed by either, and used to return
  * `VOID - no runtime Work region exists to falsify` — the instrument declining to score a
@@ -425,6 +429,66 @@ async function restoreAllGlass(before) {
   return restored;
 }
 
+/**
+ * CONTROL E — "unground the surface", added 2026-09-04 (primary) in the same commit as
+ * CORRECTION 35 in `l1-surface-roles.js`.
+ *
+ * Why it had to exist before that correction could be trusted. Controls A and B both inject
+ * `backdrop-filter: blur(12px)`, so both are caught by the walk's FIRST branch and neither one
+ * ever reaches the partial-alpha branch that correction 35 relaxes. A relaxation whose only
+ * negative controls fire for a different reason is unfalsified, and this category has produced
+ * three false passes already. E attacks the changed term directly: it strips the opaque paint
+ * off the surface's own body WITHOUT touching blur and WITHOUT touching any region's own
+ * background, so every Work region keeps whatever partial tint it had and simply loses the
+ * ground beneath it. Every Work region must then be counted again.
+ *
+ * The style is scoped to the own body by ATTRIBUTE rather than by selector, for the reason
+ * CORRECTION 33 records: `.fwin-body` on a shell root matches a nested window's body.
+ */
+async function injectUnground() {
+  return JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface disappeared before control E' });
+    if (document.querySelector('style[data-lq-cat3-control-unground-style]')) {
+      return JSON.stringify({ refuse: 'a prior category-3 unground control is still mounted' });
+    }
+    var body = (${OWN_BODY_EXPR})(root);
+    if (!body) return JSON.stringify({ refuse: 'surface exposes no own body to unground' });
+    var marked = [];
+    var node = body;
+    // Every painting ancestor BETWEEN the regions and the window, the window excluded: the
+    // window's own material is the product's and is what a real ungrounded region falls
+    // through to.
+    while (node && node !== root) { marked.push(node); node = node.parentElement; }
+    if (marked.length === 0) return JSON.stringify({ refuse: 'own body is the surface root; nothing to unground' });
+    var before = document.querySelectorAll('[data-lq-cat3-control-unground]').length;
+    if (before > 0) return JSON.stringify({ refuse: 'a prior unground attribute is still on the tree' });
+    marked.forEach(function(n){ n.setAttribute('data-lq-cat3-control-unground', ''); });
+    var style = document.createElement('style');
+    style.setAttribute('data-lq-cat3-control-unground-style', '');
+    style.textContent = '[data-lq-cat3-control-unground] { background-color: transparent !important;'
+      + ' background-image: none !important; }';
+    document.head.appendChild(style);
+    return JSON.stringify({ marked: marked.length, before: before });
+  })()`));
+}
+
+async function restoreUnground() {
+  const restored = JSON.parse(await ev(`(function(){
+    var style = document.querySelector('style[data-lq-cat3-control-unground-style]');
+    if (style) style.remove();
+    var marked = [].slice.call(document.querySelectorAll('[data-lq-cat3-control-unground]'));
+    marked.forEach(function(n){ n.removeAttribute('data-lq-cat3-control-unground'); });
+    return JSON.stringify({
+      cleared: marked.length,
+      styleStillMounted: !!document.querySelector('style[data-lq-cat3-control-unground-style]'),
+      attributesLeft: document.querySelectorAll('[data-lq-cat3-control-unground]').length
+    });
+  })()`));
+  await new Promise((resolve) => { setTimeout(resolve, 450); });
+  return restored;
+}
+
 const metricTuple = (row) => [
   row.denseWorkOnTranslucent,
   row.liquidTreatedEligible,
@@ -597,11 +661,31 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
         if (all.refuse) throw new Error(all.refuse);
         const dirtyAll = await read();
         const allRestored = await restoreAllGlass(all.before);
+
+        const ung = await injectUnground();
+        if (ung.refuse) throw new Error(ung.refuse);
+        const dirtyUnground = await read();
+        const ungRestored = await restoreUnground();
         const restored = await read();
 
         const movedOne = dirtyOne.denseWorkOnTranslucent > base.denseWorkOnTranslucent;
         const allWorkFailed = dirtyAll.denseWorkOnTranslucent === dirtyAll.byRole.Work
           && dirtyAll.byRole.Work === base.byRole.Work;
+        // Control E asserts a different CAUSE from B: no blur is injected anywhere, so the only
+        // thing that can move this number is the loss of the opaque ground. But "every Work
+        // region must fail" is the WRONG assertion here and measured 19 of 20 on `grammar` on
+        // its first run — a region that paints its OWN opaque background is still grounded
+        // when its ancestors lose theirs, and correctly so. The exact assertion is: the count
+        // must move, and every Work region that SURVIVES must survive on its own paint rather
+        // than on borrowed ground. That keeps the leg strict without failing a surface for a
+        // region the control cannot reach by construction.
+        const ungroundSurvivors = (dirtyUnground.detail || [])
+          .filter((r) => r.role === 'Work' && r.grounded)
+          .map((r) => ({ sel: r.sel, ownAlpha: r.ownAlpha, groundedReason: r.groundedReason }));
+        const ungroundedAllFailed = dirtyUnground.byRole.Work === base.byRole.Work
+          && dirtyUnground.denseWorkOnTranslucent > base.denseWorkOnTranslucent
+          && ungroundSurvivors.every((r) => typeof r.ownAlpha === 'number' && r.ownAlpha >= 0.95);
+        const ungroundReturned = !ungRestored.styleStillMounted && ungRestored.attributesLeft === 0;
         const returned = JSON.stringify(metricTuple(restored)) === JSON.stringify(metricTuple(base));
         const oneMaterialReturned = oneRestored.material === one.before.material
           && normalizedInlineStyle(oneRestored.style) === normalizedInlineStyle(one.before.style);
@@ -613,10 +697,15 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
             base: metricTuple(base),
             oneRegionGlass: metricTuple(dirtyOne),
             allGlass: metricTuple(dirtyAll),
+            ungrounded: metricTuple(dirtyUnground),
             restored: metricTuple(restored),
           },
           movedOne,
           allWorkFailed,
+          ungroundedAllFailed,
+          ungroundReturned,
+          ungroundMarked: ung.marked,
+          ungroundSurvivors,
           returned,
           oneMaterialReturned,
           oneMaterial: {
@@ -625,7 +714,8 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
             settled: oneRestored.material,
           },
           allGlassReturned,
-          verdict: movedOne && allWorkFailed && returned && oneMaterialReturned && allGlassReturned
+          verdict: movedOne && allWorkFailed && ungroundedAllFailed && returned
+            && oneMaterialReturned && allGlassReturned && ungroundReturned
             ? 'CONTROL FAILED AS REQUIRED - category 3 instrument is proven'
             : 'VOID - negative control did not falsify and restore',
         };
