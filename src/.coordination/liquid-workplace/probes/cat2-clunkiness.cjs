@@ -455,9 +455,21 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     // playback, so a control inventory taken a second apart differs with nothing driven.
     if (inChurn(c)) { churnCtrls++; continue; }
     var dis = c.disabled === true || c.getAttribute('aria-disabled') === 'true';
+    // Correction 37: the ACCESSIBLE NAME is state for a control whose state is not binary.
+    // \`name()\` keeps only the FIRST class and this row carried no aria-label or title, so a
+    // three-way cycle whose whole state lives in its name moved nothing the change signal
+    // could see. Measured 2026-09-04 on the Music widget's repeat button: off -> all flips
+    // \`aria-label\`/\`title\` "Repeat: off" -> "Repeat: all" and adds the \`on\` class, and the
+    // step was still scored a DEAD END. The badge \`1\` only appears at the third position, so
+    // \`textContent\` covers one of the three transitions. Widening here can only turn a dead
+    // end into a live step, and every banked cat2 baseline records \`deadEndCount 0\`, so no
+    // score already taken can move; the injected handler-less control has neither attribute
+    // and is unaffected, which the --control leg re-proves per run.
     ctrlAcc.push(name(c) + '|' + (c.textContent || '').trim().slice(0, 24) + '|' + (dis ? 'D' : 'E')
       + '|' + (c.getAttribute('aria-selected') || '') + '|' + (c.getAttribute('aria-expanded') || '')
-      + '|' + (c.getAttribute('aria-pressed') || '') + '|' + (typeof c.value === 'string' ? c.value.slice(0, 24) : ''));
+      + '|' + (c.getAttribute('aria-pressed') || '') + '|' + (typeof c.value === 'string' ? c.value.slice(0, 24) : '')
+      + '|' + (c.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim().slice(0, 40)
+      + '|' + (c.getAttribute('title') || '').replace(/\\s+/g, ' ').trim().slice(0, 40));
   }
 
   var scrollAcc = [];
