@@ -57,6 +57,9 @@
  * each count MOVED. Then the node is removed and a third run asserts the numbers returned to
  * baseline. A probe that has not returned a failure this session is unproven, so a `--control`
  * run that fails to move any of the three exits non-zero and VOIDS the score rather than passing.
+ * The plant arms itself against a canvas/frameless root (correction 32) and REFUSES by name if
+ * it is not hit-testable at its own centre, because "could not arm" and "cannot be falsified"
+ * are different results and only one of them is about the product.
  */
 'use strict';
 const fs = require('node:fs');
@@ -526,7 +529,23 @@ const CONTROL_INJECT = `(function(){
   if (!root) return JSON.stringify({ refuse: 'surface not found' });
   var d = document.createElement('div');
   d.id = '__cat1Control';
-  d.style.cssText = 'position:relative;background:#3a3a3a;padding:4px;display:flex;gap:8px;align-items:center';
+  // Correction 32, and it VOIDED City outright before it was made. A canvas surface can set
+  // pointer-events:none on the root and stack its art on explicit z-indices; the plant then
+  // INHERITS pointer-events:none and lands underneath them, so elementFromPoint at the tiny
+  // button's own centre returns the art (measured on .reading-garden: rootPE none, siblings up
+  // to z=18, hit = DIV.fwin-drag-strip). The pointer leg cannot file a control it cannot reach,
+  // so plantCaught stayed 0 and the run read "negative control did not falsify" - which is the
+  // instrument failing to arm, wearing the costume of a bar that cannot be broken. The plant is
+  // meant to be a control a real pointer could press, so it declares pointer-events:auto for
+  // itself and sits above its siblings. Neither is a relaxation: the two 12px buttons are still
+  // 12px and still 8px apart, and correction 31's named victim is unchanged.
+  var zMax = 0;
+  for (var zi = 0; zi < root.children.length; zi++) {
+    var zc = parseFloat(getComputedStyle(root.children[zi]).zIndex);
+    if (isFinite(zc) && zc > zMax) zMax = zc;
+  }
+  d.style.cssText = 'position:relative;background:#3a3a3a;padding:4px;display:flex;gap:8px;'
+    + 'align-items:center;pointer-events:auto;z-index:' + (zMax + 1);
   d.innerHTML = '<span style="color:#4a4a4a;font-size:13px">contrast control</span>'
     // The class is what the pointer leg's assertion NAMES. l1-hit-area.js labels a row
     // tag.class1.class2, so these two arrive as button.cat1TinyTarget and the control can
@@ -543,7 +562,22 @@ const CONTROL_INJECT = `(function(){
     + '<div aria-hidden="true" style="background:#3a3a3a"><span style="color:#414141;font-size:13px">decor control</span></div>'
     + '<div aria-hidden="true" style="background:#3a3a3a"><button style="color:#414141;font-size:13px;width:40px;height:40px">hidden op</button></div>';
   root.appendChild(d);
-  return JSON.stringify({ injected: true, id: '__cat1Control' });
+  // The control asserts its OWN arming, at the exact coordinate the pointer leg will use. A
+  // plant that is present in the DOM but unreachable produces a VOID that names the wrong
+  // thing; this REFUSES and names the occluder instead, so the next worker fixes the harness
+  // rather than the art.
+  var probe = d.querySelector('.cat1TinyTarget');
+  var pr = probe.getBoundingClientRect();
+  var hit = document.elementFromPoint(pr.x + pr.width / 2, pr.y + pr.height / 2);
+  if (!hit || !d.contains(hit)) {
+    var who = hit ? hit.tagName.toLowerCase() + '.' + String(hit.className || '').split(' ')[0]
+      + ' z=' + getComputedStyle(hit).zIndex : 'nothing (outside the viewport)';
+    d.parentElement.removeChild(d);
+    return JSON.stringify({ refuse: 'the plant is not hit-testable at its own centre ('
+      + Math.round(pr.x + pr.width / 2) + ',' + Math.round(pr.y + pr.height / 2) + ') - ' + who
+      + ' is on top, so the pointer leg could never file it' });
+  }
+  return JSON.stringify({ injected: true, id: '__cat1Control', plantHit: hit.getAttribute('aria-label') });
 })()`;
 const CONTROL_REMOVE = `(function(){
   var n = document.getElementById('__cat1Control');
@@ -685,7 +719,10 @@ async function ariaDisclose(open) {
     if (${open ? 'true' : 'false'}) {
       hits = hits.filter(function(b){ return b.getAttribute('aria-expanded') === 'false'; })
         .filter(function(b){ var r2 = b.getBoundingClientRect(); return r2.width > 0 && r2.height > 0; });
-      remembered = hits.map(function(b){ return b.getAttribute('aria-controls'); }).filter(Boolean);
+      // Correction 33 opens this in passes, so the remembered set ACCUMULATES rather than being
+      // replaced - a second pass that finds nothing left to open must not forget what the first
+      // pass opened, or the restore leg leaves the surface expanded.
+      remembered = remembered.concat(hits.map(function(b){ return b.getAttribute('aria-controls'); }).filter(Boolean));
       window.__cat1AriaOpened = remembered;
     } else {
       hits = hits.filter(function(b){
@@ -712,6 +749,14 @@ async function ariaDisclose(open) {
  * pointerdown on the frame — that fires edge-snap and persists a full-desk resize.
  */
 async function raise() {
+  // CORRECTION 34. The `/focus` below used to sit AFTER this early return, so an `@selector`
+  // surface was measured in an UNFOCUSED OS window - and `painted()` is
+  // `checkVisibility({checkOpacity:true})`, which an entry animation that never advances fails.
+  // Measured on City: the dossier dialog was in the DOM with `aria-expanded="true"` and six
+  // controls, and the probe scored ONE text record and TWO controls because the panel's fade-in
+  // was frozen at opacity 0 in a background window. Focus first, for both surface forms.
+  await post('/focus', {});
+  await new Promise((s) => setTimeout(s, 300));
   if (IS_SELECTOR) return 'root surface - no taskbar button';
   const r = await ev(`(function(){
     var w = ${ROOT_EXPR};
@@ -1051,8 +1096,44 @@ async function runKeyboard() {
     return;
   }
   const raised = await raise();
-  const disclosed = await ariaDisclose(true);
-  if (disclosed.refuse) { console.error(`REFUSE - aria-disclosure leg: ${disclosed.refuse}`); process.exit(2); }
+  // CORRECTION 33 - open in PASSES, and read the closed count back rather than trusting one
+  // sweep. Two independent reasons, both measured on City:
+  //  (a) `raise()` presses the surface to bring it forward, and an outside press is exactly what
+  //      `useDismissableDisclosure` dismisses on. React had not flushed the new `aria-expanded`
+  //      by the time the single sweep read it, so the sweep saw "true", clicked nothing, and the
+  //      panel then unmounted - City measured ONE text record and TWO controls and still read
+  //      10/10. An empty measurement is capped at 0 by the rubric, so a stale attribute here
+  //      silently manufactures a pass.
+  //  (b) a disclosure can reveal another disclosure (Anki's workbench does), and one sweep only
+  //      ever reaches the first level.
+  // The loop stops when a pass clicks nothing, and `closedAfter` is written into the receipt so
+  // a surface that genuinely refuses to open is visible rather than assumed.
+  const closedCount = async () => Number(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return -1;
+    return [].slice.call(root.querySelectorAll('button[aria-expanded="false"][aria-controls]'))
+      .filter(function(b){ var r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).length;
+  })()`));
+  // One render for the raise press to land before the first read, so pass 1 is not the one that
+  // reads the stale attribute.
+  await new Promise((s) => setTimeout(s, 250));
+  const disclosed = { clicked: 0, sel: [], passes: [], closedBefore: await closedCount() };
+  let remaining = disclosed.closedBefore;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const one = await ariaDisclose(true);
+    if (one.refuse) { console.error(`REFUSE - aria-disclosure leg: ${one.refuse}`); process.exit(2); }
+    disclosed.passes.push(one.clicked);
+    disclosed.clicked += one.clicked;
+    disclosed.sel = disclosed.sel.concat(one.sel).slice(0, 8);
+    if (one.settle) disclosed.settle = one.settle;
+    await new Promise((s) => setTimeout(s, 250));
+    remaining = await closedCount();
+    // A pass that clicked nothing while something is still closed is the stale-attribute case,
+    // not a finished sweep - it gets another pass. The loop ends when nothing is left closed, or
+    // when a pass clicked nothing and the count did not move either.
+    if (remaining === 0 || (one.clicked === 0 && pass > 0)) break;
+  }
+  disclosed.closedAfter = remaining;
   if (disclosed.clicked) restoreAria = () => ariaDisclose(false);
   const base = await run();
   if (base.refuse) await bail(2, `REFUSE - ${base.refuse}`);
@@ -1060,6 +1141,17 @@ async function runKeyboard() {
   base.ariaDisclosed = disclosed;
   if (!base.parserSelfTest.ok) {
     await bail(3, `VOID - colour parser self-test failed: ${base.parserSelfTest.why}`);
+  }
+  // CORRECTION 33, second half. The rubric caps an empty measurement at 0, and until this guard
+  // existed nothing here enforced it: City with its dossier collapsed offered ONE text record and
+  // TWO controls, every bar was trivially satisfied, and the verdict read PASS 10/10 on a surface
+  // that had not been shown. The number that matters is what was SCORED, so it is a refusal
+  // rather than a note - the operator drives the surface to a populated state and runs again.
+  if (base.text.measured < 2 || base.targets.total < 2) {
+    await bail(3, `VOID - empty measurement: ${base.text.measured} text record(s) and `
+      + `${base.targets.total} control(s) were scored. The rubric caps an empty harness at 0, not `
+      + `at a pass. Open the surface's own content first (disclosures clicked this run: `
+      + `${disclosed.clicked}, still closed: ${disclosed.closedAfter}).`);
   }
   base.motion = await motionLeg();
   if (base.motion.refuse) await bail(3, `VOID - motion leg: ${base.motion.refuse}`);
