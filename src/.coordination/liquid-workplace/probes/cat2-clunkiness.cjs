@@ -45,7 +45,8 @@
  *   deadEnds             steps that produced NO observable change (bar: 0)
  *   modalTraps           open dialogs that survive a real Escape (bar: 0)
  *   scrollTraps          content taller than its clipped box with no way to reach it (bar: 0)
- *   overBar100           inputs not acknowledged within 100 ms (bar: 0)
+ *   overBar100           inputs not acknowledged within 100 ms (bar: 0), and VOID when
+ *                        sharedPaintSamples > 0 — see correction 32
  *   costParity           the same task's input cost against the Standard-presentation path
  *
  * CORRECTIONS CARRIED OVER RATHER THAN RE-DERIVED — each already produced a false number here:
@@ -174,6 +175,11 @@ const ANCHOR_TOL = Number(arg('anchor-tol', '2'));
 // Long enough that a once-a-second clock is certain to tick inside the window.
 const IDLE_MS = Number(arg('idle', '1600')) || 1600;
 const SETTLE = Number(arg('settle', '600')) || 600;
+// Correction 32: the gap between characters of a `type:` step. Anything under one 60 Hz frame
+// makes every keystroke in a word share one paint, which is not a latency — see the recorder.
+// `|| 40` would be wrong here: `--key-spacing 0` is the falsifier that reproduces the burst this
+// correction is about, and `0 || 40` would silently give it the passing value instead.
+const KEY_SPACING = Number.isFinite(Number(arg('key-spacing', '40'))) ? Number(arg('key-spacing', '40')) : 40;
 /*
  * L7 BULLET 970 — "Keep review/input surfaces spatially fixed during active tasks."
  *
@@ -335,12 +341,26 @@ const ARM = (surface) => `(function(){
   // and contributes no latency sample.
   var st = { surface: ${JSON.stringify(surface)}, latencies: [], clicks: 0, keystrokes: 0, mute: false, muted: 0 };
   var round1 = function(n){ return Math.round(n * 10) / 10; };
+  // Correction 32: EVENTS THAT SHARE ONE PAINT DO NOT EACH HAVE A LATENCY. Every rAF callback
+  // scheduled before the same frame runs in that frame and reads the same clock, so when the
+  // driver delivers characters faster than 60 Hz, sample i is measured as (one shared paint
+  // minus keystroke i) - a monotonically DECREASING ramp, not a latency. Measured on the sticky
+  // note: 480.1 ... 5.8 over one burst, with an independent counter reporting ZERO frames
+  // painted during it; the Settings search field, driven identically as a control, produced the
+  // same zero. Any surface whose task is typing therefore failed the 100 ms bar for free.
+  // The frame is identified by rAF's own timestamp argument, which is identical for every
+  // callback in one frame - no second rAF loop, which would itself perturb the thing measured.
   var stampFor = function(kind, ev){
     var recvAt = performance.now();
     var evAt = ev && typeof ev.timeStamp === 'number' ? ev.timeStamp : recvAt;
-    requestAnimationFrame(function(){
+    requestAnimationFrame(function(frameTs){
       var paintAt = performance.now();
-      st.latencies.push({ kind: kind, recvMs: round1(paintAt - recvAt), stampMs: round1(paintAt - evAt) });
+      st.latencies.push({
+        kind: kind,
+        recvMs: round1(paintAt - recvAt),
+        stampMs: round1(paintAt - evAt),
+        frame: round1(typeof frameTs === 'number' ? frameTs : paintAt),
+      });
     });
   };
   var onInput = function(ev){ if (st.mute) { st.muted += 1; return; } st.keystrokes += 1; stampFor('input', ev); };
@@ -837,6 +857,17 @@ const READ = `(function(){
   };
   var recv = st.latencies.map(function(l){ return l.recvMs; });
   var stamp = st.latencies.map(function(l){ return l.stampMs; });
+  // Correction 32: count the samples that do NOT own their paint. Grouping by rAF's frame
+  // timestamp, any frame holding more than one sample means every sample in it is
+  // (shared paint - own event), which is an artifact of the delivery rate and not a latency.
+  var perFrame = {};
+  for (var i = 0; i < st.latencies.length; i++) {
+    var f = String(st.latencies[i].frame);
+    perFrame[f] = (perFrame[f] || 0) + 1;
+  }
+  var shared = st.latencies.filter(function(l){ return perFrame[String(l.frame)] > 1; });
+  var busiest = 0;
+  for (var k in perFrame) if (perFrame[k] > busiest) busiest = perFrame[k];
   return JSON.stringify({
     clicks: st.clicks,
     keystrokes: st.keystrokes,
@@ -845,6 +876,10 @@ const READ = `(function(){
     clickRecv: pick('click', 'recvMs'),
     worstRecv: recv.length ? Math.max.apply(null, recv) : null,
     overBar100: recv.filter(function(ms){ return ms > 100; }).length,
+    sharedPaintSamples: shared.length,
+    sharedPaintFrames: Object.keys(perFrame).filter(function(f){ return perFrame[f] > 1; }).length,
+    busiestFrame: busiest,
+    framesObserved: Object.keys(perFrame).length,
     inputStampUnscored: pick('input', 'stampMs'),
     clickStampUnscored: pick('click', 'stampMs'),
     worstStampUnscored: stamp.length ? Math.max.apply(null, stamp) : null
@@ -1004,7 +1039,15 @@ async function driveStep(surface, step, before) {
     // the resting state, which is also the state the rubric's input count is defined against.
     if (typeof f.was === 'string' && f.was !== '') await ev(CLEAR(surface, sel));
     out.target = { sel, text, wasValue: f.was };
-    await post('/type', { text });
+    // Correction 32: ONE REQUEST PER CHARACTER. `/type` loops `sendInputEvent` with no gap, so a
+    // whole word lands inside a single frame and the recorder above now (correctly) reports the
+    // run UNSCOREABLE. Spacing is also the more faithful measurement: nobody types a six-letter
+    // query in under 16 ms, and the bar being scored is whether ONE keystroke is acknowledged
+    // within 100 ms. 40 ms clears a 60 Hz frame with margin and costs 40 ms per character.
+    for (const ch of text) {
+      await post('/type', { text: ch });
+      await sleep(KEY_SPACING);
+    }
     await sleep(SETTLE);
     out.after = await snapOf(surface);
     out.moved = movedBetween(before, out.after);
@@ -1468,7 +1511,15 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     deadEnds: drove === 0 ? 'UNMEASURED' : m.deadEnds.length === 0,
     modalTraps: m.modalTraps.length === 0,
     scrollTraps: m.scrollTraps.length === 0,
-    latency: m.cost.n === 0 ? 'UNMEASURED' : m.cost.overBar100 === 0,
+    // Correction 32: a run whose samples shared a paint has no latency to score. It is neither
+    // a 10 nor a failure - it is UNSCOREABLE, and it lands in `unmeasured` below so the bar
+    // cannot pass on an instrument that was not measuring. Exempting typed tasks instead would
+    // have hidden the real 31.5 ms/keystroke defect that this ramp was masking (fixed 8b4dc866).
+    latency: m.cost.n === 0
+      ? 'UNMEASURED'
+      : (m.cost.sharedPaintSamples > 0
+        ? `UNSCOREABLE - ${m.cost.sharedPaintSamples} of ${m.cost.n} samples shared a paint (busiest frame held ${m.cost.busiestFrame}); space the driver so each event gets its own frame`
+        : m.cost.overBar100 === 0),
     costParity: costParity === true ? true : (costParity === false ? false : costParity),
   };
   const unmeasured = Object.entries(bars).filter(([, v]) => typeof v === 'string' && v !== 'N/A-single-path').map(([k]) => k);
@@ -1505,6 +1556,12 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
       worstRecv: m.cost.worstRecv,
       overBar100: m.cost.overBar100,
       n: m.cost.n,
+      // Correction 32: the instrument's own honesty fields. Non-zero sharedPaintSamples voids
+      // the latency bar above rather than scoring it.
+      sharedPaintSamples: m.cost.sharedPaintSamples,
+      sharedPaintFrames: m.cost.sharedPaintFrames,
+      busiestFrame: m.cost.busiestFrame,
+      framesObserved: m.cost.framesObserved,
       clickStampUnscored: m.cost.clickStampUnscored,
       inputStampUnscored: m.cost.inputStampUnscored,
       worstStampUnscored: m.cost.worstStampUnscored,
