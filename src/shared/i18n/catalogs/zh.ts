@@ -11148,4 +11148,9 @@ export const zh: Catalog = {
   'readingLists.preview.triage.authorAmbiguous': '作者在同一行中被更正过，请核对。',
   'readingLists.preview.triage.veryShort': '过短，可能不是书名。',
   'readingLists.preview.triage.veryLong': '过长，可能是一句话而不是书名。',
+  'readingLists.paste.failed.bridge': '此窗口无法使用阅读书单，因此没有添加任何内容。',
+  'readingLists.paste.failed.read': '无法读取你的书单，因此没有添加任何内容。请重试。',
+  'readingLists.paste.failed.write': '书单未能保存，因此没有添加任何内容。上面的修改仍然保留。',
+  'readingLists.paste.failed.conflict': '保存期间另一个窗口一直在修改这份书单。没有添加任何内容，请再次点击“添加”。',
+  'readingLists.paste.failed.noList': '该书单已不存在，因此没有添加任何内容。',
 };

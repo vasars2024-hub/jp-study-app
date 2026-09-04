@@ -21,7 +21,7 @@
  *     is the dishonest state this repo keeps finding; the blocker line names the
  *     cause ("nothing selected", "a title is empty") in the user's terms.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import './readingListPreview.css';
 import { Dialog } from '../ui/Dialog';
 import { useT } from '../../i18n';
@@ -49,6 +49,11 @@ export interface ReadingListPastePreviewProps {
   onConfirm: (payload: ReadingPreviewImport) => void;
   /** True while the caller's write is in flight; the sheet stays open and inert. */
   busy?: boolean;
+  /**
+   * The caller's own banner — a failed write, most often. Rendered inside the
+   * sheet because the dialog is a fixed overlay and a sibling paints under it.
+   */
+  notice?: ReactNode;
 }
 
 const TRIAGE_KEYS: Record<string, string> = {
@@ -64,8 +69,9 @@ export function ReadingListPastePreview({
   onCancel,
   onConfirm,
   busy = false,
+  notice,
 }: ReadingListPastePreviewProps) {
-  const { t, lang } = useT();
+  const { t } = useT();
   const [draft, setDraft] = useState<ReadingPreviewDraft>(() => beginReadingListPreview(rawText));
   const [showDropped, setShowDropped] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -146,6 +152,8 @@ export function ReadingListPastePreview({
       <div ref={bodyRef} className="rl-preview__body" onKeyDown={onKeyDown}>
         <p className="rl-preview__lede">{t('readingLists.preview.lede', { list: listName })}</p>
 
+        {notice}
+
         {summary.triage > 0 && (
           <div className="rl-preview__triage" role="note">
             <span>{t('readingLists.preview.triageCount', { count: summary.triage })}</span>
@@ -184,7 +192,6 @@ export function ReadingListPastePreview({
                 }
                 onRevert={() => setDraft((current) => revertPreviewRow(current, row.lineIndex))}
                 t={t}
-                lang={lang}
               />
             ))}
           </ul>
@@ -221,7 +228,6 @@ interface PreviewRowProps {
   onEdit: (patch: { title?: string; author?: string }) => void;
   onRevert: () => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
-  lang: string;
 }
 
 function PreviewRow({ row, busy, onToggle, onEdit, onRevert, t }: PreviewRowProps) {

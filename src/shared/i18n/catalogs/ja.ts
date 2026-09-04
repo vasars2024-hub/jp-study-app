@@ -11267,4 +11267,9 @@ export const ja: Catalog = {
   'readingLists.preview.triage.authorAmbiguous': '行の途中で著者が訂正されています。確認してください。',
   'readingLists.preview.triage.veryShort': '短すぎます。タイトルではない可能性があります。',
   'readingLists.preview.triage.veryLong': '長すぎます。タイトルではなく文の可能性があります。',
+  'readingLists.paste.failed.bridge': 'このウィンドウでは読書リストを利用できないため、何も追加されませんでした。',
+  'readingLists.paste.failed.read': 'リストを読み込めなかったため、何も追加されませんでした。もう一度お試しください。',
+  'readingLists.paste.failed.write': 'リストを保存できなかったため、何も追加されませんでした。上の編集内容は残っています。',
+  'readingLists.paste.failed.conflict': '保存中に別のウィンドウがこのリストを変更し続けました。何も追加されていません。もう一度「追加」を押してください。',
+  'readingLists.paste.failed.noList': 'そのリストは既に存在しないため、何も追加されませんでした。',
 };

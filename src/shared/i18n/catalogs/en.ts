@@ -11776,4 +11776,9 @@ export const en: Catalog = {
   'readingLists.preview.triage.authorAmbiguous': 'The author was corrected mid-line — check it.',
   'readingLists.preview.triage.veryShort': 'Very short — this may not be a title.',
   'readingLists.preview.triage.veryLong': 'Very long — this may be a sentence, not a title.',
+  'readingLists.paste.failed.bridge': 'Reading lists are not available in this window, so nothing was added.',
+  'readingLists.paste.failed.read': 'Your lists could not be read, so nothing was added. Try again.',
+  'readingLists.paste.failed.write': 'Nothing was added — the list could not be saved. Your edits above are still here.',
+  'readingLists.paste.failed.conflict': 'Another window kept changing this list while it was being saved. Nothing was added; press Add again.',
+  'readingLists.paste.failed.noList': 'That list no longer exists, so nothing was added.',
 };

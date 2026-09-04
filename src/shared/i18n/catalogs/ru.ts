@@ -12216,4 +12216,9 @@ export const ru: Catalog = {
   'readingLists.preview.triage.authorAmbiguous': 'Автор был исправлен в той же строке — проверьте.',
   'readingLists.preview.triage.veryShort': 'Очень короткая строка — возможно, это не название.',
   'readingLists.preview.triage.veryLong': 'Очень длинная строка — возможно, это предложение, а не название.',
+  'readingLists.paste.failed.bridge': 'Списки чтения недоступны в этом окне, поэтому ничего не добавлено.',
+  'readingLists.paste.failed.read': 'Не удалось прочитать ваши списки, поэтому ничего не добавлено. Попробуйте ещё раз.',
+  'readingLists.paste.failed.write': 'Ничего не добавлено — список не удалось сохранить. Ваши правки выше сохранены.',
+  'readingLists.paste.failed.conflict': 'Пока список сохранялся, другое окно продолжало его менять. Ничего не добавлено — нажмите «Добавить» ещё раз.',
+  'readingLists.paste.failed.noList': 'Этого списка больше не существует, поэтому ничего не добавлено.',
 };
