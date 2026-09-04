@@ -775,6 +775,86 @@ and still has no consumer). Undo's remaining debt is the re-parse alone.
 §11.1's click-through table still needs auditing row by row — four of its eight
 rows have no test naming them, and that has now been deferred for three turns.
 
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`, branch `wt/files-app`).**
+Three §11.4 rows: **density**, **accessibility**, and the first half of **drag
+and drop**. §11.4 goes **5 of 9 -> 8 of 9 closed** (+1 partial). The one row
+still open is drag-and-drop's other three clauses; undo's only remaining debt is
+still the re-parse.
+
+- `fbec7ec7` — **density.** Comfortable/compact, one preference over the whole
+  surface, persisted in renderer `localStorage` (NOT the document: that is user
+  data, it round-trips through main, and a chrome preference riding in it would
+  make every flip a store write, a broadcast and a line in the event log).
+
+  **Compact does not shrink a hit target, and that is the whole design.**
+  `.rlv__row-open` and `.rlv__selectall` are 34px, not 32, because the
+  accessibility walk's floor IS 32 and it steps in halves. A compact mode at
+  28px would buy this row by failing the accessibility row two bullets above it.
+  So compact spends only the space between and around the targets: 48px/row ->
+  40px/row, 17% more rows, every target unchanged. The guard asserts that NO
+  `[data-density='compact']` rule declares any height, width, transform or
+  scale, with a vacuity check that the attribute is not inert. 5 of 5 RED.
+
+- `cbd3ff26` — **accessibility, and a role the tree threw away.** Every list
+  card carried `role="progressbar"` with `aria-valuenow` INSIDE its own
+  `<button>`. ARIA gives `button` presentational children, so that role was
+  stripped in every browser: it announced nothing, while making the source read
+  as covered. The bar is `aria-hidden` now and the sentence above it ("0 of 2
+  finished") is the announcement, inside the same button. Also: `ul.rlv__grid`,
+  `ul.rlv__rows` and the picker list had no accessible name — "list, 3 items"
+  on a surface with three lists on it.
+
+  `__tests__/helpers/a11yWalk.ts` is a HARNESS (RULE 1), not a probe: it takes
+  any container. Two of its four legs open a panel FIRST, because the panels are
+  click-mounted and a walk of the resting surface never reaches them. What it
+  CONFIRMED matters as much as what it found: every control already had a name,
+  nothing clickable is a bare div, every focusable is native or `.ui-focusable`.
+  5 of 5 RED.
+
+- `a9dc23e4` — **reorder.** `reorderReadingListEntries` had existed since P0
+  with no consumer in `src/renderer`. Drag plus Alt+Arrow, one write, one undo.
+  The order handed to the mutation is the WHOLE list, never `visibleRows`: that
+  mutation APPENDS omitted ids, so a filtered reorder moves every hidden entry
+  to the end, invisibly. 5 of 5 RED after two rewrites — see below.
+
+**TWO MUTATION CONTROLS READ GREEN, and each was a finding of its own:**
+
+1. *"Compute the reorder from the filtered view"* passed all 72 tests. It
+   APPLIED (sentinel-substituted and grepped, per `mutation-control-that-never-
+   applied`) and was NEUTRALISED: `reorderRows` closes over `visibleRows` with
+   deps `[list, t, write]`, so the mutant read a stale unfiltered array and did
+   the right thing by accident. A control that the code under test can
+   accidentally satisfy proves nothing.
+2. *"Delete the `preventDefault` in `onDragOver`"* passed everything. **jsdom
+   implements NONE of the HTML drag-and-drop model** — a synthetic `drop` fires
+   whether or not `dragover` was cancelled, and cancelling dragover is the only
+   thing that permits a drop in a real browser. Every drag test would have
+   stayed green with the feature dead in the app. `defaultPrevented` on the
+   dispatched event is the one fact jsdom does report, so that is what is
+   asserted now, with its negative half.
+
+**Three more traps, all live-measured this turn:**
+
+3. **`CSS.escape` is UNDEFINED in this jsdom.** `label[for="${CSS.escape(id)}"]`
+   throws — and only for elements that HAVE an id, which on this surface means
+   only the two click-mounted panels. A walk of the resting surface passes clean
+   and the failure looks like a panel bug.
+4. **`event.dataTransfer` is `undefined` in jsdom.** A drag payload put there is
+   unreadable from every test, so the dragged id is held in a ref in the view.
+5. **A `{/* JSX comment */}` immediately after `) : (`** is a parse error: the
+   ternary arm takes one expression, and the comment makes two children with no
+   fragment. Use a `//` line comment above the element instead.
+
+Gates at `a9dc23e4`: 410 tests across the 20 reading-list suites, all passing;
+`i18n-check.cjs` EXIT 0 at **12,446** keys; `i18n-hardcoded-check.cjs` EXIT 0;
+eslint 0 errors on every touched non-CSS path.
+
+**Exact next slice: §11.4's drag-and-drop remainder** — drag an entry BETWEEN
+lists (`moveReadingListEntries` already exists and the bulk bar already uses
+it), drop a library item onto a list card, drop a `.txt` onto the lists view.
+Then **§11.1's click-through table, row by row** — four of its eight rows still
+have no test naming them, and that has now been deferred for four turns.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
