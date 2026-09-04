@@ -120,6 +120,27 @@ const WIN = arg('win', '');
 const OUT = arg('out', '');
 const CONTROL = has('control');
 const LANGS = has('langs');
+/**
+ * CORRECTION 37, Scraper 2026-09-04. A SURFACE THAT WRITES ITS OWN LIVE METRICS CANNOT BE
+ * RESTORED, so the drive leg VOIDs a surface with no defect.
+ *
+ * The Scraper rail paints `Memory: NNN MB` and `CPU: N%`. At rest they are stable — sampled
+ * 7 s apart, `innerText` diff 0 lines — but a drive is exactly the thing that moves them:
+ * clicking Downloads and clicking back to History produced a ONE-LINE diff,
+ * `Memory: 777 MB` -> `Memory: 778 MB`, and `restored` compares `textHash`, so the run VOIDed
+ * with `surfaceChanged: true, restored: false` on a round trip that genuinely restored.
+ *
+ * This is category 2's correction 19 arriving at the other harness. It is deliberately
+ * NARROWER here: a churn region is dropped from the HASH only. Its runs still count in
+ * `textRuns`/`wordRuns` and are still scanned for raw keys, placeholders and status text, so
+ * no bar term is weakened and an empty surface cannot hide behind the flag.
+ *
+ * The exclusion is not taken on trust, for the same reason cat2 does not take it on trust:
+ * `churnHash` must actually MOVE between the base and the driven reading, or the flag is
+ * widening the pass band for nothing and the run VOIDs. A selector that matches no text VOIDs
+ * too — silence is how the wrong exclusion gets banked.
+ */
+const CHURN = arg('churn', '');
 const DRIVE_INPUT = arg('drive-input', '');
 // Nonsense on purpose: it must match nothing in ANY catalogue, in any of the four languages.
 const DRIVE_VALUE = arg('drive-value', 'zzqqxxnosuchthing');
@@ -204,6 +225,17 @@ const PROBE = `(function(){
   function name(e){
     return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0];
   }
+  // Correction 37: the declared self-writing regions, dropped from the HASH and from nothing
+  // else. Membership is by ancestry so a metric line's own text node is reached.
+  var churnSel = ${JSON.stringify(CHURN)};
+  var churnEls = churnSel ? rq(churnSel) : [];
+  function inChurn(e){
+    if (!churnEls.length || !e) return false;
+    for (var a = e; a && a !== root.parentElement; a = a.parentElement) {
+      for (var ci = 0; ci < churnEls.length; ci++) if (churnEls[ci] === a) return true;
+    }
+    return false;
+  }
   // Correction 13: a mute pair reported as \`button.\` with an empty label is a finding NOBODY
   // CAN ACT ON. An icon-only button has no class and no text, so two separate surfaces both
   // reported the identical unidentifiable row and the only way to find the actual control was a
@@ -252,6 +284,7 @@ const PROBE = `(function(){
 
   var rawKeys = [], placeholders = [], statusCandidates = [];
   var textRuns = 0, textAcc = [], devOnlyRuns = 0, hostedTextRunsExcluded = 0, wordRuns = 0;
+  var churnTextRuns = 0, churnAcc = [];
   var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (var t = tw.nextNode(); t; t = tw.nextNode()) {
     var s = t.nodeValue && t.nodeValue.trim();
@@ -278,7 +311,7 @@ const PROBE = `(function(){
     // localisable text at all -- a fabricated finding of exactly the shape correction 21
     // was written for, pointing the other way.
     if (/\\p{L}/u.test(s)) wordRuns++;
-    textAcc.push(s);
+    if (inChurn(t.parentElement)) { churnTextRuns++; churnAcc.push(s); } else textAcc.push(s);
     var toks = s.split(/\\s+/);
     for (var i = 0; i < toks.length; i++) {
       if (KEY.test(toks[i])) rawKeys.push({ token: toks[i], el: name(t.parentElement) });
@@ -302,7 +335,7 @@ const PROBE = `(function(){
     if (!painted(pe) || String(pe.value || '').length > 0 || !ps) continue;
     textRuns++;
     if (/\\p{L}/u.test(ps)) wordRuns++;
-    textAcc.push(ps);
+    if (inChurn(pe)) { churnTextRuns++; churnAcc.push(ps); } else textAcc.push(ps);
     var ptoks = ps.split(/\\s+/);
     for (var pti = 0; pti < ptoks.length; pti++) {
       if (KEY.test(ptoks[pti])) rawKeys.push({ token: ptoks[pti], el: name(pe), source: 'placeholder' });
@@ -414,6 +447,9 @@ const PROBE = `(function(){
   var joined = textAcc.join('\\u0000');
   var hash = 0;
   for (var h = 0; h < joined.length; h++) { hash = ((hash * 31) + joined.charCodeAt(h)) | 0; }
+  var cjoined = churnAcc.join('\\u0000');
+  var churnHash = 0;
+  for (var ch = 0; ch < cjoined.length; ch++) { churnHash = ((churnHash * 31) + cjoined.charCodeAt(ch)) | 0; }
 
   return JSON.stringify({
     lang: document.documentElement.getAttribute('lang') || null,
@@ -426,6 +462,8 @@ const PROBE = `(function(){
     hostedWindowsExcluded: isShell ? root.querySelectorAll('.fwin').length : 0,
     wordRuns: wordRuns,
     textHash: hash,
+    churnTextRuns: churnTextRuns,
+    churnHash: churnHash,
     // Correction 19: the WHOLE candidate list, not the first ten. The node side decides
     // which of these are real catalog keys, and it cannot subtract from a truncated list.
     // Capped anyway, with the cap declared, so a pathological surface refuses rather than
@@ -715,6 +753,20 @@ const clickEl = (sel, which) => `(function(){
 })()`;
 
 /**
+ * Correction 37's receipt. Three readings of the declared self-writing regions, so a reader can
+ * see the exclusion earn itself instead of taking the flag's word for it. `moved` is what the
+ * caller VOIDs on: a churn set that never differs across the drive was excluded for nothing.
+ */
+const churnWitness = (base, driven, restored) => (CHURN
+  ? {
+      selector: CHURN,
+      runs: base.churnTextRuns,
+      hashes: { base: base.churnHash, driven: driven.churnHash, restored: restored.churnHash },
+      moved: base.churnHash !== driven.churnHash || base.churnHash !== restored.churnHash,
+    }
+  : null);
+
+/**
  * CORRECTION 36, measured 2026-08-31 on the Blanc shell — A FILTER BEHIND A DISCLOSURE IS
  * STILL THIS SURFACE'S FILTER.
  *
@@ -758,6 +810,7 @@ async function driveLeg(base) {
       clickedLabel: hit.label,
       undo: DRIVE_UNDO || DRIVE_CLICK,
       undoLabel: undo.label || null,
+      churn: churnWitness(base, driven, restored),
       surfaceChanged: driven.textHash !== base.textHash,
       restored: restored.textHash === base.textHash,
       driven: {
@@ -824,6 +877,7 @@ async function driveLeg(base) {
     openedBy: opener,
     restoredAfterEscape,
     restoredAfterUndo,
+    churn: churnWitness(base, driven, restored),
     // A drive that changed nothing has not driven anything; scoring its states would be fabrication.
     surfaceChanged: driven.textHash !== base.textHash,
     restored: restored.textHash === base.textHash && back.now === set.was,
@@ -1035,6 +1089,23 @@ async function langLeg() {
     if (!base.drive.surfaceChanged) {
       console.error('VOID - the drive changed nothing; it is not this surface\'s filter');
       process.exit(3);
+    }
+    // Correction 37: the exclusion has to earn itself, both ways round.
+    if (CHURN) {
+      const w = base.drive.churn;
+      if (!w || !w.runs) {
+        console.error(`VOID - --churn "${CHURN}" matched no painted text run on this surface; `
+          + 'an exclusion that names nothing is not an exclusion');
+        process.exit(3);
+      }
+      // An exclusion that did not move is provably INERT rather than a widening, and this is
+      // the one place the cat2 rule does NOT transfer. Every hash here is only ever compared
+      // for equality against another hash from the same run; a set of runs that is byte-identical
+      // in all three readings shifts base, driven and restored alike, so including it could not
+      // change a single verdict. The metric this flag exists for is nondeterministic — the
+      // Scraper's memory line moved on one drive and not the next — so VOIDing here would make
+      // a correct surface pass or fail by luck. Recorded, never silently dropped.
+      if (!w.moved) w.inert = true;
     }
   }
 
