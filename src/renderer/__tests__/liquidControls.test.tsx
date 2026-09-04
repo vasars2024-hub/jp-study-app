@@ -564,6 +564,31 @@ describe('the sheet stays a composition language, not a palette', () => {
     // confirmed 32px tall, the manga reader's pointer region still measured 28.5.
     expect(ruleOf('.sp-seg')).toMatch(/overflow:\s*hidden/);
     expect(ruleOf('.sp-seg-btn')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+
+    // Grammar hit both obstacles at once, and the walk named each blocker by tag.
+    // REPLACED: `.gram-x-presets` carries the scope, yet its select and its text field
+    // measured 19.5 and 21.5 — `::after` generates no box on either.
+    expect(ruleOf('.gram-x-preset-select')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    expect(ruleOf('.gram-x-preset-name')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    // CLIPPER: `.gram-x-detail` is `overflow: auto`, so with the scope applied to the
+    // action row inside it the walk still read 29.5 and named `div.gram-x-detail`.
+    expect(ruleOf('.gram-x-detail')).toMatch(/overflow:\s*auto/);
+    expect(ruleOf('.gram-x-detail-actions .ui-btn')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+    // And the third, which is `.lq-check`'s own: the expander is only as tall as the
+    // label it hangs off, so a 30px row leaves it 2px short of the floor.
+    expect(ruleOf('.gram-x-row .lq-check')).toMatch(/min-height:\s*var\(--lq-hit-target\)/);
+
+    const gx = readFileSync(resolve(__dirname, '..', 'components/grammar/GrammarExplorer.tsx'), 'utf8');
+    expect(gx).toMatch(/gram-x-controls lq-hit-scope/);
+    expect(gx).toMatch(/gram-x-presets lq-hit-scope/);
+    expect(gx).toMatch(/gram-x-detail-actions lq-hit-scope/);
+    expect(gx).toMatch(/<label className="lq-check">/);
+    expect(
+      readFileSync(resolve(__dirname, '..', 'components/grammar/GrammarBandControl.tsx'), 'utf8'),
+    ).toMatch(/wk-grade gram-x-band lq-hit-scope/);
+    expect(
+      readFileSync(resolve(__dirname, '..', 'components/grammar/GrammarContent.tsx'), 'utf8'),
+    ).toMatch(/gram-card-head lq-hit-scope/);
     // Both floors resolve the SAME token as the scope's `::after`, or the two halves of this
     // category drift the next time the floor moves. (`CSS` here is comment-stripped, so the
     // warning written into `liquid-controls.css` is not assertable — this is.)

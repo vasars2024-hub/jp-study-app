@@ -330,7 +330,7 @@ export default function GrammarExplorer({
 
   return (
     <div className={`gram-x ${className}`}>
-      <div className="gram-x-controls">
+      <div className="gram-x-controls lq-hit-scope">
         <Button
           size="sm"
           disabled={noBack}
@@ -374,7 +374,7 @@ export default function GrammarExplorer({
         </Button>
       </div>
 
-      <div className="gram-x-presets">
+      <div className="gram-x-presets lq-hit-scope">
         <select
           className="gram-x-preset-select"
           value=""
@@ -509,7 +509,7 @@ export default function GrammarExplorer({
         <div className="gram-x-detail">
           {focused ? (
             <>
-              <div className="gram-x-detail-actions">
+              <div className="gram-x-detail-actions lq-hit-scope">
                 <Button size="sm" onClick={() => toggleIn(setFavorites, focused.id)}>
                   {t(
                     favorites.has(focused.id)
