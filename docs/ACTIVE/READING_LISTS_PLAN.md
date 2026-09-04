@@ -1374,6 +1374,59 @@ a design:** it needs a callback threaded through `src/renderer/App.tsx`, which i
 is parked. `ReadingListsView.tsx` itself is CLEAN in the main tree, which is why
 this slice was safe to take.
 
+### 9.8 — 2026-09-04, §11.1 is 8 OF 8. Row 8 reaches manga; the pop-out row closes.
+
+`c286c410`, `fb154aa2`. **§11.1 has no open row left.**
+
+**`c286c410` — row 8 in the MANGA reader, recovered from `codexB`.** Its 18:56 run
+died on a usage limit at 19:05 with the slice uncommitted; finished here rather
+than discarded. `MangaReader.tsx` gets the same read-only
+`<ReadingListMembership itemId>` `NovelReader` already carried — §10.2 keeps the
+logic out of the 87 KB file. Two fixes were needed before any evidence existed:
+the harness's KNOWN ISSUE ("stalls silently, #root stays empty, no console
+error") was **static imports** evaluating the ~120-module graph before
+`window.api` was assigned — both are dynamic now, awaited after the assignment;
+and `manga-reader-harness.html` had never been written, so Vite had nothing to
+serve the URL the harness header has always named. **LIVE:** `?lists=2` → banner
+reads "On 2 lists" with buttons `Manga club 1` / `Manga club 2`; `?lists=0` →
+the strip is absent, title straight to `1 / 12`. The inherited test asserted
+`'On 1 list(s)'`, the raw plural KEY rather than the rendered `one` arm.
+
+**`fb154aa2` — the pop-out row, which 9.7 parked as needing `App.tsx`. It does
+not.** `window.api.popOut(section)` is a renderer-level seam with 19 call sites;
+neither `App.tsx` nor `preload.ts` is touched.
+
+**Scope decision, because the row does not state it:** the app pops out
+SECTIONS, not books, so the gesture belongs to a list CARD and opens Reading
+routed to that list. A per-book window would be the second navigation model
+§11.1's first bullet forbids.
+
+**The route travels through `localStorage`, and trap 1 does not forbid it.**
+Trap 1 is about list DATA and a profile reset with no restore point. This is one
+navigation intent with a 60 s TTL whose loss costs a pop-out that opens on the
+grid. A pop-out is a separate process, so `pendingRoutes` cannot reach it, and
+main's route would need `preload.ts` (` M`, eight turns). Wire format is the
+existing `reading://workspace/...` link, so the receiver validates it like any
+untrusted route.
+
+**Both delivery halves ship, because each is dead alone:** the mount claim
+serves the cold open; a `storage` subscription serves every later gesture,
+because `popOut` FOCUSES rather than remounts. Claiming is gated on
+`isPopoutWindow()` — without it the desktop eats its own hand-off and one
+Ctrl-click moves two windows.
+
+**LIVE, and it is the half jsdom cannot prove:** two Chromium documents on the
+Vite origin — B staged, A received exactly ONE `storage` event carrying it, then
+claimed `{section:'lists', listId:'live-list-1'}`; the second claim returned
+null with the key gone. **12 tests, 8 of 8 mutants RED.**
+
+**Exact next slice: §11.2's four widgets, or §11.3's reminders** — §11.4's rows
+are the other P4 gate. `App.tsx` and `preload.ts` are still ` M`; §11.2 registers
+in `widgets/registry.ts` and §11.3 in `main/buddyScheduler.ts`, so neither needs
+them. **The trap this turn refutes:** "parked on a foreign dirty path" is worth
+re-deriving before it is inherited — row 8 and the pop-out row were both parked
+on files that turned out not to be required.
+
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
 Kept only so the entry above has its subject.
