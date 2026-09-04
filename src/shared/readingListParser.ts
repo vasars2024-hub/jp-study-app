@@ -155,13 +155,16 @@ const QUOTED_SPAN_GLOBAL = /[「『"“]([^」』"”]{2,80})[」』"”]/g;
 /**
  * NFKC plus the normalizations a pasted message actually needs.
  *
- * NFKC alone already folds full-width digits and Latin, which is most of it. The
- * ideographic space is handled separately because NFKC maps it to U+0020 but a
- * run of them still needs collapsing, and a trailing one is invisible in the UI
- * and would make two identical titles compare unequal.
+ * NFKC alone already folds full-width digits and Latin, which is most of it, and
+ * it maps the ideographic space U+3000 to U+0020. What NFKC does not do is
+ * collapse a run or trim the ends — and a trailing ideographic space is invisible
+ * in the UI while making two identical titles compare unequal.
+ *
+ * `\s` covers U+3000 on its own; spelling the character out as well only earned an
+ * `no-irregular-whitespace` error.
  */
 export function normalizeLine(raw: string): string {
-  return raw.normalize('NFKC').replace(/[\s　]+/g, ' ').trim();
+  return raw.normalize('NFKC').replace(/\s+/gu, ' ').trim();
 }
 
 function stripLeadingMarker(line: string): string {
@@ -264,7 +267,7 @@ export function pairTitles(line: string): { title: string; titleJa?: string; tit
 
 const AUTHOR_MARKERS = [
   /\s+by\s+([^,;]{2,40})$/iu,
-  /\s*[【\[]([^】\]]{2,40})[】\]]\s*$/u,
+  /\s*[【[]([^】\]]{2,40})[】\]]\s*$/u,
   /\s*([^\s、,]{2,20})\s*著\s*$/u,
 ];
 
