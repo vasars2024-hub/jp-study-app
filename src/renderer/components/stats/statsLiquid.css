@@ -35,12 +35,32 @@
   gap: var(--lq-space-2);
 }
 
+/*
+ * The tray reserves its own width and its own height, both, and floats over nothing.
+ *
+ * It used to hang off the header as an overlay pinned to the details' bottom-right edge.
+ * Measured live at 1280x860: the tray landed at (753,143) 132x45 and `Sync from Anki`
+ * sits at (752.3,157) 132.7x32 — the same right-anchored column, one row down, so the
+ * tray covered 31 of the Sync button's 32 rows. `elementFromPoint` at Sync's own centre
+ * returned the tray's destructive `.btn.danger`. A press meant for Sync, or meant as
+ * "never mind", reached Reset instead; and because the topmost node there is INSIDE the
+ * details, the outside-press dismissal could not fire either. Both symptoms are one
+ * cause, and it is geometric, so the repair is geometric rather than a third listener.
+ *
+ * `--stats-tools-w` is shared by the summary and the tray on purpose: the summary
+ * reserves the width while closed, so opening moves nothing sideways. Re-measured after
+ * the change, same window: closed and open are byte-identical horizontally (actions
+ * 628.7 x 256.3, tray left 753 x 132 in both), only the column grows 35 -> 80 tall, and
+ * the hit at Sync's centre is `BUTTON.btn.small` with `details.contains(hit)` false.
+ */
 .stats-data-tools {
+  --stats-tools-w: 132px;
   position: relative;
 }
 
 .stats-data-tools > summary {
   list-style: none;
+  min-width: var(--stats-tools-w);
 }
 
 .stats-data-tools > summary::-webkit-details-marker {
@@ -48,11 +68,8 @@
 }
 
 .stats-data-tools-panel {
-  position: absolute;
-  z-index: var(--z-popover);
-  top: calc(100% + var(--lq-space-2));
-  right: 0;
-  min-width: 132px;
+  margin-top: var(--lq-space-2);
+  min-width: var(--stats-tools-w);
   padding: var(--lq-space-2);
   border: 1px solid var(--border);
   /* was `var(--lq-radius-sm)`, which nothing declares — the radius computed to 0
@@ -189,9 +206,12 @@
     flex-direction: column;
   }
 
+  /* The reserved width exists only to stop the header reflowing sideways when the tray
+     opens. Here the column is already full-width and stacked, so the reservation has
+     nothing to hold and would just be a floor a narrow window could not go under. */
+  .stats-context-head > .actions > .stats-data-tools > summary,
   .stats-data-tools-panel {
-    position: static;
-    margin-top: var(--lq-space-2);
+    min-width: 0;
   }
 
   .stats-view .stats-cards {

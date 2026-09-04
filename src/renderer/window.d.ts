@@ -960,6 +960,13 @@ declare global {
       attachSubtitleText(
         input: import('../shared/subtitleDiscoveryIpc').SubtitleAttachTextInput,
       ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
+      /**
+       * The counterpart to `attachSubtitleText` for a file already on disk. It
+       * references the path in place rather than copying it.
+       */
+      attachSubtitleFile(
+        filePath: string,
+      ): Promise<import('../shared/subtitleDiscoveryIpc').NyaaSubtitleAcceptResult>;
       detachSubtitleRecord(
         mediaId: string,
         recordId: string,
@@ -1016,6 +1023,13 @@ declare global {
        */
       subtitleForPath(filePath: string): Promise<SubtitlePick | null>;
       pickSubtitle(): Promise<SubtitlePick | null>;
+      /**
+       * A CJK-capable system font for the libass renderer, or null when the machine
+       * has none. `url` is a `localfile://` URL, not bytes.
+       */
+      subtitleFallbackFont(
+        lang: string,
+      ): Promise<import('../shared/types').SubtitleFallbackFont | null>;
       fetchYoutubeSubs(
         id: string,
         preferLang?: string,
