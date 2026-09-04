@@ -704,6 +704,77 @@ density, then drag-and-drop (`reorderReadingListEntries` already exists and has
 no consumer). §11.1's click-through table still needs auditing row by row rather
 than assuming — four of its eight rows have no test naming them.
 
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4: empty, loading and
+error states CLOSED, plus the library route the copy needed. 5 of 9 rows.**
+
+Counted against §11.4's own nine bullets: **keyboard** (`816a68c1`), **bulk
+selection** (`a9fa1550`), **performance** (`e5ad2963`), **real empty states**
+and **loading and error states** are closed; **undo** still owes only the
+re-parse; **drag and drop**, **accessibility** and **density** are open. So
+**5 of 9 closed, 1 partial, 3 open.**
+
+- `ce7ae626` — **a `reset` store could not be told from a first run.**
+  `main/readingListsStore.ts` computes a health record on every snapshot — ok /
+  empty / recovered / reset — and `useReadingListsDocument` threw it away. The
+  word appeared in no renderer file. So `reset` (the file did not parse AND
+  there was no restore point, the one case where the lists are genuinely gone)
+  hands back `emptyReadingListsDocument()`, byte-identical to a first run's, and
+  the grid rendered *"No lists yet. Make one, then paste a message into it."*
+  That is the sentence the clause forbids. `recovered` is a `--warn` notice over
+  a grid that is still drawn, `reset` is `--error`; both say the unreadable file
+  is still on disk. No revision count is printed — the store documents
+  `lostRevisions: 1` as unknown-but-at-least-one, so a number would be
+  fabricated, and a test asserts its absence. Skeleton cards share `.rlv__grid`'s
+  rule rather than copying it.
+- `5d98a401` — **28 `var(--lq-…)` sites naming tokens declared NOWHERE.** Read
+  live off pid 13316: `--lq-surface-2`, `--lq-border-weak` and `--lq-radius-2`
+  all resolve to `""`. So the sheet painted fixed white translucencies in every
+  theme, and on `classic-light` (`--bg` and `--panel` both `#ffffff`) the card
+  borders composited to exactly the page colour. `--lq-accent`'s fallback was a
+  BLUE. `liquidTokenNamesResolve.test.ts` is the repo-wide guard, with a vacuity
+  check and three recorded names in sheets other tracks hold open.
+- `aac290e6` — **the empty grid IS the paste box**, and the hint is
+  `READING_LIST_EXAMPLE_MESSAGE`, promoted out of the parser test into
+  `readingListParser.ts` and imported by both. The sample a user sees is now by
+  construction the exact input §2.1's acceptance test pins the output of.
+  Untranslated on purpose: sample input, not chrome.
+- `3384cdfb` — **`addLibraryItemToReadingList`.** §11.4's copy says "paste a
+  message **or add from your library**"; `aac290e6` printed only the first half
+  because the second route did not exist anywhere in `src/renderer`. Now it
+  does: a fold over add + bind at confidence 1, a duplicate refused and named, a
+  picker that MARKS what is already on the list rather than hiding it, and an
+  undo.
+
+**Four traps, each of which cost a run:**
+
+1. **jsdom does not perform implicit form submission from a button click.** A
+   `type="submit"` button is therefore untestable by the mouse path — the suite
+   passes on a button that does nothing. Use an explicit `onClick` and keep
+   `onSubmit` for the Enter key.
+2. **`byText` returns the wrapping DIV, not the button.** It scans
+   `button, span, p, div` in document order, so a `.rlv__paste-actions` holding
+   one button has the same trimmed text as the button. Measured `tag: "DIV"`.
+   Clicking a div does nothing, silently. It also matched the HEADER's paste
+   button when the empty state's own was meant.
+3. **A control that reads GREEN is a finding.** `state: 'owned'` on the library
+   add was dead: flipping it to `'wanted'` left all 83 tests green, because
+   `bindReadingWork` promotes immediately afterwards. Removed rather than kept.
+4. **A `const query` in the picker shadowed the filter strip's `query`** in the
+   same scope, so the row-count line vanished unless the picker's search box was
+   non-empty. Caught by an existing test, not a new one.
+
+Gates at `3384cdfb`: `npx vitest run` EXIT 0, **1067 passed | 1 skipped, 13,738
+tests passed | 6 skipped**; `i18n-check.cjs` EXIT 0 at **12,430** keys;
+`i18n-hardcoded-check.cjs` EXIT 0; `architecture-audit.cjs` EXIT 0 "Nothing
+new"; eslint 0 errors on every touched non-CSS path.
+
+**Exact next slice: §11.4's density row** (comfortable/compact — the plan's own
+"a 20-book list and a 300-book list are not the same UI problem"), then
+**accessibility**, then **drag and drop** (`reorderReadingListEntries` exists
+and still has no consumer). Undo's remaining debt is the re-parse alone.
+§11.1's click-through table still needs auditing row by row — four of its eight
+rows have no test naming them, and that has now been deferred for three turns.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
