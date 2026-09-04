@@ -4,9 +4,10 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
-import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, onLibraryItemsAdded } from './main/library';
+import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
 import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerReadingListsLateBinding } from './main/readingListsBinding';
+import { registerReadingRemindersIpc } from './main/readingListsReminders';
 import { registerDictionaryIpc, initYomitan } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
 import { registerYtPlaylistsIpc } from './main/ytPlaylists';
@@ -1673,7 +1674,29 @@ app.whenReady().then(async () => {
   registerLocalFileProtocol();
   registerLibraryIpc();
   registerReadingListsIpc();
-  registerReadingListsLateBinding(onLibraryItemsAdded);
+  // §11.3's reminders read the library for `lastReadAt` and `progress`. The
+  // reader is passed in rather than imported by the scheduler so `library.ts`
+  // stays the only module that knows where `library.json` is.
+  const readingReminders = registerReadingRemindersIpc(app.getPath('userData'), {
+    readActivity: () => {
+      const items = listLibraryItems();
+      let lastReadAt: number | null = null;
+      const activity = items.map((item) => {
+        if (typeof item.lastReadAt === 'number' && (lastReadAt === null || item.lastReadAt > lastReadAt)) {
+          lastReadAt = item.lastReadAt;
+        }
+        return {
+          itemId: item.id,
+          percent: typeof item.progress?.percent === 'number' ? item.progress.percent : 0,
+          ...(typeof item.lastReadAt === 'number' ? { lastReadAt: item.lastReadAt } : {}),
+        };
+      });
+      return { lastReadAt, items: activity };
+    },
+  });
+  registerReadingListsLateBinding(onLibraryItemsAdded, (bindings) => {
+    for (const binding of bindings) readingReminders.noteBinding(binding);
+  });
   registerDictionaryIpc();
   registerDiagnosticsIpc();
   registerShellIpc();
