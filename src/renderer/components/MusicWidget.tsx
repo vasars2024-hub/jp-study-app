@@ -72,6 +72,7 @@ export default function MusicWidget() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [ps, setPs] = useState(player.getState);
   const [big, setBig] = useState(false);
+  const [narrow, setNarrow] = useState(false);
   const [art, setArt] = useState<string | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [liked, setLiked] = useState(false);
@@ -89,10 +90,21 @@ export default function MusicWidget() {
   const liveLyrics = useLiveLyrics(ps.current, ps.duration, ps.time);
 
   // Layout switches on the widget's own size, not the screen's.
+  //
+  // `narrow` is the WIDTH half, added with the 32px hit floor: the seven transport buttons
+  // need 236 px of row, and the bar layout only offers them what is left after the art tile
+  // and the title. Measured at the compact 300x160 the rubric drives, before this existed:
+  // `div.mwidget` reported scrollWidth 381 against clientWidth 298 and the last three
+  // buttons hung 15/49/83 px past the right edge, invisible under the root's
+  // `overflow: hidden`. The threshold is the width at which that row stops fitting beside
+  // the tile, not a device breakpoint. Nothing is hidden at any size; the row moves.
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setBig(el.clientHeight >= 210));
+    const ro = new ResizeObserver(() => {
+      setBig(el.clientHeight >= 210);
+      setNarrow(el.clientWidth < 400);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -264,7 +276,11 @@ export default function MusicWidget() {
     );
 
   return (
-    <div ref={rootRef} className={`mwidget ${big ? 'big' : 'bar'}`} style={{ background: bg }}>
+    <div
+      ref={rootRef}
+      className={`mwidget ${big ? 'big' : 'bar'}${narrow ? ' narrow' : ''}`}
+      style={{ background: bg }}
+    >
       {viz.enabled && (
         <VisualizerCanvas className="mwidget-viz" settings={viz} idleBaseline={false} />
       )}

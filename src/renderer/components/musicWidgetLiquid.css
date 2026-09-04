@@ -74,3 +74,30 @@
   height: var(--lq-hit-target);
   background: transparent;
 }
+
+/* CATEGORY 4, the cost of the two rules above and the reason they are worth it. The window's
+   own floor is 260x170 (`DesktopShell.tsx` MIN_W/MIN_H), so a user can genuinely reach a
+   width where a 236px transport row does not fit beside the art tile and the title. It then
+   moves to a row of its own and the tile gives back the height. Nothing is hidden, and the
+   toolbar never scrolls: `horizontalScrollers` and `hiddenOverflowX` both have to stay 0. */
+.mwidget.narrow .mwidget-bar {
+  grid-template-columns: auto minmax(40px, 1fr);
+  grid-template-rows: auto auto auto;
+  align-content: center;
+  gap: 2px 8px;
+  padding: 4px 8px;
+}
+
+.mwidget.narrow .mwidget-bar > .mwidget-controls {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+.mwidget.narrow .mwidget-art-small {
+  width: 32px;
+  height: 32px;
+}
+
+.mwidget.narrow .mwidget-progress {
+  padding: 0 6px;
+}
