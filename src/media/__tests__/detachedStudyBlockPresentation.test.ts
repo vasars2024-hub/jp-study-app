@@ -66,13 +66,15 @@ describe('the detached Study Block declares a presentation instead of leaving it
 
   it('leaves every other host exactly as it was', () => {
     const unchanged: Array<[string | undefined, LiquidPresentationHost, boolean]> = [
-      // Was `false`. `7265c6d3` gave the Visualizer a contextual edge dock, which is a real
-      // destination for a flip, and deliberately made the DESKTOP host presentable while
-      // keeping `popout` and `reader` refused — `liquidWindowPresentation.test.ts:217` is
-      // where that policy is asserted. This row is the neighbouring-host guard, so it tracks
-      // the policy rather than pinning the old answer; the refusals this file actually owns
-      // are the `detached` ones above, and they are untouched.
+      // `visualizer, desktop` read false until 7265c6d3 gave the visualizer a
+      // contextual dock — a real region for a flip to change — which is the whole
+      // reason it was refused before. Its pop-out and reader refusals are what
+      // this row is actually for, so they take its place rather than the row
+      // being deleted: the point is that the DETACHED refusal did not leak.
+      // The policy itself is asserted in `liquidWindowPresentation.test.ts`.
       ['visualizer', 'desktop', true],
+      ['visualizer', 'popout', false],
+      ['visualizer', 'reader', false],
       ['note', 'desktop', true],
       ['note', 'popout', false],
       ['city', 'desktop', true],

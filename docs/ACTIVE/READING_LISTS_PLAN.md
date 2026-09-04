@@ -403,9 +403,11 @@ Each phase is shippable on its own and leaves the tree green.
   titles. Two fixtures deliberately pin a KNOWN LIMITATION rather than a fix
   (`君の名は。` and `ハイキュー!!` lose their trailing marks) — do not "fix" those
   without also handling ordinary sentence punctuation.
-- **A mutation test per parser rule — STILL OPEN.** The three landed this turn
-  (URL-before-split, the §4.4 abandoned guard, the CAS retry) are per-defect, not
-  per-rule. This clause is what P1 still owes.
+- **A mutation test per parser rule — CLOSED at `9d603e58`**, landed on this
+  branch by the §9.2 integration merge. The three that existed when this block
+  was written (URL-before-split, the §4.4 abandoned guard, the CAS retry) were
+  per-defect, not per-rule; `readingListParserMutations.test.ts` is the per-rule
+  harness the clause asked for.
 
 Two supporting layers landed beside the parser, both required by every P1 surface
 and neither in the phase table:
@@ -424,6 +426,137 @@ and a user, and it is also what makes `readingListsClient.ts` stop being a
 triage strip + dropped-lines disclosure first; merge, split and reorder-in-preview
 are a follow-up, and `reorderReadingListEntries` already exists for the last one.
 
+**2026-09-04, `primary2`. P1 CLOSES — all three done-when clauses.**
+
+- `6ff47c06` — **§2.5's sheet.** `shared/readingListPreview.ts` (the model, no DOM)
+  + `ReadingListPastePreview.tsx` (renders it, owns only draft state and the
+  keyboard). Edit, drop, triage strip, dropped-lines disclosure, Ctrl+Z, Reset,
+  per-row Revert. Three decisions not to re-derive: a triage row is INCLUDED
+  (§2.5 says flagged, not silently dropped); a dropped row is KEPT unticked so
+  `lineIndex` never shifts under a pending edit; Ctrl+Z inside a text field is
+  left to the caret. The confirm is disabled AND names its reason, and the
+  blank-title exclusion also lives in `readingPreviewImport` so a caller that
+  ignores the button still cannot mint a nameless work. Built on L2's **Work**
+  tokens, not Liquid — the transformation plan keeps editable tables opaque.
+  Control: a triage row starting unticked → 11 of 33 RED; dropping the
+  blank-title exclusion → 1 of 33 RED. Restored, sha256 `C5AD696F`.
+- `a4c5d6e8` — **`ReadingListPasteFlow.tsx`**, the sheet joined to the store.
+  Found and fixed a real defect in the same commit: a failed load degraded to an
+  EMPTY document, the import found no list on it and never reached IPC, so a
+  missing bridge was reported to the user as *"that list no longer exists"*.
+  6 tests against a fake main doing real CAS — two refusals → 3 writes, ONE
+  surviving import, 3 entries not 9; the attempt limit → a conflict message with
+  the sheet still standing; a re-paste reports added 0 / skipped 3. Control:
+  `attemptLimit` 1 → the retry test RED by name, restored, sha256 `A900F813`.
+  `readingListsClient.ts` stops being a `test-only-module`; the pending baseline
+  entry moves up to this flow, which **P4 §6 mounts verbatim**.
+- `9d603e58` — **the third clause: a mutation test per parser RULE**, not per
+  defect. `readingListParserMutations.test.ts` is a real mutation harness: 26
+  rows, each breaking one rule *in the parser's own source*, transpiling it in
+  memory (the parser's single import is `import type`, so a mutant needs no temp
+  file in `src/` — several suites here scan the tree) and asserting the property
+  is violated. Every row asserts its anchor is present first, and asserts the
+  property on the REAL parser first. Control: making one row's replacement
+  identical to its anchor → that row RED on "the property SURVIVED".
+
+Three inputs had to be built rather than borrowed, and each is a trap: the
+inline split drops a one-character piece (`鼻` never reaches the threshold); the
+URL-before-split defect needs a message that is ONLY a link, because a numbered
+list recovers on its own; and the overlong penalty needs a real rival —
+`quoted-prose` with no competitor passes either way.
+
+**Exact next slice: P2, §3 matching + §3.1 late binding.** Hook the fingerprint
+in `src/main/library.ts` on the item-added path, in one place, not per importer.
+Its done-when is an integration test that adds the item SECOND.
+
+**2026-09-04, `primary2`. P2 CLOSED against its own done-when (`9678a525`).**
+3 of 6 phases (P0, P1, P2).
+
+- `shared/readingListMatch.ts` — pure. Fingerprint / score / three dispositions
+  at `BIND_ACCEPT` 0.82, `BIND_SUGGEST` 0.55. `titleSimilarity` is REUSED from
+  `mediaMetadataMatch.ts`: its containment ceiling is already the "a sequel
+  swallows its predecessor" guard, and a second fuzzy matcher in one tree is how
+  two surfaces start disagreeing about what a title match is.
+- **A kana Hepburn romanizer had to be written — nothing in the tree had one**
+  (`langs.ts` folds katakana→hiragana; `jiten.ts`/`mediaIdentity.ts` only carry a
+  provider's `romajiTitle` field). Kanji contributes NO romaji key, deliberately:
+  a guessed reading produces a confident wrong bind, the one outcome this module
+  exists to prevent. Space-stripped key variants are load-bearing, not
+  belt-and-braces — Japanese writes no word boundaries, so `ノルウェイのもり`
+  romanizes to `noruweinomori` against a file named `Noruwei no Mori`, and
+  without the stripped form those are a near-miss instead of the same book.
+- **Volume disagreement is −0.35, not a nudge.** Vol 1 and vol 7 of one series
+  are the same string, so the title signal is weakest exactly where it looks
+  strongest. Author agreement stays ±0.1/−0.12 and can never reject a plain
+  title match — a book catalogued under a romanized author on one shelf and a
+  kanji author on another is not a mismatch.
+- **The hook is `writeDb`, not an importer.** `library.ts` has seven
+  `items.unshift(item)` sites and every future acquisition route adds another;
+  all 18 write sites funnel through `writeDb`, so diffing the incoming set
+  against disk yields "items that are new" for all of them at once, including
+  routes written after this line. Guarded and swallowing: a matcher fault must
+  not be able to fail the import that carried it.
+- CONTROL: dropping the `state !== 'wanted'` guard in `bindReadingWorkToItem` →
+  "does not touch an entry the user already moved off wanted" RED alone, by
+  name. Restored, +75/−0 against HEAD.
+
+**NOT closed by this slice, and not silently dropped: §3(b) catalogue
+enrichment** (jiten / `visualNovels.ts` / `malLibrary.ts` → `externalIds`,
+canonical titles, cover art). It is outside P2's stated done-when and §3 itself
+says it never blocks, so it rides with P5's smart-list/difficulty work where the
+catalogues are already being read.
+
+**TRAP, and it cost two runs.** The parser gates `line-per-title` on
+`indexed.length >= 3` (`readingListParser.ts:377`, §2.2's own rule — a one- or
+two-line message is a sentence, not a list). A short fixture parses to ZERO
+entries, so every assertion then passes vacuously against an empty list. This
+suite read as a broken binder until the parse itself was dumped.
+
+**2026-09-04, `primary2`. P3 CLOSED, all three done-when clauses (`1479861e`).**
+4 of 6 phases (P0, P1, P2, P3).
+
+- `shared/readingFinishDetector.ts` (pure) + `main/readingFinishWatcher.ts`
+  (store, CAS, broadcast), wired at `library:setProgress`. No reader was touched
+  — trap 2 holds.
+- **The dwell needs no new state.** The previous save is already on the
+  `LibraryItem` (`progress` + `lastReadAt`) and main reads it immediately before
+  overwriting it, so that pair IS §4.1's two consecutive saves. It survives a
+  restart, which an in-memory dwell map would not.
+- **§4.1's "location parses to the final part" is not directly derivable** —
+  there is no part COUNT in the tree (`LibraryItem` has `pageCount` for manga and
+  no book equivalent). Implemented as `FINAL_PART_FRACTION`: the location parses
+  AND sits at the end of the part it names. With the whole-book `percent`, "end
+  of a part" and "98.5 % of the book" can only both hold at the end of the last
+  one, while a stale `percent` of 0.99 against `p:3:0.4` is rejected — which is
+  the case the clause exists for. Recorded as a decision, not an omission.
+- `percent` is deliberately NOT in the position signature: it is a derived
+  display number and drifts between two saves at one location, which would make
+  the dwell unreachable rather than strict.
+- **DEFECT FOUND AND FIXED in `applyReadingListImport`.** Work dedup was scoped
+  to the LIST, so the same book on two lists minted two work records — and §1's
+  own rationale for works living beside lists is that the cross-list finish is
+  only free with one record to tick. P2 bound one copy, P3's fan-out ticked one
+  copy, and the second list silently never moved. Works now dedup across the
+  DOCUMENT (duplicate ENTRIES stay per-list), and an entry whose work is already
+  bound starts `owned` instead of telling §5.2's shopping list to buy a book
+  already in the library.
+- CONTROLS, **two, because the first was caught by another rule and that is
+  recorded rather than hidden**: removing only the `held` guard → 1 RED (the
+  detector's first-save case) while the watcher's scrub control stayed GREEN,
+  caught by the `dwellMs` guard. Removing BOTH — the naive `percent >= 0.98`
+  detector trap 4 names — → **4 RED including both negative controls by name**.
+  Restored, sha256 `B0A40476`.
+- Clause 3, "manual always does", was already met by P1's
+  `setReadingEntryState(..., 'finished', 'manual')` and §4.5's un-finish; both
+  re-derived green this turn rather than assumed.
+
+**Exact next slice: P4, §6 surfaces + §11 IN FULL.** §11 is a GATE on P4, not
+polish — the user named it. Click-through rides `onOpenBook` (already threaded
+through `App.tsx` 712/770/799/820/905), widgets register in
+`renderer/widgets/registry.tsx` like any other, reminders reuse
+`main/buddyScheduler.ts` and are OFF by default at most one a day. New strings
+go in the already-wired `shared/i18n/catalogs/{en,ja,zh,ru}.ts`, never a new
+module (trap 5).
 **2026-09-04, `primary`.** **P2 CLOSED on `feat/nyaa-subtitles`**, against its own
 done-when: `readingListsLateBinding.test.ts` adds the list first and the file second and
 the `wanted` entry ticks to `owned`. `9a7e269d` the matcher (kana→romaji, title
@@ -439,7 +572,35 @@ import error), and re-applies the intent on a CAS refusal. 16 tests, 4 negative 
 name. `tools/architecture-baseline.json` loses `test-only-module:readingListMatching.ts`,
 exactly as that entry's own escape clause said it would.
 
-### 9.2 FORK — P2 was built TWICE, and the merge has to de-duplicate it
+### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
+
+**The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
+disposition table below applied exactly, four gates green after. P0–P3 are now all on one
+branch: **4 of 6 phases.**
+
+What the merge actually cost, so the next fork is priced honestly:
+
+- Two real conflicts, both predicted: `main/library.ts` and this file. `library.ts` kept
+  HEAD's `onLibraryItemsAdded` seam and took `wt`'s `noteReadingProgress` + the
+  `library:setProgress` capture; `notifyLibraryItemsAdded`/`bindReadingListsToItems` were
+  deleted with the binder.
+- `shared/readingListMutations.ts` auto-merged and the dedup fix landed intact — verified,
+  not assumed: reverting the document-scope work reuse turns `readingFinishWatcher.test.ts`
+  **2 RED by name** (the cross-list tick and the abandoned-list case), restored
+  byte-identical after.
+- **One thing the table did not foresee:** `main/__tests__/readingFinishWatcher.test.ts`
+  imported the dropped binder, so it was ported onto `bindLibraryItemsIntoReadingLists`.
+  That is a *better* test than it was — P3's fan-out is now proven through P2's real
+  matcher rather than through a hand-written `boundItemIds`, so a threshold change that
+  stopped binding fails here too.
+- **`readingListMatch.ts` never became an orphan** — it was `git rm`'d during the merge, so
+  the audit had nothing to catch. `architecture-audit.cjs`: "Nothing new", 7 pending.
+
+Gates after the merge: **15 reading-list suites, 268 tests, all green**;
+`i18n-check.cjs` EXIT 0 (12,297 keys); `i18n-hardcoded-check.cjs` clean for the new files;
+`architecture-audit.cjs` EXIT 0.
+
+The record of the fork itself, kept because the shape recurs:
 
 `backup` (main tree) and `primary2` (`wt/files-app`) both implemented P2 between 00:30 and
 00:56 on 2026-09-04, neither aware of the other. Nothing else duplicates: **P3 and P1's
@@ -462,9 +623,13 @@ Conflicts to expect: `shared/readingListMutations.ts` and `main/library.ts`, bot
 `readingListMatch.ts` will merge **without** a conflict and leave two matchers standing —
 the architecture audit catches it as an orphan, but only if nobody baselines it away.
 
-**Exact next slice: P4 — §6 surfaces plus §11 in full**, once the merge above has landed.
-§11 is a gate, not polish. Do not start P4 on either branch alone: it consumes P1's preview
-(`wt`) and P2's suggest band (here), so building it before the merge forks a second time.
+**Exact next slice: P4 — §6 surfaces plus §11 in full.** The merge above HAS landed, so the
+"do not start P4 on either branch alone" bar is met: `feat/nyaa-subtitles` now carries P1's
+preview and P2's suggest band together. §11 is a gate, not polish.
+
+**And `wt/files-app` must not fork again.** files-app is 37/37 and reading-lists is now
+whole on the main branch, so there is nothing left that needs a second tree. Build P4 on
+`feat/nyaa-subtitles` only.
 
 ---
 

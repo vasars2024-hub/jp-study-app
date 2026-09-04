@@ -189,6 +189,80 @@ describe('lists', () => {
 });
 
 describe('import', () => {
+  it('reuses ONE work record when the same book lands on a second list', () => {
+    /*
+      §1's stated reason for works living beside the lists: "one work belongs to
+      many lists and carries one binding — the cross-list finish in §5.1 is only
+      free if there is exactly one record to tick". Minting a second record for
+      the same book on a second list breaks P2's binding and P3's fan-out at
+      once, and both fail silently on the list that got the copy.
+    */
+    const context = createReadingListsMutationContext(NOW);
+    const message = ['Kino no Tabi', 'コンビニ人間', '夜は短し歩けよ乙女'].join('\n');
+    const parsed = parseReadingList(message);
+
+    const first = createReadingList(emptyReadingListsDocument(), { name: 'A' }, context);
+    const withFirst = applyReadingListImport(
+      first.document,
+      first.listId,
+      parsed,
+      { rawText: message },
+      context,
+    );
+    const second = createReadingList(withFirst.document, { name: 'B' }, context);
+    const withSecond = applyReadingListImport(
+      second.document,
+      second.listId,
+      parsed,
+      { rawText: message },
+      context,
+    );
+
+    expect(withSecond.added).toBe(3);
+    expect(withSecond.document.works).toHaveLength(3);
+    const listA = withSecond.document.lists.find((list) => list.id === first.listId)!;
+    const listB = withSecond.document.lists.find((list) => list.id === second.listId)!;
+    // Different entries, same works, in the same order.
+    expect(listB.entries.map((entry) => entry.id)).not.toEqual(
+      listA.entries.map((entry) => entry.id),
+    );
+    expect(listB.entries.map((entry) => entry.workId)).toEqual(
+      listA.entries.map((entry) => entry.workId),
+    );
+  });
+
+  it('starts an entry owned when its work is already bound to a file', () => {
+    // Otherwise the shopping list (§5.2) tells the user to acquire a book that
+    // is sitting in their own library, because a later paste re-lists it.
+    const context = createReadingListsMutationContext(NOW);
+    const message = ['Kino no Tabi', 'コンビニ人間', '夜は短し歩けよ乙女'].join('\n');
+    const parsed = parseReadingList(message);
+    const first = createReadingList(emptyReadingListsDocument(), { name: 'A' }, context);
+    const withFirst = applyReadingListImport(
+      first.document,
+      first.listId,
+      parsed,
+      { rawText: message },
+      context,
+    );
+    const bound = {
+      ...withFirst.document,
+      works: withFirst.document.works.map((work, index) =>
+        index === 0 ? { ...work, boundItemIds: ['li_1'], bindConfidence: 1 } : work,
+      ),
+    };
+    const second = createReadingList(bound, { name: 'B' }, context);
+    const withSecond = applyReadingListImport(
+      second.document,
+      second.listId,
+      parsed,
+      { rawText: message },
+      context,
+    );
+    const listB = withSecond.document.lists.find((list) => list.id === second.listId)!;
+    expect(listB.entries.map((entry) => entry.state)).toEqual(['owned', 'wanted', 'wanted']);
+  });
+
   it('turns §2.1 into five wanted entries with provenance and the list URL', () => {
     const { document, listId } = listWithMessage();
     const list = document.lists.find((entry) => entry.id === listId)!;

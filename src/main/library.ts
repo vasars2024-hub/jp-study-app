@@ -11,6 +11,9 @@ import { extractReadableFromUrl } from './readabilityExtract';
 import { fetchReadingContent, type FetchReadingOptions } from './readingFetch';
 import { mt } from './i18n';
 import { extractEpubTitleFromOpf } from './epubMeta';
+import { observeReadingProgress } from './readingFinishWatcher';
+import { broadcastReadingLists } from './readingListsIpc';
+import { getReadingListsStore } from './readingListsStore';
 
 /** Token → absolute path for localfile:// wallpaper/image streaming. */
 const localFileTokens = new Map<string, string>();
@@ -172,6 +175,39 @@ function writeDb(items: LibraryItem[]): void {
     } catch {
       // See above: the write is already committed.
     }
+  }
+}
+
+/**
+ * Reading Lists §4.3: one completion detector on the path every reader already
+ * uses, rather than one per reader.
+ *
+ * Swallowing for the same reason `writeDb` above swallows its listeners — the
+ * progress save is the user's actual data and has already been written; a
+ * detector fault must not be able to turn "your place was saved" into an error.
+ */
+function noteReadingProgress(
+  item: LibraryItem,
+  previous: Progress | undefined,
+  previousAt: number | undefined,
+  next: Progress,
+  at: number,
+): void {
+  try {
+    observeReadingProgress(
+      item.id,
+      {
+        kind: item.kind,
+        ...(item.pageCount !== undefined ? { pageCount: item.pageCount } : {}),
+        ...(previous !== undefined ? { previous } : {}),
+        ...(previousAt !== undefined ? { previousAt } : {}),
+        next,
+        at,
+      },
+      { store: getReadingListsStore(), broadcast: broadcastReadingLists },
+    );
+  } catch {
+    // See above.
   }
 }
 
@@ -1366,9 +1402,17 @@ export function registerLibraryIpc(): void {
     const items = readDb();
     const it = items.find((x) => x.id === id);
     if (it) {
+      // Captured BEFORE the overwrite. This pair is the whole of §4.1's two-save
+      // dwell — the position that is being replaced and when it was written — so
+      // the completion detector needs no state of its own and keeps working
+      // across a restart.
+      const previous = it.progress;
+      const previousAt = it.lastReadAt;
+      const at = Date.now();
       it.progress = progress;
-      it.lastReadAt = Date.now();
+      it.lastReadAt = at;
       writeDb(items);
+      noteReadingProgress(it, previous, previousAt, progress, at);
     }
   });
 

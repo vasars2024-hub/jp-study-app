@@ -627,6 +627,22 @@ export function applyReadingListImport(
   const candidates = parsed.entries.filter((entry) => !excluded.has(entry.lineIndex));
 
   const worksById = new Map(document.works.map((work) => [work.id, work]));
+
+  /*
+    Two scopes, and conflating them is a real defect rather than a nicety.
+
+    A DUPLICATE ENTRY is per list: pasting the same message twice must not put
+    the same book on one list twice. A WORK is per DOCUMENT: §1's whole reason
+    for keeping works beside the lists instead of inside them is that "one work
+    belongs to many lists and carries one binding — the cross-list finish in §5.1
+    is only free if there is exactly one record to tick". Minting a second work
+    for the same book on a second list breaks precisely that: P2 binds one of
+    them, P3's fan-out ticks one of them, and the other list silently never
+    moves. Found by `readingFinishWatcher.test.ts`, which puts one book on two
+    lists and expects both to tick.
+  */
+  const worksByKey = new Map<string, ReadingWorkRef>();
+  for (const work of document.works) worksByKey.set(readingWorkKey(work), work);
   const existingKeys = new Set<string>();
   for (const entry of list.entries) {
     const work = worksById.get(entry.workId);
@@ -640,14 +656,21 @@ export function applyReadingListImport(
   let skipped = 0;
 
   for (const candidate of candidates) {
-    const work = workFromParsed(candidate, context);
-    const key = readingWorkKey(work);
+    const minted = workFromParsed(candidate, context);
+    const key = readingWorkKey(minted);
     if (existingKeys.has(key)) {
       skipped += 1;
       continue;
     }
     existingKeys.add(key);
-    newWorks.push(work);
+    // Reuse the document's record when this book is already known, so the entry
+    // inherits any binding P2 has already made rather than starting `wanted`
+    // beside a copy that is already `owned`.
+    const work = worksByKey.get(key) ?? minted;
+    if (work === minted) {
+      worksByKey.set(key, minted);
+      newWorks.push(minted);
+    }
     const entry: ReadingListEntry = {
       id: context.mintId('re'),
       workId: work.id,
@@ -655,8 +678,10 @@ export function applyReadingListImport(
       addedAt: context.now,
       // A pasted title is a book you want, not one you hold. P2's matcher is what
       // promotes it to `owned`; claiming ownership here would make the wanted
-      // filter — which is the shopping list (§5.2) — wrong on day one.
-      state: 'wanted',
+      // filter — which is the shopping list (§5.2) — wrong on day one. The one
+      // exception is a work already bound to a file: the shopping list would
+      // otherwise tell the user to acquire a book sitting in their own library.
+      state: work.boundItemIds.length ? 'owned' : 'wanted',
       sourceRef: {
         importId,
         lineIndex: candidate.lineIndex,

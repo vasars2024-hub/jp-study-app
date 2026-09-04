@@ -15,9 +15,9 @@
   ],
   "moduleCount": 963,
   "entries": {
-    "test-only-module:src/renderer/readingListsClient.ts": {
+    "test-only-module:src/renderer/components/reading/ReadingListPasteFlow.tsx": {
       "status": "pending",
-      "note": "Reading Lists P1c. Replaces the identical P1a entry for readingListParser.ts, which stopped occurring once readingListMutations.ts imported it — the chain now ends here instead. Same honest shape and the same escape clause: docs/ACTIVE/READING_LISTS_PLAN.md sequences P1 as parser + preview dialog + manual lists, the dialog is the next slice, and PENDING keeps it visible because a client with no caller is a real defect if the dialog never arrives (a route with no consumer has happened in this repo before). Re-key to accepted when the paste dialog imports it; if that slice is dropped instead, delete the module."
+      "note": "Reading Lists §2.5. Replaces the identical P1c entry for readingListsClient.ts, which stopped occurring once this flow imported it — the chain now ends one level higher, and the client is genuinely consumed by product code rather than only by its own tests. The escape clause is unchanged: docs/ACTIVE/READING_LISTS_PLAN.md sequences the lists view and the reader/library touch-points as P4 §6, and this is the component P4 mounts verbatim. PENDING keeps it visible because a paste sheet no surface can open is a route with no consumer, which this repo has shipped before. Re-key to accepted when a P4 surface renders it; if that phase is dropped instead, delete this file, ReadingListPastePreview.tsx and shared/readingListPreview.ts together."
     },
     "duplicate-export:canUndo": {
       "status": "accepted",
