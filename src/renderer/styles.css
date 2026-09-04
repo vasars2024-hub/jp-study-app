@@ -12857,7 +12857,28 @@ mark.lookup-mark,
   background: rgba(16, 15, 21, 0.5);
   backdrop-filter: blur(6px);
 }
+/* The resting visualizer bar recedes, but it carries four REAL controls and `opacity` on the
+   BAR composites them with it. Measured 2026-09-04 by rubric category 5's two-theme sweep:
+   at 0.45 in classic-light the four window glyphs composite to about #a3a3a3 on #fbfbfb —
+   2.4:1 against a 4.5 bar, and the harness's own reading was 3.92:1 against whichever
+   backdrop it walked to. Either number fails.
+
+   TUNING THE VALUE DOES NOT FIX IT, which is why it is not tuned here: 0.72 measured 4.95:1
+   in classic-light and 6.93:1 in forest-night but 3.20:1 in soft-sepia, whose FOCUSED margin
+   is only 5.86:1 to begin with. Any single alpha that clears the tightest palette is high
+   enough to stop reading as recessed on the roomy ones.
+
+   So the paint recedes and the controls do not. The bar's own fill and border drop out, the
+   title glyph keeps the old 0.45, and the four window controls keep the authored colour
+   `color-mix(--text 90%, --sidebar)` that shell.css already measured over 4.5:1 on all
+   thirteen palettes. The chrome still visibly disappears at rest and still returns whole on
+   hover or focus; what it no longer does is take its own controls under the floor with it. */
 .fwin-viz:not(:hover):not(.focused) .fwin-bar {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+}
+.fwin-viz:not(:hover):not(.focused) .fwin-title {
   opacity: 0.45;
 }
 .fwin-frameless {

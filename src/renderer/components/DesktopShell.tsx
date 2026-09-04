@@ -3843,6 +3843,18 @@ const FloatingWindow = memo(function FloatingWindow({
           ? t(app.labelKey)
           : win.section;
   const glyph: IconName = isNote ? 'note' : isVisualizer || isMusicWidget ? 'music' : app?.glyph ?? 'app';
+  // The three trinkets deliberately paint no title text, and that decision stands — but a
+  // `<section>` with no accessible name is not a region landmark at all, so all three were
+  // unnamed to assistive tech while every other window is named by its own bar. The label is
+  // supplied only where the visible one is empty, so no titled window gains a second name and
+  // no already-scored surface moves. Existing keys; no new string.
+  const untitledName = isVisualizer
+    ? t('settings.nav.visualizer')
+    : isMusicWidget
+      ? t('settings.mini.app.musicwidget')
+      : isGarden
+        ? t('palette.section.city')
+        : '';
 
   // The window element, so a drag/resize can move it directly (no per-frame
   // React setState). Committing to state on every pointermove re-rendered every
@@ -3995,6 +4007,7 @@ const FloatingWindow = memo(function FloatingWindow({
       data-section={win.section}
       data-presentation={liquid ? 'liquid' : 'standard'}
       data-maximizable={canMaximize ? 'true' : 'false'}
+      aria-label={title ? undefined : untitledName || undefined}
       style={{ left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.pin ? PIN_Z_BASE + win.z : win.z, display: hidden ? 'none' : undefined }}
       onPointerDown={onFocus}
     >

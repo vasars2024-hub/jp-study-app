@@ -1,13 +1,37 @@
 /* Visualizer's stable canvas owns the window. The two routes sit in one compact edge dock:
    quiet while the ambient surface is idle, fully visible on pointer or keyboard focus. */
+/* 28%, not the original 42%: every spectrum and wave style paints upward from the bottom
+   edge, so the old midpoint sat in the busiest band of the canvas AND below the window's
+   entry band. The hint now reads against the quiet top of the stage and is reachable where
+   a first-time user looks for the way in. */
 .viz-widget > .viz-widget-hint {
   inset: auto;
-  top: 42%;
+  top: 28%;
   left: 50%;
   width: max-content;
   max-width: calc(100% - 24px);
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+/* The interactive form. `lq-hit-placed` gives the pointer its 32px without growing the
+   painted box, so the dock's measured clearance is unchanged. */
+.viz-widget > button.viz-widget-hint-action {
+  pointer-events: auto;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.viz-widget > button.viz-widget-hint-action:hover,
+.viz-widget > button.viz-widget-hint-action:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text);
 }
 
 .viz-widget-dock {
