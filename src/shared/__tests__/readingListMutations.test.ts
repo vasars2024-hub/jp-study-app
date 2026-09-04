@@ -23,12 +23,18 @@ import {
   deleteReadingList,
   finishReadingWorkEverywhere,
   readingWorkKey,
+  moveReadingListEntries,
+  removeReadingListEntries,
   removeReadingListEntry,
   reorderReadingListEntries,
+  restoreReadingEntryStates,
   restoreReadingList,
+  restoreReadingListEntries,
   restoreReadingListEntry,
   sealReadingListsDocument,
   setReadingEntryState,
+  setReadingEntryStates,
+  undoReadingListMove,
   updateReadingList,
   type ReadingListsMutationContext,
 } from '../readingListMutations';
@@ -493,6 +499,259 @@ describe('state transitions', () => {
     const one = setReadingEntryState(document, listId, entries[0].id, 'finished', ctx());
     const two = setReadingEntryState(one.document, listId, entries[1].id, 'abandoned', ctx());
     expect(readingListProgress(two.document.lists[0])).toEqual({ finished: 1, total: 4 });
+  });
+});
+
+describe('bulk selection (§11.4)', () => {
+  it('marks a whole selection finished under ONE timestamp, and counts only what moved', () => {
+    const { document, listId } = listWithMessage();
+    const entries = document.lists[0].entries;
+    // The middle entry is already finished, so a five-id selection may move four.
+    const seeded = setReadingEntryState(document, listId, entries[2].id, 'finished', ctx(NOW + 1));
+
+    const bulk = setReadingEntryStates(
+      seeded.document,
+      listId,
+      entries.map((entry) => entry.id),
+      'finished',
+      ctx(NOW + 50),
+    );
+
+    expect(bulk.changed).toBe(4);
+    expect(bulk.previous.map((entry) => entry.id)).toEqual([
+      entries[0].id,
+      entries[1].id,
+      entries[3].id,
+      entries[4].id,
+    ]);
+    const after = bulk.document.lists[0].entries;
+    expect(after.every((entry) => entry.state === 'finished')).toBe(true);
+    // One action, one clock: the four it moved share it, the one it skipped keeps its own.
+    expect(after.filter((entry) => entry.finishedAt === NOW + 50)).toHaveLength(4);
+    expect(after.find((entry) => entry.id === entries[2].id)?.finishedAt).toBe(NOW + 1);
+    expect(bulk.events).toHaveLength(4);
+    expect(bulk.events.every((event) => event.kind === 'entry-finished')).toBe(true);
+  });
+
+  it('is a no-op — same document, no undo to offer — when nothing in the selection moves', () => {
+    const { document, listId } = listWithMessage();
+    const ids = document.lists[0].entries.map((entry) => entry.id);
+    const bulk = setReadingEntryStates(document, listId, [...ids, 'rl_nope'], 'wanted', ctx());
+    expect(bulk.document).toBe(document);
+    expect(bulk.changed).toBe(0);
+    expect(bulk.previous).toEqual([]);
+    expect(bulk.events).toEqual([]);
+  });
+
+  it('undo puts the dates back, not just the states', () => {
+    const { document, listId } = listWithMessage();
+    const entries = document.lists[0].entries;
+    const started = setReadingEntryState(document, listId, entries[0].id, 'reading', ctx(NOW + 5));
+    const before = started.document.lists[0].entries[0];
+    expect(before.startedAt).toBe(NOW + 5);
+
+    const bulk = setReadingEntryStates(
+      started.document,
+      listId,
+      [entries[0].id, entries[1].id],
+      'finished',
+      ctx(NOW + 60),
+    );
+    expect(bulk.document.lists[0].entries[1].startedAt).toBe(NOW + 60);
+
+    const undone = restoreReadingEntryStates(bulk.document, listId, bulk.previous, ctx(NOW + 61));
+    const restored = undone.document.lists[0].entries;
+    expect(restored[0]).toEqual(before);
+    expect(restored[1]).toEqual(entries[1]);
+    // The finish that a state-only undo would have left behind.
+    expect(restored[1].startedAt).toBeUndefined();
+    expect(restored[1].finishedAt).toBeUndefined();
+    expect(undone.events).toHaveLength(2);
+    expect(undone.events[0]).toMatchObject({ kind: 'entry-updated', detail: { restored: true } });
+  });
+
+  it('undo skips an entry the user removed in between rather than resurrecting it', () => {
+    const { document, listId } = listWithMessage();
+    const entries = document.lists[0].entries;
+    const bulk = setReadingEntryStates(
+      document,
+      listId,
+      [entries[0].id, entries[1].id],
+      'finished',
+      ctx(NOW + 60),
+    );
+    const gone = removeReadingListEntry(bulk.document, listId, entries[1].id, ctx(NOW + 61));
+    const undone = restoreReadingEntryStates(gone.document, listId, bulk.previous, ctx(NOW + 62));
+    expect(undone.document.lists[0].entries).toHaveLength(4);
+    expect(undone.document.lists[0].entries[0].state).toBe('wanted');
+    expect(undone.events).toHaveLength(1);
+  });
+
+  it('removes a selection in one action and drops each orphaned work with it', () => {
+    const { document, listId } = listWithMessage();
+    const entries = document.lists[0].entries;
+    expect(document.works).toHaveLength(5);
+
+    const bulk = removeReadingListEntries(
+      document,
+      listId,
+      [entries[0].id, entries[1].id, 'rl_nope'],
+      ctx(NOW + 70),
+    );
+    expect(bulk.removed).toHaveLength(2);
+    expect(bulk.document.lists[0].entries).toHaveLength(3);
+    expect(bulk.document.works).toHaveLength(3);
+    expect(bulk.events.map((event) => event.kind)).toEqual(['entry-removed', 'entry-removed']);
+  });
+
+  it('undoing a bulk removal restores the ORIGINAL row order, not a swapped one', () => {
+    const { document, listId } = listWithMessage();
+    const original = document.lists[0].entries.map((entry) => entry.id);
+
+    // The two adjacent rows are the case that breaks: removing index 0 slides the
+    // next row into index 0, so both captures read 0.
+    const bulk = removeReadingListEntries(
+      document,
+      listId,
+      [original[0], original[1]],
+      ctx(NOW + 70),
+    );
+    expect(bulk.removed.map((entry) => entry.index)).toEqual([0, 0]);
+
+    const undone = restoreReadingListEntries(bulk.document, bulk.removed, ctx(NOW + 71));
+    expect(undone.document.lists[0].entries.map((entry) => entry.id)).toEqual(original);
+    expect(undone.document.works).toHaveLength(5);
+    expect(undone.events).toHaveLength(2);
+  });
+
+  it('moves a selection to another list whole — same id, same state, same dates', () => {
+    const { document, listId } = listWithMessage();
+    const made = createReadingList(document, { name: 'Later' }, ctx(NOW, 'b'));
+    const entries = document.lists[0].entries;
+    const started = setReadingEntryState(made.document, listId, entries[1].id, 'reading', ctx(NOW + 3));
+    const before = started.document.lists[0].entries[1];
+
+    const move = moveReadingListEntries(
+      started.document,
+      listId,
+      made.listId,
+      [entries[0].id, entries[1].id],
+      ctx(NOW + 80),
+    );
+
+    expect(move.moved.map(({ entry }) => entry.id)).toEqual([entries[0].id, entries[1].id]);
+    expect(move.skipped).toEqual([]);
+    const source = move.document.lists.find((list) => list.id === listId);
+    const target = move.document.lists.find((list) => list.id === made.listId);
+    expect(source?.entries).toHaveLength(3);
+    expect(target?.entries.map((entry) => entry.id)).toEqual([entries[0].id, entries[1].id]);
+    // Whole, not a copy: the reading state and its start date travel.
+    expect(target?.entries[1].state).toBe('reading');
+    expect(target?.entries[1].startedAt).toBe(before.startedAt);
+    expect(target?.entries[1].workId).toBe(before.workId);
+    // …but `order` is re-based onto the target's own tail.
+    expect(target?.entries.map((entry) => entry.order)).toEqual([0, 1]);
+    expect(move.document.works).toHaveLength(5);
+    expect(move.events.map((event) => event.kind)).toEqual([
+      'entry-removed',
+      'entry-added',
+      'entry-removed',
+      'entry-added',
+    ]);
+  });
+
+  it('names the entry it refused to move because the work is already on the target', () => {
+    const { document, listId } = listWithMessage();
+    const made = createReadingList(document, { name: 'Later' }, ctx(NOW, 'b'));
+    const entries = document.lists[0].entries;
+    const first = moveReadingListEntries(
+      made.document,
+      listId,
+      made.listId,
+      [entries[0].id],
+      ctx(NOW + 80),
+    );
+    // Put a second entry for the SAME work back on the source, then try to move it.
+    const back = restoreReadingListEntry(first.document, {
+      listId,
+      entry: { ...entries[0], id: 're_dup' },
+      index: 0,
+      works: [],
+    }, ctx(NOW + 81));
+    const second = moveReadingListEntries(
+      back.document,
+      listId,
+      made.listId,
+      ['re_dup'],
+      ctx(NOW + 82),
+    );
+    expect(second.document).toBe(back.document);
+    expect(second.moved).toEqual([]);
+    expect(second.skipped).toEqual(['re_dup']);
+  });
+
+  it('undoing a move puts the rows back at their original indices, in order', () => {
+    const { document, listId } = listWithMessage();
+    const made = createReadingList(document, { name: 'Later' }, ctx(NOW, 'b'));
+    const original = document.lists[0].entries.map((entry) => entry.id);
+
+    const move = moveReadingListEntries(
+      made.document,
+      listId,
+      made.listId,
+      [original[0], original[1]],
+      ctx(NOW + 80),
+    );
+    expect(move.moved.map(({ index }) => index)).toEqual([0, 1]);
+
+    const undone = undoReadingListMove(
+      move.document,
+      listId,
+      made.listId,
+      move.moved,
+      ctx(NOW + 81),
+    );
+    expect(undone.document.lists.find((list) => list.id === listId)?.entries.map((e) => e.id)).toEqual(
+      original,
+    );
+    expect(undone.document.lists.find((list) => list.id === made.listId)?.entries).toEqual([]);
+    expect(undone.events).toHaveLength(2);
+  });
+
+  it('refuses a move to the same list, and undoes nothing that is no longer there', () => {
+    const { document, listId } = listWithMessage();
+    const entries = document.lists[0].entries;
+    const same = moveReadingListEntries(document, listId, listId, [entries[0].id], ctx());
+    expect(same.document).toBe(document);
+    expect(same.moved).toEqual([]);
+
+    const made = createReadingList(document, { name: 'Later' }, ctx(NOW, 'b'));
+    const move = moveReadingListEntries(
+      made.document,
+      listId,
+      made.listId,
+      [entries[0].id],
+      ctx(NOW + 80),
+    );
+    const gone = removeReadingListEntry(move.document, made.listId, entries[0].id, ctx(NOW + 81));
+    const undone = undoReadingListMove(
+      gone.document,
+      listId,
+      made.listId,
+      move.moved,
+      ctx(NOW + 82),
+    );
+    expect(undone.document).toBe(gone.document);
+    expect(undone.events).toEqual([]);
+  });
+
+  it('a bulk removal that removed nothing hands the same document back', () => {
+    const { document, listId } = listWithMessage();
+    const bulk = removeReadingListEntries(document, listId, ['rl_nope'], ctx());
+    expect(bulk.document).toBe(document);
+    expect(bulk.removed).toEqual([]);
+    const undone = restoreReadingListEntries(document, [], ctx());
+    expect(undone.document).toBe(document);
   });
 });
 
