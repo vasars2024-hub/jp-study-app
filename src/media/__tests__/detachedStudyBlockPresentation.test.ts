@@ -66,7 +66,14 @@ describe('the detached Study Block declares a presentation instead of leaving it
 
   it('leaves every other host exactly as it was', () => {
     const unchanged: Array<[string | undefined, LiquidPresentationHost, boolean]> = [
-      ['visualizer', 'desktop', false],
+      // `visualizer, desktop` read false until 7265c6d3 gave the visualizer a
+      // contextual dock — a real region for a flip to change — which is the whole
+      // reason it was refused before. Its pop-out and reader refusals are what
+      // this row is actually for, so they take its place rather than the row
+      // being deleted: the point is that the DETACHED refusal did not leak.
+      ['visualizer', 'desktop', true],
+      ['visualizer', 'popout', false],
+      ['visualizer', 'reader', false],
       ['note', 'desktop', true],
       ['note', 'popout', false],
       ['city', 'desktop', true],
