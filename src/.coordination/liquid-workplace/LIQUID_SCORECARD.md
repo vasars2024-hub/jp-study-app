@@ -3230,3 +3230,114 @@ Measured before the VOID, and true as far as it goes: `modalTraps` 0, `scrollTra
     --task "type:.gram-search=ば >> wait:600 >> scroll:.gram-x-list=0 >> click:.gram-x-row:not(.focused) .gram-x-row-main"
 
 State restored: filter cleared, 17 rows, 0 dialogs open.
+
+## 2026-09-04 · primary — `grammar` closes 8 of 8, and cat3's dense-work bar was asking the wrong question
+
+Commits `3404d9bd`, `aeb1cbc6`, `6cb20f53`, `cb58977c`, `a3d4eda8`. Surface
+`@.fwin:has(.gram-view)` / title `Grammar`, window 1, 820x580. cat1 was closed by `backup`
+earlier today (`31c157b2`); the other seven were opened and closed here.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 2 | Clunkiness | **PASS 10/10.** deadEnds 0, modalTraps 0, scrollTraps 0, latency within bar, `costParity` **true** — liquid total 2 == standard total 2, worstRecv 23.6 ms, geometry and presentation restored. Control: deadEnd/modalTrap/scrollTrap all `0 -> 1 -> 0`, inert click 10 ms. |
+| 3 | Liquid utilization | **FAIL -> PASS 10/10.** `denseWorkOnTranslucent` **1 -> 0** (harness, see below). 89 regions, Work 20 / Anchor 43 / Anchor-holds-work 25 / Ambient 0; eligible **1/1** treated and **1/1** shared-primitive. Controls A, B **and the new E** all fired. |
+| 4 | Use of space | **FAIL -> PASS 10/10.** compact 260x170: clipped **65 -> 0**, hScrollers **1 -> 0**, hiddenOverflowX **1 -> 0**. default and maximized clean throughout. All three plants fired and were proven removed. |
+| 5 | UI clarity | **8/10 -> PASS 10/10.** Q5 classic-light minRatio **1.35 -> 5.39**, failing **4 -> 0**; Q4 scanned **19 -> 12** against a bar of 12, collapsedDisclosures **0 -> 2**. Control: CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10. |
+| 6 | Feature parity | **PASS 10/10.** parity standard **8/8** == liquid **8/8**, na 0, onlyInOne 0, roundTrip held on a dirtied `gram-search`. 3 of 3 mutations armed, each felling exactly its own row. |
+| 7 | Performance | **PASS 10/10.** ceiling p50 8.3; drag 8.3/8.5/41.7, resize 8.3/16.7/16.9, theme 8.3/8.5/58.4, over-100 **0** on all three; heavy (scroll 2,410 rows) main p50 1.9 / max 6.8 against a 500 ms bar. `--jank`: over-100 **0 -> 10**, p95 **8.5 -> 116.5**. |
+| 8 | Honest states | **PASS 10/10.** rawKeys 0, placeholders 0, mutePairs 0, statesNamed 1 of 1 observable, `languagesDiffer` true across en/ja/zh-Hans/ru. Control: all three plants `0 -> 1 -> 0`. |
+
+**THE CAT3 FINDING IS AN INSTRUMENT ONE, and it is the entry worth reading.** The single failing
+region was `div.gram-x-row.focused`, whose whole offence is a 16% accent selection tint. Measured
+live in Liquid presentation, the chain beneath it is
+
+    div.gram-x-row=0.16 -> 5 transparent divs -> div.fwin-body=rgb(26,24,35) -> section.fwin=0.72+blur
+
+`.fwin-body` is **fully opaque, no blur, no `opacity`** — the desktop is nowhere near that text.
+`backingOf()` stopped at the row's own partial paint and called it dense work on glass. The walk
+was answering ONE question where the rubric asks two: *does this carry Liquid material* (right
+for the eligible/treated term — a contextual region at 0.72 over a panel really is glassy) and
+*is there opaque ground under this text* (what the dense-work bar is about, for which a partial
+paint is INCONCLUSIVE). They are now separate terms. `translucentBacking` is untouched, so every
+banked `liquidTreatedEligible` still means what it meant, and the change is monotone on the
+dense-work numerator so no banked PASS can flip.
+
+**The product code was correct.** `color-mix(..., var(--panel))` would have hardcoded one shell's
+ground into a row that Wired and Aero both remap.
+
+**CONTROL E is why that relaxation is trustworthy.** Controls A and B both inject
+`backdrop-filter`, so both are caught by the walk's FIRST branch and **neither exercises the
+branch this relaxes**. E strips the opaque paint off the surface's own body chain and injects no
+blur at all:
+
+    dense/treated/shared/eligible/Work    base [0,1,1,1,20]
+    A one region blurred                       [1,1,1,1,20]
+    B all glass                                [20,1,1,1,20]
+    E ungrounded, NO blur anywhere             [19,1,1,1,20]
+    restored                                   [0,1,1,1,20]
+
+E's first assertion was "every Work region must fail" and it read **19 of 20 — correctly**.
+`article.gram-card` paints its own opaque background and stays grounded when its ancestors lose
+theirs. The assertion is now: the count must move, and every survivor must survive on
+`ownAlpha >= 0.95` rather than on borrowed ground.
+
+**Three product defects, all invisible to a single-theme or single-size reading.**
+
+1. **88px of the window was gone, not scrolled.** At 260x170 — `DesktopShell` MIN_W/MIN_H, one
+   drag away — `div.fwin-body` measured scrollWidth **336** against clientWidth **248** under
+   `overflow-x: hidden`. Three fixed columns (filters 268 + list 320 + whatever is left) with no
+   narrow behaviour, plus an unwrappable `inline-flex` mode toggle. Repaired as reflow:
+   `.gram-view` is the `inline-size` container and the columns stack below 560px. The container
+   must be `.gram-view` and not `.gram-x` — the mode switcher is a SIBLING of the explorer, and
+   an element cannot answer a `@container` condition against itself.
+2. **Four text runs unreadable in every light palette.** `span.gram-badge` **1.35** and **1.42**,
+   `button.gram-ask-agent` and `button.gram-more-btn` **2.47**, bar 4.5. The five JLPT badges
+   hardcoded a PALE foreground over a 16% wash of their own hue — readable on a dark panel,
+   invisible on a light one, and the dark cell is a clean 5.35 so no single-theme number could
+   catch it. Now `--lv-n{1..5}-text`, the old literals verbatim in `:root` and the `--accent-text`
+   recipe in the existing grouped light-palette rule. `.gram-fam` moved with them.
+3. **19 controls scanned, 0 disclosures.** The mode switcher is now a real APG tablist (roving
+   `tabIndex`, Arrow/Home/End, `aria-controls` onto one `tabpanel`) — four tab stops became one.
+   The saved-filter builder, a permanently visible SECOND toolbar row, moved into the filter
+   panel. `Filters` and `Selection` became real `aria-expanded`/`aria-controls` disclosures.
+
+**THE STATE-DEPENDENCE THAT NEARLY BANKED A FALSE PASS.** The first Q4 arrangement measured
+12/12 exactly — and only because the run happened to have no active filter. `Reset filters`
+renders only when one IS active, so one keystroke put it at 13 and Q4 back to NO. Re-measured in
+that hostile state on purpose: Reset moved into the panel too, and the state it advertised is now
+an `is-on` DOT plus an `aria-label` on the Filters button, never colour alone. **Q4 is YES with
+the filter cleared and YES with it active.**
+
+Harness correction 35 also lands in cat5: correction 34 collapses a nav landmark's routes to one
+because "a reader takes a map in as one object". A declared tablist is that same object and APG
+makes it one tab stop for the same reason. All three of 34's guards apply unchanged — declared
+role, at least 3 of them, exactly one control signature.
+
+**FOUR TRAPS PAID FOR HERE, three of them already in this repo's ledgers.**
+
+- A backtick inside the cat5 in-page template literal stopped the harness parsing, and the
+  **stale `--out` JSON read exactly like a fresh unchanged result**. The block now says so.
+- The new `tabpanel` wrapper sits between `.gram-view--explorer` and `.gram-x` and silently broke
+  the flex chain `VirtualList` measures against — all 2,410 rows render without the four lines
+  added to that rule. Verified live after: 2,410 points, 18 rows in the DOM.
+- `git apply` in a scratch dir outside a repo falls back to the SYSTEM gitconfig, which Git for
+  Windows ships with `autocrlf=true`. The rebuilt `styles.css` came back entirely CRLF and staged
+  as **27,364 insertions / 27,307 deletions** on a four-hunk change. `debug/stage-mine.cjs` (this
+  turn's tool, gitignored) now passes `-c core.autocrlf=false` and refuses on any CR-count change.
+- cat5's Q7/Q8/Q9 read the cat6 baseline, so **cat6 must run before cat5** or three questions VOID.
+
+**RECIPES the next worker should not re-derive.** cat2 on Grammar needs an undo that restores
+FOCUS, and `scroll:` sets `scrollTop` on whatever it matches — `.gram-x-list` is
+`overflow: hidden` and the scroller is one level in, so the selector is `.gram-x-list > div`:
+
+    --both-presentations
+    --task "type:.gram-search=ば >> wait:600 >> scroll:.gram-x-list > div=0 >> click:.gram-x-row:not(.focused) .gram-x-row-main"
+    --undo "clear:.gram-search >> scroll:.gram-x-list > div=0 >> click:.gram-x-row .gram-x-row-main"
+
+Set the baseline first (clear the filter, scroll to 0, click the FIRST row) or the undo cannot
+reach it. `costParity` needs `--both-presentations`, not `--compare`. And cat8's `--langs` leg
+needs the Settings language card ON SCREEN; the route that works without a Start menu is
+`window.dispatchEvent(new CustomEvent('os:open',{detail:'settings'}))`, then click Appearance.
+
+State restored: Settings closed, Grammar standard presentation, filter cleared, 2,410 points,
+0 dialogs.
