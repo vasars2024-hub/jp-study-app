@@ -2852,3 +2852,67 @@ holds at 80/80. Evidence: `cat6-s11-visualizer-r2.json`.
 State moved and put back: `jp-settings-advanced-v1` and `jp-os-visualizer` were both absent at
 start and are absent again (verified `null` live after the run). Settings is left on the
 Visualizer section rather than Home.
+
+---
+
+## 2026-09-04 · primary — `musicwidget` takes categories 1, 3, 4, 5 and 6, and three of them were FAILs first
+
+Fourteenth surface opened. Driven live on the desktop window (bridge 39273, pid 6756, one
+window, `@.fwin[data-section="musicwidget"]` — the widget paints no title, so the section
+attribute is the name, never an index). Commits `af09a59b`, `507248a3`, `4553d44b`, `9b2aa94d`.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 1 | Accessibility | **FAIL → 10/10.** `targets32` false first: 9 controls below the floor on the hit walk. minRatio **8.99** (`span.mwidget-time`, 10.5px), 0 failing runs, belowFloor **0**, unreachable **0 of 15**, during-emulation motion **0**. Control: six axes moved and returned, rectDrift 0. |
+| 3 | Liquid utilization | **FAIL → 10/10.** `eligibleTotal` **0 → 1**, treated 1/1, shared-primitive 1/1, `denseWorkOnTranslucent` **2 → 0**. Controls A and B both "CONTROL FAILED AS REQUIRED", both restored. |
+| 4 | Use of space | **FAIL → 10/10.** default 430×190 / compact 300×160 / maximized 1264×773: clipped, overlaps, hScroll, hiddenX and dead region all **0** at all three; chrome 26.6 / 49.9 / 5.0%. Three controls fired and were proven removed. |
+| 5 | UI clarity | **6/10 → 10/10.** Ten YES. Q5 minRatio default **4.48 → 10.62**, classic-light **1.15 → 7.85**. Control: CONTROL-OK, fails Q2 Q3 Q4 Q5 Q10, residue 0. |
+| 6 | Feature parity | **10/10.** parity liquid **6/6** = standard **6/6**, na 0, onlyInOne 0, roundTripHeld true. 6 of 6 mutations armed, each falling exactly its own row. |
+
+**Three product defects, and the light-theme one is the reason this surface was worth
+opening.** (a) The widget had **no Liquid-eligible region at all**: flipping
+`data-presentation` changed nothing below the title bar, because the body's only paint was a
+hand-rolled `rgba(12,11,16,0.72)` that is byte-identical in both presentations. (b) The seek
+bar was a **4px-tall box** — the whole pointer target measured 16.5px on the hit walk — and
+the icon buttons were 27×32, i.e. at the floor in one axis only. (c) In `classic-light` the
+mini-player's own **title read 2.23:1 and its artist line 1.15:1** against a 4.5 bar; the
+artist line was already failing at **4.48:1** in the dark default, under by 0.02. A
+translucent hardcoded dark stage over a theme-owned panel composites LIGHT while the text
+stays white — no single-theme number in this repo could have caught it.
+
+The repair follows §2.3 rather than the harness: the tinted stage stays **Ambient** and
+becomes theme-owned; the transport cluster is the one **Contextual** region, a named
+`role="toolbar"` on `.lq-contextual` that takes the theme material under Liquid; and the two
+sliders share one **Anchor** plate at alpha 0.97 that does *not* follow the flip, because a
+scrubber whose ground dissolves in Liquid is the universal-glass outcome the plan calls a
+failure. Volume moved onto that plate: a slider inside a translucent contextual region is
+work inside glass.
+
+**A finding NO scored leg would have produced.** At the window's literal minimum 260×170
+(`DesktopShell.tsx` MIN_W/MIN_H) with the new disclosure OPEN — one drag and one press away —
+eight 32px buttons plus gaps are 270px against 242px of row, and three hung 6px past each edge
+under `overflow: hidden`. cat4 drives 300×160 with the disclosure shut, so it passed either
+way. Fixed by wrapping the narrow toolbar; re-measured there at 0 clipped, `scrollWidth ==
+clientWidth`, `scrollHeight == clientHeight`.
+
+**Instrument note, no bar widened.** `musicwidget` is the 30th spec in `l6-parity.js`; the
+category-6 harness itself is untouched. Its `nowPlaying` row is deliberately an EITHER — the
+title/artist pair with a queue, `.mwidget-empty` plus its real route when idle — because a row
+demanding a title scores an idle widget as a regression, and its mutation attacks whichever
+shape is on screen or it would silently mutate nothing. `secondaryDisclosure` asserts the
+collapsed region still HOLDS its four controls: a disclosure that unmounts its contents is a
+feature that is gone, not one that is tucked.
+
+**Traps paid here.** (1) An edit left a comment tail outside its `*/`, and a CSS parse error
+reads exactly like a losing cascade — the same 250×4 as the genuine specificity collision
+against `styles.css` that preceded it. (2) The `narrow` reflow rides a `[]`-dep
+ResizeObserver effect, which HMR does not replace; without a renderer reload the branch never
+fires and the fix reads as unlanded. (3) Restoring a `.fwin`'s size by clearing its inline
+width drops the app's own persisted geometry — set the value back, do not remove the property.
+
+**Running total: 13 of 25 sections at 80/80.** `musicwidget` is **5 of 8**; **94 category
+cells remain**. Next on this surface: cat2, cat7, cat8.
+
+State moved and put back: the window is back at 430×190 with the disclosure collapsed and the
+presentation as found (`liquid`); cat5 restored theme `null` and reported `storeIdentical
+true` with plant residue 0.
