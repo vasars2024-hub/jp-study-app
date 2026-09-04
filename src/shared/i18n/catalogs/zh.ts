@@ -11310,6 +11310,7 @@ export const zh: Catalog = {
   'readingLists.view.density.comfortable': '宽松',
   'readingLists.view.density.compact': '紧凑',
   'readingLists.view.density.unsaved': '该密度暂时生效，但没能保存，下次启动会恢复原样。',
+  'readingLists.view.nextUp': '接下来读：{title}',
   'readingLists.view.paste': '粘贴消息',
   'readingLists.view.pasteLabel': '粘贴包含书名的那段消息',
   'readingLists.view.pastePlaceholder': '1. 奇诺之旅\n2. コンビニ人間\n3. …',

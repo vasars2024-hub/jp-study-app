@@ -11952,6 +11952,7 @@ export const en: Catalog = {
   'readingLists.view.density.compact': 'Compact',
   'readingLists.view.density.unsaved':
     'That density is on for now, but it could not be saved, so the next launch starts over.',
+  'readingLists.view.nextUp': 'Next up: {title}',
   'readingLists.view.paste': 'Paste a message',
   'readingLists.view.pasteLabel': 'Paste the message that has the books in it',
   'readingLists.view.pastePlaceholder': '1. Kino no Tabi\n2. コンビニ人間\n3. …',

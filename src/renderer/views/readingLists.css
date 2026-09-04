@@ -55,6 +55,24 @@
   opacity: 0.6;
 }
 
+/*
+  P5 5.3's Next up. The label carries the book TITLE, which is user data of
+  unbounded length, and this header is a wrapping flex row — so it is capped and
+  clipped rather than allowed to push the export and delete controls onto their
+  own line. The zero minimum width is load-bearing: a flex item will not shrink
+  below its own content without it, and the cap alone would do nothing.
+*/
+.rlv__nextup {
+  max-width: 22ch;
+  min-width: 0;
+}
+
+.rlv__nextup > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rlv__lede {
   margin: 0;
   opacity: 0.7;

@@ -12405,6 +12405,7 @@ export const ru: Catalog = {
   'readingLists.view.density.compact': 'Компактная',
   'readingLists.view.density.unsaved':
     'Эта плотность работает сейчас, но её не удалось сохранить — при следующем запуске всё вернётся к прежнему.',
+  'readingLists.view.nextUp': 'Дальше: {title}',
   'readingLists.view.paste': 'Вставить сообщение',
   'readingLists.view.pasteLabel': 'Вставьте сообщение, в котором перечислены книги',
   'readingLists.view.pastePlaceholder': '1. Норвежский лес\n2. コンビニ人間\n3. …',
