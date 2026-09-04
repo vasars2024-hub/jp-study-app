@@ -15,6 +15,10 @@
   ],
   "moduleCount": 963,
   "entries": {
+    "test-only-module:src/shared/readingListParser.ts": {
+      "status": "pending",
+      "note": "Reading Lists P1a. The parser landed with its suite ahead of its consumer: docs/ACTIVE/READING_LISTS_PLAN.md sequences P1 as parser + preview dialog + manual lists, and the dialog is the next slice. Marked PENDING rather than accepted precisely so it stays visible — a parser with no caller is a real defect if the dialog never arrives, and a route with no consumer has happened in this repo before. Re-key to accepted when the paste dialog imports it; if that slice is dropped instead, delete the module."
+    },
     "duplicate-export:canUndo": {
       "status": "accepted",
       "note": "Two unrelated undo stacks (renderer action history, CSV editor). Same verb, different domain — not shared logic."

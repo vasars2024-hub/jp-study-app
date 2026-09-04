@@ -129,6 +129,18 @@ Expected: **6 works**, one flagged for triage.
 "yo these are the ones i said" is a greeting → dropped. Getting this exact input right is
 the acceptance test; it is checked in as a fixture.
 
+> **Corrected 2026-09-03 while implementing it (`primary`).** The heading above says **6
+> works** and the table enumerates **five**, plus a sixth row marked `—` for the URL, which
+> the same row says is "not an entry". The itemised table is the specific half and the
+> summary is the loose one, so the implementation produces **5 entries + 1 `sourceUrl`**.
+> `src/shared/__tests__/readingListParser.test.ts` asserts that count and every field of
+> every entry. Do not "fix" it back to six.
+>
+> "one flagged for triage" **is** honoured, and it is entry 3 (`author-ambiguous`, from the
+> retracted `Murakami? no, Sayaka Murata`). Entry 5 is recovered from prose but is **not**
+> flagged: §2.3 step 3 calls a quoted span a strong title signal, and asking the user about
+> the case the parser is most confident in is how a triage strip stops being read.
+
 ### 2.2 Segmentation
 
 Try each strategy, score it, keep the best — do not hard-code one:
