@@ -264,6 +264,75 @@ export function readingWorksByAuthor(
   return out;
 }
 
+/** One line of §11.1's *"the 'on 2 lists' line in the reader"*. */
+export interface ReadingListMembershipRow {
+  listId: string;
+  listName: string;
+  listArchived: boolean;
+  /** What the route scrolls to. §11.1 row 8 lands on the ENTRY, not the list top. */
+  entryId: string;
+  workId: string;
+  title: string;
+  state: ReadingEntryState;
+}
+
+/**
+ * §11.1 row 8: *"the 'on 2 lists' line in the reader → the list detail, scrolled
+ * to this entry"*.
+ *
+ * Pure, and living here rather than in a reader, because §10.2 forbids list
+ * logic inside `NovelReader.tsx` (130 KB) and `MangaReader.tsx` (87 KB). The
+ * readers get a component fed by this; they never learn what a list is.
+ *
+ * Scans EVERY work that binds the item, not `workForItem`'s first match. Two
+ * works claiming one item is a repairable state rather than an impossible one
+ * (a merge, or a bind that raced an unbind), and in that state the first match
+ * shows FEWER lists than the user is really on — a line reading "on 1 list"
+ * over two lists is worse than no line at all. Counting all of them can only
+ * over-report a real membership, never invent one.
+ *
+ * Archived lists are RETURNED, flagged, not dropped: this function cannot know
+ * whether its caller is the reader strip (which hides them) or a diagnostic
+ * (which must not).
+ *
+ * The blank guard is NOT decoration. `normalizeWork` strips `''` out of
+ * `boundItemIds` (`readingLists.ts:317`), so a document that came through the
+ * store can never match one — but this takes a `ReadingListsDocument`, and a
+ * caller holding an unnormalized one (a preview, a fixture, a migration in
+ * flight) would otherwise have every blank-bound work answer to an item that
+ * has not loaded yet. `readingListViews.test.ts` falsifies it against exactly
+ * that document rather than against a normalized one, where it cannot fail.
+ */
+export function readingListsForItem(
+  document: ReadingListsDocument,
+  itemId: string,
+): ReadingListMembershipRow[] {
+  if (!itemId) return [];
+  const works = new Map(
+    document.works
+      .filter((work) => work.boundItemIds.includes(itemId))
+      .map((work) => [work.id, work]),
+  );
+  if (works.size === 0) return [];
+  const out: ReadingListMembershipRow[] = [];
+  for (const list of document.lists) {
+    for (const entry of sortReadingListEntries(list)) {
+      const work = works.get(entry.workId);
+      if (!work) continue;
+      out.push({
+        listId: list.id,
+        listName: list.name,
+        listArchived: Boolean(list.archivedAt),
+        entryId: entry.id,
+        workId: work.id,
+        title: work.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '',
+        state: entry.state,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * The row §11.2's "Next up" widget offers, and the one the list detail
  * highlights.
