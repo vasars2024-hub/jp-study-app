@@ -345,6 +345,256 @@ function workFromParsed(
   return work;
 }
 
+function replaceWork(
+  document: ReadingListsDocument,
+  workId: string,
+  replace: (work: ReadingWorkRef) => ReadingWorkRef,
+): ReadingListsDocument {
+  return {
+    ...document,
+    works: document.works.map((work) => (work.id === workId ? replace(work) : work)),
+  };
+}
+
+/**
+ * Entry states a binding may move, and the one direction it may move them.
+ *
+ * `wanted` is the only state a bind promotes: a work the user is already
+ * `reading`, has `finished`, `abandoned` or `skipped` has a state the user
+ * earned, and a file arriving on disk is not a reason to overwrite it. The
+ * inverse is symmetric — an unbind demotes `owned` and nothing else.
+ */
+function promoteEntries(
+  document: ReadingListsDocument,
+  workId: string,
+  from: ReadingEntryState,
+  to: ReadingEntryState,
+): { document: ReadingListsDocument; entryIds: string[] } {
+  const entryIds: string[] = [];
+  const lists = document.lists.map((list) => {
+    let touched = false;
+    const entries = list.entries.map((entry) => {
+      if (entry.workId !== workId || entry.state !== from) return entry;
+      touched = true;
+      entryIds.push(entry.id);
+      return { ...entry, state: to };
+    });
+    return touched ? { ...list, entries } : list;
+  });
+  return { document: entryIds.length ? { ...document, lists } : document, entryIds };
+}
+
+export interface ReadingBindResult extends ReadingListsMutation {
+  /** False when the work was unknown or the binding was already exactly this. */
+  bound: boolean;
+  /** Entries this binding moved `wanted` -> `owned`. The undo target. */
+  promotedEntryIds: string[];
+}
+
+/**
+ * Binds a library item to a work — §3(a)'s accept branch, and the only thing
+ * that turns a pasted title into a book the user holds.
+ *
+ * `bindConfidence` is the highest claim ever made for this work rather than the
+ * latest: a second, weaker binding (a re-rip, a paper copy) must not downgrade a
+ * certainty the first one earned, and §1's comment already reads it as "below
+ * `BIND_ACCEPT` this is a suggestion, not a fact".
+ */
+export function bindReadingWork(
+  document: ReadingListsDocument,
+  workId: string,
+  itemId: string,
+  confidence: number,
+  context: ReadingListsMutationContext,
+): ReadingBindResult {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work || !itemId.trim()) {
+    return { ...unchanged(document), bound: false, promotedEntryIds: [] };
+  }
+  const already = work.boundItemIds.includes(itemId);
+  const nextConfidence = Math.min(1, Math.max(work.bindConfidence, confidence));
+  if (already && nextConfidence === work.bindConfidence && !work.suggestion) {
+    return { ...unchanged(document), bound: false, promotedEntryIds: [] };
+  }
+
+  const withWork = replaceWork(document, workId, (current) => {
+    const next: ReadingWorkRef = {
+      ...current,
+      boundItemIds: already ? current.boundItemIds : [...current.boundItemIds, itemId],
+      bindConfidence: nextConfidence,
+    };
+    // A bound work has nothing to ask about. Dropping the suggestion here is what
+    // keeps `normalizeReadingWork`'s same rule from having to repair the document.
+    delete next.suggestion;
+    return next;
+  });
+  const promoted = promoteEntries(withWork, workId, 'wanted', 'owned');
+
+  return {
+    document: promoted.document,
+    bound: true,
+    promotedEntryIds: promoted.entryIds,
+    events: [
+      {
+        at: context.now,
+        kind: 'work-bound',
+        workId,
+        detail: {
+          itemId,
+          confidence: Number(nextConfidence.toFixed(4)),
+          promoted: promoted.entryIds.length,
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * The reverse of a bind. §11.4 — every destructive action is undoable, and a
+ * wrong auto-bind is the most likely destructive action this feature performs.
+ *
+ * Losing the last binding demotes `owned` back to `wanted` and drops the
+ * confidence to zero, because "I own this" was the binding's claim and nothing
+ * else was carrying it. States the user set by hand are untouched.
+ */
+export function unbindReadingWork(
+  document: ReadingListsDocument,
+  workId: string,
+  itemId: string,
+  context: ReadingListsMutationContext,
+): ReadingBindResult {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work || !work.boundItemIds.includes(itemId)) {
+    return { ...unchanged(document), bound: false, promotedEntryIds: [] };
+  }
+  const remaining = work.boundItemIds.filter((id) => id !== itemId);
+  const withWork = replaceWork(document, workId, (current) => ({
+    ...current,
+    boundItemIds: remaining,
+    bindConfidence: remaining.length ? current.bindConfidence : 0,
+  }));
+  const demoted = remaining.length
+    ? { document: withWork, entryIds: [] as string[] }
+    : promoteEntries(withWork, workId, 'owned', 'wanted');
+
+  return {
+    document: demoted.document,
+    bound: false,
+    promotedEntryIds: demoted.entryIds,
+    events: [
+      {
+        at: context.now,
+        kind: 'work-unbound',
+        workId,
+        detail: { itemId, remaining: remaining.length, demoted: demoted.entryIds.length },
+      },
+    ],
+  };
+}
+
+export interface ReadingSuggestionInput {
+  itemId: string;
+  confidence: number;
+  signals?: Record<string, string | number | boolean>;
+}
+
+/**
+ * §3(a)'s middle band: shown as "is this it?", never applied.
+ *
+ * Refuses three ways, all of them silent no-ops rather than errors, because the
+ * late binder (§3.1) calls this on every library import and a refusal is the
+ * normal case: a work that is already bound has nothing to ask; the same item
+ * at the same confidence is the answer already on screen; and an item the user
+ * has already said no to is never offered a second time.
+ */
+export function suggestReadingWorkBinding(
+  document: ReadingListsDocument,
+  workId: string,
+  input: ReadingSuggestionInput,
+  context: ReadingListsMutationContext,
+): ReadingListsMutation & { suggested: boolean } {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work || work.boundItemIds.length || !input.itemId.trim()) {
+    return { ...unchanged(document), suggested: false };
+  }
+  const current = work.suggestion;
+  if (current?.itemId === input.itemId) {
+    if (current.dismissedAt !== undefined) return { ...unchanged(document), suggested: false };
+    if (current.confidence === input.confidence) {
+      return { ...unchanged(document), suggested: false };
+    }
+  }
+
+  return {
+    document: replaceWork(document, workId, (entry) => ({
+      ...entry,
+      suggestion: {
+        itemId: input.itemId,
+        confidence: Math.min(1, Math.max(0, input.confidence)),
+        ...(input.signals ? { signals: input.signals } : {}),
+      },
+    })),
+    suggested: true,
+    events: [
+      {
+        at: context.now,
+        kind: 'work-suggested',
+        workId,
+        detail: { itemId: input.itemId, confidence: Number(input.confidence.toFixed(4)) },
+      },
+    ],
+  };
+}
+
+/**
+ * "No, that is not it."
+ *
+ * The record is kept with a timestamp rather than deleted: deleting it would let
+ * the very next library import re-offer the same wrong item, which is the shape
+ * of a notification that cannot be turned off.
+ */
+export function dismissReadingWorkSuggestion(
+  document: ReadingListsDocument,
+  workId: string,
+  context: ReadingListsMutationContext,
+): ReadingListsMutation & { dismissed: boolean } {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work?.suggestion || work.suggestion.dismissedAt !== undefined) {
+    return { ...unchanged(document), dismissed: false };
+  }
+  const { itemId } = work.suggestion;
+  const dismissed = { ...work.suggestion, dismissedAt: context.now };
+  return {
+    document: replaceWork(document, workId, (entry) => ({ ...entry, suggestion: dismissed })),
+    dismissed: true,
+    events: [
+      { at: context.now, kind: 'work-suggested', workId, detail: { itemId, dismissed: true } },
+    ],
+  };
+}
+
+/** Undo for the above. Restores the chip exactly as it was, minus the refusal. */
+export function restoreReadingWorkSuggestion(
+  document: ReadingListsDocument,
+  workId: string,
+  context: ReadingListsMutationContext,
+): ReadingListsMutation & { restored: boolean } {
+  const work = document.works.find((entry) => entry.id === workId);
+  if (!work?.suggestion || work.suggestion.dismissedAt === undefined) {
+    return { ...unchanged(document), restored: false };
+  }
+  const { itemId } = work.suggestion;
+  const restored = { ...work.suggestion };
+  delete restored.dismissedAt;
+  return {
+    document: replaceWork(document, workId, (entry) => ({ ...entry, suggestion: restored })),
+    restored: true,
+    events: [
+      { at: context.now, kind: 'work-suggested', workId, detail: { itemId, restored: true } },
+    ],
+  };
+}
+
 /* --------------------------------------------------------------- entries -- */
 
 export interface ApplyImportOptions {

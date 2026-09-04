@@ -60,6 +60,26 @@ export interface ReadingExternalIds {
   asin?: string;
 }
 
+/**
+ * A binding the matcher scored into the middle band (P2 §3): plausible enough to
+ * show, not plausible enough to apply.
+ *
+ * It lives on the work rather than in a side table because it has exactly the
+ * lifetime of the work's `boundItemIds` — a bind clears it, an unbind may
+ * repopulate it, and a work deleted with its list takes it along. `signals` is
+ * the matcher's own breakdown, kept so the surface can answer "why do you think
+ * that" and so a false suggestion can be diagnosed instead of guessed at.
+ */
+export interface ReadingWorkSuggestion {
+  itemId: string;
+  /** 0..1, the matcher's score. Between `BIND_SUGGEST` and `BIND_ACCEPT`. */
+  confidence: number;
+  /** Free-form, small, structural. Never a path or user prose. */
+  signals?: Record<string, string | number | boolean>;
+  /** Set when the user says no, so the same item is never offered twice. */
+  dismissedAt?: number;
+}
+
 /** A book as an idea, independent of any file the user happens to hold. */
 export interface ReadingWorkRef {
   id: string;
@@ -76,6 +96,8 @@ export interface ReadingWorkRef {
   boundItemIds: string[];
   /** 0..1. Below `BIND_ACCEPT` a binding is a suggestion, not a fact. */
   bindConfidence: number;
+  /** The "is this it?" chip. Present only while nothing is bound. */
+  suggestion?: ReadingWorkSuggestion;
 }
 
 /** Which line of which paste produced an entry. Provenance, always. */
@@ -158,6 +180,8 @@ export type ReadingListEventKind =
   | 'entry-finished'
   | 'entry-unfinished'
   | 'work-bound'
+  | 'work-unbound'
+  | 'work-suggested'
   | 'import-applied'
   | 'document-recovered';
 
@@ -255,6 +279,30 @@ function normalizeExternalIds(value: unknown): ReadingExternalIds | undefined {
   return any ? out : undefined;
 }
 
+function normalizeSuggestion(value: unknown): ReadingWorkSuggestion | undefined {
+  if (!isRecord(value)) return undefined;
+  const itemId = str(value.itemId);
+  // A suggestion with no item points at nothing and would render an empty chip.
+  if (!itemId) return undefined;
+  const confidence = num(value.confidence);
+  const suggestion: ReadingWorkSuggestion = {
+    itemId,
+    confidence: confidence === undefined ? 0 : Math.min(1, Math.max(0, confidence)),
+  };
+  if (isRecord(value.signals)) {
+    const signals: Record<string, string | number | boolean> = {};
+    for (const [key, raw] of Object.entries(value.signals)) {
+      if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+        signals[key] = raw;
+      }
+    }
+    if (Object.keys(signals).length) suggestion.signals = signals;
+  }
+  const dismissedAt = num(value.dismissedAt);
+  if (dismissedAt !== undefined) suggestion.dismissedAt = dismissedAt;
+  return suggestion;
+}
+
 export function normalizeReadingWork(value: unknown): ReadingWorkRef | null {
   if (!isRecord(value)) return null;
   const id = str(value.id);
@@ -284,6 +332,10 @@ export function normalizeReadingWork(value: unknown): ReadingWorkRef | null {
   if (volume) work.volume = volume;
   const externalIds = normalizeExternalIds(value.externalIds);
   if (externalIds) work.externalIds = externalIds;
+  const suggestion = normalizeSuggestion(value.suggestion);
+  // A bound work has nothing left to suggest, and keeping both would let a
+  // surface render "owned" and "is this it?" side by side out of one record.
+  if (suggestion && !work.boundItemIds.length) work.suggestion = suggestion;
   return work;
 }
 
