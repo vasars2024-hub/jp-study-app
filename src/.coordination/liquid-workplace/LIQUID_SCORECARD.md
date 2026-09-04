@@ -2250,3 +2250,64 @@ a HEAD+edit blob through `git apply --cached` of the single hunk. (c) Closing a 
 never use the close button to tidy up after a probe.
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` has 1 of 8 categories banked.
+
+---
+
+## 2026-09-03 21:00 EDT — primary. FINDING B REPAIRED, and the boss audit's three items.
+
+**FINDING B's cause statement above was half wrong, and the half that was wrong mattered.**
+Re-derived from the tree rather than from that paragraph: `appSectionCache` (`DesktopShell.tsx`,
+just above the call site) already returned one cached `<AppSection>` element per section, so
+`children` WAS reference-stable for every app window — Statistics included. The comment beside
+it named the real limit in as many words: the `note` and `settings` bodies were not cached.
+So it was never "the memo never holds for ANY window"; it was two windows, one of them
+expensive. **Do not quote the 5.1× line above as an unrepaired defect.**
+
+Measured with one instrument across a full 2×2, in one session. One keystroke into a sticky
+note to the SECOND animation frame after it, 12 scored samples per arm after 2 warm-ups,
+keystrokes 400 ms apart so each gets its own frame (FINDING A's rule):
+
+| DesktopShell | note alone | note + Statistics + Settings | cost of the other two |
+| --- | --- | --- | --- |
+| HEAD, before | **21.4** | **52.9** | **+31.5 ms** |
+| `8b4dc866` | **22.8** | **27.9** | **+5.1 ms** |
+
+The two `note alone` arms are the negative control and they match, so what got cheaper is the
+unrelated windows and not the machine. The before arm was taken by writing HEAD's own
+`DesktopShell.tsx` into the tree, letting HMR apply it, measuring, then restoring mine and
+checking sha256 — not by comparing to a number from a previous turn's different recorder.
+
+Repair `8b4dc866`: a `useMemo`'d `<DesktopSettings>` keyed on the three pieces of live state it
+reads, with its eleven callbacks routed through `wallActionsRef` exactly as `winActionsRef`
+already does; and `noteColorCache` / `noteBodyCache` keyed by window id, so the note being typed
+in still rebuilds while no other note does. `noteBodyCache` is a `useMemo` on `[lang]`, not a
+bare ref, because it caches a translated placeholder. Guard
+`desktopWindowBodyIdentity.test.ts`, 5 tests, comments stripped first; mutation control =
+restore HEAD's file → 5 of 5 RED.
+
+**BOSS AUDIT 2026-09-04 02:55 MSK — all three handoff items answered.** The previous handoff
+recorded "nothing owed" against a 2026-08-13 section; the audit had landed by then and was
+missed. Read the file's LAST section, not a remembered one.
+
+(a) `cb4bfa75` — `attachSubtitleFile` and `subtitleFallbackFont` added to `window.d.ts`, as a
+HEAD+edit blob because that file is another track's dirty file; staged diff +14/−0. Both tsc
+identities the audit quoted are gone.
+(b) `63432f9a` — Finding P2 repaired geometrically. Reproduced first: tray `(753,143) 132x45`
+over `Sync from Anki` `(752.3,157) 132.7x32`, `elementFromPoint` at Sync's centre returning
+`BUTTON.btn.danger` with `contains` **true**. The tray now reserves its own width and height in
+flow; closed and open are identical horizontally. Three legs, armed in one `/eval` and pressed
+in the next: SUBJECT at Sync's centre → `BUTTON.btn.small`, dismissed; CONTROL inside the tray's
+own padding → not dismissed.
+(c) `ba494825` then `401b400c` — **a measured retraction.** The audit asked for both lagging
+test suites to be committed. `musicCueNavCommands.test.ts` was right and passes in isolation.
+`videoStudyLayout.test.ts` turned 3 failures into 4: its newer copy asserts Detached Study
+Blocks, which is uncommitted across 8 files and ~450 lines (`preload.ts` +87/−10,
+`StudyPlayerSlice.tsx` +243, `mediaWorkspace.css`). Its INDEX entry was reverted with
+`update-index` on the old blob so the working tree keeps the study track's copy untouched.
+
+**Trap.** A detached verification worktree is the only place the branch can be read: 4 of these
+5 failures are invisible in the shared tree, where the uncommitted copies of the same test files
+are what actually run.
+
+**Running total: unchanged at 11 of 25 sections at 80/80.** `note` still has 1 of 8 banked —
+cat2 remains VOID until FINDING A's recorder repair lands, which is the next slice.
