@@ -12453,4 +12453,5 @@ export const ru: Catalog = {
   'readingLists.view.author.title': 'Другие работы: {author}',
   'readingLists.view.author.onlyOne': 'Это единственная книга автора {author} в ваших списках.',
   'readingLists.view.author.goList': 'Перейти к списку «{name}»',
+  'readingLists.view.coverReveal': 'Показать «{title}» в библиотеке',
 };

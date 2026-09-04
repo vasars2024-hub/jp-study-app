@@ -11472,4 +11472,5 @@ export const ja: Catalog = {
   'readingLists.view.author.title': '{author} の他の作品',
   'readingLists.view.author.onlyOne': 'リストにある {author} の本はこれだけです。',
   'readingLists.view.author.goList': 'リスト「{name}」へ移動',
+  'readingLists.view.coverReveal': '「{title}」をライブラリで表示',
 };

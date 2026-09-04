@@ -75,6 +75,14 @@ export default function ReadingWorkspaceView({
   const [finderQuery, setFinderQuery] = useState('');
   /** The list a deep link named, so a widget header lands on that list's detail. */
   const [routedListId, setRoutedListId] = useState<string | null>(null);
+  /**
+   * §11.1's *"an entry's cover → the library item detail"*.
+   *
+   * An OBJECT rather than a bare id, so asking for the same book twice — cover,
+   * back, cover again — is a new value and re-reveals it. A bare id would be
+   * `===` to the last one and `LibraryView`'s effect would not fire.
+   */
+  const [reveal, setReveal] = useState<{ itemId: string } | null>(null);
   const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const routeGenerationRef = useRef(0);
 
@@ -204,7 +212,9 @@ export default function ReadingWorkspaceView({
         aria-labelledby={`reading-workspace-tab-${section}`}
       >
         <Suspense fallback={<div className="reading-workspace-loading muted" aria-live="polite" />}>
-          {surface === 'library' ? <LibraryView onOpen={onOpenBook} /> : null}
+          {surface === 'library' ? (
+            <LibraryView onOpen={onOpenBook} revealItemId={reveal?.itemId ?? null} />
+          ) : null}
           {surface === 'finder' ? (
             <ReadingFinderView
               onOpenBook={onOpenBook}
@@ -224,6 +234,13 @@ export default function ReadingWorkspaceView({
               onFindWork={(title) => {
                 setFinderQuery(title);
                 setSection('discover');
+              }}
+              // §11.1's cover route. Library is a sibling tab of this very
+              // workspace, so revealing a book is a tab switch carrying the id
+              // rather than a second navigation path into a different window.
+              onShowInLibrary={(item) => {
+                setReveal({ itemId: item.id });
+                setSection('library');
               }}
             />
           ) : null}

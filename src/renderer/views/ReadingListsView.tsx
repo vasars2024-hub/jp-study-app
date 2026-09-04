@@ -170,6 +170,20 @@ async function readDroppedText(file: File): Promise<string | null> {
   });
 }
 
+/**
+ * The cover a row draws, resolved to a plain CSS `background-image` value.
+ *
+ * A STRING, so the row's `memo` still compares by identity — and computed here
+ * rather than in the row, because the row must never read `itemsById`. An
+ * unbound row still gets a cover: `coverFallbackImage` derives one from the
+ * title, which is what the list-card mosaic already does for the same reason,
+ * so a `wanted` row is not a hole in the column.
+ */
+function rowCoverImage(item: LibraryItem | undefined, title: string): string {
+  const url = coverUrlFor(item?.coverPath, item?.id);
+  return url ? `url("${url}")` : coverFallbackImage(item?.title ?? title);
+}
+
 /** The one undo the surface offers, and the label that explains what it undoes. */
 interface UndoSlot {
   message: string;
@@ -195,6 +209,10 @@ interface ReadingRowActions {
   showSource: (entryId: string) => void;
   /** §11.1's author link: this author's other works, across every list. */
   showAuthor: (author: string) => void;
+  /** §11.1's cover: reveal the bound book in the library, rather than open it. */
+  showInLibrary: (entryId: string) => void;
+  /** Whether this host can reveal at all. `false` renders the cover inert. */
+  canReveal: boolean;
   pick: (entryId: string, range: boolean) => void;
   /** §11.4's reorder. `target` is the row dropped onto, or stepped past. */
   reorder: (entryId: string, targetEntryId: string) => void;
@@ -223,6 +241,8 @@ interface ReadingRowProps {
   hasSource: boolean;
   /** §11.1's author link, already trimmed. `null` where the work has no author. */
   author: string | null;
+  /** The cover to draw, already resolved to a URL or a fallback data image. */
+  coverImage: string;
   selected: boolean;
   actions: ReadingRowActions;
   t: ReturnType<typeof useT>['t'];
@@ -278,6 +298,7 @@ const ReadingRow = memo(function ReadingRow({
   suggestedTitle,
   hasSource,
   author,
+  coverImage,
   selected,
   actions,
   t,
@@ -327,6 +348,31 @@ const ReadingRow = memo(function ReadingRow({
         aria-label={t('readingLists.view.bulk.select', { title })}
         onClick={(event) => actions.pick(entryId, event.shiftKey)}
       />
+      {/*
+        §11.1's *"an entry's cover → the library item detail"*. A real button,
+        not a decorated div, and a SEPARATE destination from the row itself —
+        the cover reveals the book in the library, the title opens the reader.
+
+        Drawn only where there IS a library item to reveal. An unbound row's
+        cover is a fallback image with nothing behind it, and making it a
+        button would be the card that swallows the click §11.1 forbids; there
+        the same image is rendered inert.
+      */}
+      {item && actions.canReveal ? (
+        <button
+          type="button"
+          className="rlv__row-cover ui-focusable"
+          style={{ backgroundImage: coverImage }}
+          aria-label={t('readingLists.view.coverReveal', { title })}
+          onClick={() => actions.showInLibrary(entryId)}
+        />
+      ) : (
+        <span
+          className="rlv__row-cover"
+          style={{ backgroundImage: coverImage }}
+          aria-hidden="true"
+        />
+      )}
       <button
         type="button"
         className="rlv__row-open ui-focusable"
@@ -432,6 +478,15 @@ export interface ReadingListsViewProps {
    * exists to forbid.
    */
   onFindWork: (title: string) => void;
+  /**
+   * §11.1's *"an entry's cover → the library item detail"*.
+   *
+   * OPTIONAL, and the cover only becomes a button where it is supplied — a
+   * required handler that some host cannot honour would be a control that is
+   * present and does nothing, which is what §11.1's "no dead ends" forbids.
+   * `ReadingWorkspaceView` supplies it; a widget rendering a list may not.
+   */
+  onShowInLibrary?: (item: LibraryItem) => void;
   /** Deep link. When the list is gone the view falls back to the grid. */
   initialListId?: string | null;
 }
@@ -439,6 +494,7 @@ export interface ReadingListsViewProps {
 export default function ReadingListsView({
   onOpenBook,
   onFindWork,
+  onShowInLibrary,
   initialListId = null,
 }: ReadingListsViewProps) {
   const { t, lang } = useT();
@@ -665,6 +721,14 @@ export default function ReadingListsView({
     setSourceFor((current) => (current === entryId ? null : entryId));
     setAuthorFor(null);
   }, []);
+
+  const showInLibrary = useCallback(
+    (row: ReadingListRow) => {
+      const item = row.itemId ? itemsById.get(row.itemId) : undefined;
+      if (item) onShowInLibrary?.(item);
+    },
+    [itemsById, onShowInLibrary],
+  );
 
   const showAuthor = useCallback((author: string) => {
     // The two panels are mutually exclusive on purpose. Both explain the same
@@ -1182,6 +1246,7 @@ export default function ReadingListsView({
     stepRow,
     showSource,
     showAuthor,
+    showInLibrary,
   });
   live.current = {
     rows,
@@ -1195,6 +1260,7 @@ export default function ReadingListsView({
     stepRow,
     showSource,
     showAuthor,
+    showInLibrary,
   };
 
   /**
@@ -1223,6 +1289,7 @@ export default function ReadingListsView({
    * Built ONCE, deliberately — this is the prop that would otherwise change on
    * every keystroke in the filter field and re-render all 500 rows with it.
    */
+  const canReveal = Boolean(onShowInLibrary);
   const rowActions = useMemo<ReadingRowActions>(() => {
     const find = (entryId: string) =>
       live.current.rows.find((candidate) => candidate.entry.id === entryId);
@@ -1249,6 +1316,11 @@ export default function ReadingListsView({
       },
       showSource: (entryId) => live.current.showSource(entryId),
       showAuthor: (author) => live.current.showAuthor(author),
+      showInLibrary: (entryId) => {
+        const row = find(entryId);
+        if (row) live.current.showInLibrary(row);
+      },
+      canReveal,
       pick: (entryId, range) => live.current.toggleSelected(entryId, range),
       reorder: (entryId, targetEntryId) => {
         if (entryId !== targetEntryId) live.current.reorderRows(entryId, targetEntryId);
@@ -1265,7 +1337,12 @@ export default function ReadingListsView({
       },
       dragged: () => dragging.current,
     };
-  }, []);
+    // `canReveal` is a BOOLEAN in the dependency list, never the handler itself.
+    // `onShowInLibrary`'s identity changes on every render of whatever mounts
+    // this view, so depending on it would rebuild `actions` each time and
+    // repaint all 500 rows — the exact cost §11.4's performance row forbids.
+    // Whether a host can reveal at all changes at most once.
+  }, [canReveal]);
 
   /**
    * The three bulk verbs. Each is ONE write with ONE undo, which is the whole
@@ -2069,6 +2146,10 @@ export default function ReadingListsView({
                   }
                   hasSource={Boolean(row.entry.sourceRef)}
                   author={row.work?.authorRaw?.trim() || null}
+                  coverImage={rowCoverImage(
+                    row.itemId ? itemsById.get(row.itemId) : undefined,
+                    row.title,
+                  )}
                   selected={selected.has(row.entry.id)}
                   actions={rowActions}
                   t={t}

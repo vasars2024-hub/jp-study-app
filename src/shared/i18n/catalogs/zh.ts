@@ -11349,4 +11349,5 @@ export const zh: Catalog = {
   'readingLists.view.author.title': '{author} 的其他作品',
   'readingLists.view.author.onlyOne': '清单里 {author} 的书只有这一本。',
   'readingLists.view.author.goList': '前往清单“{name}”',
+  'readingLists.view.coverReveal': '在书库中显示“{title}”',
 };

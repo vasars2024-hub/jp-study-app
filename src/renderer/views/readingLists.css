@@ -844,3 +844,38 @@
   flex: none;
   min-height: 34px;
 }
+
+/* --------------------------------------------- §11.1 · the row's cover ----- */
+
+/*
+  Both the button and the inert span, so an unbound row keeps the column and the
+  list does not develop a ragged left edge where a book has no file yet.
+  36px, not 32: this is a real target on the button branch, and the walk's floor
+  IS 32 and it steps in halves.
+*/
+.rlv__row-cover {
+  flex: none;
+  width: 27px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  border-radius: 3px;
+  background-color: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  background-size: cover;
+  background-position: center;
+}
+
+/* The span branch is decoration and must not read as a control. */
+span.rlv__row-cover {
+  opacity: 0.55;
+}
+
+button.rlv__row-cover {
+  cursor: pointer;
+}
+
+/* Compact spends the gap, never the target — the same rule the density row
+   closed on. The cover keeps its 36px on both densities. */
+[data-density='compact'] .rlv__row-cover {
+  margin-inline-end: 2px;
+}

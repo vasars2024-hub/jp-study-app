@@ -1782,6 +1782,86 @@ describe('ReadingListsView — §11.1 click-through', () => {
     expect(panel!.textContent).toContain('This is the only book by Sayaka Murata on your lists.');
   });
 
+  it('routes a bound row cover to the library, as a DIFFERENT destination from the title', async () => {
+    // §11.1 row 4. The two destinations on one row are the whole point: the
+    // title opens the reader, the cover reveals the book. A cover that merely
+    // did what the title does would be decoration with a tab index.
+    const { document, listId } = boundIn('reading');
+    const revealed: LibraryItem[] = [];
+    installBridge(new FakeStore(document));
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+          onShowInLibrary={(item) => revealed.push(item)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const cover = host.querySelector('button.rlv__row-cover');
+    expect(cover).not.toBeNull();
+    await click(cover);
+    expect(revealed.map((item) => item.id)).toEqual([ITEM.id]);
+    // The reader was NOT opened — reveal and open are different verbs.
+    expect(opened).toEqual([]);
+  });
+
+  it('renders the cover inert when the host cannot reveal, rather than as a dead button', async () => {
+    // §11.1's "no dead ends": `onShowInLibrary` is optional because a widget
+    // rendering a list may not be able to honour it. Where it is absent the
+    // cover must not be a control at all — a present button that does nothing
+    // is exactly the swallowed click that rule forbids.
+    const { document, listId } = boundIn('reading');
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    expect(host.querySelector('button.rlv__row-cover')).toBeNull();
+    const inert = host.querySelector('span.rlv__row-cover');
+    expect(inert).not.toBeNull();
+    expect(inert!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('gives an unbound row a cover too, so the column does not go ragged', async () => {
+    // `coverFallbackImage` derives one from the title, which is what the list
+    // card mosaic already does. But it is never a button: there is no library
+    // item behind a `wanted` row to reveal.
+    const { document, listId } = seeded();
+    const revealed: LibraryItem[] = [];
+    installBridge(new FakeStore(document));
+    await act(async () => {
+      root.render(
+        <ReadingListsView
+          initialListId={listId}
+          onOpenBook={(item) => opened.push(item)}
+          onFindWork={(title) => sought.push(title)}
+          onShowInLibrary={(item) => revealed.push(item)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Two rows: the first bound to ITEM, the second bound to nothing.
+    const covers = [...host.querySelectorAll('.rlv__row-cover')];
+    expect(covers).toHaveLength(2);
+    expect(covers[0].tagName).toBe('BUTTON');
+    expect(covers[1].tagName).toBe('SPAN');
+    // Both actually carry an image, so neither is an empty box.
+    for (const cover of covers) {
+      expect((cover as HTMLElement).style.backgroundImage).not.toBe('');
+    }
+  });
+
   it('draws no author link where the work has no author', async () => {
     // The vacuity check for both tests above. `authorRaw` is optional and most
     // works never carry one, so a link drawn unconditionally would render the
