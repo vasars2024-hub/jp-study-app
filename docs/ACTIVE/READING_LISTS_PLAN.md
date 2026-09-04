@@ -424,6 +424,48 @@ and a user, and it is also what makes `readingListsClient.ts` stop being a
 triage strip + dropped-lines disclosure first; merge, split and reorder-in-preview
 are a follow-up, and `reorderReadingListEntries` already exists for the last one.
 
+**2026-09-04, `primary`.** **P2 CLOSED on `feat/nyaa-subtitles`**, against its own
+done-when: `readingListsLateBinding.test.ts` adds the list first and the file second and
+the `wanted` entry ticks to `owned`. `9a7e269d` the matcher (kana→romaji, title
+similarity, 0.82 accept / 0.55 suggest, five mutations); `e11f15ba` bind, unbind and the
+suggest/dismiss/restore band; `e1bd081a` the main-side hook. Recovered: `backup` died one
+second after writing `library.ts`, with the slice complete and uncommitted.
+
+The hook is **`onLibraryItemsAdded` on `writeDb` itself**, not a subscription per importer.
+`library.ts` has six import paths and nineteen `writeDb` calls; diffing the write by item id
+covers importers nobody has written yet. It defers with `setImmediate` (the import path is
+one a user waits on), swallows its own failures (an unreadable lists document is not an EPUB
+import error), and re-applies the intent on a CAS refusal. 16 tests, 4 negative controls by
+name. `tools/architecture-baseline.json` loses `test-only-module:readingListMatching.ts`,
+exactly as that entry's own escape clause said it would.
+
+### 9.2 FORK — P2 was built TWICE, and the merge has to de-duplicate it
+
+`backup` (main tree) and `primary2` (`wt/files-app`) both implemented P2 between 00:30 and
+00:56 on 2026-09-04, neither aware of the other. Nothing else duplicates: **P3 and P1's
+§2.5 preview exist only on `wt/files-app`; P2's unbind/suggest band exists only here.**
+
+The resolution is mechanical, because **`wt`'s P3 does not import a matcher.**
+`readingFinishWatcher.ts` takes `createReadingListsMutationContext`,
+`finishReadingWorkEverywhere`, `sealReadingListsDocument` and `workForItem` — all four are
+in the common ancestor `dc5c345a`/P1b. So P3 ports onto either P2 unchanged.
+
+**Keep this branch's P2, take everything else from `wt`:**
+
+| From `wt/files-app` | Disposition |
+|---|---|
+| `6ff47c06`, `a4c5d6e8` §2.5 paste preview; `9d603e58` parser mutation tests | TAKE — P1's last open clause is in `9d603e58`; delete §9.1's "still owes" line when it lands |
+| `1479861e` P3 detector + watcher, **and its cross-document work-dedup fix in `applyReadingListImport`** | TAKE — the dedup is a real defect on both sides: one book on two lists minted two works, so a finish ticked one list and not the other |
+| `shared/readingListMatch.ts`, `main/readingListsBinder.ts` and their two suites; `bindReadingWorkToItem`; the direct `writeDb` hook in `library.ts` | DROP — superseded. This branch's mutation layer is a superset (7 exports vs 1) and the `onLibraryItemsAdded` seam is the more general hook |
+
+Conflicts to expect: `shared/readingListMutations.ts` and `main/library.ts`, both real.
+`readingListMatch.ts` will merge **without** a conflict and leave two matchers standing —
+the architecture audit catches it as an orphan, but only if nobody baselines it away.
+
+**Exact next slice: P4 — §6 surfaces plus §11 in full**, once the merge above has landed.
+§11 is a gate, not polish. Do not start P4 on either branch alone: it consumes P1's preview
+(`wt`) and P2's suggest band (here), so building it before the merge forks a second time.
+
 ---
 
 ## 10. Traps, stated up front
