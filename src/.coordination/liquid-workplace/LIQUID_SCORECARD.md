@@ -2916,3 +2916,72 @@ cells remain**. Next on this surface: cat2, cat7, cat8.
 State moved and put back: the window is back at 430×190 with the disclosure collapsed and the
 presentation as found (`liquid`); cat5 restored theme `null` and reported `storeIdentical
 true` with plant residue 0.
+
+## 2026-09-04 · primary — `musicwidget` takes categories 2 and 8, and the transport was reaching a window that had closed
+
+Driven live on bridge 39273. **Two app restarts** this turn (pid 6756 → 30652 → 12644): the
+first because the repair is main-process and main does not hot-reload, the second to reproduce
+the defect from a null snapshot. Scene held to ONE OS window and the same four desk windows at
+their found geometry; the second-display desk that boot opens was closed each time so the scene
+matches every earlier `musicwidget` leg. Commits `7061329f`, `550418ab`, `a4c34eee`.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 2 | Clunkiness | **FAIL → 10/10.** deadEnds **1 → 0**, modalTraps 0, scrollTraps 0. costParity measured with `--both-presentations`: standard **3** clicks vs liquid **3**, box 430x190 both ways, `restored true`. worstRecv **15.0 / 17.8 ms** against a 100 ms bar. Idle leg `raw=true net=false` in both phases — the churn exclusion is EARNED, not asserted. Control: base [0,0,0] → dirty [1,1,1] → restored [0,0,0]. |
+| 8 | Honest states | **FAIL → 10/10.** rawKeyCount **0 in en/ja/zh/ru**, language restored `true`; placeholders 0; mutePairs 0; statesNamed **0 of 1 → 1 of 1 observable** ("Nothing playing" + its Open Music route). Control: base [0,0,0] → dirty [1,1,1] → restored [0,0,0]. |
+
+**The product defect this surface gave up, and it is not a widget defect.** The Music widget
+showed `e2e-audio-ja`, `0:20 / 1:30` and a **Pause** icon while nothing was playing and play,
+next, previous and seek all reached nobody. `player:getSnapshot` had handed window 1 a snapshot
+whose `sourceId` was **3**, a window `/health` no longer listed; `applySnapshot` set
+`remoteLeaderId = 3`, so `isLeader()` was false forever and every transport call took the
+`delegate` branch — which main forwards to every window EXCEPT the sender, i.e. to nobody.
+`main.ts` set `playerSnapshot` on publish and had **no window-destroyed path at all**. Closing a
+music pop-out is the user route in, and this desk had exactly that pop-out
+(`?popout=musicwidget`, opened from the mini widget's Music slot) in its history.
+
+Repaired in `7061329f` with no new IPC channel: `sourceId: 0` is ALREADY the renderer's
+"no leader" sentinel, so main rebroadcasts the snapshot with `sourceId: 0`, `playing: false`
+and an empty `mediaUrl` — leadership handed back, the lie removed, the track and position kept.
+Second half, or Play stays dead: the survivor mirrors a track it never loaded, so `audio.src`
+is empty and `toggle()`'s `if (!audio.src) return` made the button a no-op next to a title and
+a duration. It re-opens the track instead.
+
+**LIVE, end to end, on the real windows.** Desk (1) + mini widget (3) + pop-out music widget
+(4). Window 4 took the lead, then was closed with `window.close()`. Window 1's play control went
+**`Pause` → `Play`** at that instant with `0:12 / 1:30` intact, and pressing it then produced
+real playback — `0:02 → 0:05`, seek `2.9 → 5.8`. Honest about the one synthetic step: the
+pop-out's own "Open Music" routes to the DESK, so no reachable UI makes a pop-out the leader in
+a single boot; its `playerPublish` was sent directly. Everything downstream of that message —
+main's closed hook, the release, the broadcast, window 1's recovery — is the real path.
+
+**Negative controls, both halves, each on its own rows.** Removing the re-open branch → 1 RED,
+`makes Play reach the media again`. Forcing `releasePlayerLeadership` to always return null →
+**6 RED across both suites**, each by name. Restored and re-run clean, 13/13.
+
+**A harness gap that would have shipped as a product defect.** cat2 scored the repeat button a
+DEAD END. Driven by hand three times it is fully live: `aria-label`/`title` go
+"Repeat: off" → "all" → "one", the `on` class appears, and a `1` badge paints at the third
+position. The control inventory read `name()` (FIRST class only), textContent, disabled,
+aria-selected/expanded/pressed and value — none of which move on off → all. `aria-label` and
+`title` joined it (`550418ab`). It can only turn a dead end into a live step, never the reverse,
+and **all 49 banked cat2 baselines record `deadEndCount 0`**, so no score already taken moves;
+the injected handler-less button has neither attribute and the control re-proves that per run.
+
+**And one that was a naming bug, not an instrument bug.** cat8 found one painted "empty" host
+with no message and scored `statesNamed 0 of 1` — `.mwidget-art-empty`, the generated cover for
+a track with no art, matched by `[class*="empty"]`. The widget's REAL empty state was off screen
+because a track was playing. Renamed `mwidget-art-fallback` (`a4c34eee`); correction 39's guard
+is untouched, and the empty state was then measured **on its own** rather than vacated — hosts 2,
+message "Nothing playing / Open Music", 1 of 1.
+
+**Running total: 13 of 25 sections at 80/80.** `musicwidget` is **7 of 8**; **92 category cells
+remain**. Next on this surface: **cat7 only**, and it closes the section.
+
+State moved and put back: one window; desk `note`/`settings`/`visualizer`/`musicwidget` at their
+found geometry and `standard` presentation; language restored to `en` and asserted by the probe.
+**Two things left moved, deliberately named rather than hidden:** the Settings window is on its
+Appearance language card (the cat8 language leg REFUSES without it on screen — that refusal is
+correct and the next cat8 run on any surface needs it too), and the widget is in its **empty**
+state, because `player.stop()` has no route from this surface and the reload that produced it
+is how the empty state is reached at all.
