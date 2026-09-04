@@ -729,6 +729,75 @@ const SPECS = {
     playerFramesOnly: true,
     videoSelector: '#media-workspace video',
   },
+  visualizer: {
+    // The visualizer window is UNTITLED by design (cat5 kept the trinket's no-title look and
+    // gave it an `aria-label` instead), so `t(w)` is '' and a substring match on '' would
+    // match every open window. Correction 29's `@selector` form again.
+    title: "@.fwin[data-section='visualizer']",
+    root: '.viz-widget',
+    heavy: {
+      // This surface has NO in-window heavy control: both dock actions NAVIGATE AWAY (Music,
+      // and Settings > Visualizer), which changes the scene and voids every leg measured with
+      // it. Its one real, repeatable, in-place workload is a style change — each style is a
+      // different draw path in `VisualizerCanvas`, and `saveVizSettings` broadcasts to the
+      // live widget, so the canvas actually re-drives while the window sits still.
+      //
+      // Driven through the product's own control (`[data-viz-style]` on Settings >
+      // Visualizer), never by writing `localStorage` directly: the settings module keeps its
+      // listeners in-module, so a direct write persists the value and notifies NOBODY — the
+      // canvas would not re-render and the leg would score an idle surface as a fast one.
+      // Settings must therefore already be open on that page; the runner measures, it does
+      // not navigate, so this REFUSES rather than silently scoring nothing.
+      label: 'cycle every visualizer style over the live canvas and restore the starting one',
+      durationMs: 3000,
+      js: `(() => {
+        delete window.__lqVizLoad;
+        const stage = document.querySelector('.fwin[data-section="visualizer"] .viz-widget');
+        if (!stage) return 'REFUSE: the visualizer stage is not on screen';
+        const buttons = Array.from(document.querySelectorAll('[data-viz-style]'));
+        if (buttons.length < 2) return 'REFUSE: Settings > Visualizer is not open, so the style control this surface is driven by is absent';
+        const startIndex = buttons.findIndex((b) => b.classList.contains('primary'));
+        if (startIndex < 0) return 'REFUSE: no style is marked current, so the starting value cannot be restored';
+        const rec = {
+          styles: buttons.length,
+          start: buttons[startIndex].getAttribute('data-viz-style'),
+          ticks: 0,
+          visits: buttons.map(() => 0),
+          canvases: stage.querySelectorAll('canvas').length,
+          restored: false,
+        };
+        window.__lqVizLoad = rec;
+        const timer = setInterval(() => {
+          const next = rec.ticks % buttons.length;
+          buttons[next].click();
+          rec.visits[next] += 1;
+          rec.ticks += 1;
+          if (rec.ticks >= buttons.length * 8) {
+            clearInterval(timer);
+            buttons[startIndex].click();
+            rec.finished = true;
+          }
+        }, 30);
+        return 'cycling ' + buttons.length + ' styles over ' + rec.canvases + ' canvas layers';
+      })()`,
+      // The restore receipt is read HERE and not inside the loop, which is the opposite of the
+      // note spec's rule and for the opposite reason: `primary` is a React-rendered class, so
+      // reading it in the same task as the click that changes it reports the PREVIOUS render.
+      // That read cost one VOID run — "the starting style spectrum was not restored" while the
+      // canvas was in fact back on spectrum. `proof` runs in its own /eval after the leg, which
+      // is a later task, so this reads what actually shipped.
+      proof: `(() => {
+        const r = window.__lqVizLoad;
+        if (!r) return 'REFUSE: visualizer load never armed';
+        if (!r.finished) return 'REFUSE: the style cycle stopped after ' + r.ticks + ' of ' + (r.styles * 8) + ' changes';
+        if (r.visits.some((v) => v === 0)) return 'REFUSE: a style was never reached — ' + JSON.stringify(r.visits);
+        const now = document.querySelector('[data-viz-style].primary');
+        const live = now ? now.getAttribute('data-viz-style') : null;
+        if (live !== r.start) return 'REFUSE: the starting style ' + r.start + ' was not restored (now ' + live + ')';
+        return 'drew ' + r.ticks + ' style changes across ' + r.styles + ' styles and restored ' + r.start;
+      })()`,
+    },
+  },
   city: {
     // Mooncap Garden is FRAMELESS: no `.fwin-title-text` for a substring to match, so it is
     // named structurally by correction 29's `@selector` form — the same way cat4 and cat8

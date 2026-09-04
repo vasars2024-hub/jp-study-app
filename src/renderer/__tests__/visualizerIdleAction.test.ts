@@ -100,6 +100,19 @@ describe('Visualizer idle recovery action', () => {
     }
   });
 
+  it('names the style control the way the dock names its routes', () => {
+    // The visualizer stage has no in-window heavy control — both dock actions navigate away —
+    // so the one repeatable load that leaves the window in place is a style change, and
+    // category 7 has to address that control without depending on its position in the row or
+    // on its translated label, which differ in each of the four locales.
+    const page = readFileSync(
+      resolve(__dirname, '..', 'components', 'settings', 'pages', 'VisualizerPage.tsx'),
+      'utf8',
+    );
+    expect(page).toContain('data-viz-style={st.id}');
+    expect(page).toContain('onClick={() => patchViz({ style: st.id })}');
+  });
+
   it('keeps the reused label complete in every shared locale', () => {
     const key = 'commands.nav.open.music' as const;
     for (const catalog of [en, ja, zh, ru]) expect(catalog[key]).toBeTruthy();

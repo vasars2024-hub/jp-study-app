@@ -2733,3 +2733,50 @@ Evidence: `cat1-s11-visualizer-r2.json`, `cat1-s11-visualizer-r2-control.json`.
 **Running total: 12 of 25 sections at 80/80.** `visualizer` returns to **6 of 8** — cat1, cat2,
 cat3, cat4, cat5, cat6 hold; cat7 and cat8 remain unrun. **101 category cells remain** (102 − 1).
 Next: cat7, then cat8.
+
+## 2026-09-04 · backup — Visualizer category 7 closes at 10/10 on its own workload, not a borrowed one
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 7 | Performance under real load | **10/10** — session ceiling p50 **8.3** ms / p95 8.5 across 3 runs, noise floor over-100 **0**. Drag p50 8.3 / p95 8.5 / max 16.5, over-100 **0**. Resize p50 8.3 / p95 8.5 / max 16.8, over-100 **0**. Theme swap painted **25.7** ms apply, 48.9 restore. Heavy leg main-process p50 **2.3** / p95 4.0 / **max 9.1 ms** against a 500 ms bar, and idle beside it is p50 2.4 / max 8.9 — the load is invisible on the main loop. Main RSS 75.8 → **84.8 MB**, renderer heap 225 MB, `uptimeSecAtStart` **19,017** so no post-boot settling. `scene_stable true` on every leg; scene 3 `.fwin`, 274 window elements, 399 document elements, viewport 1264×821, dpr 1. |
+
+Sensitivity control (`--jank`): the drag leg re-run under the interaction probe's 120 ms
+renderer blocks moves p95 **8.5 → 116.6** and over-100 **0 → 10**. The recorder sees the frames
+it claims to, so the clean legs' zeros are real zeros.
+
+**The spec, and the one thing it had to decide.** This surface has no in-window heavy control:
+both dock actions NAVIGATE AWAY, which changes the scene and voids every leg measured with it.
+Its one repeatable in-place workload is a style change — each style is a different draw path in
+`VisualizerCanvas`, and `saveVizSettings` broadcasts to the live widget, so the canvas re-drives
+while the window sits still. Driven through the product's own control on Settings › Visualizer
+and never by writing `localStorage`: that module keeps its listeners in-module, so a direct
+write persists the value and notifies nobody, and the leg would score an idle canvas as a fast
+one. Receipt: **"drew 24 style changes across 3 styles and restored spectrum"**.
+
+Two things the run had to be told rather than assumed, both recorded in the spec:
+
+- The window is UNTITLED by design, so it is named by correction 29's `@selector` form. A
+  substring match on `''` matches every open window, which is how an absent surface scores.
+- The style row only renders with **Advanced** on (`jp-settings-advanced-v1`, absent before this
+  run). Turned on for the run and turned back off after; the page's own honest empty state
+  ("Turn on Advanced in the left rail to edit more options here") is what the leg's REFUSE
+  message reports when it is off.
+
+**One VOID before the pass, and it was the instrument.** The first run answered `REFUSE: the
+starting style spectrum was not restored` while the canvas was in fact back on spectrum — the
+receipt read React's `primary` class in the SAME task as the click that changes it, so it saw
+the previous render. That is the opposite of the note spec's rule, for the opposite reason, and
+the correction is in the spec. Both runs are kept: a VOID that was fixed by reading later is
+evidence about the reader, not about the surface.
+
+**PARITY GAP FOUND, not fixed here and not folded into this score.** `VizStyle` declares five
+styles and `VisualizerCanvas.tsx:375-376` draws `xp-classic` and `vista-aero`, and Blanc offers
+all five (`BlancLibraryPanels.tsx:224-225`) — but Study OS's own `VIZ_STYLES`
+(`VisualizerPage.tsx:12`) lists **three**. Two shipped draw paths are unreachable from Study OS.
+That is category 6's question, which already reads 10/10 for this surface, so it is logged here
+for the next turn rather than quietly rescored.
+
+Evidence: `cat7-s11-visualizer.json`.
+
+**Running total: 12 of 25 sections at 80/80.** `visualizer` is **7 of 8**; only cat8 is unrun.
+**100 category cells remain.**

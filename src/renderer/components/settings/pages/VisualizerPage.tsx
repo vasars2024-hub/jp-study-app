@@ -71,6 +71,11 @@ export default function VisualizerPage() {
                     key={st.id}
                     type="button"
                     className={`btn small ${viz.style === st.id ? 'primary' : ''}`}
+                    /* The one control that re-drives the live canvas, so it is named the way
+                       the dock's routes already are (`data-viz-action`). A style row addressed
+                       by position or by its translated label is a different control in each of
+                       the four locales. */
+                    data-viz-style={st.id}
                     onClick={() => patchViz({ style: st.id })}
                   >
                     {t(st.labelKey)}
