@@ -2454,3 +2454,34 @@ because the honest fix must still fail a surface that genuinely BURIES its tools
 that discriminator wrong laundered is worse than a VOID. It is the next turn's opening slice.
 
 **Running total: unchanged at 11 of 25 sections at 80/80.** `note` holds at **4 of 8**.
+
+---
+
+## 2026-09-04 · codexA — `note` closes at controlled 80/80
+
+The interrupted cat5 finding was repaired without adding a disclosure to a one-control surface.
+Q4 now requires one only when more than three controls are scanned or an existing control is
+already hidden; its control plants 23 controls and fails. Q5's two theme cells are deliberately
+identical because the note's user-selected inline paper colour is a fixed material. The new
+`--fixed-material` mode proves every measured run resolves through that opaque authored paint;
+the low-contrast control still fails in both cells.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 5 | UI clarity | **10/10** — 10/10 questions yes; Q4 1 control / 0 buried; Q5 3/3 fixed-material runs in both themes, min 11.11:1. Control fails Q2/Q3/Q4/Q5/Q10 and restores with residue 0. |
+| 6 | Feature parity | **10/10** — 5/5 rows in standard and Liquid, 0 only-in-one, 0 round-trip diffs. Every one of 5 row mutations flips exactly its row and restores. |
+| 7 | Performance | **10/10** — 90 real input events over 1.8 s, text restored exactly; main p95 3.3 ms / max 11.1 ms. Drag and resize p95 8.5 ms, 0 frames over 100 ms; jank control produces 10. |
+| 8 | Honest states | **10/10** — the empty editor's painted placeholder is the honest empty state; 4/4 locale hashes differ and each alternate locale moves 1/4 text runs. Raw keys/placeholders/mute pairs control 0,0,0 → 1,1,1 → 0,0,0. |
+
+Product repair: the note and garden glyph-only close buttons now have explicit translated
+accessible names. Live note reading after HMR: `aria="Delete note"`; focused regression suite
+10/10. Category 1 was re-driven after that change and remains **10/10**: 3 controls reachable,
+0 occluded, min contrast 11.11:1; all six control axes move and restore.
+
+Evidence: `cat1-s11-note-r2.json`, `cat5-s11-note-m.json`,
+`cat5-s11-note-control-r2.json`, `cat6-cat5-s11-note-m.json`, `cat7-s11-note.json`, and
+`cat8-s11-note.json`. Earlier controlled category 2/3/4 receipts remain the other three cells.
+
+**Running total: 12 of 25 sections at 80/80.** `note` is **8 of 8**; **13 sections / 104
+category cells remain**. Next surface is the plan-order `visualizer`, the most different compact
+ambient surface from this minimal opaque editor.

@@ -64,6 +64,12 @@
  *     meaningless, and it published a false Q3 FINDING on Resources before it was caught.
  *     `bodyScrollTop` is reported in every snapshot and a non-zero one REFUSES; `--allow-scroll`
  *     scores anyway for a surface that genuinely restores an offset. Argued at the refusal.
+ *  7. "Advanced tools discoverable" has no advanced-tool subject on a one-control surface.
+ *     A disclosure is required once the surface asks the user to scan more than three controls;
+ *     at three or fewer, the absence of a disclosure is valid only when none of those controls
+ *     is already behind one. Category 6 remains responsible for proving that features were not
+ *     hidden from this painted-control census. The clutter plant takes every surface over three,
+ *     so this zero-subject branch is falsifiable rather than a blanket exemption.
  *
  * Run:
  *   node src/.coordination/liquid-workplace/probes/cat5-ui-clarity.cjs --surface "Library" --label l6-library
@@ -197,6 +203,15 @@ const HOSTED = arg('hosted', '.fwin');
  * VOIDs rather than passes.
  */
 const ALT_CLASS = arg('alt-class', '');
+/**
+ * `--fixed-material` — the surface deliberately paints its own palette independently of the
+ * document theme. This is not a waiver for an axis that failed to apply: both theme attributes
+ * must still differ, and EVERY measured text run in both cells must resolve to an opaque
+ * background authored inline by the surface. Sticky notes are the motivating case — their
+ * selected paper colour is user state, not a theme token. The ordinary contrast plant remains
+ * the negative control and still has to make Q5 fail.
+ */
+const FIXED_MATERIAL = has('fixed-material');
 if (ALT_CLASS && ALT_ATTR) {
   console.error('REFUSE - --alt-class and --alt-attr are two spellings of the same second cell; name one.');
   process.exit(2);
@@ -813,6 +828,16 @@ const SNAP = `(function(){
    */
   var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   var seen = [], worst = null, minRatio = 99, failing = [], unmeasurable = 0;
+  var fixedMaterialRuns = 0, fixedMaterialHosts = [];
+  function fixedMaterialHost(el){
+    for (var n = el; n; n = n.parentElement) {
+      var cs = getComputedStyle(n);
+      var inlineBg = n.style && (n.style.background || n.style.backgroundColor);
+      if (alphaOf(cs.backgroundColor) >= 0.996) return inlineBg ? name(n) : null;
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+    }
+    return null;
+  }
   /**
    * A WITNESS THAT THE AXIS REACHED THE PAINT, independent of minRatio.
    *
@@ -846,6 +871,11 @@ const SNAP = `(function(){
     if (!fg || alphaOf(cs.color) < 0.95) { unmeasurable++; continue; }
     var bgs = bgCandidates(el);
     if (bgs.unmeasurable) { unmeasurable++; continue; }
+    var fixedHost = fixedMaterialHost(el);
+    if (fixedHost) {
+      fixedMaterialRuns++;
+      if (fixedMaterialHosts.indexOf(fixedHost) < 0) fixedMaterialHosts.push(fixedHost);
+    }
     // The worst stop, so a gradient is scored where it is hardest to read rather than on average.
     var r = Math.min.apply(null, bgs.colors.map(function(c){ return ratio(fg, c); }));
     digest(name(el) + '|' + fg.join(',') + '|' + bgs.colors.map(function(c){ return c.join(','); }).join(';'));
@@ -1113,6 +1143,7 @@ const SNAP = `(function(){
           scannedList: scanned.slice(0,20).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0,28); }) },
     q5: { measured: seen.length, unmeasurable: unmeasurable, paintKey: paintKey,
+          fixedMaterialRuns: fixedMaterialRuns, fixedMaterialHosts: fixedMaterialHosts,
           minRatio: minRatio === 99 ? null : Math.round(minRatio*100)/100,
           failingCount: failing.length, worst: worst, failing: failing.slice(0,8) },
     q6: { liquidRegions: liquidRegions.length, byBackdropFilter: blurRegions.length,
@@ -1378,8 +1409,8 @@ const BARS = {
   q1: '1..3 entry points in the host entry band — top for an app, taskbar for a shell',
   q2: 'a non-empty location label AND at least one way back',
   q3: 'the primary action is inside the body viewport at rest — "without hunting" means without scrolling',
-  q4: '>=1 collapsed disclosure AND <=12 controls scanned in the default state',
-  q5: 'no failing text run in EITHER theme, and the two themes must not report an identical minimum',
+  q4: '<=12 controls scanned in the default state AND (>=1 collapsed disclosure OR <=3 controls with none already behind a disclosure)',
+  q5: 'no failing text run in EITHER theme, with a moved paint digest OR a declared fixed material owning every measured run',
   q6: 'every Liquid-treated region carries a state-change transition and none loops forever',
   q7: "category 6's parity: the same features reachable in standard as in Liquid",
   q8: "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
@@ -1392,7 +1423,9 @@ function scoreSnapshot(s) {
     q1: s.q1.entryPoints >= 1 && s.q1.entryPoints <= 3 ? 'YES' : 'NO',
     q2: s.q2.titleText && s.q2.backAffordances >= 1 ? 'YES' : 'NO',
     q3: s.q3.insideBodyViewport ? 'YES' : 'NO',
-    q4: s.q4.collapsedDisclosures >= 1 && s.q4.scannedControls <= 12 ? 'YES' : 'NO',
+    q4: s.q4.scannedControls <= 12
+      && (s.q4.collapsedDisclosures >= 1
+        || (s.q4.scannedControls <= 3 && s.q4.behindDisclosure === 0)) ? 'YES' : 'NO',
     q6: s.q6.liquidRegions === 0
       ? 'NO-SUBJECT'
       : (s.q6.infiniteAnimationsOnLiquid === 0 && s.q6.carryingATransition === s.q6.liquidRegions ? 'YES' : 'NO'),
@@ -1682,13 +1715,22 @@ function scoreSnapshot(s) {
   const q5MovedRatio = A_CELL.q5.minRatio !== B_CELL.q5.minRatio;
   const q5MovedPaint = A_CELL.q5.paintKey !== B_CELL.q5.paintKey;
   const q5Moved = q5MovedRatio || q5MovedPaint;
+  const q5FixedProved = FIXED_MATERIAL
+    && A_CELL.theme !== B_CELL.theme
+    && A_CELL.q5.measured > 0 && B_CELL.q5.measured > 0
+    && A_CELL.q5.fixedMaterialRuns === A_CELL.q5.measured
+    && B_CELL.q5.fixedMaterialRuns === B_CELL.q5.measured;
+  const q5AxisProved = q5Moved || q5FixedProved;
   const q5 = {
     verdict: q5Failing === 0 ? 'YES' : 'NO',
     cells: cells.map((c) => ({ cell: c.cell, theme: c.theme, measured: c.q5.measured, unmeasurable: c.q5.unmeasurable,
-      minRatio: c.q5.minRatio, failingCount: c.q5.failingCount, worst: c.q5.worst })),
+      minRatio: c.q5.minRatio, failingCount: c.q5.failingCount, worst: c.q5.worst,
+      fixedMaterialRuns: c.q5.fixedMaterialRuns, fixedMaterialHosts: c.q5.fixedMaterialHosts })),
     failing: [...A_CELL.q5.failing, ...B_CELL.q5.failing].slice(0, 12),
     themeAxisMoved: q5Moved,
-    axisWitness: { minRatioMoved: q5MovedRatio, paintDigestMoved: q5MovedPaint },
+    fixedMaterialProved: q5FixedProved,
+    axisWitness: { minRatioMoved: q5MovedRatio, paintDigestMoved: q5MovedPaint,
+      fixedMaterialRequested: FIXED_MATERIAL },
   };
 
   const fromC6 = (term, ok) => (c6 ? (ok ? 'YES' : 'NO') : 'MEASURE');
@@ -1759,8 +1801,8 @@ function scoreSnapshot(s) {
   const voided = [];
   const unscored = questions.filter((x) => x.verdict === 'MEASURE' || x.verdict === 'NO-SUBJECT');
   for (const u of unscored) voided.push(`Q${u.id} is ${u.verdict} — ${u.verdict === 'MEASURE' ? `no category-6 baseline at ${path.relative(process.cwd(), c6path)}` : 'the surface has no subject for this question'}`);
-  if (!q5Moved && !CONTROL) {
-    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : ALT_CLASS ? ('.' + ALT_CLASS) : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}); the swap never reached the paint, so contrast stability measured nothing`);
+  if (!q5AxisProved && !CONTROL) {
+    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : ALT_CLASS ? ('.' + ALT_CLASS) : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}) and no declared fixed material owned every measured run; contrast stability measured nothing`);
   }
   if (out.storeIdentical === false) voided.push('persisted theme state was NOT restored byte-identical');
   if (out.restoreWarning) voided.push(out.restoreWarning);

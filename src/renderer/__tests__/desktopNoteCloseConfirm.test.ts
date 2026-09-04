@@ -79,6 +79,13 @@ describe('a note close asks exactly once per note', () => {
     expect(body).toMatch(/if \(!ok\) return;/);
   });
 
+  it('names the glyph-only close control as Delete note for assistive technology', () => {
+    const source = shellSource();
+    expect(source).toMatch(
+      /className="fwin-b lq-hit fwin-close"[\s\S]{0,180}?aria-label=\{isNote \? t\('desktop\.deleteNote'\) : t\('common\.close'\)\}/,
+    );
+  });
+
   it('keeps closeMany serialising its closes, so a Close All cannot stack them either', () => {
     const source = shellSource();
     const many = source.indexOf('const closeMany = async (ids: string[])');

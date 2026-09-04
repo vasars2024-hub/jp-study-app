@@ -474,6 +474,47 @@ const SPECS = {
     },
     collection: { container: '.stats-view', row: '.stats-book-row' },
   },
+  note: {
+    title: 'Sticky note',
+    root: '.desk-note-text',
+    heavy: {
+      // Typing is the note's only content workload. Drive enough React updates to expose the
+      // desktop-wide rerender regression this surface found, but restore the exact starting
+      // value before the leg ends. The receipt comes from this loop rather than from a later
+      // DOM read, so an interval that was throttled or interrupted cannot pass as fast work.
+      label: 'type and restore a sustained note burst',
+      durationMs: 2500,
+      js: `(() => {
+        delete window.__lqNoteLoad;
+        const el = document.querySelector('.fwin.fwin-note .desk-note-text');
+        if (!el) return 'REFUSE: no sticky note editor';
+        const start = el.value;
+        const rec = { ticks: 0, start, restored: false };
+        window.__lqNoteLoad = rec;
+        const set = (value) => {
+          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(el, value);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        const timer = setInterval(() => {
+          rec.ticks += 1;
+          set('lq-note-load-' + rec.ticks + '-'.repeat(rec.ticks % 24));
+          if (rec.ticks >= 90) {
+            clearInterval(timer);
+            set(start);
+            rec.restored = el.value === start;
+          }
+        }, 20);
+        return 'typing note';
+      })()`,
+      proof: `(() => {
+        const r = window.__lqNoteLoad;
+        if (!r) return 'REFUSE: note load never armed';
+        if (r.ticks < 90) return 'REFUSE: note load reached only ' + r.ticks + ' updates';
+        if (!r.restored) return 'REFUSE: note text was not restored';
+        return 'typed ' + r.ticks + ' updates and restored ' + r.start.length + ' starting characters';
+      })()`,
+    },
+  },
   calendar: {
     title: 'Calendar',
     root: '.calendar-view',

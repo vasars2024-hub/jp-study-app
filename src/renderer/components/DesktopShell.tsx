@@ -4061,6 +4061,7 @@ const FloatingWindow = memo(function FloatingWindow({
             <button
               className="fwin-b lq-hit fwin-close"
               style={noteInk}
+              aria-label={isNote ? t('desktop.deleteNote') : t('common.close')}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
             >
@@ -4105,6 +4106,7 @@ const FloatingWindow = memo(function FloatingWindow({
             </button>
             <button
               className="fwin-b lq-hit fwin-close"
+              aria-label={t('common.close')}
               title={t('common.close')}
               onClick={onClose}
             >

@@ -1439,6 +1439,81 @@
     },
 
     /**
+     * STICKY NOTE — the deliberately smallest desktop surface. Its colour has two honest
+     * representations: standard paints the note itself, while Liquid adds the contextual
+     * five-colour edge palette. The row checks the selected colour survives both rather than
+     * pretending the two presentations must have byte-identical chrome.
+     *
+     * Delete is inventoried but never driven: closing a note is the product's delete action.
+     * The generic dirty-field leg safely exercises the editor and restores the exact text.
+     */
+    note: {
+      titleRe: /Sticky note|付箋|便签|Заметк/i,
+      rootSel: '.desk-note-text',
+      probeInput: (w) => q(w, '.desk-note-text'),
+      features: [
+        {
+          id: 'editor',
+          f: (w) => {
+            const editor = q(w, '.desk-note-text');
+            return {
+              ok: !!editor && !editor.disabled && !editor.readOnly
+                && (editor.getAttribute('placeholder') || '').trim().length > 0,
+              ev: `textarea=${!!editor} enabled=${!!editor && !editor.disabled && !editor.readOnly} placeholder=${!!editor && (editor.getAttribute('placeholder') || '').trim().length > 0}`,
+            };
+          },
+        },
+        {
+          id: 'colorState',
+          f: (w) => {
+            const editor = q(w, '.desk-note-text');
+            const color = editor ? editor.style.background : '';
+            const liquid = w.getAttribute('data-presentation') === 'liquid';
+            const palette = qa(w, '.desk-note-color');
+            const pressed = palette.filter((b) => b.getAttribute('aria-pressed') === 'true');
+            const bar = q(w, '.fwin-bar');
+            const represented = liquid
+              ? palette.length === 5 && pressed.length === 1 && pressed[0].style.background === color
+              : palette.length === 0 && !!bar && bar.style.background === color;
+            return {
+              ok: !!color && represented,
+              ev: `presentation=${liquid ? 'liquid' : 'standard'} color=${color || 'absent'} palette=${palette.length} selected=${pressed.length} represented=${represented}`,
+            };
+          },
+        },
+        {
+          id: 'deleteRoute',
+          f: (w) => {
+            const close = q(w, '.fwin-close');
+            // The visible multiplication glyph is not a deletion warning. The authored
+            // accessible name is what makes this destructive route honest; title alone loses
+            // to the glyph in the accessible-name algorithm and would be announced as "times".
+            const label = close && close.getAttribute('aria-label');
+            return { ok: !!close && !close.disabled && !!label,
+              ev: `control=${!!close} enabled=${!!close && !close.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'resizeGeometry',
+          f: (w) => {
+            const handles = qa(w, '.fwin-edge-r,.fwin-edge-b,.fwin-resize');
+            const maximizable = w.getAttribute('data-maximizable');
+            return { ok: handles.length === 3 && maximizable === 'false',
+              ev: `resizeHandles=${handles.length}/3 dataMaximizable=${maximizable}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      mutations: {
+        editor: (w) => stripAttr(q(w, '.desk-note-text'), 'placeholder', 'no note editor'),
+        colorState: (w) => stripAttr(q(w, '.desk-note-text'), 'style', 'no note editor'),
+        deleteRoute: (w) => stripAttr(q(w, '.fwin-close'), 'aria-label', 'no delete control'),
+        resizeGeometry: (w) => removeClassAll([q(w, '.fwin-resize')], 'fwin-resize'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
      * STATISTICS — populated local reading and watching evidence. Sync and reset are inventoried
      * but never driven: both write user data. The scroll leg is the reversible state carried
      * through the presentation round trip; every feature row cross-checks rendered values with
@@ -6512,7 +6587,13 @@
         ev: `chromeButtons=${chrome.length}/3 liquidToggle=absent presentation=${pres} liquidClass=${w.classList.contains('fwin-liquid')}`,
       };
     }
-    const need = reader || workspace ? 1 : popout ? 3 : 4;
+    // A sticky note deliberately has only Delete and the presentation toggle. It is not
+    // minimizable (there is no taskbar identity to restore from), not maximizable (the product
+    // publishes that refusal through data-maximizable=false), and not detachable. Counting it
+    // against a general app window's four controls would turn those three explicit refusals
+    // into a lifecycle defect. The two controls it does own remain fully asserted here.
+    const note = w.classList.contains('fwin-note');
+    const need = reader || workspace ? 1 : popout ? 3 : note ? 2 : 4;
     return {
       ok: chrome.length >= need && (pressed === 'true' || pressed === 'false'),
       ev: `chromeButtons=${chrome.length}/${need} liquidAriaPressed=${pressed}`,
