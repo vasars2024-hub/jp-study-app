@@ -57,38 +57,25 @@ import type { LibraryItem } from './types';
 import type {
   ReadingEntryState,
   ReadingListsDocument,
+  ReadingWorkFormat,
   ReadingWorkRef,
+  SmartListQuery,
 } from './readingLists';
 import { normalizeMediaTitleKey } from './mediaIdentity';
 import { sortReadingListEntries } from './readingListViews';
 
 /**
- * §7's `format`. `book` and `manga` are `LibraryKind` verbatim (`types.ts:3`);
- * `vn` is NOT a library kind — visual novels are not importable as library items
- * — so it is derived from `externalIds.vndb`, which is the only vn identity this
- * model holds. A work with a vndb id is a vn whatever file happens to back it.
+ * The query and its `format` union live on the MODEL (`readingLists.ts`), beside
+ * every other persisted field, because §1 saves one onto a `smart` list and a
+ * persisted field has to go through the same total normalization pass as the
+ * rest. Re-exported here so a caller has one import to reach either half.
+ *
+ * `book` and `manga` are `LibraryKind` verbatim (`types.ts:3`); `vn` is NOT a
+ * library kind — visual novels are not importable as library items — so it is
+ * derived from `externalIds.vndb`, the only vn identity this model holds. A work
+ * with a vndb id is a vn whatever file happens to back it.
  */
-export type ReadingWorkFormat = 'book' | 'manga' | 'vn';
-
-export interface SmartListQuery {
-  format?: readonly ReadingWorkFormat[];
-  state?: readonly ReadingEntryState[];
-  /** L1–L7 cap. Unknown-level works pass unless `requireKnownDifficulty`. */
-  difficultyMax?: number;
-  /** Treat an unmeasured level as failing `difficultyMax` rather than passing. */
-  requireKnownDifficulty?: boolean;
-  /** Entry `startedAt` strictly before this epoch ms. */
-  startedBefore?: number;
-  /** Bound item's `lastReadAt` at or before this epoch ms (see decision 3). */
-  untouchedSince?: number;
-  /** Bound item's progress strictly below this 0..1 fraction (see decision 3). */
-  progressBelow?: number;
-  /** Drop works that appear on any of these list ids. */
-  notOnList?: readonly string[];
-  authorIs?: string;
-  /** Only works with at least one bound library item. */
-  ownedOnly?: boolean;
-}
+export type { ReadingWorkFormat, SmartListQuery };
 
 /**
  * The per-item facts a query needs, projected off `LibraryItem` so the evaluator

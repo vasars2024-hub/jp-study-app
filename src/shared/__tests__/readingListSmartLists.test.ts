@@ -32,11 +32,15 @@ import {
   bindReadingWork,
   createReadingList,
   createReadingListsMutationContext,
+  saveSmartReadingList,
   sealReadingListsDocument,
   setReadingEntryState,
+  updateReadingList,
 } from '../readingListMutations';
 import {
   emptyReadingListsDocument,
+  normalizeReadingListsDocument,
+  normalizeSmartListQuery,
   type ReadingEntryState,
   type ReadingListsDocument,
 } from '../readingLists';
@@ -538,6 +542,167 @@ describe('Author sweep preset', () => {
     expect(titles(evaluateSmartListPreset('author-sweep', document, ctx(items)))).toEqual([
       'More by A',
     ]);
+  });
+});
+
+// ── §7's saved half: a smart list that survives a reload ─────────────────────
+
+describe('the saved query', () => {
+  const QUERY = {
+    state: ['owned'] as const,
+    ownedOnly: true,
+    difficultyMax: 3,
+    format: ['book'] as const,
+  };
+
+  it('saveSmartReadingList makes a smart list that carries its query and no entries', () => {
+    const saved = saveSmartReadingList(
+      emptyReadingListsDocument(),
+      { name: 'Easy shelf', query: QUERY },
+      createReadingListsMutationContext(NOW),
+    );
+    const list = saved.document.lists[0];
+    expect(saved.listId).toBe(list?.id);
+    expect(list?.kind).toBe('smart');
+    expect(list?.query).toEqual(QUERY);
+    // A stored snapshot would be a second answer to "what is on it".
+    expect(list?.entries).toEqual([]);
+    // The event says the shape, never the user's own words.
+    expect(saved.events[0]?.detail).toEqual({ kind: 'smart', terms: 4 });
+  });
+
+  it('refuses a blank name and a query that means nothing', () => {
+    const blank = saveSmartReadingList(
+      emptyReadingListsDocument(),
+      { name: '   ', query: QUERY },
+      createReadingListsMutationContext(NOW),
+    );
+    expect(blank.listId).toBeNull();
+    expect(blank.document.lists).toEqual([]);
+
+    // `{}` matches the whole library, which is not a question anyone asked.
+    const empty = saveSmartReadingList(
+      emptyReadingListsDocument(),
+      { name: 'Everything', query: {} },
+      createReadingListsMutationContext(NOW),
+    );
+    expect(empty.listId).toBeNull();
+    expect(empty.document.lists).toEqual([]);
+  });
+
+  it('round-trips through the normaliser byte for byte', () => {
+    const saved = saveSmartReadingList(
+      emptyReadingListsDocument(),
+      { name: 'Easy shelf', query: QUERY },
+      createReadingListsMutationContext(NOW),
+    );
+    const reloaded = normalizeReadingListsDocument(JSON.parse(JSON.stringify(saved.document)));
+    expect(reloaded.lists[0]?.query).toEqual(QUERY);
+    // And the evaluator reads the SAVED query, not a rebuilt one.
+    const b = builder();
+    const listId = b.list('Shelf');
+    const easy = b.add(listId, 'Easy', { state: 'owned' });
+    const hard = b.add(listId, 'Hard', { state: 'owned' });
+    b.bind(easy.workId, 'it-easy');
+    b.bind(hard.workId, 'it-hard');
+    const items = [
+      facts('it-easy', { level: 2 as LevelTier }),
+      facts('it-hard', { level: 6 as LevelTier }),
+    ];
+    const query = reloaded.lists[0]?.query;
+    expect(query).toBeDefined();
+    expect(titles(evaluateSmartList(b.done(), query!, ctx(items)))).toEqual(['Easy']);
+  });
+
+  it('drops a term it cannot evaluate rather than carrying it through', () => {
+    // A future release adds a format; this one must widen, not return nothing.
+    const repaired = normalizeSmartListQuery({
+      format: ['book', 'audiobook', 'manga', 'book'],
+      state: ['owned', 'borrowed'],
+      difficultyMax: 40,
+      progressBelow: 9,
+      notOnList: ['l-1', '', 'l-1'],
+      authorIs: '  ',
+      ownedOnly: 'yes',
+    });
+    expect(repaired).toEqual({
+      format: ['book', 'manga'],
+      state: ['owned'],
+      difficultyMax: 7,
+      progressBelow: 1,
+      notOnList: ['l-1'],
+    });
+  });
+
+  it('an array that empties out is removed, not left as []', () => {
+    // `state: []` and no `state` mean the same thing to the evaluator, and only
+    // one of them survives a round trip.
+    expect(normalizeSmartListQuery({ state: ['nonsense'], ownedOnly: true })).toEqual({
+      ownedOnly: true,
+    });
+    expect(normalizeSmartListQuery({ state: ['nonsense'] })).toBeUndefined();
+    expect(normalizeSmartListQuery(null)).toBeUndefined();
+    expect(normalizeSmartListQuery('pool')).toBeUndefined();
+  });
+
+  it('a query on a non-smart list is dropped on load, not stored and ignored', () => {
+    const reloaded = normalizeReadingListsDocument({
+      schemaVersion: 1,
+      revision: 1,
+      works: [],
+      lists: [
+        { id: 'l-1', name: 'Pool', kind: 'pool', createdAt: 1, updatedAt: 1, query: QUERY },
+        { id: 'l-2', name: 'Smart', kind: 'smart', createdAt: 1, updatedAt: 1, query: QUERY },
+      ],
+    });
+    expect(reloaded.lists[0]?.query).toBeUndefined();
+    expect(reloaded.lists[1]?.query).toEqual(QUERY);
+  });
+
+  it('updateReadingList saving a query makes the list smart, and clearing it is possible', () => {
+    const created = createReadingList(
+      emptyReadingListsDocument(),
+      { name: 'Shelf' },
+      createReadingListsMutationContext(NOW),
+    );
+    const listId = created.listId;
+    const smart = updateReadingList(
+      created.document,
+      listId,
+      { query: QUERY },
+      createReadingListsMutationContext(NOW + 1),
+    );
+    expect(smart.document.lists[0]?.kind).toBe('smart');
+    expect(smart.document.lists[0]?.query).toEqual(QUERY);
+
+    const cleared = updateReadingList(
+      smart.document,
+      listId,
+      { query: null },
+      createReadingListsMutationContext(NOW + 2),
+    );
+    expect(cleared.document.lists[0]?.query).toBeUndefined();
+  });
+
+  it('a list that stops being smart loses its query in the same mutation', () => {
+    // Otherwise the in-memory document keeps a filter nothing evaluates while
+    // the reloaded one has already stripped it — the same list, two shapes.
+    const saved = saveSmartReadingList(
+      emptyReadingListsDocument(),
+      { name: 'Easy shelf', query: QUERY },
+      createReadingListsMutationContext(NOW),
+    );
+    const listId = saved.listId;
+    expect(listId).not.toBeNull();
+    const demoted = updateReadingList(
+      saved.document,
+      listId!,
+      { kind: 'pool' },
+      createReadingListsMutationContext(NOW + 1),
+    );
+    expect(demoted.document.lists[0]?.kind).toBe('pool');
+    expect(demoted.document.lists[0]?.query).toBeUndefined();
+    expect(normalizeReadingListsDocument(demoted.document).lists[0]?.query).toBeUndefined();
   });
 });
 
