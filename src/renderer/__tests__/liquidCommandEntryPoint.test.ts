@@ -80,15 +80,9 @@ describe('a command list cannot hide per-window, so it must refuse out loud', ()
     );
   });
 
-  it('the refusal names a section that really is refused', () => {
-    // The refusal must not be decorative. `visualizer` is the ONE section left
-    // that the predicate rejects: a 380x200 canvas and a bar, owning no region
-    // §2.3 assigns to the Liquid role, so a flip there would change a class name
-    // and no material. `city` was in this list until 2026-09-02 (L12 b2) and is
-    // not any more — the Mooncap garden discloses a real HUD, and the assertion
-    // below is the same claim from the other side, so this pair cannot rot into
-    // agreeing with itself.
-    expect(canPresentLiquid('visualizer')).toBe(false);
+  it('visualizer becomes presentable only on the host that owns its edge dock', () => {
+    expect(canPresentLiquid('visualizer')).toBe(true);
+    expect(canPresentLiquid('visualizer', 'popout')).toBe(false);
     expect(canPresentLiquid('city')).toBe(true);
     expect(canPresentLiquid('dictionary')).toBe(true);
     expect(canPresentLiquid('music')).toBe(true);

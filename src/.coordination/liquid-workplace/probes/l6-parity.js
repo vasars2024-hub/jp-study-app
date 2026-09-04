@@ -1439,6 +1439,68 @@
     },
 
     /**
+     * VISUALIZER — the canvas is the stable anchor; its two navigation routes occupy the
+     * contextual edge dock. No setting is changed by this spec: the Settings route is the
+     * reversible way to reach every mode, colour and analyser control, while Music is the
+     * honest recovery route for an idle visualizer.
+     */
+    visualizer: {
+      titleRe: /Visualizer|ビジュアライザー|可视化|Визуализатор/i,
+      rootSel: '.viz-widget',
+      features: [
+        {
+          id: 'visualizationCanvas',
+          f: (w) => {
+            const root = q(w, '.viz-widget');
+            const canvas = q(w, '.viz-widget-canvas');
+            const rr = root && root.getBoundingClientRect();
+            const cr = canvas && canvas.getBoundingClientRect();
+            const covered = !!rr && !!cr && cr.width >= rr.width * 0.95 && cr.height >= rr.height * 0.95;
+            return { ok: !!canvas && covered,
+              ev: `canvas=${!!canvas} root=${rr ? `${Math.round(rr.width)}x${Math.round(rr.height)}` : 'absent'} canvasBox=${cr ? `${Math.round(cr.width)}x${Math.round(cr.height)}` : 'absent'} covered=${covered}` };
+          },
+        },
+        {
+          id: 'musicRoute',
+          f: (w) => {
+            const action = q(w, '[data-viz-action="music"]');
+            const label = action && action.getAttribute('aria-label');
+            return { ok: !!action && !action.disabled && !!(label || '').trim(),
+              ev: `control=${!!action} enabled=${!!action && !action.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'settingsRoute',
+          f: (w) => {
+            const action = q(w, '[data-viz-action="settings"]');
+            const label = action && action.getAttribute('aria-label');
+            return { ok: !!action && !action.disabled && !!(label || '').trim(),
+              ev: `control=${!!action} enabled=${!!action && !action.disabled} label="${label || ''}"` };
+          },
+        },
+        {
+          id: 'contextualDock',
+          f: (w) => {
+            const dock = q(w, '.viz-widget-dock');
+            const actions = dock ? qa(dock, 'button') : [];
+            return { ok: !!dock && dock.getAttribute('data-lq-role') === 'contextual'
+                && dock.getAttribute('role') === 'toolbar'
+                && !!(dock.getAttribute('aria-label') || '').trim() && actions.length === 2,
+              ev: `dock=${!!dock} role=${dock && dock.getAttribute('data-lq-role')} toolbar=${dock && dock.getAttribute('role')} named=${!!dock && !!(dock.getAttribute('aria-label') || '').trim()} actions=${actions.length}` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      mutations: {
+        visualizationCanvas: (w) => detach(q(w, '.viz-widget-canvas'), 'no visualizer canvas'),
+        musicRoute: (w) => stripAttr(q(w, '[data-viz-action="music"]'), 'aria-label', 'no Music route'),
+        settingsRoute: (w) => stripAttr(q(w, '[data-viz-action="settings"]'), 'aria-label', 'no Settings route'),
+        contextualDock: (w) => stripAttr(q(w, '.viz-widget-dock'), 'data-lq-role', 'no edge dock'),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
      * STICKY NOTE — the deliberately smallest desktop surface. Its colour has two honest
      * representations: standard paints the note itself, while Liquid adds the contextual
      * five-colour edge palette. The row checks the selected colour survives both rather than
@@ -6721,9 +6783,9 @@
   /**
    * Trap 8's FOURTH host, added 2026-08-31 for L9's City surface (correction 24).
    *
-   * `canPresentLiquid` (`liquidWindowPresentation.ts:72`) refuses sections `city` and
-   * `visualizer` outright — "the frameless garden and visualizer trinkets have no
-   * conventional chrome to swap". So a `.fwin` can be a real, complete window and still
+   * `canPresentLiquid` formerly refused sections `city` and `visualizer` outright. Both now
+   * own real contextual regions, but the general rule remains: a `.fwin` can be a real,
+   * complete window and still
    * have NO Liquid destination, and the harness must not treat that as chromeless (it has
    * chrome: Pop out, Minimize, Close) nor as a broken `fwin` (it renders 3 buttons, not 4,
    * and no toggle, so `lifecycle` would score a correct window false and `toggleLiquid`

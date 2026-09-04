@@ -2485,3 +2485,28 @@ Evidence: `cat1-s11-note-r2.json`, `cat5-s11-note-m.json`,
 **Running total: 12 of 25 sections at 80/80.** `note` is **8 of 8**; **13 sections / 104
 category cells remain**. Next surface is the plan-order `visualizer`, the most different compact
 ambient surface from this minimal opaque editor.
+
+---
+
+## 2026-09-04 · codexA — Visualizer gains a real Liquid destination; category 6 is 10/10
+
+The scorecard's measured gap was current: Visualizer was the only desktop section refused by
+`canPresentLiquid`, because its 380×200 canvas had no contextual region for a flip to change.
+The plan's own contract supplied the smallest coherent destination: the canvas remains fixed;
+Music and full visualizer settings now live in a two-action `ContextualSurface` edge dock that
+fades at idle and returns on hover, window focus, or `:focus-within` keyboard focus. Standard
+paint `rgba(16,15,21,.82)` changes under Liquid to the theme-owned `.72` material and returns.
+
+The Settings route initially failed live: with Advanced mode off, `settings:navigate` reached
+the advanced Visualizer page and the existing guard immediately bounced it Home. Explicit
+cross-surface routes now carry a temporary guided exemption without changing the user's
+Advanced preference. Re-test: `page=visualizer`, card present, advanced preference still false.
+Visualizer is presentable only on the desktop host; pop-out and reader remain refused.
+
+Category 6: **10/10** — 5/5 rows in both presentations, 0 only-in-one, 0 round-trip diffs at
+380×200. Canvas covers 378×165; Music and Settings routes are enabled and named; the dock is a
+named contextual toolbar with exactly two actions; lifecycle is 4/4. All five mutations flip
+exactly their own row and restore. Evidence: `baselines/cat6-s11-visualizer.json`.
+
+**Running total: 12 of 25 sections at 80/80.** `visualizer` has **1 of 8**; **103 category
+cells remain**. Next: drive categories 1–4 on this same live compact surface.
