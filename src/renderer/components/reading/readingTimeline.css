@@ -75,8 +75,12 @@
   margin: var(--lq-space-3, 12px) 0 0;
   padding: 0;
   display: grid;
-  /* Wraps to one column in a narrow window rather than scrolling sideways. */
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* Wraps to one column in a narrow window rather than scrolling sideways. The
+     `min(..., 100%)` is what makes that true: a bare 240px floor is wider than
+     the 212px narrowest content this product allows, so the track would overflow
+     and clip the last days of each month with no scrollbar to reach them.
+     gridTrackFloorsFitTheWindow.test.ts caught exactly that here. */
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: var(--lq-space-2, 8px);
 }
 
