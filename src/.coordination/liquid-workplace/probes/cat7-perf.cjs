@@ -343,6 +343,80 @@ const FRAME_READ = `JSON.stringify(window.__lqFrames || null)`;
 const FRAME_STOP = `(window.__lqFramesGen = (window.__lqFramesGen || 0) + 1, window.__lqFrames = null, 'stopped')`;
 
 const SPECS = {
+  agent: {
+    title: 'Agent',
+    root: '.agent-root',
+    heavy: {
+      /*
+       * THE HEAVIEST REAL WORK HERE IS SWITCHING CONVERSATIONS, and that is a measured claim.
+       * Generating a reply is heavier still and is deliberately NOT used: it is a network call
+       * on the user's own provider key, it costs money, and it cannot be undone -- the same
+       * judgement `immersion` records for navigating the embedded browser.
+       *
+       * Swept live 2026-09-04 on this profile: 39 conversations, `.agent-rail-list`
+       * scrollHeight 2,514 over a 333px port, `.agent-canvas` 1,065 over 513. So
+       * `scrollAll('.agent-root')` would pick the RAIL (2,181px of overflow, the largest box
+       * in the root) and measure a 39-row list of two-line rows. A conversation click unmounts
+       * the whole canvas -- head, thread, composer and the full inspector with its plan queue
+       * -- and mounts another, which is strictly more work per tick than moving that list.
+       *
+       * Rows are re-queried every tick rather than captured once: each click re-renders the
+       * rail, and a captured node that has been replaced is DETACHED, so `.click()` on it is a
+       * silent no-op and the load would report 78 ticks having driven nothing.
+       *
+       * The selected conversation is persisted, so the load restores the one it started on and
+       * the proof REFUSES unless it came back.
+       */
+      label: 'select every conversation in the rail, twice',
+      /*
+       * 78 ticks REQUESTED at 50 ms is 3.9 s, and the window is nearly twice that on purpose:
+       * measured 2026-09-04, a 4,527 ms leg landed only 55 of them. Each click re-renders the
+       * canvas and the rail, so the interval SLIPS to ~82 ms of real cadence -- which is the
+       * load being real, not the timer being throttled. Shortening the cycle to fit 4.5 s
+       * would have measured a smaller surface; the window is widened instead, and the proof
+       * still refuses on a short count so a throttled run can never pass as a complete one.
+       */
+      durationMs: 7000,
+      js: `(() => {
+        delete window.__lqAgentLoad;
+        const list = document.querySelector('.agent-rail-list');
+        if (!list) return 'REFUSE: no agent rail';
+        const first = Array.from(list.querySelectorAll('.agent-rail-entry'));
+        if (first.length < 5) return 'REFUSE: expected a rail of conversations, found ' + first.length;
+        const startIndex = Math.max(0, first.findIndex((e) => e.classList.contains('is-selected')));
+        const startId = first[startIndex].getAttribute('data-agent-conversation');
+        const rec = { rows: first.length, start: startId, ticks: 0, driven: 0, restored: false };
+        window.__lqAgentLoad = rec;
+        const total = first.length * 2;
+        const timer = setInterval(() => {
+          const rows = document.querySelectorAll('.agent-rail-entry');
+          const el = rows[rec.ticks % rec.rows];
+          if (el) { el.click(); rec.driven += 1; }
+          rec.ticks += 1;
+          if (rec.ticks >= total) {
+            clearInterval(timer);
+            const back = document.querySelector('.agent-rail-entry[data-agent-conversation="' + startId + '"]');
+            if (back) back.click();
+            setTimeout(() => {
+              const sel = document.querySelector('.agent-rail-entry.is-selected');
+              rec.restored = !!sel && sel.getAttribute('data-agent-conversation') === rec.start;
+            }, 200);
+          }
+        }, 50);
+        return 'cycling ' + first.length + ' conversations twice from ' + startId;
+      })()`,
+      progress: `(window.__lqAgentLoad ? window.__lqAgentLoad.ticks : -1)`,
+      proof: `(() => {
+        const r = window.__lqAgentLoad;
+        if (!r) return 'REFUSE: the load never armed';
+        if (r.ticks < r.rows * 2) return 'REFUSE: only ' + r.ticks + ' of ' + (r.rows * 2) + ' selections ran';
+        if (r.driven < r.ticks) return 'REFUSE: ' + (r.ticks - r.driven) + ' tick(s) found no row to click';
+        if (!r.restored) return 'REFUSE: the rail did not return to ' + r.start;
+        return r.rows + ' conversations x2 = ' + r.driven + ' selections, restored to ' + r.start;
+      })()`,
+    },
+    collection: { container: '.agent-rail-list', row: '.agent-rail-item' },
+  },
   captures: {
     title: 'Reading',
     root: '.reading-captures',
