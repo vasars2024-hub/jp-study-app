@@ -1000,6 +1000,314 @@ export function finishReadingWorkEverywhere(
   return { document: { ...document, lists }, events, ticked };
 }
 
+/* --------------------------------------------------------- bulk (§11.4) -- */
+
+/*
+ * §11.4: "Shift-click ranges, then mark finished / move / remove in one action.
+ * A 40-entry list is unusable one row at a time."
+ *
+ * Both bulk mutations below are FOLDS over the single-entry mutations above, not
+ * second implementations. What "finished" means — the finish date, the implied
+ * `startedAt`, the un-finish event that carries the old `finishedBy` forward, the
+ * orphan-work collection on removal — lives in `setReadingEntryState` and
+ * `removeReadingListEntry`, and a bulk path that re-derived any of it would be a
+ * second rule free to drift from the first.
+ *
+ * One context is threaded through the whole fold, so every entry in one action
+ * shares one timestamp and the id minter never restarts mid-action.
+ *
+ * Ids naming nothing, and entries already in the target state, are skipped in
+ * silence: the counts returned are what actually moved, so a bulk action that
+ * moved nothing leaves no undo offering to restore nothing.
+ */
+
+export interface BulkReadingStateResult extends ReadingListsMutation {
+  /** Entries that actually changed. Zero means the caller should offer no undo. */
+  changed: number;
+  /**
+   * Whole entries as they were, in fold order.
+   *
+   * Not `{id, state}` pairs: un-finishing clears `finishedAt`/`finishedBy` and
+   * finishing can mint a `startedAt`, so a state-only undo silently rewrites two
+   * dates it never captured.
+   */
+  previous: ReadingListEntry[];
+}
+
+export function setReadingEntryStates(
+  document: ReadingListsDocument,
+  listId: string,
+  entryIds: readonly string[],
+  state: ReadingEntryState,
+  context: ReadingListsMutationContext,
+  finishedBy: ReadingFinishSource = 'manual',
+): BulkReadingStateResult {
+  let current = document;
+  const events: PendingReadingListEvent[] = [];
+  const previous: ReadingListEntry[] = [];
+
+  for (const entryId of entryIds) {
+    const before = current.lists
+      .find((list) => list.id === listId)
+      ?.entries.find((entry) => entry.id === entryId);
+    if (!before) continue;
+    const step = setReadingEntryState(current, listId, entryId, state, context, finishedBy);
+    // `unchanged()` hands back the same object, so identity is the honest test
+    // for "this entry was already there" — cheaper and stricter than comparing
+    // states again, which would duplicate the rule being reused.
+    if (step.document === current) continue;
+    current = step.document;
+    events.push(...step.events);
+    previous.push(before);
+  }
+
+  if (!previous.length) return { ...unchanged(document), changed: 0, previous: [] };
+  return { document: current, events, changed: previous.length, previous };
+}
+
+/**
+ * The inverse of the above: each captured entry is put back verbatim, so the
+ * dates travel with it. Entries the user has since removed are skipped rather
+ * than resurrected — undo restores what it changed, it does not re-add.
+ */
+export function restoreReadingEntryStates(
+  document: ReadingListsDocument,
+  listId: string,
+  previous: readonly ReadingListEntry[],
+  context: ReadingListsMutationContext,
+): ReadingListsMutation {
+  const list = document.lists.find((entry) => entry.id === listId);
+  if (!list) return unchanged(document);
+  const live = new Map(list.entries.map((entry) => [entry.id, entry]));
+  const restorable = previous.filter((entry) => live.has(entry.id));
+  if (!restorable.length) return unchanged(document);
+
+  const byId = new Map(restorable.map((entry) => [entry.id, entry]));
+  return {
+    document: replaceList(document, listId, (item) => ({
+      ...item,
+      updatedAt: context.now,
+      entries: item.entries.map((entry) => byId.get(entry.id) ?? entry),
+    })),
+    events: restorable.map((entry) => ({
+      at: context.now,
+      kind: 'entry-updated' as const,
+      listId,
+      entryId: entry.id,
+      workId: entry.workId,
+      detail: { restored: true, to: entry.state },
+    })),
+  };
+}
+
+export interface BulkReadingRemoveResult extends ReadingListsMutation {
+  /** In removal order. `restoreReadingListEntries` walks it backwards; see there. */
+  removed: RemovedReadingEntry[];
+}
+
+export function removeReadingListEntries(
+  document: ReadingListsDocument,
+  listId: string,
+  entryIds: readonly string[],
+  context: ReadingListsMutationContext,
+): BulkReadingRemoveResult {
+  let current = document;
+  const events: PendingReadingListEvent[] = [];
+  const removed: RemovedReadingEntry[] = [];
+
+  for (const entryId of entryIds) {
+    const step = removeReadingListEntry(current, listId, entryId, context);
+    if (!step.removed) continue;
+    current = step.document;
+    events.push(...step.events);
+    removed.push(step.removed);
+  }
+
+  if (!removed.length) return { ...unchanged(document), removed: [] };
+  return { document: current, events, removed };
+}
+
+/**
+ * Undo for a bulk removal, and the order is load-bearing.
+ *
+ * Every captured index is an index into the array **as it stood at that step**.
+ * Removing the first two rows of a list captures indices 0 and 0, because the
+ * second row slid into the first's place. Replaying those inserts forwards puts
+ * the pair back swapped; replaying them BACKWARDS unwinds each step against the
+ * array that step actually saw. `restoreReadingListEntry` already refuses an id
+ * that is present, so a partially-undone bulk cannot duplicate an entry.
+ */
+export function restoreReadingListEntries(
+  document: ReadingListsDocument,
+  removed: readonly RemovedReadingEntry[],
+  context: ReadingListsMutationContext,
+): ReadingListsMutation {
+  let current = document;
+  const events: PendingReadingListEvent[] = [];
+  for (let index = removed.length - 1; index >= 0; index -= 1) {
+    const step = restoreReadingListEntry(current, removed[index], context);
+    if (step.document === current) continue;
+    current = step.document;
+    events.push(...step.events);
+  }
+  if (current === document) return unchanged(document);
+  return { document: current, events };
+}
+
+/** An entry as it stood on the source list, so an undone move lands where it was. */
+export interface MovedReadingEntry {
+  entry: ReadingListEntry;
+  index: number;
+}
+
+export interface BulkReadingMoveResult extends ReadingListsMutation {
+  moved: MovedReadingEntry[];
+  /** Entries whose work is ALREADY on the target list. Named, not silently dropped. */
+  skipped: string[];
+}
+
+/**
+ * §11.4's "move" — the third bulk verb, and the only one that is not a fold.
+ *
+ * The entry travels whole: same id, same `workId`, same state and dates. Re-adding
+ * it through `addReadingListEntry` would mint a new work and a new id and reset
+ * the reading state, which is a copy wearing a move's label.
+ *
+ * A work already on the target is SKIPPED and named. Moving it anyway would put
+ * two entries for one book on one list, and §5's triage counts per work — so the
+ * list would then disagree with its own progress bar.
+ *
+ * `order` is re-based onto the target's tail, because `order` is a per-list
+ * position; carrying the source's number over would interleave the arrivals into
+ * the middle of a list nobody reordered.
+ */
+export function moveReadingListEntries(
+  document: ReadingListsDocument,
+  fromListId: string,
+  toListId: string,
+  entryIds: readonly string[],
+  context: ReadingListsMutationContext,
+): BulkReadingMoveResult {
+  const source = document.lists.find((list) => list.id === fromListId);
+  const target = document.lists.find((list) => list.id === toListId);
+  if (!source || !target || fromListId === toListId) {
+    return { ...unchanged(document), moved: [], skipped: [] };
+  }
+
+  const present = new Set(target.entries.map((entry) => entry.workId));
+  const moved: MovedReadingEntry[] = [];
+  const skipped: string[] = [];
+  const taken = new Set<string>();
+
+  for (const entryId of entryIds) {
+    const index = source.entries.findIndex((entry) => entry.id === entryId);
+    if (index < 0 || taken.has(entryId)) continue;
+    const entry = source.entries[index];
+    if (present.has(entry.workId)) {
+      skipped.push(entryId);
+      continue;
+    }
+    present.add(entry.workId);
+    taken.add(entryId);
+    moved.push({ entry, index });
+  }
+
+  if (!moved.length) return { ...unchanged(document), moved: [], skipped };
+
+  const arrivals = moved.map(({ entry }, offset) => ({
+    ...entry,
+    order: target.entries.length + offset,
+  }));
+  const withoutSource = replaceList(document, fromListId, (list) => ({
+    ...list,
+    updatedAt: context.now,
+    entries: list.entries.filter((entry) => !taken.has(entry.id)),
+  }));
+  return {
+    document: replaceList(withoutSource, toListId, (list) => ({
+      ...list,
+      updatedAt: context.now,
+      entries: [...list.entries, ...arrivals],
+    })),
+    moved,
+    skipped,
+    events: moved.flatMap(({ entry }) => [
+      {
+        at: context.now,
+        kind: 'entry-removed' as const,
+        listId: fromListId,
+        entryId: entry.id,
+        workId: entry.workId,
+        detail: { movedTo: toListId },
+      },
+      {
+        at: context.now,
+        kind: 'entry-added' as const,
+        listId: toListId,
+        entryId: entry.id,
+        workId: entry.workId,
+        detail: { movedFrom: fromListId },
+      },
+    ]),
+  };
+}
+
+/**
+ * Undo for a move — and its replay direction is the OPPOSITE of
+ * `restoreReadingListEntries`, which is the trap in this pair.
+ *
+ * `removeReadingListEntries` folds, so each captured index describes the array as
+ * it stood at that step and must be unwound backwards. `moveReadingListEntries`
+ * takes all its indices from ONE snapshot of the source, so they are
+ * simultaneous, and simultaneous indices are re-inserted in ASCENDING order:
+ * each insert makes room for the next one exactly where the next one expects it.
+ * Replaying these backwards puts the pair back interleaved — caught by the
+ * "original indices, in order" test, which is why it asserts the whole array.
+ */
+export function undoReadingListMove(
+  document: ReadingListsDocument,
+  fromListId: string,
+  toListId: string,
+  moved: readonly MovedReadingEntry[],
+  context: ReadingListsMutationContext,
+): ReadingListsMutation {
+  const source = document.lists.find((list) => list.id === fromListId);
+  if (!source || !moved.length) return unchanged(document);
+
+  const live = new Set(
+    document.lists.find((list) => list.id === toListId)?.entries.map((entry) => entry.id) ?? [],
+  );
+  const returning = moved.filter(({ entry }) => live.has(entry.id));
+  if (!returning.length) return unchanged(document);
+
+  const ids = new Set(returning.map(({ entry }) => entry.id));
+  const entries = [...source.entries];
+  for (const { entry, index: at } of [...returning].sort((a, b) => a.index - b.index)) {
+    entries.splice(Math.max(0, Math.min(at, entries.length)), 0, entry);
+  }
+
+  const withoutTarget = replaceList(document, toListId, (list) => ({
+    ...list,
+    updatedAt: context.now,
+    entries: list.entries.filter((entry) => !ids.has(entry.id)),
+  }));
+  return {
+    document: replaceList(withoutTarget, fromListId, (list) => ({
+      ...list,
+      updatedAt: context.now,
+      entries,
+    })),
+    events: returning.map(({ entry }) => ({
+      at: context.now,
+      kind: 'entry-added' as const,
+      listId: fromListId,
+      entryId: entry.id,
+      workId: entry.workId,
+      detail: { restored: true, movedBackFrom: toListId },
+    })),
+  };
+}
+
 /**
  * Drag-to-reorder (§11.4). Ids not named keep their relative order behind the
  * named ones rather than being dropped — a reorder that loses an entry because
