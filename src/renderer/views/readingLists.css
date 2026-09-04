@@ -136,6 +136,13 @@
    * the product allows is 212px, so a bare floor makes the single column wider
    * than its own pane and the cards clip with no scrollbar to reach them.
    * `gridTrackFloorsFitTheWindow.test.ts` is the guard, and it caught this one.
+   *
+   * Fixed twice, independently and identically, within twenty minutes on
+   * 2026-09-04 -- `eed939f2` on the branch and `dda0a4fd` in the files-app
+   * worktree, both reaching `min(220px, 100%)` from the same failing guard. The
+   * merge conflict was the two COMMENTS, never the declaration. Kept as the note
+   * it is: two workers on one turn budget will collide on whatever the gate
+   * points them both at.
    */
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: var(--lq-space-3, 12px);

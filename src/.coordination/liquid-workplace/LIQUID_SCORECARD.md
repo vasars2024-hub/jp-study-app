@@ -2985,3 +2985,97 @@ Appearance language card (the cat8 language leg REFUSES without it on screen —
 correct and the next cat8 run on any surface needs it too), and the widget is in its **empty**
 state, because `player.stop()` has no route from this surface and the reload that produced it
 is how the empty state is reached at all.
+
+## 2026-09-04 · primary2 — `musicwidget` category 7 closes at 10/10, and the surface closes at 80/80
+
+**PASS 10/10, `findings: []`, `voided: []`.** Instrument: the shared runner, `cat7-perf.cjs
+--surface musicwidget --jank`, with a ~10-line data spec (`9115c43f`) as its 30th surface. No
+new probe file (RULE 1). Baseline `baselines/cat7-musicwidget-perf.json`.
+
+**The scene, because a category-7 timing without one is not comparable to anything.** 4 `.fwin`
+(`note` / `settings` / `visualizer` / `musicwidget`, all `standard`), 316 window elements, 455
+document elements, viewport 1264x821 @ dpr 1, renderer heap 239 MB. The surface itself is a
+floating `.fwin`, matched 1, 60 elements. `scene_stable: true` on every leg. Main pid 13316,
+`uptimeSec 337` at the first leg — past the 120 s refusal, so no post-boot settling is in these
+numbers.
+
+**THIS SESSION'S CEILING, not L0's.** Three ceiling runs, p50 **8.3 ms** / p95 8.5 (217, 218,
+217 frames) — this display is running at ~120 Hz. L0's 10.0 ms is recorded as provenance only;
+scoring 8.3 against it would have reported a 17% *improvement* that is a refresh rate, not work.
+
+| leg | frame p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| ceiling | 8.3 | 8.5 | 16.8 | 0 | 4.7 |
+| drag | 8.3 | 8.5 | 9.0 | 0 | 13.5 |
+| resize | 8.3 | 8.5 | 9.0 | 0 | 3.6 |
+| theme | 8.3 | 8.5 | 25.0 | 0 | 5.0 |
+
+Theme swap cost `applyPaintedMs 25.8` / `restorePaintedMs 39.9` on this 4-window desk. Drag and
+resize both sit exactly ON the ceiling — the widget's 430x190 window costs nothing to move.
+
+**The heavy leg is the widget's own work, and it says what it is NOT.** 8 songs forward and 8
+back through the transport, 16 title changes, ending on the song it started on (`e2e-audio-ja.m4a`
+— the proof asserts the restore rather than assuming it). Main-process availability DURING that
+walk: p50 **2.0 ms**, p95 4.2, max **10.0 ms** over a 5,028 ms span, 164 samples — against the
+500 ms bar, and against an idle arm whose own max was **11.3 ms**. The honest reading is that
+16 song switches are indistinguishable from idle on the main thread: the cost lives in the audio
+element and the renderer. Written into the spec so it is not misquoted later: `coverFor` /
+`paletteFor` memoize per song id (`albumArt.ts:28,40`), so this leg is NOT the artwork pipeline.
+
+**The sensitivity control fired.** `--jank` re-ran the drag leg with ten 120 ms renderer blocks:
+p95 **8.5 → 108.4 ms**, max 116.7, `frames_over_100` **0 → 10**, all ten blocks accounted for.
+The recorder is seeing the frames it claims to, so the four flat legs above are flat, not blind.
+
+**A live harness limit, stated rather than hidden:** this profile's audio library is **2 songs**,
+so the 16-press walk wraps the queue eight times instead of touching 16 distinct files. Every
+press still paid a real `playItem` — 16 title changes prove it — but a larger library would put
+more distinct decodes behind the same gesture. It does not move this score: the main-process
+number is 20x under its bar and the frame legs are at the ceiling.
+
+**`musicwidget` is 8 of 8 — the surface closes at 80/80. Running total: 14 of 25 sections.**
+**91 category cells remain** — the previous entry's 92 minus this one. (An earlier draft of this
+line said 84; that was a fresh 25x8 recount, which does not reconcile with the running figure
+this ledger has carried since `visualizer` opened. The running figure is the one every RULE D
+line has been computed from, so it is the one continued here, and the discrepancy is left
+visible rather than quietly re-based.)
+
+## 2026-09-04 · primary2 — `files` cat1 RE-RUN: a duplicate I should have caught first, and the one number it adds
+
+**RETRACTION, in the first line, because it is the point of this entry.** I ran
+`cat1-accessibility.cjs` on `files` and wrote it up as "the first rubric cell ever taken on the
+Files app". **It is not.** The 2026-09-03 entry above (`0fc0e616`, baseline banked at
+`ff866dfd`) had already run it, landed two product repairs off it — the bulk checkbox's UA
+margin and the collapsed rail's 52 → 72 px track — and recorded the same verdict. My run
+reproduced it exactly: **FAIL on `targets32` alone**, 103 controls, 78 measured, the same four
+rows at 26.5 / 31.5 / 31.5 / 31.0. Reproducing a result a day later is worth something, but it
+is not a new cell, and the `--out` path I passed **overwrote the tracked baseline that entry
+cites**. Restored from HEAD; the banked file is `ff866dfd`'s, not mine. The cheap check I
+skipped: `git log -- baselines/cat1-<surface>.json` before pointing `--out` at it.
+
+**The one thing that is new, and it is a number rather than an adjective.** The earlier entry
+called the four remaining rows "single instances at the scroller's clip edge". That is now
+measured rather than described: of the **32** `.fa-tree-node` in `.lq-scaffold-rail` (a 399 px
+viewport over **1,657 px** of content), **11 are fully visible, exactly 1 is partially clipped
+at 27 px, and 20 are scrolled out**. That single partial node is the 26.5 px the walk scores.
+So the `.fa-tree-node` row is the fold of a scroller — one per scrolling list, in every
+scrolling list in this app — and instrument fact (a) above already accounts for the other three.
+
+**Which makes the repair the HARNESS's, and it is not a tail-of-turn change.** A control clipped
+only by a SCROLLABLE ancestor should be scrolled into view and RE-MEASURED, and excluded only if
+it then clears the floor — proven, never asserted. This exception LOOSENS a bar, which is the
+direction that can hide a genuinely unreachable control, so it needs its own control before it
+lands. Until then `files` cat1 stays FAIL, which is the honest state and matches the entry above.
+
+**Three findings raised during this run and WITHDRAWN before publication.** (1) "the Files rail
+overflows the window — 18 of 32 nodes below the frame, no scrollbar" — false; I had compared
+node rects to the WINDOW's bottom instead of the SCROLLER's, and the ancestor walk found the
+scaffold constraining the rail to 401 px via its own `40px 401px 56px` grid. (2) "the 72 px
+collapsed-rail override is not applying, the track is still 52 px" — false; the shell computes
+`--lq-rail-width-collapsed: 72px` and `grid-template-columns: 72px 374px 320px`, and the 52 px
+I read was `.fa-tree`'s own box inside the 72 px track. (3) "the Music widget's empty-state
+Open Music button is dead" — false; two `.click()`s did nothing, but with the `os:open` bus
+instrumented it fired once with `detail: "music"` and opened the window. All three are the same
+mistake in three costumes: reading a child's box, or an unfocused window, as the thing itself.
+
+**Running total unchanged: 14 of 25 sections at 80/80.** `files` is **7 of 8 categories UNRUN**
+with cat1 measured and FAILING. **90 category cells remain.**
