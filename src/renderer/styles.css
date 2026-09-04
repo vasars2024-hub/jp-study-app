@@ -7428,6 +7428,7 @@ mark.lookup-mark,
 .gram-card-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .gram-card-head h2 {
@@ -7511,6 +7512,11 @@ mark.lookup-mark,
 /* ---- Grammar/Guides mode toggle ---- */
 .gram-mode-toggle {
   display: inline-flex;
+  /* Four tabs on one unwrappable line measured 336px of content inside a 248px body
+     at the window's own minimum (260x170, `DesktopShell` MIN_W/MIN_H), and
+     `.fwin-body` is `overflow-x: hidden`, so the fourth tab was not scrolled to —
+     it was gone. Wrapping costs nothing at any width that already fits. */
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   background: var(--panel-2);
@@ -7556,6 +7562,15 @@ mark.lookup-mark,
 
 /* ---- Grammar Explorer (one component, skinned by class) ------------------ */
 
+/* The reflow context for the narrow-width rules at the end of this block. It is on
+   `.gram-view` and not on `.gram-x` because the mode switcher that also has to reflow
+   lives in `.view-head`, a SIBLING of the explorer — and because an element cannot
+   answer a `@container` condition against itself, so the query's own subjects
+   (`.gram-x-body` and its columns) must sit strictly below the named container. */
+.gram-view {
+  container-type: inline-size;
+  container-name: gramview;
+}
 .gram-x {
   display: flex;
   flex-direction: column;
@@ -8101,6 +8116,48 @@ mark.lookup-mark,
 }
 .gram-x-drawer-remove:hover {
   color: var(--text);
+}
+
+/* ---- Grammar Explorer, narrow reflow -------------------------------------
+   Measured 2026-09-04 by the category-4 harness at the Grammar window's own
+   minimum, 260x170: `div.fwin-body` scrollWidth 336 against clientWidth 248 with
+   `overflow-x: hidden`, so 88px of the explorer was UNREACHABLE, not scrollable —
+   65 clipped elements, and `div.gram-x-detail` squeezed to clientWidth 0 while
+   still reporting 170px of content. The cause is three fixed columns in one row:
+   `.gram-x-filters` 268px + `.gram-x-list` 320px + a detail that only gets what is
+   left. Below the width where the pair is still usable they stack instead, which is
+   the plan's "fluid responsive reflow" and keeps every pane reachable.
+
+   These selectors are single-class, i.e. the same specificity as the base rules
+   above — a container query adds none of its own — so this block MUST stay after
+   them in source order or it matches, runs and moves nothing. 560px is the width
+   below which the list's fixed 320 leaves the detail under ~220 and unusable; the
+   820x580 default and the maximized leg are both far above it and unchanged. */
+@container gramview (max-width: 560px) {
+  .gram-x-body {
+    flex-direction: column;
+  }
+  .gram-x-filters {
+    width: auto;
+    max-height: 38%;
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .gram-x-list {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  /* `overflow: auto` alone does not make a column flex item scroll — its automatic
+     minimum size is its content, so it pushes the list out of the box instead. */
+  .gram-x-detail {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .gram-x-drawer {
+    width: auto;
+  }
 }
 
 /* ---- Grammar review queue ------------------------------------------------ */
