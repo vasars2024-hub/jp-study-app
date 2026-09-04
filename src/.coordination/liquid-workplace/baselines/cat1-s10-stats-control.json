@@ -215,6 +215,40 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true,
+      "decorativeExemptionIsNarrow": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        5,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        2,
+        7,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        5,
+        0,
+        0
+      ]
+    }
+  },
   "ariaRestored": {
     "skipped": "nothing was opened"
   }

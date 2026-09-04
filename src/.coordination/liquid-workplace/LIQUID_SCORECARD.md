@@ -2105,3 +2105,72 @@ cells predate the fix is the point; silently re-labelling them would not be.
 **Running total: 10 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
 `youtube`, `calendar`, `resources`, `flashcards`, `library`, `music`. **15 left**, of which 14
 are scorable in both presentations (`visualizer` and `musicwidget` offer no presentation toggle).
+
+## 2026-09-03 · primary — Statistics — 80/80 — commit `2427124e` (finished from backup's interrupted turn)
+
+`stats` is the **eleventh** of the 25 `DESKTOP_WIN_SECTIONS` at 80/80 and opens the RULE C pair
+`stats` (densest of the 15 left) + `note` (most different). Driven on the `.fwin` "Statistics"
+(`@.fwin:has(.stats-view)`), standard presentation, 820×580, viewport 1264×821, with a profile
+carrying real study data — a wiped one caps this surface's own bars. Zero new probes (RULE 1).
+
+**RECOVERY NOTE, because the provenance matters.** `backup` opened this surface at `2372c8c0`
+(cats 1 and 8), drove cats 2/3/4/6/7 at 19:45–19:47, landed the repair `2427124e` at 19:52 and
+lost its session two minutes later, before any receipt was written. This turn re-derived the
+banked JSON rather than trusting the commit messages, **re-drove cats 1, 2 and 5 after the
+repair**, and closes the surface. The pre-fix numbers in `2372c8c0`'s message (25 text runs,
+6 controls) were measured mid-load; the post-fix sweep sees **86 runs / 11 controls** on the
+same window, so the figures below are strictly the denser measurement.
+
+**sampled-out for this bullet:** `agent` `novels` `grammar` `translate` `player` `anki`
+`immersion` `reading` `scraper` `files` `note` `city` `visualizer` `musicwidget`.
+
+| # | Category | Score | Number measured | Negative control (failed as required) |
+| - | -------- | ----- | --------------- | ------------------------------------- |
+| 1 | Accessibility | **10/10**, re-derived AFTER the repair | **86** text runs, 0 unmeasurable, **0 failing**, min **5.35** (`span.stats-card-lbl "known"`, 12 px); 11 targets by rect, smallest `button.fwin-b` **24 px**, 5 under the 32 px floor by rect and **0** WCAG 2.5.8 failures; 12 controls hit-tested / 11 measured, **0 below the floor by hit box**, smallest painted hit **32×32.5**, `stolenCount` **0** and `occludedCount` **1** — the by-design popover overlap the repair made dismissable; keyboard **11/11** reachable, 0 focus hosts; motion **32** declarations over threshold at rest → **0** under emulated `prefers-reduced-motion` → 32 after, emulation taken and released | 6 axes planted, all 6 moved (`0,5,0,0,0 → 2,7,2,1,2 → 0,5,0,0`), `rectDrift 0`, back to baseline |
+| 2 | Clunkiness | **10/10**, re-driven AFTER the repair | 3 counted steps over the repaired disclosure path (open → close → jump to recent), **0** dead ends, **0** modal traps, **0** scroll traps, worst click→recv **0.9 ms**, **0** over the 100 ms bar; cost parity Liquid **3** = Standard **3**, 820×580 both, restored to standard; resting and after-task idle both churn **net false** over 1,600 ms | `--control`: dead end / modal trap / scroll trap **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true`, inert click 0.1 ms |
+| 3 | Liquid utilization | **10/10** | driven into Liquid and restored: `denseWorkOnTranslucent` **0** over **74** regions; Liquid-eligible **1/1** treated and **1/1** backed by a shared primitive; roles Work **2**, Anchor **69**, Anchor-holds-work **2**, Ambient **0**; the window's own paint `alpha 0.72`, `backdrop blur(8px) saturate(1.25)` | both plants fired on `section.stats-section.stats-knowledge` — one region to glass (`0,1,1,1,2 → 1,1,1,1,2`), then every Work region (`allWorkFailed`); `oneMaterialReturned` and `allGlassReturned` true |
+| 4 | Use of space | **10/10** | all three sizes ran and restored: default dead **8.9 %**, compact **0.5 %**, maximized **13.5 %** against a 15 bar; clipped **0**, overlaps **0**, horizontal scrollers **0** at every size; chrome **11.4 / 76.8 / 8.6 %** and dominant canvas **93.7 / 78.8 / 95.3 %**; content grows not chrome, `default → maximized` | injected clip **0→1→0** with removal proven; the art-plate exclusion named its own plant (hangs out **269 px**, `clipped` did NOT rise); the backdrop plant took overlaps **0 → 24** and was **not excused** |
+| 5 | UI clarity | **10/10**, driven AFTER the repair | all ten questions YES. Q1 **1** entry point / 1 accent button (`Last 14 days`); Q2 title `Statistics` with 1 way back; Q4 **2** controls scanned against a bar of 12 (`Last 14 days`, `Sync from Anki`), 1 collapsed disclosure, **0** hidden behind it; Q5 **86** runs, **0 failing in EITHER theme**, min **5.35** (default) / **5.71** (classic-light), theme axis moved on both minRatio and paint digest; Q10 above the identity bar at 5 markers, both card hosts uniform-one-kind and so exempt (`dashboardHosts 0`); Q6/Q7/Q8/Q9 from this surface's own category-6 baseline | `--control`: **Q2, Q3, Q4, Q5 and Q10 all went NO**, the heterogeneous 6-card plant taking `cardControlSignatures` **1 → 6** and `dashboardHosts` **0 → 1**, scanned controls **2 → 24** against the bar of 12 |
+| 6 | Feature parity + reversibility | **10/10** | ledger **9/9 reachable in standard, 9/9 in Liquid**, `na` 0, rows agree, nothing only-in-one; round trip `standard → liquid → standard` with **0** diffs, shell held, other-presentation box 820×580; no editable text field exists on this surface, recorded as `dirtyNote` rather than silently skipped; drive receipt `recentActivity 0 → 814 moved`, `scroll top 320 of range 836` | every mutation armed and felled **exactly its own row** (`knowledgeSummary` → 9/9 → 8/9 → restored 9/9), no unexpected row moved |
+| 7 | Performance under real load | **10/10** | ceiling p50/p95 **8.3 / 8.4** ms, max 9.0, 0 over 16, main-loop p50 2.4 max 15.4 — session ceiling re-run 3× with 0 frames over 100 and `comparable to L0`; drag p95 **8.4** (max 91.7, 6 over 16, 4 over 33, **0 over 100**); resize p95 **8.5** (max 91.6, 3 over 16, 2 over 33); theme p95 **8.5** (max 83.4, 5 over 16, 3 over 33); heavy leg "scroll the whole statistics view" **80 samples / 2,530 ms**, main-loop p50 **3.9** p95 **10.9** max **27.7**, receipt `scrolled inside:fwin-body to 1137 px over 91 ticks (overflow 1137), restored to 0`; idle 80 samples p50 **4.5** p95 **11.9**; `findings []`, `voided []` | `--jank`: drag p95 **8.4 → 116.7 ms**, max **125.1**, frames over 100 **0 → 10**, **10** blocks injected |
+| 8 | Honest states | **10/10**, both driven bars MEASURED | raw keys **0** against a 10,234-key catalog, placeholders **0**, mute pairs **0**, **0** disabled controls; states **1 of 1 observable** — the zero-data state names it in full (`No reading tracked yet. Open a book from your Library…`), 0 unpainted, and `loading`/`error`/`offline` are `notObservable` and excluded rather than passed; four languages give **4 distinct hashes**, **14 of 25** runs move in each of ja/zh/ru (**56.0 %**), max raw keys in any language **0**, and `ui-lang` started and ended **absent** (`restored: true`) | rawKeys/placeholders/mutePairs **0,0,0 → 1,1,1 → 0,0,0**, `backToBaseline: true` |
+
+Evidence: `baselines/cat{1..8}-s10-stats*.json`.
+
+**ONE PRODUCT REPAIR, found by cat1's `hit.occluded` and landed by backup as `2427124e`.**
+
+With the Reset disclosure open, its panel sits at (753,143) 132×45 and the Word Knowledge
+"Sync from Anki" button at (752,157) 133×32 one row below. `document.elementFromPoint` at the
+CENTRE OF THE SYNC BUTTON returned `BUTTON.btn.danger` — the Reset action, not the button the
+user can still see. The overlap itself is what `position:absolute; z-index:var(--z-popover)` is
+for; what was missing is the other half of the popover contract. A native `<details>` closes
+only when its own summary is pressed again, so the obvious way out — click elsewhere —
+activated whatever the panel had covered. `useDismissableDisclosure`, already solving this
+inside `MediaLibraryBrowser`, moved to `components/ui` and Statistics became its second caller.
+After the repair, `stolenCount` is **0** and the single remaining `occluded` row is the
+by-design overlap, now dismissable by an outside press and by Escape.
+
+**HONEST SCOPE NOTE.** Categories 3, 4, 6 and 7 were driven on the build immediately BEFORE the
+repair. The repair adds two document listeners and one `open` transition to a disclosure — no
+geometry, no material, no route, no ledger row — so those four cells are carried rather than
+re-driven, and the three categories the repair could move (1 accessibility, 2 clunkiness whose
+task IS the disclosure path, 5 clarity whose Q4 counts that disclosure) were ALL re-driven after
+it. Saying which cells predate the fix is the point.
+
+**TWO INSTRUMENT TRAPS, both paid for this turn.**
+
+1. **`cat1-accessibility.cjs` prints its report but writes NOTHING without `--out`.** Unlike
+   `cat5`, which resolves `baselines/cat<N>-<label>.json` itself and says `wrote <path>`, cat1
+   is silent and leaves no file. A run that "looks banked" from its console output is not, and
+   the next worker sees a missing baseline where a 10/10 was measured.
+2. **A `.stats-recent-jump` click leaves `.fwin-body` scrolled 814 px, and the NEXT run refuses
+   on it.** cat2's own task ends with that jump, so with `--both-presentations` the second leg
+   starts scrolled and REFUSES `occluded: ... centre resolves to null` — which reads exactly
+   like a dead control. The fix is inside the task: a leading `scroll:.fwin-body=0` step, which
+   the harness bills as a restore primitive and does NOT count as input (correction 18), plus
+   the same spec as `--undo`. `eval:` is **not** a step kind.
+
+**Running total: 11 of 25 sections at 80/80** — `dictionary`, `video`, `games`, `settings`,
+`youtube`, `calendar`, `resources`, `flashcards`, `library`, `music`, `stats`. **14 left**, of
+which 13 are scorable in both presentations (`visualizer` and `musicwidget` offer no
+presentation toggle).

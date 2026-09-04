@@ -1,0 +1,288 @@
+{
+  "label": "s10-stats",
+  "surface": "@.fwin:has(.stats-view)",
+  "win": "(focused)",
+  "task": "scroll:.fwin-body=0 >> click:.fwin:has(.stats-view) .stats-data-tools > summary >> wait:400 >> click:.fwin:has(.stats-view) .stats-data-tools > summary >> wait:300 >> click:.fwin:has(.stats-view) .stats-recent-jump >> wait:700",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 86,
+    "controlCount": 11,
+    "box": "820x580",
+    "results": 4
+  },
+  "inputCost": {
+    "clicks": 3,
+    "keystrokes": 0,
+    "total": 3
+  },
+  "latencyMs": {
+    "clickRecv": [
+      0.8,
+      0.7,
+      0.9
+    ],
+    "inputRecv": [],
+    "worstRecv": 0.9,
+    "overBar100": 0,
+    "n": 3,
+    "clickStampUnscored": [
+      50.4,
+      55.2,
+      59.2
+    ],
+    "inputStampUnscored": [],
+    "worstStampUnscored": 59.2
+  },
+  "steps": [
+    {
+      "step": "scroll:.fwin-body=0",
+      "target": {
+        "sel": ".fwin-body",
+        "was": 814,
+        "now": 0,
+        "range": 1137
+      },
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": true,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "click:.fwin:has(.stats-view) .stats-data-tools > summary",
+      "target": {
+        "sel": ".fwin:has(.stats-view) .stats-data-tools > summary",
+        "label": "Reset",
+        "disabled": false,
+        "at": "853,122"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "click:.fwin:has(.stats-view) .stats-data-tools > summary",
+      "target": {
+        "sel": ".fwin:has(.stats-view) .stats-data-tools > summary",
+        "label": "Reset",
+        "disabled": false,
+        "at": "853,122"
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:300",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "click:.fwin:has(.stats-view) .stats-recent-jump",
+      "target": {
+        "sel": ".fwin:has(.stats-view) .stats-recent-jump",
+        "label": "Last 14 days",
+        "disabled": false,
+        "at": "758,122"
+      },
+      "counted": true,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": true,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:700",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "scroll:.fwin-body=0",
+    "steps": [
+      "scroll:.fwin-body=0"
+    ],
+    "restored": true,
+    "baseHash": "fsmn7h",
+    "afterHash": "fsmn7h",
+    "liveRegionsBefore": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "liveRegionsAfter": [
+      "div.stats-level-estimate|Beginner",
+      "div.stats-level-estimate|Estimated level",
+      "div.stats-level-estimate|From Familiar-or-better coverage of your JLPT / HSK word lists."
+    ],
+    "textHashRoundTrip": {
+      "base": "cmvm9e",
+      "after": "cmvm9e"
+    }
+  },
+  "stepsDriven": 3,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 0,
+  "scrollTraps": [],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "820x580",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 0.9
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "820x580",
+      "total": 3,
+      "deadEnds": 0,
+      "worstRecv": 0.7
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "820x580"
+    },
+    "liquidTotal": 3,
+    "standardTotal": 3
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": true,
+    "latency": true,
+    "costParity": true
+  },
+  "spatialFixity": null,
+  "spatialFixitySamples": null,
+  "spatialFixityControl": null,
+  "spatialFixityVerdict": null,
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ]
+}

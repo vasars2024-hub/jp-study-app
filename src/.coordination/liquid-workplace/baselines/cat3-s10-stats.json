@@ -1,0 +1,91 @@
+{
+  "label": "s10-stats",
+  "surface": "@.fwin:has(.stats-view)",
+  "win": "main",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "820x580",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 74,
+  "controlsSkipped": 6,
+  "byRole": {
+    "Work": 2,
+    "Liquid-eligible": 1,
+    "Anchor": 69,
+    "Anchor(holds work)": 2,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 1,
+  "sharedPrimitiveEligible": 1,
+  "eligibleTotal": 1,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "section.stats-section.stats-knowledge",
+      "path": [
+        0,
+        1
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        1,
+        1,
+        1,
+        2
+      ],
+      "oneRegionGlass": [
+        1,
+        1,
+        1,
+        1,
+        2
+      ],
+      "allGlass": [
+        2,
+        1,
+        1,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        1,
+        1,
+        1,
+        2
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}
