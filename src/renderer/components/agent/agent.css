@@ -36,6 +36,17 @@
   --agent-text: var(--text);
   --agent-muted: var(--muted);
   --agent-accent: var(--accent);
+  /* The accent AS TEXT is a different colour from the accent, and this surface
+     had been painting the raw one on three text nodes. Measured live on the
+     branch chip at 11px: `#ff2e4d` on this shell's own `--agent-surface-2`
+     `#272433` is **4.19:1** against a 4.5 bar, and rubric category 1 failed on
+     exactly that node. `--accent-text` is the token this repo already derived
+     against the OPAQUE surface vars, which is the ground here (a wash ground
+     wants `--accent-text-on-wash` instead - see `styles.css`); the same chip
+     reads 5.60:1 through it. Non-text uses of the accent - the pinned icon,
+     every `border-color` - stay on `--agent-accent`: their bar is 3:1 and
+     4.19 already clears it, so tinting them would be damage, not repair. */
+  --agent-accent-text: var(--accent-text, var(--accent-2));
   --agent-accent-deep: color-mix(in srgb, var(--accent) 62%, #101018);
   --agent-accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --agent-gap: var(--space-md, 12px);
@@ -101,7 +112,14 @@
   flex: 1 1 auto;
   min-height: 0;
   margin: 0;
-  padding: 0;
+  /* The end padding is the hit floor, not decoration. This list scrolls, so a
+     classic scrollbar takes 10px off its right edge, and a row that ends flush
+     against it leaves the pin button's `lq-hit-scope` expander nowhere to grow:
+     the pointer walk read 30.49 of 32 on all nine, and `elementFromPoint`
+     returned `.agent-rail-list` - the SCROLLBAR - for every column past 456.
+     Two pixels of gutter is what lets the 32px expander land without any
+     control changing size. */
+  padding: 0 2px 0 0;
   overflow-y: auto;
   list-style: none;
 }
@@ -595,6 +613,16 @@
   gap: var(--space-sm, 8px);
   padding-bottom: var(--space-sm, 8px);
   border-bottom: 1px solid var(--agent-line);
+  /* `.agent-conversation` is a column flex box, so this header is a flex ITEM
+     and its default `flex-shrink: 1` applies. As soon as the transcript is
+     taller than the canvas - the ordinary case - the header is compressed while
+     its own children keep their heights and OVERFLOW it. Measured live on a
+     two-message conversation: the header's box was 9px tall holding a 38px
+     control row, and the Delete button and view toggle painted 17px down over
+     the first message, taking that message's branch chip to 28.43 of the 32px
+     pointer floor with `div.agent-view-toggle` named as its blocker. The header
+     never had a reason to shrink; it has a reason not to. */
+  flex: 0 0 auto;
 }
 
 .agent-conversation-identity {
@@ -625,8 +653,15 @@
   background: color-mix(in srgb, var(--agent-surface) 78%, transparent);
 }
 
+/* Own-box floor, not the shared expander, for the same neighbour reason as
+   `.agent-message-branch`: this segmented control is the LAST row of the
+   conversation header, and a 32px expander on a 26px segment reaches 3px past
+   the header into the first message's own chip row - measured, it took that
+   chip's pointer region to 29.27 of 32 and named this button as the blocker.
+   Growing the segments in flow pushes the header down instead of overlaying
+   what is beneath it, and it is the one change here a reader will see. */
 .agent-view-toggle-button {
-  min-height: 26px;
+  min-height: var(--lq-hit-target);
   padding: 3px 10px;
   border: 0;
   border-radius: var(--radius-pill, 999px);
@@ -778,11 +813,19 @@
  * It keeps the chip's shape so the row still reads as one band, and gains the
  * height, the cursor and the interactive colour that say it is pressable.
  */
+/* The one control on this surface that cannot take the shared `lq-hit-scope`
+   expander. Its row sits 0.2px below the conversation header's own control row,
+   so a 32px expander centred on a 24px chip reaches 4px up and steals from the
+   view toggle and the Delete action - measured, `stolen` went 0 -> 3 with
+   `worstShrunkBy: 7` and the walk named this chip as their blocker. That is the
+   neighbour case `liquid-controls.css` documents, and its stated fallback is the
+   only thing that works here: the floor goes on the control's own box, which
+   grows the flow instead of overlaying it. */
 .agent-message-branch {
-  min-height: 24px;
+  min-height: var(--lq-hit-target);
   margin-left: auto;
   background: transparent;
-  color: var(--agent-accent, var(--accent-2));
+  color: var(--agent-accent-text, var(--accent-2));
   cursor: pointer;
 }
 .agent-message-branch:hover {
@@ -930,7 +973,7 @@
 .agent-message-error {
   margin: 0;
   font-size: var(--font-size-sm, 0.8125rem);
-  color: var(--agent-accent);
+  color: var(--agent-accent-text, var(--accent-2));
 }
 
 .agent-message-attachments,
@@ -1189,7 +1232,7 @@
 }
 
 .agent-card-action-error {
-  color: var(--agent-accent);
+  color: var(--agent-accent-text, var(--accent-2));
   font-size: var(--font-size-xs, 0.75rem);
 }
 

@@ -350,7 +350,7 @@ function ContextShelf({
             data-agent-context={item.id}
             tabIndex={-1}
           >
-            <div className="agent-context-item-head">
+            <div className="agent-context-item-head lq-hit-scope">
               <span className="agent-chip agent-chip-kind">
                 {t(`agent.context.kind.${item.kind}`)}
               </span>
@@ -770,7 +770,7 @@ function MessageRow({
         </ul>
       ) : null}
       {message.cards.length > 0 ? (
-        <ul className="agent-cards">
+        <ul className="agent-cards lq-hit-scope">
           {message.cards.map((card) => {
             const sources = card.sourceContextIds.flatMap((contextId) => {
               const source = conversation.context.find((item) => item.id === contextId);
@@ -2114,7 +2114,7 @@ export default function AgentWorkspaceShell() {
             results.length === 0 ? (
               <p className="agent-placeholder" role="status">{t('agent.search.none')}</p>
             ) : (
-              <ul className="agent-rail-list agent-search-results">
+              <ul className="agent-rail-list agent-search-results lq-hit-scope">
                 {results.map((result) => (
                   <li key={result.conversationId} className="agent-rail-item">
                     <button
@@ -2147,7 +2147,7 @@ export default function AgentWorkspaceShell() {
               </ul>
             )
           ) : (
-          <ul className="agent-rail-list" ref={railRef} onKeyDown={railKeyDown}>
+          <ul className="agent-rail-list lq-hit-scope" ref={railRef} onKeyDown={railKeyDown}>
             {summaries.map((summary) => (
               <li key={summary.id} className="agent-rail-item">
                 <button
@@ -2278,7 +2278,7 @@ export default function AgentWorkspaceShell() {
                     the next request's prompt, so it has to be changeable where
                     the user can see what it currently is.
                   */}
-                  <label className="agent-mode-picker">
+                  <label className="agent-mode-picker lq-check">
                     <span className="agent-visually-hidden">{t('agent.mode.label')}</span>
                     <select
                       className="agent-mode-select"

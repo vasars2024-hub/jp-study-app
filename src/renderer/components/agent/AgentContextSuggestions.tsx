@@ -75,7 +75,7 @@ export function AgentContextSuggestions({
     <section className="agent-context-suggestions" aria-labelledby="agent-context-suggestions-title">
       <div className="agent-context-suggestions-heading">
         <span id="agent-context-suggestions-title">{t('agent.suggestions.title')}</span>
-        <label className="agent-context-suggestion-language">
+        <label className="agent-context-suggestion-language lq-check">
           <span>{t('agent.suggestions.explanationLanguage')}</span>
           <select
             value={explanationLanguage}
@@ -89,7 +89,7 @@ export function AgentContextSuggestions({
           </select>
         </label>
       </div>
-      <div className="agent-context-suggestion-list">
+      <div className="agent-context-suggestion-list lq-hit-scope">
         {batchSuggestion ? (
           <button
             key={batchSuggestion.id}
