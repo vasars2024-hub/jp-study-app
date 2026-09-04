@@ -367,6 +367,26 @@ const SPECS = {
     },
     collection: { container: '.library', row: '.card' },
   },
+  grammar: {
+    title: 'Grammar',
+    root: '.gram-x-list',
+    heavy: {
+      // The explorer's real load is its catalogue: `VirtualList` over the deduped corpus,
+      // 2,410 rows and a 139,780px scrollHeight inside a 322px viewport, so every tick
+      // remounts a whole window of rows. `scrollAll` finds the scroller itself and it is NOT
+      // `.gram-x-list` -- that box is `overflow: hidden` by design (the note at `.gram-x-list`
+      // in styles.css says why), and the scroller is the VirtualList root one level inside it.
+      // Typing into the search box is the other candidate and is deliberately NOT used: it is
+      // already category 2's `/type` leg, and a search that narrows the list to 4 rows makes
+      // the collection SMALLER, i.e. it measures the surface at its lightest.
+      label: 'scroll the whole 2,410-row grammar catalogue',
+      durationMs: 3000,
+      js: scrollAll('.gram-x-list'),
+      progress: scrollProgress,
+      proof: scrollProof,
+    },
+    collection: { container: '.gram-x-list', row: '.gram-x-row' },
+  },
   immersion: {
     title: 'Immersion',
     root: '.immersion-root',

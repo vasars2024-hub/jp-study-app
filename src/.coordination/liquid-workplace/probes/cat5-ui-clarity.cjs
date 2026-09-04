@@ -831,9 +831,29 @@ const SNAP = `(function(){
       .filter(function(c){ return c && c !== 'active' && c !== 'is-active' && c !== 'selected' && c !== 'current'; })
       .sort().join('.');
   }
+  /*
+   * CORRECTION 35 (2026-09-04, primary) -- A TABLIST IS A ROUTE MAP TOO.
+   *
+   * Correction 34's own words are "a navigation landmark's destinations are neither advanced
+   * nor tools: they are the surface's map, and a reader takes a map in as one object". A
+   * declared tablist is that same object by a different name -- one visible panel out of N,
+   * chosen by a switcher -- and APG treats the whole tablist as ONE tab stop for exactly this
+   * reason. Measured on grammar: its four mode tabs spent 4 of the 12 budget while being the
+   * one control on the surface a reader never has to read twice.
+   *
+   * NO BACKTICKS ANYWHERE IN THIS BLOCK. It sits inside the in-page template literal, so one
+   * backtick ends the string and the whole harness fails to parse -- which it did, once, and
+   * the stale --out JSON from the previous run read exactly like a fresh unchanged result.
+   *
+   * ALL THREE of correction 34's guards apply unchanged and are what keep this narrow, so this
+   * is one more accepted ROLE and not a new rule: the role must be declared (a div a surface
+   * merely styles as tabs does not collapse), there must be at least 3 of them, and they must
+   * share EXACTLY ONE control signature. A toolbar with mixed controls collapses nothing.
+   * Every collapsed group is still published in navRouteGroups with its landmark and size.
+   */
   var navRouteGroups = [];
   var navCollapsed = [];
-  rq('nav,[role="navigation"]').filter(painted).forEach(function(lm){
+  rq('nav,[role="navigation"],[role="tablist"]').filter(painted).forEach(function(lm){
     var inside = scannedRaw.filter(function(e){ return e !== lm && lm.contains(e) && navCollapsed.indexOf(e) < 0; });
     if (inside.length < 3) return;
     var sigs = [];

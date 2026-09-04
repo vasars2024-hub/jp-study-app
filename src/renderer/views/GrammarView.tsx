@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { GRAMMAR } from '../data/grammar';
 import { useT } from '../i18n';
 import {
@@ -21,8 +21,29 @@ import {
   type PracticeFilters,
 } from '../data/grammar/practiceFilters';
 import { ContextualSurface } from '../components/liquid/LiquidSurface';
+import { clearHandoff, takeHandoffJson } from '../pendingHandoff';
 
 type Mode = 'grammar' | 'practice' | 'guides' | 'review';
+
+/**
+ * The four modes, in their rendered order, with the i18n key of each label.
+ *
+ * They were four hand-written `<button>`s with no relationship to the panel they swapped in:
+ * no `role`, no `aria-selected`, no `aria-controls`, and four separate tab stops that a
+ * keyboard user had to walk through one at a time to reach the content. They are the textbook
+ * tab pattern — one visible panel out of four, chosen by a horizontal switcher — so they are
+ * now a real APG tablist: `aria-selected` states the choice, `aria-controls` names the panel it
+ * reveals, and a roving `tabIndex` plus arrow/Home/End keys makes the whole switcher ONE tab
+ * stop, which is the actual behaviour improvement here.
+ */
+const MODES: ReadonlyArray<{ mode: Mode; labelKey: string }> = [
+  { mode: 'grammar', labelKey: 'grammar.mode.points' },
+  { mode: 'practice', labelKey: 'grammar.mode.practice' },
+  { mode: 'guides', labelKey: 'grammar.mode.guides' },
+  { mode: 'review', labelKey: 'grammar.mode.review' },
+];
+const MODE_PANEL_ID = 'gram-mode-panel';
+const modeTabId = (mode: Mode) => `gram-mode-tab-${mode}`;
 
 export default function GrammarView() {
   const aero = useAeroMaterials();
@@ -33,10 +54,33 @@ export default function GrammarView() {
   const { t } = useT();
 
   useEffect(() => {
-    const onPractice = (ev: Event) => {
-      const detail = (ev as CustomEvent).detail;
+    const openPractice = (detail: unknown) => {
       setPracticeSeed(parsePracticeDeepLink(detail));
       setMode('practice');
+    };
+
+    /*
+     * Drain first, then listen.
+     *
+     * This view lives in a `lazy()` chunk behind `Suspense`, so a "practice
+     * this" link fired before it mounted found no listener — a `CustomEvent`
+     * is not queued, and the link was delivered to nobody with no retry and no
+     * error path. Measured cold: dispatched at T+93 ms, mounted at T+691 ms,
+     * app left on Grammar points and nothing said. Audit F22.
+     *
+     * The dispatchers now write a one-shot handoff before opening the section.
+     * `takeHandoff` reads and clears in one step, so this cannot double-apply
+     * with the listener below, and a second mount cannot replay a link the
+     * user already followed.
+     */
+    const pending = takeHandoffJson<unknown>('grammarPractice');
+    if (pending !== null) openPractice(pending);
+
+    const onPractice = (ev: Event) => {
+      // Clear any handoff the same call wrote: a mounted view is served by the
+      // event, and leaving the handoff behind would re-apply it on remount.
+      clearHandoff('grammarPractice');
+      openPractice((ev as CustomEvent).detail);
     };
     window.addEventListener('grammar:open-practice', onPractice);
     return () => window.removeEventListener('grammar:open-practice', onPractice);
@@ -49,6 +93,31 @@ export default function GrammarView() {
    * deep link. Both explorers are now one component skinned by CSS, so the mode
    * switch below is the only thing that decides what renders.
    */
+
+  /**
+   * APG tablist keys. `Home`/`End` are part of the pattern, not extras — with a roving
+   * tabIndex the arrows are the ONLY way to reach the other three tabs from the keyboard,
+   * so getting this wrong makes three modes unreachable rather than merely awkward.
+   * Selection follows focus, which is the right choice here: each panel is already
+   * mounted-on-demand and switching is the whole purpose of the control.
+   */
+  const onModeKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const i = MODES.findIndex((m) => m.mode === mode);
+    if (i < 0) return;
+    let next = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % MODES.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + MODES.length) % MODES.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = MODES.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    setMode(MODES[next].mode);
+    // The old tab has just lost its tab stop, so focus has to be moved deliberately or it
+    // falls to <body> and the next arrow key does nothing at all.
+    requestAnimationFrame(() => {
+      document.getElementById(modeTabId(MODES[next].mode))?.focus();
+    });
+  };
 
   const modeLabel =
     mode === 'grammar'
@@ -85,52 +154,60 @@ export default function GrammarView() {
         The other three modes keep the natural block flow they were built for. */}
     <div className={`gram-view${mode === 'grammar' ? ' gram-view--explorer' : ''}`}>
       {/* L5 — contextual, not dense work: one intro line and the mode switch. The
-          four mode panels below stay conventional Work; a grammar point’s prose and
+          four mode panels below stay conventional Work; a grammar point's prose and
           its practice form are exactly what §2 keeps off translucent material.
           `ContextualSurface` is inert until this window is put in Liquid
           presentation, so conventional pixels are unchanged. */}
       <ContextualSurface className="view-head">
         <p className="muted">{t('grammar.intro')}</p>
-        <div className="gram-mode-toggle">
-          <button
-            className={`gram-mode-btn ${mode === 'grammar' ? 'active' : ''}`}
-            onClick={() => setMode('grammar')}
-          >
-            {t('grammar.mode.points')}
-          </button>
-          <button
-            className={`gram-mode-btn ${mode === 'practice' ? 'active' : ''}`}
-            onClick={() => setMode('practice')}
-          >
-            {t('grammar.mode.practice')}
-          </button>
-          <button
-            className={`gram-mode-btn ${mode === 'guides' ? 'active' : ''}`}
-            onClick={() => setMode('guides')}
-          >
-            {t('grammar.mode.guides')}
-          </button>
-          <button
-            className={`gram-mode-btn ${mode === 'review' ? 'active' : ''}`}
-            onClick={() => setMode('review')}
-          >
-            {t('grammar.mode.review')}
-          </button>
+        <div
+          className="gram-mode-toggle"
+          role="tablist"
+          aria-label={t('grammar.mode.legend')}
+          onKeyDown={onModeKeyDown}
+        >
+          {MODES.map(({ mode: m, labelKey }) => (
+            <button
+              key={m}
+              type="button"
+              id={modeTabId(m)}
+              role="tab"
+              aria-selected={mode === m}
+              aria-controls={MODE_PANEL_ID}
+              // Roving tab stop: only the selected tab is reachable with Tab, and the
+              // arrow keys move between them. Four separate stops is what this cost before.
+              tabIndex={mode === m ? 0 : -1}
+              className={`gram-mode-btn ${mode === m ? 'active' : ''}`}
+              onClick={() => setMode(m)}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
         </div>
       </ContextualSurface>
 
-      {mode === 'grammar' ? (
-        <GrammarExplorer
-          className={aero ? 'gram-x--aero' : ''}
-          renderDetail={(point) => <GrammarDetail key={point.id} point={point} />}
-        />
-      ) : mode === 'practice' ? (
-        <GrammarPracticePanel initialFilters={practiceSeed} />
-      ) : mode === 'review' ? (
-        <GrammarCurationPanel />
-      ) : (
-        <GuidesBrowser />
-      )}
+      {/* One panel for all four modes, because only one is ever rendered: a `tabpanel` per
+          mode would declare three panels that do not exist. `aria-labelledby` follows the
+          selected tab, so the panel announces which mode it is showing. */}
+      <div
+        id={MODE_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={modeTabId(mode)}
+        className="gram-mode-panel"
+      >
+        {mode === 'grammar' ? (
+          <GrammarExplorer
+            className={aero ? 'gram-x--aero' : ''}
+            renderDetail={(point) => <GrammarDetail key={point.id} point={point} />}
+          />
+        ) : mode === 'practice' ? (
+          <GrammarPracticePanel initialFilters={practiceSeed} />
+        ) : mode === 'review' ? (
+          <GrammarCurationPanel />
+        ) : (
+          <GuidesBrowser />
+        )}
+      </div>
     </div>
     </AppChrome>
   );

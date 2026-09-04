@@ -125,6 +125,22 @@
   --warning-text: var(--warning);
   --danger-text: var(--danger);
 
+  /* The five JLPT level hues WHEN THEY ARE TEXT, same split and same reason again.
+     `.gram-badge.lv-N5` painted a hardcoded #6fd9a0 on a 16% wash of its own hue: on a dark
+     panel that composites to a readable mint, on `classic-light` it composites to
+     **1.35:1** against a 4.5 bar — measured 2026-09-04 on the live Grammar window, the worst
+     text run in either theme by a wide margin. The dark values here are the old literals
+     verbatim, so no dark palette moves a single pixel; the light remap below derives them
+     with the --accent-text recipe. The WASH keeps its own hue and is untouched — a 16% tint
+     is legible on either ground, it is only the foreground that cannot be one fixed value. */
+  --lv-n5-text: #6fd9a0;
+  --lv-n4-text: #aeb6ff;
+  --lv-n3-text: #c9a3f3;
+  --lv-n2-text: #f0c074;
+  --lv-n1-text: #f3a3b0;
+  --gram-fam-1-text: #ffce6b;
+  --gram-fam-2-text: #f0c074;
+
   /* Study-activity channels (Phase 6 slice 8). Reading keeps the chart colour it has
      always had; watching gets a cool blue that is far enough round the wheel from the
      brand red to be unmistakable, and is deliberately NOT --warning or --success —
@@ -1144,6 +1160,16 @@ html[data-chrome='frosted'] .os-taskbar {
   --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
   --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
   --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
+  /* The JLPT level hues, same 30% recipe. Mixed against the WASH's own base hue rather than
+     against the pale dark-theme literal, so each level keeps its identity while the light
+     palettes get a foreground that contrasts with their own ground. */
+  --lv-n5-text: color-mix(in srgb, #2f8a5b 30%, var(--text));
+  --lv-n4-text: color-mix(in srgb, #4553d6 30%, var(--text));
+  --lv-n3-text: color-mix(in srgb, #7b3fc4 30%, var(--text));
+  --lv-n2-text: color-mix(in srgb, #b06c0a 30%, var(--text));
+  --lv-n1-text: color-mix(in srgb, #c0304a 30%, var(--text));
+  --gram-fam-1-text: color-mix(in srgb, #a86b00 30%, var(--text));
+  --gram-fam-2-text: color-mix(in srgb, #a86b00 30%, var(--text));
 }
 
 /* ---------- Study OS boot animation ---------- */
@@ -7355,23 +7381,23 @@ mark.lookup-mark,
 }
 .gram-badge.lv-N5 {
   background: rgba(90, 208, 138, 0.16);
-  color: #6fd9a0;
+  color: var(--lv-n5-text);
 }
 .gram-badge.lv-N4 {
   background: rgba(108, 123, 255, 0.18);
-  color: #aeb6ff;
+  color: var(--lv-n4-text);
 }
 .gram-badge.lv-N3 {
   background: rgba(180, 120, 255, 0.16);
-  color: #c9a3f3;
+  color: var(--lv-n3-text);
 }
 .gram-badge.lv-N2 {
   background: rgba(240, 170, 80, 0.16);
-  color: #f0c074;
+  color: var(--lv-n2-text);
 }
 .gram-badge.lv-N1 {
   background: rgba(224, 85, 106, 0.18);
-  color: #f3a3b0;
+  color: var(--lv-n1-text);
 }
 /* Familiarity pill: gram-badge geometry, the wk-grade knowledge palette. Loud
    while unlearned and quiet once Known, matching the vocabulary band control. */
@@ -7386,11 +7412,11 @@ mark.lookup-mark,
 }
 .gram-fam.fam-1 {
   background: rgba(255, 179, 0, 0.35);
-  color: #ffce6b;
+  color: var(--gram-fam-1-text);
 }
 .gram-fam.fam-2 {
   background: rgba(255, 179, 0, 0.18);
-  color: #f0c074;
+  color: var(--gram-fam-2-text);
 }
 .gram-fam.fam-3 {
   background: var(--panel-2);
@@ -7428,6 +7454,7 @@ mark.lookup-mark,
 .gram-card-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .gram-card-head h2 {
@@ -7440,7 +7467,10 @@ mark.lookup-mark,
 .gram-ask-agent {
   margin-left: auto;
   background: transparent;
-  color: var(--accent-2);
+  /* `--accent-2` is the accent mixed 28% toward WHITE, so as TEXT on a light panel it
+     measured 2.47:1 here. `--accent-text` is the token this repo already built for that
+     difference and is `var(--accent-2)` on every dark palette, so nothing dark moves. */
+  color: var(--accent-text);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 10px;
@@ -7511,6 +7541,11 @@ mark.lookup-mark,
 /* ---- Grammar/Guides mode toggle ---- */
 .gram-mode-toggle {
   display: inline-flex;
+  /* Four tabs on one unwrappable line measured 336px of content inside a 248px body
+     at the window's own minimum (260x170, `DesktopShell` MIN_W/MIN_H), and
+     `.fwin-body` is `overflow-x: hidden`, so the fourth tab was not scrolled to —
+     it was gone. Wrapping costs nothing at any width that already fits. */
+  flex-wrap: wrap;
   gap: 4px;
   padding: 4px;
   background: var(--panel-2);
@@ -7556,6 +7591,15 @@ mark.lookup-mark,
 
 /* ---- Grammar Explorer (one component, skinned by class) ------------------ */
 
+/* The reflow context for the narrow-width rules at the end of this block. It is on
+   `.gram-view` and not on `.gram-x` because the mode switcher that also has to reflow
+   lives in `.view-head`, a SIBLING of the explorer — and because an element cannot
+   answer a `@container` condition against itself, so the query's own subjects
+   (`.gram-x-body` and its columns) must sit strictly below the named container. */
+.gram-view {
+  container-type: inline-size;
+  container-name: gramview;
+}
 .gram-x {
   display: flex;
   flex-direction: column;
@@ -7572,6 +7616,26 @@ mark.lookup-mark,
 .gram-x-controls .gram-search {
   flex: 1;
   min-width: 160px;
+}
+/* Filters can be on while the panel is shut. The marker is a SHAPE, not a colour — a colour
+   swap alone would say nothing to anyone who cannot see it, and the button also carries an
+   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row. */
+.gram-x-filters-btn.is-on {
+  position: relative;
+}
+.gram-x-filters-btn.is-on::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-text);
+}
+.gram-x-filters-reset {
+  display: flex;
+  margin-bottom: 10px;
 }
 .gram-x-count {
   display: flex;
@@ -8101,6 +8165,48 @@ mark.lookup-mark,
 }
 .gram-x-drawer-remove:hover {
   color: var(--text);
+}
+
+/* ---- Grammar Explorer, narrow reflow -------------------------------------
+   Measured 2026-09-04 by the category-4 harness at the Grammar window's own
+   minimum, 260x170: `div.fwin-body` scrollWidth 336 against clientWidth 248 with
+   `overflow-x: hidden`, so 88px of the explorer was UNREACHABLE, not scrollable —
+   65 clipped elements, and `div.gram-x-detail` squeezed to clientWidth 0 while
+   still reporting 170px of content. The cause is three fixed columns in one row:
+   `.gram-x-filters` 268px + `.gram-x-list` 320px + a detail that only gets what is
+   left. Below the width where the pair is still usable they stack instead, which is
+   the plan's "fluid responsive reflow" and keeps every pane reachable.
+
+   These selectors are single-class, i.e. the same specificity as the base rules
+   above — a container query adds none of its own — so this block MUST stay after
+   them in source order or it matches, runs and moves nothing. 560px is the width
+   below which the list's fixed 320 leaves the detail under ~220 and unusable; the
+   820x580 default and the maximized leg are both far above it and unchanged. */
+@container gramview (max-width: 560px) {
+  .gram-x-body {
+    flex-direction: column;
+  }
+  .gram-x-filters {
+    width: auto;
+    max-height: 38%;
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .gram-x-list {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  /* `overflow: auto` alone does not make a column flex item scroll — its automatic
+     minimum size is its content, so it pushes the list out of the box instead. */
+  .gram-x-detail {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .gram-x-drawer {
+    width: auto;
+  }
 }
 
 /* ---- Grammar review queue ------------------------------------------------ */
@@ -9908,7 +10014,8 @@ mark.lookup-mark,
 .gram-more-btn {
   margin-top: 12px;
   background: transparent;
-  color: var(--accent-2);
+  /* Same 2.47:1 classic-light run as `.gram-ask-agent`, same token. */
+  color: var(--accent-text);
   border: 1px dashed var(--border);
   border-radius: 8px;
   padding: 8px 12px;
@@ -14740,6 +14847,17 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+/* The tabpanel wrapper sits between `.gram-view--explorer` and `.gram-x`, so it inherits the
+   bounding job the note at `.gram-x-list` describes: without these four lines the wrapper is a
+   plain block, `.gram-x` grows to its own content, `VirtualList` measures the whole 139,780px
+   as its viewport and renders all 2,410 rows. The virtualisation is present and inert exactly
+   as it was before `gram-view--explorer` existed. */
+.gram-view--explorer > .gram-mode-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .fwin-resize {
   position: absolute;

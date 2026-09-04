@@ -3891,6 +3891,7 @@ export const en: Catalog = {
   // Grammar view
   'grammar.intro':
     'JLPT N5–N1 and HSK 1–10 grammar, plus Practice builder, tests, and guides.',
+  'grammar.mode.legend': 'Grammar sections',
   'grammar.mode.points': 'Grammar points',
   'grammar.mode.practice': 'Practice',
   'grammar.practice.filters': 'Filters',
@@ -4094,6 +4095,7 @@ export const en: Catalog = {
   'grammar.explorer.back': 'Back',
   'grammar.explorer.forward': 'Forward',
   'grammar.explorer.filters': 'Filters',
+  'grammar.explorer.filtersOn': 'Filters — some are active',
   'grammar.explorer.reset': 'Reset filters',
   'grammar.explorer.select': 'Select this point',
   'grammar.explorer.selectedCount': '{count} selected',

@@ -3950,6 +3950,7 @@ export const zh: Catalog = {
 
   // Grammar view
   'grammar.intro': 'JLPT N5–N1 与 HSK 1–10 语法，含练习构建器、测试与指南。',
+  'grammar.mode.legend': '语法板块',
   'grammar.mode.points': '语法点',
   'grammar.mode.practice': '练习',
   'grammar.practice.filters': '筛选',
@@ -4128,6 +4129,7 @@ export const zh: Catalog = {
   'grammar.explorer.back': '后退',
   'grammar.explorer.forward': '前进',
   'grammar.explorer.filters': '筛选',
+  'grammar.explorer.filtersOn': '筛选 — 已启用',
   'grammar.explorer.reset': '重置筛选',
   'grammar.explorer.select': '选择此语法点',
   'grammar.explorer.selectedCount': '已选 {count} 项',
