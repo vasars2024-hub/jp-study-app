@@ -957,6 +957,83 @@ is committed HEAD and not somebody's uncommitted conversions:** `npx vitest run`
 `i18n-check` EXIT 0 at 12,466 keys. `i18n-hardcoded-check` EXIT 0.
 `architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
 
+**2026-09-04, `primary2`. §11.1 CLOSES 8 of 8. §11 CLOSES 19 of 19. P4 is DONE.**
+
+- `ed946667` — `readingListsForItem`, row 8's pure core. Scans EVERY work binding
+  the item rather than `workForItem`'s first match: two works claiming one item
+  is repairable, not impossible, and the first match then reports FEWER lists
+  than the user is on. Archived lists come back FLAGGED — the derivation cannot
+  know if its caller is the reader strip or a diagnostic.
+
+  An `itemId.trim()` was written and then REMOVED: no test could falsify it, and
+  untestable defensive code reads as covered. The blank guard that stayed is
+  falsified against an UNNORMALIZED document, because `normalizeWork` strips
+  `''` out of `boundItemIds` (`readingLists.ts:317`) and the assertion passes
+  with the guard deleted on a normalized one. **9 of 9 mutants RED.**
+
+- `421bdff1` — **A DEFECT FOUND BY NEEDING A ROUTE. `section: 'lists'` was
+  unreachable, and five live call sites had been publishing nothing.**
+
+  `lists` is in `READING_WORKSPACE_SECTIONS` and `readingWorkspaceSurfaceForSection`
+  maps it to a real surface, but `SECTION_ALIASES` — the ONLY table
+  `normalizeReadingWorkspaceSection` reads — never got the key. So every route
+  naming it normalized to `null` and `resolveReadingWorkspaceOpenRequest`
+  dropped the `os:open` before `DesktopShell` could publish it. Dead:
+  `ReadingReminderHost.tsx:106/:118/:119` (§11.3's "open the list") and
+  `widgets/readingLists.tsx:61/:128` (§11.2's "click the header → list detail").
+  **Both sections were closed as passing**, and §11.2's is the one the user named
+  in their own words.
+
+  The test is written over the SECTION union, through both the object form and
+  the serialized deep-link form, so the next section added is caught the same
+  way instead of shipping dead too. Deleting the one alias line turns 3 of 13 RED.
+
+  Also adds row 8's `entryId` to the route, dropped when no `listId` names a
+  list — an entry id alone names a row in an unnamed list.
+
+- `906e68b0` — **row 8 itself.** `ReadingListMembership` is read-only: §10.2
+  keeps list logic out of the two reader files, so the reader hands it an item
+  id and renders what comes back. **Nothing** renders for a book on no list —
+  an "on 0 lists" chip is noise, not an empty state. Archived lists are dropped
+  HERE, at the caller that knows. The landing scrolls, marks `data-focused`, and
+  moves the keyboard into the row; it CLEARS a filter that would hide that row
+  and does NOT clear it for an entry that is not on the list at all.
+
+  **9 of 10 mutants RED.** Two read GREEN first. *"a stale entry id still
+  scrolls"* was a REAL gap: without the membership guard the effect falls
+  through and clears the user's filter for a row that was never there, and
+  nothing is marked either way, so the mark alone cannot tell the two apart —
+  the test now sets a filter and it is RED. *"itemId guard removed"* stays GREEN
+  and is NOT a gap: `itemId ?? ''` is caught by the core's own blank guard,
+  which has its own RED mutant. Recorded rather than counted.
+
+  The component test drives `resolveReadingWorkspaceOpenRequest`, the function
+  `DesktopShell` runs — not the event detail. Reading the detail passes on a
+  route the resolver rejects, which is how the five call sites above shipped dead.
+
+**TWO TRAPS:**
+
+1. **`addReadingListEntry` mints a NEW work on every call**
+   (`readingListMutations.ts:762` — `workFromParsed` then
+   `works: [...next.works, work]`). It never reuses one by title. Adding one
+   book to three lists by hand gives THREE works, so a fixture binding only
+   `works.find(...)` answers "on 1 list" and reads as the strip being broken.
+2. **A whole-file `String.replace` mutation script hits the wrong function.**
+   The first version of `mutate-row8-core.cjs` mutated `readingWorksByAuthor`,
+   which sits ABOVE `readingListsForItem` and shares almost every anchor line;
+   six of nine landed there and four still read RED off the author tests. Scope
+   every mutation to the target function's own text span.
+
+**`MangaReader.tsx` IS NOT WIRED.** It is ` M` in the main tree from another
+track (checked twice, 15:47 and 16:02), and editing it here blocks
+`relay-mergeback` until that path goes clean. The change is one import and one
+`<ReadingListMembership itemId={item.id} />` beside the title, exactly as in
+`NovelReader.tsx:2982`. **Do it the first turn the path is clean.**
+
+### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
+
+Kept only so the entry above has its subject.
+
 **Exact next slice: §11.1's LAST row, row 8** — *the "on 2 lists" line in the
 reader*. Trap §10.2 forbids list LOGIC in `NovelReader.tsx` (130 KB) and
 `MangaReader.tsx` (87 KB), so this is a READ-ONLY touch-point: a small component
