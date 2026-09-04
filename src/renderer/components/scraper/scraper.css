@@ -5103,6 +5103,44 @@
     display: none;
   }
 
+  /* The rule above narrows the rail column to 52px, but nothing here made the
+     rail ITSELF collapse: `.is-collapsed` is a component state the drawer does
+     not set, and the label-hiding tier is `max-width: 700px`. So between 700
+     and 1100 every rail label kept its full width inside a 52px
+     `overflow: hidden` box and was sliced mid-word — measured 2026-09-04 at
+     820x580 with the drawer open: the group label read "SCRAP", the seven page
+     buttons "D." "N" "Di" "Hi" "So" "To", and the status block "Memo 554 M" /
+     "CPU: 1". Each of the 17 rail buttons measured 152x32 with 44px of that
+     hit-testable, the rest under `.scr-drawer`. Same five selectors and the
+     same centring as the 700px tier, because it is the same 52px rail. */
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-label,
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-dot,
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-group-label,
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-tasks,
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-metric {
+    display: none;
+  }
+
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-item {
+    justify-content: center;
+  }
+
+  /* "Idle"/"Running" is the one thing the status block exists to say, so it is
+     clipped visually and kept for a reader rather than removed — the six
+     declarations are `.sr-only` in `theme/a11y.css`, which a container query
+     cannot apply because it cannot add a class. */
+  .scr-shell.is-drawer-open .scr-rail .scr-rail-state-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
   .scr-drawer {
     grid-column: 2;
   }

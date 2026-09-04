@@ -84,8 +84,10 @@ export default function ScraperNav({ stats }: { stats: ScraperSystemStats }) {
               so `.scr-rail`'s `overflow: hidden` clipped 18px and both rail rows
               geometrically overlapped the settings drawer beside them. It goes
               screen-reader-only rather than `display: none` — the running/idle state
-              is the one thing this block exists to say. */}
-          <span className={ctl.railCollapsed ? 'sr-only' : undefined}>
+              is the one thing this block exists to say. The rail also collapses to
+              52px without this state, from the two `scr-shell` container tiers, and
+              those cannot add a class — hence the stable hook they hide it by. */}
+          <span className={`scr-rail-state-text${ctl.railCollapsed ? ' sr-only' : ''}`}>
             {busy ? sx('nav.statusRunning') : sx('nav.statusIdle')}
           </span>
         </div>
