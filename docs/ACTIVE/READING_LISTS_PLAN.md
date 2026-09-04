@@ -467,6 +467,53 @@ list recovers on its own; and the overlong penalty needs a real rival —
 in `src/main/library.ts` on the item-added path, in one place, not per importer.
 Its done-when is an integration test that adds the item SECOND.
 
+**2026-09-04, `primary2`. P2 CLOSED against its own done-when (`9678a525`).**
+3 of 6 phases (P0, P1, P2).
+
+- `shared/readingListMatch.ts` — pure. Fingerprint / score / three dispositions
+  at `BIND_ACCEPT` 0.82, `BIND_SUGGEST` 0.55. `titleSimilarity` is REUSED from
+  `mediaMetadataMatch.ts`: its containment ceiling is already the "a sequel
+  swallows its predecessor" guard, and a second fuzzy matcher in one tree is how
+  two surfaces start disagreeing about what a title match is.
+- **A kana Hepburn romanizer had to be written — nothing in the tree had one**
+  (`langs.ts` folds katakana→hiragana; `jiten.ts`/`mediaIdentity.ts` only carry a
+  provider's `romajiTitle` field). Kanji contributes NO romaji key, deliberately:
+  a guessed reading produces a confident wrong bind, the one outcome this module
+  exists to prevent. Space-stripped key variants are load-bearing, not
+  belt-and-braces — Japanese writes no word boundaries, so `ノルウェイのもり`
+  romanizes to `noruweinomori` against a file named `Noruwei no Mori`, and
+  without the stripped form those are a near-miss instead of the same book.
+- **Volume disagreement is −0.35, not a nudge.** Vol 1 and vol 7 of one series
+  are the same string, so the title signal is weakest exactly where it looks
+  strongest. Author agreement stays ±0.1/−0.12 and can never reject a plain
+  title match — a book catalogued under a romanized author on one shelf and a
+  kanji author on another is not a mismatch.
+- **The hook is `writeDb`, not an importer.** `library.ts` has seven
+  `items.unshift(item)` sites and every future acquisition route adds another;
+  all 18 write sites funnel through `writeDb`, so diffing the incoming set
+  against disk yields "items that are new" for all of them at once, including
+  routes written after this line. Guarded and swallowing: a matcher fault must
+  not be able to fail the import that carried it.
+- CONTROL: dropping the `state !== 'wanted'` guard in `bindReadingWorkToItem` →
+  "does not touch an entry the user already moved off wanted" RED alone, by
+  name. Restored, +75/−0 against HEAD.
+
+**NOT closed by this slice, and not silently dropped: §3(b) catalogue
+enrichment** (jiten / `visualNovels.ts` / `malLibrary.ts` → `externalIds`,
+canonical titles, cover art). It is outside P2's stated done-when and §3 itself
+says it never blocks, so it rides with P5's smart-list/difficulty work where the
+catalogues are already being read.
+
+**TRAP, and it cost two runs.** The parser gates `line-per-title` on
+`indexed.length >= 3` (`readingListParser.ts:377`, §2.2's own rule — a one- or
+two-line message is a sentence, not a list). A short fixture parses to ZERO
+entries, so every assertion then passes vacuously against an empty list. This
+suite read as a broken binder until the parse itself was dumped.
+
+**Exact next slice: P3, §4 the completion detector.** In main on the
+`library:setProgress` path, never in a reader. The negative control — scrub to
+end does NOT tick — ships in the same commit as the rule.
+
 ---
 
 ## 10. Traps, stated up front
