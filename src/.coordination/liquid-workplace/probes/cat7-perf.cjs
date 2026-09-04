@@ -906,6 +906,85 @@ const SPECS = {
     },
     collection: { container: '.music-vlist', row: '.music-song' },
   },
+  musicwidget: {
+    // Untitled by design, like the visualizer trinket beside it — correction 29's `@selector`
+    // form names the window, and a substring match on '' would match every window open.
+    title: "@.fwin[data-section='musicwidget']",
+    root: '.mwidget',
+    heavy: {
+      // The widget's heaviest repeatable IN-PLACE operation is moving through the queue. Every
+      // skip re-runs `playItem` (a new `audio.src` and a decode), re-renders the whole widget
+      // against a different song, re-keys the lyrics ticker and repaints the album stage.
+      // Nothing else it owns is close: play/pause, volume, shuffle and repeat are state flips.
+      //
+      // HONEST ABOUT ITS OWN CEILING: `coverFor`/`paletteFor` memoize per song id
+      // (`albumArt.ts:28,40`), so a queue of N songs pays the artwork decode once each and the
+      // repeated cost measured here is the audio load, the re-render and the ticker. That is
+      // the real cost of the real gesture; it is not the artwork pipeline, and this leg must
+      // never be quoted as if it were.
+      //
+      // The two dock-style alternatives were rejected for the reason the visualizer's were:
+      // "Open Music" NAVIGATES, which changes the scene mid-leg and voids every number taken
+      // with it, and the seek bar writes `audio.currentTime`, which is one property assignment.
+      //
+      // The walk is SYMMETRIC and restores itself. `advance()` steps the queue index with
+      // wraparound, so N forward then N back returns to the starting song — but only with
+      // shuffle OFF (`playerBus.ts:293` picks at random otherwise) and only while each song is
+      // under 4 s old, because `prev()` restarts the current song instead of stepping back past
+      // that mark (`playerBus.ts:315`). Both conditions are checked, not assumed: shuffle is
+      // read off its own `aria-pressed` and REFUSES rather than scoring an unreversible walk,
+      // and the 220 ms cadence keeps every song far under the 4 s restart threshold.
+      label: 'walk 8 songs forward and 8 back through the widget transport, ending on the song it started on',
+      durationMs: 5000,
+      js: `(() => {
+        delete window.__lqMwLoad;
+        const w = document.querySelector('.fwin[data-section="musicwidget"] .mwidget');
+        if (!w) return 'REFUSE: the Music widget is not on screen';
+        if (w.querySelector('.mwidget-empty')) return 'REFUSE: the widget has no current song, so it has no work to do — start one from Music first';
+        const btns = Array.from(w.querySelectorAll('.mwidget-controls > button'));
+        const play = w.querySelector('.mwidget-play');
+        const i = btns.indexOf(play);
+        if (i < 1 || i + 1 >= btns.length) return 'REFUSE: the transport row is not prev/play/next, so forward and back cannot be told apart';
+        const group = w.querySelector('.mwidget-more-group');
+        const shuffle = group ? group.querySelector('button[aria-pressed]') : null;
+        if (!shuffle) return 'REFUSE: no shuffle control, so its state cannot be read and the walk cannot be shown to be reversible';
+        if (shuffle.getAttribute('aria-pressed') === 'true') return 'REFUSE: shuffle is ON — advance() then picks at random and 8 back does not undo 8 forward';
+        const nameOf = () => { const t = w.querySelector('.mwidget-title'); return t ? (t.getAttribute('title') || '') : ''; };
+        const rec = { start: nameOf(), forward: 0, back: 0, seen: [], end: '', restored: false, half: 8 };
+        if (!rec.start) return 'REFUSE: the current song has no name, so there is nothing to restore to';
+        rec.seen.push(rec.start);
+        window.__lqMwLoad = rec;
+        const timer = setInterval(() => {
+          if (rec.forward < rec.half) { btns[i + 1].click(); rec.forward++; }
+          else if (rec.back < rec.half) { btns[i - 1].click(); rec.back++; }
+          else {
+            clearInterval(timer);
+            setTimeout(() => { rec.end = nameOf(); rec.restored = rec.end === rec.start; }, 500);
+            return;
+          }
+          const n = nameOf();
+          if (n && rec.seen[rec.seen.length - 1] !== n) rec.seen.push(n);
+        }, 220);
+        return 'walking ' + (rec.half * 2) + ' songs from ' + rec.start;
+      })()`,
+      progress: `(() => { const r = window.__lqMwLoad; return r ? r.forward + r.back : -1 })()`,
+      proof: `(() => {
+        const r = window.__lqMwLoad;
+        if (!r) return 'REFUSE: the Music widget load never armed';
+        if (r.forward < r.half || r.back < r.half) return 'REFUSE: incomplete walk ' + JSON.stringify({ forward: r.forward, back: r.back });
+        if (r.seen.length < 2) return 'REFUSE: the song never changed across ' + (r.forward + r.back) + ' presses, so the transport did not drive anything';
+        if (!r.restored) return 'REFUSE: the widget did not return to ' + r.start + ' (ended on ' + (r.end || '<unread>') + ')';
+        return 'walked ' + (r.forward + r.back) + ' songs (' + r.forward + ' forward / ' + r.back + ' back) over ' + r.seen.length + ' title changes, restored to ' + r.start;
+      })()`,
+    },
+    // DELIBERATELY NULL, not omitted. This surface has NO scrolling collection: the only
+    // repeated-row structure it owns is the lyrics ticker, and `LyricsStrip` renders exactly
+    // two lines — the current one and the next — at every size. Pointing
+    // `cat7-collection-weight` at a two-line ticker would mint a "collection" the widget does
+    // not have and report a weight for it, which is the fabrication the City entry above
+    // avoided by recording its verdict instead. There is nothing here to sample.
+    collection: null,
+  },
   games: {
     title: 'Game Arena',
     root: '.game-arena',
