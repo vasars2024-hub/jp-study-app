@@ -132,6 +132,22 @@ describe('sticky-note title-bar ink', () => {
     expect(ratios[0]).toEqual({ color: '#fff3a3', ratio: 11.11 });
   });
 
+  it('leaves no unreachable strip under the textarea', () => {
+    // A textarea is inline-block by default and its line box reserves descender space BELOW it,
+    // so the note body's scrollHeight ran 4px past a clientHeight it cannot scroll — the body is
+    // `overflow:hidden`, which category 2 scores as a scroll trap. Measured live 2026-09-03 on a
+    // 260x220 note: scrollHeight 189 / clientHeight 185 before, 185 / 185 after.
+    const css = readFileSync(resolve(REPO, 'src/renderer/styles.css'), 'utf8');
+    const rule = /\.desk-note-text \{([^}]*)\}/.exec(css);
+    expect(rule).toBeTruthy();
+    // Comments stripped: this rule carries prose that names `display: block` and `overflow:hidden`,
+    // and a raw scan of it would pass on the explanation alone (`css-comment-fails-css-test`).
+    const body = (rule as RegExpExecArray)[1].replace(/\/\*[\s\S]*?\*\//g, ' ');
+    expect(body).toMatch(/display:\s*block/);
+    // The body it lives in is the thing that cannot scroll, so the pairing is the real assertion.
+    expect(/\.fwin-body-note \{([^}]*)\}/.exec(css)?.[1]).toMatch(/overflow:\s*hidden/);
+  });
+
   it('MUTATION CONTROL — the chrome ink the note does NOT use would fail that bar', () => {
     // `.fwin-b`'s own colour is what the Liquid toggle inherited before the repair; it is a
     // near-white tuned for a dark bar. Against `#fff3a3` it is the 1.2:1 that was measured.
