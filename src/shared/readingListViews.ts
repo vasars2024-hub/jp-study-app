@@ -13,6 +13,7 @@
  * what keeps two surfaces from disagreeing about what "finished" means.
  */
 
+import type { LevelTier } from './levelScale';
 import type {
   ReadingEntryState,
   ReadingList,
@@ -346,14 +347,76 @@ export function readingListsForItem(
  */
 const NEXT_UP_PRIORITY: readonly ReadingEntryState[] = ['reading', 'owned', 'wanted'];
 
+/**
+ * §5.3's second half — *"by best-fit difficulty for pools"*.
+ *
+ * A `pool` list is explicitly UNORDERED: the user dropped twenty books in a bag
+ * and the app is supposed to hand back the one to read now. For every other kind
+ * the arrangement IS the answer and this must not fire — `ordered` is the
+ * user's sequence, `tiered` already sorts by tier, `challenge` is a set with a
+ * date. So the difficulty fit is scoped to `pool` and nothing else.
+ *
+ * The scale is the SAME L1–L7 `LevelTier` §7's `difficultyMax` rides
+ * (`effectiveLevelEstimate`, `libraryLevel.ts:13`). There is no second reading
+ * scale in this app and inventing one here would make the smart-list cap and the
+ * queue disagree about what "too hard" means.
+ *
+ * Both inputs are OPTIONAL and the default is byte-for-byte today's behaviour.
+ * §11.2's "Next up" widget ships and renders this row already; widening the
+ * function unconditionally would silently re-order what that widget shows, which
+ * is a behaviour change nobody asked for. A caller opts in by having the levels
+ * to opt in WITH.
+ */
+export interface NextUpOptions {
+  /**
+   * L1–L7 per WORK id. A work that is absent, or maps to `null`, is unmeasured
+   * — which is a real and common state, not an error: a fresh import has no
+   * level for minutes to hours.
+   */
+  levels?: ReadonlyMap<string, LevelTier | null>;
+  /** The reader's own tier, from `getUserLevel()`. */
+  targetLevel?: LevelTier | null;
+}
+
+/**
+ * Lower sorts first. Four components, in order:
+ *
+ * 1. **Measured before unmeasured.** An unmeasured work is never PREFERRED over
+ *    a known fit, and is never EXCLUDED either — the same call §7 made for
+ *    `difficultyMax`, and for the same reason: excluding it makes a fresh import
+ *    invisible for as long as enrichment takes.
+ * 2. **Distance from the target tier**, so the closest fit wins.
+ * 3. **Easier wins an exact tie.** A book one tier below the reader is always
+ *    readable; a book one tier above may simply not be. When the app is choosing
+ *    on the user's behalf it takes the readable one.
+ * 4. Falls through to the caller's order, which `Array.prototype.sort` preserves.
+ */
+function nextUpFitKey(
+  row: ReadingListRow,
+  levels: ReadonlyMap<string, LevelTier | null>,
+  target: LevelTier,
+): [number, number, number] {
+  const level = levels.get(row.entry.workId) ?? null;
+  if (level == null) return [1, 0, 0];
+  return [0, Math.abs(level - target), level > target ? 1 : 0];
+}
+
 export function nextUpReadingRow(
   list: ReadingList,
   works: readonly ReadingWorkRef[],
+  options: NextUpOptions = {},
 ): ReadingListRow | null {
   const rows = readingListRows(list, works);
+  const { levels, targetLevel } = options;
+  const byFit = list.kind === 'pool' && levels != null && targetLevel != null;
   for (const state of NEXT_UP_PRIORITY) {
-    const found = rows.find((row) => row.entry.state === state);
-    if (found) return found;
+    const band = rows.filter((row) => row.entry.state === state);
+    if (band.length === 0) continue;
+    if (!byFit) return band[0];
+    const ranked = band
+      .map((row) => ({ row, key: nextUpFitKey(row, levels, targetLevel) }))
+      .sort((a, b) => a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2]);
+    return ranked[0].row;
   }
   return null;
 }

@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { LevelTier } from '../levelScale';
 import type {
   ReadingEntryState,
   ReadingList,
@@ -293,6 +294,88 @@ describe('nextUpReadingRow', () => {
   it('is null when every entry is finished, abandoned or skipped', () => {
     const states: ReadingEntryState[] = ['finished', 'abandoned', 'skipped'];
     expect(nextUpReadingRow(list(states), worksFor(states))).toBeNull();
+  });
+});
+
+describe('nextUpReadingRow — §5.3 best-fit difficulty for pools', () => {
+  const FOUR_OWNED: ReadingEntryState[] = ['owned', 'owned', 'owned', 'owned'];
+  const works = worksFor(FOUR_OWNED);
+  // w0 far too hard, w1 one below the reader, w2 one above, w3 exactly on it.
+  const levels = new Map<string, LevelTier | null>([
+    ['w0', 7],
+    ['w1', 3],
+    ['w2', 5],
+    ['w3', 4],
+  ]);
+
+  it('picks the closest tier to the reader rather than the first row', () => {
+    const row = nextUpReadingRow(list(FOUR_OWNED), works, { levels, targetLevel: 4 });
+    expect(row?.entry.id).toBe('e3');
+    // The control the whole option exists for: the SAME list with no levels is
+    // the shipped behaviour, unchanged.
+    expect(nextUpReadingRow(list(FOUR_OWNED), works)?.entry.id).toBe('e0');
+    expect(nextUpReadingRow(list(FOUR_OWNED), works, { targetLevel: 4 })?.entry.id).toBe('e0');
+    expect(nextUpReadingRow(list(FOUR_OWNED), works, { levels })?.entry.id).toBe('e0');
+  });
+
+  it('breaks an exact tie toward the EASIER book', () => {
+    // w1 is 3 and w2 is 5 against a target of 4: both one tier away. A book below
+    // the reader is always readable; one above may not be.
+    const twoWay = new Map<string, LevelTier | null>([
+      ['w0', null],
+      ['w1', 3],
+      ['w2', 5],
+      ['w3', null],
+    ]);
+    const row = nextUpReadingRow(list(FOUR_OWNED), works, { levels: twoWay, targetLevel: 4 });
+    expect(row?.entry.id).toBe('e1');
+    // And the direction is what decided it, not the order: put the harder book
+    // first and it still loses.
+    const reversed = new Map<string, LevelTier | null>([
+      ['w0', 5],
+      ['w1', 3],
+    ]);
+    expect(
+      nextUpReadingRow(list(['owned', 'owned']), worksFor(['owned', 'owned']), {
+        levels: reversed,
+        targetLevel: 4,
+      })?.entry.id,
+    ).toBe('e1');
+  });
+
+  it('never prefers an unmeasured work over a measured fit, and never drops it', () => {
+    const unmeasured = new Map<string, LevelTier | null>([['w1', 7]]);
+    // w0 is absent from the map entirely, w1 is measured but four tiers off.
+    // Measured-and-far still beats unknown: this is §7's `difficultyMax` call.
+    expect(
+      nextUpReadingRow(list(['owned', 'owned']), worksFor(['owned', 'owned']), {
+        levels: unmeasured,
+        targetLevel: 3,
+      })?.entry.id,
+    ).toBe('e1');
+    // But an all-unmeasured pool still answers, in list order, rather than null.
+    expect(
+      nextUpReadingRow(list(['owned', 'owned']), worksFor(['owned', 'owned']), {
+        levels: new Map(),
+        targetLevel: 3,
+      })?.entry.id,
+    ).toBe('e0');
+  });
+
+  it('does not re-order any kind but pool, and never crosses a state band', () => {
+    for (const kind of ['ordered', 'tiered', 'challenge', 'smart'] as const) {
+      const row = nextUpReadingRow(list(FOUR_OWNED, { kind }), works, {
+        levels,
+        targetLevel: 4,
+      });
+      expect([kind, row?.entry.id]).toEqual([kind, 'e0']);
+    }
+    // A perfectly-levelled book that is already FINISHED does not get promoted
+    // over a worse-fitting one that is merely owned — the band wins first.
+    const mixed: ReadingEntryState[] = ['owned', 'reading', 'owned', 'finished'];
+    expect(
+      nextUpReadingRow(list(mixed), worksFor(mixed), { levels, targetLevel: 4 })?.entry.id,
+    ).toBe('e1');
   });
 });
 
