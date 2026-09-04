@@ -1,0 +1,131 @@
+/*
+ * Reading Lists §11.3 — the reminder card.
+ *
+ * Built on L2's `--lq-liquid-*` tokens rather than a shell's own colours, so the
+ * same card is legible in Study OS, Blanc, Aero and Wired without any of them
+ * having to know it exists. It is a contextual, temporary surface — exactly the
+ * role the Liquid contract reserves for glass — so it uses the liquid material
+ * and not the anchor one.
+ *
+ * Fallbacks are given on every token: this host mounts inside `ToastHost`, which
+ * a shell can render before the theme layer has painted, and an unresolved
+ * custom property renders as nothing at all rather than as a default.
+ */
+
+.rl-reminder-host {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9600;
+  display: flex;
+  justify-content: flex-end;
+  /* The host never eats a desktop click; only the card does. */
+  pointer-events: none;
+}
+
+.rl-reminder {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 34px 12px 14px;
+  border: 1px solid var(--lq-liquid-border, rgba(255, 255, 255, 0.16));
+  border-radius: var(--lq-liquid-radius, 14px);
+  background: var(--lq-liquid-bg, rgba(28, 30, 36, 0.92));
+  backdrop-filter: blur(var(--lq-liquid-blur, 18px)) saturate(var(--lq-liquid-saturate, 140%));
+  box-shadow: var(--lq-liquid-shadow, 0 12px 32px rgba(0, 0, 0, 0.38));
+  color: var(--lq-liquid-text, #f2f4f8);
+  animation: rl-reminder-in var(--lq-motion-enter, 180ms) var(--lq-ease-enter, ease-out);
+}
+
+@keyframes rl-reminder-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* A card that slides in is decoration; a card that appears is information. */
+@media (prefers-reduced-motion: reduce) {
+  .rl-reminder {
+    animation: none;
+  }
+}
+
+.rl-reminder-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rl-reminder-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rl-reminder-body {
+  font-size: 12px;
+  color: var(--lq-liquid-text-muted, rgba(242, 244, 248, 0.72));
+  overflow-wrap: anywhere;
+}
+
+.rl-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rl-reminder-btn {
+  /* Not below the hit-target floor even when the label is one short word. */
+  min-height: var(--lq-hit-target, 32px);
+  padding: 0 10px;
+  border: 1px solid var(--lq-liquid-border, rgba(255, 255, 255, 0.18));
+  border-radius: 8px;
+  background: var(--lq-liquid-bg-raised, rgba(255, 255, 255, 0.1));
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rl-reminder-btn:hover {
+  border-color: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.34));
+}
+
+.rl-reminder-btn:focus-visible,
+.rl-reminder-close:focus-visible {
+  outline: 2px solid var(--lq-liquid-highlight, #7fb2ff);
+  outline-offset: 2px;
+}
+
+/* "Never again" is an answer, not the default one. Present, not prominent. */
+.rl-reminder-btn.is-quiet {
+  background: transparent;
+  color: var(--lq-liquid-text-muted, rgba(242, 244, 248, 0.72));
+}
+
+.rl-reminder-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lq-liquid-text-muted, rgba(242, 244, 248, 0.72));
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rl-reminder-close:hover {
+  background: var(--lq-liquid-bg-raised, rgba(255, 255, 255, 0.1));
+  color: var(--lq-liquid-text, #f2f4f8);
+}

@@ -89,6 +89,14 @@ export interface ReadingWorkspaceRoute {
   workId?: string;
   editionId?: string;
   itemId?: string;
+  /**
+   * Which reading list the `lists` section opens on.
+   *
+   * Its own field rather than a reuse of `workId`: a list and a work are
+   * different records with different lifetimes, and a route that says `workId`
+   * while carrying a list id is a lie the next reader has to discover.
+   */
+  listId?: string;
 }
 
 export interface ReadingWorkspaceCover {
@@ -244,6 +252,7 @@ function normalizeRouteRecord(raw: Record<string, unknown>): ReadingWorkspaceRou
     ...(optionalId(raw.workId) ? { workId: optionalId(raw.workId) } : {}),
     ...(optionalId(raw.editionId) ? { editionId: optionalId(raw.editionId) } : {}),
     ...(optionalId(raw.itemId) ? { itemId: optionalId(raw.itemId) } : {}),
+    ...(optionalId(raw.listId) ? { listId: optionalId(raw.listId) } : {}),
   };
 }
 
@@ -271,6 +280,7 @@ export function normalizeReadingWorkspaceRoute(value: unknown): ReadingWorkspace
         workId: url.searchParams.get('workId') ?? undefined,
         editionId: url.searchParams.get('editionId') ?? undefined,
         itemId: url.searchParams.get('itemId') ?? undefined,
+        listId: url.searchParams.get('listId') ?? undefined,
       });
     } catch {
       return null;
@@ -291,6 +301,7 @@ export function serializeReadingWorkspaceRoute(route: ReadingWorkspaceRoute): st
   if (normalized.workId) params.set('workId', normalized.workId);
   if (normalized.editionId) params.set('editionId', normalized.editionId);
   if (normalized.itemId) params.set('itemId', normalized.itemId);
+  if (normalized.listId) params.set('listId', normalized.listId);
   return `reading://workspace/${normalized.section}?${params.toString()}`;
 }
 

@@ -1162,6 +1162,18 @@ export function getLibraryItem(id: string): LibraryItem | undefined {
   return readDb().find((x) => x.id === id);
 }
 
+/**
+ * Every item, for a main-process caller that needs the whole shelf.
+ *
+ * Exported so this file stays the only module that knows where `library.json`
+ * is: Reading Lists' reminder scheduler needs `progress` and `lastReadAt` across
+ * the library, and a second reader of that path is a duplicate-storage defect
+ * waiting for the two to disagree.
+ */
+export function listLibraryItems(): LibraryItem[] {
+  return readDb();
+}
+
 /** Absolute paths of an item's page images, in reading order. */
 export function listItemPagePaths(id: string): string[] {
   const pagesDir = path.join(itemDir(id), 'pages');

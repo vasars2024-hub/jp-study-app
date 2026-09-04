@@ -19,6 +19,7 @@ import type {
   ReadingListEntry,
   ReadingListKind,
   ReadingListsDocument,
+  ReadingListTarget,
   ReadingWorkRef,
 } from './readingLists';
 
@@ -194,6 +195,129 @@ export function readingListRows(
       suggestion: hasLiveSuggestion(work),
     };
   });
+}
+
+/**
+ * The row §11.2's "Next up" widget offers, and the one the list detail
+ * highlights.
+ *
+ * Priority is `reading`, then `owned`, then `wanted` — a book already open
+ * outranks one merely on the shelf, and a book on the shelf outranks one that
+ * has to be acquired first. Within a band the list's own order decides, so the
+ * user's arrangement is what picks the book rather than a hidden heuristic.
+ * `finished`, `abandoned` and `skipped` are never next up.
+ */
+const NEXT_UP_PRIORITY: readonly ReadingEntryState[] = ['reading', 'owned', 'wanted'];
+
+export function nextUpReadingRow(
+  list: ReadingList,
+  works: readonly ReadingWorkRef[],
+): ReadingListRow | null {
+  const rows = readingListRows(list, works);
+  for (const state of NEXT_UP_PRIORITY) {
+    const found = rows.find((row) => row.entry.state === state);
+    if (found) return found;
+  }
+  return null;
+}
+
+export interface ReadingFinishRecord {
+  entryId: string;
+  listId: string;
+  listName: string;
+  title: string;
+  itemId: string | null;
+  finishedAt: number;
+}
+
+/**
+ * The most recent finishes across every list, newest first.
+ *
+ * Read off the entries rather than the event log: the log is capped and
+ * compacted, so a year-in-review built on it silently loses the start of the
+ * year. `finishedAt` is on the entry and survives everything.
+ *
+ * De-duplicated per WORK: §4's fan-out ticks the same book on every list it is
+ * on, and a widget that shows one finish three times reads as three books.
+ */
+export function recentReadingFinishes(
+  document: ReadingListsDocument,
+  limit = 5,
+): ReadingFinishRecord[] {
+  const byId = new Map(document.works.map((work) => [work.id, work]));
+  const seen = new Set<string>();
+  const found: ReadingFinishRecord[] = [];
+  for (const list of document.lists) {
+    for (const entry of list.entries) {
+      if (entry.state !== 'finished' || entry.finishedAt === undefined) continue;
+      const work = byId.get(entry.workId);
+      found.push({
+        entryId: entry.id,
+        listId: list.id,
+        listName: list.name,
+        title: work?.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '',
+        itemId: work?.boundItemIds[0] ?? null,
+        finishedAt: entry.finishedAt,
+      });
+    }
+  }
+  found.sort((a, b) => b.finishedAt - a.finishedAt || a.entryId.localeCompare(b.entryId));
+  const deduped: ReadingFinishRecord[] = [];
+  for (const record of found) {
+    const key = `${record.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(record);
+    if (deduped.length >= Math.max(0, limit)) break;
+  }
+  return deduped;
+}
+
+export interface ReadingChallengePace {
+  remaining: number;
+  /** Whole days to the target date. Negative once it has passed. */
+  daysLeft: number;
+  /** Books per day the remainder now needs. `null` when the date has passed. */
+  requiredPerDay: number | null;
+  /**
+   * Books ahead of (positive) or behind (negative) an even pace.
+   *
+   * Both directions are reported plainly. §11.2 is explicit that "behind" is
+   * not an alarm: a pace line that shouts is a pace line the user turns off.
+   */
+  aheadBy: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The one honest sentence §11.2's challenge widget prints, as numbers.
+ *
+ * Returns `null` when the list carries no target date — a pace computed against
+ * a date nobody set is a number invented by the widget.
+ */
+export function readingChallengePace(
+  summary: ReadingListSummary,
+  target: ReadingListTarget | undefined,
+  now: number,
+  createdAt: number,
+): ReadingChallengePace | null {
+  if (!target?.by) return null;
+  const goal = Math.max(target.count ?? summary.counted, summary.finished);
+  const remaining = Math.max(0, goal - summary.finished);
+  const daysLeft = Math.ceil((target.by - now) / DAY_MS);
+  const span = Math.max(1, target.by - createdAt);
+  // Elapsed is clamped into the window: before the start and after the end an
+  // even pace is meaningless, and an unclamped ratio produces an "ahead by" of
+  // several books on a challenge that has not begun.
+  const elapsed = Math.min(Math.max(0, now - createdAt), span);
+  const expected = goal * (elapsed / span);
+  return {
+    remaining,
+    daysLeft,
+    requiredPerDay: daysLeft > 0 ? remaining / daysLeft : null,
+    aheadBy: Math.round((summary.finished - expected) * 10) / 10,
+  };
 }
 
 export type ReadingListSort = 'recent' | 'name' | 'progress';

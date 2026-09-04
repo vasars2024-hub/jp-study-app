@@ -113,12 +113,19 @@
   margin: 0;
   padding: 0;
   display: grid;
-  /* The floor is CLAMPED to the container, not left bare. A bare 220px floor reads like
-     "at least 220px, more if there is room" and is not: 220 is a HARD minimum, so in the
-     212px content box the shell's own 260px window minimum produces, the track keeps its
-     220px and 8px of every card leaves the frame -- with no way back, because `.fwin-body`
-     is `overflow-x: hidden`. Same shape, same fix as the floors category 4 already clamped;
-     `gridTrackFloorsFitTheWindow` is the guard that caught this one. */
+  /*
+   * `min(220px, 100%)` rather than a bare `220px`: the narrowest content width
+   * the product allows is 212px, so a bare floor makes the single column wider
+   * than its own pane and the cards clip with no scrollbar to reach them.
+   * `gridTrackFloorsFitTheWindow.test.ts` is the guard, and it caught this one.
+   *
+   * Fixed twice, independently and identically, within twenty minutes on
+   * 2026-09-04 -- `eed939f2` on the branch and `dda0a4fd` in the files-app
+   * worktree, both reaching `min(220px, 100%)` from the same failing guard. The
+   * merge conflict was the two COMMENTS, never the declaration. Kept as the note
+   * it is: two workers on one turn budget will collide on whatever the gate
+   * points them both at.
+   */
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: var(--lq-space-3, 12px);
 }

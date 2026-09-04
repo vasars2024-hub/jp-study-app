@@ -78,7 +78,15 @@ describe('late binding — the item arrives after the list', () => {
       () => NOW,
     );
 
-    expect(result).toEqual({ bound: 1, suggested: 0, applied: true });
+    expect(result).toEqual({
+      bound: 1,
+      suggested: 0,
+      applied: true,
+      // §11.3's "new binding" reminder needs the book NAMED, not counted.
+      boundWorks: [
+        { workId: readWork().id, listId: 'l1', entryId: 'e1', itemId: 'lib-1', title: 'コンビニ人間' },
+      ],
+    });
     expect(readWork().boundItemIds).toEqual(['lib-1']);
     expect(readEntry().state).toBe('owned');
 
@@ -109,7 +117,7 @@ describe('late binding — the item arrives after the list', () => {
       () => NOW,
     );
 
-    expect(result).toEqual({ bound: 0, suggested: 0, applied: false });
+    expect(result).toEqual({ bound: 0, suggested: 0, boundWorks: [], applied: false });
     expect(readEntry().state).toBe('wanted');
     expect(readWork().suggestion).toBeUndefined();
     // No revision burned and no broadcast: a no-op must not look like a change.
@@ -124,7 +132,9 @@ describe('late binding — the item arrives after the list', () => {
       () => NOW,
     );
 
-    expect(result).toEqual({ bound: 0, suggested: 1, applied: true });
+    // A suggestion is not a binding, so it names nobody — the reminder must not
+    // announce a book the matcher only guessed at.
+    expect(result).toEqual({ bound: 0, suggested: 1, boundWorks: [], applied: true });
     // The honest half: nothing is marked owned on a maybe.
     expect(readEntry().state).toBe('wanted');
     expect(readWork().suggestion?.itemId).toBe('lib-5');
@@ -205,7 +215,8 @@ describe('the compare-and-swap re-apply', () => {
       () => NOW,
     );
     expect(refusals).toBe(1);
-    expect(result).toEqual({ bound: 1, suggested: 0, applied: true });
+    expect(result).toMatchObject({ bound: 1, suggested: 0, applied: true });
+    expect(result.boundWorks.map((entry) => entry.itemId)).toEqual(['lib-7']);
     expect(readEntry().state).toBe('owned');
   });
 

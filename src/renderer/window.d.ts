@@ -94,6 +94,11 @@ import type {
   ReadingListsSnapshot,
 } from '../shared/readingListsBridge';
 import type {
+  ReadingReminder,
+  ReadingReminderKind,
+  ReadingReminderSettings,
+} from '../shared/readingListReminders';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -1266,6 +1271,12 @@ declare global {
       ): Promise<ReadingListsResult>;
       readingListsEvents(limit?: number): Promise<ReadingListsEventsResult>;
       onReadingListsChanged(cb: (snapshot: ReadingListsSnapshot) => void): () => void;
+      readingRemindersGet(): Promise<ReadingReminderSettings>;
+      readingRemindersSet(
+        patch: Partial<ReadingReminderSettings>,
+      ): Promise<ReadingReminderSettings>;
+      readingRemindersSilence(kind: ReadingReminderKind): Promise<ReadingReminderSettings>;
+      onReadingReminder(cb: (reminder: ReadingReminder) => void): () => void;
       onAgentOperationalChanged(cb: (state: AgentOperationalState) => void): () => void;
       agentExecutionLeaseAcquire(
         request: AgentExecutionLeaseAcquireRequest,

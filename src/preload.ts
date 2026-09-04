@@ -168,6 +168,11 @@ import type {
   ReadingListsSnapshot,
 } from './shared/readingListsBridge';
 import type {
+  ReadingReminder,
+  ReadingReminderKind,
+  ReadingReminderSettings,
+} from './shared/readingListReminders';
+import type {
   AgentExecutionLeaseAcquireRequest,
   AgentExecutionLeaseAcquireResult,
   AgentExecutionLeaseCommitRequest,
@@ -2137,6 +2142,21 @@ const api = {
     const handler = (_event: unknown, snapshot: ReadingListsSnapshot): void => cb(snapshot);
     ipcRenderer.on('readingLists:changed', handler);
     return () => ipcRenderer.removeListener('readingLists:changed', handler);
+  },
+  // §11.3's reminders. The schedule lives in main with the lists, so these three
+  // read and write settings — a renderer never decides when something fires.
+  readingRemindersGet: (): Promise<ReadingReminderSettings> =>
+    ipcRenderer.invoke('readingListsReminders:get'),
+  readingRemindersSet: (
+    patch: Partial<ReadingReminderSettings>,
+  ): Promise<ReadingReminderSettings> =>
+    ipcRenderer.invoke('readingListsReminders:set', patch),
+  readingRemindersSilence: (kind: ReadingReminderKind): Promise<ReadingReminderSettings> =>
+    ipcRenderer.invoke('readingListsReminders:silence', kind),
+  onReadingReminder: (cb: (reminder: ReadingReminder) => void): (() => void) => {
+    const handler = (_event: unknown, reminder: ReadingReminder): void => cb(reminder);
+    ipcRenderer.on('readingLists:reminder', handler);
+    return () => ipcRenderer.removeListener('readingLists:reminder', handler);
   },
   onAgentOperationalChanged: (cb: (state: AgentOperationalState) => void): (() => void) => {
     const handler = (_event: unknown, state: AgentOperationalState): void => cb(state);

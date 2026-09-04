@@ -19,6 +19,12 @@ import {
   VocabularyProgress,
   WordOfTheDay,
 } from './study';
+import {
+  ReadingChallengePaceWidget,
+  ReadingListProgressWidget,
+  ReadingNextUpWidget,
+  ReadingRecentlyFinishedWidget,
+} from './readingLists';
 import { MiniPlayer } from './music';
 import { ContinueWatchingWidget } from './continueWatching';
 import { Calculator } from './utility';
@@ -58,6 +64,13 @@ export const WIDGETS: WidgetDef[] = [
   // 30px title bar: 250 fits three rows and the "N more" line, 130 fits one and that line.
   // Eyeballing them is what clipped the first cut's last row in half.
   { type: 'continue-watching', titleKey: 'widgets.title.continue-watching', category: 'Study', descKey: 'widgets.desc.continue-watching', defaultSize: { w: 320, h: 250 }, minSize: { w: 240, h: 130 }, component: ContinueWatchingWidget },
+  // Reading Lists §11.2. `reading-list-finished` derives its row count from its
+  // own height, so its minimum is the height that still shows one row plus the
+  // frame's 30px title bar and `.widget-body`'s padding.
+  { type: 'reading-list-progress', titleKey: 'widgets.title.reading-list-progress', category: 'Study', descKey: 'widgets.desc.reading-list-progress', defaultSize: { w: 300, h: 260 }, minSize: { w: 220, h: 200 }, component: ReadingListProgressWidget },
+  { type: 'reading-next-up', titleKey: 'widgets.title.reading-next-up', category: 'Study', descKey: 'widgets.desc.reading-next-up', defaultSize: { w: 220, h: 240 }, minSize: { w: 170, h: 180 }, component: ReadingNextUpWidget },
+  { type: 'reading-challenge-pace', titleKey: 'widgets.title.reading-challenge-pace', category: 'Study', descKey: 'widgets.desc.reading-challenge-pace', defaultSize: { w: 300, h: 160 }, minSize: { w: 230, h: 130 }, component: ReadingChallengePaceWidget },
+  { type: 'reading-list-finished', titleKey: 'widgets.title.reading-list-finished', category: 'Study', descKey: 'widgets.desc.reading-list-finished', defaultSize: { w: 300, h: 200 }, minSize: { w: 220, h: 90 }, component: ReadingRecentlyFinishedWidget },
 
   // ---- Statistics ----
   { type: 'learning-heatmap', titleKey: 'widgets.title.learning-heatmap', category: 'Statistics', descKey: 'widgets.desc.learning-heatmap', defaultSize: { w: 300, h: 150 }, minSize: { w: 220, h: 120 }, component: LearningHeatmap },

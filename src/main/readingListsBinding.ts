@@ -41,6 +41,7 @@ import {
   type ReadingListsMutationContext,
 } from '../shared/readingListMutations';
 import type { ReadingListsDocument } from '../shared/readingLists';
+import type { ReadingReminderBinding } from '../shared/readingListReminders';
 import { getReadingListsStore, type ReadingListsStore } from './readingListsStore';
 import { broadcastReadingLists } from './readingListsIpc';
 
@@ -96,6 +97,15 @@ export function libraryItemCandidate(item: LibraryItem): ReadingMatchCandidate {
 export interface LateBindingOutcome {
   bound: number;
   suggested: number;
+  /**
+   * The works that actually bound, named rather than counted.
+   *
+   * §11.3's "new binding" reminder is the one that earns an interrupt, and it
+   * cannot be built from a count: it has to say WHICH book turned up and lead to
+   * the entry. Collected here because this is the only place that knows both the
+   * work and the item it matched.
+   */
+  boundWorks: ReadingReminderBinding[];
 }
 
 /**
@@ -111,10 +121,11 @@ export function applyLateBinding(
   context: ReadingListsMutationContext,
 ): { document: ReadingListsDocument; events: PendingReadingListEvent[] } & LateBindingOutcome {
   const events: PendingReadingListEvent[] = [];
+  const boundWorks: ReadingReminderBinding[] = [];
   let next = document;
   let bound = 0;
   let suggested = 0;
-  if (!candidates.length) return { document: next, events, bound, suggested };
+  if (!candidates.length) return { document: next, events, bound, suggested, boundWorks };
 
   // Snapshot the ids first: `next` is rebuilt each iteration and a work bound in
   // an earlier pass must not be re-read from the newer document as unbound.
@@ -134,6 +145,16 @@ export function applyLateBinding(
       next = result.document;
       events.push(...result.events);
       bound += 1;
+      const placed = firstEntryForWork(next, workId);
+      if (placed) {
+        boundWorks.push({
+          workId,
+          listId: placed.listId,
+          entryId: placed.entryId,
+          itemId: outcome.best.candidateId,
+          title: work.titleRaw,
+        });
+      }
       continue;
     }
     if (outcome.disposition !== 'suggest') continue;
@@ -162,7 +183,26 @@ export function applyLateBinding(
     suggested += 1;
   }
 
-  return { document: next, events, bound, suggested };
+  return { document: next, events, bound, suggested, boundWorks };
+}
+
+/**
+ * Where a work sits, for a reminder that has to lead somewhere.
+ *
+ * The first list that holds it, in document order. A work on several lists gets
+ * ONE reminder — §11.3 caps reminders at one a day, so fanning a single arrival
+ * out into three would spend three days saying the same thing.
+ */
+function firstEntryForWork(
+  document: ReadingListsDocument,
+  workId: string,
+): { listId: string; entryId: string } | null {
+  for (const list of document.lists) {
+    for (const entry of list.entries) {
+      if (entry.workId === workId) return { listId: list.id, entryId: entry.id };
+    }
+  }
+  return null;
 }
 
 /**
@@ -177,7 +217,7 @@ export function bindLibraryItemsIntoReadingLists(
   now: () => number = Date.now,
 ): LateBindingOutcome & { applied: boolean } {
   const candidates = items.map(libraryItemCandidate).filter((candidate) => !!candidate.title.trim());
-  if (!candidates.length) return { bound: 0, suggested: 0, applied: false };
+  if (!candidates.length) return { bound: 0, suggested: 0, boundWorks: [], applied: false };
 
   for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
     const snapshot = store.read();
@@ -186,19 +226,24 @@ export function bindLibraryItemsIntoReadingLists(
     // Identity means the matcher found nothing to say. Writing anyway would burn
     // a revision and broadcast a no-change to every window.
     if (result.document === snapshot.document) {
-      return { bound: 0, suggested: 0, applied: false };
+      return { bound: 0, suggested: 0, boundWorks: [], applied: false };
     }
     const write = store.write(snapshot.document.revision, result.document, result.events);
     if (write.applied) {
       // Main wrote this with no renderer to return it to, so every window is a
       // recipient (`readingListsIpc.ts`'s own note on `broadcastReadingLists`).
       broadcastReadingLists(write.snapshot);
-      return { bound: result.bound, suggested: result.suggested, applied: true };
+      return {
+        bound: result.bound,
+        suggested: result.suggested,
+        boundWorks: result.boundWorks,
+        applied: true,
+      };
     }
   }
   // Three refusals in a row means a renderer is writing continuously. Dropping
   // the pass is safe: the next import re-runs it, and nothing was half-applied.
-  return { bound: 0, suggested: 0, applied: false };
+  return { bound: 0, suggested: 0, boundWorks: [], applied: false };
 }
 
 /**
@@ -207,11 +252,13 @@ export function bindLibraryItemsIntoReadingLists(
  */
 export function registerReadingListsLateBinding(
   subscribe: (listener: (items: LibraryItem[]) => void) => void,
+  onBound?: (bindings: readonly ReadingReminderBinding[]) => void,
 ): void {
   subscribe((items) => {
     setImmediate(() => {
       try {
-        bindLibraryItemsIntoReadingLists(items);
+        const outcome = bindLibraryItemsIntoReadingLists(items);
+        if (outcome.boundWorks.length) onBound?.(outcome.boundWorks);
       } catch {
         // A missing or unreadable reading-lists document is not an import fault.
       }

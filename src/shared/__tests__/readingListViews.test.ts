@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest';
 import type { ReadingEntryState, ReadingList, ReadingWorkRef } from '../readingLists';
 import {
   hasLiveSuggestion,
+  nextUpReadingRow,
+  readingChallengePace,
   readingListRows,
+  recentReadingFinishes,
   sortReadingListEntries,
   sortReadingListSummaries,
   summarizeReadingList,
@@ -262,5 +265,107 @@ describe('totalReadingTriage', () => {
     };
     expect(totalReadingTriage(document)).toBe(1);
     expect(summarizeReadingLists(document).map((s) => s.listId)).toEqual(['l1', 'l2', 'l3']);
+  });
+});
+
+describe('nextUpReadingRow', () => {
+  it('prefers a book already open over one merely on the shelf, then the list order', () => {
+    const states: ReadingEntryState[] = ['wanted', 'owned', 'reading', 'owned'];
+    const l = list(states);
+    const works = worksFor(states);
+    expect(nextUpReadingRow(l, works)?.entry.id).toBe('e2');
+
+    // With nothing being read, the shelf wins over the shopping list, and among
+    // the shelf entries the user's own order decides.
+    const noReading = list(['wanted', 'owned', 'finished', 'owned']);
+    expect(nextUpReadingRow(noReading, works)?.entry.id).toBe('e1');
+  });
+
+  it('is null when every entry is finished, abandoned or skipped', () => {
+    const states: ReadingEntryState[] = ['finished', 'abandoned', 'skipped'];
+    expect(nextUpReadingRow(list(states), worksFor(states))).toBeNull();
+  });
+});
+
+describe('recentReadingFinishes', () => {
+  it('is newest first, and counts one book once however many lists it is on', () => {
+    const works = [
+      work({ id: 'w0', titleRaw: 'A' }),
+      work({ id: 'w1', titleRaw: 'B' }),
+    ];
+    const entry = (id: string, workId: string, finishedAt: number) => ({
+      id,
+      workId,
+      order: 0,
+      addedAt: NOW,
+      state: 'finished' as const,
+      finishedAt,
+    });
+    const document = {
+      schemaVersion: 1,
+      revision: 1,
+      works,
+      lists: [
+        { ...list([]), id: 'l1', entries: [entry('e1', 'w0', NOW + 10), entry('e2', 'w1', NOW + 40)] },
+        // The same book, ticked by §4's fan-out on a second list. A widget that
+        // showed it twice would read as two books.
+        { ...list([]), id: 'l2', entries: [entry('e3', 'w0', NOW + 10)] },
+      ],
+    };
+    expect(recentReadingFinishes(document, 5).map((r) => r.title)).toEqual(['B', 'A']);
+    expect(recentReadingFinishes(document, 1).map((r) => r.title)).toEqual(['B']);
+  });
+
+  it('ignores an entry that is finished with no date rather than dating it now', () => {
+    const document = {
+      schemaVersion: 1,
+      revision: 1,
+      works: [work({ id: 'w0', titleRaw: 'A' })],
+      lists: [
+        {
+          ...list([]),
+          entries: [{ id: 'e0', workId: 'w0', order: 0, addedAt: NOW, state: 'finished' as const }],
+        },
+      ],
+    };
+    expect(recentReadingFinishes(document)).toEqual([]);
+  });
+});
+
+describe('readingChallengePace', () => {
+  const DAY = 86_400_000;
+
+  it('says nothing at all when the list has no target date', () => {
+    const summary = summarizeReadingList(list(['finished', 'wanted']), worksFor(['a', 'b']));
+    expect(readingChallengePace(summary, undefined, NOW, NOW)).toBeNull();
+    expect(readingChallengePace(summary, { count: 10 }, NOW, NOW)).toBeNull();
+  });
+
+  it('reports ahead and behind as the same number with a sign', () => {
+    const states: ReadingEntryState[] = ['finished', 'finished', 'wanted', 'wanted'];
+    const summary = summarizeReadingList(list(states), worksFor(states));
+    const target = { count: 4, by: NOW + 10 * DAY };
+
+    // Halfway through the window with half the books done: exactly on pace.
+    const even = readingChallengePace(summary, target, NOW + 5 * DAY, NOW);
+    expect(even?.aheadBy).toBe(0);
+    expect(even?.remaining).toBe(2);
+    expect(even?.daysLeft).toBe(5);
+
+    // Same finishes, later in the window: behind, and it says so plainly.
+    expect(readingChallengePace(summary, target, NOW + 9 * DAY, NOW)?.aheadBy).toBeLessThan(0);
+    // And earlier: ahead.
+    expect(readingChallengePace(summary, target, NOW + DAY, NOW)?.aheadBy).toBeGreaterThan(0);
+  });
+
+  it('clamps elapsed into the window, so a challenge that has not started is not "ahead"', () => {
+    const states: ReadingEntryState[] = ['wanted', 'wanted'];
+    const summary = summarizeReadingList(list(states), worksFor(states));
+    const target = { count: 2, by: NOW + 10 * DAY };
+    // Before the start: zero expected, zero finished, zero ahead — never a
+    // negative elapsed producing a phantom lead.
+    expect(readingChallengePace(summary, target, NOW - 5 * DAY, NOW)?.aheadBy).toBe(0);
+    // Past the date: no required rate at all rather than a division by zero.
+    expect(readingChallengePace(summary, target, NOW + 20 * DAY, NOW)?.requiredPerDay).toBeNull();
   });
 });

@@ -695,6 +695,30 @@ export const SETTINGS_REGISTRY: SettingsRegistryEntry[] = [
     group: 'Study',
   },
   {
+    id: 'reading-reminders',
+    titleKey: 'settings.readingReminders.title',
+    descKey: 'settings.readingReminders.desc',
+    // Every word a person would actually type. The MAL-sync defect this repo
+    // already paid for was a registry entry whose keywords pointed at a page
+    // that did not contain the panel — so `pageId` is the page it renders on.
+    keywords: [
+      'reminder',
+      'reminders',
+      'reading list',
+      'reading lists',
+      'nudge',
+      'notification',
+      'daily read',
+      'stalled',
+      'challenge',
+      'pace',
+      'never again',
+      'silence',
+    ],
+    pageId: 'reading',
+    group: 'Study',
+  },
+  {
     id: 'whisper',
     titleKey: 'search.whisper',
     descKey: 'search.whisper.desc',

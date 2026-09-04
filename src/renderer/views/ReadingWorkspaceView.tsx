@@ -73,6 +73,8 @@ export default function ReadingWorkspaceView({
   const [passage, setPassage] = useState<ReadingPassageHandoff | null>(null);
   /** What Reading Lists asked Discover to look for. Empty until it does. */
   const [finderQuery, setFinderQuery] = useState('');
+  /** The list a deep link named, so a widget header lands on that list's detail. */
+  const [routedListId, setRoutedListId] = useState<string | null>(null);
   const tabsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const routeGenerationRef = useRef(0);
 
@@ -82,6 +84,7 @@ export default function ReadingWorkspaceView({
     const generation = routeGenerationRef.current + 1;
     routeGenerationRef.current = generation;
     setSection(route.section);
+    if (route.listId) setRoutedListId(route.listId);
 
     // Resolve identity against the current library record instead of persisting
     // a second copy in the handoff. Progress and import metadata therefore stay
@@ -211,6 +214,8 @@ export default function ReadingWorkspaceView({
           ) : null}
           {surface === 'lists' ? (
             <ReadingListsView
+              key={routedListId ?? 'all'}
+              initialListId={routedListId}
               onOpenBook={onOpenBook}
               // §11.1's acquisition path, and the reason it is a real one here:
               // Discover is a sibling tab of this very workspace, so "find this"
