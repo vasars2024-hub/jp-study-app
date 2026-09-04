@@ -3576,3 +3576,49 @@ needs the Settings language card ON SCREEN; the route that works without a Start
 
 State restored: Settings closed, Grammar standard presentation, filter cleared, 2,410 points,
 0 dialogs.
+
+## 2026-09-04 · primary — `scraper` opens as the SIXTEENTH surface: categories 1, 3, 4 and 6 close at 10/10
+
+Commits `8dbe5623`, `9b5ffd14`. Surface title `Scraper`, window 1, 820x580. **This receipt was
+written by the turn AFTER the one that landed the two product commits — that turn died on its
+usage limit at 12:53 with the code committed and the scorecard entry unwritten.** cat1 was
+re-run here before the row was recorded (below); 3, 4 and 6 are recorded from their own commits'
+measured numbers, which are quoted in full in `git show 8dbe5623 9b5ffd14`.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 1 | Accessibility | **FAIL -> PASS 10/10.** At 820x580 with the settings drawer OPEN, `stolenCount` **17 -> 0**, `worstShrunkBy` **63.3% -> 0**. Re-run at 13:0x from this turn, drawer closed: all five bars true, `stolenCount` 0, `belowFloorByHit` 0, `occludedCount` 0, `ariaRestored` clean. Control on the landing turn: counts 0/5/0/0/0 -> 2/7/2/1/2, all six bars moved, `backToBaseline` true, `rectDrift` 0. |
+| 3 | Liquid utilization | **PASS 10/10.** 128 regions, dense 0, eligible **10/10** treated and **10/10** shared-primitive — after harness CORRECTION 36 (below) took `marked` from 1 to 10. |
+| 4 | Use of space | **FAIL -> PASS 10/10.** At 260x170 (`DesktopShell` MIN_W/MIN_H) `main.scr-main` wanted **366 in 150** and `nav.scr-rail` **70 in 51**; now 150 and inside the rail, with `clipped` **0 at all three sizes** — nothing was hidden to move the number. Controls: injected clip 0 -> 1 -> 0; a front-painted plant 0 -> 11 -> 0 and correctly NOT excused as a backdrop; the art plate hangs out by 279 and IS excused without `clipped` rising. |
+| 6 | Feature parity | **PASS 10/10.** parity standard **7/7** == liquid **7/7**, roundTrip 0 diffs, 7 of 7 mutations armed and each felling exactly its own row. |
+
+**THE CAT1 DEFECT IS A CONTAINER-QUERY TIER THAT NARROWS THE BOX AND NOT ITS CONTENTS.**
+`@container scr-shell (max-width: 1100px)` takes the rail column to 52px when the settings drawer
+opens, but `.is-collapsed` — the class every label-hiding rule keys on — is a COMPONENT state the
+drawer never sets, and those rules live only in the 700px tier. So in the whole band 700–1100 the
+rail was a 52px `overflow: hidden` box holding full-width labels: the group label read `SCRAP`,
+the page buttons `D.` `N` `Di` `Hi` `So` `To`, the status block `Memo 554 M` / `CPU: 1`. Seventeen
+controls with a 152x32 rect and 44px of it hit-testable. The running/idle text is CLIPPED, not
+removed — a bare coloured dot is colour-alone signalling — so it takes the same `sr-only` geometry
+the component already applies for `railCollapsed`, through a stable class a container query can
+reach.
+
+**THE CAT4 DEFECT IS A CHAIN OF INTRINSIC MINIMUMS, and the method is the transferable part.**
+Bisected by hiding one `.scr-page` child at a time rather than guessed at. Five levels each
+contribute: `.scr-grid`'s 300px track, `.scr-dashboard-quick`'s `repeat(3, minmax(110px, 1fr))`,
+`.scr-tile-row`'s 150px tiles, a 337px seven-part `.scr-health-row`, and `.scr-card-body` floored
+at its widest EMPTY state. Every one is a grid item whose automatic minimum is its own
+min-content, so they add. A definite column at each level stops the propagation.
+
+**HARNESS CORRECTION 36 — cat3's control E marked only the region's OWN body chain.** On this
+surface that is `marked: 1` and moves the dense count by ZERO: the Scraper grounds its own
+interior, so two Work regions at `ownAlpha` 0 survived on BORROWED ground the control never
+touched, and the leg VOIDed a surface that has no defect. E now marks every ancestor of every Work
+region up to the window — the window and the regions themselves still excluded. That is strictly
+MORE falsifying, which is the only safe direction to relax a control in. `marked` **1 -> 10**,
+ungrounded dense **0 -> 2**, and the single survivor is `div.lq-anchor.scr-search` at `ownAlpha` 1,
+i.e. standing on its own paint.
+
+**Still open on `scraper`: categories 2, 5, 7, 8.** cat7 has no `SPECS` entry for this surface yet;
+copy `grammar`'s, which is the newest and carries its reasoning. cat6 is already banked, so cat5's
+Q7/Q8/Q9 will not VOID on a missing baseline.
