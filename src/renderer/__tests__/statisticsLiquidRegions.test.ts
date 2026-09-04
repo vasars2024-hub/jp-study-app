@@ -64,8 +64,19 @@ describe('Statistics Liquid regions', () => {
     expect(VIEW).toContain('const recentActivityRef = useRef<HTMLElement>(null);');
     expect(VIEW).toContain('className="btn primary stats-recent-jump"');
     expect(VIEW).toContain("recentActivityRef.current?.scrollIntoView({ block: 'start' })");
-    expect(VIEW).toContain('<details className="stats-data-tools">');
+    // Not `'<details className="stats-data-tools">'`: the disclosure grew a `ref` and an
+    // `onToggle` when `2427124e` gave it light dismiss, JSX wrapped its props onto their own
+    // lines, and this assertion failed on the FORMATTING while the contract it names was
+    // intact. What it is actually for is that the destructive Reset stays disclosed, so match
+    // the element and its class without pinning them to one line.
+    expect(VIEW).toMatch(/<details\s+className="stats-data-tools"/);
     expect(VIEW).toContain('<summary className="btn">{t(\'stats.reset\')}</summary>');
+    // The other half of the popover contract, and the reason the repair exists: a native
+    // `<details>` closes only when its own summary is pressed again, so without light dismiss
+    // the obvious way out — click elsewhere — activated whatever the panel had covered.
+    // Measured live: the Reset panel overlapped "Sync from Anki" and `elementFromPoint` at that
+    // button's centre returned `BUTTON.btn.danger`.
+    expect(VIEW).toContain('useDismissableDisclosure(dataToolsRef, dataToolsOpen)');
     expect(VIEW).toContain('ref={recentActivityRef} className="stats-section stats-recent-activity"');
     expect(CSS).toContain('.stats-data-tools-panel {');
     expect(CSS).toContain('background: var(--panel);');
