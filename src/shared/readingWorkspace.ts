@@ -97,6 +97,20 @@ export interface ReadingWorkspaceRoute {
    * while carrying a list id is a lie the next reader has to discover.
    */
   listId?: string;
+  /**
+   * Which ENTRY of `listId` the detail scrolls to and selects.
+   *
+   * §11.1 row 8 — *"the 'on 2 lists' line in the reader → the list detail,
+   * scrolled to this entry"* — is only honest with this. A route carrying
+   * `listId` alone lands on the list top, and on a 200-book list the row the
+   * user clicked is off screen, which is the dead-end §11.1 forbids.
+   *
+   * Its own field rather than a reuse of `itemId`: one item can appear on the
+   * same list twice through two works, so the item does not identify a row.
+   * Meaningless without `listId` and ignored when the list is gone — the view
+   * falls back to the grid exactly as it does for a stale `listId`.
+   */
+  entryId?: string;
 }
 
 export interface ReadingWorkspaceCover {
@@ -142,6 +156,17 @@ const SECTION_ALIASES: Record<string, ReadingWorkspaceSection> = {
   'reading-finder': 'discover',
   readingfinder: 'discover',
   library: 'library',
+  // `lists` was added to READING_WORKSPACE_SECTIONS and to
+  // readingWorkspaceSurfaceForSection but never here, and this table is the
+  // ONLY thing normalizeReadingWorkspaceSection reads — so every route naming
+  // it normalized to null and five live call sites published nothing:
+  // ReadingReminderHost's three (§11.3's "open the list") and
+  // widgets/readingLists.tsx's two (§11.2's "click the header → list detail").
+  // A section in the union but not in the alias table is unreachable, silently.
+  lists: 'lists',
+  list: 'lists',
+  'reading-lists': 'lists',
+  readinglists: 'lists',
   captures: 'captures',
   capture: 'captures',
   lens: 'captures',
@@ -253,6 +278,12 @@ function normalizeRouteRecord(raw: Record<string, unknown>): ReadingWorkspaceRou
     ...(optionalId(raw.editionId) ? { editionId: optionalId(raw.editionId) } : {}),
     ...(optionalId(raw.itemId) ? { itemId: optionalId(raw.itemId) } : {}),
     ...(optionalId(raw.listId) ? { listId: optionalId(raw.listId) } : {}),
+    // Dropped without a `listId`. An entry id alone names a row in an unnamed
+    // list, which no receiver can act on, and keeping it would let a caller
+    // believe it had asked for something.
+    ...(optionalId(raw.listId) && optionalId(raw.entryId)
+      ? { entryId: optionalId(raw.entryId) }
+      : {}),
   };
 }
 
@@ -281,6 +312,7 @@ export function normalizeReadingWorkspaceRoute(value: unknown): ReadingWorkspace
         editionId: url.searchParams.get('editionId') ?? undefined,
         itemId: url.searchParams.get('itemId') ?? undefined,
         listId: url.searchParams.get('listId') ?? undefined,
+        entryId: url.searchParams.get('entryId') ?? undefined,
       });
     } catch {
       return null;
@@ -302,6 +334,7 @@ export function serializeReadingWorkspaceRoute(route: ReadingWorkspaceRoute): st
   if (normalized.editionId) params.set('editionId', normalized.editionId);
   if (normalized.itemId) params.set('itemId', normalized.itemId);
   if (normalized.listId) params.set('listId', normalized.listId);
+  if (normalized.entryId) params.set('entryId', normalized.entryId);
   return `reading://workspace/${normalized.section}?${params.toString()}`;
 }
 
