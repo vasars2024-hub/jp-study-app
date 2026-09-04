@@ -221,24 +221,49 @@
   // something to scroll. `overflow: hidden` containers are deliberately excluded — they are
   // chrome (`.fwin`, `.os-desktop`, `body`), they are still programmatically scrollable, and
   // scrolling them is exactly the damage this replaces.
-  const scrollParent = (el) => {
+  //
+  // RESOLVED PER AXIS, and the single-answer version was wrong in a way that reads as a clean
+  // measurement. It returned the nearest ancestor that scrolls in EITHER axis and `centreIn`
+  // then wrote both offsets on it, so a horizontal-only scroller nested inside the vertical
+  // one absorbed the vertical centring as a no-op and every control below the fold stayed
+  // below it. Measured live on `files` 2026-09-04: `div.fa-tree` is 52px wide over 172px of
+  // content and does not scroll vertically at all (scrollHeight === clientHeight, the rail
+  // above it is the real vertical scroller), so all 32 `.fa-tree-node` resolved to it, 25 of
+  // them were then filed `occluded by div.os-desktop` — outside the window entirely — and the
+  // run scored 53 of 103 controls, one and a half controls above its own VOID threshold.
+  // Splitting the walk is strictly TIGHTENING: it can only put a control INSIDE a viewport it
+  // was outside of, never the reverse, so it cannot turn a real failure into a pass.
+  const scrollParentIn = (el, axis) => {
     let p = el.parentElement;
     while (p && p !== document.body) {
       const cs = getComputedStyle(p);
-      const y = /(auto|scroll|overlay)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight;
-      const x = /(auto|scroll|overlay)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth;
-      if (y || x) return p;
+      const scrolls =
+        axis === 'y'
+          ? /(auto|scroll|overlay)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight
+          : /(auto|scroll|overlay)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth;
+      if (scrolls) return p;
       p = p.parentElement;
     }
     return null;
   };
-
-  // Centre `el` inside `sp` by writing `sp`'s own offsets. Nothing else in the document moves.
-  const centreIn = (el, sp) => {
-    const er = el.getBoundingClientRect();
-    const sr = sp.getBoundingClientRect();
-    sp.scrollTop += er.top + er.height / 2 - (sr.top + sr.height / 2);
-    sp.scrollLeft += er.left + er.width / 2 - (sr.left + sr.width / 2);
+  // Centre `el` inside its scroll regions by writing THEIR own offsets — the vertical one on
+  // the element that actually scrolls vertically, the horizontal one likewise, which are not
+  // always the same element. Nothing else in the document moves.
+  const centreIn = (el) => {
+    const spY = scrollParentIn(el, 'y');
+    const spX = scrollParentIn(el, 'x');
+    if (spY) {
+      const er = el.getBoundingClientRect();
+      const sr = spY.getBoundingClientRect();
+      spY.scrollTop += er.top + er.height / 2 - (sr.top + sr.height / 2);
+    }
+    if (spX) {
+      // Re-read: writing spY.scrollTop above may have moved this element.
+      const er = el.getBoundingClientRect();
+      const sr = spX.getBoundingClientRect();
+      spX.scrollLeft += er.left + er.width / 2 - (sr.left + sr.width / 2);
+    }
+    return spY || spX;
   };
 
   for (const el of els) {
@@ -258,8 +283,7 @@
       return b.width * b.height;
     };
     const target = hosts.reduce((a, b) => (area(b) > area(a) ? b : a));
-    const sp = scrollParent(target);
-    if (sp) centreIn(target, sp);
+    centreIn(target);
     let r = target.getBoundingClientRect();
     let cx = r.left + r.width / 2;
     let cy = r.top + r.height / 2;
