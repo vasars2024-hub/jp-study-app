@@ -12280,6 +12280,11 @@ export const ru: Catalog = {
   'readingLists.reminder.pace.body': '{books} книг за {days} дн.',
   'readingLists.reminder.daily.title': 'Сегодня ещё ничего не прочитано',
   'readingLists.reminder.daily.body': 'Ваши списки подождут, сколько нужно.',
+  'readingLists.reminder.action.open': 'Открыть список',
+  'readingLists.reminder.action.continue': 'Продолжить',
+  'readingLists.reminder.action.finish': 'Отметить прочитанной',
+  'readingLists.reminder.action.abandon': 'Перенести в брошенные',
+  'readingLists.reminder.action.silence': 'Больше не напоминать',
   'readingLists.view.archived': 'В архиве',
   'readingLists.view.triage': {
     one: '{count} требует проверки',

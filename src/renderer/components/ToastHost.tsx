@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ToastViewport } from './ui/Toast';
+import ReadingReminderHost from './reading/ReadingReminderHost';
 import { useT } from '../i18n';
 
 /**
@@ -175,6 +176,14 @@ export default function ToastHost() {
         </div>
       )}
       <ToastViewport />
+      {/*
+        Reading Lists §11.3's reminder card. Mounted here for the reason this
+        file's header already gives: this is the one place every shell mounts
+        exactly once, and App.tsx alone renders `ToastHost` in ten branches. An
+        eleventh mount point would be eleven chances for one shell to be the one
+        that never shows a reminder. It renders nothing until main pushes one.
+      */}
+      <ReadingReminderHost />
     </>
   );
 }

@@ -11840,6 +11840,11 @@ export const en: Catalog = {
   'readingLists.reminder.pace.body': '{books} books in {days} days.',
   'readingLists.reminder.daily.title': 'Nothing read today',
   'readingLists.reminder.daily.body': 'Your lists are waiting whenever you are.',
+  'readingLists.reminder.action.open': 'Open the list',
+  'readingLists.reminder.action.continue': 'Continue',
+  'readingLists.reminder.action.finish': 'Mark finished',
+  'readingLists.reminder.action.abandon': 'Move to abandoned',
+  'readingLists.reminder.action.silence': 'Never again',
   'readingLists.view.archived': 'Archived',
   'readingLists.view.triage': {
     one: '{count} needs a look',
