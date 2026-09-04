@@ -3134,3 +3134,70 @@ here would collide with that mergeback.
 
 Gates: `npx vitest run` (isolated, at `38a9a831`) EXIT 0; `i18n-check` EXIT 0 at 12,396 keys;
 `architecture-audit` EXIT 0 "Nothing new"; eslint 0 errors on both touched paths.
+
+## 2026-09-04 · backup — `grammar` category 1 closes at 10/10, and the floor had no primitive for half the controls
+
+`7b3b2207`, `31c157b2`. Surface `@.fwin:has(.gram-view)`, window 1, 820x580, standard
+presentation. **PASS 10/10, controlled.**
+
+    belowFloorByHit   27 -> 11 -> 2 -> 0      stolen 0 throughout      occluded 0 throughout
+
+Four numbers, four steps, because the 27 were three DIFFERENT obstacles and the walk named
+each blocker rather than leaving it to be guessed:
+
+| n | blocker named by the walk | remedy |
+|---|---|---|
+| 16 | none — `input[type=checkbox]`, 13px, no class | `.lq-check`, new primitive |
+| 1 | `span.gram-x-title` | `.gram-x-row .lq-check` min-height |
+| 2 | `div.gram-x-presets` (a select and a text field) | min-height on their own boxes |
+| 4+1+1 | none — plain buttons | `lq-hit-scope` on their containers |
+| 2 | `div.gram-x-detail` (`overflow: auto`) | min-height on the control |
+
+**THE FINDING WORTH CARRYING, and it is not about Grammar.** `liquid-controls.css` has said
+since the floor was written that `input` and `select` are excluded from `.lq-hit-scope`
+because `::after` generates no box on a replaced element, and that the floor is therefore
+"a `min-height` on the control, written where the control lives". It is written where the
+control lives in **zero** places. There are **245 native checkboxes across 97 renderer files**
+and not one carries a floor. The sheet named the hole and then left 97 call sites to each
+remember it — which is the failure mode RULE C exists for, and it is why this scored FAIL on
+a surface nobody would have suspected (WCAG 2.5.8 passes cleanly here, 0 fails, nearest
+neighbour 58px, so it reads as fine until it is walked).
+
+`.lq-check` fills it. The construction is the finding: the floor CANNOT go on the checkbox,
+because `min-height` on a tick box is visual growth and `css-measure` §2 already records that
+as damage. It goes on a `<label>` WRAPPING the control — label activation forwards the click,
+so the label carries 32px and the checkbox does not change size. **On a `span` the same
+expander is a dead region that SWALLOWS the click while still reading as a 32px target to
+`elementFromPoint`** — fixed to the instrument, a regression to a pointer. That span is the
+unit test's negative control, and it asserts the box stays unchecked.
+
+Control run, all six legs: contrast, targets-by-pointer, targets-by-rect, 2.5.8, keyboard and
+decorative-exemption **all MOVED**; `plantCaughtByPointer: 2`; `backToBaseline: true`,
+`rectDrift: 0`. Other four bars already true and still true: contrast min **5.35**, unreachable
+**0**, motionAfter **0**, 2.5.8 fails **0**.
+
+`belowFloorByRect` finishes at **28** and that is the correct answer, not a half-fix: the floor
+is a pointer region. Only two rules here grow a box, each because a clipper or a replaced
+element makes an expander impossible.
+
+**TRAP THAT COST ME A FALSE "NOTHING MOVED".** The `targets32` bar is
+`belowFloorByHit === 0 && stolenCount === 0`. `targets.under32Count` and `targets.smallest`
+are RECT numbers and do not move when a floor lands — they read 36 and "input 13px" both
+before and after, identically. Read `hit.belowFloorByHit`; a diff of the `targets` block alone
+says the fix did nothing.
+
+**THE PREVIOUS HANDOFF'S "no way to drive the app" IS WRONG, and this is the cheap fix.** A
+bridge token lives in the instance's OWN `cwd/debug/bridge.json` — the worktree app's token was
+sitting in `jp-wt-filesapp/debug/bridge.json` the whole time, readable and valid. But do not
+drive another worker's app: `JP_DEBUG_PORT` alone is NOT enough for a second instance, because
+Electron's single-instance lock keys on the userData path, so the second copy quits into the
+first and its bridge never binds. `JP_USER_DATA_DIR` (dev-only, `main.ts:145`, written for
+exactly this) is the missing half. The full recipe, ~3 minutes:
+
+    $env:JP_DEBUG_PORT="39274"; $env:PORT="5174"
+    $env:JP_USER_DATA_DIR="$env:USERPROFILE\.claude-runs\backup-scratch-profile"
+    npm start
+
+A scratch profile is a FIRST RUN, so it lands on the consent gate with the shell unmounted —
+hiding the node reveals nothing. Record the DECLINE instead (`jp-telemetry-consent` = `no`,
+no network call) and complete the tour (`jp-study.onboarding.v1.completedAt`), then reload.
