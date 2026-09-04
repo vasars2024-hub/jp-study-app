@@ -71,6 +71,82 @@
   border-color: var(--danger, #d9534f);
 }
 
+/* `recovered` is not `reset`: the lists on screen are real, only stale. Danger
+   red on both would make the two indistinguishable at a glance, which is the
+   whole distinction §11.4 asks the surface to draw. */
+.rlv__notice--warn {
+  border-color: var(--warning, #d9a13b);
+}
+
+/* ------------------------------------------------- the loading skeleton -- */
+
+.rlv__loading {
+  display: grid;
+  gap: var(--lq-space-3, 12px);
+}
+
+/* Deliberately the same four declarations as `.rlv__card-open`, so the
+   placeholder occupies the card's real box rather than an approximation. */
+.rlv__skeleton-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+}
+
+.rlv__skeleton-mosaic,
+.rlv__skeleton-line {
+  border-radius: 6px;
+  /* A tint of the text colour, not a hardcoded grey: the high-contrast block in
+     `liquid-tokens.css` reassigns `--lq-work-text-muted`, so the placeholders
+     follow the theme instead of vanishing into it. */
+  background: color-mix(in srgb, var(--lq-work-text-muted, #888) 22%, transparent);
+}
+
+.rlv__skeleton-mosaic {
+  aspect-ratio: 3 / 2;
+}
+
+.rlv__skeleton-line {
+  height: 10px;
+}
+
+.rlv__skeleton-line--name {
+  width: 70%;
+}
+
+.rlv__skeleton-line--meta {
+  width: 40%;
+}
+
+.rlv__skeleton-line--bar {
+  width: 100%;
+  height: 6px;
+}
+
+/* The pulse is decoration; the placeholders read the same without it, and a
+   surface that keeps animating under `prefers-reduced-motion` is a category-1
+   failure in this repo's own rubric. */
+@media (prefers-reduced-motion: no-preference) {
+  .rlv__skeleton-mosaic,
+  .rlv__skeleton-line {
+    animation: rlv-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rlv-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .rlv__new,
 .rlv__paste-actions {
   display: flex;
@@ -179,7 +255,13 @@
 
 /* --------------------------------------------------------------- the grid -- */
 
-.rlv__grid {
+/*
+ * The skeleton shares the grid rule rather than copying it. Two declarations
+ * would be two chances to drift, and a placeholder laid out differently from the
+ * thing it stands in for is a layout that jumps the moment the data arrives.
+ */
+.rlv__grid,
+.rlv__skeleton {
   list-style: none;
   margin: 0;
   padding: 0;

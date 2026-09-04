@@ -106,14 +106,22 @@ function seeded(): { document: ReadingListsDocument; listId: string } {
   return { document: sealReadingListsDocument(linked.document), listId };
 }
 
-function installBridge(store: FakeStore | null, loadFails = false) {
+function installBridge(
+  store: FakeStore | null,
+  loadFails = false,
+  /** How the served document came to be. Defaults to the healthy read. */
+  health: { state: string; lostRevisions: number; detectedAt?: number } = {
+    state: 'ok',
+    lostRevisions: 0,
+  },
+) {
   (window as unknown as { api?: unknown }).api = {
     listLibrary: async () => [ITEM],
     ...(store && !loadFails
       ? {
           readingListsLoad: async () => ({
             ok: true,
-            snapshot: { document: store.document, health: { state: 'ok', lostRevisions: 0 } },
+            snapshot: { document: store.document, health },
           }),
           readingListsWrite: store.write,
           readingListsEvents: async () => ({ ok: true, events: [] }),
@@ -290,6 +298,100 @@ describe('ReadingListsView', () => {
     await render();
     expect(host.textContent).toContain('No lists yet');
     expect(host.querySelector('.rlv__state--error')).toBeNull();
+    // The negative control for the two tests below: a healthy read shows NO
+    // recovery notice, so the notice is not simply always rendered.
+    expect(host.querySelector('[data-health]')).toBeNull();
+  });
+
+  /**
+   * §11.4's *a corrupt store shows what happened, it does not silently show
+   * zero lists*.
+   *
+   * `reset` is the case that makes this a defect rather than a nicety: main
+   * hands back `emptyReadingListsDocument()`, byte-identical to a first run's,
+   * so the ONLY thing separating "you have no lists yet" from "your lists are
+   * gone" is the health record — which the view discarded before this.
+   */
+  describe('store health (§11.4)', () => {
+    const EMPTY = () => new FakeStore(sealReadingListsDocument(emptyReadingListsDocument()));
+
+    it('does not let a reset store read as a first run', async () => {
+      installBridge(EMPTY(), false, { state: 'reset', lostRevisions: 0, detectedAt: 7 });
+      await render();
+      const notice = host.querySelector<HTMLElement>('[data-health="reset"]');
+      expect(notice).not.toBeNull();
+      expect(notice?.getAttribute('role')).toBe('alert');
+      expect(notice?.textContent).toContain('could not be read');
+      // It says the unreadable file survives, because that is the user's only
+      // route back to it and deleting it is what they will assume happened.
+      expect(notice?.textContent).toContain('still on disk');
+    });
+
+    it('tells a recovered store apart from a reset one, and does not call it danger', async () => {
+      const { document } = seeded();
+      installBridge(new FakeStore(document), false, {
+        state: 'recovered',
+        lostRevisions: 1,
+        detectedAt: 9,
+      });
+      await render();
+      const notice = host.querySelector<HTMLElement>('[data-health="recovered"]');
+      expect(notice).not.toBeNull();
+      expect(notice?.className).toContain('rlv__notice--warn');
+      expect(notice?.className).not.toContain('rlv__notice--error');
+      // The lists it recovered are real and still drawn — this is a warning
+      // over a working surface, not a replacement for it.
+      expect(host.querySelector('.rlv__grid')).not.toBeNull();
+      // `lostRevisions` is documented as unknown-but-at-least-one, so no count
+      // is printed. Asserting the absence keeps a later "helpful" edit honest.
+      expect(notice?.textContent).not.toContain('1 ');
+    });
+
+    it('stays dismissed once dismissed', async () => {
+      installBridge(EMPTY(), false, { state: 'reset', lostRevisions: 0, detectedAt: 7 });
+      await render();
+      await click(byText('Dismiss'));
+      expect(host.querySelector('[data-health]')).toBeNull();
+    });
+  });
+
+  it('draws skeleton cards while the store is loading, and only until it answers', async () => {
+    let release: ((value: unknown) => void) | null = null;
+    const store = new FakeStore(seeded().document);
+    (window as unknown as { api?: unknown }).api = {
+      listLibrary: async () => [ITEM],
+      readingListsLoad: () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({
+              ok: true,
+              snapshot: { document: store.document, health: { state: 'ok', lostRevisions: 0 } },
+            });
+        }),
+      readingListsWrite: store.write,
+      readingListsEvents: async () => ({ ok: true, events: [] }),
+      onReadingListsChanged: () => () => undefined,
+    };
+    await render();
+
+    const skeleton = host.querySelector('[data-testid="rlv-skeleton"]');
+    expect(skeleton).not.toBeNull();
+    expect(skeleton?.querySelectorAll('.rlv__skeleton-card')).toHaveLength(6);
+    // Placeholders are hidden from assistive tech; the status text is what a
+    // screen reader gets, and it is a real sentence rather than six empty cards.
+    expect(skeleton?.getAttribute('aria-hidden')).toBe('true');
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('Loading');
+    // A skeleton is not an error and is not an empty state.
+    expect(host.querySelector('.rlv__state--error')).toBeNull();
+    expect(host.textContent).not.toContain('No lists yet');
+
+    await act(async () => {
+      (release as unknown as (value: unknown) => void)(null);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(host.querySelector('[data-testid="rlv-skeleton"]')).toBeNull();
+    expect(host.querySelector('.rlv__grid')).not.toBeNull();
   });
 
   it('filters rows by title and says so, rather than looking like an empty list', async () => {

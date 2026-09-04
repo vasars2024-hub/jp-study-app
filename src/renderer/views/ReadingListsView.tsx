@@ -88,6 +88,14 @@ const SORT_KEYS: Record<ReadingListSort, string> = {
   progress: 'readingLists.view.sort.progress',
 };
 
+/**
+ * Six placeholders, because the grid's `auto-fill` fits three per row at the
+ * default window and two full rows read as a grid rather than as a stray card.
+ * A fixed count is deliberate: guessing the real number from a previous session
+ * would make the skeleton lie whenever it guessed wrong.
+ */
+const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
+
 /** The one undo the surface offers, and the label that explains what it undoes. */
 interface UndoSlot {
   message: string;
@@ -272,8 +280,11 @@ export default function ReadingListsView({
   const { t, lang } = useT();
   // One subscription, shared with §11.2's widgets: four copies of a load effect
   // is four chances to disagree about what "not loaded yet" looks like.
-  const { document, failure: loadFailure, adopt, reload } = useReadingListsDocument();
+  const { document, failure: loadFailure, health, adopt, reload } = useReadingListsDocument();
   const [writeFailure, setWriteFailure] = useState<string | null>(null);
+  // Dismissal is per detected-at, not a bare boolean: a SECOND recovery, later in
+  // the same session, is a new fact and has to be announced again.
+  const [healthDismissedAt, setHealthDismissedAt] = useState<number | null>(null);
   const items = useLibraryItems();
   const [listId, setListId] = useState<string | null>(initialListId);
   const [sort, setSort] = useState<ReadingListSort>('recent');
@@ -760,7 +771,7 @@ export default function ReadingListsView({
 
   if (!document) {
     return (
-      <div className="rlv" data-surface="reading-lists">
+      <div className="rlv" data-surface="reading-lists" data-mode="loading">
         {loadFailure ? (
           <div className="rlv__state rlv__state--error" role="alert">
             <p>{t('readingLists.view.loadFailed')}</p>
@@ -774,16 +785,75 @@ export default function ReadingListsView({
             </Button>
           </div>
         ) : (
-          <div className="rlv__state" aria-busy="true">
-            {t('readingLists.view.loading')}
+          /**
+           * §11.4's "skeleton rows while the store loads". The placeholders are
+           * `aria-hidden` and the status text is the only thing a screen reader
+           * gets — announcing six empty cards is worse than announcing nothing.
+           */
+          <div className="rlv__loading" aria-busy="true">
+            <p className="rlv__state" role="status">
+              {t('readingLists.view.loading')}
+            </p>
+            <ul className="rlv__skeleton" aria-hidden="true" data-testid="rlv-skeleton">
+              {SKELETON_CARDS.map((slot) => (
+                <li key={slot} className="rlv__skeleton-card">
+                  <span className="rlv__skeleton-mosaic" />
+                  <span className="rlv__skeleton-line rlv__skeleton-line--name" />
+                  <span className="rlv__skeleton-line rlv__skeleton-line--meta" />
+                  <span className="rlv__skeleton-line rlv__skeleton-line--bar" />
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
     );
   }
 
+  /**
+   * §11.4: *a corrupt store shows what happened and offers last-good recovery,
+   * it does not silently show zero lists*.
+   *
+   * `reset` is the case that makes this load-bearing. Main hands back an empty
+   * document, which is byte-identical to a first run's, so without this the
+   * surface renders "No lists yet. Make one, then paste a message into it." over
+   * a store that just lost every list. `recovered` is the milder half — the
+   * lists on screen are real, but they are the restore point, so anything
+   * written since the corruption is not here.
+   *
+   * Both name the file, because recovery is a file operation and the user's only
+   * route to the unreadable original is on disk.
+   */
+  const showHealth =
+    (health?.state === 'recovered' || health?.state === 'reset') &&
+    // Normalized on both sides: a health record with no `detectedAt` would
+    // otherwise compare `undefined !== null` and refuse to stay dismissed.
+    (health.detectedAt ?? 0) !== (healthDismissedAt ?? -1);
+  const healthNotice = showHealth ? (
+    <div
+      className={`rlv__notice rlv__notice--${health.state === 'reset' ? 'error' : 'warn'}`}
+      role="alert"
+      data-health={health.state}
+    >
+      <span>
+        {health.state === 'reset'
+          ? t('readingLists.view.health.reset')
+          : t('readingLists.view.health.recovered')}
+      </span>
+      <Button
+        size="sm"
+        onClick={() => {
+          setHealthDismissedAt(health.detectedAt ?? 0);
+        }}
+      >
+        {t('readingLists.view.health.dismiss')}
+      </Button>
+    </div>
+  ) : null;
+
   const notices = (
     <>
+      {healthNotice}
       {writeFailure ? (
         <div className="rlv__notice rlv__notice--error" role="alert">
           {t('readingLists.view.writeFailed')}

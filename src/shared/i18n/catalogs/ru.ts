@@ -12265,6 +12265,11 @@ export const ru: Catalog = {
   'readingLists.view.loadFailed': 'Списки не удалось прочитать, поэтому ничего не показано.',
   'readingLists.view.retry': 'Повторить',
   'readingLists.view.writeFailed': 'Изменение не сохранилось, поэтому ничего не изменилось.',
+  'readingLists.view.health.recovered':
+    'Файл со списками чтения не читается, поэтому восстановлена последняя рабочая копия. Всё, что менялось после неё, сюда не попало.',
+  'readingLists.view.health.reset':
+    'Файл со списками чтения не читается, и запасной копии не было, поэтому всё начинается с пустого места. Нечитаемый файл остался на диске и не удалён.',
+  'readingLists.view.health.dismiss': 'Закрыть',
   'readingLists.view.emptyGrid': 'Списков пока нет. Создайте один и вставьте в него сообщение.',
   'readingLists.view.emptyList': 'Список пуст. Вставьте сообщение, чтобы его заполнить.',
   'readingLists.view.newList': 'Новый список',

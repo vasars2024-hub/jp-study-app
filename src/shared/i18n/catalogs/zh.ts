@@ -11196,6 +11196,11 @@ export const zh: Catalog = {
   'readingLists.view.loadFailed': '无法读取你的书单，因此没有显示任何内容。',
   'readingLists.view.retry': '重试',
   'readingLists.view.writeFailed': '该改动没有保存，因此没有任何变化。',
+  'readingLists.view.health.recovered':
+    '无法读取你的阅读清单文件，因此已恢复最后一份可用的副本。该副本之后的改动不在这里。',
+  'readingLists.view.health.reset':
+    '无法读取你的阅读清单文件，也没有更早的副本可以回退，因此从空白开始。无法读取的文件仍在磁盘上，并未被删除。',
+  'readingLists.view.health.dismiss': '关闭',
   'readingLists.view.emptyGrid': '还没有书单。先新建一个，再把消息粘贴进去。',
   'readingLists.view.emptyList': '这个书单是空的。粘贴一段消息来填充它。',
   'readingLists.view.newList': '新建书单',

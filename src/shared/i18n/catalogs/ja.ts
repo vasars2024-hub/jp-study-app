@@ -11316,6 +11316,11 @@ export const ja: Catalog = {
   'readingLists.view.loadFailed': 'リストを読み込めなかったため、何も表示されていません。',
   'readingLists.view.retry': '再試行',
   'readingLists.view.writeFailed': 'この変更は保存されなかったため、何も変わっていません。',
+  'readingLists.view.health.recovered':
+    '読書リストのファイルを読み込めなかったため、最後に正常だった控えを復元しました。その控えより後の変更はここにはありません。',
+  'readingLists.view.health.reset':
+    '読書リストのファイルを読み込めず、戻れる控えもなかったため、空の状態で始めています。読み込めなかったファイルはディスク上に残っており、削除されていません。',
+  'readingLists.view.health.dismiss': '閉じる',
   'readingLists.view.emptyGrid':
     'リストがまだありません。作成してから、メッセージを貼り付けてください。',
   'readingLists.view.emptyList': 'このリストは空です。メッセージを貼り付けて追加してください。',

@@ -11825,6 +11825,11 @@ export const en: Catalog = {
   'readingLists.view.loadFailed': 'Your lists could not be read, so none are shown.',
   'readingLists.view.retry': 'Try again',
   'readingLists.view.writeFailed': 'That change was not saved, so nothing has changed.',
+  'readingLists.view.health.recovered':
+    'Your reading-lists file could not be read, so the last copy that worked was restored. Anything changed after that copy was made is not here.',
+  'readingLists.view.health.reset':
+    'Your reading-lists file could not be read and there was no earlier copy to fall back on, so this is starting empty. The unreadable file is still on disk and has not been deleted.',
+  'readingLists.view.health.dismiss': 'Dismiss',
   'readingLists.view.emptyGrid': 'No lists yet. Make one, then paste a message into it.',
   'readingLists.view.emptyList': 'This list is empty. Paste a message to fill it.',
   'readingLists.view.newList': 'New list',
