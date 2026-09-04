@@ -16,12 +16,29 @@
  * The fix has three parts, and this file guards all three, because none of them
  * can be seen by a DOM-structural test and jsdom has no layout at all:
  *
- *   · one right-hand column (`.study-side-rail`) owns mining AND the transcript,
- *     so the rail opening no longer shoves mining sideways into the grammar card;
+ *   · one column owns mining AND the transcript, so the rail opening no longer
+ *     shoves mining sideways into the grammar card;
  *   · the dock's real height is published to CSS as `--study-dock-height`, so
  *     what sits above it stops guessing;
  *   · the columns declare their width once (`--study-column`) and the subtitle
  *     centres in what they leave (`--study-left/right-gutter`).
+ *
+ * ## The first part moved, 2026-09-03
+ *
+ * `d076b9b3` replaced the hand-written `.study-side-rail` with the workspace's
+ * dock system: the overlay now publishes a `blockRenderers` map and `StudyDocks`
+ * decides which side each block lands on. The three assertions that named the
+ * rail's JSX were left pointing at a wrapper the overlay no longer renders, so
+ * the branch tip carried 3 deterministic failures while the shared working tree
+ * hid them behind a newer uncommitted copy of this file.
+ *
+ * They are re-pointed here rather than deleted, and at the same defect. The
+ * collision the rail prevented is prevented now by `.study-dock`: one flex
+ * column per side, ordered by the workspace rather than by JSX. So the successor
+ * assertions are that the overlay places NEITHER panel itself (exactly one JSX
+ * occurrence each, inside the block map) and that the dock does the stacking.
+ * That is strictly stronger than the rail check, which could not see a second
+ * copy of a panel rendered somewhere else on the surface.
  *
  * Source-level assertions on purpose. `VideoCoreStudyOverlay.tsx` imports the
  * adopted player's jotai atoms and cannot be imported by a test — the same
@@ -34,7 +51,10 @@ import { resolve } from 'node:path';
 
 const SRC = resolve(__dirname, '../..');
 const OVERLAY = resolve(SRC, 'media/VideoCoreStudyOverlay.tsx');
+const DOCKS = resolve(SRC, 'media/StudyDocks.tsx');
+const BAR = resolve(SRC, 'media/StudyBottomBar.tsx');
 const CSS = resolve(SRC, 'media/mediaWorkspace.css');
+const DOCK_CSS = resolve(SRC, 'media/studyWorkspace.css');
 
 /**
  * Comments out before any source sweep.
@@ -66,23 +86,60 @@ function block(css: string, selector: string): string {
   throw new Error(`unterminated rule for \`${selector}\``);
 }
 
+/**
+ * The body of a braced construct opened by `header`. Brace-counted, like `block`.
+ *
+ * Every caller below proves the count terminated where it should — a runaway that
+ * swallowed the component's whole return would make the `toContain` assertions
+ * pass for the wrong reason, which is exactly how the rail assertions kept
+ * looking healthy in the shared tree.
+ */
+function braced(text: string, header: string): string {
+  const at = text.indexOf(header);
+  expect(at, `no \`${header}\``).toBeGreaterThan(-1);
+  const open = text.indexOf('{', at);
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return text.slice(open + 1, i);
+  }
+  throw new Error(`unterminated \`${header}\``);
+}
+
 const overlay = code(readFileSync(OVERLAY, 'utf8'));
+const docks = code(readFileSync(DOCKS, 'utf8'));
+const bar = code(readFileSync(BAR, 'utf8'));
 const css = code(readFileSync(CSS, 'utf8'));
+const dockCss = code(readFileSync(DOCK_CSS, 'utf8'));
 
 describe('the study surface is one column layout, not four anchored panels', () => {
-  it('renders mining and the transcript inside the rail', () => {
-    const at = overlay.indexOf('<div className="study-side-rail">');
-    expect(at, 'the rail wrapper is gone').toBeGreaterThan(-1);
-    const rail = overlay.slice(at, overlay.indexOf('</div>', at));
-    expect(rail).toContain('<VideoCoreMiningPanel');
-    expect(rail).toContain('<VideoCoreTranscriptPanel');
+  it('hands mining and the transcript to the dock instead of placing them', () => {
+    const map = braced(overlay, 'const blockRenderers: BlockRenderers =');
+    // The count stopped at the map's own closing brace and not at the end of the
+    // component, so the two `toContain`s below mean what they say.
+    expect(map, 'the block map ran past its own closing brace').not.toContain('<StudyDocks');
+    expect(map).toContain('<VideoCoreMiningPanel');
+    expect(map).toContain('<VideoCoreTranscriptPanel');
+    expect(overlay).toContain('<StudyDocks renderers={blockRenderers} />');
+
+    // The successor to the rail check, and the part that actually guards the
+    // collision: a panel the overlay renders a SECOND time, outside the map, is
+    // placing itself again no matter what the dock decides.
+    for (const tag of ['<VideoCoreMiningPanel', '<VideoCoreTranscriptPanel']) {
+      expect(overlay.split(tag).length - 1, `${tag} is also rendered outside the block map`)
+        .toBe(1);
+    }
   });
 
-  it('puts mining above the transcript, so the transcript takes the remainder', () => {
-    const at = overlay.indexOf('<div className="study-side-rail">');
-    const rail = overlay.slice(at, overlay.indexOf('</div>', at));
-    expect(rail.indexOf('<VideoCoreMiningPanel'))
-      .toBeLessThan(rail.indexOf('<VideoCoreTranscriptPanel'));
+  it('lets the dock stack a side, ordered by the workspace and not by JSX', () => {
+    // One container per side, every block of that side inside it, sorted — the three
+    // properties `.study-side-rail` used to supply by being hand-written.
+    expect(docks).toMatch(/className="study-dock"/);
+    expect(docks).toMatch(/data-dock=\{side\}/);
+    expect(docks).toMatch(/list\.sort\(\(a, b\) => a\.order - b\.order\)/);
+    const dock = block(dockCss, '#media-workspace .study-dock');
+    expect(dock).toMatch(/display:\s*flex/);
+    expect(dock).toMatch(/flex-direction:\s*column/);
   });
 
   it('lets the column place both panels — neither positions itself', () => {
@@ -113,7 +170,10 @@ describe('the study surface is one column layout, not four anchored panels', () 
 
 describe('the dock publishes its height instead of being guessed at', () => {
   it('observes the dock and writes the variable onto the slice', () => {
-    expect(overlay).toMatch(/ref=\{dockRef\}/);
+    // The ref now crosses a component boundary — `d076b9b3` split the bar out — so
+    // follow it across, which the old single-file `ref={dockRef}` could not.
+    expect(overlay).toMatch(/barRef=\{dockRef\}/);
+    expect(bar).toMatch(/ref=\{props\.barRef\}/);
     expect(overlay).toMatch(/new ResizeObserver\(publish\)/);
     expect(overlay).toMatch(/setProperty\('--study-dock-height'/);
     // On the slice, so a pop-out workspace cannot overwrite the main window's.
