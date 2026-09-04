@@ -2510,3 +2510,26 @@ exactly their own row and restore. Evidence: `baselines/cat6-s11-visualizer.json
 
 **Running total: 12 of 25 sections at 80/80.** `visualizer` has **1 of 8**; **103 category
 cells remain**. Next: drive categories 1–4 on this same live compact surface.
+
+---
+
+## 2026-09-04 · codexA — Visualizer categories 1–4 close; one overlap repaired
+
+All four cells were driven on the live 380×200 window after the contextual-dock change.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 1 | Accessibility | **10/10** — 5 text runs, min 6.87:1; 6/6 controls keyboard-reachable; 0 hit-floor, WCAG 2.5.8, or motion failures. Six control axes move and restore. |
+| 2 | Clunkiness | **10/10** — real presentation-toggle task costs 1 click in both modes; worst receive 17.1 ms standard / 15.4 ms Liquid, 0 dead ends, traps, or >100 ms samples; undo and presentation restore exact. Control 0,0,0 → 1,1,1 → 0,0,0. |
+| 3 | Liquid utilization | **10/10** — 4 regions: eligible 1/1 treated and shared, Anchor 2, Ambient 1, dense Work on translucent 0. With no runtime Work region, the plant control moves eligible 1→2 and dense 0→1, fails both bars, then restores. |
+| 4 | Use of space | **10/10** — default 380×200, compact 260×170, maximized 1264×773: clipped/overlaps/horizontal/dead all 0, canvas share 82.1→78.8→95.3%, every leg restored. Three geometry controls fire and restore. |
+
+Category 4's first run was a real FAIL: the idle hint's element used `inset:0`, so its semantic
+box covered the whole canvas and overlapped the new dock by 78×42 px at default and compact.
+The hint now owns only its painted 86×17 box above the dock; overlap is 1→0 at both sizes.
+
+Evidence: `cat1-s11-visualizer.json`, `cat2-s11-visualizer.json`,
+`cat3-s11-visualizer.json`, `cat4-s11-visualizer.json`.
+
+**Running total: 12 of 25 sections at 80/80.** `visualizer` has **5 of 8**; **99 category
+cells remain**. Next: categories 5, 7, and 8.

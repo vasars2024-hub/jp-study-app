@@ -1,5 +1,15 @@
 /* Visualizer's stable canvas owns the window. The two routes sit in one compact edge dock:
    quiet while the ambient surface is idle, fully visible on pointer or keyboard focus. */
+.viz-widget > .viz-widget-hint {
+  inset: auto;
+  top: 42%;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .viz-widget-dock {
   position: absolute;
   right: 8px;
