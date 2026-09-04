@@ -352,3 +352,127 @@ describe('status colours have a text variant, and it is what status TEXT paints'
     }
   });
 });
+
+/**
+ * The FOURTH instance of the same shape, and the first where the GROUND is what moved.
+ *
+ * `--accent-text`'s 30% share was solved against the opaque surface vars — `--bg`, `--panel`,
+ * `--panel-2`, `--sidebar`. A chip with `background: var(--accent-weak)` is not one of those:
+ * the wash tints its surface 14-16% TOWARDS the accent, i.e. towards the foreground, so the
+ * same share loses contrast precisely where the design leans hardest on the accent.
+ *
+ * Measured 2026-09-04 on the live Scraper rail's active item, compositing the real ancestor
+ * chain, 9 accent presets x 6 light palettes + the 3 darks = 81 cells with transitions frozen:
+ * the shipped `color: var(--accent)` failed **54 of 54** light cells (worst 1.28:1, rose-pine +
+ * amber); `--accent-text`'s 30% share still failed at **4.28:1** (soft-sepia + amber); 26 was
+ * the largest passing share at 4.55 and **24 ships**, at 4.69, because a 1.1% margin on a
+ * ground derived from a user-chosen colour is not a margin. The darks keep `var(--accent-2)`:
+ * worst of their 27 cells is 5.89.
+ *
+ * The last assertion is the one that matters most. Eleven MORE rules in `scraper.css` paint the
+ * accent on that same wash, and they were found by a predicate, not by eye — so the predicate is
+ * what is guarded, and a twelfth added later fails here rather than on someone's light palette.
+ */
+const SCRAPER = readFileSync(
+  resolve(__dirname, '..', 'components', 'scraper', 'scraper.css'),
+  'utf8',
+)
+  .replace(/\r\n?/g, '\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '');
+
+describe('--accent-text-on-wash', () => {
+  const shareOf = (value: string): number | null => {
+    const m = value.match(/var\(--accent\)\s+([\d.]+)%/);
+    return m ? Number(m[1]) : null;
+  };
+
+  it('defaults on :root to the dark highlight, so the darks are untouched', () => {
+    const root = blocks().filter((b) => /^:root$/.test(b.selector));
+    expect(root.length, 'the base :root block moved or was renamed').toBeGreaterThan(0);
+    const value = root
+      .flatMap((b) => b.declarations.split(';'))
+      .map((d) => d.match(/^\s*--accent-text-on-wash\s*:\s*(.+)$/))
+      .find((m): m is RegExpMatchArray => m !== null)?.[1]
+      .trim();
+    expect(value, 'not declared on :root — every consumer resolves to nothing').toBeTruthy();
+    expect(value, '27 of 27 dark cells already clear the bar; re-deriving there only dulls the accent')
+      .toBe('var(--accent-2)');
+  });
+
+  it('is overridden by every palette that sets color-scheme: light', () => {
+    const lightThemes = new Set<string>();
+    for (const b of blocks()) {
+      if (!/color-scheme\s*:\s*light/.test(b.declarations)) continue;
+      for (const t of themesIn(b.selector)) lightThemes.add(t);
+    }
+    expect(lightThemes.size, 'no light palette found at all — the selector shape changed').toBe(6);
+
+    const overridden = new Set<string>();
+    for (const b of blocks()) {
+      if (!/--accent-text-on-wash\s*:/.test(b.declarations)) continue;
+      for (const t of themesIn(b.selector)) overridden.add(t);
+    }
+    expect(
+      [...lightThemes].filter((t) => !overridden.has(t)),
+      'a light palette inheriting the dark default paints a whitened accent on an accent-tinted ' +
+        'near-white chip. Join the override list beside --accent-text.',
+    ).toEqual([]);
+  });
+
+  it('mixes toward the palette own --text, at a SMALLER share than --accent-text', () => {
+    const valuesOf = (token: string) =>
+      blocks().flatMap((b) =>
+        b.declarations
+          .split(';')
+          .map((d) => d.match(new RegExp(`^\\s*${token}\\s*:\\s*(.+)$`)))
+          .filter((m): m is RegExpMatchArray => m !== null)
+          .map((m) => ({ selector: b.selector, value: m[1].trim() })),
+      );
+
+    const wash = valuesOf('--accent-text-on-wash').filter((v) => v.value !== 'var(--accent-2)');
+    expect(wash.length, 'no light override declares a value').toBeGreaterThan(0);
+    const notDerived = wash.filter(
+      (v) => !v.value.includes('var(--text)') || !v.value.includes('var(--accent)'),
+    );
+    expect(
+      notDerived.map((v) => `${v.selector} { --accent-text-on-wash: ${v.value} }`),
+      'a literal here is legible on exactly one palette and ignores the user accent',
+    ).toEqual([]);
+
+    const opaque = valuesOf('--accent-text').filter((v) => v.value !== 'var(--accent-2)');
+    const washShare = shareOf(wash[0].value);
+    const opaqueShare = shareOf(opaque[0]?.value ?? '');
+    expect(washShare, 'the wash share is unreadable — the recipe shape changed').not.toBeNull();
+    expect(opaqueShare, 'the opaque share is unreadable — the recipe shape changed').not.toBeNull();
+    expect(
+      (washShare ?? Infinity) < (opaqueShare ?? -Infinity),
+      `wash ${washShare} vs opaque ${opaqueShare}: the whole reason this token exists is that an ` +
+        'accent-tinted ground needs LESS accent in its foreground, not the same or more',
+    ).toBe(true);
+    expect(washShare, 'measured: 26 is the largest passing share and 24 is what ships').toBeLessThanOrEqual(26);
+  });
+
+  it('is what every accent-on-its-own-wash run in the Scraper paints', () => {
+    const offenders: string[] = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    let m: RegExpExecArray | null;
+    let washRules = 0;
+    while ((m = re.exec(SCRAPER))) {
+      const selector = m[1].trim().replace(/\s+/g, ' ');
+      const decl = m[2];
+      if (!/(?:^|;)\s*background\s*:\s*var\(--accent-weak\)/.test(decl)) continue;
+      washRules++;
+      const color = decl.match(/(?:^|;)\s*color\s*:\s*([^;]+)/)?.[1].trim();
+      if (color === 'var(--accent)') offenders.push(`${selector} { color: ${color} }`);
+    }
+    // An empty sweep would make the assertion vacuously true — this is the shape that has
+    // produced a false pass in this repo before.
+    expect(washRules, 'no accent-weak background found at all — the predicate is stale')
+      .toBeGreaterThanOrEqual(12);
+    expect(
+      offenders,
+      'the plain accent on its own 16% wash measured 1.28-2.74:1 across all 54 light cells. ' +
+        'Use --accent-text-on-wash.',
+    ).toEqual([]);
+  });
+});

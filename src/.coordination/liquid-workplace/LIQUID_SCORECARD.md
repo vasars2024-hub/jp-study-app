@@ -3576,3 +3576,174 @@ needs the Settings language card ON SCREEN; the route that works without a Start
 
 State restored: Settings closed, Grammar standard presentation, filter cleared, 2,410 points,
 0 dialogs.
+
+## 2026-09-04 · primary — `scraper` opens as the SIXTEENTH surface: categories 1, 3, 4 and 6 close at 10/10
+
+Commits `8dbe5623`, `9b5ffd14`. Surface title `Scraper`, window 1, 820x580. **This receipt was
+written by the turn AFTER the one that landed the two product commits — that turn died on its
+usage limit at 12:53 with the code committed and the scorecard entry unwritten.** cat1 was
+re-run here before the row was recorded (below); 3, 4 and 6 are recorded from their own commits'
+measured numbers, which are quoted in full in `git show 8dbe5623 9b5ffd14`.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 1 | Accessibility | **FAIL -> PASS 10/10.** At 820x580 with the settings drawer OPEN, `stolenCount` **17 -> 0**, `worstShrunkBy` **63.3% -> 0**. Re-run at 13:0x from this turn, drawer closed: all five bars true, `stolenCount` 0, `belowFloorByHit` 0, `occludedCount` 0, `ariaRestored` clean. Control on the landing turn: counts 0/5/0/0/0 -> 2/7/2/1/2, all six bars moved, `backToBaseline` true, `rectDrift` 0. |
+| 3 | Liquid utilization | **PASS 10/10.** 128 regions, dense 0, eligible **10/10** treated and **10/10** shared-primitive — after harness CORRECTION 36 (below) took `marked` from 1 to 10. |
+| 4 | Use of space | **FAIL -> PASS 10/10.** At 260x170 (`DesktopShell` MIN_W/MIN_H) `main.scr-main` wanted **366 in 150** and `nav.scr-rail` **70 in 51**; now 150 and inside the rail, with `clipped` **0 at all three sizes** — nothing was hidden to move the number. Controls: injected clip 0 -> 1 -> 0; a front-painted plant 0 -> 11 -> 0 and correctly NOT excused as a backdrop; the art plate hangs out by 279 and IS excused without `clipped` rising. |
+| 6 | Feature parity | **PASS 10/10.** parity standard **7/7** == liquid **7/7**, roundTrip 0 diffs, 7 of 7 mutations armed and each felling exactly its own row. |
+
+**THE CAT1 DEFECT IS A CONTAINER-QUERY TIER THAT NARROWS THE BOX AND NOT ITS CONTENTS.**
+`@container scr-shell (max-width: 1100px)` takes the rail column to 52px when the settings drawer
+opens, but `.is-collapsed` — the class every label-hiding rule keys on — is a COMPONENT state the
+drawer never sets, and those rules live only in the 700px tier. So in the whole band 700–1100 the
+rail was a 52px `overflow: hidden` box holding full-width labels: the group label read `SCRAP`,
+the page buttons `D.` `N` `Di` `Hi` `So` `To`, the status block `Memo 554 M` / `CPU: 1`. Seventeen
+controls with a 152x32 rect and 44px of it hit-testable. The running/idle text is CLIPPED, not
+removed — a bare coloured dot is colour-alone signalling — so it takes the same `sr-only` geometry
+the component already applies for `railCollapsed`, through a stable class a container query can
+reach.
+
+**THE CAT4 DEFECT IS A CHAIN OF INTRINSIC MINIMUMS, and the method is the transferable part.**
+Bisected by hiding one `.scr-page` child at a time rather than guessed at. Five levels each
+contribute: `.scr-grid`'s 300px track, `.scr-dashboard-quick`'s `repeat(3, minmax(110px, 1fr))`,
+`.scr-tile-row`'s 150px tiles, a 337px seven-part `.scr-health-row`, and `.scr-card-body` floored
+at its widest EMPTY state. Every one is a grid item whose automatic minimum is its own
+min-content, so they add. A definite column at each level stops the propagation.
+
+**HARNESS CORRECTION 36 — cat3's control E marked only the region's OWN body chain.** On this
+surface that is `marked: 1` and moves the dense count by ZERO: the Scraper grounds its own
+interior, so two Work regions at `ownAlpha` 0 survived on BORROWED ground the control never
+touched, and the leg VOIDed a surface that has no defect. E now marks every ancestor of every Work
+region up to the window — the window and the regions themselves still excluded. That is strictly
+MORE falsifying, which is the only safe direction to relax a control in. `marked` **1 -> 10**,
+ungrounded dense **0 -> 2**, and the single survivor is `div.lq-anchor.scr-search` at `ownAlpha` 1,
+i.e. standing on its own paint.
+
+**Still open on `scraper`: categories 2, 5, 7, 8.** cat7 has no `SPECS` entry for this surface yet;
+copy `grammar`'s, which is the newest and carries its reasoning. cat6 is already banked, so cat5's
+Q7/Q8/Q9 will not VOID on a missing baseline.
+
+## 2026-09-04 · primary — `scraper` category 2 closes at 10/10, and the whole run turned on TWO harness arguments
+
+No product change: the Scraper's dominant discovery task is already clean. What this entry is
+worth reading for is that the run VOIDed twice on the instrument before it measured anything, and
+both causes are surface-shape, not defects.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 2 | Clunkiness | **PASS 10/10.** Task `type:.scr-search-input=regex >> click:.scr-search-hit` — 1 click + 5 keystrokes, **total 6**. deadEnds **0**, modalTraps **0**, scrollTraps **0**, decorativeClips 0. `worstRecv` **45.6 ms** against the 100 ms bar, `overBar100` **0**, `sharedPaintSamples` **0**, `busiestFrame` 1 of 6 frames. `costParity` **true** — standard total 6 == liquid total 6, worstRecv 45.6 vs 45.1, presentation restored to standard at 820x580. Control: deadEnd / modalTrap / scrollTrap all `0 -> 1 -> 0`, `backToBaseline` true, inert click 0.6 ms. |
+
+**VOID 1 — `--churn` at the default 1600 ms idle is UNEARNED on this surface.** `.scr-rail-metric`
+is the rail's `Memory: NNN MB` / `CPU: N%` pair and it genuinely self-updates, so it has to be
+excluded or every driven step reads live (correction 19). But it moves by about **1 MB every three
+seconds**, and the idle leg samples 1600 ms apart — so `rawChurns` was `false` in both phases and
+the harness correctly refused the exclusion as a widened pass band. `--idle 5000` earns it:
+resting `rawChurns` false, after-task `rawChurns` **true** on the text channel, `netChurns` **false**
+in both. That asymmetry is the honest reading — the exclusion is earned in the phase where the
+surface is actually doing something.
+
+**VOID 2 — a five-character `type:` burst at the default 40 ms spacing shares paints.**
+`latency` came back `UNSCOREABLE - 2 of 6 samples shared a paint (busiest frame held 2)`, which is
+correction 32 refusing to score rather than reporting a flattering number. `--key-spacing 220`
+gives every event its own frame: `framesObserved` 6, `busiestFrame` 1, `sharedPaintSamples` 0.
+This is the repo's `type-burst-starves-raf` note arriving through the harness instead of through a
+fabricated ramp — **a short word in a search box is enough to trigger it.**
+
+**The rail has no stable per-page hook**, so the undo leg reaches History as
+`.scr-rail-group:first-child .scr-rail-list li:nth-child(4) .scr-rail-item`. `.scr-rail-list li:nth-child(4)`
+alone matches TWO buttons — History in the `Scraper` group and `Script Console` in `Tools` — so
+the group qualifier is load-bearing, not decoration.
+
+`scraper` is now **5 of 8**: 1, 2, 3, 4, 6 at 10/10. Open: 5, 7, 8.
+
+## 2026-09-04 · primary — `scraper` closes 8 of 8 at 10/10, the SIXTEENTH surface certified
+
+Commits `7ad24d33` (product), `e914b3aa` (harness correction 37), with `8dbe5623` / `9b5ffd14`
+from the interrupted turn and their receipt at `56929b53`. Surface title `Scraper`, window 1,
+820x580, standard presentation.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 5 | UI clarity | **FAIL 9/10 -> PASS 10/10.** Q5 was the only NO. minRatio **4.74 -> 5.35** dark and **2.74 -> 5.71** classic-light, failing **1 -> 0**, 65 runs measured / 0 unmeasurable in both cells, `themeAxisMoved` true. Re-verified under the AMBER preset on both tightest palettes: soft-sepia **4.62**, rose-pine **4.60**, failing 0, and the rail label no longer owns the minimum in either. Q1–Q4, Q6, Q10 YES; Q7/Q8/Q9 from the banked cat6. Control: CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10. |
+| 7 | Performance | **PASS 10/10**, twice. Interrupted turn: ceiling p50 8.3 / p95 8.5 over 217 frames, drag p50 8.3 / p95 16.2 / max 33.5 / over-100 **0**, resize and theme likewise 0, main p50 2.6. Re-run here independently: drag max 90.1, resize 80.1, theme 20.0, over-100 **0** on all three against a 500 ms main-block bar. Control (`--jank`, 120 ms renderer blocks): `jank_blocks` 10, over-100 **0 -> 10**, p95 **8.7 -> 108.4**. |
+| 8 | Honest states | **PASS 10/10.** rawKeys **0**, placeholders **0**, mutePairs **0**, `statesNamed` **1 of 1 observable** (the `empty` state, "No scrape jobs match this filter."), `languagesDiffer` **true** across en/ja/zh-Hans/ru with `rawKeyCountMax` 0 and the language restored. Control: rawKeys / placeholders / mutePairs all `0 -> 1 -> 0`, `backToBaseline` true. |
+
+**THE CAT5 DEFECT IS THE GROUND, NOT THE FOREGROUND, and it is the entry worth reading.**
+`--accent-text` — this repo's own token for the accent-when-it-is-text — was solved against the
+OPAQUE surface vars (`--bg`, `--panel`, `--panel-2`, `--sidebar`). A chip with
+`background: var(--accent-weak)` is not one of those: the wash tints its surface 16% *towards
+the accent*, i.e. towards the foreground, so the same 30% share loses contrast exactly where the
+design leans hardest on the accent.
+
+Swept live on the failing element, compositing its real ancestor chain, **9 accent presets x 6
+light palettes + 3 darks = 81 cells**, transitions frozen, `color-mix(#ff0000 50%, #000000)`
+self-test returning `#800000` on every run:
+
+| foreground | worst light cell | |
+| - | - | - |
+| `var(--accent)`, as shipped | **1.28** rose-pine + amber | **54 of 54 light cells FAIL** |
+| `--accent-text` verbatim, 30% | **4.28** soft-sepia + amber | still fails the 4.5 bar |
+| 26% | 4.55 soft-sepia + amber | largest passing |
+| **24% — SHIPPED** | **4.69** soft-sepia + amber | |
+| darks, `var(--accent-2)` | 5.89 forest-night + ruby | unchanged |
+
+24 rather than the largest-passing 26 because 4.55 is a **1.1% margin** on a ground that is
+itself derived from a user-chosen colour, and a banked ratio PASS has already expired in this
+repo when a bar moved under it. The new token is `--accent-text-on-wash`, declared once beside
+`--accent-text` with that table attached.
+
+**ELEVEN MORE RULES IN `scraper.css` WERE ON THAT SAME GROUND**, and cat5 could not see them
+because they belong to pages the History view does not render — a page-local pass would have
+banked a surface-wide defect. They were found by a PREDICATE (`background: var(--accent-weak)`
+in the same block as `color: var(--accent)`), so the predicate is what
+`accentTextToken.test.ts` now asserts: a twelfth added later fails in CI rather than on
+one user's light palette. Three mutation controls — one rule reverted, the share widened
+24 -> 30, the light override dropped — each felled exactly its own case (RED 1, RED 1, RED 2)
+against a GREEN base, each restored byte-identical by SHA256.
+
+**HARNESS CORRECTION 37 — cat8 could not measure this surface at all.** The drive leg returned
+`surfaceChanged: true, restored: false` on a round trip that genuinely restored. Diffed by hand:
+clicking Downloads and back to History moves exactly ONE line, `Memory: 777 MB` -> `778 MB`, and
+`restored` compares `textHash`. At REST the surface is stable (innerText 7 s apart, diff 0 lines)
+— **a drive is the thing that moves it**, which is why no resting check finds this. `--churn`
+lands, narrower than cat2's: the declared regions drop out of the HASH only and still count in
+`textRuns`/`wordRuns` and still face the rawKey, placeholder and status scans, so no bar term is
+weakened.
+
+Where it deliberately does NOT copy cat2 is the unearned-exclusion rule, and a measurement forced
+the difference: the first control run VOIDed because the memory line happened not to tick that
+time. Every hash here is only compared for equality against another hash from the SAME run, so a
+churn set that is byte-identical in all three readings shifts base, driven and restored alike and
+cannot change a verdict — **provably inert, not a widening**. VOIDing on it makes a correct
+surface pass or fail by luck. Inert is recorded (`churn.inert`), never silently dropped; a
+selector matching no painted run still VOIDs, because that is a stale instrument. Both branches
+were observed live: `moved: false` on the run that VOIDed before the change, `moved: true`
+(655386222 -> 68580270 -> 68580270) on the run that banks the score.
+
+**RECIPES the next worker should not re-derive on this surface.**
+
+- The rail has **no stable per-page hook**. History is
+  `.scr-rail-group:first-child .scr-rail-list li:nth-child(4) .scr-rail-item`; the group
+  qualifier is load-bearing, because `.scr-rail-list li:nth-child(4)` alone also matches
+  `Script Console` in the `Tools` group.
+- cat2 needs `--idle 5000` (the memory line moves about 1 MB every three seconds, and the
+  default 1600 ms idle leg cannot see it, so the `--churn` exclusion reads UNEARNED) and
+  `--key-spacing 220` (a five-character `type:` burst at the default 40 ms shares paints and
+  latency comes back `UNSCOREABLE`).
+- cat8's `--langs` leg refuses until the Settings **Appearance** page is on screen:
+  `window.dispatchEvent(new CustomEvent('os:open',{detail:'settings'}))`, then click
+  `button.os-set-nav-item` whose text is `Appearance`. It refuses to click a bare `.sp-seg-btn`
+  by name, which is correct — that selector also matches the Subtitle segment.
+- `.scr-search-input` is a poor cat8 drive: Escape does not clear it, so the leg VOIDs on a
+  failed restore. Drive a rail navigation with an explicit `--drive-undo` instead.
+
+`sampled-out:` for this bullet — `agent` `library` `novels` `translate` `player` `anki`
+`flashcards` `stats` `resources` `city` `immersion` `calendar` `reading`. `scraper` was chosen as
+the densest never-scored surface (17 nav routes, 12 pages, 58 painted controls at rest), and
+`files` had already been opened by primary2, so the "most different" half of the RULE C pair was
+already taken; this closes the denser half.
+
+State restored: Scraper on History, search cleared, standard presentation, 820x580, default
+theme (no `data-theme`), crimson accent inline (`--accent` `#ff2e4d`, `--accent-2` `#ff6b81`,
+`--red` `#ff2e4d`, `--red-deep` `#d21734`). Settings is left OPEN on Appearance — cat8's language
+leg needs it and the next surface's cat8 will too.

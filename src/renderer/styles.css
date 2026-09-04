@@ -82,6 +82,34 @@
      no fixed share can rescue it, because at that point the user has asked for the background
      colour as text. The presets are the contract; a custom accent is the user's own call. */
   --accent-text: var(--accent-2);
+
+  /* --accent-text-on-wash: the accent as text WHEN THE GROUND IS THE ACCENT'S OWN WASH.
+     `--accent-text` above was derived against the opaque surface vars (--bg, --panel,
+     --panel-2, --sidebar). A `background: var(--accent-weak)` chip is a different ground:
+     the wash tints that surface 14-16% TOWARDS the accent, i.e. towards the foreground,
+     so the same 30% share loses contrast exactly where it is most needed.
+
+     Measured 2026-09-04 on the live Scraper rail's active item, the real composited
+     ancestor chain, 9 accent presets x 6 light palettes + 3 darks = 81 cells, transitions
+     frozen, `color-mix(#ff0000 50%, #000000)` self-test returning #800000 each run:
+
+         share      worst light cell                     verdict
+         100 (inert, i.e. plain var(--accent))  1.65  rose-pine + amber   the shipped defect
+          30 (--accent-text verbatim)           4.28  soft-sepia + amber  FAILS the 4.5 bar
+          26                                    4.55  soft-sepia + amber  largest passing
+          24                                    4.69  soft-sepia + amber  SHIPPED
+          20                                    4.99  soft-sepia + amber
+
+     Every one of the 54 light cells fails at the shipped `var(--accent)`, so the defect is
+     the rule and not one palette. 24 rather than the largest-passing 26 because 4.55 is a
+     1.1% margin on a ground that is itself derived from a user-chosen colour, and this repo
+     has already had a banked ratio PASS expire when a bar moved under it. 24 keeps 4.2%.
+
+     Darks are unchanged and keep `var(--accent-2)`: worst of the 27 dark cells is 5.89
+     (forest-night + ruby), and re-deriving there would dull the accent for no gain — the
+     same reasoning `--accent-text` records for itself. Probe: `debug/_scr-share-sweep.js`,
+     scratch, reusing `l1-accent-text-presets.js`'s colour math verbatim. */
+  --accent-text-on-wash: var(--accent-2);
   /* Subtle accent wash for hover fills on quiet controls (ghost buttons, etc.).
      Derives from the live --accent (set by the accent-preset personalization),
      so it re-tints automatically. Was referenced by .ui-btn--ghost:hover but
@@ -1157,6 +1185,9 @@ html[data-chrome='frosted'] .os-taskbar {
 :root[data-theme='rose-pine'],
 :root[data-theme='paper'] {
   --accent-text: color-mix(in srgb, var(--accent) 30%, var(--text));
+  /* The wash ground needs a smaller share than the opaque one. Derivation, the 81 cells it
+     came from and why 24 and not 26 are all at the token's declaration above. */
+  --accent-text-on-wash: color-mix(in srgb, var(--accent) 24%, var(--text));
   --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
   --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
   --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
