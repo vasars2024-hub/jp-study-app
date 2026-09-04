@@ -4112,3 +4112,88 @@ own cat7 spec records that clicking a site card navigates an embedded browser to
 the user's connection, which is a side effect the score never needs — its load is a rail scroll,
 and cat2's dominant task must not be a card click either. And every category is capped at 0 on an
 empty harness, so check each candidate has real content before spending a run on it.
+
+## 2026-09-04 · primary — City (Mooncap Garden), the 18th surface: 5 of 8 categories, and the instrument was the first defect
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — seven,
+named, not silently truncated. City was taken first of the eight because `83da5c12`'s routing
+table records it as fully scaffolded (cat6 app spec + cat7 `SPECS` both present) and because it
+is the first CANVAS/FRAMELESS surface any of these harnesses has been asked to score — which
+is exactly where their dense-surface assumptions bite.
+
+Instrument: the shared `cat*` harnesses, `--win 1`, **zero new probes** (RULE 1). Root naming
+follows the existing convention for this surface: `@.fwin-frameless` for cat3/cat5/cat8,
+`@.reading-garden` for cat1, `--app city` for cat6.
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 1 | Accessibility | **10/10** | 23 text records, min **4.62:1** (`p "Organism dossier" 8px`), 0 failing, 0 unmeasurable; 6 controls, **0 unreachable**; 0 WCAG 2.5.8 fails; smallest 22px by rect but **0 below the pointer floor** (`.lq-hit`'s inset `::after`); motion **93 → 0 → 93** | all six bars moved, `plantCaughtByPointer 2`, `backToBaseline true`, `rectDrift 0` |
+| 3 | Liquid utilization | **10/10** | 53 regions — Work 1 / Liquid-eligible 1 / Anchor 11 / Ambient 40; `denseWorkOnTranslucent` **1 → 0** after the repair below; eligible 1/1 treated and 1/1 on a shared primitive | A moved one region, B failed every Work region under all-glass, E vacuous-and-proven (see correction 37) |
+| 6 | Feature parity | **10/10** | parity **9/9 standard = 9/9 liquid**, `na 0`, rowsAgree; round trip standard→liquid→standard, `fieldsHeld` and `shellHeld`, 0 diffs, other box 680x657 | **9 of 9** declared mutations armed, each fell **exactly its own row**, all restored |
+| 8 | Honest states | **10/10** | `statesNamed` **1 of 1 observable** (`empty`, message quoted back); 27 text runs; **0** raw i18n keys against a 10,475-key / 109-namespace catalog; 0 placeholders; 0 mute pairs; `languagesDiffer` across en/ja/zh/ru | rawKeys/placeholders/mutePairs `0,0,0 → 1,1,1 → 0,0,0` |
+| 5 | UI clarity | **5/10** — NOT closed | Q2 ✓, Q7 ✓, Q8 ✓, Q9 ✓, Q10 ✓. Five NO, numbers below | control run separately: **fired on Q2, Q3, Q4, Q5, Q10** |
+
+**cat1 and cat3 both PASSED before the repairs and both passes were false.** That is the
+finding of this turn and it is worth more than the four cells:
+
+- `ea3efd0b` — **cat1 scored City 10/10 twice on a surface it could not see.** `raise()`
+  returned early for an `@selector` surface, *before* its `/focus` call, so those surfaces were
+  measured in an UNFOCUSED window; `painted()` is `checkVisibility({checkOpacity:true})`, and the
+  dossier carries `animation: garden-info-reveal 220ms both` whose 0% frame is `opacity:0`
+  (`readingGarden.css`). An animation that never advances in a background window holds it there.
+  The panel was in the DOM with `aria-expanded="true"` and six controls; the probe scored **ONE
+  text record and TWO controls** and returned PASS. Corrections **32** (the negative control's
+  plant inherited `pointer-events:none` and landed under `.fwin-drag-strip`, so `plantCaught 0`
+  read as "cannot be falsified"), **33** (disclosures open in passes, plus an explicit VOID under
+  2 text records or 2 controls — the rubric's empty-harness cap, which nothing enforced) and
+  **34** (the focus, above).
+- `a01c8787` — cat3 correction **37**: control E strips BORROWED ground from under every Work
+  region and requires the count to move. A region anchored on its own `ownAlpha: 1` paint cannot
+  be ungrounded by construction, so the repair below made its own re-score VOID. E now admits a
+  vacuous branch, proven from the measured baseline (every Work region self-painted, ≥1 to speak
+  of, ground actually reached — `marked 4`, count unmoved). One borrowed-ground region anywhere
+  and the `>` bar applies unchanged; control B is untouched and still fired this run.
+
+**Two product repairs, each scored after the fix in the fix's own commit:**
+
+- `a01c8787` — **the garden's only form sat on 22px of blur.** `div.reading-garden-info-music`
+  (toggle pair + range input) is City's one Work region and had no paint of its own: a hairline
+  `border-top` over `aside.lq-contextual`'s `backdrop-filter`, with stars and drifting dust moving
+  under the slider track. §2.3 puts forms on a stable anchor. It gets one, in the garden's own
+  night palette (`#0b1622`, the dossier gradient's darker stop). cat1 re-run and unchanged at
+  10/10.
+- `45ddf61d` — **the garden lived its empty state without naming it.** At zero pages the dossier
+  said only "0 / 50 pages banked", which reads as stalled progress, not "you have not started".
+  `mooncap.info.nothingRead` in en/ja/zh/ru, conditional on `sceneProgress.pagesRead === 0`, with
+  a test asserting BOTH directions (present at 0, absent at 1 and at 400). Mutation control
+  `{true && (` applied and verified applied: **2 of 3 RED**, and they are the two absence cases.
+
+**cat5's five NOs, with their numbers, because the next turn opens on them:**
+
+1. **Q5 is the real one and it is NOT City-specific.** In `classic-light` the frameless window
+   buttons `⧉ ◇ ─ ×` measure **1.61:1** — `div.fwin-frameless-controls@72% over section.fwin@100%`
+   — 4 failing of 33 measured. The dark theme is clean (0 failing, min **12.6:1**). Every
+   frameless window in the app shares that chrome, so this is a shared-chrome light-theme defect
+   that City merely happens to be standing on.
+2. **Q4 is probably the instrument.** `collapsedDisclosures 0` counts `<details>` only, while the
+   same receipt records `ariaDisclosures: [{region: 'aside.lq-contextual', controlsTaken: 4}]` —
+   the mushroom IS the disclosure and it is an `aria-expanded` button, the same shape cat1's
+   correction 33 had to learn. 9 scanned controls, and **4 of the 9 are `import.meta.env.DEV`
+   sky-console buttons** (`Sky sim`, `Star`, `Asteroid`, `Ice barrage`) that no packaged build
+   ships — cat7's spec already records that exclusion by name; cat5 does not.
+3. **Q6 names a dev-only control too:** the only Liquid region without a transition is
+   `div.reading-garden-sky-console-body`. 4 Liquid-material regions, 2 carrying a transition,
+   0 infinite animations.
+4. **Q1 `entryPoints 0` / Q3 `primaryAction null`** are the dense-surface assumption again — an
+   ambient canvas scene has no accent button and no primary input by design. Decide whether the
+   bar is wrong here or whether City genuinely owes an entry affordance; do not invent an accent
+   button to satisfy a probe.
+
+cat2, cat4 and cat7 were not run this turn. cat4 is expected to fail on the recorded parallax
+grounds (39 layers measuring 910x1137 in a 680x709 window ON PURPOSE, and a frameless window has
+no Maximize button so only 2 of 3 gesture legs run) — `cat2-clunkiness.cjs` already carries that
+art-plate exclusion and cat4 still has none.
+
+**Baseline banked:** `baselines/cat6-city.json` (gitignored, like every baseline here). cat5's
+Q7/Q8/Q9 VOID without it and read `MEASURE`; with it they are all three YES. **Run cat6 before
+cat5, always.**
