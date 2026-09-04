@@ -11323,7 +11323,17 @@ export const ja: Catalog = {
   'readingLists.view.health.dismiss': '閉じる',
   'readingLists.view.empty.grid':
     'リストがまだありません。名前を付けて、送られてきたメッセージを貼り付けてください。保存する前に、何が見つかったかを確認できます。',
-  'readingLists.view.empty.list': 'このリストにはまだ何もありません。メッセージを貼り付けて追加してください。',
+  'readingLists.view.empty.list':
+    'このリストにはまだ何もありません。送られてきたメッセージを貼り付けるか、すでに持っている本を追加してください。',
+  'readingLists.view.library.add': 'ライブラリから追加',
+  'readingLists.view.library.label': 'すでに持っている本を選ぶ',
+  'readingLists.view.library.filterPlaceholder': 'ライブラリを検索',
+  'readingLists.view.library.showing': '{total}件中{shown}件を表示しています。',
+  'readingLists.view.library.emptyLibrary': 'ライブラリが空のため、追加できるものはまだありません。',
+  'readingLists.view.library.noMatch': 'ライブラリに「{query}」に一致するものはありません。',
+  'readingLists.view.library.onList': '追加済み',
+  'readingLists.view.library.added': '「{title}」を追加しました。',
+  'readingLists.view.library.already': '「{title}」はすでにこのリストにあります。',
   'readingLists.view.empty.nameLabel': 'リストの名前',
   'readingLists.view.empty.submit': 'メッセージを読み取る',
   'readingLists.view.empty.needName': 'まずリストに名前を付けてください。',

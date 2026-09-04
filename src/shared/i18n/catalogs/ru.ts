@@ -12272,7 +12272,17 @@ export const ru: Catalog = {
   'readingLists.view.health.dismiss': 'Закрыть',
   'readingLists.view.empty.grid':
     'Списков пока нет. Придумайте название и вставьте сообщение, которое вам прислали, — вы увидите, что нашлось, ещё до сохранения.',
-  'readingLists.view.empty.list': 'В этом списке пока ничего нет. Вставьте сообщение, чтобы его заполнить.',
+  'readingLists.view.empty.list':
+    'В этом списке пока ничего нет. Вставьте присланное сообщение или добавьте книгу, которая у вас уже есть.',
+  'readingLists.view.library.add': 'Добавить из библиотеки',
+  'readingLists.view.library.label': 'Выберите книгу, которая у вас уже есть',
+  'readingLists.view.library.filterPlaceholder': 'Поиск по библиотеке',
+  'readingLists.view.library.showing': 'Показано {shown} из {total}.',
+  'readingLists.view.library.emptyLibrary': 'Библиотека пуста, добавлять пока нечего.',
+  'readingLists.view.library.noMatch': 'В библиотеке нет ничего по запросу «{query}».',
+  'readingLists.view.library.onList': 'уже здесь',
+  'readingLists.view.library.added': '«{title}» добавлено.',
+  'readingLists.view.library.already': '«{title}» уже в этом списке.',
   'readingLists.view.empty.nameLabel': 'Название списка',
   'readingLists.view.empty.submit': 'Разобрать сообщение',
   'readingLists.view.empty.needName': 'Сначала дайте списку название.',

@@ -43,6 +43,7 @@ import { coverFallbackImage, coverUrlFor } from '../utils/coverArt';
 import type { ReadingEntryState, ReadingListEntry } from '../../shared/readingLists';
 import { READING_LIST_EXAMPLE_MESSAGE } from '../../shared/readingListParser';
 import {
+  addLibraryItemToReadingList,
   createReadingList,
   createReadingListsMutationContext,
   deleteReadingList,
@@ -299,6 +300,10 @@ export default function ReadingListsView({
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [anchor, setAnchor] = useState<string | null>(null);
   const [moveSkipped, setMoveSkipped] = useState(0);
+  const [picking, setPicking] = useState(false);
+  const [pickFilter, setPickFilter] = useState('');
+  /** The title of the book the last add declined as already present, or `null`. */
+  const [libraryNote, setLibraryNote] = useState<string | null>(null);
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
   const filterFieldRef = useRef<HTMLInputElement | null>(null);
 
@@ -315,6 +320,9 @@ export default function ReadingListsView({
     setSelected(new Set());
     setAnchor(null);
     setMoveSkipped(0);
+    setPicking(false);
+    setPickFilter('');
+    setLibraryNote(null);
   }, [listId]);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -485,6 +493,58 @@ export default function ReadingListsView({
       });
     },
     [write],
+  );
+
+  /**
+   * §11.4's "or add from your library", and §11.1's other direction: until this
+   * existed, `addReadingListEntry` had no renderer caller outside the paste
+   * flow, so a book already in the library could not be put on a list at all.
+   *
+   * The duplicate is reported rather than swallowed. A second click on the same
+   * book would otherwise look exactly like a click that did nothing.
+   */
+  const addFromLibrary = useCallback(
+    (item: LibraryItem) => {
+      if (!list) return;
+      const held: { entryId: string | null; duplicate: boolean } = {
+        entryId: null,
+        duplicate: false,
+      };
+      void write(
+        (current) => {
+          const mutation = addLibraryItemToReadingList(
+            current,
+            list.id,
+            { id: item.id, title: item.title },
+            createReadingListsMutationContext(),
+          );
+          held.entryId = mutation.entryId;
+          held.duplicate = mutation.duplicate;
+          return mutation;
+        },
+        () =>
+          held.entryId && !held.duplicate
+            ? {
+                message: t('readingLists.view.library.added', { title: item.title }),
+                run: () => {
+                  const entryId = held.entryId;
+                  if (!entryId) return;
+                  void write((current) =>
+                    removeReadingListEntry(
+                      current,
+                      list.id,
+                      entryId,
+                      createReadingListsMutationContext(),
+                    ),
+                  );
+                },
+              }
+            : null,
+      ).then(() => {
+        setLibraryNote(held.duplicate ? item.title : null);
+      });
+    },
+    [list, t, write],
   );
 
   const removeList = useCallback(
@@ -946,6 +1006,83 @@ export default function ReadingListsView({
 
   if (list) {
     const summary = summaries.find((candidate) => candidate.listId === list.id);
+
+    /**
+     * The library picker. Filtered on the WHOLE library rather than on a
+     * pre-trimmed "not already on this list" set: hiding a book the user owns
+     * because it is already here reads as the library being incomplete, and
+     * they then go looking for it. It is shown, marked, and its button says so —
+     * the mutation refuses the duplicate either way.
+     */
+    const onList = new Set(
+      rows.map((row) => row.itemId).filter((itemId): itemId is string => Boolean(itemId)),
+    );
+    // NOT `query`: the filter strip below already has a `query` in this scope,
+    // and shadowing it made the row-count line vanish unless the PICKER's search
+    // box happened to be non-empty. The existing filter test caught it.
+    const pickQuery = pickFilter.trim().toLowerCase();
+    const candidates = (
+      pickQuery ? items.filter((item) => item.title.toLowerCase().includes(pickQuery)) : items
+    ).slice(
+      0,
+      // A cap, not virtualization: this is a transient picker over a library
+      // that is thousands of items, and the filter above it is the real
+      // navigation. The count line says the cap is in force so it is not a
+      // silent truncation.
+      50,
+    );
+    const libraryPicker = (
+      <div className="rlv__picker" data-testid="rlv-library-picker">
+        <label className="rlv__paste-label" htmlFor="rlv-pick">
+          {t('readingLists.view.library.label')}
+        </label>
+        <input
+          id="rlv-pick"
+          type="search"
+          className="rlv__filter-field ui-focusable"
+          value={pickFilter}
+          placeholder={t('readingLists.view.library.filterPlaceholder')}
+          onChange={(event) => setPickFilter(event.target.value)}
+        />
+        <p className="rlv__picker-count" role="status">
+          {t('readingLists.view.library.showing', {
+            shown: candidates.length,
+            total: items.length,
+          })}
+        </p>
+        {items.length === 0 ? (
+          <p className="rlv__state">{t('readingLists.view.library.emptyLibrary')}</p>
+        ) : candidates.length === 0 ? (
+          <p className="rlv__state">
+            {t('readingLists.view.library.noMatch', { query: pickFilter.trim() })}
+          </p>
+        ) : (
+          <ul className="rlv__picker-list">
+            {candidates.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className="rlv__picker-item ui-focusable"
+                  disabled={onList.has(item.id)}
+                  onClick={() => addFromLibrary(item)}
+                >
+                  <span className="rlv__picker-title">{item.title}</span>
+                  {onList.has(item.id) ? (
+                    <span className="rlv__picker-on">{t('readingLists.view.library.onList')}</span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="rlv__paste-actions">
+          <Button size="sm" onClick={() => setPicking(false)}>
+            {t('readingLists.view.pasteCancel')}
+          </Button>
+        </div>
+      </div>
+    );
+
     return (
       <div
         className="rlv"
@@ -985,11 +1122,20 @@ export default function ReadingListsView({
           <Button size="sm" onClick={() => setPasting((open) => !open)}>
             {t('readingLists.view.paste')}
           </Button>
+          <Button size="sm" onClick={() => setPicking((open) => !open)}>
+            {t('readingLists.view.library.add')}
+          </Button>
           <Button size="sm" variant="danger" onClick={() => summary && removeList(summary)}>
             {t('readingLists.view.deleteList')}
           </Button>
         </header>
         {notices}
+        {picking ? libraryPicker : null}
+        {libraryNote ? (
+          <p className="rlv__notice" role="status">
+            {t('readingLists.view.library.already', { title: libraryNote })}
+          </p>
+        ) : null}
         {pasting ? (
           <form
             className="rlv__paste"
@@ -1107,13 +1253,9 @@ export default function ReadingListsView({
            * §11.4: *Empty list → "paste a message or add from your library".
            * Never a bare "No items".*
            *
-           * The copy names ONE route, not two, and that is deliberate rather
-           * than a shortened sentence: no surface in this app can add a library
-           * item to a reading list — `addReadingListEntry` has no renderer
-           * caller outside the paste flow. Printing the clause's second half
-           * would be an empty state pointing at a control that does not exist,
-           * which is worse than the bare "No items" it replaces. The route is
-           * the next slice; the copy grows when the control does.
+           * Both routes, and both are real controls in this block rather than
+           * prose pointing at the header. The copy named only the paste route
+           * for exactly as long as the library route did not exist.
            */
           <div className="rlv__empty" data-testid="rlv-empty-list">
             <p className="rlv__empty-lede">{t('readingLists.view.empty.list')}</p>
@@ -1125,6 +1267,13 @@ export default function ReadingListsView({
                 }}
               >
                 {t('readingLists.view.paste')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setPicking(true);
+                }}
+              >
+                {t('readingLists.view.library.add')}
               </Button>
             </div>
             {exampleHint}

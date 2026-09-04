@@ -383,18 +383,104 @@ describe('ReadingListsView', () => {
     });
 
     /**
-     * The clause's copy reads "paste a message or add from your library". The
-     * second route does not exist — `addReadingListEntry` has no renderer caller
-     * outside the paste flow — so the empty state deliberately does not offer
-     * it. This test pins that as a decision rather than an oversight, and it is
-     * the test that must be DELETED when the library route lands.
+     * Replaces "does not advertise a library route the app cannot perform yet",
+     * deleted in the commit that built the route. The clause's copy reads
+     * "paste a message or add from your library" and now BOTH halves are real
+     * controls in the empty block, not prose pointing at the header.
      */
-    it('does not advertise a library route the app cannot perform yet', async () => {
+    it('offers both of the clause’s routes, as controls, from the empty list', async () => {
       const context = createReadingListsMutationContext(1_700_000_000_000);
       const made = createReadingList(emptyReadingListsDocument(), { name: 'Empty' }, context);
       installBridge(new FakeStore(sealReadingListsDocument(made.document)));
       await render(made.listId);
-      expect(host.textContent).not.toContain('from your library');
+      const buttons = [
+        ...(host
+          .querySelector('[data-testid="rlv-empty-list"]')
+          ?.querySelectorAll<HTMLButtonElement>('.rlv__paste-actions button') ?? []),
+      ].map((button) => button.textContent?.trim());
+      expect(buttons).toEqual(['Paste a message', 'Add from library']);
+    });
+  });
+
+  /**
+   * §11.4's "or add from your library" — the route that did not exist until the
+   * commit adding these. `addReadingListEntry` had no renderer caller outside
+   * the paste flow, so a book already in the library could not be put on a list
+   * at all.
+   */
+  describe('adding from the library (§11.4)', () => {
+    async function openPicker() {
+      const context = createReadingListsMutationContext(1_700_000_000_000);
+      const made = createReadingList(emptyReadingListsDocument(), { name: 'Mine' }, context);
+      const store = new FakeStore(sealReadingListsDocument(made.document));
+      installBridge(store);
+      await render(made.listId);
+      await click(
+        host
+          .querySelector('[data-testid="rlv-empty-list"]')
+          ?.querySelectorAll('.rlv__paste-actions button')[1] ?? null,
+      );
+      return store;
+    }
+
+    function pickerItems(): HTMLButtonElement[] {
+      return [...host.querySelectorAll<HTMLButtonElement>('.rlv__picker-item')];
+    }
+
+    it('puts the picked book on the list, owned and bound to the real item', async () => {
+      const store = await openPicker();
+      expect(host.querySelector('[data-testid="rlv-library-picker"]')).not.toBeNull();
+      expect(pickerItems().map((button) => button.textContent?.trim())).toEqual(['Kino no Tabi']);
+
+      await click(pickerItems()[0]);
+      expect(store.writes).toBe(1);
+      const list = store.document.lists[0];
+      expect(list?.entries).toHaveLength(1);
+      // `owned`, because the file is on disk — not `wanted`, which is the state
+      // that routes a row to acquisition. Promoted by the bind, not set here.
+      expect(list?.entries[0]?.state).toBe('owned');
+      const work = store.document.works.find((w) => w.id === list?.entries[0]?.workId);
+      expect(work?.boundItemIds).toEqual([ITEM.id]);
+      expect(work?.bindConfidence).toBe(1);
+    });
+
+    it('opens the added row at the library item, not at acquisition', async () => {
+      await openPicker();
+      await click(pickerItems()[0]);
+      // The row is now in the list; §11.1 says it must go somewhere real, and a
+      // bound row goes to the item. This is the whole point of binding on add.
+      await click(host.querySelector('.rlv__row-open'));
+      expect(opened.map((item) => item.id)).toEqual([ITEM.id]);
+      expect(sought).toEqual([]);
+    });
+
+    it('offers an undo that takes it back off', async () => {
+      const store = await openPicker();
+      await click(pickerItems()[0]);
+      expect(host.querySelector('.rlv__notice--undo')?.textContent).toContain('Kino no Tabi');
+      await click(byText('Undo'));
+      expect(store.document.lists[0]?.entries).toEqual([]);
+    });
+
+    it('shows a book already on the list, disabled and marked, rather than hiding it', async () => {
+      await openPicker();
+      await click(pickerItems()[0]);
+      // Still listed — hiding it reads as the library being incomplete and the
+      // user goes looking for it.
+      const [item] = pickerItems();
+      expect(item?.disabled).toBe(true);
+      expect(item?.textContent).toContain('already here');
+    });
+
+    it('says how many of the library it is showing, and answers an empty filter', async () => {
+      await openPicker();
+      expect(host.querySelector('.rlv__picker-count')?.textContent).toBe('Showing 1 of 1.');
+      await typeInto(host.querySelector<HTMLInputElement>('#rlv-pick'), 'zzz');
+      expect(pickerItems()).toHaveLength(0);
+      expect(host.textContent).toContain('Nothing in your library matches');
+      // A filter that matches nothing is NOT the same message as a library that
+      // has nothing, and the surface must not conflate them.
+      expect(host.textContent).not.toContain('Your library is empty');
     });
   });
 

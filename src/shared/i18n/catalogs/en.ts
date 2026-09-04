@@ -11832,7 +11832,18 @@ export const en: Catalog = {
   'readingLists.view.health.dismiss': 'Dismiss',
   'readingLists.view.empty.grid':
     'No lists yet. Name one and paste the message someone sent you — you will see what it found before anything is saved.',
-  'readingLists.view.empty.list': 'Nothing in this list yet. Paste a message to fill it.',
+  'readingLists.view.empty.list':
+    'Nothing in this list yet. Paste a message someone sent you, or add a book you already have.',
+  'readingLists.view.library.add': 'Add from library',
+  'readingLists.view.library.label': 'Pick a book you already have',
+  'readingLists.view.library.filterPlaceholder': 'Search your library',
+  'readingLists.view.library.showing': 'Showing {shown} of {total}.',
+  'readingLists.view.library.emptyLibrary':
+    'Your library is empty, so there is nothing to add from it yet.',
+  'readingLists.view.library.noMatch': 'Nothing in your library matches “{query}”.',
+  'readingLists.view.library.onList': 'already here',
+  'readingLists.view.library.added': 'Added “{title}”.',
+  'readingLists.view.library.already': '“{title}” is already on this list.',
   'readingLists.view.empty.nameLabel': 'Call this list',
   'readingLists.view.empty.submit': 'Read the message',
   'readingLists.view.empty.needName': 'Give the list a name first.',

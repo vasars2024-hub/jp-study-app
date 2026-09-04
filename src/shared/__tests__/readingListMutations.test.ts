@@ -16,6 +16,7 @@ import {
 } from '../readingLists';
 import { parseReadingList } from '../readingListParser';
 import {
+  addLibraryItemToReadingList,
   addReadingListEntry,
   applyReadingListImport,
   createReadingList,
@@ -897,5 +898,103 @@ describe('sealing and identity', () => {
     const ids = Array.from({ length: 200 }, () => context.mintId('rw'));
     expect(new Set(ids).size).toBe(200);
     expect(ids.every((id) => id.startsWith('rw_'))).toBe(true);
+  });
+});
+
+/**
+ * §11.4's "or add from your library". Until this landed, `addReadingListEntry`
+ * had no renderer caller outside the paste flow — a reading-list feature in
+ * which you could not add a book you already own.
+ */
+describe('adding a library item', () => {
+  const ITEM = { id: 'item-9', title: 'Kino no Tabi' };
+
+  function emptyList() {
+    const context = ctx();
+    const created = createReadingList(emptyReadingListsDocument(), { name: 'Mine' }, context);
+    return { document: created.document, listId: created.listId, context };
+  }
+
+  it('adds the entry, binds it to the item, and calls it owned', () => {
+    const { document, listId, context } = emptyList();
+    const result = addLibraryItemToReadingList(document, listId, ITEM, context);
+
+    expect(result.duplicate).toBe(false);
+    expect(result.entryId).not.toBeNull();
+    const list = result.document.lists.find((candidate) => candidate.id === listId);
+    expect(list?.entries).toHaveLength(1);
+    const entry = list?.entries[0];
+    // `owned`, not `wanted`: the file is on disk, and `wanted` is the state that
+    // sends §11.1's row routing to the acquisition path. The promotion is
+    // `bindReadingWork`'s — an explicit `state: 'owned'` argument was written
+    // here first and measured DEAD (flipping it to `'wanted'` left all 83 tests
+    // green), so it was removed rather than kept as belt-and-braces.
+    expect(entry?.state).toBe('owned');
+
+    const work = result.document.works.find((candidate) => candidate.id === entry?.workId);
+    expect(work?.titleRaw).toBe('Kino no Tabi');
+    // The user picked this exact item, so the binding is certain rather than a
+    // suggestion the matcher then has to re-derive.
+    expect(work?.boundItemIds).toEqual(['item-9']);
+    expect(work?.bindConfidence).toBe(1);
+    expect(work?.suggestion).toBeUndefined();
+  });
+
+  it('records both halves in the event log, not just the add', () => {
+    const { document, listId, context } = emptyList();
+    const result = addLibraryItemToReadingList(document, listId, ITEM, context);
+    expect(result.events.map((event) => event.kind)).toEqual(['entry-added', 'work-bound']);
+  });
+
+  it('refuses a second copy of the same item and says which entry it kept', () => {
+    const { document, listId, context } = emptyList();
+    const first = addLibraryItemToReadingList(document, listId, ITEM, context);
+    const second = addLibraryItemToReadingList(first.document, listId, ITEM, context);
+
+    expect(second.duplicate).toBe(true);
+    // Unchanged means unchanged: same document, no events, and the entry it
+    // names is the one already there — so the surface can point at it.
+    expect(second.document).toBe(first.document);
+    expect(second.events).toEqual([]);
+    expect(second.entryId).toBe(first.entryId);
+  });
+
+  it('does NOT call the same book on a different list a duplicate', () => {
+    const { document, listId, context } = emptyList();
+    const other = createReadingList(document, { name: 'Also mine' }, context);
+    const first = addLibraryItemToReadingList(other.document, listId, ITEM, context);
+    const second = addLibraryItemToReadingList(first.document, other.listId, ITEM, context);
+
+    expect(second.duplicate).toBe(false);
+    expect(
+      second.document.lists.find((candidate) => candidate.id === other.listId)?.entries,
+    ).toHaveLength(1);
+  });
+
+  it('refuses an unknown list, a blank id and a blank title without throwing', () => {
+    const { document, listId, context } = emptyList();
+    for (const [where, args] of [
+      ['unknown list', ['rl_nope', ITEM]],
+      ['blank id', [listId, { id: '  ', title: 'X' }]],
+      ['blank title', [listId, { id: 'item-1', title: '   ' }]],
+    ] as const) {
+      const result = addLibraryItemToReadingList(
+        document,
+        args[0] as string,
+        args[1] as { id: string; title: string },
+        context,
+      );
+      expect([where, result.entryId, result.document === document]).toEqual([where, null, true]);
+    }
+  });
+
+  it('undoes cleanly through the mutation that already exists', () => {
+    const { document, listId, context } = emptyList();
+    const added = addLibraryItemToReadingList(document, listId, ITEM, context);
+    const removed = removeReadingListEntry(added.document, listId, added.entryId ?? '', context);
+    // Back to nothing — the orphaned work is collected too, so a re-add is a
+    // fresh add rather than a duplicate against a work nothing references.
+    expect(removed.document.lists.find((c) => c.id === listId)?.entries).toEqual([]);
+    expect(removed.document.works).toEqual([]);
   });
 });

@@ -11203,7 +11203,17 @@ export const zh: Catalog = {
   'readingLists.view.health.dismiss': '关闭',
   'readingLists.view.empty.grid':
     '还没有书单。取个名字，再把别人发给你的消息粘贴进来——保存之前你可以先看看识别出了什么。',
-  'readingLists.view.empty.list': '这个书单里还什么都没有。粘贴一段消息来填充它。',
+  'readingLists.view.empty.list':
+    '这个书单里还什么都没有。粘贴一段别人发给你的消息，或者添加一本你已经有的书。',
+  'readingLists.view.library.add': '从书库添加',
+  'readingLists.view.library.label': '挑一本你已经有的书',
+  'readingLists.view.library.filterPlaceholder': '搜索你的书库',
+  'readingLists.view.library.showing': '共 {total} 项，显示 {shown} 项。',
+  'readingLists.view.library.emptyLibrary': '你的书库是空的，暂时没有可以添加的内容。',
+  'readingLists.view.library.noMatch': '书库中没有与“{query}”匹配的内容。',
+  'readingLists.view.library.onList': '已在其中',
+  'readingLists.view.library.added': '已添加“{title}”。',
+  'readingLists.view.library.already': '“{title}”已经在这个书单里了。',
   'readingLists.view.empty.nameLabel': '书单名称',
   'readingLists.view.empty.submit': '读取这段消息',
   'readingLists.view.empty.needName': '请先给书单取个名字。',
