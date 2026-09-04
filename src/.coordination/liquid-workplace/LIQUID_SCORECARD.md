@@ -3141,3 +3141,94 @@ pointing `--out` at it is how the previous turn destroyed the file its own entry
 
 **Running total unchanged: 14 of 25 sections at 80/80.** `files` is 7 of 8 categories UNRUN,
 cat1 measured and FAILING on three named rows. **90 category cells remain.**
+
+---
+
+## 2026-09-04 · primary2 — `files` cat3 PASSES 10/10, after the instrument stopped scoring its own control's target
+
+Driven live on the desktop window (bridge 39273, pid 13316 — **already running, not
+restarted**), `@.fwin:has(.fa-shell)`, 820x580, `--presentation liquid` with the driver flipping
+it and handing it back. Commits `876d5d00` (product) and `4300d523` (instrument).
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 3 | Liquid utilization | **VOID → FAIL → 10/10.** `denseWorkOnTranslucent` **2 → 0**, `eligibleTotal` **4 → 6**, treated **6/6**, shared-primitive **6/6**. 68 regions, 77 controls skipped, Work 24, Liquid-eligible 6. Control A falsified **0 → 1** and restored; control B **0 → 24**, `allWorkFailed` true, `returned` true. |
+
+**It read VOID first, and that was the instrument scoring its own victim.** Control A took the
+first Work region in walk order and made it glass, requiring `denseWorkOnTranslucent` to rise.
+The first Work region on `files` is `div.fa-toolbar` — **already one of the two regions that
+term counts** — so the number could not move (2 → 2, `movedOne: false`) and a FAIL the walk had
+measured correctly was reported as `VOID - negative control did not falsify`. It now picks the
+first Work region the scored term does NOT contain; on a clean surface that is every Work
+region, so nothing banked moves. (`control-must-attack-the-scored-term`, again, from the other
+direction: last time the control resolved a different element than the question scored — this
+time it resolved the same one.)
+
+**The product half.** Two regions, both the app's own chrome, neither declaring itself:
+
+| region | box | why it scored Work | fix |
+| --- | --- | --- | --- |
+| `div.fa-toolbar` | 703x38, 8 focusables, 0 rows, 0 li | `role` null → classified by content; one `<input>` gives `forms >= 1` | `role="toolbar"` + `filesApp.toolbar.label` |
+| `div.fa-folder-actions` | 48x100, 3 commands | `role="group"` is not a landmark the walk reads, and it wore the folder LIST's name | `role="toolbar"` + a new `filesApp.collections.actionsLabel` |
+
+Both parents already carry `data-lq-role="liquid"` (`.lq-scaffold-toolbar`, `nav.lq-scaffold-rail`),
+so the declaration alone makes them contextual chrome on a shared primitive — no CSS, no local
+material. `.lq-contextual` was **considered and rejected**: it paints a card (background, border,
+radius, shadow, padding) and would have drawn nested cards inside the rail, which is the
+universal-glass outcome §2.3 forbids. Guard test `filesAppChromeLandmarks.test.tsx`, **4 of 4
+mutations RED**, each failing exactly its own row.
+
+**CORRECTION 35, and it is why I did not annotate my way up the tree.** Fixing those two moved
+the count 2 → 1 and surfaced their ANCESTOR, `div.fa-collections`; declaring that would have
+surfaced `div.fa-tree` above it. Four landmarks inside one `<nav>` to move a number is the
+gaming smell, so the tree got measured instead, and the walk was wrong twice over:
+
+- `div.fa-tree` scored Work on `text 532` — and **all 532 characters are
+  `button.fa-tree-node` labels**. The instrument states 70 lines earlier that a control is not a
+  region, then counted control text as the container's prose.
+- `div.fa-collections` scored Work on `forms 1`, and that control is a `<select>` three levels
+  down inside `.fa-folder-actions`, which the same walk classifies as chrome. Counted once for
+  the chrome region and again for its ancestor — the depth-counting the leaf-most rule already
+  rejects.
+
+So `text` now skips CONTROL and CONTEXTUAL subtrees; `forms`/`rows`/`items` skip CONTEXTUAL
+only, because `input` is itself in `CONTROL_SEL` and excluding controls there would drive
+`forms` to 0 everywhere and blind the walk to every form panel on every surface.
+
+**MONOTONE, and re-derived rather than asserted.** `isContextual` is untouched and `dense`
+short-circuits on it, so the Liquid-eligible set — and with it both contextual bars and their
+denominators — is bit-identical; only `denseWorkOnTranslucent` can move, and only downward,
+i.e. only toward the bar it must satisfy. A banked PASS sits at 0 and cannot go below it. Then
+measured anyway: **`note`, banked 10/10 on 2026-09-03, re-derives regions 1 / Work 1 /
+`denseWorkOnTranslucent` 0 / PASS 10/10 — identical**, and it is the surface that exercises
+correction 34's textarea promotion. The unscored `byRole` histogram does shift (Work → Anchor,
+and an all-labels region Anchor → Ambient), so an older receipt's histogram is a stale reading
+of the same surface, not a changed surface.
+
+**`musicwidget` was tried first as the re-derivation subject and is NOT evidence.** It is idle
+right now — `.mwidget-empty` true, `.mwidget-controls` absent — so its one Liquid-eligible
+region does not exist, and the run scored `eligibleTotal 0` vacuously against a banked 1. That
+is a different surface STATE, not a changed reading, and it confirms nothing either way.
+
+**TRAP, and it cost two runs before it was named: the presentation toggle is INTERMITTENT under
+a programmatic click.** Measured over ~a dozen drives on `files` and `Sticky note`: it lands
+roughly **every other time, in both directions, on the same button within the same minute**. A
+listener attached to that button counted exactly **one** click on a drive that never moved
+`data-presentation` at +900ms or at +3s — the event fires, the window does not change. The
+driver was one click plus a fixed 500ms read, so it refused with *"the presentation toggle did
+not reach liquid"*, which names the surface rather than the instrument. It now retries up to six
+click-then-poll attempts against the mode the **caller** asked for; the restore leg passes the
+mode it found, so it no longer polls for the run's target and then warns about a restore that
+worked. **Two explanations were wrong and are recorded in the file so nobody re-derives them:**
+it is not "only unfocused windows" (`files` was focused and still failed later), and
+`btn.focus()` is not the fix (kept — it costs nothing and is the keyboard path — but it failed
+twice with `document.activeElement` confirming focus). **The mechanism was not established and
+must not be reported as known.**
+
+Baseline `baselines/cat3-files.json` — a new path, force-added past `.gitignore`, matching
+`ff866dfd`'s precedent. Every window was left in the presentation it was found in
+(`standard` × 5, verified after the last run).
+
+**`files` is 2 of 8 categories run: cat1 FAIL (three real rows, entry above), cat3 10/10.
+Running total unchanged at 14 of 25 sections at 80/80 — a section closes at 8 of 8.
+89 category cells remain.**
