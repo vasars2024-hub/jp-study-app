@@ -1420,12 +1420,29 @@ Vite origin — B staged, A received exactly ONE `storage` event carrying it, th
 claimed `{section:'lists', listId:'live-list-1'}`; the second claim returned
 null with the key gone. **12 tests, 8 of 8 mutants RED.**
 
-**Exact next slice: §11.2's four widgets, or §11.3's reminders** — §11.4's rows
-are the other P4 gate. `App.tsx` and `preload.ts` are still ` M`; §11.2 registers
-in `widgets/registry.ts` and §11.3 in `main/buddyScheduler.ts`, so neither needs
-them. **The trap this turn refutes:** "parked on a foreign dirty path" is worth
-re-deriving before it is inherited — row 8 and the pop-out row were both parked
-on files that turned out not to be required.
+**RETRACTED WITHIN THE SAME TURN — this block first named §11.2 and §11.3 as the
+next slice. Both closed on 2026-09-04 by `backup` (`d4f9bd4d`, `ca0093b5`),
+sixteen blocks above. Re-derived against the TREE rather than that entry:**
+
+| § | derived from the tree | verdict |
+|---|---|---|
+| 11.1 | 8 table rows, the last two closed above | **8 of 8** |
+| 11.2 | `widgets/registry.tsx` imports and registers `ReadingListProgressWidget`, `ReadingNextUpWidget`, `ReadingChallengePaceWidget`, `ReadingRecentlyFinishedWidget` in `WIDGETS` | **4 of 4** |
+| 11.3 | `main/readingListsReminders.ts` — `createReadingRemindersScheduler`, `registerReadingRemindersIpc`, and `READING_REMINDER_KINDS` = the plan's four | **closed** |
+| 11.4 | keyboard (`readingListsAccessibility.test.tsx`, Alt+Arrow), undo (`UndoSlot`), drag/drop (12 handlers, `8ec4ee24`), bulk (shift ranges + finish/move/remove), empty, loading/error, a11y, performance (`rowRenders` seam, `e5ad2963`), density (`readingListsDensity.ts`) | **9 of 9** |
+
+**So P0–P5 and §11 are ALL closed, and this plan has no open unit.** The next
+turn takes **liquid**, not this — and should NOT re-open a section here on the
+strength of a stale "next slice" line, including the one this block first wrote.
+
+**Two traps, both paid for in this turn:**
+
+1. **"Parked on a foreign dirty path" is worth re-deriving before inheriting
+   it.** Row 8 and the pop-out row were both parked on files that turned out not
+   to be required: `popOut` is a renderer seam with 19 call sites, and
+   `MangaReader.tsx`'s dirt was an unfinished slice, not another track's.
+2. **A "next slice" line written from the block above it, rather than from the
+   log, points at finished work.** §11.2 and §11.3 had been closed for hours.
 
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
