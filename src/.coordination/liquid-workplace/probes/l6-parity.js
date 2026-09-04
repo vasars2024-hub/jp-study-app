@@ -1501,6 +1501,91 @@
     },
 
     /**
+     * MUSIC WIDGET — the mini-player. Like the visualizer it paints NO title, so `findWin`
+     * reaches it on `rootSel` and the `titleRe` below is documentation of the name assistive
+     * tech gets (`aria-label` from `settings.mini.app.musicwidget`), not the match that runs.
+     *
+     * The rows are the widget's OBSERVABLE side effects, not its paint: seven named transport
+     * actions in one named toolbar, a seek slider whose range really tracks the loaded track,
+     * a volume slider, the now-playing identity OR the honest empty state with its real route,
+     * and the window's own lifecycle. Nothing here changes the user's playback: `check` reads,
+     * it never presses play, because a parity sweep that started the audio would leave the
+     * desk in a state the next harness measures.
+     *
+     * `nowPlaying` is deliberately an EITHER: with a queue it is the title/artist pair, and
+     * idle it is `.mwidget-empty` plus the button that opens Music. A row that demanded a
+     * title would score an idle widget as a regression, which is the "empty harness" cap —
+     * and a row that accepted only the empty state would score a playing one the same way.
+     */
+    musicwidget: {
+      titleRe: /Music Widget|ミニプレーヤー|音乐小组件|Музыкальный виджет/i,
+      rootSel: '.mwidget',
+      features: [
+        {
+          id: 'transportToolbar',
+          f: (w) => {
+            const bar = q(w, '.mwidget-controls');
+            const named = bar ? qa(bar, 'button').filter(
+              (b) => (b.getAttribute('aria-label') || '').trim(),
+            ) : [];
+            const buttons = bar ? qa(bar, 'button') : [];
+            return { ok: !!bar && bar.getAttribute('role') === 'toolbar'
+                && !!(bar.getAttribute('aria-label') || '').trim()
+                && buttons.length >= 7 && named.length === buttons.length,
+              ev: `toolbar=${!!bar} role=${bar && bar.getAttribute('role')} named="${bar && bar.getAttribute('aria-label')}" buttons=${buttons.length} withName=${named.length}` };
+          },
+        },
+        {
+          id: 'seekControl',
+          f: (w) => {
+            const plate = q(w, '.mwidget-progress');
+            const seek = plate ? q(plate, 'input[type="range"]') : null;
+            const times = plate ? qa(plate, '.mwidget-time') : [];
+            const label = seek && seek.getAttribute('aria-label');
+            return { ok: !!seek && !!(label || '').trim() && times.length === 2
+                && Number(seek.max) > 0,
+              ev: `slider=${!!seek} label="${label || ''}" max=${seek && seek.max} timeReadouts=${times.length}` };
+          },
+        },
+        {
+          id: 'volumeControl',
+          f: (w) => {
+            const vol = q(w, '.mwidget-vol input[type="range"]');
+            const label = vol && vol.getAttribute('aria-label');
+            const onPlate = !!vol && !!vol.closest('.mwidget-progress');
+            return { ok: !!vol && !!(label || '').trim() && onPlate
+                && Number(vol.value) >= 0 && Number(vol.value) <= 1,
+              ev: `slider=${!!vol} label="${label || ''}" value=${vol && vol.value} onAnchorPlate=${onPlate}` };
+          },
+        },
+        {
+          id: 'nowPlaying',
+          f: (w) => {
+            const title = txt(q(w, '.mwidget-title'));
+            const empty = q(w, '.mwidget-empty');
+            const route = empty ? q(empty, 'button') : null;
+            const stated = !!title || (!!empty && !!route && !!txt(route));
+            return { ok: stated,
+              ev: `title="${title}" emptyState=${!!empty} emptyRoute="${route ? txt(route) : ''}"` };
+          },
+        },
+        { id: 'windowLifecycle', f: (w) => lifecycle(w) },
+      ],
+      mutations: {
+        transportToolbar: (w) => stripAttr(q(w, '.mwidget-controls'), 'role', 'no transport toolbar'),
+        seekControl: (w) => stripAttr(q(w, '.mwidget-progress input[type="range"]'), 'aria-label', 'no seek slider'),
+        volumeControl: (w) => stripAttr(q(w, '.mwidget-vol input[type="range"]'), 'aria-label', 'no volume slider'),
+        // The now-playing identity has two shapes, so the mutation has to attack whichever
+        // one is on screen or it silently mutates nothing and the row cannot fall.
+        nowPlaying: (w) => detach(
+          q(w, '.mwidget-title') || q(w, '.mwidget-empty'),
+          'no now-playing identity and no empty state',
+        ),
+        windowLifecycle: (w) => stripAttr(q(w, '.fwin-b-liquid'), 'aria-pressed', 'no liquid control'),
+      },
+    },
+
+    /**
      * STICKY NOTE — the deliberately smallest desktop surface. Its colour has two honest
      * representations: standard paints the note itself, while Liquid adds the contextual
      * five-colour edge palette. The row checks the selected colour survives both rather than
