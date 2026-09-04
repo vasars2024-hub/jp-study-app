@@ -3622,3 +3622,36 @@ i.e. standing on its own paint.
 **Still open on `scraper`: categories 2, 5, 7, 8.** cat7 has no `SPECS` entry for this surface yet;
 copy `grammar`'s, which is the newest and carries its reasoning. cat6 is already banked, so cat5's
 Q7/Q8/Q9 will not VOID on a missing baseline.
+
+## 2026-09-04 · primary — `scraper` category 2 closes at 10/10, and the whole run turned on TWO harness arguments
+
+No product change: the Scraper's dominant discovery task is already clean. What this entry is
+worth reading for is that the run VOIDed twice on the instrument before it measured anything, and
+both causes are surface-shape, not defects.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 2 | Clunkiness | **PASS 10/10.** Task `type:.scr-search-input=regex >> click:.scr-search-hit` — 1 click + 5 keystrokes, **total 6**. deadEnds **0**, modalTraps **0**, scrollTraps **0**, decorativeClips 0. `worstRecv` **45.6 ms** against the 100 ms bar, `overBar100` **0**, `sharedPaintSamples` **0**, `busiestFrame` 1 of 6 frames. `costParity` **true** — standard total 6 == liquid total 6, worstRecv 45.6 vs 45.1, presentation restored to standard at 820x580. Control: deadEnd / modalTrap / scrollTrap all `0 -> 1 -> 0`, `backToBaseline` true, inert click 0.6 ms. |
+
+**VOID 1 — `--churn` at the default 1600 ms idle is UNEARNED on this surface.** `.scr-rail-metric`
+is the rail's `Memory: NNN MB` / `CPU: N%` pair and it genuinely self-updates, so it has to be
+excluded or every driven step reads live (correction 19). But it moves by about **1 MB every three
+seconds**, and the idle leg samples 1600 ms apart — so `rawChurns` was `false` in both phases and
+the harness correctly refused the exclusion as a widened pass band. `--idle 5000` earns it:
+resting `rawChurns` false, after-task `rawChurns` **true** on the text channel, `netChurns` **false**
+in both. That asymmetry is the honest reading — the exclusion is earned in the phase where the
+surface is actually doing something.
+
+**VOID 2 — a five-character `type:` burst at the default 40 ms spacing shares paints.**
+`latency` came back `UNSCOREABLE - 2 of 6 samples shared a paint (busiest frame held 2)`, which is
+correction 32 refusing to score rather than reporting a flattering number. `--key-spacing 220`
+gives every event its own frame: `framesObserved` 6, `busiestFrame` 1, `sharedPaintSamples` 0.
+This is the repo's `type-burst-starves-raf` note arriving through the harness instead of through a
+fabricated ramp — **a short word in a search box is enough to trigger it.**
+
+**The rail has no stable per-page hook**, so the undo leg reaches History as
+`.scr-rail-group:first-child .scr-rail-list li:nth-child(4) .scr-rail-item`. `.scr-rail-list li:nth-child(4)`
+alone matches TWO buttons — History in the `Scraper` group and `Script Console` in `Tools` — so
+the group qualifier is load-bearing, not decoration.
+
+`scraper` is now **5 of 8**: 1, 2, 3, 4, 6 at 10/10. Open: 5, 7, 8.
