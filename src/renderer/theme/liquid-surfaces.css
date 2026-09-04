@@ -140,13 +140,29 @@
 }
 
 /* Focus must stay visible on a translucent surface, where a subtle ring is the
-   first thing lost. Uses the shell's own focus token, not a colour. */
+   first thing lost. Uses the shell's own focus tokens, not a colour.
+
+   THE TOKEN NAME WAS WRONG AND THE WHOLE RULE WAS DEAD. This read
+   `var(--focus-ring)` — singular — and **nothing in the repo declares that
+   name**: 0 CSS declarations, 0 `setProperty` calls. A `var()` that resolves to
+   nothing is invalid at computed-value time, which drops the ENTIRE `outline`
+   declaration, so all four Liquid surface roles fell back to whatever ring they
+   would have had without this sheet. The real tokens are the three `tokens.css`
+   declares at `:root` (214–216), and the idiom below is the one the rest of the
+   repo already uses (`mediaLibrary.css:719`, `scraper.css:274`).
+
+   The width and the offset are tokens for the same reason the colour is:
+   `a11y.css:70-71,114` raises the ring to **3px** under high contrast and
+   `blanc.css:151` / `frutiger-aero.css:62` each remap the colour. Hardcoding
+   `2px solid` here opted every Liquid surface out of all three at once — which
+   is both the accessibility invariant and the "never hardcode one shell's
+   values into a shared component" rule, in one line. */
 .lq-anchor :focus-visible,
 .lq-work :focus-visible,
 .lq-liquid :focus-visible,
 .lq-contextual :focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* ---- motion: displacement is a token, not a media query here -------------

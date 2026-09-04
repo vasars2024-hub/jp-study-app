@@ -3286,3 +3286,87 @@ a run whose maximize had failed. 17.4% is the real figure.
 3 bars. Running total unchanged at 14 of 25 sections at 80/80. **89** category cells remain — the
 first draft of this line said 88, counting cat4 as closed because it had been run. It failed, so
 it is not closed and the count does not move. Only cat3 came off the board this turn.**
+
+## 2026-09-04 · primary — the branch is GREEN at its own tip, and the Liquid focus ring was dead
+
+**No rubric cell moved this turn. Running total unchanged: 14 of 25 sections at 80/80, 90
+category cells remain.** Said plainly rather than implied — the live app on port 39273 is
+`jp-wt-filesapp`'s dev server (pid 13316, parent chain `19692 → 13460 → 13316`, cwd the
+worktree), `debug/bridge.json` carries a dead instance's token (pid 12644), and the token of a
+running bridge exists only in that process's memory. Restarting it would have killed a
+concurrent worker's app mid-turn, so no cell was driven. **This is the standing cost of the
+one-app/two-workers arrangement and it is the reason to prefer `JP_DEBUG_PORT` for any future
+second instance** — the variable exists (`debugBridge.ts:39`) and nothing was using it.
+
+**THE BOSS AUDIT'S JOB 1 IS CLOSED.** `audit-20260903-195429-f370cf16` found
+`feat/nyaa-subtitles` RED at its own tip — 5 failures, 0 pre-existing — and said every green
+reading had come from the shared dirty tree. Re-derived the way it asked, in a detached
+worktree at `38a9a831` with `node_modules` junctioned, never in the shared tree:
+**`npx vitest run` EXIT 0 — 1064 files passed | 1 skipped, 13,696 tests passed | 6 skipped, 0
+failed.** Its three named suites pass there too (26/26). Item (b) landed as `63432f9a`, item
+(c) is in `window.d.ts` (2 hits). All three items of that audit are done.
+
+One correction the next audit needs, because this one built half a finding on it:
+`src/renderer/__tests__/videoStudyLayout.test.ts` is still ` M` in the shared tree with 308
+insertions and an **mtime of 2026-08-07**. The COMMITTED version is the one that passes; the
+dirty copy is the stale pre-refactor one. It is not lost work and it is not a red suite. Left
+exactly as found.
+
+**PRODUCT — `7bea52d4`.** `theme/liquid-surfaces.css` declared
+`outline: 2px solid var(--focus-ring)` for `.lq-anchor`, `.lq-work`, `.lq-liquid` and
+`.lq-contextual`. **Nothing declares `--focus-ring`**: 0 declarations across all 95 CSS files
+with comments stripped, 0 `setProperty` calls in every `.ts`/`.tsx` under `src/`. An
+unresolvable `var()` is invalid at computed-value time, so the browser drops the whole
+`outline` — the one rule written to keep focus visible on translucent material did nothing on
+any Liquid surface. Now `var(--focus-ring-width) solid var(--focus-ring-color)` +
+`var(--focus-ring-offset)`, the three `tokens.css` declares at `:root` (214–216) and the form
+`mediaLibrary.css:719` / `scraper.css:274` already use. The hardcoded `2px solid` was also
+opting every Liquid surface out of `a11y.css`'s **3px** high-contrast ring and out of Blanc's
+and Aero's colour remaps. Three controls, all RED for different reasons: restore the original
+→ 2 of 3 by name; right token, width back to `2px` → 1 of 3; drop the guard's comment
+stripping → 1 of 3.
+
+**THAT THIRD CONTROL IS THE ONE TO CARRY FORWARD.** A raw-text scan of this defect class
+fabricates findings: `liquid-window.css` and `statsLiquid.css` each document their own past
+repairs by *naming the undeclared token they used to read*, so an unstripped scan reports 3
+live defects that are all prose. I produced that exact false reading during this slice and
+withdrew it before publishing. `5d98a401`'s `liquidTokenNamesResolve.test.ts` (on
+`wt/files-app`, not yet merged) handles the same three by **allowlisting the files** instead —
+which passes today but silences a genuine future regression in them. Worth converting to
+stripping when it lands; it is not a defect, it is a weaker guard.
+
+Not touched, deliberately: the 12 other undeclared `--lq-*` reads are all in
+`views/readingLists.css` and its two companions, already repaired in `5d98a401`. Fixing them
+here would collide with that mergeback.
+
+Gates: `npx vitest run` (isolated, at `38a9a831`) EXIT 0; `i18n-check` EXIT 0 at 12,396 keys;
+`architecture-audit` EXIT 0 "Nothing new"; eslint 0 errors on both touched paths.
+
+## 2026-09-04 · primary2 — merge reconciliation, and cat1's close is PROVISIONAL
+
+The two sections above were written concurrently on `wt/files-app` and
+`feat/nyaa-subtitles` and both survived the merge; neither is edited. They
+disagree on one number and the disagreement is an artifact of the merge, not a
+dispute: **89 category cells remain.** `primary`'s entry says 90 and moved no
+cell — correct on its own tree, where `files` cat3's 10/10 was not yet merged.
+`d2e66783` took that cell off the board. (See `merged-json-derived-blocks-go-
+stale`: the rows union correctly while the derived counts keep pre-merge
+numbers.)
+
+**And a cell of my own that has to be qualified.** `1ba0545f` closed `files`
+cat1 at 10/10, and its repair #1 floored all five flexible `.fa-row` tracks at
+`minmax(var(--lq-hit-target), Nfr)`. `e165e4ea` REVERTED that floor: it put a
+248px minimum on a row against the 212px of canvas the 260x170 window
+`DesktopShell.tsx`'s MIN_W/MIN_H allow, and cat4's compact leg went from 0
+horizontal scrollers to 2. The size column is rebalanced `0.8fr -> 1fr` instead,
+which computes to 36.3px against the 32px floor at the default 820x580 — wider
+than the 32.00px the floor gave it.
+
+**The walk has NOT been re-run since that revert.** The arithmetic says cat1
+still passes at the default size and the CSS guard asserts the share, but a
+number I did not measure is not a measurement. cat1 stays counted as closed
+because the reverted rule provably gives MORE width than the one that closed it,
+and the qualification is recorded here so the next worker re-runs
+`cat1-accessibility.cjs` on `files` before quoting that 10/10. If it fails, the
+cell comes back on the board — the same way `c7fa2df7`'s and `c7b9c21d`'s did.
+
