@@ -1,10 +1,10 @@
 {
-  "label": "s10-stats",
-  "surface": "@.fwin:has(.stats-view)",
+  "label": "s11-note",
+  "surface": "@.fwin.fwin-note",
   "win": "(focused)",
   "theme": null,
   "presentation": "standard",
-  "box": "820x580",
+  "box": "260x220",
   "deferredVisibilityOwners": 0,
   "parserSelfTest": {
     "ok": true,
@@ -12,10 +12,10 @@
     "parsed": "222,125,128"
   },
   "text": {
-    "measured": 86,
+    "measured": 3,
     "unmeasurable": 0,
-    "minRatio": 5.35,
-    "minOwner": "span.stats-card-lbl \"known\" 12px",
+    "minRatio": 11.11,
+    "minOwner": "span.fwin-title-text \"Sticky note\" 12.5px",
     "failingCount": 0,
     "worst": [],
     "inactiveSkipped": 0,
@@ -24,26 +24,11 @@
     "inactiveWorst": []
   },
   "targets": {
-    "total": 11,
+    "total": 3,
     "smallest": "button.fwin-b 24px",
     "smallestPx": 24,
-    "under32Count": 5,
+    "under32Count": 2,
     "under32": [
-      {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
-      },
-      {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
-      },
-      {
-        "el": "button.fwin-b",
-        "min": 24,
-        "nearest": 32
-      },
       {
         "el": "button.fwin-b",
         "min": 24,
@@ -59,7 +44,7 @@
     "wcag258Fails": []
   },
   "keyboard": {
-    "controls": 11,
+    "controls": 3,
     "unreachableCount": 0,
     "unreachable": [],
     "focusHostCount": 0,
@@ -95,31 +80,31 @@
   "motion": {
     "emulationTook": true,
     "emulationReleased": true,
-    "beforeOverThreshold": 32,
+    "beforeOverThreshold": 4,
     "beforeLongest": {
-      "el": "div.stats-bar-fill",
-      "dur": 0.3
+      "el": "div.fwin-bar",
+      "dur": 0.14
     },
     "duringOverThreshold": 0,
     "duringLongest": null,
-    "afterOverThreshold": 32,
+    "afterOverThreshold": 4,
     "motionDurationToken": "0.140s",
     "reduceMotionClass": false
   },
   "hit": {
-    "title": ".fwin:has(.stats-view)",
+    "title": ".fwin.fwin-note",
     "floor": 32,
     "presentation": "standard",
     "theme": null,
-    "box": "820x580",
+    "box": "260x220",
     "deferredVisibilityOwners": 0,
-    "controls": 12,
-    "measured": 11,
-    "belowFloorByRect": 5,
+    "controls": 3,
+    "measured": 3,
+    "belowFloorByRect": 2,
     "belowFloorByHit": 0,
     "belowFloor": [],
     "smallestHit": {
-      "el": "button.fwin-b.lq-hit",
+      "el": "button.fwin-b.lq-hit.fwin-b-liquid",
       "rect": "30x24",
       "rectMin": 24,
       "hit": "32x32.5",
@@ -128,29 +113,21 @@
       "shrunkBy": 0,
       "blockers": [
         "div.fwin-bar",
-        "button.fwin-b.lq-hit.fwin-b-liquid",
-        "section.fwin.focused",
+        "button.fwin-b.lq-hit.fwin-close",
+        "section.fwin.focused.fwin-note",
         "div.fwin-bar"
       ]
     },
     "stolenCount": 0,
     "stolen": [],
     "worstShrunkBy": 0,
-    "occludedCount": 1,
-    "occluded": [
-      {
-        "el": "button.btn.small",
-        "rect": "133x32",
-        "by": "button.btn.danger"
-      }
-    ],
+    "occludedCount": 0,
+    "occluded": [],
     "disabledCount": 0,
     "disabled": [],
-    "disclosedForRun": 1,
+    "disclosedForRun": 0,
     "disclosuresRestored": true,
-    "scrollLeaks": [
-      "div.fwin-body 0,0 -> 1137,0"
-    ],
+    "scrollLeaks": [],
     "deferredRestore": {
       "first": {
         "repaired": {
@@ -203,7 +180,7 @@
     "firstRun": {
       "belowFloorByHit": 0,
       "stolenCount": 0,
-      "occludedCount": 1
+      "occludedCount": 0
     }
   },
   "bars": {
@@ -215,6 +192,40 @@
   },
   "verdict": "PASS 10/10",
   "failedBars": [],
+  "control": {
+    "moved": {
+      "contrast": true,
+      "targetsByPointer": true,
+      "targetsByRect": true,
+      "wcag258": true,
+      "keyboard": true,
+      "decorativeExemptionIsNarrow": true
+    },
+    "backToBaseline": true,
+    "rectDrift": 0,
+    "counts": {
+      "base": [
+        0,
+        2,
+        0,
+        0,
+        0
+      ],
+      "dirty": [
+        2,
+        4,
+        2,
+        1,
+        2
+      ],
+      "restored": [
+        0,
+        2,
+        0,
+        0
+      ]
+    }
+  },
   "ariaRestored": {
     "skipped": "nothing was opened"
   }

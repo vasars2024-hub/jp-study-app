@@ -3762,6 +3762,13 @@ const FloatingWindow = memo(function FloatingWindow({
   // disagree (boss audit 2026-08-17 finding 2).
   const canGoLiquid = canPresentLiquid(win.section);
   const liquid = isWinLiquid(win) && canGoLiquid;
+  // A note paints its own title bar in one of five pastel `NOTE_COLORS`, so every glyph in
+  // that bar needs the dark ink the standard chrome does not supply. The title and the close
+  // button each carried their own copy of this ternary and the Liquid toggle, added later,
+  // carried none — measured 2026-09-03 on a `#fff3a3` note, the `◇` painted 1.2:1 against a
+  // 4.5 bar while its two neighbours sat at 11.1:1. Two copies were two chances for a third
+  // control to be missed, which is exactly what happened, so the predicate lives here once.
+  const noteInk = isNote && !liquid ? { color: '#3a3320' } : undefined;
   // Real apps (including Mooncap Garden and the music widget) can detach into their own OS window;
   // desktop-only trinkets (notes, the viz widget) cannot.
   const canPopOut = !isNote && !isVisualizer;
@@ -3927,7 +3934,7 @@ const FloatingWindow = memo(function FloatingWindow({
           onPointerDown={dragStart}
           onDoubleClick={() => canMaximize && onMaximize()}
         >
-          <span className="fwin-title" style={isNote && !liquid ? { color: '#3a3320' } : undefined}>
+          <span className="fwin-title" style={noteInk}>
             <Icon name={glyph} size={15} style={{ marginRight: 6, verticalAlign: '-2px' }} />
             <span className="fwin-title-text">{title}</span>
           </span>
@@ -3940,6 +3947,7 @@ const FloatingWindow = memo(function FloatingWindow({
             {canGoLiquid && (
               <button
                 className={`fwin-b lq-hit fwin-b-liquid ${liquid ? 'is-liquid' : ''}`}
+                style={noteInk}
                 title={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
                 aria-label={liquid ? t('desktop.returnToStandard') : t('desktop.makeLiquid')}
                 aria-pressed={liquid}
@@ -3982,7 +3990,7 @@ const FloatingWindow = memo(function FloatingWindow({
             )}
             <button
               className="fwin-b lq-hit fwin-close"
-              style={isNote && !liquid ? { color: '#3a3320' } : undefined}
+              style={noteInk}
               title={isNote ? t('desktop.deleteNote') : t('common.close')}
               onClick={onClose}
             >

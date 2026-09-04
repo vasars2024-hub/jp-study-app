@@ -1,0 +1,433 @@
+{
+  "label": "s10-stats",
+  "app": "statistics",
+  "win": "main",
+  "raised": "already-on-top",
+  "matchedBy": "title",
+  "host": "fwin",
+  "presentationAsFound": "standard",
+  "box": "820x580",
+  "driven": [
+    {
+      "step": "recentActivity",
+      "result": "{\"before\":0,\"after\":814,\"moved\":true}"
+    },
+    {
+      "step": "scroll",
+      "result": "{\"top\":320,\"range\":836,\"key\":\"fwin-body\"}"
+    }
+  ],
+  "drivenRefusals": 0,
+  "settle": {
+    "afterDrive": {
+      "where": "after drive, before parity check",
+      "converged": true,
+      "reads": 2,
+      "ms": 364,
+      "signature": "769|198|10",
+      "trace": [
+        "769|198|10",
+        "769|198|10"
+      ],
+      "snapshot": {
+        "app": "statistics",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "111",
+        "chars": 769,
+        "nodes": 198,
+        "controls": 10,
+        "fields": {},
+        "scroll": [
+          "fwin-body:320,0"
+        ]
+      }
+    },
+    "afterFlipOut": {
+      "where": "flip -> liquid",
+      "converged": true,
+      "reads": 2,
+      "ms": 365,
+      "signature": "769|198|10",
+      "trace": [
+        "769|198|10",
+        "769|198|10"
+      ],
+      "snapshot": {
+        "app": "statistics",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "liquid",
+        "liquidClass": true,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "111",
+        "chars": 769,
+        "nodes": 198,
+        "controls": 10,
+        "fields": {},
+        "scroll": [
+          "fwin-body:338,0"
+        ]
+      }
+    },
+    "afterFlipBack": {
+      "where": "flip -> standard",
+      "converged": true,
+      "reads": 2,
+      "ms": 362,
+      "signature": "769|198|10",
+      "trace": [
+        "769|198|10",
+        "769|198|10"
+      ],
+      "snapshot": {
+        "app": "statistics",
+        "matchedBy": "title",
+        "host": "fwin",
+        "presentation": "standard",
+        "liquidClass": false,
+        "rect": {
+          "x": 128,
+          "y": 84,
+          "w": 820,
+          "h": 580
+        },
+        "maximized": false,
+        "focused": true,
+        "zIndex": "111",
+        "chars": 769,
+        "nodes": 198,
+        "controls": 10,
+        "fields": {},
+        "scroll": [
+          "fwin-body:320,0"
+        ]
+      }
+    },
+    "disabled": false,
+    "allConverged": true,
+    "unconverged": []
+  },
+  "parity": {
+    "standard": "9/9",
+    "liquid": "9/9",
+    "na": 0,
+    "equal": true,
+    "rowsAgree": true,
+    "failing": [],
+    "onlyInOne": []
+  },
+  "rowEvidence": [
+    {
+      "id": "knowledgeSummary",
+      "standard": {
+        "reachable": true,
+        "evidence": "cards=4 complete=4 syncEnabled=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "cards=4 complete=4 syncEnabled=true"
+      }
+    },
+    {
+      "id": "levelEstimate",
+      "standard": {
+        "reachable": true,
+        "evidence": "role=status badge=\"Beginner\" title=\"Estimated level\""
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "role=status badge=\"Beginner\" title=\"Estimated level\""
+      }
+    },
+    {
+      "id": "summaryMetrics",
+      "standard": {
+        "reachable": true,
+        "evidence": "cards=9 complete=9"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "cards=9 complete=9"
+      }
+    },
+    {
+      "id": "activityChart",
+      "standard": {
+        "reachable": true,
+        "evidence": "bars=14 labelled=14"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "bars=14 labelled=14"
+      }
+    },
+    {
+      "id": "bookBreakdown",
+      "standard": {
+        "reachable": true,
+        "evidence": "rows=3 complete=3"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "rows=3 complete=3"
+      }
+    },
+    {
+      "id": "showResume",
+      "standard": {
+        "reachable": true,
+        "evidence": "rows=2 controls=2 labelled=2"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "rows=2 controls=2 labelled=2"
+      }
+    },
+    {
+      "id": "recentActivity",
+      "standard": {
+        "reachable": true,
+        "evidence": "button=true target=true scrolled=true"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "button=true target=true scrolled=true"
+      }
+    },
+    {
+      "id": "resetRecovery",
+      "standard": {
+        "reachable": true,
+        "evidence": "details=true closed=true summary=\"Reset\" action=\"Reset\""
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "details=true closed=true summary=\"Reset\" action=\"Reset\""
+      }
+    },
+    {
+      "id": "windowLifecycle",
+      "standard": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=false"
+      },
+      "liquid": {
+        "reachable": true,
+        "evidence": "chromeButtons=5/4 liquidAriaPressed=true"
+      }
+    }
+  ],
+  "roundTrip": {
+    "trip": "standard -> liquid -> standard",
+    "dirtiedField": null,
+    "dirtyNote": "surface has no editable text field",
+    "fieldsHeld": true,
+    "shellHeld": true,
+    "diffs": [],
+    "otherPresentationBox": "820x580"
+  },
+  "control": {
+    "mutations": [
+      {
+        "mutation": "knowledgeSummary",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "knowledgeSummary"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "levelEstimate",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "levelEstimate"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "summaryMetrics",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "summaryMetrics"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "activityChart",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "activityChart"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "bookBreakdown",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "bookBreakdown"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "showResume",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "title stripped",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "showResume"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"title\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "recentActivity",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "stats-recent-activity removed from 1 of 1",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "recentActivity"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"removed-class\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "resetRecovery",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "element detached",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "resetRecovery"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"detached\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      },
+      {
+        "mutation": "windowLifecycle",
+        "declaredCascade": [],
+        "preBaseline": "9/9",
+        "ownRowBefore": "true",
+        "ownRowAfter": "false",
+        "applied": "aria-pressed stripped",
+        "armed": true,
+        "unarmableReason": null,
+        "reachable": "8/9",
+        "fellRows": [
+          "windowLifecycle"
+        ],
+        "exactlyOwnRow": true,
+        "unexpectedRows": [],
+        "restored": "[\"aria-pressed\",\"statistics:scroll\"]",
+        "afterRestore": "9/9",
+        "returned": true
+      }
+    ],
+    "armed": 9,
+    "declared": 9,
+    "unarmable": [],
+    "verdict": "CONTROL FAILED AS REQUIRED - category 6 instrument is proven"
+  },
+  "bars": {
+    "allRowsReachable": true,
+    "parityEqual": true,
+    "roundTripHeld": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": []
+}

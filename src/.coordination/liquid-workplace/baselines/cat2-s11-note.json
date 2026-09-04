@@ -1,0 +1,233 @@
+{
+  "label": "s11-note",
+  "surface": "@.fwin.fwin-note",
+  "win": "(focused)",
+  "task": "type:.desk-note-text=Buy milk and review 12 cards >> wait:400",
+  "strictMode": "on - latency carries the dev double-render tax; see correction 31",
+  "presentation": "standard",
+  "raised": "root surface - no taskbar button",
+  "base": {
+    "textRuns": 3,
+    "controlCount": 3,
+    "box": "260x220",
+    "results": 1
+  },
+  "inputCost": {
+    "clicks": 0,
+    "keystrokes": 28,
+    "total": 28
+  },
+  "latencyMs": {
+    "clickRecv": [],
+    "inputRecv": [
+      480.1,
+      428.7,
+      376.3,
+      325.2,
+      268.4,
+      214.1,
+      158.9,
+      139.3,
+      129.6,
+      123.7,
+      116.1,
+      109.4,
+      102.4,
+      92.5,
+      85.2,
+      79.5,
+      73.8,
+      68.1,
+      62.7,
+      55.6,
+      49.5,
+      43.7,
+      36,
+      30,
+      23.9,
+      16.9,
+      11.5,
+      5.8
+    ],
+    "worstRecv": 480.1,
+    "overBar100": 13,
+    "n": 28,
+    "clickStampUnscored": [],
+    "inputStampUnscored": [
+      480.5,
+      428.8,
+      376.4,
+      325.3,
+      268.6,
+      214.3,
+      159,
+      139.4,
+      129.6,
+      123.8,
+      116.3,
+      109.6,
+      103.3,
+      92.8,
+      85.4,
+      79.6,
+      73.8,
+      68.3,
+      62.8,
+      55.8,
+      49.6,
+      43.8,
+      36.1,
+      30.2,
+      24,
+      17.1,
+      11.6,
+      5.9
+    ],
+    "worstStampUnscored": 480.5
+  },
+  "steps": [
+    {
+      "step": "type:.desk-note-text=Buy milk and review 12 cards",
+      "target": {
+        "sel": ".desk-note-text",
+        "text": "Buy milk and review 12 cards",
+        "wasValue": ""
+      },
+      "counted": true,
+      "moved": {
+        "text": true,
+        "controls": true,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": true
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    },
+    {
+      "step": "wait:400",
+      "target": null,
+      "counted": false,
+      "moved": {
+        "text": false,
+        "controls": false,
+        "results": false,
+        "dialogs": false,
+        "scroll": false,
+        "focus": false,
+        "box": false,
+        "any": false
+      },
+      "caretOnly": false,
+      "deadEnd": false,
+      "anchorShift": null
+    }
+  ],
+  "idle": [
+    {
+      "phase": "resting",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    },
+    {
+      "phase": "after-task",
+      "idleMs": 1600,
+      "rawChurns": false,
+      "rawChannels": [],
+      "netChurns": false,
+      "netChannels": [],
+      "excluded": {
+        "textRuns": 0,
+        "controls": 0
+      }
+    }
+  ],
+  "churn": null,
+  "undo": {
+    "spec": "clear:.desk-note-text",
+    "steps": [
+      "clear:.desk-note-text"
+    ],
+    "restored": true,
+    "baseHash": "1oz4tyy",
+    "afterHash": "1oz4tyy",
+    "liveRegionsBefore": [],
+    "liveRegionsAfter": [],
+    "textHashRoundTrip": {
+      "base": "1oz4tyy",
+      "after": "1oz4tyy"
+    }
+  },
+  "stepsDriven": 1,
+  "deadEndCount": 0,
+  "deadEnds": [],
+  "scrollTrapCount": 1,
+  "scrollTraps": [
+    {
+      "sel": "div.fwin-body",
+      "overflowY": "hidden",
+      "unreachablePx": 4
+    }
+  ],
+  "decorativeClips": [],
+  "openDialogs": [],
+  "modalTrapCount": 0,
+  "modalTraps": [],
+  "dialogsClosedByEscape": [],
+  "costParity": {
+    "first": {
+      "presentation": "standard",
+      "box": "260x220",
+      "total": 28,
+      "deadEnds": 0,
+      "worstRecv": 480.1
+    },
+    "second": {
+      "presentation": "liquid",
+      "box": "260x220",
+      "total": 28,
+      "deadEnds": 0,
+      "worstRecv": 476.7
+    },
+    "restored": true,
+    "restoredTo": {
+      "presentation": "standard",
+      "pressed": "false",
+      "box": "260x220"
+    },
+    "liquidTotal": 28,
+    "standardTotal": 28
+  },
+  "bars": {
+    "deadEnds": true,
+    "modalTraps": true,
+    "scrollTraps": false,
+    "latency": false,
+    "costParity": true
+  },
+  "spatialFixity": null,
+  "spatialFixitySamples": null,
+  "spatialFixityControl": null,
+  "spatialFixityVerdict": null,
+  "verdict": "FAIL",
+  "failedBars": [
+    "scrollTraps",
+    "latency"
+  ],
+  "unmeasuredBars": [],
+  "notMeasuredHere": [
+    "dead controls outside the dominant-task path (honesty-probe A - every control driven)",
+    "mute-pair explanation quality (rubric category 8 harness)"
+  ]
+}

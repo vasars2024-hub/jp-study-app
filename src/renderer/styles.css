@@ -14742,6 +14742,11 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   overflow: hidden;
 }
 .desk-note-text {
+  /* A textarea is inline-block by default, so its line box reserves descender space BELOW it
+     and the note body's scrollHeight ran 4px past a clientHeight it cannot scroll (the body is
+     overflow:hidden). Measured 2026-09-03: scrollHeight 189 against clientHeight 185 on a
+     260x220 note, which category 2 scores as a scroll trap. `block` removes the line box. */
+  display: block;
   width: 100%;
   height: 100%;
   border: none;
