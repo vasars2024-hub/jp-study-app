@@ -233,14 +233,69 @@
     && !el.matches(EXPLICIT_LANDMARK_SEL)
     && Boolean(el.parentElement && el.parentElement.closest(SECTIONING_SEL));
 
+  /**
+   * CORRECTION 35 (2026-09-04, primary2) — DENSITY IS THE REGION'S OWN, not its subtree's.
+   *
+   * `text`, `forms`, `rows` and `items` were raw `textContent` / `querySelectorAll` over the
+   * whole subtree, so a container inherited the density of two things that are not its own
+   * content. Measured on `files`, whose rail is `nav.lq-scaffold-rail` (`data-lq-role="liquid"`)
+   * over a navigation tree of ~30 buttons and three headed sections:
+   *
+   *   div.fa-tree         text 532  ->  Work, because 532 >= 200. Every one of those 532
+   *                       characters is a `button.fa-tree-node` LABEL. The instrument already
+   *                       says so 70 lines up — "A single control is not a region... Controls
+   *                       are category 1's business; category 3 scores regions" — and then
+   *                       counted their text as the container's prose anyway.
+   *   div.fa-collections  forms 1   ->  Work, and the one form control is a `<select>` three
+   *                       levels down inside `.fa-folder-actions`, which THIS SAME WALK
+   *                       classifies as contextual chrome. Counting it twice, once for the
+   *                       chrome region and again for its ancestor, is the same depth-counting
+   *                       the "leaf-most only" rule below already rejects.
+   *
+   * So two exclusions, and they are deliberately NOT the same set:
+   *
+   *   text   skips CONTROL subtrees and CONTEXTUAL subtrees. A button's label is the button's,
+   *          and a nested chrome region's prose is that region's.
+   *   forms/rows/items skip CONTEXTUAL subtrees ONLY. A form control inside a region IS that
+   *          region's density — that is the whole point of the rule — and `input` is itself in
+   *          CONTROL_SEL, so excluding controls here would drive `forms` to 0 everywhere and
+   *          blind the walk to every form panel on the surface.
+   *
+   * MONOTONE, which is why no banked baseline needs re-deriving to stay honest: both exclusions
+   * can only LOWER a count, so a region can only move Work -> Anchor/Ambient, never the other
+   * way. `isContextual` is untouched, and `dense` short-circuits on it, so the Liquid-eligible
+   * set — and with it BOTH contextual bars and their denominators — is bit-identical. The only
+   * SCORED term that can move is `denseWorkOnTranslucent`, and only downward, i.e. only toward
+   * the bar it must satisfy. A surface that banked PASS with 0 cannot go below 0. The unscored
+   * `byRole` histogram does shift — Work -> Anchor, and a region whose text was all button
+   * labels reads Anchor -> Ambient — so a banked receipt's histogram is a stale reading of the
+   * same surface, not a changed surface. Re-derived on `musicwidget` (banked 10/10 this
+   * morning) to confirm rather than assert.
+   */
+  const CTX_SKIP = (n) => n.matches(CONTEXTUAL_SEL) && !isSectionCaption(n);
+  /** Top-most `sel` subtrees inside `el` that `skip` accepts — nested ones are already inside. */
+  const topMostSkipped = (el, sel, skip) => {
+    const hits = [...el.querySelectorAll(sel)].filter(skip);
+    return hits.filter((n) => !hits.some((o) => o !== n && o.contains(n)));
+  };
+
   const classify = (el) => {
-    const text = (el.textContent || '').trim().length;
+    const textSkipped = topMostSkipped(
+      el,
+      `${CONTROL_SEL},${CONTEXTUAL_SEL}`,
+      (n) => n.matches(CONTROL_SEL) || CTX_SKIP(n),
+    );
+    const text = Math.max(0, (el.textContent || '').trim().length
+      - textSkipped.reduce((sum, n) => sum + (n.textContent || '').trim().length, 0));
+    const ctxSkipped = topMostSkipped(el, CONTEXTUAL_SEL, CTX_SKIP);
+    const own = (sel) => [...el.querySelectorAll(sel)]
+      .filter((n) => !ctxSkipped.some((s) => s.contains(n))).length;
     // Correction 34: `querySelectorAll` is descendants-only, so a region that IS the editor
     // counted `forms: 0` and fell through to Ambient. Count the element itself too.
-    const forms = el.querySelectorAll('input,textarea,select,[contenteditable="true"]').length
+    const forms = own('input,textarea,select,[contenteditable="true"]')
       + (el.matches(EDITOR_SEL) ? 1 : 0);
-    const rows = el.querySelectorAll('table,tr,.dict-entry,.card,article').length;
-    const items = el.querySelectorAll('li').length;
+    const rows = own('table,tr,.dict-entry,.card,article');
+    const items = own('li');
     const focusables = [...el.querySelectorAll(FOCUSABLE)].filter((n) => {
       const b = n.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !n.disabled;

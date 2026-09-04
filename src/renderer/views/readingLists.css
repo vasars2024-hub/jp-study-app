@@ -62,13 +62,158 @@
   align-items: center;
   gap: var(--lq-space-2, 8px);
   padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
-  border-radius: var(--lq-radius-2, 10px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
 }
 
 .rlv__notice--error {
   border-color: var(--danger, #d9534f);
+}
+
+/* `recovered` is not `reset`: the lists on screen are real, only stale. Danger
+   red on both would make the two indistinguishable at a glance, which is the
+   whole distinction §11.4 asks the surface to draw. */
+.rlv__notice--warn {
+  border-color: var(--warning, #d9a13b);
+}
+
+/* --------------------------------------------- the library picker (§11.4) -- */
+
+.rlv__picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+}
+
+.rlv__picker-count {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+}
+
+.rlv__picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Bounded so the picker cannot push the list it is adding to off screen. */
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.rlv__picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  width: 100%;
+  /* 34, not 32: the accessibility walk's floor IS 32 and it steps in halves, so
+     a control sized to exactly its floor is scored under the bar by rounding. */
+  min-height: 34px;
+  padding: 4px 8px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 10px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rlv__picker-item:hover:not(:disabled) {
+  border-color: var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+}
+
+.rlv__picker-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.rlv__picker-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rlv__picker-on {
+  margin-left: auto;
+  font-size: 0.85em;
+  white-space: nowrap;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+}
+
+/* ------------------------------------------------- the loading skeleton -- */
+
+.rlv__loading {
+  display: grid;
+  gap: var(--lq-space-3, 12px);
+}
+
+/* Deliberately the same four declarations as `.rlv__card-open`, so the
+   placeholder occupies the card's real box rather than an approximation. */
+.rlv__skeleton-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
+}
+
+.rlv__skeleton-mosaic,
+.rlv__skeleton-line {
+  border-radius: 6px;
+  /* A tint of the text colour, not a hardcoded grey: the high-contrast block in
+     `liquid-tokens.css` reassigns `--lq-work-text-muted`, so the placeholders
+     follow the theme instead of vanishing into it. */
+  background: color-mix(in srgb, var(--lq-work-text-muted, #888) 22%, transparent);
+}
+
+.rlv__skeleton-mosaic {
+  aspect-ratio: 3 / 2;
+}
+
+.rlv__skeleton-line {
+  height: 10px;
+}
+
+.rlv__skeleton-line--name {
+  width: 70%;
+}
+
+.rlv__skeleton-line--meta {
+  width: 40%;
+}
+
+.rlv__skeleton-line--bar {
+  width: 100%;
+  height: 6px;
+}
+
+/* The pulse is decoration; the placeholders read the same without it, and a
+   surface that keeps animating under `prefers-reduced-motion` is a category-1
+   failure in this repo's own rubric. */
+@media (prefers-reduced-motion: no-preference) {
+  .rlv__skeleton-mosaic,
+  .rlv__skeleton-line {
+    animation: rlv-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes rlv-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .rlv__new,
@@ -85,9 +230,9 @@
   flex: 1 1 220px;
   min-width: 0;
   padding: 6px 10px;
-  border-radius: var(--lq-radius-2, 10px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.18));
-  background: var(--lq-surface-1, rgba(0, 0, 0, 0.18));
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg, rgba(0, 0, 0, 0.18));
   color: inherit;
   font: inherit;
 }
@@ -107,6 +252,55 @@
   font-weight: 600;
 }
 
+/* ------------------------------------------------ real empty states (§11.4) -- */
+
+.rlv__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lq-space-2, 8px);
+  /* The lede and the example are prose; the fields under them are not, so the
+     measure is on the block rather than on the sheet. */
+  max-width: var(--lq-measure, 72ch);
+}
+
+.rlv__empty-lede {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.rlv__empty-why {
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+.rlv__example {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px dashed var(--lq-work-border, rgba(255, 255, 255, 0.18));
+}
+
+.rlv__example-label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.rlv__example-text {
+  margin: 0;
+  max-width: 100%;
+  /* `pre-wrap`, not `pre`: the sample's third line is long, and a `pre` would
+     add a horizontal scroller to an empty state — the exact unreachable-content
+     failure the files-app rail was fixed for. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
 /*
  * §11.4's filter strip. `flex-wrap` rather than a fixed two-column row: the count
  * is a whole sentence in every language and a narrow list window must be allowed
@@ -120,13 +314,72 @@
 }
 
 .rlv__filter-count {
-  color: var(--lq-text-muted, rgba(255, 255, 255, 0.66));
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
   font-size: 0.9em;
+}
+
+/* ---------------------------------------------- bulk selection (§11.4) -- */
+
+.rlv__selectall {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  /*
+    34, not 32. The accessibility walk's floor IS 32 and it steps in halves, so a
+    control sized to exactly its floor is knife-edge — a row of them has already
+    been scored under the bar by rounding alone.
+  */
+  min-height: 34px;
+  padding-inline: 4px;
+  font-size: 0.9em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rlv__bulk {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__bulk-count {
+  font-weight: 600;
+}
+
+.rlv__bulk-note {
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+.rlv__bulk-move {
+  min-height: 34px;
+}
+
+.rlv__row-pick {
+  /*
+    The tick box itself is ~13px on every platform; the reachable target is the
+    box plus this margin, which is what the walk measures on an <input>.
+  */
+  width: 18px;
+  height: 34px;
+  margin: 0 2px;
+  cursor: pointer;
 }
 
 /* --------------------------------------------------------------- the grid -- */
 
-.rlv__grid {
+/*
+ * The skeleton shares the grid rule rather than copying it. Two declarations
+ * would be two chances to drift, and a placeholder laid out differently from the
+ * thing it stands in for is a layout that jumps the moment the data arrives.
+ */
+.rlv__grid,
+.rlv__skeleton {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -165,16 +418,16 @@
   min-height: 44px;
   padding: var(--lq-space-3, 12px);
   text-align: left;
-  border-radius: var(--lq-radius-3, 14px);
-  border: 1px solid var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
   color: inherit;
   font: inherit;
   cursor: pointer;
 }
 
 .rlv__card-open:hover {
-  background: var(--lq-surface-3, rgba(255, 255, 255, 0.09));
+  background: var(--lq-anchor-bg-raised, rgba(255, 255, 255, 0.09));
 }
 
 .rlv__mosaic {
@@ -182,7 +435,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 2px;
   aspect-ratio: 3 / 2;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   overflow: hidden;
 }
 
@@ -217,14 +470,14 @@
   display: block;
   height: 4px;
   border-radius: 999px;
-  background: var(--lq-surface-3, rgba(255, 255, 255, 0.12));
+  background: var(--lq-anchor-bg-raised, rgba(255, 255, 255, 0.12));
   overflow: hidden;
 }
 
 .rlv__bar-fill {
   display: block;
   height: 100%;
-  background: var(--lq-accent, #6ea8fe);
+  background: var(--accent, #ff2e4d);
 }
 
 /* -------------------------------------------------------------- the detail -- */
@@ -240,17 +493,17 @@
 
 .rlv__row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--lq-space-2, 8px);
   padding: 4px;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   border: 1px solid transparent;
 }
 
 .rlv__row:hover {
-  border-color: var(--lq-border-weak, rgba(255, 255, 255, 0.14));
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.05));
+  border-color: var(--lq-work-border, rgba(255, 255, 255, 0.14));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.05));
 }
 
 .rlv__row[data-state='finished'] .rlv__row-title,
@@ -268,7 +521,7 @@
   padding: 4px 8px;
   text-align: left;
   border: 0;
-  border-radius: var(--lq-radius-2, 10px);
+  border-radius: var(--radius-md, 10px);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -298,8 +551,8 @@
   margin: 0;
   padding: 4px 8px;
   font-size: 0.9em;
-  border-radius: var(--lq-radius-2, 10px);
-  background: var(--lq-surface-2, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-md, 10px);
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -307,4 +560,322 @@
   .rlv__row-open {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------- density (§11.4) -- */
+
+/*
+ * COMPACT DOES NOT SHRINK A HIT TARGET, AND THAT IS THE WHOLE DESIGN.
+ *
+ * The obvious compact mode is "make the rows shorter", and it is wrong here:
+ * `.rlv__row-open` is 34px because the accessibility walk's floor IS 32 and it
+ * steps in halves, so a control sized to exactly its floor is knife-edge (see
+ * `.rlv__selectall`, and `lq-hit-gives-nothing-at-exactly-32`). A density mode
+ * that took rows to 28px would trade a pass on this row of §11.4 for a fail on
+ * the accessibility row two bullets above it.
+ *
+ * So compact spends the SPACE BETWEEN and AROUND the targets, which is free:
+ *
+ *   comfortable  34 button + 4+4 padding + 1+1 border = 44, + 4 gap = 48/row
+ *   compact      34 button + 1+1 padding + 1+1 border = 38, + 2 gap = 40/row
+ *
+ * 17% more rows on one screen, and every pointer target is the size it was.
+ * `readingListsDensity.test.ts` asserts exactly that: the button floors are
+ * IDENTICAL in both modes and only the surrounding metrics move.
+ */
+
+.rlv[data-density='compact'] .rlv__rows {
+  gap: 2px;
+}
+
+.rlv[data-density='compact'] .rlv__row {
+  padding: 1px;
+}
+
+/* The secondary line is the first thing to go quiet, not the first thing to be
+   hidden: a 300-book list still has to tell you which of them you own. */
+.rlv[data-density='compact'] .rlv__row-where {
+  font-size: 0.8em;
+}
+
+/* Cards: narrower tracks fit more per row, and the cover mosaic is what makes a
+   card tall, so it is what compact trims. The 170px floor keeps the same
+   `min(…, 100%)` guard as the comfortable track — a bare floor wider than the
+   212px pane clips the cards with no scrollbar to reach them. */
+.rlv[data-density='compact'] .rlv__grid,
+.rlv[data-density='compact'] .rlv__skeleton {
+  grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
+  gap: var(--lq-space-2, 8px);
+}
+
+.rlv[data-density='compact'] .rlv__card-open {
+  gap: 4px;
+  padding: var(--lq-space-2, 8px);
+}
+
+.rlv[data-density='compact'] .rlv__mosaic,
+.rlv[data-density='compact'] .rlv__skeleton-mosaic {
+  aspect-ratio: 5 / 2;
+}
+
+/* --------------------------------------------------- reorder (§11.4) -- */
+
+/* The one line the surface says about reordering. Muted, because it is an
+   instruction and not a state — and it is only rendered when there is more
+   than one row, so it never explains a gesture there is nothing to use it on. */
+.rlv__hint {
+  margin: 0;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.85em;
+}
+
+/* `grab`, not `move`: the row is still a click target for opening the book, and
+   `move` on something you mostly click reads as "this row is only draggable". */
+.rlv__row[draggable='true'] {
+  cursor: grab;
+}
+
+/* The row's own children must not steal the drag. A native <select> and a text
+   button both start their own selection gesture, which cancels the drag with no
+   feedback at all — the classic "drag works everywhere except on the words". */
+.rlv__row-open,
+.rlv__row-title,
+.rlv__row-where {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* ------------------------------ §11.4 · drop targets and the move rail ----- */
+
+/*
+  The rail exists only while a row is being dragged, so it must not push the
+  list down and make the row jump out from under the pointer mid-gesture:
+  it is absolutely placed over the top of the rows, not inserted before them.
+*/
+.rlv__droprail {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px dashed var(--accent, #ff2e4d);
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__droprail-lede {
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+/*
+  34px, not 32: the accessibility walk's floor IS 32 and it steps in halves, so
+  a target sized exactly at the floor is knife-edge on it. Same reasoning, same
+  number as `.rlv__row-open` and `.rlv__selectall`.
+*/
+.rlv__droprail-target {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 var(--lq-space-3, 12px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+}
+
+/*
+  The hover state of a drop target has to survive the pointer being over a CHILD
+  of the target, which `:hover` does and a JS `dragenter`/`dragleave` pair does
+  not — hence `data-over`, set from `dragover` rather than `dragenter`.
+*/
+.rlv__droprail-target[data-over='true'],
+.rlv__card[data-over='true'] .rlv__card-open {
+  border-color: var(--accent, #ff2e4d);
+  background: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.14));
+}
+
+/* The rail's own targets must not become drag sources when the pointer rests
+   on their text — the same steal `.rlv__row-open` above is guarding against. */
+.rlv__droprail-target {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* ------------------------------------ §11.1 · the source-message panel ----- */
+
+.rlv__source {
+  display: grid;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__source-head {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.rlv__source-title {
+  margin: 0;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.rlv__source-when,
+.rlv__source-partial {
+  margin: 0;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+/*
+  The pasted message is quoted text, so it is READ, not skimmed — §11.4's own
+  "reading stays on a stable opaque anchor" rule. No translucency here, and the
+  numbering is `ol` so the line the entry came from can be counted to.
+*/
+.rlv__source-lines {
+  margin: 0;
+  padding: var(--lq-space-2, 8px) var(--lq-space-2, 8px) var(--lq-space-2, 8px)
+    var(--lq-space-5, 28px);
+  max-height: 40vh;
+  overflow: auto;
+  border-radius: var(--radius-md, 10px);
+  background: var(--lq-anchor-bg, rgba(0, 0, 0, 0.22));
+}
+
+.rlv__source-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lq-space-2, 8px);
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*
+  Not colour alone: the produced line carries a left rule AND the words "this
+  line" next to it, because §11.4's accessibility row rules out a highlight that
+  only a sighted reader can perceive.
+*/
+.rlv__source-line[data-produced='true'] {
+  border-left: 3px solid var(--accent, #ff2e4d);
+  padding-left: 8px;
+  background: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.1));
+}
+
+.rlv__source-mark {
+  flex: none;
+  font-size: 0.8em;
+  color: var(--accent, #ff2e4d);
+}
+
+.rlv__source-text {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* --------------------------------------- §11.1 · the author's other works -- */
+
+.rlv__author {
+  display: grid;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+/* The author link sits in the row's own grid, not inside the open button —
+   a nested button is invalid and the browser hoists it out of its parent. */
+.rlv__row-author {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlv__author-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--lq-space-1, 4px);
+}
+
+.rlv__author-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+}
+
+/* 34px for the same reason every other target on this surface is 34 and not 32:
+   the accessibility walk's floor IS 32 and it steps in halves. */
+.rlv__author-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lq-space-2, 8px);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.rlv__author-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlv__author-where,
+.rlv__author-state {
+  flex: none;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.85em;
+}
+
+.rlv__author-list-link {
+  flex: none;
+  min-height: 34px;
+}
+
+/* --------------------------------------------- §11.1 · the row's cover ----- */
+
+/*
+  Both the button and the inert span, so an unbound row keeps the column and the
+  list does not develop a ragged left edge where a book has no file yet.
+  36px, not 32: this is a real target on the button branch, and the walk's floor
+  IS 32 and it steps in halves.
+*/
+.rlv__row-cover {
+  flex: none;
+  width: 27px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  border-radius: 3px;
+  background-color: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+  background-size: cover;
+  background-position: center;
+}
+
+/* The span branch is decoration and must not read as a control. */
+span.rlv__row-cover {
+  opacity: 0.55;
+}
+
+button.rlv__row-cover {
+  cursor: pointer;
+}
+
+/* Compact spends the gap, never the target — the same rule the density row
+   closed on. The cover keeps its 36px on both densities. */
+[data-density='compact'] .rlv__row-cover {
+  margin-inline-end: 2px;
 }

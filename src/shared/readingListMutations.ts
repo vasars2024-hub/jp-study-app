@@ -801,6 +801,79 @@ export function addReadingListEntry(
   };
 }
 
+export interface AddLibraryItemResult extends ReadingListsMutation {
+  entryId: string | null;
+  /** True when the item was already on this list. Nothing changed; say so. */
+  duplicate: boolean;
+}
+
+/**
+ * §11.4's other half of "paste a message **or add from your library**".
+ *
+ * A fold over the two mutations that already exist rather than a third way to
+ * mint an entry, so what an entry IS stays in one place — the same reasoning the
+ * bulk verbs are built on.
+ *
+ * Three things it does that a bare `addReadingListEntry` would get wrong:
+ *
+ *   · **It binds.** The user picked this exact item out of their own library, so
+ *     the binding is certain — confidence 1, not a suggestion the matcher then
+ *     has to re-derive and the user has to confirm.
+ *   · **It ends up `owned`, not `wanted`** — the file is on disk, and `wanted`
+ *     is the acquisition state that sends §11.1's row routing to the acquisition
+ *     path. That promotion is `bindReadingWork`'s, not a `state: 'owned'`
+ *     argument here. Passing one as well was written first and MEASURED dead: a
+ *     mutation flipping it to `'wanted'` left all 83 tests green, because the
+ *     bind promotes the entry immediately afterwards. Two rules for one fact is
+ *     how they drift, so the fact lives in the bind alone.
+ *   · **It refuses a duplicate and names it.** Adding the same book twice is a
+ *     mis-click, not an intent, and the second copy is indistinguishable from
+ *     the first once it lands. Reported through `duplicate` so the surface can
+ *     say which book it declined instead of appearing to do nothing.
+ *
+ * One `context` for both halves, deliberately. A second
+ * `createReadingListsMutationContext()` restarts its id counter at 1 and mints
+ * an id that already exists in this document.
+ */
+export function addLibraryItemToReadingList(
+  document: ReadingListsDocument,
+  listId: string,
+  item: { id: string; title: string },
+  context: ReadingListsMutationContext,
+): AddLibraryItemResult {
+  const list = document.lists.find((entry) => entry.id === listId);
+  if (!list || !item.id.trim() || !item.title.trim()) {
+    return { ...unchanged(document), entryId: null, duplicate: false };
+  }
+
+  // Bound to this item AND already on this list. A work bound to the item but
+  // sitting on a DIFFERENT list is not a duplicate — the same book on two lists
+  // is the ordinary case.
+  const existing = list.entries.find((entry) => {
+    const work = document.works.find((candidate) => candidate.id === entry.workId);
+    return work?.boundItemIds.includes(item.id) ?? false;
+  });
+  if (existing) {
+    return { ...unchanged(document), entryId: existing.id, duplicate: true };
+  }
+
+  const added = addReadingListEntry(document, listId, { title: item.title }, context);
+  if (!added.entryId) return { ...added, duplicate: false };
+
+  const entry = added.document.lists
+    .find((candidate) => candidate.id === listId)
+    ?.entries.find((candidate) => candidate.id === added.entryId);
+  if (!entry) return { ...added, duplicate: false };
+
+  const bound = bindReadingWork(added.document, entry.workId, item.id, 1, context);
+  return {
+    document: bound.document,
+    events: [...added.events, ...bound.events],
+    entryId: added.entryId,
+    duplicate: false,
+  };
+}
+
 export interface RemovedReadingEntry {
   listId: string;
   entry: ReadingListEntry;

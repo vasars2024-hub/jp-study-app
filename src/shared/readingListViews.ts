@@ -22,6 +22,10 @@ import type {
   ReadingListTarget,
   ReadingWorkRef,
 } from './readingLists';
+// The SAME normaliser `readingListMatching` compares authors with. Two author
+// normalisers is two answers to "is this the same person", and the surface and
+// the matcher would disagree in exactly the cases this link exists for.
+import { normalizeMediaTitleKey } from './mediaIdentity';
 
 /** Every state, in the order a surface should show them. Chips read left to right. */
 export const READING_ENTRY_STATES: readonly ReadingEntryState[] = [
@@ -197,6 +201,69 @@ export function readingListRows(
   });
 }
 
+/** One line of §11.1's "that author's other works, owned and wanted". */
+export interface ReadingAuthorRow {
+  entryId: string;
+  workId: string;
+  title: string;
+  /** `null` is the acquisition destination, exactly as on `ReadingListRow`. */
+  itemId: string | null;
+  state: ReadingEntryState;
+  listId: string;
+  listName: string;
+  listArchived: boolean;
+}
+
+/**
+ * §11.1: *"an author name → that author's other works, owned and wanted"*.
+ *
+ * Across EVERY list, not just the one open, because "other works" is a question
+ * about the author and not about the list the user happens to be looking at —
+ * a version scoped to the current list would answer "none" for the common case
+ * of one book per list and read as the link being broken.
+ *
+ * A work on two lists yields TWO rows, each naming its list. Collapsing them
+ * would throw away the only fact that tells the user where to go next, and the
+ * caller can still count distinct `workId`s.
+ *
+ * Matching is on `normalizeMediaTitleKey`, the same normaliser
+ * `readingListMatching` uses for authors, so "Sayaka Murata" and "murata,
+ * sayaka" do not silently become two authors. A blank author matches NOTHING:
+ * `authorRaw` is optional and most works never carry one, so a key-less match
+ * would return every authorless work in the document.
+ */
+export function readingWorksByAuthor(
+  document: ReadingListsDocument,
+  authorRaw: string,
+): ReadingAuthorRow[] {
+  const key = normalizeMediaTitleKey(authorRaw);
+  if (!key) return [];
+  const works = new Map(
+    document.works
+      .filter((work) => normalizeMediaTitleKey(work.authorRaw ?? '') === key)
+      .map((work) => [work.id, work]),
+  );
+  if (works.size === 0) return [];
+  const out: ReadingAuthorRow[] = [];
+  for (const list of document.lists) {
+    for (const entry of sortReadingListEntries(list)) {
+      const work = works.get(entry.workId);
+      if (!work) continue;
+      out.push({
+        entryId: entry.id,
+        workId: work.id,
+        title: work.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '',
+        itemId: work.boundItemIds[0] ?? null,
+        state: entry.state,
+        listId: list.id,
+        listName: list.name,
+        listArchived: Boolean(list.archivedAt),
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * The row §11.2's "Next up" widget offers, and the one the list detail
  * highlights.
@@ -365,4 +432,35 @@ export function totalReadingTriage(document: ReadingListsDocument): number {
     }
   }
   return triaged.size;
+}
+
+/**
+ * §11.4's reorder, as a pure move over an id order.
+ *
+ * `moved` is placed immediately BEFORE `target` when it is travelling up the
+ * list, and immediately AFTER it when travelling down. That is what every list
+ * UI does and it is the only rule that makes a drop onto the row you came from
+ * a no-op instead of an off-by-one.
+ *
+ * The array handed in is the WHOLE list order, never the filtered view. Dropping
+ * A onto C while B is hidden by a filter is otherwise ambiguous — "before C" and
+ * "after B" are different positions and the user can see only one of them. Given
+ * the full order the move is well defined: A lands next to C, and B keeps its own
+ * place relative to C. `readingListsView.test.tsx` drives exactly that case.
+ *
+ * Returns the input array unchanged (by value) when the move is a no-op, so a
+ * caller can compare and skip the write.
+ */
+export function reorderEntryIds(
+  order: readonly string[],
+  movedId: string,
+  targetId: string,
+): string[] {
+  const from = order.indexOf(movedId);
+  const to = order.indexOf(targetId);
+  if (from < 0 || to < 0 || from === to) return [...order];
+  const rest = order.filter((id) => id !== movedId);
+  const at = rest.indexOf(targetId);
+  rest.splice(from > to ? at : at + 1, 0, movedId);
+  return rest;
 }

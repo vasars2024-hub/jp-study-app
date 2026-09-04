@@ -652,6 +652,320 @@ these four commits.
 click-through table is largely satisfied by P4b and §11.2; audit it row by row against the
 table rather than assuming, then §11.4's eight pass/fail rows.
 
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4: bulk selection and
+performance CLOSED. P4 owes §11.1's audit and five §11.4 rows.**
+
+Counted against §11.4's own nine bullets: **keyboard** (`816a68c1`), **bulk
+selection** and **performance** are closed; **undo** is closed for every
+destructive act that exists (remove entry, delete list, dismiss suggestion, and
+all three bulk verbs) and still owes the re-parse; **drag and drop**, **real
+empty states**, **loading/error states**, **accessibility** and **density** are
+open. So **3 of 9 closed, 1 partial, 5 open.**
+
+- `f55e002a` — the three bulk verbs in the mutation layer. Finish and remove are
+  FOLDS over the single-entry mutations, so what "finished" means stays in one
+  place; move is not a fold, and carries the entry whole (same id, workId, state,
+  dates) because re-adding it would mint a new work and reset the state. A work
+  already on the target is skipped and NAMED. 43/43, five mutation controls.
+- `a9fa1550` — the bulk bar. The selection is **derived through the live rows**
+  before it is used, so an entry removed by another window falls out of the count
+  on its own. A **shift-range spans only the rows on screen**; ranging over the
+  unfiltered list selects entries that were never visible. 18/18, three controls.
+- `e5ad2963` — §11.4's performance row: one row repaints on a one-row change,
+  not 500. 20/20, two controls.
+
+**Two traps, both of which cost a run here:**
+
+1. **`applyReadingListsMutation` normalizes its base**, which rebuilds every
+   entry object — so `memo` on `row.entry` identity NEVER bites and scored 500 of
+   500 rows re-rendering. Pass `entryId` and `state`; they are primitives.
+2. **The two bulk undos replay their captured indices in OPPOSITE directions.**
+   The removal fold captures each index against the array as it stood at that
+   step (two adjacent rows both capture 0) and unwinds BACKWARDS; the move takes
+   all its indices from one snapshot, so they are simultaneous and re-insert in
+   ASCENDING order. I wrote the move backwards first; only a whole-array
+   assertion caught it.
+
+Smaller: `setUiLang` is a dynamic import of a 12,000-key module, so a fixed
+microtask wait reads 0 repaints on a CORRECT component — poll `getUiLang()`. And
+a `perl -0pi` whose pattern carried a Japanese literal double-encoded six
+characters elsewhere in the file; grep for mojibake after any scripted non-ASCII
+edit.
+
+Gates at `e5ad2963`: `npx vitest run` EXIT 0, **1064 passed | 1 skipped, 13,705
+tests**; `i18n-check.cjs` EXIT 0 at **12,410** keys; `architecture-audit.cjs`
+EXIT 0 "Nothing new"; eslint 0 errors on every touched path.
+
+**Exact next slice: §11.4's empty/loading/error states**, which is the cheapest
+remaining row and the one a new user hits first — the grid's "No lists yet" is
+the bare string the plan forbids and should be the paste box itself with §2.1's
+example as the hint, and the detail's load state should be skeleton rows. Then
+density, then drag-and-drop (`reorderReadingListEntries` already exists and has
+no consumer). §11.1's click-through table still needs auditing row by row rather
+than assuming — four of its eight rows have no test naming them.
+
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4: empty, loading and
+error states CLOSED, plus the library route the copy needed. 5 of 9 rows.**
+
+Counted against §11.4's own nine bullets: **keyboard** (`816a68c1`), **bulk
+selection** (`a9fa1550`), **performance** (`e5ad2963`), **real empty states**
+and **loading and error states** are closed; **undo** still owes only the
+re-parse; **drag and drop**, **accessibility** and **density** are open. So
+**5 of 9 closed, 1 partial, 3 open.**
+
+- `ce7ae626` — **a `reset` store could not be told from a first run.**
+  `main/readingListsStore.ts` computes a health record on every snapshot — ok /
+  empty / recovered / reset — and `useReadingListsDocument` threw it away. The
+  word appeared in no renderer file. So `reset` (the file did not parse AND
+  there was no restore point, the one case where the lists are genuinely gone)
+  hands back `emptyReadingListsDocument()`, byte-identical to a first run's, and
+  the grid rendered *"No lists yet. Make one, then paste a message into it."*
+  That is the sentence the clause forbids. `recovered` is a `--warn` notice over
+  a grid that is still drawn, `reset` is `--error`; both say the unreadable file
+  is still on disk. No revision count is printed — the store documents
+  `lostRevisions: 1` as unknown-but-at-least-one, so a number would be
+  fabricated, and a test asserts its absence. Skeleton cards share `.rlv__grid`'s
+  rule rather than copying it.
+- `5d98a401` — **28 `var(--lq-…)` sites naming tokens declared NOWHERE.** Read
+  live off pid 13316: `--lq-surface-2`, `--lq-border-weak` and `--lq-radius-2`
+  all resolve to `""`. So the sheet painted fixed white translucencies in every
+  theme, and on `classic-light` (`--bg` and `--panel` both `#ffffff`) the card
+  borders composited to exactly the page colour. `--lq-accent`'s fallback was a
+  BLUE. `liquidTokenNamesResolve.test.ts` is the repo-wide guard, with a vacuity
+  check and three recorded names in sheets other tracks hold open.
+- `aac290e6` — **the empty grid IS the paste box**, and the hint is
+  `READING_LIST_EXAMPLE_MESSAGE`, promoted out of the parser test into
+  `readingListParser.ts` and imported by both. The sample a user sees is now by
+  construction the exact input §2.1's acceptance test pins the output of.
+  Untranslated on purpose: sample input, not chrome.
+- `3384cdfb` — **`addLibraryItemToReadingList`.** §11.4's copy says "paste a
+  message **or add from your library**"; `aac290e6` printed only the first half
+  because the second route did not exist anywhere in `src/renderer`. Now it
+  does: a fold over add + bind at confidence 1, a duplicate refused and named, a
+  picker that MARKS what is already on the list rather than hiding it, and an
+  undo.
+
+**Four traps, each of which cost a run:**
+
+1. **jsdom does not perform implicit form submission from a button click.** A
+   `type="submit"` button is therefore untestable by the mouse path — the suite
+   passes on a button that does nothing. Use an explicit `onClick` and keep
+   `onSubmit` for the Enter key.
+2. **`byText` returns the wrapping DIV, not the button.** It scans
+   `button, span, p, div` in document order, so a `.rlv__paste-actions` holding
+   one button has the same trimmed text as the button. Measured `tag: "DIV"`.
+   Clicking a div does nothing, silently. It also matched the HEADER's paste
+   button when the empty state's own was meant.
+3. **A control that reads GREEN is a finding.** `state: 'owned'` on the library
+   add was dead: flipping it to `'wanted'` left all 83 tests green, because
+   `bindReadingWork` promotes immediately afterwards. Removed rather than kept.
+4. **A `const query` in the picker shadowed the filter strip's `query`** in the
+   same scope, so the row-count line vanished unless the picker's search box was
+   non-empty. Caught by an existing test, not a new one.
+
+Gates at `3384cdfb`: `npx vitest run` EXIT 0, **1067 passed | 1 skipped, 13,738
+tests passed | 6 skipped**; `i18n-check.cjs` EXIT 0 at **12,430** keys;
+`i18n-hardcoded-check.cjs` EXIT 0; `architecture-audit.cjs` EXIT 0 "Nothing
+new"; eslint 0 errors on every touched non-CSS path.
+
+**Exact next slice: §11.4's density row** (comfortable/compact — the plan's own
+"a 20-book list and a 300-book list are not the same UI problem"), then
+**accessibility**, then **drag and drop** (`reorderReadingListEntries` exists
+and still has no consumer). Undo's remaining debt is the re-parse alone.
+§11.1's click-through table still needs auditing row by row — four of its eight
+rows have no test naming them, and that has now been deferred for three turns.
+
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`, branch `wt/files-app`).**
+Three §11.4 rows: **density**, **accessibility**, and the first half of **drag
+and drop**. §11.4 goes **5 of 9 -> 8 of 9 closed** (+1 partial). The one row
+still open is drag-and-drop's other three clauses; undo's only remaining debt is
+still the re-parse.
+
+- `fbec7ec7` — **density.** Comfortable/compact, one preference over the whole
+  surface, persisted in renderer `localStorage` (NOT the document: that is user
+  data, it round-trips through main, and a chrome preference riding in it would
+  make every flip a store write, a broadcast and a line in the event log).
+
+  **Compact does not shrink a hit target, and that is the whole design.**
+  `.rlv__row-open` and `.rlv__selectall` are 34px, not 32, because the
+  accessibility walk's floor IS 32 and it steps in halves. A compact mode at
+  28px would buy this row by failing the accessibility row two bullets above it.
+  So compact spends only the space between and around the targets: 48px/row ->
+  40px/row, 17% more rows, every target unchanged. The guard asserts that NO
+  `[data-density='compact']` rule declares any height, width, transform or
+  scale, with a vacuity check that the attribute is not inert. 5 of 5 RED.
+
+- `cbd3ff26` — **accessibility, and a role the tree threw away.** Every list
+  card carried `role="progressbar"` with `aria-valuenow` INSIDE its own
+  `<button>`. ARIA gives `button` presentational children, so that role was
+  stripped in every browser: it announced nothing, while making the source read
+  as covered. The bar is `aria-hidden` now and the sentence above it ("0 of 2
+  finished") is the announcement, inside the same button. Also: `ul.rlv__grid`,
+  `ul.rlv__rows` and the picker list had no accessible name — "list, 3 items"
+  on a surface with three lists on it.
+
+  `__tests__/helpers/a11yWalk.ts` is a HARNESS (RULE 1), not a probe: it takes
+  any container. Two of its four legs open a panel FIRST, because the panels are
+  click-mounted and a walk of the resting surface never reaches them. What it
+  CONFIRMED matters as much as what it found: every control already had a name,
+  nothing clickable is a bare div, every focusable is native or `.ui-focusable`.
+  5 of 5 RED.
+
+- `a9dc23e4` — **reorder.** `reorderReadingListEntries` had existed since P0
+  with no consumer in `src/renderer`. Drag plus Alt+Arrow, one write, one undo.
+  The order handed to the mutation is the WHOLE list, never `visibleRows`: that
+  mutation APPENDS omitted ids, so a filtered reorder moves every hidden entry
+  to the end, invisibly. 5 of 5 RED after two rewrites — see below.
+
+**TWO MUTATION CONTROLS READ GREEN, and each was a finding of its own:**
+
+1. *"Compute the reorder from the filtered view"* passed all 72 tests. It
+   APPLIED (sentinel-substituted and grepped, per `mutation-control-that-never-
+   applied`) and was NEUTRALISED: `reorderRows` closes over `visibleRows` with
+   deps `[list, t, write]`, so the mutant read a stale unfiltered array and did
+   the right thing by accident. A control that the code under test can
+   accidentally satisfy proves nothing.
+2. *"Delete the `preventDefault` in `onDragOver`"* passed everything. **jsdom
+   implements NONE of the HTML drag-and-drop model** — a synthetic `drop` fires
+   whether or not `dragover` was cancelled, and cancelling dragover is the only
+   thing that permits a drop in a real browser. Every drag test would have
+   stayed green with the feature dead in the app. `defaultPrevented` on the
+   dispatched event is the one fact jsdom does report, so that is what is
+   asserted now, with its negative half.
+
+**Three more traps, all live-measured this turn:**
+
+3. **`CSS.escape` is UNDEFINED in this jsdom.** `label[for="${CSS.escape(id)}"]`
+   throws — and only for elements that HAVE an id, which on this surface means
+   only the two click-mounted panels. A walk of the resting surface passes clean
+   and the failure looks like a panel bug.
+4. **`event.dataTransfer` is `undefined` in jsdom.** A drag payload put there is
+   unreadable from every test, so the dragged id is held in a ref in the view.
+5. **A `{/* JSX comment */}` immediately after `) : (`** is a parse error: the
+   ternary arm takes one expression, and the comment makes two children with no
+   fragment. Use a `//` line comment above the element instead.
+
+Gates at `a9dc23e4`: 410 tests across the 20 reading-list suites, all passing;
+`i18n-check.cjs` EXIT 0 at **12,446** keys; `i18n-hardcoded-check.cjs` EXIT 0;
+eslint 0 errors on every touched non-CSS path.
+
+**Exact next slice: §11.4's drag-and-drop remainder** — drag an entry BETWEEN
+lists (`moveReadingListEntries` already exists and the bulk bar already uses
+it), drop a library item onto a list card, drop a `.txt` onto the lists view.
+Then **§11.1's click-through table, row by row** — four of its eight rows still
+have no test naming them, and that has now been deferred for four turns.
+
+**2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4 CLOSES at 9 of 9.
+§11.1 goes 3 of 8 rows to 7 of 8. §11 is 18 of 19. P4 owes ONE row: §11.1 row 8.**
+
+`8ec4ee24`, `9ddc89a5`, `16fc0811`, `a50faedb`. 33 mutation controls across the
+four, every one sentinel-checked as APPLIED before its verdict was read;
+**33 of 33 RED**.
+
+- `8ec4ee24` — **§11.4's drag-and-drop remainder, all three clauses.** Between
+  lists (a rail of the other lists, mounted on `dragstart` and gone on
+  `dragend`), a library book onto a list card, a `.txt` onto the view.
+
+  **The library half needed NO change to the library.** `LibraryView` has set
+  `app/lib-item` on all four of its drag sources (1273, 1584, 1624, 1846) and
+  read it back at 464 since long before this view existed. Joining that type was
+  the whole integration; minting a second one would have been two contracts for
+  one drag.
+
+  **THE GUARD THAT DECIDES WHETHER ANY OF IT WORKS: every `dragover` test is
+  written against `dataTransfer.types`, never `getData`.** The HTML model puts
+  the data store in *protected* mode during `dragover`, where `getData` returns
+  `''` for every type no matter what the drag holds. A guard written on `getData`
+  never cancels `dragover`, Chromium then refuses every drop — and jsdom, which
+  has no protected mode either, reports the whole feature green.
+
+  A dropped file lands in the §2.5 preview, never straight into the list: a file
+  is a paste through a different door, and it would otherwise be the one intake
+  path that skips the preview. In the grid there is no list to import into, so
+  the FILE NAMES the list it creates.
+
+- `9ddc89a5` — **§11.1 rows 2 and 7.** Row 2 was not implemented at all:
+  `openRow` opened the book and wrote nothing. It promotes `owned → reading`
+  now, and **only** from `owned` — `finished`, `abandoned` and `skipped` are
+  decisions, and opening a book you abandoned to check one line is not a
+  decision to resume it. No undo toast, deliberately: it would fire on the app's
+  most common gesture, and the row's own state Select is the reversal, in view.
+
+  Row 7's highlight is derived from `sourceRef.lineIndex`, **never** by matching
+  `rawLine` back into the text. The fixture is a message naming the same title
+  on lines 2 and 4 with the entry from line 4; the matching mutant marks line 2.
+  Matching would also silently mark nothing after §2.4's re-parse.
+
+- `16fc0811` — **§11.1 row 6.** `authorRaw` has been on the work since P0 and
+  the parser writes it (`readingListMutations.ts:343`); **nothing in
+  `src/renderer` had ever read it.** `readingWorksByAuthor` is a pure function
+  in `readingListViews.ts`, not a hook, because §11.2's widgets and P5's smart
+  lists want the same answer. Across EVERY list — a list-scoped version answers
+  "none" for the ordinary one-book-per-list case and reads like a broken link.
+  Same normaliser as `readingListMatching`, so two spellings are one person; a
+  BLANK author matches nothing, or every authorless work comes back.
+
+**Two findings of the "it read green" kind, both kept as tests:**
+
+1. `addLibraryItemToReadingList` binds through `boundItemIds`, not an `itemId`
+   field. An assertion on `work.itemId` reads `undefined` and would have passed
+   as `toBeUndefined()`. The row must be BOUND, not merely titled the same, or
+   §3's matcher has to find its own book back.
+2. The parser rejects a bare `Delta\nEcho` — 0 titles, "2 lines were ignored".
+   A file-drop fixture has to be list-SHAPED (`1. Delta`), or the preview opens
+   empty and the test proves only that a panel appeared.
+
+**Gates at `16fc0811`, from a worktree with `git status --short` EMPTY, so this
+is committed HEAD and not somebody's uncommitted conversions:** `npx vitest run`
+**EXIT 0 — 1,073 files passed / 1 skipped; 13,827 tests passed / 6 skipped**.
+`i18n-check` EXIT 0 at **12,465** keys. `i18n-hardcoded-check` EXIT 0.
+`architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
+
+- `a50faedb` — **§11.1 row 4, so §11.1 closes 7 of 8 and §11 stands at 18 of 19.**
+  Rows had no cover at all; only list cards carried the mosaic. **Two
+  destinations on one row** — the title opens the reader, the cover reveals the
+  book — because a cover repeating what the title does is decoration with a tab
+  index.
+
+  **What makes it a link rather than a wire:** `resolveSelection` returns `null`
+  for an id not in `visible`, deliberately (`libraryShelf.ts` — a recorded id
+  outlives its item three ordinary ways). So `setSelectedId` ALONE lands on a
+  CLOSED drawer whenever the user's folder/language/level filter excludes that
+  book, which is indistinguishable from a dead link. `LibraryView`'s new
+  `revealItemId` clears those three filters, and that is the honest thing to
+  show: the user asked for this book, not for their filter.
+
+  Keyed on the id, not on mount, so cover → back → cover reveals again;
+  `ReadingWorkspaceView` holds an `{itemId}` OBJECT rather than a bare id for
+  the same reason. `onShowInLibrary` is OPTIONAL and the cover is a button only
+  where a host supplies it — otherwise, and on an unbound row, the same image
+  renders inert and `aria-hidden`, so the column does not go ragged. `canReveal`
+  enters `rowActions` as a BOOLEAN dep: the handler's identity changes on every
+  render of the mount and depending on it would repaint all 500 rows.
+
+  7 of 7 mutants RED, including *"the reveal leaves the folder filter set"* and
+  *"the reveal fires on mount only"*. **33 of 33 mutants RED across this turn's
+  four product commits.**
+
+  TRAP: the filter precondition must be driven from the shelf's folder rail
+  (`LibraryView.tsx:1393`), never the View menu — menu items render as bare
+  children on the default theme and are unreachable from a jsdom mount, so a
+  test written against the menu finds no button and reads as the rail missing.
+
+**Gates re-run after `a50faedb`, tree clean:** `npx vitest run` **EXIT 0 —
+1,074 files passed / 1 skipped; 13,839 tests, 13,833 passed / 6 skipped.**
+`i18n-check` EXIT 0 at 12,466 keys. `i18n-hardcoded-check` EXIT 0.
+`architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
+
+**Exact next slice: §11.1's LAST row, row 8** — *the "on 2 lists" line in the
+reader*. Trap §10.2 forbids list LOGIC in `NovelReader.tsx` (130 KB) and
+`MangaReader.tsx` (87 KB), so this is a READ-ONLY touch-point: a small component
+fed by a pure `readingListsForItem(document, itemId)` next to
+`readingWorksByAuthor` in `readingListViews.ts`, rendered by the readers and
+routing through the same `onOpenBook`/list-detail seams row 6's panel uses.
+Both reader files were clean in the main tree as of 2026-09-04 12:05, so the
+edit is conflict-safe; re-check before starting. Then P5.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the

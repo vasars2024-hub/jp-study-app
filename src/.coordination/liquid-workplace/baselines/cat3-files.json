@@ -1,0 +1,97 @@
+{
+  "label": "p2-files",
+  "surface": "@.fwin:has(.fa-shell)",
+  "win": "(focused)",
+  "depth": 12,
+  "raised": "root surface - focused OS window",
+  "presentationAsFound": "standard",
+  "presentationDriven": true,
+  "box": "820x580",
+  "presentation": "liquid",
+  "windowOwnPaint": {
+    "alpha": 0.72,
+    "backdrop": "blur(8px) saturate(1.25)",
+    "image": null,
+    "opacity": 1
+  },
+  "regions": 68,
+  "controlsSkipped": 77,
+  "byRole": {
+    "Work": 24,
+    "Liquid-eligible": 6,
+    "Anchor": 8,
+    "Anchor(holds work)": 30,
+    "Ambient": 0
+  },
+  "denseWorkOnTranslucent": 0,
+  "denseWorkOnTranslucentList": [],
+  "liquidTreatedEligible": 6,
+  "sharedPrimitiveEligible": 6,
+  "eligibleTotal": 6,
+  "theme": null,
+  "materials": null,
+  "viewport": "1264x821",
+  "bars": {
+    "denseWorkAnchored": true,
+    "contextualTreated": true,
+    "sharedPrimitives": true
+  },
+  "verdict": "PASS 10/10",
+  "failedBars": [],
+  "control": {
+    "target": {
+      "sel": "div.fa-row",
+      "path": [
+        0,
+        2,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "counts": {
+      "base": [
+        0,
+        6,
+        6,
+        6,
+        24
+      ],
+      "oneRegionGlass": [
+        1,
+        6,
+        6,
+        6,
+        24
+      ],
+      "allGlass": [
+        24,
+        6,
+        6,
+        6,
+        24
+      ],
+      "restored": [
+        0,
+        6,
+        6,
+        6,
+        24
+      ]
+    },
+    "movedOne": true,
+    "allWorkFailed": true,
+    "returned": true,
+    "oneMaterialReturned": true,
+    "oneMaterial": {
+      "before": "none|rgba(0, 0, 0, 0)",
+      "immediate": "none|rgba(0, 0, 0, 0)",
+      "settled": "none|rgba(0, 0, 0, 0)"
+    },
+    "allGlassReturned": true,
+    "verdict": "CONTROL FAILED AS REQUIRED - category 3 instrument is proven"
+  }
+}

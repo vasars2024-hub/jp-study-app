@@ -209,22 +209,75 @@ async function readPresentation() {
   })()`));
 }
 
-async function clickPresentationToggle() {
-  const clicked = JSON.parse(await ev(`(function(){
-    var root = ${ROOT_EXPR};
-    if (!root) return JSON.stringify({ refuse: 'surface disappeared before the presentation toggle' });
-    // Same ownership rule as readPresentation (correction 32): clicking a nested window's
-    // toggle would change a window this run does not own and leave it changed.
-    var btn = (${OWN_TOGGLE_EXPR})(root);
-    if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle of its own' });
-    btn.click();
-    return JSON.stringify({ ok: true });
-  })()`));
-  if (clicked.refuse) return clicked;
-  // The toggle animates the frame; L3 measured the class landing at t+26ms. 500ms is the
-  // same settle the control restore uses and is well past both.
-  await new Promise((resolve) => { setTimeout(resolve, 500); });
-  return readPresentation();
+/**
+ * Click the surface's own presentation toggle and wait for `want` ('liquid' | 'standard') to
+ * land. `want` is the CALLER's target, not the run's `--presentation`: the restore leg at the
+ * end drives back to whatever mode the surface was found in, and polling for the run's target
+ * there would wait out the whole deadline and then warn about a restore that had worked.
+ *
+ * RETRY, because the toggle is INTERMITTENT under a programmatic click. This was one click and
+ * a fixed `setTimeout(500)` read, and it produced two REFUSE runs that named the surface rather
+ * than the instrument: "the presentation toggle did not reach liquid".
+ *
+ * What was actually measured, 2026-09-04, on the sticky note and on `files`, over about a dozen
+ * drives: a click lands roughly every other time, in BOTH directions, on the same button within
+ * the same minute. A listener attached to the button counted exactly one click on a drive that
+ * did not move `data-presentation` at +900ms or at +3s, so the event fires and the window does
+ * not change — consistent with the click being toggled twice somewhere, though that was NOT
+ * established and no reader should treat it as known. A retry loop of six alternating
+ * click/read attempts moved it on the second every time it was used.
+ *
+ * TWO EARLIER EXPLANATIONS WERE WRONG, recorded so nobody re-derives them. (1) "It only fails
+ * on an unfocused window" — `files` was focused and flipped first try, the note was not and did
+ * not, which fit until the note failed again while focused. (2) "`btn.focus()` before the click
+ * is what makes it land" — it worked once in the standard->liquid direction and then failed
+ * twice liquid->standard with focus confirmed via `document.activeElement`. The focus call is
+ * KEPT because it costs nothing and matches how the keyboard reaches this control, but it is
+ * not the fix and must not be cited as one.
+ *
+ * This matters beyond scoring: the RESTORE leg drives the same toggle, so a single-shot click
+ * could score correctly and then silently hand back a window in a presentation it did not find
+ * it in — persisted state, left changed, under an exit code of 0.
+ *
+ * Keep prose like this OUT of the evaluated template below. A backtick inside a comment inside a
+ * template literal closes the template, and the file then fails to parse at all — which is
+ * exactly how the first draft of this fix died.
+ */
+const PRESENTATION_ATTEMPTS = 6;
+const PRESENTATION_SETTLE_MS = 1500;
+
+async function clickPresentationToggle(want) {
+  let last = await readPresentation();
+  if (last.refuse) return last;
+  for (let attempt = 0; attempt < PRESENTATION_ATTEMPTS; attempt += 1) {
+    if ((last.liquid ? 'liquid' : 'standard') === want) {
+      return { ...last, attempts: attempt };
+    }
+    const clicked = JSON.parse(await ev(`(function(){
+      var root = ${ROOT_EXPR};
+      if (!root) return JSON.stringify({ refuse: 'surface disappeared before the presentation toggle' });
+      // Same ownership rule as readPresentation (correction 32): clicking a nested window's
+      // toggle would change a window this run does not own and leave it changed.
+      var btn = (${OWN_TOGGLE_EXPR})(root);
+      if (!btn) return JSON.stringify({ refuse: 'surface offers no presentation toggle of its own' });
+      btn.focus();
+      btn.click();
+      return JSON.stringify({ ok: true, focused: document.activeElement === btn });
+    })()`));
+    if (clicked.refuse) return clicked;
+    // Poll for the value we ASKED FOR rather than for "any change": a stale reading cannot
+    // satisfy it, and the loop still gives up — reporting the last state it actually saw —
+    // when the toggle genuinely does nothing.
+    const deadline = Date.now() + PRESENTATION_SETTLE_MS;
+    for (;;) {
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+      last = await readPresentation();
+      if (last.refuse) return last;
+      if ((last.liquid ? 'liquid' : 'standard') === want) break;
+      if (Date.now() > deadline) break;
+    }
+  }
+  return { ...last, attempts: PRESENTATION_ATTEMPTS };
 }
 
 async function configure() {
@@ -554,7 +607,7 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
       process.exitCode = 2;
       return;
     }
-    const moved = await clickPresentationToggle();
+    const moved = await clickPresentationToggle(PRESENTATION);
     if (moved.refuse) {
       console.error(`REFUSE - ${moved.refuse}`);
       process.exitCode = 2;
@@ -616,11 +669,26 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
     };
 
     if (CONTROL) {
-      const work = base.detail.find((row) => row.role === 'Work' && Array.isArray(row.path));
+      const workRows = base.detail.filter((row) => row.role === 'Work' && Array.isArray(row.path));
+      // CORRECTION 2026-09-04 — control A must attack a RIVAL, not the victim.
+      //
+      // This used to be `.find(row => row.role === 'Work')`, i.e. the first Work region in
+      // walk order, whatever its backing. Control A blurs that region and requires
+      // `denseWorkOnTranslucent` to INCREASE. Measured on `files`: the first Work region is
+      // `div.fa-toolbar`, which is ALREADY one of the two regions that term counts, so making
+      // it glass changed nothing — 2 -> 2, `movedOne: false` — and a product FAIL that the
+      // walk had measured correctly was reported as `VOID - negative control did not falsify`.
+      // The instrument was scoring its own control's target. So: pick the first Work region
+      // the scored term does NOT already contain (`translucentBacking` falsy). On `files` that
+      // is 24 of the 26 Work regions; on a clean surface it is all of them, so every baseline
+      // banked before this correction re-derives identically.
+      const work = workRows.find((row) => !row.translucentBacking) || null;
       if (!work) {
-        // No runtime Work region: falsify by planting instead of by perturbing. See
-        // `plantControls` for why the old VOID here was the instrument's limit, not the
-        // surface's defect.
+        // No ANCHORED runtime Work region: either the surface has no Work at all, or every
+        // Work region it has is already on glass and so is already inside the failing term.
+        // Both leave controls A and B nothing to move, so falsify by planting instead of by
+        // perturbing. See `plantControls` for why the old VOID here was the instrument's
+        // limit, not the surface's defect.
         const planted = await plantControls();
         if (planted.refuse) throw new Error(planted.refuse);
         const dirty = await read();
@@ -635,7 +703,10 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
         const proven = movedEligible && sharedHeld && movedDense && returned && cleaned;
         out.control = {
           kind: 'plant',
-          why: 'the surface has no runtime Work region; controls A and B have nothing to perturb',
+          why: workRows.length === 0
+            ? 'the surface has no runtime Work region; controls A and B have nothing to perturb'
+            : `all ${workRows.length} runtime Work regions are already on translucent backing, so`
+              + ' control A has no anchored rival to make glass; planting instead',
           plantSidePx: planted.side,
           counts: {
             base: metricTuple(base),
@@ -843,7 +914,7 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
       // The window's presentation is persisted state. A harness that drives it and exits owes
       // the next worker the state it found, whether or not the score passed.
       try {
-        const back = await clickPresentationToggle();
+        const back = await clickPresentationToggle(restorePresentationTo);
         const backMode = back.liquid ? 'liquid' : 'standard';
         if (backMode !== restorePresentationTo) {
           console.error(`WARNING - presentation left as ${backMode}, expected`

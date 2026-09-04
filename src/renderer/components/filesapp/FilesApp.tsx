@@ -24,6 +24,7 @@
  *    the root node clears it. Same window either way (gate 5's shape).
  */
 import {
+  Fragment,
   Suspense,
   lazy,
   useCallback,
@@ -35,6 +36,7 @@ import {
 } from 'react';
 import { useT } from '../../i18n';
 import { LANG_TAGS } from '../../../shared/i18n/core';
+import { summarizeFolder } from './folderSummary';
 import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
 import VirtualList from '../VirtualList';
@@ -1131,10 +1133,16 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---------------- gate 19: saved searches ---------------- */}
       <div className="fa-smart">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.smart.heading')}</h3>
+          {/* `title` on every rail label the collapsed rail ellipsizes. The
+              accessible name is unchanged — the text stays in the DOM — but a
+              pointer user in the 72px rail otherwise reads two characters. */}
+          <h3 className="fa-collections-title" title={t('filesApp.smart.heading')}>
+            {t('filesApp.smart.heading')}
+          </h3>
           <button
             type="button"
             className="fa-smart-save"
+            title={t('filesApp.smart.save')}
             onClick={() => {
               // Refused HERE as well as in the model, so the name editor never
               // opens on a view that cannot produce a search worth saving.
@@ -1219,7 +1227,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---------------- gate 18: Favorites ---------------- */}
       <div className="fa-favorites">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.favorites.heading')}</h3>
+          <h3 className="fa-collections-title" title={t('filesApp.favorites.heading')}>
+            {t('filesApp.favorites.heading')}
+          </h3>
           {/* Pinning a LOCATION is the gate's second half, and this is where a
               user would look for it: on the folder they are standing in. */}
           {scopeAsFavorite ? (
@@ -1285,8 +1295,15 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       {/* ---- gate 16: the only folders in this tree the user writes ---- */}
       <div className="fa-collections">
         <div className="fa-collections-head">
-          <h3 className="fa-collections-title">{t('filesApp.collections.heading')}</h3>
-          <button type="button" className="fa-collections-new" onClick={onNewFolder}>
+          <h3 className="fa-collections-title" title={t('filesApp.collections.heading')}>
+            {t('filesApp.collections.heading')}
+          </h3>
+          <button
+            type="button"
+            className="fa-collections-new"
+            title={t('filesApp.collections.new')}
+            onClick={onNewFolder}
+          >
             {t('filesApp.collections.new')}
           </button>
         </div>
@@ -1369,14 +1386,33 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
             selected, derived or not — a control that vanishes on a derived
             folder cannot say why it refused, and the gate asks for a named
             message rather than an absence. */}
-        <div className="fa-folder-actions" role="group" aria-label={t('filesApp.collections.heading')}>
-          <button type="button" className="fa-action fa-folder-rename" onClick={onStartRename}>
+        {/* `role="group"` labelled "My folders" was two things wrong at once: `group` is
+            generic enough to cover a fieldset, so nothing downstream could tell this cluster
+            of three commands from a form; and the name it borrowed described the folder LIST
+            above rather than the actions themselves. It is a toolbar, inside the scaffold rail
+            (`data-lq-role="liquid"`), and it now says so — see the note on `.fa-toolbar`. */}
+        <div
+          className="fa-folder-actions"
+          role="toolbar"
+          aria-label={t('filesApp.collections.actionsLabel')}
+        >
+          <button
+            type="button"
+            className="fa-action fa-folder-rename"
+            title={t('filesApp.collections.rename')}
+            onClick={onStartRename}
+          >
             {t('filesApp.collections.rename')}
           </button>
-          <button type="button" className="fa-action fa-folder-delete" onClick={onRequestDelete}>
+          <button
+            type="button"
+            className="fa-action fa-folder-delete"
+            title={t('filesApp.collections.delete')}
+            onClick={onRequestDelete}
+          >
             {t('filesApp.collections.delete')}
           </button>
-          <label className="fa-folder-move">
+          <label className="fa-folder-move" title={t('filesApp.collections.moveTo')}>
             <span className="fa-visually-hidden">{t('filesApp.collections.moveTo')}</span>
             <select
               value={
@@ -1464,8 +1500,18 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         })
       : null;
 
+  // L9 category 3, measured live 2026-09-04 on the 820x580 window in Liquid: this strip and
+  // `.fa-folder-actions` below were the surface's only two `denseWorkOnTranslucent` regions.
+  // Neither is dense work — this one is 703x38 and holds a search field, a sort control, a view
+  // toggle and four buttons — but an undeclared `<div>` has no runtime evidence that it is
+  // chrome, so the walk classified both by content and §2.3's "dense work on glass" bar failed
+  // on the app's own toolbar. The role is the honest declaration and it is what the scaffold
+  // already assumes: `.lq-scaffold-toolbar` around it carries `data-lq-role="liquid"`, so once
+  // this says `toolbar` it is contextual chrome on a shared Liquid primitive, which is exactly
+  // what §2.3 reserves Liquid for. Same shape and same reasoning as `MusicWidget`'s transport
+  // cluster. The name is the region's; every control inside keeps its own.
   const toolbar = (
-    <div className="fa-toolbar">
+    <div className="fa-toolbar" role="toolbar" aria-label={t('filesApp.toolbar.label')}>
       {/* Search, sort and refresh act on the item list. On a panel scope there
           is no list for them to act on, and a control that is present and does
           nothing is a worse answer than one that is absent. */}
@@ -1964,6 +2010,23 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
   })();
 
+  /**
+   * What the inspector says when nothing is selected — rubric category 4.
+   *
+   * Measured live 2026-09-04 at maximized (1264x773): the inspector was a 320px
+   * column holding ONE 43px sentence, and its empty remainder was the surface's
+   * largest dead rectangle at **316x572, 17.4% of the viewport** against a 15%
+   * bar. The sentence stays (it is the honest answer to "why is this empty"),
+   * but a fixed column that earns nothing until the user clicks is exactly what
+   * this category is for.
+   *
+   * Everything here is derived from `visible` — the rows actually on screen
+   * under the current scope, search and filters — so it can never disagree with
+   * the list beside it. The counting rules live in `folderSummary.ts` with
+   * their own suite; see that file for why `sizeBytes: null` is not zero.
+   */
+  const folderSummary = useMemo(() => summarizeFolder(visible), [visible]);
+
   const inspector = selected && mineability ? (
     <div className="fa-details">
       <h2 className="fa-details-title">{selected.name}</h2>
@@ -2094,7 +2157,52 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       ) : null}
     </div>
   ) : (
-    <p className="fa-state">{t('filesApp.state.noSelection')}</p>
+    <div className="fa-details fa-details-summary">
+      <h2 className="fa-details-title">{scopeLabel ?? t('filesApp.summary.title')}</h2>
+      <dl className="fa-details-list">
+        <dt>{t('filesApp.summary.shown')}</dt>
+        <dd>{t('filesApp.summary.itemCount', { count: visible.length })}</dd>
+        <dt>{t('filesApp.summary.totalSize')}</dt>
+        <dd>
+          {/* `formatSize(null, …)` rather than a literal em dash: `format.ts`
+              owns that decision ("a store with no size and a genuinely empty
+              file must not print the same") and a second copy of the glyph is
+              exactly the drift that file was extracted to stop. */}
+          {folderSummary.sizedCount === 0
+            ? formatSize(null, t, lang)
+            : folderSummary.unsizedCount === 0
+              ? formatSize(folderSummary.bytes, t, lang)
+              : t('filesApp.summary.sizePartial', {
+                  size: formatSize(folderSummary.bytes, t, lang),
+                  count: folderSummary.unsizedCount,
+                })}
+        </dd>
+        {folderSummary.kinds.map(([kind, count]) => (
+          <Fragment key={kind}>
+            <dt>{t(`filesApp.kind.${kind}`)}</dt>
+            <dd>{t('filesApp.summary.itemCount', { count })}</dd>
+          </Fragment>
+        ))}
+        {folderSummary.kindsTotal > folderSummary.kinds.length ? (
+          <>
+            <dt>{t('filesApp.summary.otherKinds')}</dt>
+            <dd>
+              {t('filesApp.summary.kindCount', {
+                count: folderSummary.kindsTotal - folderSummary.kinds.length,
+              })}
+            </dd>
+          </>
+        ) : null}
+      </dl>
+      {folderSummary.broken > 0 ? (
+        <p className="fa-details-note fa-summary-broken">
+          {t('filesApp.summary.broken', { count: folderSummary.broken })}
+        </p>
+      ) : null}
+      {/* The original empty state, kept verbatim and kept LAST: the summary
+          answers "what is in here", this answers "why is there nothing else". */}
+      <p className="fa-state">{t('filesApp.state.noSelection')}</p>
+    </div>
   );
 
   /* ---------------------------- dock ---------------------------- */

@@ -3080,6 +3080,213 @@ mistake in three costumes: reading a child's box, or an unfocused window, as the
 **Running total unchanged: 14 of 25 sections at 80/80.** `files` is **7 of 8 categories UNRUN**
 with cat1 measured and FAILING. **90 category cells remain.**
 
+## 2026-09-04 · primary2 — `files` cat1: 25 of 103 controls were never scored, and the row that failed loudest was the instrument's
+
+The 2026-09-03 cell and my 2026-09-04 reproduction of it both read **FAIL on `targets32`
+alone**, 103 controls, **78 measured**, 25 `occluded`, four rows below the 32px floor at
+26.5 / 31.5 / 31.5 / 31.0. Both entries described the 26.5 row as a scroller's fold and
+proposed loosening the walk to forgive it. **That was the wrong repair on a correct number
+about the wrong thing**, and the live measurement that settles it is worth more than either
+description.
+
+**`div.fa-tree` is 52px wide over 172px of content and does not scroll vertically at all** —
+`scrollHeight === clientHeight`; `nav.lq-scaffold-rail`, 399 over 1,657, is the real vertical
+scroller. `l1-hit-area.js` resolved ONE scroll parent for both axes and wrote both offsets on
+it, so all 32 `.fa-tree-node` centred against a horizontal-only element, the vertical write
+was a no-op, and 25 of them stayed below the fold and were filed `occluded by div.os-desktop`
+— **outside the window**. The run scored 53 against its own VOID threshold of 51.5: one and a
+half controls from voiding, and it had read as a clean measurement twice.
+
+**Two repairs, `8c5bc2f0` (product) and `49755620` + this turn's refinement (instrument).**
+
+- The product half is why `.fa-tree` was a horizontal scroller at all: five rail controls with
+  intrinsic min-content widths — "Save this search" 108px, "Delete folder" 90px, the move
+  `label`+`select` 77px, "New folder" 46px — painted **105 / 25 / 12 / 33 px past the rail's
+  own right edge**, chopped mid-word, and `.fa-tree` clipped them into a 120px sideways scroll
+  region with no scrollbar. Contained, ellipsized, `title`-carried. After: **0 past the rail**,
+  `.fa-tree` 59/52, all six control classes at 48px inside the 52px box.
+- The instrument half resolves the scroll parent PER AXIS. Its control names its victim: a
+  120px vertical scroller containing a horizontal-ONLY scroller containing a 40x40
+  `button.hitNestPlant` 400px below the fold — clickable, over the floor. **HEAD filed it
+  `occluded by div.os-desktop`; this version measures it.**
+
+**`files`, re-read clean with the plant removed and two consecutive runs agreeing
+(`stable: true`): measured 78 → 103 of 103, occluded 25 → 0, stolen 1 → 0.** The
+`button.fa-tree-node` 26.5 row is GONE — it was never a property of the control.
+
+**The refinement, and it disproved my own hypothesis, which is the point of running it.** The
+0.5px walk cannot resolve an edge better than 0.5px, so I expected the two 31.5s to be flush
+32px boxes losing exactly one STEP. The walk now bisects the last bracket to 0.05px. They did
+not go up. `div.fa-row` went **31.5 → 31.05** and `input.fa-bulk-check` **31.0 → 30.55**:
+those regions are genuinely ~1 and ~1.45px short of the 32px boxes they render, and the
+hypothesis was wrong. `button.fa-cell-size` went the other way, **31.5 → 31.93**, and still
+fails — which is the control on the refinement itself: it did not simply widen everything, and
+`hit-walk-step-caps-at-31-5` records what inflating targets in CSS cost last time (24 stolen
+rows). The cat1 negative control still caught **2 of 2** 12x12 plants by pointer, so nothing
+small was laundered.
+
+**`files` cat1 = FAIL, and it stays FAIL.** Four of five bars pass — contrast minRatio
+**4.65**, WCAG 2.5.8 **0**, keyboard unreachable **0**, motion **0 of 21** — and `targets32`
+fails on three rows that are now real rather than artefacts:
+
+| control | rect | pointer region | short by |
+| --- | --- | --- | --- |
+| `button.fa-cell.fa-cell-size` | **31**x32 | 31.93 x 32.99 | its own rect is under the floor |
+| `div.fa-row` | 364x32 | 52.05 x **31.05** | 0.95px vertically, to the next row |
+| `input.fa-bulk-check` | 32x32 | 32.99 x **30.55** | 1.45px vertically, inside its own cell |
+
+Negative control: **6 of 6 moved**, `backToBaseline` true, plants caught 2. Baseline banked as
+`baselines/cat1-files-r2.json` — a NEW path. `cat1-files.json` is TRACKED at `ff866dfd` and
+pointing `--out` at it is how the previous turn destroyed the file its own entry cited.
+
+**Running total unchanged: 14 of 25 sections at 80/80.** `files` is 7 of 8 categories UNRUN,
+cat1 measured and FAILING on three named rows. **90 category cells remain.**
+
+---
+
+## 2026-09-04 · primary2 — `files` cat3 PASSES 10/10, after the instrument stopped scoring its own control's target
+
+Driven live on the desktop window (bridge 39273, pid 13316 — **already running, not
+restarted**), `@.fwin:has(.fa-shell)`, 820x580, `--presentation liquid` with the driver flipping
+it and handing it back. Commits `876d5d00` (product) and `4300d523` (instrument).
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 3 | Liquid utilization | **VOID → FAIL → 10/10.** `denseWorkOnTranslucent` **2 → 0**, `eligibleTotal` **4 → 6**, treated **6/6**, shared-primitive **6/6**. 68 regions, 77 controls skipped, Work 24, Liquid-eligible 6. Control A falsified **0 → 1** and restored; control B **0 → 24**, `allWorkFailed` true, `returned` true. |
+
+**It read VOID first, and that was the instrument scoring its own victim.** Control A took the
+first Work region in walk order and made it glass, requiring `denseWorkOnTranslucent` to rise.
+The first Work region on `files` is `div.fa-toolbar` — **already one of the two regions that
+term counts** — so the number could not move (2 → 2, `movedOne: false`) and a FAIL the walk had
+measured correctly was reported as `VOID - negative control did not falsify`. It now picks the
+first Work region the scored term does NOT contain; on a clean surface that is every Work
+region, so nothing banked moves. (`control-must-attack-the-scored-term`, again, from the other
+direction: last time the control resolved a different element than the question scored — this
+time it resolved the same one.)
+
+**The product half.** Two regions, both the app's own chrome, neither declaring itself:
+
+| region | box | why it scored Work | fix |
+| --- | --- | --- | --- |
+| `div.fa-toolbar` | 703x38, 8 focusables, 0 rows, 0 li | `role` null → classified by content; one `<input>` gives `forms >= 1` | `role="toolbar"` + `filesApp.toolbar.label` |
+| `div.fa-folder-actions` | 48x100, 3 commands | `role="group"` is not a landmark the walk reads, and it wore the folder LIST's name | `role="toolbar"` + a new `filesApp.collections.actionsLabel` |
+
+Both parents already carry `data-lq-role="liquid"` (`.lq-scaffold-toolbar`, `nav.lq-scaffold-rail`),
+so the declaration alone makes them contextual chrome on a shared primitive — no CSS, no local
+material. `.lq-contextual` was **considered and rejected**: it paints a card (background, border,
+radius, shadow, padding) and would have drawn nested cards inside the rail, which is the
+universal-glass outcome §2.3 forbids. Guard test `filesAppChromeLandmarks.test.tsx`, **4 of 4
+mutations RED**, each failing exactly its own row.
+
+**CORRECTION 35, and it is why I did not annotate my way up the tree.** Fixing those two moved
+the count 2 → 1 and surfaced their ANCESTOR, `div.fa-collections`; declaring that would have
+surfaced `div.fa-tree` above it. Four landmarks inside one `<nav>` to move a number is the
+gaming smell, so the tree got measured instead, and the walk was wrong twice over:
+
+- `div.fa-tree` scored Work on `text 532` — and **all 532 characters are
+  `button.fa-tree-node` labels**. The instrument states 70 lines earlier that a control is not a
+  region, then counted control text as the container's prose.
+- `div.fa-collections` scored Work on `forms 1`, and that control is a `<select>` three levels
+  down inside `.fa-folder-actions`, which the same walk classifies as chrome. Counted once for
+  the chrome region and again for its ancestor — the depth-counting the leaf-most rule already
+  rejects.
+
+So `text` now skips CONTROL and CONTEXTUAL subtrees; `forms`/`rows`/`items` skip CONTEXTUAL
+only, because `input` is itself in `CONTROL_SEL` and excluding controls there would drive
+`forms` to 0 everywhere and blind the walk to every form panel on every surface.
+
+**MONOTONE, and re-derived rather than asserted.** `isContextual` is untouched and `dense`
+short-circuits on it, so the Liquid-eligible set — and with it both contextual bars and their
+denominators — is bit-identical; only `denseWorkOnTranslucent` can move, and only downward,
+i.e. only toward the bar it must satisfy. A banked PASS sits at 0 and cannot go below it. Then
+measured anyway: **`note`, banked 10/10 on 2026-09-03, re-derives regions 1 / Work 1 /
+`denseWorkOnTranslucent` 0 / PASS 10/10 — identical**, and it is the surface that exercises
+correction 34's textarea promotion. The unscored `byRole` histogram does shift (Work → Anchor,
+and an all-labels region Anchor → Ambient), so an older receipt's histogram is a stale reading
+of the same surface, not a changed surface.
+
+**`musicwidget` was tried first as the re-derivation subject and is NOT evidence.** It is idle
+right now — `.mwidget-empty` true, `.mwidget-controls` absent — so its one Liquid-eligible
+region does not exist, and the run scored `eligibleTotal 0` vacuously against a banked 1. That
+is a different surface STATE, not a changed reading, and it confirms nothing either way.
+
+**TRAP, and it cost two runs before it was named: the presentation toggle is INTERMITTENT under
+a programmatic click.** Measured over ~a dozen drives on `files` and `Sticky note`: it lands
+roughly **every other time, in both directions, on the same button within the same minute**. A
+listener attached to that button counted exactly **one** click on a drive that never moved
+`data-presentation` at +900ms or at +3s — the event fires, the window does not change. The
+driver was one click plus a fixed 500ms read, so it refused with *"the presentation toggle did
+not reach liquid"*, which names the surface rather than the instrument. It now retries up to six
+click-then-poll attempts against the mode the **caller** asked for; the restore leg passes the
+mode it found, so it no longer polls for the run's target and then warns about a restore that
+worked. **Two explanations were wrong and are recorded in the file so nobody re-derives them:**
+it is not "only unfocused windows" (`files` was focused and still failed later), and
+`btn.focus()` is not the fix (kept — it costs nothing and is the keyboard path — but it failed
+twice with `document.activeElement` confirming focus). **The mechanism was not established and
+must not be reported as known.**
+
+Baseline `baselines/cat3-files.json` — a new path, force-added past `.gitignore`, matching
+`ff866dfd`'s precedent. Every window was left in the presentation it was found in
+(`standard` × 5, verified after the last run).
+
+**`files` is 2 of 8 categories run: cat1 FAIL (three real rows, entry above), cat3 10/10.
+Running total unchanged at 14 of 25 sections at 80/80 — a section closes at 8 of 8.
+89 category cells remain.**
+
+---
+
+## 2026-09-04 · primary2 — `files` cat4 = FAIL on three bars, and the default size is now clean
+
+Same window and same session as the cat3 entry above (bridge 39273, pid 13316, `@.fwin:has(.fa-shell)`).
+Commit `7ce76225`. Three sizes driven and each restored; `sizesRan 3 of 3`, `refusedLegs []`,
+`visibleAtEveryRead: true`.
+
+| size | box | clipped | overlaps | hScroll | hiddenOverflowX | dead % | chrome % |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| default | 820x580 | 0 | 0 | 0 | **0** (was 1) | 9 | 44.3 |
+| compact | 260x170 | **5** | 0 | 0 | **1** | 0.4 | 39.2 |
+| maximized | 1264x773 | 0 | 0 | 0 | **0** (was 1) | **17.4** | 39.6 |
+
+**Verdict FAIL**, `failedBars: clipped, horizontal, deadRegion`. Controls all fired and all
+restored: injected clip 0 → 1 → 0 with `removalProven`; the art-plate exclusion caught its plant
+as a plate (`clippedDidNotRise`, `namedInArtPlateClips`); the backdrop exclusion moved overlaps
+0 → **13** → 0 and refused to excuse an inert-but-painted plant as backdrop; sub-minimum shrink
+to 200x140 reported 6 clipped and restored. The pager leg was `applicable: false` — no proven
+pager on its last page, stated rather than scored.
+
+**The `horizontal` bar is FIXED at two of three sizes and the fix is in this turn.** `div.fa-tree
+59>52` was the residue of yesterday's containment repair. It was **verified reachable-or-not
+before anything was touched**: `scrollLeft = 500` moved the tree to **7**, so those px were real
+hidden content under `overflow-x: hidden`, not a `scrollWidth` artefact — a box can report
+`scrollWidth > clientWidth` and then refuse to scroll, and that is the discriminator. Bisected by
+hiding children one at a time (max movement 2px, so not one control), it was two empty-state
+SENTENCES at `overflow-wrap: normal`, 57/48 and 55/48. Now 52/52, maxScroll 0.
+
+**A rejected first attempt, recorded because it looked right and was not:** `min-width: 0` on the
+three rail sections and two row wrappers, on the flex `min-width: auto` theory. It APPLIED —
+computed `0px` on all five — and moved nothing. It was removed rather than kept as defence.
+
+**Two things the previous reading got wrong, both instrument, both now known.** (1) The FIRST
+cat4 run reported `maximized` at box **820x580** with numbers identical to default; the maximize
+click had not taken, and an unmaximized "maximized" leg is not a measurement. It maximized on the
+next run to 1264x773. Treat a maximized box equal to the default box as a failed drive, not a
+result. (2) The same run's `sizes[]` said maximized dead **9%** while its own
+`deadRegionPctBySize` said **17.4%** — the two disagreed because they came from different legs of
+a run whose maximize had failed. 17.4% is the real figure.
+
+**What remains for `files` cat4, in the order I would take it:**
+
+1. `deadRegion` at **maximized, 17.4%** — the only bar failing at a size the user actually gets
+   by clicking maximize. Dead box at default was `245x382 at grid 28,12`, basis "visible surface".
+2. `clipped` **5** at compact **260x170**, plus one `hiddenOverflowX` still there at that size
+   only. 260x170 is below anything the window can be dragged to, so weigh whether the compact leg
+   is a real user state here before spending on it — but say so with a number, do not assume.
+
+**`files` is 3 of 8 categories RUN but only 1 of 8 CLOSED: cat1 FAIL, cat3 10/10, cat4 FAIL on
+3 bars. Running total unchanged at 14 of 25 sections at 80/80. **89** category cells remain — the
+first draft of this line said 88, counting cat4 as closed because it had been run. It failed, so
+it is not closed and the count does not move. Only cat3 came off the board this turn.**
+
 ## 2026-09-04 · primary — the branch is GREEN at its own tip, and the Liquid focus ring was dead
 
 **No rubric cell moved this turn. Running total unchanged: 14 of 25 sections at 80/80, 90
@@ -3134,6 +3341,34 @@ here would collide with that mergeback.
 
 Gates: `npx vitest run` (isolated, at `38a9a831`) EXIT 0; `i18n-check` EXIT 0 at 12,396 keys;
 `architecture-audit` EXIT 0 "Nothing new"; eslint 0 errors on both touched paths.
+
+## 2026-09-04 · primary2 — merge reconciliation, and cat1's close is PROVISIONAL
+
+The two sections above were written concurrently on `wt/files-app` and
+`feat/nyaa-subtitles` and both survived the merge; neither is edited. They
+disagree on one number and the disagreement is an artifact of the merge, not a
+dispute: **89 category cells remain.** `primary`'s entry says 90 and moved no
+cell — correct on its own tree, where `files` cat3's 10/10 was not yet merged.
+`d2e66783` took that cell off the board. (See `merged-json-derived-blocks-go-
+stale`: the rows union correctly while the derived counts keep pre-merge
+numbers.)
+
+**And a cell of my own that has to be qualified.** `1ba0545f` closed `files`
+cat1 at 10/10, and its repair #1 floored all five flexible `.fa-row` tracks at
+`minmax(var(--lq-hit-target), Nfr)`. `e165e4ea` REVERTED that floor: it put a
+248px minimum on a row against the 212px of canvas the 260x170 window
+`DesktopShell.tsx`'s MIN_W/MIN_H allow, and cat4's compact leg went from 0
+horizontal scrollers to 2. The size column is rebalanced `0.8fr -> 1fr` instead,
+which computes to 36.3px against the 32px floor at the default 820x580 — wider
+than the 32.00px the floor gave it.
+
+**The walk has NOT been re-run since that revert.** The arithmetic says cat1
+still passes at the default size and the CSS guard asserts the share, but a
+number I did not measure is not a measurement. cat1 stays counted as closed
+because the reverted rule provably gives MORE width than the one that closed it,
+and the qualification is recorded here so the next worker re-runs
+`cat1-accessibility.cjs` on `files` before quoting that 10/10. If it fails, the
+cell comes back on the board — the same way `c7fa2df7`'s and `c7b9c21d`'s did.
 
 ## 2026-09-04 · backup — `grammar` category 1 closes at 10/10, and the floor had no primitive for half the controls
 

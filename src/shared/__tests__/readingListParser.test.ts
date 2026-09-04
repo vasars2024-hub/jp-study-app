@@ -24,19 +24,17 @@ import {
   parseReadingList,
   scoreSegmentation,
   splitAuthor,
+  READING_LIST_EXAMPLE_MESSAGE,
   READING_LIST_PARSER_VERSION,
 } from '../readingListParser';
 
-const WORKED_EXAMPLE = [
-  'yo these are the ones i said',
-  '',
-  '1. Kino no Tabi',
-  '2. 君の膵臓をたべたい',
-  '3. Convenience Store Woman (コンビニ人間) — Murakami? no, Sayaka Murata',
-  '- ハリー・ポッター 1〜3巻',
-  'also 「夜は短し歩けよ乙女」 if u can find it lol',
-  'https://example.com/list/1234',
-].join('\n');
+/**
+ * The literal moved to `readingListParser.ts` so §11.4's empty state can show
+ * the user the exact input this file pins the output of. Imported rather than
+ * re-typed: two copies would let the hint drift from the acceptance test, which
+ * is the one thing showing a worked example in a UI must not do.
+ */
+const WORKED_EXAMPLE = READING_LIST_EXAMPLE_MESSAGE;
 
 describe('§2.1 — this exact input must produce this exact list', () => {
   const parsed = parseReadingList(WORKED_EXAMPLE);

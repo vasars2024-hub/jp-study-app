@@ -50,6 +50,16 @@
   gap: 1px;
   padding: var(--lq-space-2);
   overflow-y: auto;
+  /* Declaring ONE axis makes the other compute to `auto`, not `visible` — so
+     `overflow-y: auto` alone silently made this a horizontal scroller too.
+     Measured live 2026-09-04 in the collapsed rail: `scrollWidth 172` against
+     `clientWidth 52`, i.e. 120px of sideways scroll with no scrollbar and
+     nothing in it but the clipped halves of five overflowing controls (the
+     rule further down contains those). Every label here ellipsizes, so this
+     tree never has anywhere to go sideways and saying so is the honest
+     declaration. It also stops this element shadowing `.lq-scaffold-rail` —
+     the REAL vertical scroller — for anything that resolves a scroll parent. */
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -141,6 +151,101 @@
   gap: var(--lq-space-1);
   min-width: var(--lq-hit-target);
   padding: 0 var(--lq-space-1);
+}
+
+/*
+ * THE OTHER HALF OF THAT REPAIR, AND IT WAS MISSED. The rule above contains
+ * `.fa-tree-node`, which shrinks because `.fa-tree-label` sits in a flex row
+ * with an ellipsis. Every OTHER control in the rail — the two section headings
+ * and their buttons, and the selected folder's action row — has an intrinsic
+ * min-content width and no containment at all, so in the 52px content box of a
+ * collapsed rail they simply paint past its right edge.
+ *
+ * Measured live 2026-09-04 in the state the app opens in (window 820x580 ->
+ * scaffold 782 -> `medium` -> rail collapsed), against the rail's own right
+ * edge, not the window's: FIVE controls over, worst 105px —
+ *   button.fa-smart-save          "Save this search"   108px wide, 105px over
+ *   button.fa-collections-new     "New folder"          46px wide,  33px over
+ *   button.fa-action.fa-folder-delete "Delete folder"   90px wide,  25px over
+ *   label.fa-folder-move + its select                   77px wide,  12px over
+ * They are chopped mid-word by `.fa-tree`'s own overflow, and that clip is why
+ * `.fa-tree` reported `scrollWidth 172` against `clientWidth 52` — a 120px
+ * horizontal scroll region with no scrollbar and nothing in it but the halves
+ * of these labels. `.lq-scaffold-rail` itself measured 60/60: it is not the
+ * rail that overflows, it is these five controls inside it.
+ *
+ * The fix follows the contract the tree nodes already use rather than inventing
+ * a second one: keep the control, contain it, ellipsize it, and put the full
+ * text in `title` for a pointer user. The accessible name is unaffected — the
+ * text stays in the DOM and an ellipsis is a paint, not a truncation. Hiding
+ * these or moving them out of the rail was rejected for the reason the Files
+ * plan states outright: a capability that the collapsed state cannot reach is a
+ * regression, and these are the only route to saving a search, creating a
+ * folder, and renaming/deleting/moving one.
+ *
+ * The heads stack instead of sitting `space-between`, because a 52px row cannot
+ * hold a heading and a button side by side without both becoming one glyph.
+ */
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--lq-space-1);
+  padding: 0;
+}
+
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-title,
+.lq-scaffold[data-rail-collapsed='true'] .fa-smart-save,
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-new,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-actions .fa-action,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-move,
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-move select {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * AND THE LAST 7px OF IT, which the two rules above did not reach — because
+ * they contain CONTROLS, and the thing still overflowing is a sentence.
+ *
+ * Measured live 2026-09-04, after the leaf repair had already taken `.fa-tree`
+ * from `scrollWidth 172 / clientWidth 52` down to **59 / 52**. Those 7px are
+ * real and unreachable, not a rounding artefact: `scrollLeft = 500` moved the
+ * tree to **7** under `overflow-x: hidden`, and the discriminator matters,
+ * because a box can report `scrollWidth > clientWidth` and then refuse to
+ * scroll at all. No descendant's right EDGE passed the content edge (max 270
+ * against 270) — the overflow is inside two boxes, not past them:
+ *
+ *   p.fa-collections-empty.fa-smart-empty  "No saved searches of your own yet."  57 / 48
+ *   p.fa-collections-empty                 "Nothing pinned yet."                 55 / 48
+ *
+ * Both computed `overflow-wrap: normal`, so in a 48px content box "searches"
+ * and "Nothing" are single unbreakable runs wider than the line and each one
+ * hangs out by its own excess. The folders section's own copy happens to fit
+ * ("folders" is short enough) and measured a clean 48 / 48 — which is exactly
+ * why this is keyed on the shared class rather than on the two that fail
+ * today: the same sentence is longer in ja, zh and ru.
+ *
+ * `anywhere` rather than `break-word` deliberately. Both break the run, but
+ * only `anywhere` also lowers the element's min-content contribution, and the
+ * min-content width is what the ancestor's scroll area is computed from — with
+ * `break-word` the paragraph wraps and `.fa-tree` still reports 59. Wrapping
+ * rather than clipping keeps the sentence readable, which an empty state has
+ * to be; hiding it would answer the measurement and lose the message.
+ */
+.lq-scaffold[data-rail-collapsed='true'] .fa-collections-empty {
+  overflow-wrap: anywhere;
+}
+
+/* The action row is already `flex-wrap: wrap`; wrapping only helps once its
+   children can be narrower than their text, which is what the rule above buys.
+   Stretched so each action still owns a full 48px-wide pointer target rather
+   than shrinking to its ellipsis. */
+.lq-scaffold[data-rail-collapsed='true'] .fa-folder-actions {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* Kept legible rather than decorative: this number is the gate-1 reading. */
@@ -523,7 +628,22 @@
 
 .fa-row {
   display: grid;
-  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  /* THE SIZE COLUMN IS A SORT BUTTON AND IT WAS 30.92 PX WIDE. Measured live
+     2026-09-04 at the default 820x580: `0.8fr` of a 7.4fr / 276px row gave
+     `button.fa-cell.fa-cell-size` a rect of 30.92 and a pointer region of
+     31.92 — the one row of `files` cat1 whose own RECT was under the 32px
+     floor. At `1fr` it is 36.3 / 37.3.
+
+     REBALANCED RATHER THAN FLOORED. The floor LANDED first, as `1ba0545f`, and
+     is reverted here, so it is not tried a third time. `minmax(var(--lq-hit-target),
+     Nfr)` on all five tracks fixed cat1 identically and read clean at the
+     default size — and then cost 248px of MINIMUM row width against the 212px
+     the canvas gives at the 260x170 window `DesktopShell.tsx`'s `MIN_W`/`MIN_H`
+     actually allow. cat4's compact leg went from 0 horizontal scrollers to 2
+     (`div.lq-scaffold-canvas 240>212`, `div.fa-rows 240>202`). A ratio costs
+     nothing at any width. The compact VIEW overrides this line with its own
+     three-column template. */
+  grid-template-columns: var(--lq-hit-target) minmax(0, 3fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.4fr);
   align-items: center;
   gap: var(--lq-space-3);
   padding: 0 var(--lq-space-3);
@@ -534,9 +654,35 @@
      24: an odd row height puts the centred checkbox on a half-pixel, and the
      pointer walk then reports its region as not covering its own rect —
      `stolenCount` went 1 -> 24, and `stolen` is half of the same bar. 32px
-     stays. The one remaining sub-floor row is at the scroller's clip edge. */
+     stays.
+
+     RE-TESTED 2026-09-04 against a BETTER instrument and the rejection holds.
+     The walk now bisects its boundary to 0.05px instead of stepping at 0.5px,
+     which is exactly the half-pixel resolution the paragraph above blames — so
+     the experiment was worth repeating rather than inheriting. It was not the
+     resolution: at 33px, `stolenCount` 0 -> **23**, every one a `div.fa-row`
+     short by 0.5px, and `input.fa-bulk-check` only went 30.55 -> 31.05, still
+     under the floor. One control gained half a pixel and 23 rows lost one.
+
+     The last line of the original note IS withdrawn, though: it said the one
+     remaining sub-floor row sat at the scroller's clip edge. It did not. That
+     row was `button.fa-tree-node` and it was the hit walk centring in a
+     horizontal-only scroller (`49755620`); with that fixed the row does not
+     exist. The three that remain are listed in LIQUID_SCORECARD.md and the
+     smallest is genuinely 1.45px short of the box it renders. */
   height: 32px;
-  border-bottom: 1px solid var(--lq-work-border);
+  /* THE SEPARATOR IS AN INSET SHADOW, NOT A BORDER, and that is the third
+     attempt at the paragraph above — the one that does not move the row.
+     `border-bottom` is inside `box-sizing: border-box`, so a 32px row has a
+     31px CONTENT box, and `align-items: center` then puts every 32px control
+     in the row on a HALF-PIXEL. Measured live 2026-09-04 off pid 13316:
+     `.fa-bulk-check` sat at [273.5, 305.5] inside a row at [274, 306], and its
+     own `.fa-cell-select` parent won `elementFromPoint` 0.3px inside it. An
+     inset shadow paints the identical 1px rule and consumes no height: the
+     same checkbox reads [274, 306], integral, at every scroll offset tested
+     (0/1/9/12). The row's outer height is unchanged at 32px, so nothing above
+     or below it shifts — this is not the rejected 33px experiment. */
+  box-shadow: inset 0 -1px 0 var(--lq-work-border);
   cursor: default;
 }
 
@@ -610,6 +756,20 @@
   z-index: 1;
   background: var(--lq-work-bg-raised);
   font-weight: 600;
+  /* ONE PIXEL, AND IT IS THE FIRST ROW'S. `z-index: 1` makes this header paint
+     ABOVE the list, and Chromium's hit rect for a box starts ~1px above the box
+     itself — reproduced 2026-09-04 on a throwaway stack of four plain 32px divs
+     on `document.body`, every one reading `up 16.96 / down 15.01`, so it is the
+     engine and not this stylesheet. Rows absorb that harmlessly: each takes a px
+     from the row above and loses one to the row below, and reads 32.02. The
+     FIRST row has no row above it — it has a later-painted sticky header, which
+     keeps the overlap and leaves the row at **31.06**, under the 32px floor,
+     along with its own `.fa-bulk-check`. That was two of the three rows failing
+     `files` cat1. One pixel of separation puts them at 32.02 with nothing else
+     moved (`.fa-head .fa-cell` stays 33.01, row 1 stays 32.02). The margin is on
+     the header rather than padding inside `.fa-rows` deliberately: `.fa-rows` is
+     the VirtualList viewport and its padding is inside the windowing math. */
+  margin-bottom: 1px;
 }
 
 .fa-head .fa-cell {
@@ -703,6 +863,24 @@
 .fa-details-note {
   margin: var(--lq-space-2) 0 0;
   color: var(--lq-liquid-text-muted);
+}
+
+/* The no-selection inspector is the SAME panel as the item inspector, not a
+   second kind of thing, so it inherits `.fa-details` and adds nothing but the
+   two corrections below. `.fa-state` carries its own `--lq-space-4` because it
+   is normally the only child of a bare pane; nested inside a panel that is
+   already padded it lands 16px out of line with the `dl` above it. */
+.fa-details-summary .fa-state {
+  padding: 0;
+}
+
+/* Same rule as `.fa-view-notice` and `.fa-folder-notice[data-tone='error']`:
+   this stylesheet says "wrong" with WEIGHT rather than with a hue, so it
+   survives a theme with no danger colour of its own. A broken link is a fact
+   about the folder, so it must not read as muted like the note beneath it. */
+.fa-summary-broken {
+  color: var(--lq-liquid-text);
+  font-weight: 600;
 }
 
 /* A scope is a filter someone asked for, so it reads as a dismissible note

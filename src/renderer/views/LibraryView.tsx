@@ -62,6 +62,20 @@ import type { ReadingWorkspaceActionId } from '../../shared/readingWorkspaceActi
 
 interface Props {
   onOpen: (item: LibraryItem) => void;
+  /**
+   * An item to select on arrival — Reading Lists' §11.1 *"an entry's cover →
+   * the library item detail"*, and any other surface that wants to reveal a
+   * book rather than open it.
+   *
+   * A bare `setSelectedId` would NOT be enough and that is the whole reason
+   * this is a prop rather than a caller-side click. `resolveSelection` returns
+   * `null` for an id that is not in `visible`, deliberately — so a book hidden
+   * by the folder, language or level filter the user last left set would land
+   * on a closed drawer and read as a dead link. Revealing therefore CLEARS
+   * those three filters, which is also the honest thing to show: the user
+   * asked for this book, not for their filter.
+   */
+  revealItemId?: string | null;
 }
 
 /** 'all' and 'unfiled' are reserved views; anything else is a folder name. */
@@ -131,7 +145,7 @@ function canOcrToText(item: LibraryItem): boolean {
   return file.toLowerCase().endsWith('.pdf');
 }
 
-export default function LibraryView({ onOpen: onOpenProp }: Props) {
+export default function LibraryView({ onOpen: onOpenProp, revealItemId = null }: Props) {
   // §5.10 ARCH: opening a book plays the tape-seek cue (wired pack only).
   const onOpen = (item: LibraryItem) => {
     if (document.documentElement.getAttribute('data-materials') === 'wired') {
@@ -208,6 +222,23 @@ export default function LibraryView({ onOpen: onOpenProp }: Props) {
   /** JLPT/HSK cover badges keyed by library item id. */
   const [bookLevels, setBookLevels] = useState<Record<string, BookLevelEstimate>>({});
   const levelEnrichCancel = useRef({ cancelled: false });
+
+  /**
+   * §11.1's reveal. Keyed on the id, so asking for the SAME book twice — leave
+   * the drawer, come back through the same cover — reveals it again; a
+   * mount-only effect would answer the second click with nothing.
+   *
+   * The three filters are cleared with it. See `revealItemId`'s note: without
+   * that, a book the user's own filter excludes resolves to `null` and the
+   * drawer never opens, which is indistinguishable from a broken link.
+   */
+  useEffect(() => {
+    if (!revealItemId) return;
+    setActive('all');
+    setLangFilter('all');
+    setLevelFilter('all');
+    setSelectedId(revealItemId);
+  }, [revealItemId]);
 
   useEffect(() => {
     // Scan the watch folder for anything new, then load.
