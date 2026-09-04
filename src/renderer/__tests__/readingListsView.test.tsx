@@ -150,6 +150,38 @@ function rows(): HTMLLIElement[] {
   return [...host.querySelectorAll<HTMLLIElement>('.rlv__row')];
 }
 
+/**
+ * Returns the native event so a test can read `defaultPrevented`. That is the
+ * only honest control for "Space ticks instead of activating": jsdom never
+ * synthesises the click a real browser fires from Space on a `<button>`, so
+ * asserting `opened` stayed empty would pass even with the guard deleted.
+ */
+async function press(node: Element | null, key: string): Promise<KeyboardEvent> {
+  expect(node).not.toBeNull();
+  const event = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  await act(async () => {
+    (node as HTMLElement).dispatchEvent(event);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return event;
+}
+
+/** React tracks the value node-side, so the native setter is what it notices. */
+async function typeInto(node: HTMLInputElement | null, value: string) {
+  expect(node).not.toBeNull();
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  await act(async () => {
+    setter?.call(node, value);
+    node?.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
+function filterField(): HTMLInputElement | null {
+  return host.querySelector<HTMLInputElement>('.rlv__filter-field');
+}
+
 async function click(node: Element | null) {
   expect(node).not.toBeNull();
   await act(async () => {
@@ -254,6 +286,78 @@ describe('ReadingListsView', () => {
     await render();
     expect(host.textContent).toContain('No lists yet');
     expect(host.querySelector('.rlv__state--error')).toBeNull();
+  });
+
+  it('filters rows by title and says so, rather than looking like an empty list', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+    expect(rows()).toHaveLength(2);
+
+    await typeInto(filterField(), 'kino');
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain('Kino no Tabi');
+    expect(host.querySelector('.rlv__filter-count')?.textContent).toContain('1 of 2 shown');
+
+    await typeInto(filterField(), 'nothing here');
+    expect(rows()).toHaveLength(0);
+    // The distinction the plan asks for: "no match" is not "this list is empty".
+    expect(host.textContent).toContain('matches “nothing here”');
+    expect(host.textContent).not.toContain('This list is empty');
+
+    await typeInto(filterField(), '');
+    expect(rows()).toHaveLength(2);
+    expect(host.querySelector('.rlv__filter-count')).toBeNull();
+  });
+
+  it('focuses the filter on “/” from a row, and leaves “/” alone inside a field', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    const rowButton = rows()[0].querySelector<HTMLButtonElement>('.rlv__row-open');
+    rowButton?.focus();
+    const fromRow = await press(rowButton, '/');
+    expect(fromRow.defaultPrevented).toBe(true);
+    expect(window.document.activeElement).toBe(filterField());
+
+    // Control: the same key inside the field must reach the field as text.
+    const inField = await press(filterField(), '/');
+    expect(inField.defaultPrevented).toBe(false);
+  });
+
+  it('ticks a row finished on Space and puts it back on a second Space', async () => {
+    const { document, listId } = seeded();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(listId);
+
+    const button = () => rows()[0].querySelector('.rlv__row-open');
+    const first = await press(button(), ' ');
+    // Prevented, or a real browser also fires the click and the row opens the
+    // reader at the same moment it is ticked.
+    expect(first.defaultPrevented).toBe(true);
+    expect(rows()[0].dataset.state).toBe('finished');
+    expect(opened).toEqual([]);
+
+    await press(button(), ' ');
+    // §4.5: un-finishing lands on a state the row could really have been in.
+    expect(rows()[0].dataset.state).not.toBe('finished');
+    expect(['reading', 'owned', 'wanted']).toContain(rows()[0].dataset.state);
+    expect(store.writes).toBe(2);
+  });
+
+  it('removes a row on Delete and still offers the undo', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    const removed = await press(rows()[1].querySelector('.rlv__row-open'), 'Delete');
+    expect(removed.defaultPrevented).toBe(true);
+    expect(rows()).toHaveLength(1);
+
+    await click(byText('Undo'));
+    expect(rows()).toHaveLength(2);
   });
 
   it('offers a dismissable suggestion and restores it on undo', async () => {

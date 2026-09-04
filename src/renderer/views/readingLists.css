@@ -80,6 +80,7 @@
 }
 
 .rlv__new-field,
+.rlv__filter-field,
 .rlv__paste-field {
   flex: 1 1 220px;
   min-width: 0;
@@ -104,6 +105,23 @@
 
 .rlv__paste-label {
   font-weight: 600;
+}
+
+/*
+ * §11.4's filter strip. `flex-wrap` rather than a fixed two-column row: the count
+ * is a whole sentence in every language and a narrow list window must be allowed
+ * to put it under the field instead of squeezing the field to nothing.
+ */
+.rlv__filter {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.rlv__filter-count {
+  color: var(--lq-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
 }
 
 /* --------------------------------------------------------------- the grid -- */

@@ -121,11 +121,17 @@ export default function ReadingListsView({
   const [pasteText, setPasteText] = useState('');
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoSlot | null>(null);
+  const [filter, setFilter] = useState('');
   const nameFieldRef = useRef<HTMLInputElement | null>(null);
+  const filterFieldRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (naming) nameFieldRef.current?.focus();
   }, [naming]);
+
+  // A filter that survives navigation would hide rows in a list the user has not
+  // typed anything about yet, which reads as "this list is empty".
+  useEffect(() => setFilter(''), [listId]);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
@@ -142,6 +148,17 @@ export default function ReadingListsView({
   const rows = useMemo(
     () => (list && document ? readingListRows(list, document.works) : []),
     [list, document],
+  );
+
+  /**
+   * §11.4's filter. Matching is on the row TITLE only — the state select and the
+   * suggestion line are chrome, and folding them in makes "reading" match every
+   * row that merely offers `reading` as an option.
+   */
+  const query = filter.trim().toLowerCase();
+  const visibleRows = useMemo(
+    () => (query ? rows.filter((row) => row.title.toLowerCase().includes(query)) : rows),
+    [query, rows],
   );
 
   /**
@@ -280,6 +297,31 @@ export default function ReadingListsView({
     [list, write],
   );
 
+  /**
+   * §11.4's `Space`, and §4.5's "always reversible" read from the keyboard.
+   *
+   * Un-finishing needs a destination and the entry does not record where it came
+   * from, so the destination is DERIVED rather than guessed: an entry that was
+   * ever started goes back to `reading`, one that is bound to a file goes back to
+   * `owned`, and one with no file at all goes back to `wanted`. Every branch is a
+   * state the row could legitimately have been in, and none of them invents a
+   * finish date — `setReadingEntryState` deletes `finishedAt` on the way out.
+   */
+  const toggleFinished = useCallback(
+    (row: ReadingListRow) => {
+      const next: ReadingEntryState =
+        row.entry.state === 'finished'
+          ? row.entry.startedAt !== undefined
+            ? 'reading'
+            : row.itemId
+              ? 'owned'
+              : 'wanted'
+          : 'finished';
+      changeState(row, next);
+    },
+    [changeState],
+  );
+
   const dismissSuggestion = useCallback(
     (row: ReadingListRow) => {
       const workId = row.work?.id;
@@ -351,7 +393,27 @@ export default function ReadingListsView({
   if (list) {
     const summary = summaries.find((candidate) => candidate.listId === list.id);
     return (
-      <div className="rlv" data-surface="reading-lists" data-mode="detail">
+      <div
+        className="rlv"
+        data-surface="reading-lists"
+        data-mode="detail"
+        /**
+         * §11.4's `/`. Bound on the view rather than the document: a global
+         * listener would steal the key from every other window in this shell,
+         * and a list that is not on screen has no filter to focus.
+         */
+        onKeyDown={(event) => {
+          if (event.key !== '/' || event.defaultPrevented) return;
+          const target = event.target as HTMLElement | null;
+          const tag = target?.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+            return;
+          }
+          event.preventDefault();
+          filterFieldRef.current?.focus();
+          filterFieldRef.current?.select();
+        }}
+      >
         <header className="rlv__head">
           <Button size="sm" leftIcon={<Icon name="chevron" />} onClick={() => setListId(null)}>
             {t('readingLists.view.back')}
@@ -402,11 +464,40 @@ export default function ReadingListsView({
             </div>
           </form>
         ) : null}
+        {rows.length === 0 ? null : (
+          <div className="rlv__filter">
+            <input
+              ref={filterFieldRef}
+              type="search"
+              className="rlv__filter-field ui-focusable"
+              value={filter}
+              placeholder={t('readingLists.view.filterPlaceholder')}
+              aria-label={t('readingLists.view.filterLabel')}
+              onChange={(event) => setFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && filter) {
+                  event.preventDefault();
+                  setFilter('');
+                }
+              }}
+            />
+            {query ? (
+              <span className="rlv__filter-count" role="status">
+                {t('readingLists.view.filterCount', {
+                  shown: visibleRows.length,
+                  total: rows.length,
+                })}
+              </span>
+            ) : null}
+          </div>
+        )}
         {rows.length === 0 ? (
           <p className="rlv__state">{t('readingLists.view.emptyList')}</p>
+        ) : visibleRows.length === 0 ? (
+          <p className="rlv__state">{t('readingLists.view.filterEmpty', { query: filter.trim() })}</p>
         ) : (
           <ul className="rlv__rows">
-            {rows.map((row) => {
+            {visibleRows.map((row) => {
               const item = row.itemId ? itemsById.get(row.itemId) : undefined;
               const suggested = row.suggestion ? row.work?.suggestion : undefined;
               return (
@@ -415,6 +506,22 @@ export default function ReadingListsView({
                     type="button"
                     className="rlv__row-open ui-focusable"
                     onClick={() => openRow(row)}
+                    /**
+                     * §11.4's row keys. `Enter` is left to the button's own
+                     * activation — that is what "Enter opens" already means — and
+                     * only the two keys the plan reassigns are intercepted. Space
+                     * MUST be prevented or the browser fires the click as well and
+                     * the row both ticks and opens the reader.
+                     */
+                    onKeyDown={(event) => {
+                      if (event.key === ' ' || event.key === 'Spacebar') {
+                        event.preventDefault();
+                        toggleFinished(row);
+                      } else if (event.key === 'Delete') {
+                        event.preventDefault();
+                        removeRow(row);
+                      }
+                    }}
                   >
                     <span className="rlv__row-title">{row.title}</span>
                     <span className="rlv__row-where">
