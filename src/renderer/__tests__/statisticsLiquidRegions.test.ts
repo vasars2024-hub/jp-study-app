@@ -81,4 +81,34 @@ describe('Statistics Liquid regions', () => {
     expect(CSS).toContain('.stats-data-tools-panel {');
     expect(CSS).toContain('background: var(--panel);');
   });
+
+  it('reserves the reset tray in flow rather than floating it over the Anki sync button', () => {
+    // Comments are stripped first, on purpose. This stylesheet's own prose describes the
+    // overlay geometry that was removed, and a raw-text guard would match the prose rather
+    // than a declaration — a CSS comment failing a CSS test has produced a false finding in
+    // this repo before.
+    const rules = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const trayStart = rules.indexOf('.stats-data-tools-panel {');
+    expect(trayStart).toBeGreaterThan(-1);
+    const tray = rules.slice(trayStart, rules.indexOf('}', trayStart));
+
+    // Light dismiss cannot save a control the tray is sitting on: at Sync's own centre the
+    // topmost node WAS the tray's `.btn.danger`, which is an inside press, so nothing
+    // dismissed and the destructive button took the hit. Taking the tray out of the overlay
+    // layer removes both symptoms at once.
+    expect(tray).not.toMatch(/position\s*:\s*(absolute|fixed)/);
+    expect(tray).not.toMatch(/z-index/);
+    expect(tray).toContain('margin-top: var(--lq-space-2);');
+
+    // One shared width for the summary and the tray, so the closed summary already reserves
+    // what the open tray needs and the neighbouring "Last 14 days" button never moves.
+    // Measured live: actions 628.7 x 256.3 and tray left 753 x 132 in BOTH states.
+    expect(rules).toContain('--stats-tools-w: 132px;');
+    expect(tray).toContain('min-width: var(--stats-tools-w);');
+    const summaryStart = rules.indexOf('.stats-data-tools > summary {');
+    expect(summaryStart).toBeGreaterThan(-1);
+    expect(rules.slice(summaryStart, rules.indexOf('}', summaryStart))).toContain(
+      'min-width: var(--stats-tools-w);',
+    );
+  });
 });
