@@ -11327,5 +11327,7 @@ export const zh: Catalog = {
   },
   'readingLists.view.undo.listDeleted': '已删除“{name}”。',
   'readingLists.view.undo.entryRemoved': '已把“{title}”从这个书单移除。',
+  'readingLists.view.undo.reordered': '已调整这个书单的顺序。',
+  'readingLists.view.rowReorder': '重新排序：按住 Alt 键，再按上下方向键。',
   'readingLists.view.undo.suggestionDismissed': '已忽略“{title}”的匹配建议。',
 };

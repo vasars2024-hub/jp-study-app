@@ -1031,3 +1031,185 @@ describe('ReadingListsView — density (§11.4)', () => {
     expect(host.textContent).toContain('コンビニ人間');
   });
 });
+
+/**
+ * §11.4's drag-and-drop reorder, driven on the real component.
+ *
+ * `reorderEntryIds` has its own suite in `shared/__tests__/readingListViews`;
+ * what only the mounted view can prove is that the gesture reaches it, that the
+ * order handed to the mutation is the WHOLE list rather than the filtered view,
+ * that the keyboard path exists at all, and that it undoes.
+ *
+ * TRAP: jsdom implements no `DataTransfer`. `event.dataTransfer` is `undefined`
+ * on every synthetic drag event, so a payload put there is unreadable and a
+ * feature built on it cannot be driven from a test at all. The dragged id is
+ * held in the view; `setData` is called only where it exists.
+ */
+describe('ReadingListsView — reorder (§11.4)', () => {
+  function seededFour(
+    entryTitles: string[] = ['Alpha', 'Bravo', 'Charlie', 'Delta'],
+  ): { document: ReadingListsDocument; listId: string } {
+    let current = emptyReadingListsDocument();
+    const created = createReadingList(
+      current,
+      { name: 'Ordered' },
+      createReadingListsMutationContext(1_700_000_000_000),
+    );
+    current = created.document;
+    for (const title of entryTitles) {
+      current = addReadingListEntry(
+        current,
+        created.listId,
+        { title },
+        createReadingListsMutationContext(1_700_000_000_010),
+      ).document;
+    }
+    return { document: sealReadingListsDocument(current), listId: created.listId };
+  }
+
+  function titles(): string[] {
+    return rows().map((row) => row.querySelector('.rlv__row-title')?.textContent ?? '');
+  }
+
+  /** A drag from one row onto another, in the three events the view listens for. */
+  async function dragRowOnto(from: number, to: number) {
+    const source = rows()[from];
+    const target = rows()[to];
+    expect(source, `no row at ${from}`).toBeTruthy();
+    expect(target, `no row at ${to}`).toBeTruthy();
+    await act(async () => {
+      source.dispatchEvent(new window.Event('dragstart', { bubbles: true }));
+      target.dispatchEvent(new window.Event('dragover', { bubbles: true, cancelable: true }));
+      target.dispatchEvent(new window.Event('drop', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('moves a dragged row down, landing it AFTER the row it was dropped on', async () => {
+    const { document, listId } = seededFour();
+    installBridge(new FakeStore(document));
+    await render(listId);
+    expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+
+    await dragRowOnto(0, 2);
+    expect(titles()).toEqual(['Bravo', 'Charlie', 'Alpha', 'Delta']);
+  });
+
+  it('moves a dragged row up, landing it BEFORE the row it was dropped on', async () => {
+    const { document, listId } = seededFour();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await dragRowOnto(3, 1);
+    expect(titles()).toEqual(['Alpha', 'Delta', 'Bravo', 'Charlie']);
+  });
+
+  it('cancels dragover, which is the only thing that allows the drop at all', async () => {
+    // MEASURED, not assumed: jsdom implements none of the HTML drag-and-drop
+    // model, so a synthetic `drop` fires whether or not `dragover` was
+    // cancelled — deleting the `preventDefault` leaves every other test in this
+    // block green while the feature is dead in the real app. `defaultPrevented`
+    // on the dispatched event is the one fact jsdom does report, so it is what
+    // is asserted, and the negative half (no drag in progress → not cancelled)
+    // ships with it.
+    const { document, listId } = seededFour();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    const idle = new window.Event('dragover', { bubbles: true, cancelable: true });
+    await act(async () => {
+      rows()[1].dispatchEvent(idle);
+      await Promise.resolve();
+    });
+    expect(idle.defaultPrevented).toBe(false);
+
+    const during = new window.Event('dragover', { bubbles: true, cancelable: true });
+    await act(async () => {
+      rows()[0].dispatchEvent(new window.Event('dragstart', { bubbles: true }));
+      rows()[1].dispatchEvent(during);
+      await Promise.resolve();
+    });
+    expect(during.defaultPrevented).toBe(true);
+  });
+
+  it('writes nothing when a row is dropped on itself', async () => {
+    const { document, listId } = seededFour();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(listId);
+
+    const before = store.writes;
+    await dragRowOnto(1, 1);
+    expect(store.writes).toBe(before);
+    expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+  });
+
+  it('reorders from the keyboard, because a drag-only reorder is unreachable', async () => {
+    const { document, listId } = seededFour();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    const open = rows()[2].querySelector('.rlv__row-open');
+    await act(async () => {
+      open?.dispatchEvent(
+        new window.KeyboardEvent('keydown', {
+          key: 'ArrowUp',
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(titles()).toEqual(['Alpha', 'Charlie', 'Bravo', 'Delta']);
+  });
+
+  it('leaves a filtered-out entry where it was, instead of appending it', async () => {
+    // THE reason the write is computed over `rows` and not `visibleRows`.
+    // `reorderReadingListEntries` appends every id the caller omitted, so a
+    // reorder computed from the filtered view would silently move Bravo and
+    // Delta to the end of the list — invisibly, because they are filtered out.
+    const { document, listId } = seededFour([
+      'Keep One',
+      'Skip Two',
+      'Keep Three',
+      'Skip Four',
+    ]);
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await typeInto(filterField(), 'keep');
+    expect(titles()).toEqual(['Keep One', 'Keep Three']);
+
+    // "Keep One" moves DOWN past a hidden row onto "Keep Three".
+    await dragRowOnto(0, 1);
+    expect(titles()).toEqual(['Keep Three', 'Keep One']);
+
+    await typeInto(filterField(), '');
+    // Computed over the full order, "Keep One" lands immediately after "Keep
+    // Three" and the two hidden rows keep their own places.
+    //
+    // Computed over the FILTERED order it would be ['Keep Three', 'Keep One']
+    // plus the two omitted ids appended, i.e. Skip Two would jump from
+    // position 2 to position 3 — invisibly, because it is filtered out. That is
+    // the discriminating difference and it is why this assertion exists.
+    expect(titles()).toEqual(['Skip Two', 'Keep Three', 'Keep One', 'Skip Four']);
+  });
+
+  it('undoes back to the exact order it started in', async () => {
+    const { document, listId } = seededFour();
+    installBridge(new FakeStore(document));
+    await render(listId);
+
+    await dragRowOnto(0, 3);
+    expect(titles()).toEqual(['Bravo', 'Charlie', 'Delta', 'Alpha']);
+
+    await click(
+      [...host.querySelectorAll('button')].find((node) => node.textContent?.trim() === 'Undo') ??
+        null,
+    );
+    expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
+  });
+});

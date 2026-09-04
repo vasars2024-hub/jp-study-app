@@ -11970,5 +11970,7 @@ export const en: Catalog = {
   },
   'readingLists.view.undo.listDeleted': '“{name}” was deleted.',
   'readingLists.view.undo.entryRemoved': '“{title}” was removed from this list.',
+  'readingLists.view.undo.reordered': 'This list was reordered.',
+  'readingLists.view.rowReorder': 'Reorder: hold Alt and press the up or down arrow.',
   'readingLists.view.undo.suggestionDismissed': 'The suggestion for “{title}” was dismissed.',
 };

@@ -366,3 +366,34 @@ export function totalReadingTriage(document: ReadingListsDocument): number {
   }
   return triaged.size;
 }
+
+/**
+ * §11.4's reorder, as a pure move over an id order.
+ *
+ * `moved` is placed immediately BEFORE `target` when it is travelling up the
+ * list, and immediately AFTER it when travelling down. That is what every list
+ * UI does and it is the only rule that makes a drop onto the row you came from
+ * a no-op instead of an off-by-one.
+ *
+ * The array handed in is the WHOLE list order, never the filtered view. Dropping
+ * A onto C while B is hidden by a filter is otherwise ambiguous — "before C" and
+ * "after B" are different positions and the user can see only one of them. Given
+ * the full order the move is well defined: A lands next to C, and B keeps its own
+ * place relative to C. `readingListsView.test.tsx` drives exactly that case.
+ *
+ * Returns the input array unchanged (by value) when the move is a no-op, so a
+ * caller can compare and skip the write.
+ */
+export function reorderEntryIds(
+  order: readonly string[],
+  movedId: string,
+  targetId: string,
+): string[] {
+  const from = order.indexOf(movedId);
+  const to = order.indexOf(targetId);
+  if (from < 0 || to < 0 || from === to) return [...order];
+  const rest = order.filter((id) => id !== movedId);
+  const at = rest.indexOf(targetId);
+  rest.splice(from > to ? at : at + 1, 0, movedId);
+  return rest;
+}

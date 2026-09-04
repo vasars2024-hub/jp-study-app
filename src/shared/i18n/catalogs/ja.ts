@@ -11448,5 +11448,7 @@ export const ja: Catalog = {
   },
   'readingLists.view.undo.listDeleted': '「{name}」を削除しました。',
   'readingLists.view.undo.entryRemoved': '「{title}」をこのリストから削除しました。',
+  'readingLists.view.undo.reordered': 'このリストの並び順を変更しました。',
+  'readingLists.view.rowReorder': '並べ替え: Alt キーを押しながら上下の矢印キーを押してください。',
   'readingLists.view.undo.suggestionDismissed': '「{title}」の候補を却下しました。',
 };

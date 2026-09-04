@@ -617,3 +617,30 @@
 .rlv[data-density='compact'] .rlv__skeleton-mosaic {
   aspect-ratio: 5 / 2;
 }
+
+/* --------------------------------------------------- reorder (§11.4) -- */
+
+/* The one line the surface says about reordering. Muted, because it is an
+   instruction and not a state — and it is only rendered when there is more
+   than one row, so it never explains a gesture there is nothing to use it on. */
+.rlv__hint {
+  margin: 0;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.85em;
+}
+
+/* `grab`, not `move`: the row is still a click target for opening the book, and
+   `move` on something you mostly click reads as "this row is only draggable". */
+.rlv__row[draggable='true'] {
+  cursor: grab;
+}
+
+/* The row's own children must not steal the drag. A native <select> and a text
+   button both start their own selection gesture, which cancels the drag with no
+   feedback at all — the classic "drag works everywhere except on the words". */
+.rlv__row-open,
+.rlv__row-title,
+.rlv__row-where {
+  -webkit-user-drag: none;
+  user-select: none;
+}

@@ -57,6 +57,7 @@ import {
   moveReadingListEntries,
   removeReadingListEntries,
   removeReadingListEntry,
+  reorderReadingListEntries,
   restoreReadingEntryStates,
   restoreReadingList,
   restoreReadingListEntries,
@@ -72,6 +73,7 @@ import {
 import {
   READING_ENTRY_STATES,
   readingListRows,
+  reorderEntryIds,
   sortReadingListSummaries,
   summarizeReadingLists,
   type ReadingListRow,
@@ -126,6 +128,15 @@ interface ReadingRowActions {
   setState: (entryId: string, state: ReadingEntryState) => void;
   dismissSuggestion: (entryId: string) => void;
   pick: (entryId: string, range: boolean) => void;
+  /** §11.4's reorder. `target` is the row dropped onto, or stepped past. */
+  reorder: (entryId: string, targetEntryId: string) => void;
+  /** Keyboard reorder: -1 up, +1 down. Drag alone would be inaccessible. */
+  step: (entryId: string, delta: -1 | 1) => void;
+  /** Which row is being dragged, so the row can mark itself. */
+  dragStart: (entryId: string) => void;
+  dragEnd: () => void;
+  /** The id currently being dragged, read at drop time. */
+  dragged: () => string | null;
 }
 
 interface ReadingRowProps {
@@ -195,7 +206,35 @@ const ReadingRow = memo(function ReadingRow({
 }: ReadingRowProps) {
   rowRenders += 1;
   return (
-    <li className="rlv__row" data-state={state}>
+    <li
+      className="rlv__row"
+      data-state={state}
+      /*
+        §11.4's drag and drop. The dragged id is held in the VIEW, not in
+        `dataTransfer`: jsdom implements no `DataTransfer`, so a payload put
+        there is unreadable in every test and the feature would ship on a path
+        nothing can drive. `setData` is still called where it exists, because a
+        drag with an empty data store is refused outright by some hosts.
+      */
+      draggable
+      onDragStart={(event) => {
+        actions.dragStart(entryId);
+        event.dataTransfer?.setData('text/plain', entryId);
+      }}
+      onDragEnd={() => actions.dragEnd()}
+      onDragOver={(event) => {
+        // Without this the drop event never fires at all — the default action
+        // for dragover is "refuse the drop", and it is silent about it.
+        if (actions.dragged()) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        const moved = actions.dragged();
+        if (!moved) return;
+        event.preventDefault();
+        actions.reorder(moved, entryId);
+        actions.dragEnd();
+      }}
+    >
       {/*
         `onClick` rather than `onChange`, with `readOnly` to keep the input
         controlled without React's warning: the shift key is on the mouse event,
@@ -221,7 +260,13 @@ const ReadingRow = memo(function ReadingRow({
          * fires the click as well and the row both ticks and opens the reader.
          */
         onKeyDown={(event) => {
-          if (event.key === ' ' || event.key === 'Spacebar') {
+          if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+            // The keyboard half of §11.4's reorder. A drag-only reorder would
+            // be a feature the accessibility row two bullets up forbids, and
+            // Alt+Arrow is the pairing every other reorderable list uses.
+            event.preventDefault();
+            actions.step(entryId, event.key === 'ArrowUp' ? -1 : 1);
+          } else if (event.key === ' ' || event.key === 'Spacebar') {
             event.preventDefault();
             actions.toggleFinished(entryId);
           } else if (event.key === 'Delete') {
@@ -654,6 +699,73 @@ export default function ReadingListsView({
   );
 
   /**
+   * §11.4's reorder — one write, one undo, both drag and keyboard.
+   *
+   * The order handed to the mutation is computed from `rows`, the WHOLE list,
+   * never from `visibleRows`. A filter hides rows without removing them, and
+   * `reorderReadingListEntries` appends anything the caller omitted, so passing
+   * the filtered order would silently move every hidden entry to the end.
+   *
+   * The undo is the order as it was BEFORE, captured inside the mutator so a
+   * compare-and-swap retry records the document that actually won.
+   */
+  const reorderRows = useCallback(
+    (movedId: string, targetId: string) => {
+      if (!list) return;
+      const targetList = list.id;
+      const held: { previous: string[] } = { previous: [] };
+      void write(
+        (current) => {
+          const currentList = current.lists.find((candidate) => candidate.id === targetList);
+          const order = (currentList?.entries ?? []).map((entry) => entry.id);
+          held.previous = order;
+          return reorderReadingListEntries(
+            current,
+            targetList,
+            reorderEntryIds(order, movedId, targetId),
+            createReadingListsMutationContext(),
+          );
+        },
+        () => {
+          const captured = held.previous;
+          if (captured.length === 0) return null;
+          return {
+            message: t('readingLists.view.undo.reordered'),
+            run: () => {
+              void write((current) =>
+                reorderReadingListEntries(
+                  current,
+                  targetList,
+                  captured,
+                  createReadingListsMutationContext(),
+                ),
+              );
+            },
+          };
+        },
+      );
+    },
+    [list, t, write],
+  );
+
+  /**
+   * The keyboard step. It moves past the next VISIBLE row, not the next row in
+   * the document: under a filter the rows between are not on screen, and
+   * stepping into a gap the user cannot see is a control that appears to do
+   * nothing. The write itself is still computed over the full order.
+   */
+  const stepRow = useCallback(
+    (entryId: string, delta: -1 | 1) => {
+      const order = visibleRows.map((row) => row.entry.id);
+      const at = order.indexOf(entryId);
+      const target = order[at + delta];
+      if (at < 0 || target === undefined) return;
+      reorderRows(entryId, target);
+    },
+    [reorderRows, visibleRows],
+  );
+
+  /**
    * §11.4's `Space`, and §4.5's "always reversible" read from the keyboard.
    *
    * Un-finishing needs a destination and the entry does not record where it came
@@ -714,6 +826,8 @@ export default function ReadingListsView({
     changeState,
     dismissSuggestion,
     toggleSelected,
+    reorderRows,
+    stepRow,
   });
   live.current = {
     rows,
@@ -723,7 +837,16 @@ export default function ReadingListsView({
     changeState,
     dismissSuggestion,
     toggleSelected,
+    reorderRows,
+    stepRow,
   };
+
+  /**
+   * The dragged row, in a ref rather than in state: nothing about the drag is
+   * rendered mid-gesture, and putting it in state would re-render every row on
+   * `dragstart` — the exact cost §11.4's performance row forbids.
+   */
+  const dragging = useRef<string | null>(null);
 
   /**
    * Built ONCE, deliberately — this is the prop that would otherwise change on
@@ -754,6 +877,17 @@ export default function ReadingListsView({
         if (row) live.current.dismissSuggestion(row);
       },
       pick: (entryId, range) => live.current.toggleSelected(entryId, range),
+      reorder: (entryId, targetEntryId) => {
+        if (entryId !== targetEntryId) live.current.reorderRows(entryId, targetEntryId);
+      },
+      step: (entryId, delta) => live.current.stepRow(entryId, delta),
+      dragStart: (entryId) => {
+        dragging.current = entryId;
+      },
+      dragEnd: () => {
+        dragging.current = null;
+      },
+      dragged: () => dragging.current,
     };
   }, []);
 
@@ -1330,7 +1464,18 @@ export default function ReadingListsView({
         ) : visibleRows.length === 0 ? (
           <p className="rlv__state">{t('readingLists.view.filterEmpty', { query: filter.trim() })}</p>
         ) : (
-          <ul className="rlv__rows" aria-label={t('readingLists.view.rowsLabel', { name: list.name })}>
+          <>
+            {/* Discoverability. A drag handle is invisible to anyone not
+                already dragging, and the keyboard half is invisible to
+                everyone — so the surface says it, once, and only when there
+                is more than one row to move. */}
+            {visibleRows.length > 1 ? (
+              <p className="rlv__hint">{t('readingLists.view.rowReorder')}</p>
+            ) : null}
+            <ul
+              className="rlv__rows"
+              aria-label={t('readingLists.view.rowsLabel', { name: list.name })}
+            >
             {visibleRows.map((row) => {
               const suggested = row.suggestion ? row.work?.suggestion : undefined;
               return (
@@ -1350,7 +1495,8 @@ export default function ReadingListsView({
                 />
               );
             })}
-          </ul>
+            </ul>
+          </>
         )}
         <ReadingListPasteFlow
           open={previewText !== null}

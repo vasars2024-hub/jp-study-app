@@ -12429,5 +12429,7 @@ export const ru: Catalog = {
   },
   'readingLists.view.undo.listDeleted': '«{name}» удалён.',
   'readingLists.view.undo.entryRemoved': '«{title}» убран из этого списка.',
+  'readingLists.view.undo.reordered': 'Порядок списка изменён.',
+  'readingLists.view.rowReorder': 'Изменить порядок: удерживая Alt, нажимайте стрелку вверх или вниз.',
   'readingLists.view.undo.suggestionDismissed': 'Подсказка для «{title}» отклонена.',
 };

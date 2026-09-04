@@ -11,6 +11,7 @@ import {
   nextUpReadingRow,
   readingChallengePace,
   readingListRows,
+  reorderEntryIds,
   recentReadingFinishes,
   sortReadingListEntries,
   sortReadingListSummaries,
@@ -367,5 +368,47 @@ describe('readingChallengePace', () => {
     expect(readingChallengePace(summary, target, NOW - 5 * DAY, NOW)?.aheadBy).toBe(0);
     // Past the date: no required rate at all rather than a division by zero.
     expect(readingChallengePace(summary, target, NOW + 20 * DAY, NOW)?.requiredPerDay).toBeNull();
+  });
+});
+
+describe('reorderEntryIds — the §11.4 move, as a pure function', () => {
+  const ORDER = ['a', 'b', 'c', 'd'];
+
+  it('inserts BEFORE the target when travelling up', () => {
+    expect(reorderEntryIds(ORDER, 'd', 'b')).toEqual(['a', 'd', 'b', 'c']);
+  });
+
+  it('inserts AFTER the target when travelling down', () => {
+    // The whole reason the two directions differ: dropping `a` onto `c` while
+    // moving down and landing it BEFORE `c` would leave it exactly where the
+    // user could already see it was not, an off-by-one nobody can explain.
+    expect(reorderEntryIds(ORDER, 'a', 'c')).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('is a no-op when a row is dropped onto itself', () => {
+    expect(reorderEntryIds(ORDER, 'b', 'b')).toEqual(ORDER);
+  });
+
+  it('is a no-op for an id that is not in the order', () => {
+    expect(reorderEntryIds(ORDER, 'zz', 'b')).toEqual(ORDER);
+    expect(reorderEntryIds(ORDER, 'b', 'zz')).toEqual(ORDER);
+  });
+
+  it('never drops or duplicates an id, whatever the move', () => {
+    // The invariant that makes this safe to hand to `reorderReadingListEntries`,
+    // which appends anything the caller omitted: a lossy reorder would silently
+    // move every omitted entry to the end of the list.
+    for (const moved of ORDER) {
+      for (const target of ORDER) {
+        const next = reorderEntryIds(ORDER, moved, target);
+        expect([...next].sort()).toEqual([...ORDER].sort());
+      }
+    }
+  });
+
+  it('returns a copy, so a caller cannot mutate the order it was given', () => {
+    const next = reorderEntryIds(ORDER, 'b', 'b');
+    next.push('e');
+    expect(ORDER).toHaveLength(4);
   });
 });
