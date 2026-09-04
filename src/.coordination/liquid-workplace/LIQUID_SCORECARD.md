@@ -3282,5 +3282,7 @@ a run whose maximize had failed. 17.4% is the real figure.
    only. 260x170 is below anything the window can be dragged to, so weigh whether the compact leg
    is a real user state here before spending on it — but say so with a number, do not assume.
 
-**`files` is 3 of 8 categories run: cat1 FAIL, cat3 10/10, cat4 FAIL on 3 bars. Running total
-unchanged at 14 of 25 sections at 80/80. 88 category cells remain.**
+**`files` is 3 of 8 categories RUN but only 1 of 8 CLOSED: cat1 FAIL, cat3 10/10, cat4 FAIL on
+3 bars. Running total unchanged at 14 of 25 sections at 80/80. **89** category cells remain — the
+first draft of this line said 88, counting cat4 as closed because it had been run. It failed, so
+it is not closed and the count does not move. Only cat3 came off the board this turn.**
