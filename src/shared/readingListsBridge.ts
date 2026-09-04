@@ -48,15 +48,19 @@ export type ReadingListsChannel =
   (typeof READING_LISTS_CHANNELS)[keyof typeof READING_LISTS_CHANNELS];
 
 /**
- * `bridge-unavailable` is renderer-only: `window.api` does not carry the method,
- * which is what a stale preload or a non-Electron host looks like. The rest can
- * only originate in main.
+ * Two of these are renderer-only. `bridge-unavailable` means `window.api` does
+ * not carry the method, which is what a stale preload or a non-Electron host
+ * looks like. `conflict` means the compare-and-swap was refused more times than
+ * the client retried — a distinct, honest state ("the list moved under you"),
+ * and folding it into `write-failed` would be exactly the generic failure the
+ * surface must not show. The other two can only originate in main.
  */
 export type ReadingListsFailureCode =
   | 'invalid-request'
   | 'read-failed'
   | 'write-failed'
-  | 'bridge-unavailable';
+  | 'bridge-unavailable'
+  | 'conflict';
 
 /**
  * How the document main is serving came to be. The surface needs this to satisfy
@@ -114,6 +118,7 @@ const FAILURE_CODES = new Set<ReadingListsFailureCode>([
   'read-failed',
   'write-failed',
   'bridge-unavailable',
+  'conflict',
 ]);
 
 const HEALTH_STATES = new Set<ReadingListsHealthState>([
