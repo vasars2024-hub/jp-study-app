@@ -11451,4 +11451,13 @@ export const ja: Catalog = {
   'readingLists.view.undo.reordered': 'このリストの並び順を変更しました。',
   'readingLists.view.rowReorder': '並べ替え: Alt キーを押しながら上下の矢印キーを押してください。',
   'readingLists.view.undo.suggestionDismissed': '「{title}」の候補を却下しました。',
+  'readingLists.view.undo.movedOne': '1件を「{name}」へ移動しました。',
+  'readingLists.view.moveRail.label': 'この項目を別のリストへ移動',
+  'readingLists.view.moveRail.lede': '移動先のリストにドロップしてください:',
+  'readingLists.view.drop.dismiss': '閉じる',
+  'readingLists.view.drop.notText': 'ここに取り込めるのは .txt と .md のファイルだけです。',
+  'readingLists.view.drop.unreadable': 'そのファイルを読み込めなかったため、何も取り込みませんでした。',
+  'readingLists.view.drop.empty': 'そのファイルは空だったため、取り込むものがありませんでした。',
+  'readingLists.view.drop.unknownItem':
+    'その本はライブラリにもう存在しないため、追加しませんでした。',
 };

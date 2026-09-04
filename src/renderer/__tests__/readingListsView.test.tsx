@@ -1213,3 +1213,322 @@ describe('ReadingListsView — reorder (§11.4)', () => {
     expect(titles()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta']);
   });
 });
+
+/**
+ * §11.4's drag-and-drop remainder: an entry BETWEEN lists, a library item onto
+ * a list, and a `.txt` onto the view.
+ *
+ * All three ride `dataTransfer`, which jsdom does not implement at all — so
+ * every event below is dispatched with a HAND-BUILT transfer whose `types`,
+ * `getData` and `files` behave the way the HTML model says they do at the
+ * moment the event fires. That is the point rather than a shortcut: the guards
+ * under test are written against `types` precisely because `getData` is
+ * specified to return the empty string during `dragover`, and a test that let
+ * `getData` answer during dragover would validate a guard that cannot work in
+ * Chromium.
+ */
+describe('ReadingListsView — drops (§11.4)', () => {
+  /**
+   * A transfer in the mode the spec calls *protected*: `types` is readable,
+   * `getData` returns the empty string, `files` is empty. This is what a
+   * `dragover` handler really sees in a browser.
+   */
+  function protectedTransfer(types: string[]): DataTransfer {
+    return { types, getData: () => '', files: [] } as unknown as DataTransfer;
+  }
+
+  /** A transfer in read/write mode — what a `drop` handler really sees. */
+  function readableTransfer(data: Record<string, string>, files: unknown[] = []): DataTransfer {
+    return {
+      types: [...Object.keys(data), ...(files.length ? ['Files'] : [])],
+      getData: (type: string) => data[type] ?? '',
+      files,
+      setData: () => undefined,
+    } as unknown as DataTransfer;
+  }
+
+  /** A stand-in for a dropped `File`: `name` plus the `Blob.text()` the view uses. */
+  function droppedFile(name: string, text: string | null): unknown {
+    return { name, text: async () => (text === null ? Promise.reject(new Error('io')) : text) };
+  }
+
+  async function fire(
+    node: Element | null,
+    type: 'dragover' | 'drop',
+    transfer: DataTransfer,
+  ): Promise<Event> {
+    expect(node, 'no node to dispatch ' + type + ' on').toBeTruthy();
+    const event = new window.Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', { value: transfer });
+    await act(async () => {
+      node?.dispatchEvent(event);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    return event;
+  }
+
+  /** Two lists, three entries in the first — a real cross-list move needs both. */
+  function twoLists(): { document: ReadingListsDocument; from: string; to: string } {
+    let current = emptyReadingListsDocument();
+    const a = createReadingList(
+      current,
+      { name: 'Reading now' },
+      createReadingListsMutationContext(1_700_000_000_000),
+    );
+    current = a.document;
+    const b = createReadingList(
+      current,
+      { name: 'Someday' },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    current = b.document;
+    for (const title of ['Alpha', 'Bravo', 'Charlie']) {
+      current = addReadingListEntry(
+        current,
+        a.listId,
+        { title },
+        createReadingListsMutationContext(1_700_000_000_010),
+      ).document;
+    }
+    return { document: sealReadingListsDocument(current), from: a.listId, to: b.listId };
+  }
+
+  function rowTitles(): string[] {
+    return rows().map((row) => row.querySelector('.rlv__row-title')?.textContent ?? '');
+  }
+
+  function rail(): HTMLElement | null {
+    return host.querySelector<HTMLElement>('[data-testid="rlv-droprail"]');
+  }
+
+  function railTarget(listId: string): HTMLElement | null {
+    return (
+      [...host.querySelectorAll<HTMLElement>('.rlv__droprail-target')].find(
+        (node) => node.dataset.listId === listId,
+      ) ?? null
+    );
+  }
+
+  function cards(): HTMLLIElement[] {
+    return [...host.querySelectorAll<HTMLLIElement>('.rlv__card')];
+  }
+
+  function dropNote(): string {
+    return (
+      host.querySelector<HTMLElement>('[data-testid="rlv-drop-note"] span')?.textContent?.trim() ??
+      ''
+    );
+  }
+
+  async function startRowDrag(index: number) {
+    await act(async () => {
+      rows()[index].dispatchEvent(new window.Event('dragstart', { bubbles: true }));
+      await Promise.resolve();
+    });
+  }
+
+  async function endRowDrag(index: number) {
+    await act(async () => {
+      rows()[index].dispatchEvent(new window.Event('dragend', { bubbles: true }));
+      await Promise.resolve();
+    });
+  }
+
+  it('has no move rail at rest — it exists only for the length of the drag', async () => {
+    const { document, from, to } = twoLists();
+    installBridge(new FakeStore(document));
+    await render(from);
+
+    // The vacuity check for every assertion below: if the rail were always
+    // mounted, "the rail appeared on dragstart" would be true of nothing.
+    expect(rail()).toBeNull();
+
+    await startRowDrag(0);
+    expect(rail()).not.toBeNull();
+    expect(railTarget(to)?.textContent).toBe('Someday');
+    // The list you are IN is never a destination for its own entry.
+    expect(railTarget(from)).toBeNull();
+
+    await endRowDrag(0);
+    expect(rail()).toBeNull();
+  });
+
+  it('moves an entry to another list when it is dropped on that list, and undoes it', async () => {
+    const { document, from, to } = twoLists();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(from);
+    expect(rowTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+
+    await startRowDrag(1);
+    await fire(railTarget(to), 'drop', readableTransfer({}));
+
+    expect(rowTitles()).toEqual(['Alpha', 'Charlie']);
+    expect(store.document.lists.find((entry) => entry.id === to)?.entries).toHaveLength(1);
+
+    // Undo, because §11.4 says every destructive action leaves one, and a move
+    // out of the list the user is looking at is destructive from where they sit.
+    await click(
+      [...host.querySelectorAll('button')].find((node) => node.textContent?.trim() === 'Undo') ??
+        null,
+    );
+    expect(rowTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    expect(store.document.lists.find((entry) => entry.id === to)?.entries).toHaveLength(0);
+  });
+
+  it('cancels dragover on a rail target only while a row is actually being dragged', async () => {
+    const { document, from, to } = twoLists();
+    installBridge(new FakeStore(document));
+    await render(from);
+
+    await startRowDrag(0);
+    const target = railTarget(to);
+    const during = await fire(target, 'dragover', protectedTransfer([]));
+    expect(during.defaultPrevented).toBe(true);
+
+    // The negative half, and it is the ONLY honest one: jsdom fires `drop`
+    // whether or not `dragover` was cancelled, so asserting "the row did not
+    // move" would pass with the guard deleted. `defaultPrevented` is the single
+    // fact jsdom does report about the drag model.
+    await endRowDrag(0);
+    const after = new window.Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(after, 'dataTransfer', { value: protectedTransfer([]) });
+    await act(async () => {
+      target?.dispatchEvent(after);
+      await Promise.resolve();
+    });
+    expect(after.defaultPrevented).toBe(false);
+  });
+
+  it('mounts the rail without re-rendering a single row', async () => {
+    // §11.4's performance row, and the reason the dragged id stayed in a ref
+    // while only the rail's visibility went into state. If `ReadingRow`'s memo
+    // were broken by this change, dragstart would repaint every row.
+    const { document, from } = twoLists();
+    installBridge(new FakeStore(document));
+    await render(from);
+
+    const before = readingRowRendersForTesting();
+    await startRowDrag(0);
+    expect(rail()).not.toBeNull();
+    expect(readingRowRendersForTesting() - before).toBe(0);
+  });
+
+  it('adds a library book dropped onto a list card, and says so when the book is gone', async () => {
+    const { document, to } = twoLists();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(null);
+
+    const card = cards().find((node) => node.dataset.listId === to) ?? null;
+    const dropped = await fire(card, 'drop', readableTransfer({ 'app/lib-item': ITEM.id }));
+    expect(dropped.defaultPrevented).toBe(true);
+
+    const entries = store.document.lists.find((entry) => entry.id === to)?.entries ?? [];
+    expect(entries).toHaveLength(1);
+    const work = store.document.works.find((candidate) => candidate.id === entries[0]?.workId);
+    expect(work?.titleRaw).toBe(ITEM.title);
+    // BOUND, not merely titled the same. `addLibraryItemToReadingList` binds at
+    // confidence 1 through `boundItemIds`; a row that only carried the title
+    // would still need §3's matcher to find its own book back.
+    expect(work?.boundItemIds).toContain(ITEM.id);
+
+    // An id the library no longer has is a real state — the library loads
+    // independently of this view and a drag outlives a refresh.
+    const writesBefore = store.writes;
+    await fire(card, 'drop', readableTransfer({ 'app/lib-item': 'item-vanished' }));
+    expect(dropNote()).toBe('That book is no longer in the library, so it was not added.');
+    expect(store.writes).toBe(writesBefore);
+  });
+
+  it('cancels dragover on a card for a library item and for nothing else', async () => {
+    const { document, to } = twoLists();
+    installBridge(new FakeStore(document));
+    await render(null);
+    const card = cards().find((node) => node.dataset.listId === to) ?? null;
+
+    const good = await fire(card, 'dragover', protectedTransfer(['app/lib-item']));
+    expect(good.defaultPrevented).toBe(true);
+
+    // `text/plain` is what a text-selection drag carries. Accepting it would
+    // make every card a target for every stray drag in the shell.
+    const bad = await fire(card, 'dragover', protectedTransfer(['text/plain']));
+    expect(bad.defaultPrevented).toBe(false);
+  });
+
+  it('opens the preview for a .txt dropped on an open list rather than importing it unseen', async () => {
+    const { document, from } = twoLists();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(from);
+
+    const writesBefore = store.writes;
+    const event = await fire(
+      host.querySelector('.rlv[data-mode="detail"]'),
+      'drop',
+      readableTransfer({}, [droppedFile('friend.txt', '1. Delta\n2. Echo\n')]),
+    );
+    expect(event.defaultPrevented).toBe(true);
+
+    // §2.5 makes the preview mandatory for a paste, and a dropped file is a
+    // paste through a different door. Nothing may be written before it is seen:
+    // the list still holds its three rows and the store took no write.
+    expect(store.writes).toBe(writesBefore);
+    expect(rowTitles()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    // The file's own titles are what the preview is showing, not a stale paste.
+    const preview = host.querySelector('[data-testid="rlv-preview"], .rlpf') ?? host;
+    expect(preview.textContent).toContain('Delta');
+    expect(preview.textContent).toContain('Echo');
+  });
+
+  it('names the new list after the dropped file when there is no list open', async () => {
+    const store = new FakeStore(sealReadingListsDocument(emptyReadingListsDocument()));
+    installBridge(store);
+    await render(null);
+
+    await fire(
+      host.querySelector('.rlv[data-mode="grid"]'),
+      'drop',
+      readableTransfer({}, [droppedFile('Books from Mika.txt', 'Alpha\nBravo\n')]),
+    );
+
+    // The file name is the only name the gesture carries; inventing "Untitled"
+    // would throw it away.
+    expect(store.document.lists.map((entry) => entry.name)).toEqual(['Books from Mika']);
+  });
+
+  it('refuses a file that is not text, an unreadable one and an empty one, in words', async () => {
+    const { document, from } = twoLists();
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(from);
+    const surface = () => host.querySelector('.rlv[data-mode="detail"]');
+    const writesBefore = store.writes;
+
+    await fire(surface(), 'drop', readableTransfer({}, [droppedFile('cover.png', 'binary')]));
+    expect(dropNote()).toBe('Only .txt and .md files can be imported here.');
+
+    await fire(surface(), 'drop', readableTransfer({}, [droppedFile('gone.txt', null)]));
+    expect(dropNote()).toBe('That file could not be read, so nothing was imported.');
+
+    await fire(surface(), 'drop', readableTransfer({}, [droppedFile('blank.txt', '   \n')]));
+    expect(dropNote()).toBe('That file was empty, so there was nothing to import.');
+
+    expect(store.writes).toBe(writesBefore);
+  });
+
+  it('cancels dragover on the surface for Files and not for a plain text drag', async () => {
+    const { document, from } = twoLists();
+    installBridge(new FakeStore(document));
+    await render(from);
+    const surface = host.querySelector('.rlv[data-mode="detail"]');
+
+    const files = await fire(surface, 'dragover', protectedTransfer(['Files']));
+    expect(files.defaultPrevented).toBe(true);
+
+    const plain = await fire(surface, 'dragover', protectedTransfer(['text/plain']));
+    expect(plain.defaultPrevented).toBe(false);
+  });
+});

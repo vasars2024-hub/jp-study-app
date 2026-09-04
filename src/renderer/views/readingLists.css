@@ -644,3 +644,62 @@
   -webkit-user-drag: none;
   user-select: none;
 }
+
+/* ------------------------------ §11.4 · drop targets and the move rail ----- */
+
+/*
+  The rail exists only while a row is being dragged, so it must not push the
+  list down and make the row jump out from under the pointer mid-gesture:
+  it is absolutely placed over the top of the rows, not inserted before them.
+*/
+.rlv__droprail {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+  padding: var(--lq-space-2, 8px) var(--lq-space-3, 12px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px dashed var(--accent, #ff2e4d);
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__droprail-lede {
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+/*
+  34px, not 32: the accessibility walk's floor IS 32 and it steps in halves, so
+  a target sized exactly at the floor is knife-edge on it. Same reasoning, same
+  number as `.rlv__row-open` and `.rlv__selectall`.
+*/
+.rlv__droprail-target {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 var(--lq-space-3, 12px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg, rgba(255, 255, 255, 0.03));
+}
+
+/*
+  The hover state of a drop target has to survive the pointer being over a CHILD
+  of the target, which `:hover` does and a JS `dragenter`/`dragleave` pair does
+  not — hence `data-over`, set from `dragover` rather than `dragenter`.
+*/
+.rlv__droprail-target[data-over='true'],
+.rlv__card[data-over='true'] .rlv__card-open {
+  border-color: var(--accent, #ff2e4d);
+  background: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.14));
+}
+
+/* The rail's own targets must not become drag sources when the pointer rests
+   on their text — the same steal `.rlv__row-open` above is guarding against. */
+.rlv__droprail-target {
+  -webkit-user-drag: none;
+  user-select: none;
+}

@@ -11973,4 +11973,13 @@ export const en: Catalog = {
   'readingLists.view.undo.reordered': 'This list was reordered.',
   'readingLists.view.rowReorder': 'Reorder: hold Alt and press the up or down arrow.',
   'readingLists.view.undo.suggestionDismissed': 'The suggestion for “{title}” was dismissed.',
+  'readingLists.view.undo.movedOne': 'One entry moved to “{name}”.',
+  'readingLists.view.moveRail.label': 'Move this entry to another list',
+  'readingLists.view.moveRail.lede': 'Drop on a list to move it there:',
+  'readingLists.view.drop.dismiss': 'Dismiss',
+  'readingLists.view.drop.notText': 'Only .txt and .md files can be imported here.',
+  'readingLists.view.drop.unreadable': 'That file could not be read, so nothing was imported.',
+  'readingLists.view.drop.empty': 'That file was empty, so there was nothing to import.',
+  'readingLists.view.drop.unknownItem':
+    'That book is no longer in the library, so it was not added.',
 };

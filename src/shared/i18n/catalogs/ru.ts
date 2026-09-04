@@ -12432,4 +12432,13 @@ export const ru: Catalog = {
   'readingLists.view.undo.reordered': 'Порядок списка изменён.',
   'readingLists.view.rowReorder': 'Изменить порядок: удерживая Alt, нажимайте стрелку вверх или вниз.',
   'readingLists.view.undo.suggestionDismissed': 'Подсказка для «{title}» отклонена.',
+  'readingLists.view.undo.movedOne': 'Одна запись перенесена в «{name}».',
+  'readingLists.view.moveRail.label': 'Перенести эту запись в другой список',
+  'readingLists.view.moveRail.lede': 'Отпустите на списке, чтобы перенести:',
+  'readingLists.view.drop.dismiss': 'Скрыть',
+  'readingLists.view.drop.notText': 'Сюда можно импортировать только файлы .txt и .md.',
+  'readingLists.view.drop.unreadable': 'Файл не удалось прочитать, поэтому ничего не импортировано.',
+  'readingLists.view.drop.empty': 'Файл оказался пустым, импортировать было нечего.',
+  'readingLists.view.drop.unknownItem':
+    'Этой книги больше нет в библиотеке, поэтому она не добавлена.',
 };

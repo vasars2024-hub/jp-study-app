@@ -106,6 +106,69 @@ const SORT_KEYS: Record<ReadingListSort, string> = {
  */
 const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
 
+/**
+ * The drag payload `LibraryView` has always written. NOT a new contract — it is
+ * set at four call sites there (`LibraryView.tsx` 1273, 1584, 1624, 1846) and
+ * read back at 464 for filing into a folder. The reading-lists surface joins
+ * that existing type rather than minting a second one for the same drag, which
+ * is why dropping a book onto a list needs no change to the library at all.
+ */
+const LIBRARY_ITEM_MIME = 'app/lib-item';
+
+/**
+ * What counts as "a `.txt`" for §11.4's file drop. `.md` is included because a
+ * pasted book list saved out of a chat app is as likely to be markdown, and the
+ * parser (§2.3) already strips the bullet and heading marks either way.
+ */
+const TEXT_DROP_RE = /\.(txt|md)$/i;
+
+/**
+ * Whether a drag carries something this surface takes.
+ *
+ * Read off `types`, NOT `getData`: the HTML drag-and-drop model puts the data
+ * store in *protected* mode for `dragover`, where `getData` returns `''` for
+ * every type no matter what the drag holds. A guard written on `getData` would
+ * therefore never cancel `dragover`, the browser would refuse every drop, and
+ * the feature would be dead in the app while every jsdom test passed — jsdom
+ * has no protected mode either.
+ */
+function dragTypeIncludes(transfer: DataTransfer | null | undefined, type: string): boolean {
+  const types = transfer?.types;
+  return types ? Array.from(types).includes(type) : false;
+}
+
+function dropTypesAccepted(transfer: DataTransfer | null | undefined): boolean {
+  return dragTypeIncludes(transfer, LIBRARY_ITEM_MIME) || dragTypeIncludes(transfer, 'Files');
+}
+
+/**
+ * Read a dropped file as text, or `null` if it cannot be read.
+ *
+ * `Blob.text()` is the whole implementation where it exists. `FileReader` is
+ * the fallback, and it is not decoration: this runs in Electron's renderer AND
+ * in jsdom, and a test that hands the handler a plain `{ name, text() }` stub
+ * must reach the same branch as the real `File` does. A rejection is answered
+ * with `null` rather than thrown, because the caller's whole job is to turn it
+ * into a sentence on screen.
+ */
+async function readDroppedText(file: File): Promise<string | null> {
+  try {
+    if (typeof file.text === 'function') return await file.text();
+  } catch {
+    return null;
+  }
+  return await new Promise<string | null>((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 /** The one undo the surface offers, and the label that explains what it undoes. */
 interface UndoSlot {
   message: string;
@@ -356,6 +419,12 @@ export default function ReadingListsView({
   /** The title of the book the last add declined as already present, or `null`. */
   const [libraryNote, setLibraryNote] = useState<string | null>(null);
   /**
+   * Why the last drop did nothing, already translated. §11.4's honest-states
+   * row: a drop that lands on the surface and produces no list, no row and no
+   * word is indistinguishable from a drop the surface never received.
+   */
+  const [dropFailure, setDropFailure] = useState<string | null>(null);
+  /**
    * §11.4's density row. Read from storage ONCE, lazily — a bare
    * `useState(loadReadingListDensity())` calls into `localStorage` on every
    * render of a view that re-renders on every store broadcast.
@@ -568,9 +637,8 @@ export default function ReadingListsView({
    * The duplicate is reported rather than swallowed. A second click on the same
    * book would otherwise look exactly like a click that did nothing.
    */
-  const addFromLibrary = useCallback(
-    (item: LibraryItem) => {
-      if (!list) return;
+  const addLibraryItemTo = useCallback(
+    (targetListId: string, item: LibraryItem) => {
       const held: { entryId: string | null; duplicate: boolean } = {
         entryId: null,
         duplicate: false,
@@ -579,7 +647,7 @@ export default function ReadingListsView({
         (current) => {
           const mutation = addLibraryItemToReadingList(
             current,
-            list.id,
+            targetListId,
             { id: item.id, title: item.title },
             createReadingListsMutationContext(),
           );
@@ -597,7 +665,7 @@ export default function ReadingListsView({
                   void write((current) =>
                     removeReadingListEntry(
                       current,
-                      list.id,
+                      targetListId,
                       entryId,
                       createReadingListsMutationContext(),
                     ),
@@ -609,7 +677,143 @@ export default function ReadingListsView({
         setLibraryNote(held.duplicate ? item.title : null);
       });
     },
-    [list, t, write],
+    [t, write],
+  );
+
+  const addFromLibrary = useCallback(
+    (item: LibraryItem) => {
+      if (!list) return;
+      addLibraryItemTo(list.id, item);
+    },
+    [addLibraryItemTo, list],
+  );
+
+  /**
+   * §11.4's "drop a library item onto a list". The payload is `app/lib-item`
+   * and it is NOT a new contract — `LibraryView` has set exactly that type on
+   * all four of its drag sources since long before this view existed, so the
+   * gesture works across the two floating windows with no change to the library
+   * at all. Reading a different type here would have been a second contract for
+   * the same drag.
+   *
+   * Returns whether it consumed the drop, so the caller only calls
+   * `preventDefault` for a payload it actually handled.
+   */
+  const dropLibraryItem = useCallback(
+    (targetListId: string, transfer: DataTransfer | null | undefined): boolean => {
+      const itemId = transfer?.getData?.(LIBRARY_ITEM_MIME);
+      if (!itemId) return false;
+      const item = items.find((candidate) => candidate.id === itemId);
+      // An id with no item is a real state, not an impossible one: the library
+      // is loaded independently and a drag can outlive a refresh. Silently
+      // doing nothing is what §11.4's honest-states row forbids.
+      if (!item) {
+        setDropFailure(t('readingLists.view.drop.unknownItem'));
+        return true;
+      }
+      setDropFailure(null);
+      addLibraryItemTo(targetListId, item);
+      return true;
+    },
+    [addLibraryItemTo, items, t],
+  );
+
+  /**
+   * §11.4's "drop a `.txt` onto the lists view to import it". It lands in the
+   * SAME preview §2.5 makes mandatory for a paste — a file is a paste that
+   * arrived by a different door, and importing it unseen would be the one
+   * intake path that skips the preview.
+   */
+  const dropTextFile = useCallback(
+    (transfer: DataTransfer | null | undefined): boolean => {
+      const files = Array.from(transfer?.files ?? []);
+      if (files.length === 0) return false;
+      const file = files.find((candidate) => TEXT_DROP_RE.test(candidate.name));
+      if (!file) {
+        setDropFailure(t('readingLists.view.drop.notText'));
+        return true;
+      }
+      setDropFailure(null);
+      // Captured at DROP time, not read after the await: the file read is async
+      // and the user can navigate out of the list mid-read. The list they
+      // dropped on is the list they meant.
+      const droppedOnto = listId;
+      void readDroppedText(file).then((text) => {
+        if (text === null) {
+          setDropFailure(t('readingLists.view.drop.unreadable'));
+          return;
+        }
+        if (!text.trim()) {
+          setDropFailure(t('readingLists.view.drop.empty'));
+          return;
+        }
+        if (droppedOnto) {
+          setListId(droppedOnto);
+          setPreviewText(text);
+          return;
+        }
+        // In the grid there is no list to import INTO, so the file names one.
+        // A dropped file that silently created "Untitled" would lose the only
+        // name the gesture actually carried.
+        createListWithPaste(file.name.replace(TEXT_DROP_RE, ''), text);
+      });
+      return true;
+    },
+    [createListWithPaste, listId, t],
+  );
+
+  /**
+   * §11.4's "drag an entry between lists". One entry, one write, one undo — the
+   * same `moveReadingListEntries` the bulk bar uses, because a second move path
+   * would be a second place for the skip rule to disagree with itself.
+   */
+  const moveEntryToList = useCallback(
+    (entryId: string, toListId: string) => {
+      if (!list || !toListId || toListId === list.id) return;
+      const fromList = list.id;
+      const name = document?.lists.find((candidate) => candidate.id === toListId)?.name ?? toListId;
+      const held: { moved: MovedReadingEntry[] } = { moved: [] };
+      void write(
+        (current) => {
+          const mutation = moveReadingListEntries(
+            current,
+            fromList,
+            toListId,
+            [entryId],
+            createReadingListsMutationContext(),
+          );
+          held.moved = mutation.moved;
+          return mutation;
+        },
+        () => {
+          const captured = held.moved;
+          if (!captured.length) return null;
+          return {
+            message: t('readingLists.view.undo.movedOne', { name }),
+            run: () => {
+              void write((current) =>
+                undoReadingListMove(
+                  current,
+                  fromList,
+                  toListId,
+                  captured,
+                  createReadingListsMutationContext(),
+                ),
+              );
+            },
+          };
+        },
+      );
+      // The moved row is gone from this list, so a selection that still names it
+      // would leave the bulk bar counting a row nothing can act on.
+      setSelected((current) => {
+        if (!current.has(entryId)) return current;
+        const next = new Set(current);
+        next.delete(entryId);
+        return next;
+      });
+    },
+    [document, list, t, write],
   );
 
   const removeList = useCallback(
@@ -849,6 +1053,21 @@ export default function ReadingListsView({
   const dragging = useRef<string | null>(null);
 
   /**
+   * Whether a row drag is in flight, in STATE rather than in the ref above,
+   * because §11.4's "drag an entry between lists" needs a destination that only
+   * exists while the gesture does — a rail of the other lists, rendered on
+   * `dragstart` and gone on `dragend`.
+   *
+   * This does NOT cost the performance row. `ReadingRow` is `memo` on
+   * primitives plus three identity-stable props, so a re-render of the view
+   * that changes none of them re-renders zero rows; the test asserts that
+   * number rather than reasoning about it.
+   */
+  const [dragActive, setDragActive] = useState(false);
+  /** The list a cross-list drop is hovering, so it can say so before the drop. */
+  const [dragOverList, setDragOverList] = useState<string | null>(null);
+
+  /**
    * Built ONCE, deliberately — this is the prop that would otherwise change on
    * every keystroke in the filter field and re-render all 500 rows with it.
    */
@@ -883,9 +1102,12 @@ export default function ReadingListsView({
       step: (entryId, delta) => live.current.stepRow(entryId, delta),
       dragStart: (entryId) => {
         dragging.current = entryId;
+        setDragActive(true);
       },
       dragEnd: () => {
         dragging.current = null;
+        setDragActive(false);
+        setDragOverList(null);
       },
       dragged: () => dragging.current,
     };
@@ -1167,6 +1389,14 @@ export default function ReadingListsView({
           {t('readingLists.view.writeFailed')}
         </div>
       ) : null}
+      {dropFailure ? (
+        <div className="rlv__notice rlv__notice--warn" role="status" data-testid="rlv-drop-note">
+          <span>{dropFailure}</span>
+          <Button size="sm" variant="ghost" onClick={() => setDropFailure(null)}>
+            {t('readingLists.view.drop.dismiss')}
+          </Button>
+        </div>
+      ) : null}
       {undo ? (
         <div className="rlv__notice rlv__notice--undo" role="status">
           <span>{undo.message}</span>
@@ -1285,6 +1515,24 @@ export default function ReadingListsView({
           event.preventDefault();
           filterFieldRef.current?.focus();
           filterFieldRef.current?.select();
+        }}
+        /**
+         * §11.4's two INBOUND drops, both on the surface rather than on a
+         * bullseye: a library book dropped anywhere on an open list joins it,
+         * and a `.txt` dropped anywhere on it opens the §2.5 preview.
+         *
+         * The dragover guard reads `types`, never `getData` — `getData` is
+         * specified to return the empty string during a drag for everything but
+         * the drop event itself, so a guard written on it accepts nothing and
+         * the whole feature reads as dead.
+         */
+        onDragOver={(event) => {
+          if (dropTypesAccepted(event.dataTransfer)) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          if (dropLibraryItem(list.id, event.dataTransfer) || dropTextFile(event.dataTransfer)) {
+            event.preventDefault();
+          }
         }}
       >
         <header className="rlv__head">
@@ -1431,6 +1679,52 @@ export default function ReadingListsView({
             {t('readingLists.view.bulk.skipped', { count: moveSkipped })}
           </p>
         ) : null}
+        {/*
+          §11.4's "drag an entry between lists". The destination has to EXIST
+          while the gesture does, and in a single-list view the other lists are
+          off screen — so they appear as a rail for the length of the drag and
+          are gone the moment it ends.
+
+          Mounted only while dragging, deliberately: a rail that is always there
+          is a permanent strip of dead targets, and the same move already has a
+          resting-state control (the bulk bar's move Select) for anyone who is
+          not dragging. This is the gesture, not the only route.
+        */}
+        {dragActive && otherLists.length > 0 ? (
+          <div
+            className="rlv__droprail"
+            role="group"
+            aria-label={t('readingLists.view.moveRail.label')}
+            data-testid="rlv-droprail"
+          >
+            <span className="rlv__droprail-lede">{t('readingLists.view.moveRail.lede')}</span>
+            {otherLists.map((candidate) => (
+              <div
+                key={candidate.id}
+                className="rlv__droprail-target"
+                data-list-id={candidate.id}
+                data-over={dragOverList === candidate.id}
+                onDragOver={(event) => {
+                  if (!rowActions.dragged()) return;
+                  event.preventDefault();
+                  if (dragOverList !== candidate.id) setDragOverList(candidate.id);
+                }}
+                onDragLeave={() => {
+                  setDragOverList((current) => (current === candidate.id ? null : current));
+                }}
+                onDrop={(event) => {
+                  const moved = rowActions.dragged();
+                  if (!moved) return;
+                  event.preventDefault();
+                  moveEntryToList(moved, candidate.id);
+                  rowActions.dragEnd();
+                }}
+              >
+                {candidate.name}
+              </div>
+            ))}
+          </div>
+        ) : null}
         {rows.length === 0 ? (
           /**
            * §11.4: *Empty list → "paste a message or add from your library".
@@ -1521,7 +1815,25 @@ export default function ReadingListsView({
   }
 
   return (
-    <div className="rlv" data-surface="reading-lists" data-mode="grid" data-density={density}>
+    <div
+      className="rlv"
+      data-surface="reading-lists"
+      data-mode="grid"
+      data-density={density}
+      /*
+        §11.4's file drop, grid half. There is no open list here, so the file
+        NAMES the list it creates — see `dropTextFile`. A library item dropped
+        on the empty background is deliberately NOT accepted: there is no list
+        it could mean, and inventing one would be a guess. It is accepted on a
+        card, below, where it means exactly one thing.
+      */
+      onDragOver={(event) => {
+        if (dropTypesAccepted(event.dataTransfer)) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        if (dropTextFile(event.dataTransfer)) event.preventDefault();
+      }}
+    >
       <header className="rlv__head">
         <h2 className="rlv__title">{t('readingLists.view.title')}</h2>
         <span className="rlv__spacer" />
@@ -1642,7 +1954,34 @@ export default function ReadingListsView({
         // about an unlabelled <ul>, and this surface has three of them.
         <ul className="rlv__grid" aria-label={t('readingLists.view.title')}>
           {summaries.map((summary) => (
-            <li key={summary.listId} className="rlv__card" data-archived={summary.archived}>
+            <li
+              key={summary.listId}
+              className="rlv__card"
+              data-archived={summary.archived}
+              data-list-id={summary.listId}
+              data-over={dragOverList === summary.listId}
+              /*
+                §11.4's "drop a library item onto a list", literal half: the
+                card IS the list, so a book dropped on it joins that list.
+                A `.txt` dropped on a card falls through to the root handler
+                above and creates a NEW list — a card is a destination for a
+                book, not for a message that describes a whole list.
+              */
+              onDragOver={(event) => {
+                if (!dragTypeIncludes(event.dataTransfer, LIBRARY_ITEM_MIME)) return;
+                event.preventDefault();
+                if (dragOverList !== summary.listId) setDragOverList(summary.listId);
+              }}
+              onDragLeave={() => {
+                setDragOverList((current) => (current === summary.listId ? null : current));
+              }}
+              onDrop={(event) => {
+                if (!dropLibraryItem(summary.listId, event.dataTransfer)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                setDragOverList(null);
+              }}
+            >
               <button
                 type="button"
                 className="rlv__card-open ui-focusable"

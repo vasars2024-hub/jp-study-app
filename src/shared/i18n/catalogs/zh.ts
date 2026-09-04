@@ -11330,4 +11330,12 @@ export const zh: Catalog = {
   'readingLists.view.undo.reordered': '已调整这个书单的顺序。',
   'readingLists.view.rowReorder': '重新排序：按住 Alt 键，再按上下方向键。',
   'readingLists.view.undo.suggestionDismissed': '已忽略“{title}”的匹配建议。',
+  'readingLists.view.undo.movedOne': '已将 1 个条目移动到“{name}”。',
+  'readingLists.view.moveRail.label': '将此条目移动到其他清单',
+  'readingLists.view.moveRail.lede': '拖放到某个清单即可移动：',
+  'readingLists.view.drop.dismiss': '关闭',
+  'readingLists.view.drop.notText': '这里只能导入 .txt 和 .md 文件。',
+  'readingLists.view.drop.unreadable': '无法读取该文件，因此没有导入任何内容。',
+  'readingLists.view.drop.empty': '该文件是空的，没有可导入的内容。',
+  'readingLists.view.drop.unknownItem': '这本书已不在书库中，因此没有添加。',
 };
