@@ -1701,6 +1701,97 @@ describe('ReadingListsView — §11.1 click-through', () => {
     ]);
   });
 
+  it('routes the author link to that author OTHER works, each going somewhere real', async () => {
+    // §11.1 row 6. Two lists so "across every list" is falsifiable: a version
+    // scoped to the open list would find only Earthlings and miss Life Ceremony.
+    const context = createReadingListsMutationContext(1_700_000_000_000);
+    const a = createReadingList(emptyReadingListsDocument(), { name: 'Reading now' }, context);
+    const b = createReadingList(
+      a.document,
+      { name: 'Someday' },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    let current = b.document;
+    for (const [listId, title] of [
+      [a.listId, 'Convenience Store Woman'],
+      [a.listId, 'Earthlings'],
+      [b.listId, 'Life Ceremony'],
+    ] as const) {
+      current = addReadingListEntry(
+        current,
+        listId,
+        { title },
+        createReadingListsMutationContext(1_700_000_000_010),
+      ).document;
+    }
+    // The author is what the parser writes onto the work (`parsed.author`).
+    const authored: ReadingListsDocument = sealReadingListsDocument({
+      ...current,
+      works: current.works.map((work) => ({ ...work, authorRaw: 'Sayaka Murata' })),
+    });
+
+    installBridge(new FakeStore(authored));
+    await render(a.listId);
+
+    const links = [...host.querySelectorAll('.rlv__row-author')];
+    expect(links.map((node) => node.textContent)).toEqual(['Sayaka Murata', 'Sayaka Murata']);
+    expect(host.querySelector('[data-testid="rlv-author"]')).toBeNull();
+
+    await click(links[0]);
+    const panel = host.querySelector('[data-testid="rlv-author"]');
+    expect(panel).not.toBeNull();
+
+    // OTHER works: the two rows already on screen in this list are not repeated,
+    // and the one on the other list — which is the whole point — is here.
+    const titles = [...panel!.querySelectorAll('.rlv__author-title')].map(
+      (node) => node.textContent,
+    );
+    expect(titles).toEqual(['Life Ceremony']);
+
+    // Somewhere real. Nothing is bound, so it is the acquisition path with the
+    // title — never a card that swallows the click.
+    await click(panel!.querySelector('.rlv__author-open'));
+    expect(sought).toEqual(['Life Ceremony']);
+
+    // And the list name is a destination of its own.
+    await click(host.querySelector('.rlv__author-list-link'));
+    expect(host.querySelector('.rlv__title')?.textContent).toBe('Someday');
+  });
+
+  it('says which author has only this one book instead of drawing an empty panel', async () => {
+    const context = createReadingListsMutationContext(1_700_000_000_000);
+    const created = createReadingList(emptyReadingListsDocument(), { name: 'Solo' }, context);
+    const added = addReadingListEntry(
+      created.document,
+      created.listId,
+      { title: 'Earthlings' },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    const seeded: ReadingListsDocument = sealReadingListsDocument({
+      ...added.document,
+      works: added.document.works.map((work) => ({ ...work, authorRaw: 'Sayaka Murata' })),
+    });
+
+    installBridge(new FakeStore(seeded));
+    await render(created.listId);
+    await click(host.querySelector('.rlv__row-author'));
+
+    const panel = host.querySelector('[data-testid="rlv-author"]');
+    expect(panel).not.toBeNull();
+    expect(panel!.querySelectorAll('.rlv__author-row')).toHaveLength(0);
+    expect(panel!.textContent).toContain('This is the only book by Sayaka Murata on your lists.');
+  });
+
+  it('draws no author link where the work has no author', async () => {
+    // The vacuity check for both tests above. `authorRaw` is optional and most
+    // works never carry one, so a link drawn unconditionally would render the
+    // literal string "undefined" and open a panel matching every authorless work.
+    const { document, listId } = boundIn('owned');
+    installBridge(new FakeStore(document));
+    await render(listId);
+    expect(host.querySelectorAll('.rlv__row-author')).toHaveLength(0);
+  });
+
   it('shows the one surviving line, and says so, when the import row is gone', async () => {
     // §2.4's re-parse replaces an import, so an entry can outlive the message
     // that produced it. An empty panel would read as a broken chip.

@@ -5,12 +5,18 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { ReadingEntryState, ReadingList, ReadingWorkRef } from '../readingLists';
+import type {
+  ReadingEntryState,
+  ReadingList,
+  ReadingListsDocument,
+  ReadingWorkRef,
+} from '../readingLists';
 import {
   hasLiveSuggestion,
   nextUpReadingRow,
   readingChallengePace,
   readingListRows,
+  readingWorksByAuthor,
   reorderEntryIds,
   recentReadingFinishes,
   sortReadingListEntries,
@@ -410,5 +416,90 @@ describe('reorderEntryIds — the §11.4 move, as a pure function', () => {
     const next = reorderEntryIds(ORDER, 'b', 'b');
     next.push('e');
     expect(ORDER).toHaveLength(4);
+  });
+});
+
+describe('readingWorksByAuthor — §11.1, the other works by one author', () => {
+  /** Two lists; the same author on three works, spelled three ways. */
+  function document(): ReadingListsDocument {
+    const works: ReadingWorkRef[] = [
+      work({ id: 'w0', titleRaw: 'Convenience Store Woman', authorRaw: 'Sayaka Murata' }),
+      work({ id: 'w1', titleRaw: 'Earthlings', authorRaw: '  sayaka   MURATA ' }),
+      work({ id: 'w2', titleRaw: 'Kafka on the Shore', authorRaw: 'Haruki Murakami' }),
+      work({ id: 'w3', titleRaw: 'Life Ceremony', authorRaw: 'Sayaka Murata', boundItemIds: ['li9'] }),
+      // No author at all — the case a blank key would sweep up.
+      work({ id: 'w4', titleRaw: 'A book from nowhere' }),
+    ];
+    const listOf = (id: string, name: string, pairs: [string, ReadingEntryState][], patch: Partial<ReadingList> = {}): ReadingList => ({
+      id,
+      name,
+      kind: 'pool',
+      createdAt: NOW,
+      updatedAt: NOW,
+      entries: pairs.map(([workId, state], index) => ({
+        id: id + '_e' + index,
+        workId,
+        order: index,
+        addedAt: NOW + index,
+        state,
+      })),
+      imports: [],
+      ...patch,
+    });
+    return {
+      schemaVersion: 1,
+      revision: 1,
+      works,
+      lists: [
+        listOf('lA', 'Reading now', [['w0', 'reading'], ['w2', 'wanted'], ['w4', 'wanted']]),
+        listOf('lB', 'Someday', [['w1', 'wanted'], ['w3', 'owned']], { archivedAt: NOW }),
+      ],
+    } as unknown as ReadingListsDocument;
+  }
+
+  it('finds the author across every list, however the name was spelled', () => {
+    const rows = readingWorksByAuthor(document(), 'SAYAKA murata');
+    expect(rows.map((row) => row.title)).toEqual([
+      'Convenience Store Woman',
+      'Earthlings',
+      'Life Ceremony',
+    ]);
+    // Across lists, and an archived list is still a place the book IS.
+    expect(rows.map((row) => row.listId)).toEqual(['lA', 'lB', 'lB']);
+    expect(rows.map((row) => row.listArchived)).toEqual([false, true, true]);
+    // "owned and wanted" — the state travels, and so does the destination.
+    expect(rows.map((row) => row.state)).toEqual(['reading', 'wanted', 'owned']);
+    expect(rows.map((row) => row.itemId)).toEqual([null, null, 'li9']);
+  });
+
+  it('matches nothing for a blank author rather than everything without one', () => {
+    // `authorRaw` is optional and most works never carry one, so a key-less
+    // match would return every authorless work in the document.
+    expect(readingWorksByAuthor(document(), '')).toEqual([]);
+    expect(readingWorksByAuthor(document(), '   ')).toEqual([]);
+    expect(readingWorksByAuthor(document(), 'nobody at all')).toEqual([]);
+  });
+
+  it('keeps one work on two lists as two rows, each naming its list', () => {
+    const base = document();
+    const twice: ReadingListsDocument = {
+      ...base,
+      lists: [
+        base.lists[0],
+        {
+          ...base.lists[1],
+          entries: [
+            ...base.lists[1].entries,
+            { id: 'lB_e9', workId: 'w0', order: 9, addedAt: NOW, state: 'wanted' as const },
+          ],
+        },
+      ],
+    };
+    const rows = readingWorksByAuthor(twice, 'Sayaka Murata');
+    const first = rows.filter((row) => row.workId === 'w0');
+    expect(first).toHaveLength(2);
+    expect(first.map((row) => row.listName)).toEqual(['Reading now', 'Someday']);
+    // Distinct entry ids, so a caller can key on them without collisions.
+    expect(new Set(first.map((row) => row.entryId)).size).toBe(2);
   });
 });

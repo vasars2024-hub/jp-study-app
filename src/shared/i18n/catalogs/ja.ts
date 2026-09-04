@@ -11468,4 +11468,8 @@ export const ja: Catalog = {
   'readingLists.view.source.close': '閉じる',
   'readingLists.view.source.partial':
     'そのメッセージの残りは失われており、この項目のもとになった行だけが残っています。',
+  'readingLists.view.author.open': '{author} の他の作品',
+  'readingLists.view.author.title': '{author} の他の作品',
+  'readingLists.view.author.onlyOne': 'リストにある {author} の本はこれだけです。',
+  'readingLists.view.author.goList': 'リスト「{name}」へ移動',
 };

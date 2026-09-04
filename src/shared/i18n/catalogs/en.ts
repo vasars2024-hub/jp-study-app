@@ -11990,4 +11990,8 @@ export const en: Catalog = {
   'readingLists.view.source.close': 'Close',
   'readingLists.view.source.partial':
     'The rest of that message is gone — only the line this entry came from was kept.',
+  'readingLists.view.author.open': 'Other works by {author}',
+  'readingLists.view.author.title': 'Other works by {author}',
+  'readingLists.view.author.onlyOne': 'This is the only book by {author} on your lists.',
+  'readingLists.view.author.goList': 'Go to the list “{name}”',
 };

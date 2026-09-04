@@ -12449,4 +12449,8 @@ export const ru: Catalog = {
   'readingLists.view.source.close': 'Закрыть',
   'readingLists.view.source.partial':
     'Остальная часть сообщения потеряна — сохранилась только строка, из которой взята эта запись.',
+  'readingLists.view.author.open': 'Другие работы: {author}',
+  'readingLists.view.author.title': 'Другие работы: {author}',
+  'readingLists.view.author.onlyOne': 'Это единственная книга автора {author} в ваших списках.',
+  'readingLists.view.author.goList': 'Перейти к списку «{name}»',
 };

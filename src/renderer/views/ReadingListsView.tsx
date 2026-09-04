@@ -73,6 +73,7 @@ import {
 import {
   READING_ENTRY_STATES,
   readingListRows,
+  readingWorksByAuthor,
   reorderEntryIds,
   sortReadingListSummaries,
   summarizeReadingLists,
@@ -192,6 +193,8 @@ interface ReadingRowActions {
   dismissSuggestion: (entryId: string) => void;
   /** §11.1's source-message chip: open the paste this row came out of. */
   showSource: (entryId: string) => void;
+  /** §11.1's author link: this author's other works, across every list. */
+  showAuthor: (author: string) => void;
   pick: (entryId: string, range: boolean) => void;
   /** §11.4's reorder. `target` is the row dropped onto, or stepped past. */
   reorder: (entryId: string, targetEntryId: string) => void;
@@ -218,6 +221,8 @@ interface ReadingRowProps {
    * prop would break the memo §11.4's performance row depends on.
    */
   hasSource: boolean;
+  /** §11.1's author link, already trimmed. `null` where the work has no author. */
+  author: string | null;
   selected: boolean;
   actions: ReadingRowActions;
   t: ReturnType<typeof useT>['t'];
@@ -272,6 +277,7 @@ const ReadingRow = memo(function ReadingRow({
   item,
   suggestedTitle,
   hasSource,
+  author,
   selected,
   actions,
   t,
@@ -352,6 +358,23 @@ const ReadingRow = memo(function ReadingRow({
           {item ? t('readingLists.view.rowOpen') : t('readingLists.view.rowFind')}
         </span>
       </button>
+      {/*
+        §11.1's author link. OUTSIDE the open button, not inside it: a button
+        inside a button is invalid HTML, React logs it, and the browser's own
+        fix-up moves it out of the button — where it would then no longer open
+        the reader NOR the author, which is the dead control §11.1 forbids.
+      */}
+      {author !== null ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="rlv__row-author"
+          aria-label={t('readingLists.view.author.open', { author })}
+          onClick={() => actions.showAuthor(author)}
+        >
+          {author}
+        </Button>
+      ) : null}
       <Select
         className="rlv__row-state"
         aria-label={t('readingLists.view.rowState', { title })}
@@ -445,6 +468,8 @@ export default function ReadingListsView({
   const [libraryNote, setLibraryNote] = useState<string | null>(null);
   /** §11.1: the entry whose source message is open, or `null`. */
   const [sourceFor, setSourceFor] = useState<string | null>(null);
+  /** §11.1: the author whose other works are open, or `null`. */
+  const [authorFor, setAuthorFor] = useState<string | null>(null);
   /**
    * Why the last drop did nothing, already translated. §11.4's honest-states
    * row: a drop that lands on the surface and produces no list, no row and no
@@ -638,7 +663,30 @@ export default function ReadingListsView({
 
   const showSource = useCallback((entryId: string) => {
     setSourceFor((current) => (current === entryId ? null : entryId));
+    setAuthorFor(null);
   }, []);
+
+  const showAuthor = useCallback((author: string) => {
+    // The two panels are mutually exclusive on purpose. Both explain the same
+    // row, and stacking them pushes the row itself off screen.
+    setAuthorFor((current) => (current === author ? null : author));
+    setSourceFor(null);
+  }, []);
+
+  /**
+   * §11.1: *"an author name → that author's other works, owned and wanted"*.
+   *
+   * Across the whole document — see `readingWorksByAuthor`. The rows the user is
+   * already looking at are filtered out here rather than in the query, because
+   * "other works" is a property of this SURFACE (you are looking at that list),
+   * not of the data; the widgets in §11.2 will want the unfiltered answer.
+   */
+  const authorRows = useMemo(() => {
+    if (!authorFor || !document) return null;
+    const all = readingWorksByAuthor(document, authorFor);
+    const here = new Set(list ? list.entries.map((entry) => entry.id) : []);
+    return { author: authorFor, all, others: all.filter((row) => !here.has(row.entryId)) };
+  }, [authorFor, document, list]);
 
   /**
    * §11.1's *"a source-message chip → the original paste, with the producing
@@ -1133,6 +1181,7 @@ export default function ReadingListsView({
     reorderRows,
     stepRow,
     showSource,
+    showAuthor,
   });
   live.current = {
     rows,
@@ -1145,6 +1194,7 @@ export default function ReadingListsView({
     reorderRows,
     stepRow,
     showSource,
+    showAuthor,
   };
 
   /**
@@ -1198,6 +1248,7 @@ export default function ReadingListsView({
         if (row) live.current.dismissSuggestion(row);
       },
       showSource: (entryId) => live.current.showSource(entryId),
+      showAuthor: (author) => live.current.showAuthor(author),
       pick: (entryId, range) => live.current.toggleSelected(entryId, range),
       reorder: (entryId, targetEntryId) => {
         if (entryId !== targetEntryId) live.current.reorderRows(entryId, targetEntryId);
@@ -1719,6 +1770,82 @@ export default function ReadingListsView({
             </ol>
           </section>
         ) : null}
+        {authorRows ? (
+          <section
+            className="rlv__author"
+            aria-label={t('readingLists.view.author.title', { author: authorRows.author })}
+            data-testid="rlv-author"
+          >
+            <header className="rlv__source-head">
+              <h3 className="rlv__source-title">
+                {t('readingLists.view.author.title', { author: authorRows.author })}
+              </h3>
+              <span className="rlv__spacer" />
+              <Button size="sm" onClick={() => setAuthorFor(null)}>
+                {t('readingLists.view.source.close')}
+              </Button>
+            </header>
+            {authorRows.others.length === 0 ? (
+              /**
+               * A real empty state, not a blank panel. It names WHICH author and
+               * says the one thing the user needs — that this is the only one on
+               * their lists — rather than reading as a link that failed.
+               */
+              <p className="rlv__source-when" role="status">
+                {t('readingLists.view.author.onlyOne', { author: authorRows.author })}
+              </p>
+            ) : (
+              <ul
+                className="rlv__author-list"
+                aria-label={t('readingLists.view.author.title', { author: authorRows.author })}
+              >
+                {authorRows.others.map((row) => (
+                  <li key={row.entryId} className="rlv__author-row">
+                    {/*
+                      §11.1's "no dead ends" applied to this panel too: the row
+                      opens the reader when there is a file and goes to the
+                      acquisition path when there is not — the same two
+                      destinations, through the same two callbacks, as a list row.
+                    */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rlv__author-open ui-focusable"
+                      onClick={() => {
+                        const found = row.itemId ? itemsById.get(row.itemId) : undefined;
+                        if (found) onOpenBook(found);
+                        else onFindWork(row.title);
+                      }}
+                    >
+                      <span className="rlv__author-title">{row.title}</span>
+                      <span className="rlv__author-where">
+                        {row.itemId
+                          ? t('readingLists.view.rowOpen')
+                          : t('readingLists.view.rowFind')}
+                      </span>
+                    </Button>
+                    <span className="rlv__author-state">{t(STATE_KEYS[row.state])}</span>
+                    {/* Which list, because that is the fact that tells the user
+                        where to go next, and it is why one work on two lists
+                        stays two rows here. */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rlv__author-list-link"
+                      aria-label={t('readingLists.view.author.goList', { name: row.listName })}
+                      onClick={() => {
+                        setAuthorFor(null);
+                        setListId(row.listId);
+                      }}
+                    >
+                      {row.listName}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
         {picking ? libraryPicker : null}
         {libraryNote ? (
           <p className="rlv__notice" role="status">
@@ -1941,6 +2068,7 @@ export default function ReadingListsView({
                     suggested ? (itemsById.get(suggested.itemId)?.title ?? suggested.itemId) : null
                   }
                   hasSource={Boolean(row.entry.sourceRef)}
+                  author={row.work?.authorRaw?.trim() || null}
                   selected={selected.has(row.entry.id)}
                   actions={rowActions}
                   t={t}

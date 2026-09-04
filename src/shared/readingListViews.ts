@@ -22,6 +22,10 @@ import type {
   ReadingListTarget,
   ReadingWorkRef,
 } from './readingLists';
+// The SAME normaliser `readingListMatching` compares authors with. Two author
+// normalisers is two answers to "is this the same person", and the surface and
+// the matcher would disagree in exactly the cases this link exists for.
+import { normalizeMediaTitleKey } from './mediaIdentity';
 
 /** Every state, in the order a surface should show them. Chips read left to right. */
 export const READING_ENTRY_STATES: readonly ReadingEntryState[] = [
@@ -195,6 +199,69 @@ export function readingListRows(
       suggestion: hasLiveSuggestion(work),
     };
   });
+}
+
+/** One line of §11.1's "that author's other works, owned and wanted". */
+export interface ReadingAuthorRow {
+  entryId: string;
+  workId: string;
+  title: string;
+  /** `null` is the acquisition destination, exactly as on `ReadingListRow`. */
+  itemId: string | null;
+  state: ReadingEntryState;
+  listId: string;
+  listName: string;
+  listArchived: boolean;
+}
+
+/**
+ * §11.1: *"an author name → that author's other works, owned and wanted"*.
+ *
+ * Across EVERY list, not just the one open, because "other works" is a question
+ * about the author and not about the list the user happens to be looking at —
+ * a version scoped to the current list would answer "none" for the common case
+ * of one book per list and read as the link being broken.
+ *
+ * A work on two lists yields TWO rows, each naming its list. Collapsing them
+ * would throw away the only fact that tells the user where to go next, and the
+ * caller can still count distinct `workId`s.
+ *
+ * Matching is on `normalizeMediaTitleKey`, the same normaliser
+ * `readingListMatching` uses for authors, so "Sayaka Murata" and "murata,
+ * sayaka" do not silently become two authors. A blank author matches NOTHING:
+ * `authorRaw` is optional and most works never carry one, so a key-less match
+ * would return every authorless work in the document.
+ */
+export function readingWorksByAuthor(
+  document: ReadingListsDocument,
+  authorRaw: string,
+): ReadingAuthorRow[] {
+  const key = normalizeMediaTitleKey(authorRaw);
+  if (!key) return [];
+  const works = new Map(
+    document.works
+      .filter((work) => normalizeMediaTitleKey(work.authorRaw ?? '') === key)
+      .map((work) => [work.id, work]),
+  );
+  if (works.size === 0) return [];
+  const out: ReadingAuthorRow[] = [];
+  for (const list of document.lists) {
+    for (const entry of sortReadingListEntries(list)) {
+      const work = works.get(entry.workId);
+      if (!work) continue;
+      out.push({
+        entryId: entry.id,
+        workId: work.id,
+        title: work.titleRaw.trim() || entry.sourceRef?.rawLine.trim() || '',
+        itemId: work.boundItemIds[0] ?? null,
+        state: entry.state,
+        listId: list.id,
+        listName: list.name,
+        listArchived: Boolean(list.archivedAt),
+      });
+    }
+  }
+  return out;
 }
 
 /**

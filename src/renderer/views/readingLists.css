@@ -779,3 +779,68 @@
 .rlv__source-text {
   font-family: var(--font-mono, ui-monospace, monospace);
 }
+
+/* --------------------------------------- §11.1 · the author's other works -- */
+
+.rlv__author {
+  display: grid;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+/* The author link sits in the row's own grid, not inside the open button —
+   a nested button is invalid and the browser hoists it out of its parent. */
+.rlv__row-author {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlv__author-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--lq-space-1, 4px);
+}
+
+.rlv__author-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+}
+
+/* 34px for the same reason every other target on this surface is 34 and not 32:
+   the accessibility walk's floor IS 32 and it steps in halves. */
+.rlv__author-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--lq-space-2, 8px);
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.rlv__author-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rlv__author-where,
+.rlv__author-state {
+  flex: none;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.85em;
+}
+
+.rlv__author-list-link {
+  flex: none;
+  min-height: 34px;
+}
