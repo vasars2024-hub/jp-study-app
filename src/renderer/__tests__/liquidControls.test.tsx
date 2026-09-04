@@ -570,6 +570,66 @@ describe('the sheet stays a composition language, not a palette', () => {
     expect(CSS).toMatch(/max\(100%,\s*var\(--lq-hit-target\)\)/);
   });
 
+  /**
+   * `.lq-check` — the replaced-element half of the hit floor.
+   *
+   * The sheet had stated this hole for as long as the floor has existed: `::after`
+   * generates no box on an `input`, so checkboxes were left to a `min-height` "written
+   * where the control lives", and across 245 native checkboxes in 97 renderer files
+   * nowhere did. Category 1 measured 17 of them at 13px in the Grammar catalogue.
+   *
+   * What is asserted here is the FORWARDING, not the geometry — jsdom reports every
+   * rect as 0, so a test that mounted the wrapper and checked its size would measure
+   * nothing at all (the same trap `fitCount` exists to dodge, higher up this file).
+   * Geometry is pinned by the shared `::after` selector list and measured live.
+   */
+  it('puts the floor on a label that forwards, and a span wrapper is the control that proves it', () => {
+    const styles = CSS;
+    // ONE `::after`, shared with the other three expanders, or the halves drift.
+    const at = styles.indexOf('.lq-hit::after');
+    expect(at).toBeGreaterThan(-1);
+    const expander = styles.slice(at, styles.indexOf('}', at));
+    expect(expander).toContain('.lq-check::after');
+    expect(expander).toMatch(/width:\s*max\(100%,\s*var\(--lq-hit-target\)\)/);
+    // Without a containing block the absolutely-positioned expander escapes to the
+    // nearest positioned ancestor and lands somewhere else entirely.
+    const rule = styles.slice(styles.indexOf('.lq-check {'), styles.indexOf('}', styles.indexOf('.lq-check {')));
+    expect(rule).toMatch(/position:\s*relative/);
+
+    // SUBJECT — a label wrapper. A click anywhere in it reaches the checkbox.
+    const host = render(
+      <>
+        <label className="lq-check">
+          <input type="checkbox" defaultChecked={false} aria-label="subject" />
+        </label>
+        <span className="lq-check">
+          <input type="checkbox" defaultChecked={false} aria-label="control" />
+        </span>
+      </>,
+    );
+    const [label, span] = [
+      host.querySelector('label.lq-check') as HTMLLabelElement,
+      host.querySelector('span.lq-check') as HTMLSpanElement,
+    ];
+    const boxOf = (el: Element) => el.querySelector('input') as HTMLInputElement;
+
+    expect(boxOf(label).checked).toBe(false);
+    act(() => {
+      label.click();
+    });
+    expect(boxOf(label).checked).toBe(true);
+
+    // NEGATIVE CONTROL — the same class on a span. The expander is identical, so
+    // `elementFromPoint` would report a 32px target either way; only the forwarding
+    // tells them apart, and a span swallows the click. This is why the call sites take
+    // a label, and it fails if someone "simplifies" one back to a span.
+    expect(boxOf(span).checked).toBe(false);
+    act(() => {
+      span.click();
+    });
+    expect(boxOf(span).checked).toBe(false);
+  });
+
   it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
     const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
     expect(frames).toContain('var(--lq-motion-scale)');

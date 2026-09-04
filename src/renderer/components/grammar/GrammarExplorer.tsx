@@ -295,12 +295,17 @@ export default function GrammarExplorer({
             selected.has(p.id) ? 'selected' : ''
           }`}
         >
-          <input
-            type="checkbox"
-            checked={selected.has(p.id)}
-            onChange={() => toggleSelected(p.id)}
-            aria-label={t('grammar.explorer.select')}
-          />
+          {/* The label is load-bearing, not decoration: `.lq-check` puts the 32px hit
+              floor on the WRAPPER, and only a label forwards that click to the control
+              inside it. A span here would be a dead 32px region over the checkbox. */}
+          <label className="lq-check">
+            <input
+              type="checkbox"
+              checked={selected.has(p.id)}
+              onChange={() => toggleSelected(p.id)}
+              aria-label={t('grammar.explorer.select')}
+            />
+          </label>
           <button className="gram-x-row-main" onClick={() => focus(p.id)}>
             <span className="gram-x-row-top">
               <span className="gram-x-title" lang="ja">

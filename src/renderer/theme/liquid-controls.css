@@ -64,8 +64,41 @@
   position: relative;
 }
 
+/* `.lq-check` is the replaced-element half of the floor, and it exists because the
+   paragraph above states the hole without filling it: `::after` generates no box on an
+   `input` or a `select`, so those two were left to write a `min-height` "where the control
+   lives" — and across 245 native checkboxes in 97 renderer files, nowhere did. Rubric
+   category 1 measured 17 bare `input[type=checkbox]` at 13px in the Grammar catalogue
+   against a 32px bar; they carry no class at all, so no per-surface rule could have
+   reached them either.
+
+   The floor cannot go on the checkbox itself. `min-height` on a checkbox is VISUAL growth,
+   which §2 of `css-measure` already recorded as damage rather than repair — a 32px tick box
+   in a dense list is a worse surface than a 13px one. So the class goes on a `<label>`
+   WRAPPING the control: label activation forwards a click to its own control, so an expander
+   on the label is a real hit area for the checkbox without the checkbox changing size by one
+   pixel. That is the only construction here that works on a replaced element.
+
+   It must be a `label` that CONTAINS the input (or one wired by `for=`). On a plain `span`
+   the expander is dead space that swallows the click instead of forwarding it — which reads
+   as fixed to `elementFromPoint` and is a REGRESSION to a pointer. The test asserts the
+   forwarding, not the geometry.
+
+   Same `::after` as the other three, for the same reason: geometry that cannot drift. The
+   same two traps apply unchanged — an `overflow: hidden` ancestor clips it back, and an
+   expander that reaches past its row steals its neighbour's corner, so re-measure
+   `stolen`/`occluded` after adding one rather than assuming the floor came free. */
+.lq-check {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
 .lq-hit::after,
 .lq-hit-placed::after,
+.lq-check::after,
 .lq-hit-scope :is(button, a[href], [role='button'], [role='tab'])::after {
   content: '';
   position: absolute;
