@@ -1202,12 +1202,26 @@
   letter-spacing: 0.025em;
 }
 
+/* The dossier is contextual by design and takes the Liquid material - it floats over a live
+ * canvas. This block is the one thing inside it that is NOT reading: a toggle pair and a range
+ * input, i.e. a form. §2.3's rule is that forms sit on a stable anchor, and category 3 measured
+ * exactly that miss - `denseWorkOnTranslucent 1`, the whole surface's only Work region, named
+ * as `div.reading-garden-info-music (backdrop-filter on aside.lq-contextual=0.72+blur)`. It had
+ * no paint of its own at all: a hairline border-top over 22px of blur, with the garden's stars
+ * and drifting dust moving underneath the slider track a user is trying to aim at.
+ *
+ * So it gets its own settled ground, in the garden's own night palette rather than a shell's -
+ * OPAQUE, which is what takes it out of the ancestor's backdrop-filter reach. The gradient's
+ * darker stop (rgba(4,10,18,...)) is the colour this sits over, so the panel reads as the same
+ * material at rest rather than as a foreign card. */
 .reading-garden-info-music {
   display: grid;
   gap: 7px;
   margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(151, 209, 207, 0.12);
+  padding: 9px 10px 10px;
+  border: 1px solid rgba(151, 209, 207, 0.14);
+  border-radius: 10px;
+  background: #0b1622;
 }
 
 .reading-garden-info-music-heading {

@@ -780,8 +780,33 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
         const ungroundSurvivors = (dirtyUnground.detail || [])
           .filter((r) => r.role === 'Work' && r.grounded)
           .map((r) => ({ sel: r.sel, ownAlpha: r.ownAlpha, groundedReason: r.groundedReason }));
+        // CORRECTION 37, 2026-09-04 (primary), measured on `city`. The survivor exemption above
+        // has a limit case the previous correction did not reach: when EVERY baseline Work
+        // region already paints its own opaque ground, control E has no borrowed ground left to
+        // remove and the count CANNOT move — so `> base` is unsatisfiable and the leg VOIDs a
+        // surface that has no defect. City is the extreme: one Work region,
+        // `div.reading-garden-info-music`, anchored on its own `ownAlpha 1` paint, marked 4
+        // ancestors, count 0 -> 0, and `ungroundSurvivors` said exactly why
+        // ("opaque ground at div.reading-garden-info-music=1"). That is the fix E exists to
+        // reward, and it read as the instrument failing.
+        //
+        // So the vacuous branch is admitted, but only when it is PROVEN from the measured
+        // baseline rather than inferred from a zero: every Work region self-painted at
+        // baseline, at least one Work region to speak of, ground actually reached
+        // (`ung.marked > 0`), and the count genuinely unmoved. Nothing is relaxed for a surface
+        // with any borrowed-ground region — one such region and the `>` bar applies as before.
+        // Control B is unaffected and still requires every Work region to fail when the whole
+        // surface is made glass, so the walk's ability to see THIS region fail is still proven
+        // this run; only E's own claim, about borrowed ground, has an empty subject.
+        const baseWorkOwnAlphas = (base.detail || [])
+          .filter((r) => r.role === 'Work')
+          .map((r) => ({ sel: r.sel, ownAlpha: r.ownAlpha }));
+        const ungroundVacuous = base.byRole.Work > 0
+          && ung.marked > 0
+          && baseWorkOwnAlphas.every((r) => typeof r.ownAlpha === 'number' && r.ownAlpha >= 0.95)
+          && dirtyUnground.denseWorkOnTranslucent === base.denseWorkOnTranslucent;
         const ungroundedAllFailed = dirtyUnground.byRole.Work === base.byRole.Work
-          && dirtyUnground.denseWorkOnTranslucent > base.denseWorkOnTranslucent
+          && (ungroundVacuous || dirtyUnground.denseWorkOnTranslucent > base.denseWorkOnTranslucent)
           && ungroundSurvivors.every((r) => typeof r.ownAlpha === 'number' && r.ownAlpha >= 0.95);
         const ungroundReturned = !ungRestored.styleStillMounted && ungRestored.attributesLeft === 0;
         const returned = JSON.stringify(metricTuple(restored)) === JSON.stringify(metricTuple(base));
@@ -801,6 +826,8 @@ const normalizedInlineStyle = (style) => (style == null || style.trim() === '' ?
           movedOne,
           allWorkFailed,
           ungroundedAllFailed,
+          ungroundVacuous,
+          baseWorkOwnAlphas,
           ungroundReturned,
           ungroundMarked: ung.marked,
           ungroundSurvivors,
