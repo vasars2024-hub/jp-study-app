@@ -2818,3 +2818,37 @@ One trap for the next surface: `cat5-ui-clarity.cjs` resolves its category-6 dep
 `baselines/cat6-<LABEL>.json`, so a re-run under a different `--label` VOIDs on
 `Q7/Q8/Q9 is MEASURE — no category-6 baseline`. That is not a regression in the surface; it is
 the label. This surface's label for cat5 is `s11-visualizer`.
+
+### Visualizer style parity — the gap logged at 80/80, decided and closed (`f09e784e`)
+
+The previous turn logged it and did not fix it: `VizStyle` declares five styles,
+`VisualizerCanvas.tsx:375-376` draws `xp-classic` and `vista-aero`,
+`BlancLibraryPanels.tsx:224-225` offers all five, and `VisualizerPage.tsx:12` listed **three**.
+
+**Decision: expose all five in Study OS**, not record two as Blanc-only. The deciding fact is
+not reachability but state: `visualizerSettings.ts:45` validates `viz.style` against all five,
+so a style set in Blanc came back to a Study OS row where **no button was `primary`** — the
+surface could not display its own persisted value, and the only exit was to pick a different
+style. Recording the two as Blanc-only would still have required Study OS to represent them.
+
+**Live, on the running app (pid 6756), Settings › Visualizer with Advanced on:** the row
+renders **5** buttons — `spectrum, wave, particles, xp-classic, vista-aero` — labelled
+`Spectrum / Waveform / Particles / XP Classic / Vista Aero`. Clicking `xp-classic`:
+`primary = ["xp-classic"]`, exactly one, and `jp-os-visualizer.style = "xp-classic"`. Control:
+`vista-aero` then `spectrum` each moved `primary` to **exactly** the clicked style and dropped
+the previous one — never two, never none. Both are values the row could not previously show.
+
+**NOT verified, stated rather than glossed:** that the two draw paths paint differently. The
+canvas hashed **identically** under all three styles (`378x165`, dataURL len 2710, hash
+`2e7924d5`) because the widget is in its idle stage — `"Nothing is playing / Open Music"`, the
+state cat8 above added. With no audio the idle stage is painted instead of any style, so the
+pixel signature cannot discriminate them. That needs a playing track, not a fix.
+
+**cat6 re-scored because the change touched the `settingsRoute` row's surface: PASS 10/10**,
+`parity` 5/5 standard and 5/5 liquid, `roundTripHeld`, all **5 of 5** declared mutations armed
+and each fell **exactly its own row** with `unexpectedRows []` and `afterRestore 5/5`. Section
+holds at 80/80. Evidence: `cat6-s11-visualizer-r2.json`.
+
+State moved and put back: `jp-settings-advanced-v1` and `jp-os-visualizer` were both absent at
+start and are absent again (verified `null` live after the run). Settings is left on the
+Visualizer section rather than Home.
