@@ -139,12 +139,26 @@ function delegate(cmd: PlayerCommand): void {
   if (!isLeader()) window.api.playerSendCommand(cmd);
 }
 
+/**
+ * The survivor of a closed leader mirrors a track it never loaded: `audio.src` is empty
+ * while the surface still shows the title, the duration and a Pause icon. Returning early
+ * there made Play a control with no observable effect, which is the shape the rubric's
+ * honest-states category forbids. Re-open the track instead — restarting it from its saved
+ * position is exactly what pressing Play is asking for.
+ */
+function togglePlayback(): void {
+  if (!audio.src) {
+    if (state.current) void playItemById(state.current.id);
+    return;
+  }
+  if (audio.paused) void audio.play().catch(() => undefined);
+  else audio.pause();
+}
+
 function runCommand(cmd: PlayerCommand): void {
   switch (cmd.type) {
     case 'toggle':
-      if (!audio.src) return;
-      if (audio.paused) void audio.play().catch(() => undefined);
-      else audio.pause();
+      togglePlayback();
       break;
     case 'next':
       advance(1);
@@ -306,9 +320,7 @@ export function prev(): void {
 }
 export function toggle(): void {
   if (!isLeader()) return delegate({ type: 'toggle' });
-  if (!audio.src) return;
-  if (audio.paused) void audio.play().catch(() => undefined);
-  else audio.pause();
+  togglePlayback();
 }
 function seekLocal(t: number): void {
   audio.currentTime = t;

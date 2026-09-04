@@ -73,6 +73,7 @@ import {
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
+import { releasePlayerLeadership } from './shared/playerSync';
 import type { AgentNavigationDestination } from './shared/agentNavigation';
 import { LEGACY_WIN_SECTION_ALIASES } from './shared/desktop';
 import {
@@ -1606,9 +1607,34 @@ function registerPopoutIpc(): void {
 // window owns the <audio> element; the rest mirror UI via player:sync.
 let playerSnapshot: PlayerSnapshot | null = null;
 
+/**
+ * Hand leadership back when the window that owned the `<audio>` element is gone, and
+ * tell every survivor. Without this the snapshot outlives its publisher and the whole
+ * transport delegates into nothing — see `releasePlayerLeadership` for the measurement.
+ * Called both when a window closes and on every snapshot read, because a renderer can
+ * also disappear through `render-process-gone` without a `closed` event we saw.
+ */
+function releasePlayerLeaderIfGone(): void {
+  const live = BrowserWindow.getAllWindows()
+    .filter((w) => !w.isDestroyed())
+    .map((w) => w.webContents.id);
+  const released = releasePlayerLeadership(playerSnapshot, live);
+  if (!released) return;
+  playerSnapshot = released;
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('player:sync', released);
+  }
+}
+
 function registerPlayerSyncIpc(): void {
   ipcMain.handle('player:windowId', (e): number => e.sender.id);
-  ipcMain.handle('player:getSnapshot', (): PlayerSnapshot | null => playerSnapshot);
+  ipcMain.handle('player:getSnapshot', (): PlayerSnapshot | null => {
+    releasePlayerLeaderIfGone();
+    return playerSnapshot;
+  });
+  app.on('browser-window-created', (_event, win) => {
+    win.once('closed', () => releasePlayerLeaderIfGone());
+  });
   ipcMain.on('player:publish', (e, snap: PlayerSnapshot) => {
     playerSnapshot = snap;
     for (const win of BrowserWindow.getAllWindows()) {
