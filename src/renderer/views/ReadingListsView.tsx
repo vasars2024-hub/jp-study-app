@@ -78,6 +78,7 @@ import {
 } from '../../shared/readingListMutations';
 import {
   READING_ENTRY_STATES,
+  nextUpReadingRow,
   readingListRows,
   readingWorksByAuthor,
   reorderEntryIds,
@@ -92,6 +93,9 @@ import {
   type ReadingListExportFormat,
 } from '../../shared/readingListExport';
 import { projectReadingListFinish } from '../../shared/readingListProjection';
+import type { LevelTier } from '../../shared/levelScale';
+import { effectiveLevelEstimate } from '../../shared/libraryLevel';
+import { getUserLevel } from '../levelService';
 import { LANG_TAGS } from '../../shared/i18n/core';
 import './readingLists.css';
 
@@ -646,6 +650,57 @@ export default function ReadingListsView({
   const projection = useMemo(
     () => (document && listId ? projectReadingListFinish(document, listId, Date.now()) : null),
     [document, listId],
+  );
+
+  /**
+   * P5 §5.3's "Next up" button, and §6's list-detail bullet of the same name.
+   *
+   * The two inputs the pure core needs, and neither is invented here: the tier
+   * comes from `getUserLevel()`, the same reader the Reading Finder builds its
+   * level band from, and the per-work level is `effectiveLevelEstimate` — the
+   * one L1–L7 scale §7's `difficultyMax` already rides.
+   *
+   * `getUserLevel` reads storage and is guarded, because a throw here would
+   * take the whole list detail down for a button. Falling back to `null` turns
+   * the fit OFF and leaves list order, which is the shipped behaviour.
+   */
+  const targetLevel = useMemo<LevelTier | null>(() => {
+    try {
+      return getUserLevel();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /**
+   * Keyed by WORK, not by item: the core is given works and the two ids are not
+   * interchangeable. A work bound to nothing, or to an item the library has not
+   * loaded yet, is UNMEASURED rather than absent — §7's call, and the reason a
+   * fresh import is not invisible for as long as enrichment takes.
+   */
+  const workLevels = useMemo(() => {
+    const out = new Map<string, LevelTier | null>();
+    for (const work of document?.works ?? []) {
+      let level: LevelTier | null = null;
+      for (const itemId of work.boundItemIds) {
+        const item = itemsById.get(itemId);
+        const found = item ? effectiveLevelEstimate(item) : null;
+        if (found != null) {
+          level = found;
+          break;
+        }
+      }
+      out.set(work.id, level);
+    }
+    return out;
+  }, [document, itemsById]);
+
+  const nextUp = useMemo(
+    () =>
+      list && document
+        ? nextUpReadingRow(list, document.works, { levels: workLevels, targetLevel })
+        : null,
+    [list, document, workLevels, targetLevel],
   );
 
   const rows = useMemo(
@@ -2004,6 +2059,28 @@ export default function ReadingListsView({
                 { date: formatProjectionDay(projection.finishesAt, lang) },
               )}
             </span>
+          ) : null}
+          {/*
+            P5 §5.3 / §6: *"'Next up' button"*. It routes through `openRow`, the
+            SAME handler a row click uses, so the queue inherits §11.1's whole
+            contract for free — bound goes to the reader, `owned` is promoted to
+            `reading`, and an unbound `wanted` entry lands on acquisition rather
+            than swallowing the click. A second navigation path here would be a
+            second answer to "where does a book open".
+
+            The title is IN the label rather than a bare "Next up": a button
+            that opens a reader without saying which book is a button the user
+            has to press to find out what it does.
+          */}
+          {nextUp ? (
+            <Button
+              size="sm"
+              className="rlv__nextup"
+              leftIcon={<Icon name="bookmark" />}
+              onClick={() => openRow(nextUp)}
+            >
+              {t('readingLists.view.nextUp', { title: nextUp.title })}
+            </Button>
           ) : null}
           <span className="rlv__spacer" />
           {densityControl}

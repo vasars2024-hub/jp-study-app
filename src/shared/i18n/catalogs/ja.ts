@@ -11431,6 +11431,7 @@ export const ja: Catalog = {
   'readingLists.view.density.compact': 'コンパクト',
   'readingLists.view.density.unsaved':
     'この表示密度は今だけ有効です。保存できなかったため、次回の起動時には元に戻ります。',
+  'readingLists.view.nextUp': '次に読む: {title}',
   'readingLists.view.paste': 'メッセージを貼り付け',
   'readingLists.view.pasteLabel': '本が書かれたメッセージを貼り付けてください',
   'readingLists.view.pastePlaceholder': '1. キノの旅\n2. コンビニ人間\n3. …',
