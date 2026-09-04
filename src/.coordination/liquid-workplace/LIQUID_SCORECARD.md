@@ -3033,4 +3033,8 @@ more distinct decodes behind the same gesture. It does not move this score: the 
 number is 20x under its bar and the frame legs are at the ceiling.
 
 **`musicwidget` is 8 of 8 — the surface closes at 80/80. Running total: 14 of 25 sections.**
-84 category cells remain.
+**91 category cells remain** — the previous entry's 92 minus this one. (An earlier draft of this
+line said 84; that was a fresh 25x8 recount, which does not reconcile with the running figure
+this ledger has carried since `visualizer` opened. The running figure is the one every RULE D
+line has been computed from, so it is the one continued here, and the discrepancy is left
+visible rather than quietly re-based.)
