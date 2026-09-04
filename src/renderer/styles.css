@@ -125,6 +125,22 @@
   --warning-text: var(--warning);
   --danger-text: var(--danger);
 
+  /* The five JLPT level hues WHEN THEY ARE TEXT, same split and same reason again.
+     `.gram-badge.lv-N5` painted a hardcoded #6fd9a0 on a 16% wash of its own hue: on a dark
+     panel that composites to a readable mint, on `classic-light` it composites to
+     **1.35:1** against a 4.5 bar — measured 2026-09-04 on the live Grammar window, the worst
+     text run in either theme by a wide margin. The dark values here are the old literals
+     verbatim, so no dark palette moves a single pixel; the light remap below derives them
+     with the --accent-text recipe. The WASH keeps its own hue and is untouched — a 16% tint
+     is legible on either ground, it is only the foreground that cannot be one fixed value. */
+  --lv-n5-text: #6fd9a0;
+  --lv-n4-text: #aeb6ff;
+  --lv-n3-text: #c9a3f3;
+  --lv-n2-text: #f0c074;
+  --lv-n1-text: #f3a3b0;
+  --gram-fam-1-text: #ffce6b;
+  --gram-fam-2-text: #f0c074;
+
   /* Study-activity channels (Phase 6 slice 8). Reading keeps the chart colour it has
      always had; watching gets a cool blue that is far enough round the wheel from the
      brand red to be unmistakable, and is deliberately NOT --warning or --success —
@@ -1144,6 +1160,16 @@ html[data-chrome='frosted'] .os-taskbar {
   --success-text: color-mix(in srgb, var(--success) 30%, var(--text));
   --warning-text: color-mix(in srgb, var(--warning) 30%, var(--text));
   --danger-text: color-mix(in srgb, var(--danger) 30%, var(--text));
+  /* The JLPT level hues, same 30% recipe. Mixed against the WASH's own base hue rather than
+     against the pale dark-theme literal, so each level keeps its identity while the light
+     palettes get a foreground that contrasts with their own ground. */
+  --lv-n5-text: color-mix(in srgb, #2f8a5b 30%, var(--text));
+  --lv-n4-text: color-mix(in srgb, #4553d6 30%, var(--text));
+  --lv-n3-text: color-mix(in srgb, #7b3fc4 30%, var(--text));
+  --lv-n2-text: color-mix(in srgb, #b06c0a 30%, var(--text));
+  --lv-n1-text: color-mix(in srgb, #c0304a 30%, var(--text));
+  --gram-fam-1-text: color-mix(in srgb, #a86b00 30%, var(--text));
+  --gram-fam-2-text: color-mix(in srgb, #a86b00 30%, var(--text));
 }
 
 /* ---------- Study OS boot animation ---------- */
@@ -7355,23 +7381,23 @@ mark.lookup-mark,
 }
 .gram-badge.lv-N5 {
   background: rgba(90, 208, 138, 0.16);
-  color: #6fd9a0;
+  color: var(--lv-n5-text);
 }
 .gram-badge.lv-N4 {
   background: rgba(108, 123, 255, 0.18);
-  color: #aeb6ff;
+  color: var(--lv-n4-text);
 }
 .gram-badge.lv-N3 {
   background: rgba(180, 120, 255, 0.16);
-  color: #c9a3f3;
+  color: var(--lv-n3-text);
 }
 .gram-badge.lv-N2 {
   background: rgba(240, 170, 80, 0.16);
-  color: #f0c074;
+  color: var(--lv-n2-text);
 }
 .gram-badge.lv-N1 {
   background: rgba(224, 85, 106, 0.18);
-  color: #f3a3b0;
+  color: var(--lv-n1-text);
 }
 /* Familiarity pill: gram-badge geometry, the wk-grade knowledge palette. Loud
    while unlearned and quiet once Known, matching the vocabulary band control. */
@@ -7386,11 +7412,11 @@ mark.lookup-mark,
 }
 .gram-fam.fam-1 {
   background: rgba(255, 179, 0, 0.35);
-  color: #ffce6b;
+  color: var(--gram-fam-1-text);
 }
 .gram-fam.fam-2 {
   background: rgba(255, 179, 0, 0.18);
-  color: #f0c074;
+  color: var(--gram-fam-2-text);
 }
 .gram-fam.fam-3 {
   background: var(--panel-2);
@@ -7441,7 +7467,10 @@ mark.lookup-mark,
 .gram-ask-agent {
   margin-left: auto;
   background: transparent;
-  color: var(--accent-2);
+  /* `--accent-2` is the accent mixed 28% toward WHITE, so as TEXT on a light panel it
+     measured 2.47:1 here. `--accent-text` is the token this repo already built for that
+     difference and is `var(--accent-2)` on every dark palette, so nothing dark moves. */
+  color: var(--accent-text);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 10px;
@@ -9965,7 +9994,8 @@ mark.lookup-mark,
 .gram-more-btn {
   margin-top: 12px;
   background: transparent;
-  color: var(--accent-2);
+  /* Same 2.47:1 classic-light run as `.gram-ask-agent`, same token. */
+  color: var(--accent-text);
   border: 1px dashed var(--border);
   border-radius: 8px;
   padding: 8px 12px;
