@@ -130,16 +130,26 @@ const TRAILING_CHATTER = [
   'btw',
 ];
 
+/**
+ * A circled numeral, stripped from the RAW line before anything normalizes it.
+ *
+ * Found by the message corpus: NFKC folds ① to a bare `1`, so by the time
+ * `stripLeadingMarker` runs, `①走れメロス` reads `1走れメロス` and no marker rule
+ * matches a digit with no separator after it. Adding one that did would eat the
+ * `1` out of `1Q84`, so the fix has to happen before the fold, not after.
+ */
+const CIRCLED_MARKER = /^\s*[①-⑳]\s*/u;
+
 const LEADING_MARKERS = [
   /^\s*\(?\d{1,3}\)\s*/,
   /^\s*\d{1,3}\s*[.)、]\s*/,
   /^\s*\d{1,3}\s+-\s+/,
-  /^\s*[①②③④⑤⑥⑦⑧⑨⑩]\s*/,
+  /^\s*[①-⑳]\s*/u,
   /^\s*[一二三四五六七八九十]{1,3}\s*、\s*/,
   /^\s*[-*•・→>＞]+\s*/,
 ];
 
-const NUMBERED_LINE = /^\s*(?:\(?\d{1,3}[.)、]|\d{1,3}\s+-\s|[①②③④⑤⑥⑦⑧⑨⑩]|[一二三四五六七八九十]{1,3}、)/;
+const NUMBERED_LINE = /^\s*(?:\(?\d{1,3}[.)、]|\d{1,3}\s+-\s|[①-⑳]|[一二三四五六七八九十]{1,3}、)/u;
 /*
   The space after the bullet is required for `-` and `*` and optional for the
   rest. `・こころ` with no space is the ordinary Japanese form and appears in real
@@ -190,7 +200,15 @@ function stripTrailingChatter(line: string): string {
     }
     // Punctuation runs left behind by the phrase above, and the ones a message
     // ends with on its own: "…if u can find it!!" and "…おもしろい？？".
-    const trimmed = out.replace(/[!?！？~〜.,、。\s]+$/u, '');
+    // Emoji join the punctuation run: the corpus had `ハイキュー!! 🔥🔥` and
+    // `呪術廻戦 😭`, and §2.3 step 2 names emoji runs as chatter outright.
+    // \u200D and \uFE0F are the ZWJ and variation selector that hold a composite
+    // emoji together; spelled as escapes rather than literals so they stay visible
+    // to the next reader and cannot be eaten by an editor.
+    const trimmed = out.replace(
+      /(?:[!?！？~〜.,、。\s\p{Extended_Pictographic}]|\u200D|\uFE0F)+$/u,
+      '',
+    );
     if (trimmed !== out) {
       out = trimmed;
       changed = true;
@@ -265,6 +283,14 @@ export function pairTitles(line: string): { title: string; titleJa?: string; tit
   return { title: ja, titleJa: ja, titleEn: en };
 }
 
+/**
+ * `著者著 タイトル`. The suffix form below is the one §2.3 step 4 spells out, but
+ * the corpus turned up the prefix form on three of three real Japanese messages
+ * that used the marker at all, and `line.slice(0, match.index)` yields an empty
+ * title for it — so it needs its own rule rather than another entry in the list.
+ */
+const AUTHOR_PREFIX = /^([^\s、,]{2,20})\s*著\s+(.+)$/u;
+
 const AUTHOR_MARKERS = [
   /\s+by\s+([^,;]{2,40})$/iu,
   /\s*[【[]([^】\]]{2,40})[】\]]\s*$/u,
@@ -294,6 +320,8 @@ export function splitAuthor(line: string): {
       triage: 'author-ambiguous',
     };
   }
+  const prefixed = AUTHOR_PREFIX.exec(line);
+  if (prefixed) return { line: prefixed[2].trim(), author: prefixed[1].trim() };
   for (const marker of AUTHOR_MARKERS) {
     const match = marker.exec(line);
     if (!match) continue;
@@ -318,7 +346,14 @@ function isChatter(line: string): boolean {
 
 interface Segments {
   strategy: ReadingListSegmentation;
-  lines: { text: string; lineIndex: number }[];
+  /**
+   * `text` is what gets cleaned into a title. `rawLine` is the source line the
+   * preview shows beside it, and they differ for the two strategies that carve a
+   * title OUT of a line — `inline-separated` and `quoted-prose`. Storing the
+   * carved piece as the provenance made `sourceRef.rawLine` a fragment rather
+   * than "which line of which paste produced this entry" (§1).
+   */
+  lines: { text: string; lineIndex: number; rawLine?: string }[];
 }
 
 function segmentCandidates(lines: string[]): Segments[] {
@@ -343,21 +378,35 @@ function segmentCandidates(lines: string[]): Segments[] {
     out.push({ strategy: 'line-per-title', lines: indexed });
   }
 
-  // One line holding a run of titles. Only worth trying when there is essentially
-  // one line, or the split yields more pieces than there are lines.
-  const joined = indexed.map((line) => line.text).join(' ');
+  /*
+    One line holding a run of titles. Only worth trying when there is essentially
+    one line, or the split yields more pieces than there are lines.
+
+    URLs come out BEFORE the split, and the corpus is why: `/` is one of the
+    separators, so a single link anywhere in the message split it into "https:",
+    "example.com" and "a 2. 折りたたみ北京 https:" — three pieces, which beat the
+    real numbered strategy and shredded a perfectly ordinary list. A message whose
+    only content is "check this <link>" produced two fabricated titles the same
+    way.
+  */
+  const joined = indexed.map((line) => line.text.replace(URL_PATTERN, ' ')).join(' ');
   const pieces = joined.split(/\s*[、,;；/／]\s*/u).filter((piece) => piece.trim().length > 1);
   if (pieces.length >= 3 && pieces.length > indexed.length) {
     out.push({
       strategy: 'inline-separated',
-      lines: pieces.map((text) => ({ text, lineIndex: indexed[0]?.lineIndex ?? 0 })),
+      lines: pieces.map((text) => ({
+        text,
+        lineIndex: indexed[0]?.lineIndex ?? 0,
+        // The piece is the title; the LINE is the provenance §2.5 shows beside it.
+        rawLine: indexed[0]?.text ?? text,
+      })),
     });
   }
 
-  const quoted: { text: string; lineIndex: number }[] = [];
+  const quoted: Segments['lines'] = [];
   for (const line of indexed) {
     for (const match of line.text.matchAll(QUOTED_SPAN_GLOBAL)) {
-      quoted.push({ text: match[1], lineIndex: line.lineIndex });
+      quoted.push({ text: match[1], lineIndex: line.lineIndex, rawLine: line.text });
     }
   }
   if (quoted.length) out.push({ strategy: 'quoted-prose', lines: quoted });
@@ -396,8 +445,13 @@ export function scoreSegmentation(lines: readonly { text: string }[]): number {
   return lengths.length < 2 ? score * 0.25 : score;
 }
 
-function cleanEntry(rawLine: string, lineIndex: number): ParsedReadingEntry | null {
-  let text = normalizeLine(rawLine);
+function cleanEntry(
+  source: string,
+  lineIndex: number,
+  rawLine: string = source,
+): ParsedReadingEntry | null {
+  // The circled numeral has to go before NFKC folds it to a bare digit.
+  let text = normalizeLine(source.replace(CIRCLED_MARKER, ''));
 
   // 1. URLs out first, so a trailing link cannot be mistaken for a title word.
   const urls = text.match(URL_PATTERN) ?? [];
@@ -492,7 +546,7 @@ export function parseReadingList(rawText: string): ParsedReadingList {
   const dropped: string[] = [];
 
   for (const line of best.lines) {
-    const entry = cleanEntry(line.text, line.lineIndex);
+    const entry = cleanEntry(line.text, line.lineIndex, line.rawLine ?? line.text);
     if (entry) entries.push(entry);
     else dropped.push(line.text);
   }

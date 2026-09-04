@@ -390,6 +390,40 @@ Each phase is shippable on its own and leaves the tree green.
 | **P4** | Lists view + detail + reader/library touch-points + i18n ×4. | Zero hardcoded strings (`tools/i18n-hardcoded-check.cjs` clean for the new files). |
 | **P5** | Pace, next-up, smart lists, export, timeline. | Per §5/§7/§8. |
 
+### 9.1 Progress log — append only, one block per turn
+
+**2026-09-03, `primary`.** P0 CLOSED (`25a83b55`). P1 is **2 of 3 clauses closed**:
+
+- §2.1's worked example — CLOSED at `065805d5`, field by field. The heading's "6
+  works" versus its own five-row table is settled in §2.1's own correction block.
+- **≥25 real-message fixtures — CLOSED at `3837058a`. 28 fixtures**, asserted by
+  exact title list plus a provenance check on every entry. It found **five real
+  parser defects** on its first run, listed in that commit; the largest was that a
+  URL anywhere in a message beat the correct segmentation and returned fabricated
+  titles. Two fixtures deliberately pin a KNOWN LIMITATION rather than a fix
+  (`君の名は。` and `ハイキュー!!` lose their trailing marks) — do not "fix" those
+  without also handling ordinary sentence punctuation.
+- **A mutation test per parser rule — STILL OPEN.** The three landed this turn
+  (URL-before-split, the §4.4 abandoned guard, the CAS retry) are per-defect, not
+  per-rule. This clause is what P1 still owes.
+
+Two supporting layers landed beside the parser, both required by every P1 surface
+and neither in the phase table:
+
+- `dc5c345a` — `shared/readingListMutations.ts`, every change a surface can make,
+  as pure `(document) -> {document, events}` functions. 30 tests.
+- `e953820e` — `renderer/readingListsClient.ts`, the compare-and-swap retry. A
+  refused write re-applies the INTENT against the document main handed back; a
+  patch-based client resurrects the entry the other window removed, and the
+  mutation control in that commit demonstrates exactly that.
+
+**Exact next slice: the §2.5 paste preview dialog.** Everything under it exists —
+parser, mutations, client, IPC, store. It is the last thing standing between P1
+and a user, and it is also what makes `readingListsClient.ts` stop being a
+`test-only-module` in `tools/architecture-baseline.json`. Ship edit + drop +
+triage strip + dropped-lines disclosure first; merge, split and reorder-in-preview
+are a follow-up, and `reorderReadingListEntries` already exists for the last one.
+
 ---
 
 ## 10. Traps, stated up front

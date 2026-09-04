@@ -15,9 +15,9 @@
   ],
   "moduleCount": 963,
   "entries": {
-    "test-only-module:src/shared/readingListParser.ts": {
+    "test-only-module:src/renderer/readingListsClient.ts": {
       "status": "pending",
-      "note": "Reading Lists P1a. The parser landed with its suite ahead of its consumer: docs/ACTIVE/READING_LISTS_PLAN.md sequences P1 as parser + preview dialog + manual lists, and the dialog is the next slice. Marked PENDING rather than accepted precisely so it stays visible — a parser with no caller is a real defect if the dialog never arrives, and a route with no consumer has happened in this repo before. Re-key to accepted when the paste dialog imports it; if that slice is dropped instead, delete the module."
+      "note": "Reading Lists P1c. Replaces the identical P1a entry for readingListParser.ts, which stopped occurring once readingListMutations.ts imported it — the chain now ends here instead. Same honest shape and the same escape clause: docs/ACTIVE/READING_LISTS_PLAN.md sequences P1 as parser + preview dialog + manual lists, the dialog is the next slice, and PENDING keeps it visible because a client with no caller is a real defect if the dialog never arrives (a route with no consumer has happened in this repo before). Re-key to accepted when the paste dialog imports it; if that slice is dropped instead, delete the module."
     },
     "duplicate-export:canUndo": {
       "status": "accepted",
