@@ -27,12 +27,12 @@
 // blocks, or binary-search by temporarily commenting out MangaReader.tsx's
 // own imports.
 import { createRoot } from 'react-dom/client';
-import MangaReader from '../views/MangaReader';
-import { bootTheme } from '../theme';
 import '../theme/tokens.css';
 import '../styles.css';
 import type { LibraryItem } from '../../shared/types';
 import type { MokuroPage } from '../../shared/mokuroTypes';
+import { emptyReadingListsDocument } from '../../shared/readingLists';
+import { createReadingList, addLibraryItemToReadingList, createReadingListsMutationContext } from '../../shared/readingListMutations';
 
 const PAGE_W = 800;
 const PAGE_H = 1200;
@@ -110,12 +110,21 @@ const fixtureItem: LibraryItem = {
 
 const noop = async (): Promise<void> => undefined;
 const notFound = async (): Promise<null> => null;
+let readingDocument = emptyReadingListsDocument();
+const listCount = Math.max(0, Math.min(5, Number(new URLSearchParams(location.search).get('lists')) || 0));
+for (let index = 0; index < listCount; index += 1) {
+  const created = createReadingList(readingDocument, { name: `Manga club ${index + 1}` }, createReadingListsMutationContext());
+  readingDocument = addLibraryItemToReadingList(created.document, created.listId, fixtureItem, createReadingListsMutationContext()).document;
+}
 
 // Minimal stand-in for the preload bridge. Anything MangaReader/DictionaryPopup
 // might reach that isn't explicitly mocked falls through the Proxy below to a
 // generic resolved no-op rather than throwing, so the harness stays usable
 // even if a code path reaches an untouched IPC method.
 const mangaApi = {
+  readingListsLoad: async () => ({ ok: true, snapshot: { document: readingDocument, health: { state: 'ok', lostRevisions: 0 } } }),
+  onReadingListsChanged: () => () => undefined,
+  playerWindowId: async () => 'manga-harness',
   getMangaPages: async () => pages,
   readMangaPage: async () => pages[0],
   setProgress: noop,
@@ -149,18 +158,25 @@ const mangaApi = {
 const apiProxy = new Proxy(mangaApi as Record<string, unknown>, {
   get(target, prop: string) {
     if (prop in target) return target[prop];
-    // Unknown method: return a callable that resolves to a harmless empty value.
+    if (prop.startsWith('on')) return () => () => undefined;
+    // Unknown request resolves empty; subscriptions return an unsubscribe above.
     return async () => undefined;
   },
 });
 
 (window as unknown as { api: unknown }).api = apiProxy;
 
-bootTheme();
-
-const container = document.getElementById('root');
-if (container) {
-  createRoot(container).render(
+// The reader and theme both reach preload during module evaluation.
+void (async () => {
+  const { bootTheme } = await import('../theme');
+  bootTheme();
+  const { default: MangaReader } = await import('../views/MangaReader');
+  const container = document.getElementById('root');
+  if (container) createRoot(container).render(
     <MangaReader item={fixtureItem} onClose={() => console.log('[harness] onClose called')} />,
   );
-}
+})().catch((error) => {
+  console.error(error);
+  const container = document.getElementById('root');
+  if (container) container.textContent = String(error);
+});

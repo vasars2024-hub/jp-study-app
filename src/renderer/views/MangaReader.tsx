@@ -7,7 +7,9 @@ import {
 } from '../../shared/readingLibraryAdapter';
 import type { MokuroBlock, MokuroBlockKind, MokuroBox, MokuroPage } from '../../shared/mokuroTypes';
 import { formatBytes } from '../../shared/assetRegistry';
+import { confirmDialog } from '../components/ui';
 import DictionaryPopup from '../components/DictionaryPopup';
+import ReadingListMembership from '../components/reading/ReadingListMembership';
 import SentenceTranslatePopup from '../components/SentenceTranslatePopup';
 import MangaOcrOverlay from '../components/MangaOcrOverlay';
 import {
@@ -1081,9 +1083,20 @@ export default function MangaReader({ item, onClose }: Props) {
    * Defined before the Escape keydown effect so it isn't referenced in the TDZ.
    */
   const requestClose = useCallback(() => {
-    if (mangaSettings.historyBehavior === 'none' || window.confirm(t('manga.settings.confirmClose'))) {
+    if (mangaSettings.historyBehavior === 'none') {
       onClose();
+      return;
     }
+    // Kept void-returning so every caller (Escape handler, close button, command
+    // handlers) is unchanged; the close is simply deferred until the dialog
+    // resolves instead of blocking on a native confirm.
+    void confirmDialog({
+      title: t('common.close'),
+      message: t('manga.settings.confirmClose'),
+      confirmLabel: t('common.close'),
+    }).then((ok) => {
+      if (ok) onClose();
+    });
   }, [mangaSettings.historyBehavior, onClose, t]);
 
   useEffect(() => {
@@ -1841,6 +1854,7 @@ export default function MangaReader({ item, onClose }: Props) {
           {t('manga.backLibrary')}
         </button>
         <div className="reader-title">{item.title}</div>
+        <ReadingListMembership itemId={item.id} />
         <div className="reader-controls lq-hit-scope">
           {mangaSettings.showPageNumber && (
             <span className="muted page-count">

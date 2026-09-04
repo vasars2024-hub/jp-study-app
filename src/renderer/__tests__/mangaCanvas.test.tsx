@@ -41,6 +41,9 @@ import {
 } from './helpers/readingCanvasSurface';
 import type { LibraryItem } from '../../shared/types';
 import type { MokuroPage } from '../../shared/mokuroTypes';
+import { resetReadingListsClientForTesting } from '../readingListsClient';
+import { emptyReadingListsDocument } from '../../shared/readingLists';
+import { createReadingList, addLibraryItemToReadingList, createReadingListsMutationContext } from '../../shared/readingListMutations';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -89,6 +92,7 @@ async function openOcrPanel(h: ReadingSurfaceHarness): Promise<void> {
 }
 
 beforeEach(() => {
+  resetReadingListsClientForTesting();
   installResizeObserver();
   /*
    * `autoTranslate` ships ON, and it makes the reader scan the first page by
@@ -119,6 +123,24 @@ afterEach(() => {
 });
 
 describe('the manga reader through the L6 reading canvas', () => {
+  it('renders this manga’s list memberships and leaves an unlisted manga uncluttered', async () => {
+    let h = await mountReader(1200);
+    expect(h.container.querySelector('.rlm')).toBeNull();
+    h.teardown();
+    harness = null;
+    resetReadingListsClientForTesting();
+    const created = createReadingList(emptyReadingListsDocument(), { name: 'Manga club' }, createReadingListsMutationContext());
+    const added = addLibraryItemToReadingList(created.document, created.listId, ITEM, createReadingListsMutationContext());
+    window.api.readingListsLoad = async () => ({ ok: true, snapshot: {
+      document: added.document, health: { state: 'ok', lostRevisions: 0 },
+    } });
+    h = await mountReader(1200);
+    // The `one` arm, resolved — not the raw plural key. `readingLists.membership.count`
+    // has two arms and only the singular can render at a count of 1.
+    expect(h.container.querySelector('.rlm__count')?.textContent).toBe('On 1 list');
+    expect(h.container.querySelector('.rlm__link')?.textContent).toBe('Manga club');
+  });
+
   it('renders the stage inside the canvas document region, under the fill policy', async () => {
     const h = await mountReader(1200);
     const canvas = h.container.querySelector<HTMLElement>('.manga-canvas');
