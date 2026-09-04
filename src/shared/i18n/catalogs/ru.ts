@@ -12364,6 +12364,27 @@ export const ru: Catalog = {
     many: '{count} требуют проверки',
     other: '{count} требуют проверки',
   },
+  'readingLists.timeline.title': 'Читательский год',
+  'readingLists.timeline.empty': 'Пока ничего не дочитано. Прочитанные книги появятся здесь — в тот день, когда вы их закончили.',
+  'readingLists.timeline.year': 'Год',
+  'readingLists.timeline.count': {
+    one: '{count} книга дочитана в {year}',
+    few: '{count} книги дочитаны в {year}',
+    many: '{count} книг дочитано в {year}',
+    other: '{count} книги дочитано в {year}',
+  },
+  'readingLists.timeline.elsewhere': {
+    one: 'ещё {count} в другие годы',
+    few: 'ещё {count} в другие годы',
+    many: 'ещё {count} в другие годы',
+    other: 'ещё {count} в другие годы',
+  },
+  'readingLists.timeline.dayLabel': {
+    one: '{date} — {count} книга',
+    few: '{date} — {count} книги',
+    many: '{date} — {count} книг',
+    other: '{date} — {count} книги',
+  },
   'readingLists.smart.title': 'Умные списки',
   'readingLists.smart.lede':
     'Сохранённые вопросы — ответ пересчитывается по вашей библиотеке при каждом открытии.',
