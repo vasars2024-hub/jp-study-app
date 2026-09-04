@@ -101,10 +101,18 @@ const SOURCE = readFileSync(
 
 describe('grammar explorer wiring', () => {
   it('passes a title alongside every disabled prop in the controls row', () => {
-    const row = SOURCE.slice(
-      SOURCE.indexOf('className="gram-x-controls"'),
-      SOURCE.indexOf('className="gram-x-presets"'),
-    );
+    // Anchored on the class NAME, not on a closing quote. Both containers took a
+    // second class (`lq-hit-scope`, the rubric category 1 hit floor) and an exact
+    // `className="gram-x-controls"` match then found nothing, sliced an empty string
+    // and reported "the controls row moved or was renamed" — which was true of
+    // neither. The reason this file reads source at all is that GrammarExplorer
+    // cannot be rendered here, so its anchors have to survive an added class.
+    const at = (cls: string) => {
+      const i = SOURCE.indexOf(`className="${cls}`);
+      expect(i, `${cls} anchor`).toBeGreaterThan(-1);
+      return i;
+    };
+    const row = SOURCE.slice(at('gram-x-controls'), at('gram-x-presets'));
     expect(row.length, 'the controls row moved or was renamed').toBeGreaterThan(200);
     const disabledCount = (row.match(/\bdisabled=\{/g) || []).length;
     const titleCount = (row.match(/\btitle=\{/g) || []).length;
