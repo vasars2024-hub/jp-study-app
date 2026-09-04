@@ -3038,3 +3038,53 @@ line said 84; that was a fresh 25x8 recount, which does not reconcile with the r
 this ledger has carried since `visualizer` opened. The running figure is the one every RULE D
 line has been computed from, so it is the one continued here, and the discrepancy is left
 visible rather than quietly re-based.)
+
+## 2026-09-04 · primary2 — `files` opens at category 1 with a **FAIL**, and the failing term is the INSTRUMENT
+
+First rubric cell ever taken on the Files app — the 25th `DESKTOP_WIN_SECTIONS` entry and the
+newest surface in the tree. `cat1-accessibility.cjs --surface Files --win 1 --label files`.
+Baseline `baselines/cat1-files.json`.
+
+**Verdict FAIL, one bar: `targets32`.** The other four bars pass — contrast, WCAG 2.5.8
+(`wcag258FailCount 0`), keyboard (`unreachable 0`), motion. Surface: 820x580 window, root
+`.lq-scaffold fa-shell` (it is built on the L2 primitive, as required), 396 elements, **103
+controls, 78 measured**, rail collapsed at a 782px scaffold, grid `72px 374px 320px`.
+
+**The four controls under the 32px hit floor, and what each one actually is:**
+
+| control | rect | hit | blocker |
+| --- | --- | --- | --- |
+| `button.fa-tree-node` | 48x32 | 48.5x**26.5** | `div.fa-tree` |
+| `button.fa-cell.fa-cell-size` | 31x32 | 31.5x32.5 | `div.fa-row.fa-head` |
+| `div.fa-row` | 364x32 | 52.5x**31.5** | `button.fa-cell.fa-cell-kind` |
+| `input.fa-bulk-check` | 32x32 | 32.5x**31.0** | `div.fa-row` |
+
+Three of the four sit at **31.0–31.5** against a floor of 32 — inside the band this repo has
+already written up twice (`hit-walk-step-caps-at-31-5`, and `.lq-hit` giving nothing at exactly
+32, because `max(100%, 32px)` is a floor and not a margin). The recorded lesson on those is
+explicit: the CSS "fix" for one of them cost 24 stolen rows. They are not touched here.
+
+**The fourth was measured, not assumed, and it is the fold of a scroller.** `.lq-scaffold-rail`
+is a real scroller — 399px viewport against 1,657px of content — and of its **32** `.fa-tree-node`
+children, **11 are fully visible, exactly 1 is partially clipped at 27px, and 20 are scrolled
+out**. That single partial node is the 26.5px the walk scored. It is reachable the moment the
+rail scrolls, and every scrolling list in this app has exactly one such row at its fold.
+
+**So the failing term is the harness, and the fix belongs there — but it LOOSENS a bar, which is
+the dangerous direction and is why it is not being done in the tail of a turn.** The correct
+shape: a control clipped only by a SCROLLABLE ancestor must be scrolled into view and
+re-measured, and excluded only if it then clears the floor — proven, never asserted. A blanket
+"ignore clipped controls" exception would hide a genuinely unreachable control, which is the one
+thing this bar exists to catch.
+
+**Two findings raised during this run and WITHDRAWN before publication**, recorded because the
+withdrawals are the useful part: (1) "the rail overflows the window, 18 of 32 nodes below the
+frame" — false; the ancestor walk found `.lq-scaffold-rail` constrained to 401px by the
+scaffold's own `40px 401px 56px` grid and scrolling correctly. Comparing node rects to the
+WINDOW's bottom instead of the SCROLLER's is what produced it. (2) "the 72px collapsed-rail
+override is not applying, the track is still 52px" — false; the shell computes
+`--lq-rail-width-collapsed: 72px` and `grid-template-columns: 72px 374px 320px`. The 52px read
+was `.fa-tree`'s own box inside the 72px track, not the track.
+
+**Running total unchanged: 14 of 25 sections at 80/80.** `files` has **0 of 8** banked — cat1 is
+measured and FAILING, which is a cell taken, not a cell closed. **90 category cells remain.**
