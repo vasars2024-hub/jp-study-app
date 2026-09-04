@@ -1312,6 +1312,68 @@ Editing it here blocks `relay-mergeback` until that path goes clean. After that,
 P5 has nothing open and the track's remaining surface is §11.3 reminders and
 §11.4's residual rows.
 
+### 9.7 — 2026-09-04, §11.1's "Back works" row CLOSED.
+
+`1bee620b`.
+
+**What it is.** §11.1: *"Opening a book from a list and coming back returns to the
+list at the same scroll position and selection."* Both halves, keyed BY LIST in a
+module-level `Map` in `ReadingListsView.tsx`.
+
+**Module-level, and NOT persisted.** Opening a book navigates the app away and
+UNMOUNTS the view, so component state is gone by the time the user returns — a
+`useRef` would remember nothing across the only journey the rule is about. And a
+scroll offset is a session affordance, not a setting: `localStorage` would add a
+key with no restore point (trap 1) to remember where someone was three days ago,
+and a stale offset restored into a list that has since changed length is worse
+than starting at the top.
+
+**A REAL DEFECT, found by the test rather than reasoned about.** Grid and detail
+are both a `div.rlv`, so React reconciles them to the SAME host node and the
+browser keeps its scroll offset across the switch. Measured: list A left at 300 →
+grid → open list B, and B opened at **300**. The restore therefore writes
+UNCONDITIONALLY, including the 0.
+
+**Three timing traps, all paid for here:**
+
+1. **`detailRef.current` is null in a passive cleanup on unmount** — React has
+   already detached the ref. It is also null on the way IN, because the first
+   render of a visit is the loading state. So the scroll is recorded by the
+   container's own `onScroll` as it happens; only the selection is captured in a
+   cleanup, and that needs no DOM.
+2. **An effect keyed on `listId` alone runs before the document exists.** The
+   store loads after mount, so the selection restore found no list, returned, and
+   never got a second chance. It depends on `document` now, with a
+   once-per-arrival ref guard — without that guard it re-selects on every store
+   broadcast and a row the user deselected comes back, which reads as a haunted
+   UI. That guard has its own test, driving a real broadcast through
+   `onReadingListsChanged`.
+3. **jsdom performs no layout**, so a real `scrollTop` write is clamped to 0 and
+   an assertion on it passes whether the feature works or not. The suite gives
+   `HTMLElement.prototype.scrollTop` a backing property for its duration, and
+   restores it.
+
+**This does NOT undo the existing clear-on-navigate effect** and must not be read
+as doing so. What is remembered is keyed by list, so leaving A for B still arrives
+at B with B's own state and the bulk bar can never hold a row from a list that is
+not on screen. Asserted in both directions.
+
+**Evidence. 6 tests. 9 of 10 mutants RED**, plus an inert SENTINEL that stayed
+GREEN. **The tenth is GREEN and is recorded as knowingly unfalsifiable rather than
+counted as 10 of 10:** deleting the dead-id filter changes nothing observable,
+because `selectedIds` already derives the actionable list through `rows` and the
+select-all checkbox reads `selected.has` over `visibleRows`. The line is kept as
+defence in depth and says so at the call site, so the next worker does not spend a
+run trying to make it fail.
+
+**§11.1's last open row is now the pop-out** — *"Middle-click / Ctrl-click opens
+in a pop-out (`AppSection popout`, `App.tsx:799`)"*. **PARKED, and not for want of
+a design:** it needs a callback threaded through `src/renderer/App.tsx`, which is
+` M` in the MAIN tree from another track (checked 17:58). Editing it here blocks
+`relay-mergeback` until that path goes clean — the same reason `MangaReader.tsx`
+is parked. `ReadingListsView.tsx` itself is CLEAN in the main tree, which is why
+this slice was safe to take.
+
 ### 9.1 SUPERSEDED — the slice below was row 8, and it is closed above
 
 Kept only so the entry above has its subject.
