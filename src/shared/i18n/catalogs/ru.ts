@@ -12364,6 +12364,31 @@ export const ru: Catalog = {
     many: '{count} требуют проверки',
     other: '{count} требуют проверки',
   },
+  'readingLists.smart.title': 'Умные списки',
+  'readingLists.smart.lede':
+    'Сохранённые вопросы — ответ пересчитывается по вашей библиотеке при каждом открытии.',
+  'readingLists.smart.preset.abandoned': 'Заброшенные',
+  'readingLists.smart.preset.readyToRead': 'Можно читать',
+  'readingLists.smart.preset.authorSweep': 'Всё у автора',
+  'readingLists.smart.hint.abandoned':
+    'Начаты больше месяца назад, прочитано меньше 90 %, с тех пор не открывались.',
+  'readingLists.smart.hint.readyToRead':
+    'Есть на полке, ещё не открывались, уровень {level} или ниже.',
+  'readingLists.smart.hint.authorSweep':
+    'Что осталось у автора {author} — его книгу вы дочитали последней.',
+  'readingLists.smart.hint.authorSweepEmpty': 'Появится, когда вы дочитаете следующую книгу.',
+  'readingLists.smart.unavailable':
+    'Дочитайте книгу, у которой указан автор, и список заполнится сам.',
+  'readingLists.smart.empty': 'Сейчас ничего не подходит.',
+  'readingLists.smart.count': {
+    one: '{count} книга',
+    few: '{count} книги',
+    many: '{count} книг',
+    other: '{count} книги',
+  },
+  'readingLists.smart.rowsLabel': 'Книги по запросу «{name}»',
+  'readingLists.smart.level': 'Уровень {level}',
+  'readingLists.smart.unrated': 'Уровень не измерен',
   'readingLists.view.sort.label': 'Порядок списков',
   'readingLists.view.sort.recent': 'По изменению',
   'readingLists.view.sort.name': 'По названию',

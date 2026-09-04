@@ -34,6 +34,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LibraryItem } from '../../shared/types';
 import Icon from '../components/Icons';
 import { ReadingListPasteFlow } from '../components/reading/ReadingListPasteFlow';
+import ReadingSmartLists from '../components/reading/ReadingSmartLists';
 import { Button, Select } from '../components/ui';
 import { useT } from '../i18n';
 import { applyReadingListsMutation, latestReadingListsSnapshot } from '../readingListsClient';
@@ -2569,6 +2570,18 @@ export default function ReadingListsView({
           ))}
         </ul>
       )}
+      {/*
+        P5 §7. Below the grid because it ANSWERS questions about what is already
+        in the lists — a panel offering "Abandoned" above a user's own lists
+        would be the app leading with a judgement. It renders nothing at all
+        until there is at least one work to ask about.
+      */}
+      <ReadingSmartLists
+        document={document}
+        items={items}
+        onOpenBook={onOpenBook}
+        onFindWork={onFindWork}
+      />
     </div>
   );
 }

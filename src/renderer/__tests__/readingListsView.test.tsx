@@ -238,6 +238,41 @@ describe('ReadingListsView', () => {
     expect(host.textContent).toContain('0 of 2 finished');
   });
 
+  /**
+   * P5 §7's panel is reached from HERE, and a component that works standalone
+   * while the view never renders it is the same dead route as a module with no
+   * caller. So: the panel is on the grid, its presets are real, and it is NOT on
+   * the detail — the detail is one list, and a question about all of them there
+   * would answer about books the open list does not contain.
+   */
+  it('renders the smart-list panel on the grid', async () => {
+    const { document } = seeded();
+    installBridge(new FakeStore(document));
+    await render();
+    const panel = host.querySelector('[data-testid="rlv-smart-lists"]');
+    expect(panel).not.toBeNull();
+    expect([...panel!.querySelectorAll('.rlsm__chip')].map((n) => n.textContent)).toEqual([
+      'Abandoned',
+      'Ready to read',
+      'Author sweep',
+    ]);
+  });
+
+  /**
+   * A SEPARATE mount, deliberately. `render()` re-renders the same root and the
+   * view holds `listId` in state seeded from the prop, so calling it twice never
+   * leaves the grid — an in-test navigation here asserted nothing and read as a
+   * product defect on the first run.
+   */
+  it('does not render the smart-list panel on a list detail', async () => {
+    const { document, listId } = seeded();
+    installBridge(new FakeStore(document));
+    await render(listId);
+    // The detail really is open, so the absence below is about the panel.
+    expect(rows()).toHaveLength(2);
+    expect(host.querySelector('[data-testid="rlv-smart-lists"]')).toBeNull();
+  });
+
   it('opens the library item for a bound row and routes an unbound row to acquisition', async () => {
     const { document, listId } = seeded();
     installBridge(new FakeStore(document));

@@ -11915,6 +11915,27 @@ export const en: Catalog = {
     one: '{count} needs a look',
     other: '{count} need a look',
   },
+  'readingLists.smart.title': 'Smart lists',
+  'readingLists.smart.lede': 'Saved questions, answered against your library every time you look.',
+  'readingLists.smart.preset.abandoned': 'Abandoned',
+  'readingLists.smart.preset.readyToRead': 'Ready to read',
+  'readingLists.smart.preset.authorSweep': 'Author sweep',
+  'readingLists.smart.hint.abandoned':
+    'Started over a month ago, less than 90% read, and untouched since.',
+  'readingLists.smart.hint.readyToRead':
+    'On your shelf, not opened yet, at level {level} or easier.',
+  'readingLists.smart.hint.authorSweep': 'What is left by {author}, whose book you finished last.',
+  'readingLists.smart.hint.authorSweepEmpty': 'Follows on from the last book you finish.',
+  'readingLists.smart.unavailable':
+    'Finish a book that has an author on it and this fills itself in.',
+  'readingLists.smart.empty': 'Nothing matches this right now.',
+  'readingLists.smart.count': {
+    one: '{count} book',
+    other: '{count} books',
+  },
+  'readingLists.smart.rowsLabel': 'Books matching {name}',
+  'readingLists.smart.level': 'Level {level}',
+  'readingLists.smart.unrated': 'Not rated yet',
   'readingLists.view.sort.label': 'Order lists by',
   'readingLists.view.sort.recent': 'Recently changed',
   'readingLists.view.sort.name': 'Name',
