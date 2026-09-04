@@ -21,8 +21,15 @@ import {
   type GxLevel,
 } from '../../grammarFamiliarity';
 import {
+  applyCuration,
+  loadCuration,
+  onCurationChanged,
+  type CurationState,
+} from '../../grammarCuration';
+import {
   addPreset,
   loadPresets,
+  sameFilters,
   savePresets,
   snapshotFilters,
   type FilterPreset,
@@ -32,6 +39,10 @@ import { Button } from '../ui';
 import VirtualList from '../VirtualList';
 import GrammarBandControl from './GrammarBandControl';
 import GrammarFilterPanel from './GrammarFilterPanel';
+
+/** The two regions the toolbar's disclosures name through `aria-controls`. */
+const FILTERS_PANEL_ID = 'gram-x-filters-panel';
+const DRAWER_ID = 'gram-x-selection-drawer';
 
 /**
  * The single grammar Explorer, shared by every skin.
@@ -101,11 +112,22 @@ export default function GrammarExplorer({
   const [favorites, setFavorites] = useState<Set<string>>(() => loadIds(FAVORITES_KEY));
   const [studyQueue, setStudyQueue] = useState<Set<string>>(() => loadIds(STUDY_KEY));
   const [familiarity, setFamiliarityState] = useState<FamiliarityState>(() => loadFamiliarity());
+  const [curation, setCuration] = useState<CurationState>(() => loadCuration());
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showFilters, setShowFilters] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
   const [presets, setPresets] = useState<FilterPreset[]>(() => loadPresets());
+  /*
+   * Which saved preset the current filters came from, or '' for none.
+   *
+   * The select used to pin `value=""`, so loading a named preset left the box
+   * reading "Saved filters…" — the one control on screen that could tell you
+   * which of your presets was active never did (audit T4). It is cleared below
+   * the moment the filters stop matching, because a preset name over filters
+   * that have since been edited is the same defect pointing the other way.
+   */
+  const [activePresetId, setActivePresetId] = useState('');
   const [presetName, setPresetName] = useState('');
   const [status, setStatus] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -113,12 +135,30 @@ export default function GrammarExplorer({
   useEffect(() => savePresets(presets), [presets]);
 
   useEffect(() => savePracticeFilters(filters, EXPLORER_FILTERS_KEY), [filters]);
+
+  /*
+   * Drop the preset name as soon as the filters stop being that preset.
+   *
+   * Naming a preset over filters the user has since edited would be the same
+   * defect as T4 in the other direction — a label that does not describe what
+   * is on screen. Compared structurally rather than by reference: `setFilters`
+   * always produces a new object, so an identity check would clear the name on
+   * every keystroke including the one that applied it.
+   */
+  useEffect(() => {
+    if (!activePresetId) return;
+    const active = presets.find((p) => p.id === activePresetId);
+    if (!active || !sameFilters(active.filters, filters)) setActivePresetId('');
+  }, [filters, presets, activePresetId]);
   useEffect(() => saveIds(FAVORITES_KEY, favorites), [favorites]);
   useEffect(() => saveIds(STUDY_KEY, studyQueue), [studyQueue]);
 
   // A practice session grading a card, or another window, writes familiarity;
   // re-read so the badges and band controls here never show a stale level.
   useEffect(() => onFamiliarityChanged(() => setFamiliarityState(loadFamiliarity())), []);
+
+  // Likewise for Review verdicts written in the sibling panel.
+  useEffect(() => onCurationChanged(() => setCuration(loadCuration())), []);
 
   const setBand = useCallback(
     (id: string, level: GxLevel) => {
@@ -131,8 +171,12 @@ export default function GrammarExplorer({
     [],
   );
 
-  // Dedupe is static; decoration re-runs only when learner state changes.
-  const baseCorpus = useMemo(() => dedupeGrammarByTitle(GRAMMAR), []);
+  // Curated first, then deduped, then decorated — the same order Practice
+  // uses, so the two screens cannot disagree about what the corpus is.
+  // `applyCuration` reaching here is what makes a Review verdict mean
+  // something outside the Review screen (audit F20).
+  const curated = useMemo(() => applyCuration(GRAMMAR, curation), [curation]);
+  const baseCorpus = useMemo(() => dedupeGrammarByTitle(curated), [curated]);
   const corpus = useMemo(() => applyFamiliarity(baseCorpus, familiarity), [baseCorpus, familiarity]);
   const list = useMemo(() => filterGrammarPoints(corpus, filters), [corpus, filters]);
 
@@ -232,6 +276,7 @@ export default function GrammarExplorer({
 
   const noSelection = selectedPoints.length === 0;
   const selectionReason = noSelection ? t('grammar.explorer.reason.noSelection') : undefined;
+  const filtersActive = hasActiveFilters(filters);
   // A disabled control has to say what would enable it, the way Save already does. History starts
   // empty on every open, so Back and Forward are greyed out the moment the explorer mounts.
   const noBack = historyIndex <= 0;
@@ -282,6 +327,7 @@ export default function GrammarExplorer({
   // state sharing arrays with the stored preset.
   const applyPreset = useCallback((preset: FilterPreset) => {
     setFilters(snapshotFilters(preset.filters));
+    setActivePresetId(preset.id);
   }, []);
 
   const renderRow = useCallback(
@@ -356,16 +402,29 @@ export default function GrammarExplorer({
           placeholder={t('grammar.search.placeholder')}
           lang="ja"
         />
-        <Button size="sm" onClick={() => setShowFilters((v) => !v)}>
-          {t('grammar.explorer.filters')}
-        </Button>
-        {hasActiveFilters(filters) && (
-          <Button size="sm" onClick={() => setFilters({ ...DEFAULT_PRACTICE_FILTERS })}>
-            {t('grammar.explorer.reset')}
-          </Button>
-        )}
+        {/* A real APG disclosure, not a button that happens to toggle something: the panel it
+            opens is named, and its state is announced. Both this and the selection drawer
+            below were plain buttons, so a screen reader was told a control existed and never
+            told whether pressing it had opened anything. */}
         <Button
           size="sm"
+          className={filtersActive ? 'gram-x-filters-btn is-on' : 'gram-x-filters-btn'}
+          aria-expanded={showFilters}
+          aria-controls={FILTERS_PANEL_ID}
+          // Filters can be active while the panel is shut, and a list quietly showing 4 of
+          // 2,410 rows for no visible reason is the surface lying by omission. The marker is
+          // a dot AND this label, never colour alone.
+          aria-label={filtersActive ? t('grammar.explorer.filtersOn') : undefined}
+          // Deliberately NOT a `title`: `grammarDisabledReasons.test.ts` holds this row to
+          // "a title is a disabled reason and nothing else", and this control is enabled.
+          onClick={() => setShowFilters((v) => !v)}
+        >
+          {t('grammar.explorer.filters')}
+        </Button>
+        <Button
+          size="sm"
+          aria-expanded={showDrawer && !noSelection}
+          aria-controls={DRAWER_ID}
           onClick={() => setShowDrawer((v) => !v)}
           disabled={noSelection}
           title={selectionReason}
@@ -374,48 +433,15 @@ export default function GrammarExplorer({
         </Button>
       </div>
 
-      <div className="gram-x-presets lq-hit-scope">
-        <select
-          className="gram-x-preset-select"
-          value=""
-          aria-label={t('grammar.explorer.presets')}
-          onChange={(e) => {
-            const p = presets.find((x) => x.id === e.target.value);
-            if (p) applyPreset(p);
-          }}
-        >
-          <option value="">{t('grammar.explorer.presets')}</option>
-          {presets.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <input
-          className="gram-x-preset-name"
-          type="text"
-          value={presetName}
-          placeholder={t('grammar.explorer.presetNamePlaceholder')}
-          onChange={(e) => setPresetName(e.target.value)}
-        />
-        <Button
-          size="sm"
-          disabled={!presetName.trim()}
-          title={!presetName.trim() ? t('grammar.explorer.reason.noPresetName') : undefined}
-          onClick={() => {
-            setPresets((prev) => addPreset(prev, presetName, filters));
-            setStatus(t('grammar.explorer.status.presetSaved', { name: presetName.trim() }));
-            setPresetName('');
-          }}
-        >
-          {t('grammar.explorer.savePreset')}
-        </Button>
-        {status && (
-          <span className="gram-x-status muted" role="status">
-            {status}
-          </span>
-        )}
-      </div>
+      {/* The status line stays OUT of the filter panel on purpose. `setStatus` is written by
+          the bulk favourite/queue/deck actions too, so a live region that only exists while
+          the filters are open would silently swallow the confirmation for three actions that
+          have nothing to do with filtering. */}
+      {status && (
+        <div className="gram-x-status muted" role="status">
+          {status}
+        </div>
+      )}
 
       <div className="gram-x-count muted">
         {t('grammar.count', { count: list.length })}
@@ -434,7 +460,58 @@ export default function GrammarExplorer({
 
       <div className="gram-x-body">
         {showFilters && (
-          <div className="gram-x-filters">
+          <div className="gram-x-filters" id={FILTERS_PANEL_ID}>
+            {/* Reset belongs with the filters it resets, and it is only ever needed by
+                someone who has come here to change them. Its toolbar slot is replaced by the
+                is-on marker on the Filters button, so the STATE stays visible while the
+                control moves one press away. */}
+            {filtersActive && (
+              <div className="gram-x-filters-reset lq-hit-scope">
+                <Button size="sm" onClick={() => setFilters({ ...DEFAULT_PRACTICE_FILTERS })}>
+                  {t('grammar.explorer.reset')}
+                </Button>
+              </div>
+            )}
+            {/* Saved filters are filter state, so the builder lives with the filters rather
+                than as a permanent second toolbar row. Same three controls, same handlers. */}
+            <div className="gram-x-presets lq-hit-scope">
+              <select
+                className="gram-x-preset-select"
+                value={activePresetId}
+                aria-label={t('grammar.explorer.presets')}
+                onChange={(e) => {
+                  const p = presets.find((x) => x.id === e.target.value);
+                  if (p) applyPreset(p);
+                  else setActivePresetId('');
+                }}
+              >
+                <option value="">{t('grammar.explorer.presets')}</option>
+                {presets.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="gram-x-preset-name"
+                type="text"
+                value={presetName}
+                placeholder={t('grammar.explorer.presetNamePlaceholder')}
+                onChange={(e) => setPresetName(e.target.value)}
+              />
+              <Button
+                size="sm"
+                disabled={!presetName.trim()}
+                title={!presetName.trim() ? t('grammar.explorer.reason.noPresetName') : undefined}
+                onClick={() => {
+                  setPresets((prev) => addPreset(prev, presetName, filters));
+                  setStatus(t('grammar.explorer.status.presetSaved', { name: presetName.trim() }));
+                  setPresetName('');
+                }}
+              >
+                {t('grammar.explorer.savePreset')}
+              </Button>
+            </div>
             <GrammarFilterPanel corpus={corpus} filters={filters} onChange={setFilters} />
           </div>
         )}
@@ -456,7 +533,11 @@ export default function GrammarExplorer({
         </div>
 
         {showDrawer && !noSelection && (
-          <aside className="gram-x-drawer" aria-label={t('grammar.explorer.drawerTitle')}>
+          <aside
+            className="gram-x-drawer"
+            id={DRAWER_ID}
+            aria-label={t('grammar.explorer.drawerTitle')}
+          >
             <div className="gram-x-drawer-head">
               <strong>{t('grammar.explorer.drawerTitle')}</strong>
               <Button size="sm" onClick={() => setSelected(new Set())}>

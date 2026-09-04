@@ -7617,6 +7617,26 @@ mark.lookup-mark,
   flex: 1;
   min-width: 160px;
 }
+/* Filters can be on while the panel is shut. The marker is a SHAPE, not a colour — a colour
+   swap alone would say nothing to anyone who cannot see it, and the button also carries an
+   `aria-label` naming the state. Positioned rather than appended so it cannot reflow the row. */
+.gram-x-filters-btn.is-on {
+  position: relative;
+}
+.gram-x-filters-btn.is-on::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-text);
+}
+.gram-x-filters-reset {
+  display: flex;
+  margin-bottom: 10px;
+}
 .gram-x-count {
   display: flex;
   gap: 10px;
@@ -14827,6 +14847,17 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+/* The tabpanel wrapper sits between `.gram-view--explorer` and `.gram-x`, so it inherits the
+   bounding job the note at `.gram-x-list` describes: without these four lines the wrapper is a
+   plain block, `.gram-x` grows to its own content, `VirtualList` measures the whole 139,780px
+   as its viewport and renders all 2,410 rows. The virtualisation is present and inert exactly
+   as it was before `gram-view--explorer` existed. */
+.gram-view--explorer > .gram-mode-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .fwin-resize {
   position: absolute;

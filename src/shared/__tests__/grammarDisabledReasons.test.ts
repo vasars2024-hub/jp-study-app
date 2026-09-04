@@ -112,7 +112,12 @@ describe('grammar explorer wiring', () => {
       expect(i, `${cls} anchor`).toBeGreaterThan(-1);
       return i;
     };
-    const row = SOURCE.slice(at('gram-x-controls'), at('gram-x-presets'));
+    // End anchor moved from `gram-x-presets` to `gram-x-status` on 2026-09-04: the saved-filter
+    // preset row is no longer the next thing after the toolbar — it moved INSIDE the filter
+    // panel, several hundred lines down, so the old slice swallowed the whole explorer and
+    // counted the preset Save button's own reason as a fourth title in the toolbar. The status
+    // line is what directly follows the row now. Same rule, same numbers, correct region.
+    const row = SOURCE.slice(at('gram-x-controls'), at('gram-x-status'));
     expect(row.length, 'the controls row moved or was renamed').toBeGreaterThan(200);
     const disabledCount = (row.match(/\bdisabled=\{/g) || []).length;
     const titleCount = (row.match(/\btitle=\{/g) || []).length;

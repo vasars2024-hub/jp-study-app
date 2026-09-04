@@ -3970,6 +3970,7 @@ export const ja: Catalog = {
 
   // Grammar view
   'grammar.intro': 'JLPT N5〜N1 と HSK 1〜10 の文法、練習ビルダー、テスト、ガイド。',
+  'grammar.mode.legend': '文法セクション',
   'grammar.mode.points': '文法項目',
   'grammar.mode.practice': '練習',
   'grammar.practice.filters': 'フィルター',
@@ -4147,6 +4148,7 @@ export const ja: Catalog = {
   'grammar.explorer.back': '戻る',
   'grammar.explorer.forward': '進む',
   'grammar.explorer.filters': 'フィルター',
+  'grammar.explorer.filtersOn': 'フィルター — 適用中',
   'grammar.explorer.reset': 'フィルターをリセット',
   'grammar.explorer.select': 'この項目を選択',
   'grammar.explorer.selectedCount': '{count}件を選択中',

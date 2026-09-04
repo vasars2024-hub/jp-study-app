@@ -4268,6 +4268,7 @@ export const ru: Catalog = {
 
   // Grammar view
   'grammar.intro': 'Грамматика JLPT N5–N1 и HSK 1–10, конструктор практики, тесты и гайды.',
+  'grammar.mode.legend': 'Разделы грамматики',
   'grammar.mode.points': 'Грамматика',
   'grammar.mode.practice': 'Практика',
   'grammar.practice.filters': 'Фильтры',
@@ -4486,6 +4487,7 @@ export const ru: Catalog = {
   'grammar.explorer.back': 'Назад',
   'grammar.explorer.forward': 'Вперёд',
   'grammar.explorer.filters': 'Фильтры',
+  'grammar.explorer.filtersOn': 'Фильтры — есть активные',
   'grammar.explorer.reset': 'Сбросить фильтры',
   'grammar.explorer.select': 'Выбрать эту конструкцию',
   // Phrased with a colon so the numeral needs no case agreement.
