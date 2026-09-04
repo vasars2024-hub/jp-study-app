@@ -856,10 +856,11 @@ Then **§11.1's click-through table, row by row** — four of its eight rows sti
 have no test naming them, and that has now been deferred for four turns.
 
 **2026-09-04, `primary2` (worktree `jp-wt-filesapp`). §11.4 CLOSES at 9 of 9.
-§11.1 goes 3 of 8 rows to 6 of 8. P4 owes §11.1 rows 4 and 8.**
+§11.1 goes 3 of 8 rows to 7 of 8. §11 is 18 of 19. P4 owes ONE row: §11.1 row 8.**
 
-`8ec4ee24`, `9ddc89a5`, `16fc0811`. 26 mutation controls across the three, every
-one sentinel-checked as APPLIED before its verdict was read; **26 of 26 RED**.
+`8ec4ee24`, `9ddc89a5`, `16fc0811`, `a50faedb`. 33 mutation controls across the
+four, every one sentinel-checked as APPLIED before its verdict was read;
+**33 of 33 RED**.
 
 - `8ec4ee24` — **§11.4's drag-and-drop remainder, all three clauses.** Between
   lists (a rail of the other lists, mounted on `dragstart` and gone on
@@ -920,14 +921,50 @@ is committed HEAD and not somebody's uncommitted conversions:** `npx vitest run`
 `i18n-check` EXIT 0 at **12,465** keys. `i18n-hardcoded-check` EXIT 0.
 `architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
 
-**Exact next slice: §11.1's last two rows.** Row 4 — *an entry's cover → the
-library item detail* — needs a per-row cover thumbnail (rows have none today;
-only list cards carry the mosaic) and a route into `LibraryView`'s detail
-drawer, which `ReadingWorkspaceView.tsx:207` mounts as `<LibraryView
-onOpen={onOpenBook} />` with no item-selection prop. Row 8 — *the "on 2 lists"
-line in the reader* — is the one that touches a reader; trap §10.2 forbids list
-LOGIC in `NovelReader.tsx`/`MangaReader.tsx`, and a read-only touch-point fed by
-`readingWorksByAuthor`'s sibling query is the shape that respects it.
+- `a50faedb` — **§11.1 row 4, so §11.1 closes 7 of 8 and §11 stands at 18 of 19.**
+  Rows had no cover at all; only list cards carried the mosaic. **Two
+  destinations on one row** — the title opens the reader, the cover reveals the
+  book — because a cover repeating what the title does is decoration with a tab
+  index.
+
+  **What makes it a link rather than a wire:** `resolveSelection` returns `null`
+  for an id not in `visible`, deliberately (`libraryShelf.ts` — a recorded id
+  outlives its item three ordinary ways). So `setSelectedId` ALONE lands on a
+  CLOSED drawer whenever the user's folder/language/level filter excludes that
+  book, which is indistinguishable from a dead link. `LibraryView`'s new
+  `revealItemId` clears those three filters, and that is the honest thing to
+  show: the user asked for this book, not for their filter.
+
+  Keyed on the id, not on mount, so cover → back → cover reveals again;
+  `ReadingWorkspaceView` holds an `{itemId}` OBJECT rather than a bare id for
+  the same reason. `onShowInLibrary` is OPTIONAL and the cover is a button only
+  where a host supplies it — otherwise, and on an unbound row, the same image
+  renders inert and `aria-hidden`, so the column does not go ragged. `canReveal`
+  enters `rowActions` as a BOOLEAN dep: the handler's identity changes on every
+  render of the mount and depending on it would repaint all 500 rows.
+
+  7 of 7 mutants RED, including *"the reveal leaves the folder filter set"* and
+  *"the reveal fires on mount only"*. **33 of 33 mutants RED across this turn's
+  four product commits.**
+
+  TRAP: the filter precondition must be driven from the shelf's folder rail
+  (`LibraryView.tsx:1393`), never the View menu — menu items render as bare
+  children on the default theme and are unreachable from a jsdom mount, so a
+  test written against the menu finds no button and reads as the rail missing.
+
+**Gates re-run after `a50faedb`, tree clean:** `npx vitest run` **EXIT 0 —
+1,074 files passed / 1 skipped; 13,839 tests, 13,833 passed / 6 skipped.**
+`i18n-check` EXIT 0 at 12,466 keys. `i18n-hardcoded-check` EXIT 0.
+`architecture-audit` EXIT 0, "Nothing new", 6 pending. eslint 0 errors.
+
+**Exact next slice: §11.1's LAST row, row 8** — *the "on 2 lists" line in the
+reader*. Trap §10.2 forbids list LOGIC in `NovelReader.tsx` (130 KB) and
+`MangaReader.tsx` (87 KB), so this is a READ-ONLY touch-point: a small component
+fed by a pure `readingListsForItem(document, itemId)` next to
+`readingWorksByAuthor` in `readingListViews.ts`, rendered by the readers and
+routing through the same `onOpenBook`/list-detail seams row 6's panel uses.
+Both reader files were clean in the main tree as of 2026-09-04 12:05, so the
+edit is conflict-safe; re-check before starting. Then P5.
 
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
