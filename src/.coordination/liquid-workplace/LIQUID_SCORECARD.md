@@ -2634,3 +2634,48 @@ Evidence: `cat1-s11-visualizer.json`, `cat2-s11-visualizer.json`,
 
 **Running total: 12 of 25 sections at 80/80.** `visualizer` has **5 of 8**; **99 category
 cells remain**. Next: categories 5, 7, and 8.
+
+---
+
+## 2026-09-04 · primary — Visualizer category 5 closes on three product repairs; category 1 is WITHDRAWN
+
+Category 5 scored **7/10** first, and all three findings were the product, not the instrument.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 5 | UI clarity | **10/10** at `24301ffd`, from 7/10. Control: **CONTROL-OK**, fails Q2 Q3 Q4 Q5 Q10, residue 0, 2 titles blanked and the root name stripped and restored. |
+
+- **Q1/Q3** — the idle hint painted a music glyph and the words "Open Music" under
+  `pointer-events: none`, while the only real route sat in a dock quiet until hover or focus.
+  It is now the surface's `data-primary` action and moves 42% → 28% of the stage: spectrum and
+  wave both paint upward from the bottom edge, so the old midpoint sat in the busiest band and
+  below the window's entry band. Blanc passes no handler and degrades to the same painted text.
+- **Q2** — the three untitled trinkets are a deliberate design and that stands, but a `section`
+  with no accessible name is not a region landmark, so all three were unnamed to AT. Repaired
+  with `aria-label` on the untitled window only. The harness's Q2 widened to accept an AUTHORED
+  name, painted or announced — a strict superset reached only when the painted title is empty,
+  which already scored NO. **The control caught the widening immediately** (`CONTROL DID NOT
+  FAIL on Q2`); the plant now strips the root name too, under a suffixed marker rather than the
+  bare plant attribute, which would have nulled Q3's `primaryAction` for the whole surface.
+- **Q5** — `opacity: 0.45` on the resting `.fwin-viz` bar composites its four REAL controls
+  with it: **2.4:1** in classic-light against a 4.5 bar. Tuning the alpha does not fix it —
+  0.72 measured 4.95 classic-light / 6.93 forest-night / **3.20 soft-sepia**, whose focused
+  margin is only 5.86. So the paint recedes and the controls do not. At rest after the change:
+  soft-sepia **6.24**, classic-light **12.50**, forest-night **12.20**.
+
+**CATEGORY 1'S 10/10 FOR THIS SURFACE IS WITHDRAWN, and it is not this turn's change.** Three
+runs today read `targets32` FAIL: `belowFloorByHit 2`, `stolenCount 2`, the two
+`button.viz-widget-action` measuring **29.5×29.5** against a 32×32 rect, stolen by their own
+`.viz-widget-dock`. The 22:53 baseline recorded `stolenCount 0` on the same six controls.
+Discriminator run: with the new hint button `display:none` the failure is **unchanged** (6
+controls, byHit 2, stolen 2), so the hint is not the cause. `.viz-widget-action` is exactly
+`var(--lq-hit-target)` = 32px and `.lq-hit::after` is `max(100%, 32px)`, i.e. **no expansion at
+all at exactly 32** — the control is knife-edge on a walk that steps 2.5px, which is the shape
+`hit-walk-step-caps-at-31-5` already records, and where that memory warns the CSS "fix" cost 24
+stolen rows. Recorded, not papered over and not chased at the tail of a turn.
+
+**Running total: unchanged at 12 of 25 sections at 80/80.** `visualizer` is **6 of 8** — cat2,
+cat3, cat4, cat5, cat6 hold; **cat1 reverts to open** and cat7 and cat8 are unrun. `visualizer`
+therefore went 5 → 6 by closing cat5 and 6 → 5 by withdrawing cat1, so **102 category cells
+remain**, one better than the 103 before this turn. Next: cat1's floor question, then cat7 and
+cat8.
