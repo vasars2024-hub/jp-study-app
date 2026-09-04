@@ -2679,3 +2679,57 @@ cat3, cat4, cat5, cat6 hold; **cat1 reverts to open** and cat7 and cat8 are unru
 therefore went 5 → 6 by closing cat5 and 6 → 5 by withdrawing cat1, so **102 category cells
 remain**, one better than the 103 before this turn. Next: cat1's floor question, then cat7 and
 cat8.
+
+---
+
+## 2026-09-04 · backup — Visualizer category 1 is RESTORED at 10/10, and the cause was not the floor
+
+The withdrawal above was right to withdraw and wrong about why. `targets32` did not fail because
+`.viz-widget-action` is knife-edge at exactly `--lq-hit-target`; it failed because **the dock was
+not where it is painted in the source**, and the two buttons were covered by window chrome.
+
+Measured live before any change, walking each button from its own centre:
+
+| button | hitW × hitH | left blocker | up blocker |
+| ------ | ----------- | ------------ | ---------- |
+| Open Music | 29.5 × 29.5 | `section.fwin.focused.fwin-viz` | `div.fwin-bar` |
+| Visualizer — options | 32.5 × 29.5 | `div.lq-contextual.viz-widget-dock` | `div.fwin-bar` |
+
+`div.fwin-bar` is the TITLE BAR. A dock declared `right: 8px; bottom: 8px` cannot be blocked by
+the title bar, so the geometry was read directly: dock rect **(121,110) 78×42** against a
+`.viz-widget` parent at **(129,118) 378×165** — up and left, outside its own stage, 8px past the
+window's left edge. One step further left `elementFromPoint` returned
+`input.os-set-search-input`, i.e. the page BEHIND the window.
+
+Cause: `ContextualSurface` renders `lq-contextual viz-widget-dock`, and `liquid-surfaces.css`
+sets `position: relative` on `.lq-contextual` at the same (0,1,0) specificity from a sheet that
+loads later. `right`/`bottom` then resolve as relative OFFSETS, which is exactly the −8/−8 shift
+observed. This is the third instance of that collision; `components/liquid/readingCanvas.css`
+records the first two for `.lq-anchor`/`.lq-liquid`.
+
+Scope check before fixing it in the shared class: a live sweep of **all 12 mounted
+`.lq-contextual` elements** for `position: relative` + a non-auto offset + a box escaping its
+parent found **exactly one** suspect, this dock. So the repair is local — `9781d731`, a child
+combinator — and the shared role class is untouched, which it must be or every conventional
+window repaints.
+
+| # | Category | Result and discriminating evidence |
+| - | -------- | ---------------------------------- |
+| 1 | Accessibility | **10/10** at `9781d731` — 5 text runs, min **14.59:1** (`button.fwin-b "◇" 13px`); 7 controls, **0** unreachable; hit walk `belowFloorByHit 0 / stolenCount 0 / occludedCount 0`, stable across both runs; smallest pointer region **32×32.5**; WCAG 2.5.8 fails 0; reduce-motion `duringOverThreshold 0`, emulation taken and released. |
+
+After the fix, same window, same session: dock `position: absolute`, rect **(421,233) 78×42**,
+inside the parent at the intended 8px inset, and **both buttons 32.5 × 32.5** with the dock
+itself the only blocker on every side. The before/after pair is the discriminator — one CSS line
+between two measurements of the same six controls.
+
+Control (`--control`): all six axes MOVED and returned — contrast, targetsByPointer,
+targetsByRect, wcag258, keyboard, decorativeExemptionIsNarrow all `true`; counts
+`[0,5,0,0,0] → [2,7,2,1,2] → [0,5,0,0]`, `backToBaseline true`, `rectDrift 0`,
+`plantCaughtByPointer 2`. Regression guard `visualizerIdleAction.test.ts` reads both sheets and
+compares what decides the cascade; its own mutation control put 1 of 4 RED.
+
+Evidence: `cat1-s11-visualizer-r2.json`, `cat1-s11-visualizer-r2-control.json`.
+
+**Running total: 12 of 25 sections at 80/80.** `visualizer` returns to **6 of 8** — cat1, cat2,
+cat3, cat4, cat5, cat6 hold; cat7 and cat8 remain unrun. **101 category cells remain** (102 − 1).
+Next: cat7, then cat8.
