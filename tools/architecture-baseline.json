@@ -126,10 +126,6 @@
     "test-only-module:src/shared/filesApp/notebookAbsorption.ts": {
       "status": "pending",
       "note": "FILES_APP_PLAN.md gate 7's evidence, at a finer grain than routeParity.ts: one row per Notebook STREAM naming the Files enumerator that indexes it and the section that still shows it. Test-only for the same reason and by the same pattern as routeParity.ts above -- shared/__tests__/filesAppNotebookAbsorption.test.ts re-derives the stream vocabulary from renderer/notebookTimeline.ts, the enumerator ids from both registries, the route from AppSection.tsx and every symbol from the named module. Marked 'pending', not 'accepted': its natural app consumer is the same per-item \"also reachable in <section>\" affordance routeParity is waiting on, plus a Files-app diagnostic for the two streams the index cannot see (plan, transcript). When either lands this entry comes out rather than being re-justified."
-    },
-    "test-only-module:src/shared/readingListMatching.ts": {
-      "status": "pending",
-      "note": "Reading Lists P2(a). The scorer ships one slice ahead of its caller: P2(b) adds the binding mutation and P2(c) hooks it into src/main/library.ts's item-added path, which is where the only production import will come from. PENDING, never accepted -- a matcher no importer ever calls is a real defect in this repo's history, and the escape clause is the same one readingListsClient.ts carries: when the main-side binder imports it this entry comes OUT, and if P2(c) is dropped instead the module is deleted rather than re-justified."
     }
   }
 }

@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
-import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot } from './main/library';
+import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, onLibraryItemsAdded } from './main/library';
 import { registerReadingListsIpc } from './main/readingListsIpc';
+import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerDictionaryIpc, initYomitan } from './main/dictionary';
 import { registerMediaIpc } from './main/media';
 import { registerYtPlaylistsIpc } from './main/ytPlaylists';
@@ -1646,6 +1647,7 @@ app.whenReady().then(async () => {
   registerLocalFileProtocol();
   registerLibraryIpc();
   registerReadingListsIpc();
+  registerReadingListsLateBinding(onLibraryItemsAdded);
   registerDictionaryIpc();
   registerDiagnosticsIpc();
   registerShellIpc();

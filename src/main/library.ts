@@ -132,8 +132,47 @@ function readDb(): LibraryItem[] {
     return [];
   }
 }
+/**
+ * "An item entered the library", as one seam.
+ *
+ * Six importers write here through nineteen `writeDb` calls, and Reading Lists'
+ * late binding (`READING_LISTS_PLAN.md` §3.1) has to see every one of them —
+ * including importers that do not exist yet. Subscribing per importer would make
+ * that a thing to remember; diffing the write makes it a thing that is true.
+ *
+ * Delivery is synchronous and the caller's failure is its own: a subscriber that
+ * throws must not fail an import that already reached disk.
+ */
+type LibraryItemsAddedListener = (items: LibraryItem[]) => void;
+
+const itemsAddedListeners: LibraryItemsAddedListener[] = [];
+let knownItemIds: Set<string> | null = null;
+
+export function onLibraryItemsAdded(listener: LibraryItemsAddedListener): void {
+  itemsAddedListeners.push(listener);
+}
+
+/** Test seam. Production never calls this. */
+export function resetLibraryItemsAddedListenersForTesting(): void {
+  itemsAddedListeners.length = 0;
+  knownItemIds = null;
+}
+
 function writeDb(items: LibraryItem[]): void {
+  // Resolved on the first write of a session rather than at module load: the
+  // userData path is only meaningful after Electron is ready.
+  const known = knownItemIds ?? new Set(readDb().map((item) => item.id));
+  const added = items.filter((item) => !known.has(item.id));
   fs.writeFileSync(dbPath(), JSON.stringify(items, null, 2), 'utf-8');
+  knownItemIds = new Set(items.map((item) => item.id));
+  if (!added.length) return;
+  for (const listener of itemsAddedListeners) {
+    try {
+      listener(added);
+    } catch {
+      // See above: the write is already committed.
+    }
+  }
 }
 
 function readConfig(): Config {
