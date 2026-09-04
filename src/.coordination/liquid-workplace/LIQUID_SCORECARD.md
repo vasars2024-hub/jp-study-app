@@ -2985,3 +2985,52 @@ Appearance language card (the cat8 language leg REFUSES without it on screen —
 correct and the next cat8 run on any surface needs it too), and the widget is in its **empty**
 state, because `player.stop()` has no route from this surface and the reload that produced it
 is how the empty state is reached at all.
+
+## 2026-09-04 · primary2 — `musicwidget` category 7 closes at 10/10, and the surface closes at 80/80
+
+**PASS 10/10, `findings: []`, `voided: []`.** Instrument: the shared runner, `cat7-perf.cjs
+--surface musicwidget --jank`, with a ~10-line data spec (`9115c43f`) as its 30th surface. No
+new probe file (RULE 1). Baseline `baselines/cat7-musicwidget-perf.json`.
+
+**The scene, because a category-7 timing without one is not comparable to anything.** 4 `.fwin`
+(`note` / `settings` / `visualizer` / `musicwidget`, all `standard`), 316 window elements, 455
+document elements, viewport 1264x821 @ dpr 1, renderer heap 239 MB. The surface itself is a
+floating `.fwin`, matched 1, 60 elements. `scene_stable: true` on every leg. Main pid 13316,
+`uptimeSec 337` at the first leg — past the 120 s refusal, so no post-boot settling is in these
+numbers.
+
+**THIS SESSION'S CEILING, not L0's.** Three ceiling runs, p50 **8.3 ms** / p95 8.5 (217, 218,
+217 frames) — this display is running at ~120 Hz. L0's 10.0 ms is recorded as provenance only;
+scoring 8.3 against it would have reported a 17% *improvement* that is a refresh rate, not work.
+
+| leg | frame p50 | p95 | max | >100 ms | main max |
+| --- | --- | --- | --- | --- | --- |
+| ceiling | 8.3 | 8.5 | 16.8 | 0 | 4.7 |
+| drag | 8.3 | 8.5 | 9.0 | 0 | 13.5 |
+| resize | 8.3 | 8.5 | 9.0 | 0 | 3.6 |
+| theme | 8.3 | 8.5 | 25.0 | 0 | 5.0 |
+
+Theme swap cost `applyPaintedMs 25.8` / `restorePaintedMs 39.9` on this 4-window desk. Drag and
+resize both sit exactly ON the ceiling — the widget's 430x190 window costs nothing to move.
+
+**The heavy leg is the widget's own work, and it says what it is NOT.** 8 songs forward and 8
+back through the transport, 16 title changes, ending on the song it started on (`e2e-audio-ja.m4a`
+— the proof asserts the restore rather than assuming it). Main-process availability DURING that
+walk: p50 **2.0 ms**, p95 4.2, max **10.0 ms** over a 5,028 ms span, 164 samples — against the
+500 ms bar, and against an idle arm whose own max was **11.3 ms**. The honest reading is that
+16 song switches are indistinguishable from idle on the main thread: the cost lives in the audio
+element and the renderer. Written into the spec so it is not misquoted later: `coverFor` /
+`paletteFor` memoize per song id (`albumArt.ts:28,40`), so this leg is NOT the artwork pipeline.
+
+**The sensitivity control fired.** `--jank` re-ran the drag leg with ten 120 ms renderer blocks:
+p95 **8.5 → 108.4 ms**, max 116.7, `frames_over_100` **0 → 10**, all ten blocks accounted for.
+The recorder is seeing the frames it claims to, so the four flat legs above are flat, not blind.
+
+**A live harness limit, stated rather than hidden:** this profile's audio library is **2 songs**,
+so the 16-press walk wraps the queue eight times instead of touching 16 distinct files. Every
+press still paid a real `playItem` — 16 title changes prove it — but a larger library would put
+more distinct decodes behind the same gesture. It does not move this score: the main-process
+number is 20x under its bar and the frame legs are at the ceiling.
+
+**`musicwidget` is 8 of 8 — the surface closes at 80/80. Running total: 14 of 25 sections.**
+84 category cells remain.
