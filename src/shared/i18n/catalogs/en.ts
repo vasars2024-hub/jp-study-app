@@ -11982,4 +11982,12 @@ export const en: Catalog = {
   'readingLists.view.drop.empty': 'That file was empty, so there was nothing to import.',
   'readingLists.view.drop.unknownItem':
     'That book is no longer in the library, so it was not added.',
+  'readingLists.view.source.chip': 'Message',
+  'readingLists.view.source.open': 'Show the message “{title}” came from',
+  'readingLists.view.source.title': 'Where “{title}” came from',
+  'readingLists.view.source.pastedAt': 'Pasted {when}',
+  'readingLists.view.source.thisLine': 'this line',
+  'readingLists.view.source.close': 'Close',
+  'readingLists.view.source.partial':
+    'The rest of that message is gone — only the line this entry came from was kept.',
 };

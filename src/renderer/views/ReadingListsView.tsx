@@ -190,6 +190,8 @@ interface ReadingRowActions {
   remove: (entryId: string) => void;
   setState: (entryId: string, state: ReadingEntryState) => void;
   dismissSuggestion: (entryId: string) => void;
+  /** §11.1's source-message chip: open the paste this row came out of. */
+  showSource: (entryId: string) => void;
   pick: (entryId: string, range: boolean) => void;
   /** §11.4's reorder. `target` is the row dropped onto, or stepped past. */
   reorder: (entryId: string, targetEntryId: string) => void;
@@ -210,6 +212,12 @@ interface ReadingRowProps {
   item: LibraryItem | undefined;
   /** The suggested item's title, already resolved — the row never reads a map. */
   suggestedTitle: string | null;
+  /**
+   * Whether this row came out of a paste. A BOOLEAN rather than the source
+   * object: the row only decides whether to draw the chip, and a fresh object
+   * prop would break the memo §11.4's performance row depends on.
+   */
+  hasSource: boolean;
   selected: boolean;
   actions: ReadingRowActions;
   t: ReturnType<typeof useT>['t'];
@@ -263,6 +271,7 @@ const ReadingRow = memo(function ReadingRow({
   title,
   item,
   suggestedTitle,
+  hasSource,
   selected,
   actions,
   t,
@@ -353,6 +362,22 @@ const ReadingRow = memo(function ReadingRow({
           label: t(STATE_KEYS[state]),
         }))}
       />
+      {/*
+        §11.1's source-message chip. Rendered only where there IS a source: a
+        row typed by hand or added from the library came from no paste, and a
+        chip that opens an empty message is the dead card §11.1 forbids.
+      */}
+      {hasSource ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="rlv__row-source"
+          aria-label={t('readingLists.view.source.open', { title })}
+          onClick={() => actions.showSource(entryId)}
+        >
+          {t('readingLists.view.source.chip')}
+        </Button>
+      ) : null}
       <Button
         size="sm"
         variant="ghost"
@@ -418,6 +443,8 @@ export default function ReadingListsView({
   const [pickFilter, setPickFilter] = useState('');
   /** The title of the book the last add declined as already present, or `null`. */
   const [libraryNote, setLibraryNote] = useState<string | null>(null);
+  /** §11.1: the entry whose source message is open, or `null`. */
+  const [sourceFor, setSourceFor] = useState<string | null>(null);
   /**
    * Why the last drop did nothing, already translated. §11.4's honest-states
    * row: a drop that lands on the surface and produces no list, no row and no
@@ -566,14 +593,87 @@ export default function ReadingListsView({
     [adopt, document],
   );
 
+  /**
+   * §11.1 rows 1–3, the whole "every row goes somewhere real" contract:
+   *
+   *   bound            → the reader, `onOpenBook` (the seam `App.tsx` threads;
+   *                      a second navigation path would put the reader in a
+   *                      different window than the library puts it in)
+   *   bound, on the shelf → the reader AND `owned → reading`
+   *   unbound (wanted) → the acquisition path, `onFindWork(title)`
+   *
+   * The promotion is the row §11.1 calls "bound, never started". It is written
+   * only from `owned`: `wanted` cannot reach here with an item bound, and
+   * `finished`, `abandoned` and `skipped` are all deliberate states a re-read
+   * must not quietly overwrite — opening a book you abandoned to check one line
+   * is not a decision to resume it.
+   *
+   * No undo toast, deliberately. A toast on every open would fire on the app's
+   * single most common gesture, and the reversal is already one control away
+   * and in view: the row's own state Select, which the promotion visibly moves.
+   */
   const openRow = useCallback(
     (row: ReadingListRow) => {
       const item = row.itemId ? itemsById.get(row.itemId) : undefined;
-      if (item) onOpenBook(item);
-      else onFindWork(row.title);
+      if (!item) {
+        onFindWork(row.title);
+        return;
+      }
+      if (list && row.entry.state === 'owned') {
+        const targetList = list.id;
+        void write((current) =>
+          setReadingEntryState(
+            current,
+            targetList,
+            row.entry.id,
+            'reading',
+            createReadingListsMutationContext(),
+          ),
+        );
+      }
+      onOpenBook(item);
     },
-    [itemsById, onFindWork, onOpenBook],
+    [itemsById, list, onFindWork, onOpenBook, write],
   );
+
+  const showSource = useCallback((entryId: string) => {
+    setSourceFor((current) => (current === entryId ? null : entryId));
+  }, []);
+
+  /**
+   * §11.1's *"a source-message chip → the original paste, with the producing
+   * line highlighted"*, resolved from data §1 has stored since P0: the entry
+   * carries `sourceRef.importId` and `lineIndex`, and the list carries the
+   * import with its whole `rawText`.
+   *
+   * `lineIndex` indexes the RAW text's lines, and the highlight is derived by
+   * that index rather than by matching `rawLine` back against the text. Matching
+   * would pick the wrong line in the ordinary case this feature exists for — a
+   * message that lists the same title twice — and would silently highlight
+   * nothing after §2.4's re-parse rewrites a line.
+   */
+  const sourceView = useMemo(() => {
+    if (!sourceFor || !list) return null;
+    const entry = list.entries.find((candidate) => candidate.id === sourceFor);
+    const ref = entry?.sourceRef;
+    if (!ref) return null;
+    const found = list.imports.find((candidate) => candidate.id === ref.importId);
+    const title = rows.find((row) => row.entry.id === sourceFor)?.title ?? '';
+    // A paste whose import row is gone is a REAL state: §2.4's re-parse replaces
+    // an import, and an entry can outlive the message that produced it. The raw
+    // line survives on the entry, so the one line is still shown — with the
+    // reason the rest is missing, rather than an empty panel.
+    if (!found) {
+      return { title, lines: [ref.rawLine], highlight: 0, partial: true, pastedAt: null };
+    }
+    return {
+      title,
+      lines: found.rawText.split('\n'),
+      highlight: ref.lineIndex,
+      partial: false,
+      pastedAt: found.pastedAt,
+    };
+  }, [list, rows, sourceFor]);
 
   const createList = useCallback(() => {
     const name = draftName.trim();
@@ -1032,6 +1132,7 @@ export default function ReadingListsView({
     toggleSelected,
     reorderRows,
     stepRow,
+    showSource,
   });
   live.current = {
     rows,
@@ -1043,6 +1144,7 @@ export default function ReadingListsView({
     toggleSelected,
     reorderRows,
     stepRow,
+    showSource,
   };
 
   /**
@@ -1095,6 +1197,7 @@ export default function ReadingListsView({
         const row = find(entryId);
         if (row) live.current.dismissSuggestion(row);
       },
+      showSource: (entryId) => live.current.showSource(entryId),
       pick: (entryId, range) => live.current.toggleSelected(entryId, range),
       reorder: (entryId, targetEntryId) => {
         if (entryId !== targetEntryId) live.current.reorderRows(entryId, targetEntryId);
@@ -1561,6 +1664,61 @@ export default function ReadingListsView({
           </Button>
         </header>
         {notices}
+        {/*
+          §11.1's source-message chip lands HERE rather than in a modal: the
+          whole point of the row is "which line of which message produced this",
+          and a dialog that covers the list hides the very row being explained.
+        */}
+        {sourceView ? (
+          <section
+            className="rlv__source"
+            aria-label={t('readingLists.view.source.title', { title: sourceView.title })}
+            data-testid="rlv-source"
+          >
+            <header className="rlv__source-head">
+              <h3 className="rlv__source-title">
+                {t('readingLists.view.source.title', { title: sourceView.title })}
+              </h3>
+              {sourceView.pastedAt !== null ? (
+                <span className="rlv__source-when">
+                  {t('readingLists.view.source.pastedAt', {
+                    when: new Date(sourceView.pastedAt).toLocaleDateString(lang),
+                  })}
+                </span>
+              ) : null}
+              <span className="rlv__spacer" />
+              <Button size="sm" onClick={() => setSourceFor(null)}>
+                {t('readingLists.view.source.close')}
+              </Button>
+            </header>
+            {sourceView.partial ? (
+              <p className="rlv__source-partial" role="status">
+                {t('readingLists.view.source.partial')}
+              </p>
+            ) : null}
+            <ol className="rlv__source-lines">
+              {sourceView.lines.map((line, index) => (
+                <li
+                  // The index IS the identity here — these are the lines of one
+                  // immutable pasted message, and two identical lines are the
+                  // case this panel exists to tell apart.
+                  key={index}
+                  className="rlv__source-line"
+                  data-produced={index === sourceView.highlight}
+                >
+                  {/* The empty line still needs a box, or the numbering that
+                      makes `lineIndex` legible skips and stops matching. */}
+                  <span className="rlv__source-text">{line || ' '}</span>
+                  {index === sourceView.highlight ? (
+                    <span className="rlv__source-mark">
+                      {t('readingLists.view.source.thisLine')}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
         {picking ? libraryPicker : null}
         {libraryNote ? (
           <p className="rlv__notice" role="status">
@@ -1782,6 +1940,7 @@ export default function ReadingListsView({
                   suggestedTitle={
                     suggested ? (itemsById.get(suggested.itemId)?.title ?? suggested.itemId) : null
                   }
+                  hasSource={Boolean(row.entry.sourceRef)}
                   selected={selected.has(row.entry.id)}
                   actions={rowActions}
                   t={t}

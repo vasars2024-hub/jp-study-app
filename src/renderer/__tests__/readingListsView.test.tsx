@@ -27,9 +27,14 @@ import {
   createReadingList,
   createReadingListsMutationContext,
   sealReadingListsDocument,
+  setReadingEntryState,
   suggestReadingWorkBinding,
 } from '../../shared/readingListMutations';
-import { emptyReadingListsDocument, type ReadingListsDocument } from '../../shared/readingLists';
+import {
+  emptyReadingListsDocument,
+  type ReadingEntryState,
+  type ReadingListsDocument,
+} from '../../shared/readingLists';
 import type { LibraryItem } from '../../shared/types';
 
 let host: HTMLDivElement;
@@ -1530,5 +1535,212 @@ describe('ReadingListsView — drops (§11.4)', () => {
 
     const plain = await fire(surface, 'dragover', protectedTransfer(['text/plain']));
     expect(plain.defaultPrevented).toBe(false);
+  });
+});
+
+/**
+ * §11.1's click-through table, the two rows nothing named until now: *"an entry,
+ * bound, never started → the reader at the start, and the entry flips
+ * `owned → reading`"*, and *"a source-message chip → the original paste, with
+ * the producing line highlighted"*.
+ *
+ * Rows 1, 3 and 5 of that table (bound → reader, `wanted` → acquisition, card →
+ * detail) are already asserted above and in `shared/__tests__/readingListViews`.
+ */
+describe('ReadingListsView — §11.1 click-through', () => {
+  /** One list, one entry bound to `ITEM`, in whatever state the caller names. */
+  function boundIn(state: ReadingEntryState): { document: ReadingListsDocument; listId: string } {
+    const context = createReadingListsMutationContext(1_700_000_000_000);
+    const created = createReadingList(emptyReadingListsDocument(), { name: 'Shelf' }, context);
+    const added = addReadingListEntry(
+      created.document,
+      created.listId,
+      { title: ITEM.title },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    const entry = added.document.lists[0].entries[0];
+    let current = bindReadingWork(
+      added.document,
+      entry.workId,
+      ITEM.id,
+      1,
+      createReadingListsMutationContext(1_700_000_000_002),
+    ).document;
+    current = setReadingEntryState(
+      current,
+      created.listId,
+      entry.id,
+      state,
+      createReadingListsMutationContext(1_700_000_000_003),
+    ).document;
+    return { document: sealReadingListsDocument(current), listId: created.listId };
+  }
+
+  function stateOf(store: FakeStore): string {
+    return store.document.lists[0].entries[0].state;
+  }
+
+  async function openFirstRow() {
+    await click(host.querySelector('.rlv__row-open'));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('flips a bound entry from owned to reading when it is opened', async () => {
+    const { document, listId } = boundIn('owned');
+    const store = new FakeStore(document);
+    installBridge(store);
+    await render(listId);
+    expect(stateOf(store)).toBe('owned');
+
+    await openFirstRow();
+
+    // Both halves: the reader really opened, AND the shelf copy is now being read.
+    expect(opened.map((item) => item.id)).toEqual([ITEM.id]);
+    expect(stateOf(store)).toBe('reading');
+  });
+
+  it('does not overwrite a state the user chose on purpose', async () => {
+    // The promotion is written ONLY from `owned`. `finished`, `abandoned` and
+    // `skipped` are decisions; opening an abandoned book to check one line is
+    // not a decision to resume it, and `reading` is already right.
+    for (const state of ['reading', 'finished', 'abandoned', 'skipped'] as const) {
+      const { document, listId } = boundIn(state);
+      const store = new FakeStore(document);
+      installBridge(store);
+      await render(listId);
+      const writesBefore = store.writes;
+
+      await openFirstRow();
+
+      expect(opened.length, `the reader did not open from ${state}`).toBeGreaterThan(0);
+      expect(stateOf(store), `${state} was overwritten`).toBe(state);
+      expect(store.writes, `${state} cost a write`).toBe(writesBefore);
+      opened.length = 0;
+    }
+  });
+
+  it('shows the pasted message with the producing line marked, and no chip without one', async () => {
+    // The whole reason the highlight is derived from `lineIndex` and not by
+    // matching the raw line back: this message names the same title twice.
+    const raw = ['from mika:', 'Kino no Tabi', 'something else', 'Kino no Tabi'].join('\n');
+    const context = createReadingListsMutationContext(1_700_000_000_000);
+    const current = createReadingList(emptyReadingListsDocument(), { name: 'From Mika' }, context);
+    const listId = current.listId;
+    const added = addReadingListEntry(
+      current.document,
+      listId,
+      { title: 'Kino no Tabi' },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    const plain = addReadingListEntry(
+      added.document,
+      listId,
+      { title: 'Typed by hand' },
+      createReadingListsMutationContext(1_700_000_000_002),
+    );
+    // The provenance §1 stores at import time, written directly so the test
+    // does not depend on the paste flow's own shape.
+    const doc = plain.document;
+    const list = doc.lists[0];
+    const seeded: ReadingListsDocument = sealReadingListsDocument({
+      ...doc,
+      lists: [
+        {
+          ...list,
+          imports: [
+            {
+              id: 'imp1',
+              rawText: raw,
+              pastedAt: 1_700_000_000_000,
+              parserVersion: 'test',
+              entryIds: [list.entries[0].id],
+            },
+          ],
+          entries: [
+            {
+              ...list.entries[0],
+              sourceRef: { importId: 'imp1', lineIndex: 3, rawLine: 'Kino no Tabi' },
+            },
+            list.entries[1],
+          ],
+        },
+      ],
+    });
+
+    installBridge(new FakeStore(seeded));
+    await render(listId);
+
+    // The chip exists only where a source does — a hand-typed row has none.
+    const chips = [...host.querySelectorAll('.rlv__row-source')];
+    expect(chips).toHaveLength(1);
+    expect(rows()[0].querySelector('.rlv__row-source')).not.toBeNull();
+    expect(rows()[1].querySelector('.rlv__row-source')).toBeNull();
+    expect(host.querySelector('[data-testid="rlv-source"]')).toBeNull();
+
+    await click(chips[0]);
+
+    const panel = host.querySelector('[data-testid="rlv-source"]');
+    expect(panel).not.toBeNull();
+    const lines = [...panel!.querySelectorAll('.rlv__source-line')];
+    expect(lines.map((line) => line.querySelector('.rlv__source-text')?.textContent)).toEqual([
+      'from mika:',
+      'Kino no Tabi',
+      'something else',
+      'Kino no Tabi',
+    ]);
+    // The FOURTH line, not the second — both read 'Kino no Tabi', and matching
+    // the raw line back would have marked the wrong one.
+    expect(lines.map((line) => (line as HTMLElement).dataset.produced)).toEqual([
+      'false',
+      'false',
+      'false',
+      'true',
+    ]);
+  });
+
+  it('shows the one surviving line, and says so, when the import row is gone', async () => {
+    // §2.4's re-parse replaces an import, so an entry can outlive the message
+    // that produced it. An empty panel would read as a broken chip.
+    const context = createReadingListsMutationContext(1_700_000_000_000);
+    const created = createReadingList(emptyReadingListsDocument(), { name: 'Orphan' }, context);
+    const added = addReadingListEntry(
+      created.document,
+      created.listId,
+      { title: 'Kino no Tabi' },
+      createReadingListsMutationContext(1_700_000_000_001),
+    );
+    const list = added.document.lists[0];
+    const seeded: ReadingListsDocument = sealReadingListsDocument({
+      ...added.document,
+      lists: [
+        {
+          ...list,
+          imports: [],
+          entries: [
+            {
+              ...list.entries[0],
+              sourceRef: { importId: 'vanished', lineIndex: 7, rawLine: '3. Kino no Tabi' },
+            },
+          ],
+        },
+      ],
+    });
+
+    installBridge(new FakeStore(seeded));
+    await render(created.listId);
+    await click(host.querySelector('.rlv__row-source'));
+
+    const panel = host.querySelector('[data-testid="rlv-source"]');
+    expect(panel?.textContent).toContain('3. Kino no Tabi');
+    expect(panel?.textContent).toContain('only the line this entry came from was kept');
+    // `lineIndex` 7 must not index into a one-line array and mark nothing.
+    expect(
+      [...panel!.querySelectorAll('.rlv__source-line')].map(
+        (line) => (line as HTMLElement).dataset.produced,
+      ),
+    ).toEqual(['true']);
   });
 });

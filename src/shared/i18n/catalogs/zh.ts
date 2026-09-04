@@ -11338,4 +11338,11 @@ export const zh: Catalog = {
   'readingLists.view.drop.unreadable': '无法读取该文件，因此没有导入任何内容。',
   'readingLists.view.drop.empty': '该文件是空的，没有可导入的内容。',
   'readingLists.view.drop.unknownItem': '这本书已不在书库中，因此没有添加。',
+  'readingLists.view.source.chip': '来源消息',
+  'readingLists.view.source.open': '显示“{title}”的来源消息',
+  'readingLists.view.source.title': '“{title}”的来源',
+  'readingLists.view.source.pastedAt': '粘贴于 {when}',
+  'readingLists.view.source.thisLine': '就是这一行',
+  'readingLists.view.source.close': '关闭',
+  'readingLists.view.source.partial': '那条消息的其余部分已丢失，只保留了产生该条目的这一行。',
 };

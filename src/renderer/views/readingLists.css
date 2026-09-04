@@ -703,3 +703,79 @@
   -webkit-user-drag: none;
   user-select: none;
 }
+
+/* ------------------------------------ §11.1 · the source-message panel ----- */
+
+.rlv__source {
+  display: grid;
+  gap: var(--lq-space-2, 8px);
+  padding: var(--lq-space-3, 12px);
+  border-radius: var(--lq-work-radius, 14px);
+  border: 1px solid var(--lq-work-border, rgba(255, 255, 255, 0.18));
+  background: var(--lq-work-bg-raised, rgba(255, 255, 255, 0.06));
+}
+
+.rlv__source-head {
+  display: flex;
+  align-items: center;
+  gap: var(--lq-space-2, 8px);
+  flex-wrap: wrap;
+}
+
+.rlv__source-title {
+  margin: 0;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.rlv__source-when,
+.rlv__source-partial {
+  margin: 0;
+  color: var(--lq-work-text-muted, rgba(255, 255, 255, 0.66));
+  font-size: 0.9em;
+}
+
+/*
+  The pasted message is quoted text, so it is READ, not skimmed — §11.4's own
+  "reading stays on a stable opaque anchor" rule. No translucency here, and the
+  numbering is `ol` so the line the entry came from can be counted to.
+*/
+.rlv__source-lines {
+  margin: 0;
+  padding: var(--lq-space-2, 8px) var(--lq-space-2, 8px) var(--lq-space-2, 8px)
+    var(--lq-space-5, 28px);
+  max-height: 40vh;
+  overflow: auto;
+  border-radius: var(--radius-md, 10px);
+  background: var(--lq-anchor-bg, rgba(0, 0, 0, 0.22));
+}
+
+.rlv__source-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lq-space-2, 8px);
+  padding: 2px 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/*
+  Not colour alone: the produced line carries a left rule AND the words "this
+  line" next to it, because §11.4's accessibility row rules out a highlight that
+  only a sighted reader can perceive.
+*/
+.rlv__source-line[data-produced='true'] {
+  border-left: 3px solid var(--accent, #ff2e4d);
+  padding-left: 8px;
+  background: var(--lq-liquid-highlight, rgba(255, 255, 255, 0.1));
+}
+
+.rlv__source-mark {
+  flex: none;
+  font-size: 0.8em;
+  color: var(--accent, #ff2e4d);
+}
+
+.rlv__source-text {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

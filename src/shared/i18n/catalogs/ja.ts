@@ -11460,4 +11460,12 @@ export const ja: Catalog = {
   'readingLists.view.drop.empty': 'そのファイルは空だったため、取り込むものがありませんでした。',
   'readingLists.view.drop.unknownItem':
     'その本はライブラリにもう存在しないため、追加しませんでした。',
+  'readingLists.view.source.chip': 'メッセージ',
+  'readingLists.view.source.open': '「{title}」の出典メッセージを表示',
+  'readingLists.view.source.title': '「{title}」の出典',
+  'readingLists.view.source.pastedAt': '{when} に貼り付け',
+  'readingLists.view.source.thisLine': 'この行',
+  'readingLists.view.source.close': '閉じる',
+  'readingLists.view.source.partial':
+    'そのメッセージの残りは失われており、この項目のもとになった行だけが残っています。',
 };

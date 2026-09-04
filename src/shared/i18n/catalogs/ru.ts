@@ -12441,4 +12441,12 @@ export const ru: Catalog = {
   'readingLists.view.drop.empty': 'Файл оказался пустым, импортировать было нечего.',
   'readingLists.view.drop.unknownItem':
     'Этой книги больше нет в библиотеке, поэтому она не добавлена.',
+  'readingLists.view.source.chip': 'Сообщение',
+  'readingLists.view.source.open': 'Показать сообщение, из которого взято «{title}»',
+  'readingLists.view.source.title': 'Откуда взялось «{title}»',
+  'readingLists.view.source.pastedAt': 'Вставлено {when}',
+  'readingLists.view.source.thisLine': 'эта строка',
+  'readingLists.view.source.close': 'Закрыть',
+  'readingLists.view.source.partial':
+    'Остальная часть сообщения потеряна — сохранилась только строка, из которой взята эта запись.',
 };
