@@ -3747,3 +3747,157 @@ State restored: Scraper on History, search cleared, standard presentation, 820x5
 theme (no `data-theme`), crimson accent inline (`--accent` `#ff2e4d`, `--accent-2` `#ff6b81`,
 `--red` `#ff2e4d`, `--red-deep` `#d21734`). Settings is left OPEN on Appearance — cat8's language
 leg needs it and the next surface's cat8 will too.
+
+## 2026-09-04 · backup — `agent` opens as the SEVENTEENTH surface: categories 1, 3, 4 and 6 at 10/10; cat5 is 9/10 and NOT closed
+
+Commits `f9b51119` (cat1), `9706610c` (cat3+cat4), `4db9cc55` (cat6 harness), `db9fc3f3` (cat5 Q3).
+Live against the warm instance the 16:15 turn left running — port 39274, pid 20540, window 1,
+`.agent-root` at 782x513 inside an 820x580 `.fwin`. **Not one minute went to instance setup**,
+which is the second turn running that this is the whole rate story.
+
+**`agent` was chosen** as the seventeenth surface because it is the one app L5's own gate still
+names as remaining, and because both of its prerequisites already existed — a `cat6` app spec in
+`l6-parity.js` and a `cat7` SPECS entry — so the turn went to measurement rather than
+scaffolding. `sampled-out:` for this bullet — `library` `novels` `translate` `player` `anki`
+`flashcards` `stats` `resources` `city` `immersion` `calendar` `reading`.
+
+**THE SURFACE WAS DRIVEN TO REAL CONTENT FIRST, and this decided the whole turn.** At rest the
+Agent opens on a placeholder: 23 controls, `.agent-placeholder` present, 0 messages. The first
+cat1 run scored that and read `belowFloorByHit 16`. Selecting the one conversation with a real
+two-message exchange and switching to Full mode gives **43 controls and 72 text nodes**, and the
+walk changed identity — `.agent-context-remove` and the suggestion controls dropped out, and
+`.agent-message-branch`, `.agent-card-action` and a contrast failure appeared. Scoring the
+placeholder would have banked a different surface's numbers. The first run's rows were repaired
+anyway, since the walk had named them.
+
+**ONE DEFECT SHAPE ACCOUNTS FOR THREE OF THE FOUR CATEGORIES**, and it is worth stating once: a
+flex or grid item allowed to be squashed below its own content while its children keep their
+heights and paint over what is beneath.
+
+| where | measured | remedy |
+| - | - | - |
+| `.agent-conversation-head` | box **9px tall around a 38px control row**; Delete and the view toggle painted 17px down over the first message | `flex: 0 0 auto` |
+| `.agent-rail-head` / `.agent-search` / `.agent-rail-foot` | `div.agent-rail-head x div.agent-canvas (188x8)`, `div.agent-search x div.agent-canvas (188x6)` at the compact size | `flex: 0 0 auto` on each |
+| `.agent-rail` itself | at 236x140 the shell stacks and gives the rail **56px around 156px of children** — deeper than the list can absorb at zero height | `overflow-y: auto`, so it scrolls rather than clips |
+
+### Category 1 — PASS 10/10
+
+    belowFloorByHit   15 -> 3 -> 1 -> 1 -> 0        stolen  0 -> 3 -> 1 -> 1 -> 0
+    contrast minRatio 4.15 FAIL -> 5.35             failing 1 -> 0
+    43 controls / 72 text nodes / 0 unreachable / 0 durations left under emulation
+
+Five steps, because two repairs only MOVED the theft to a different pair of controls before the
+fifth found the cause above. The routes, and each is the one that control could actually take:
+
+- **FAMILY** — 9 identical pin buttons, `lq-hit-scope` on `.agent-rail-list` rather than 9 call
+  sites. **The scope alone moved nothing**: the list scrolls, so the classic scrollbar takes 10px
+  off its right edge and the rows end flush against it — `elementFromPoint` returned
+  `.agent-rail-list`, the SCROLLBAR, for every column past 456, and all nine stayed at 30.49 of
+  32. `padding: 0 2px 0 0` is what lets the expander land, and no control changes size.
+- **REPLACED** — both `<select>`s take `.lq-check` on the wrapping `<label>`, never a scope.
+- **NEIGHBOUR** — `.agent-message-branch` and `.agent-view-toggle-button` take the floor on their
+  own box. Scoping `.agent-message-head` took `stolen` 0 -> 3 with `worstShrunkBy: 7`; scoping
+  `.agent-view-toggle` took the chip below it to 28.43 of 32.
+
+**CONTRAST — the accent-as-text family again, and on the OTHER ground.** The branch chip painted
+`var(--agent-accent)` at 11px: `#ff2e4d` on this shell's own `--agent-surface-2` `#272433` is
+**4.19:1** against a 4.5 bar, arithmetic that reproduces by hand. This is NOT the
+`--accent-text-on-wash` case the 16:05 turn shipped — that token is for a `--accent-weak` ground;
+here the ground is an opaque surface var, which is exactly what `--accent-text` was solved
+against, and the chip reads **5.60** through it. Found by a PREDICATE and the predicate is what
+`agentHitFloorAccentText.test.ts` asserts. `border-color`, `accent-color` and the pinned-icon
+glyph stay on the raw accent — their bar is 3:1 and 4.19 clears it — and that exemption is NAMED
+in the test rather than regexed away, so it stays reviewable.
+
+Control: all six legs MOVED, `plantCaughtByPointer: 2`, `rectDrift: 0`.
+
+### Category 3 — PASS 10/10 (Liquid presentation)
+
+    regions 55 / Work 8 / Liquid-eligible 3 / Anchor 22 / Anchor-holds-work 10 / Ambient 12
+    denseWorkOnTranslucent 0        sharedPrimitiveEligible 2 of 3 -> 3 of 3
+
+The harness REFUSES in standard presentation and is right to. The missing primitive is
+`aside.agent-inspector`, 484x362 — sticky, translucent, collapsible, beside the work rather than
+in it. It IS a Liquid inspector and said so nowhere. `data-lq-role="liquid"`, deliberately NOT
+`.lq-inspector`: that class is a LAYOUT primitive (`display:flex; height:100%`) and this aside
+has its own sticky geometry, so adopting it would restructure a correct surface to satisfy an
+instrument. Control: `movedOne`, `allWorkFailed`, `ungroundedAllFailed` all true.
+
+### Category 4 — PASS 10/10
+
+    compact 260x170        overlaps 2 -> 0
+    sub-minimum 200x140    clipped 1 / overlaps 2  ->  0 / 0
+    dead region            default 2.7% / compact 0.7% / maximized 11.8%
+
+### Category 6 — PASS 10/10, on TWO harness corrections and no product code
+
+    parity   standard 8/8   liquid 8/8   equal / rowsAgree / na 0
+    control  3 of 3 mutations armed, each felling exactly its own row (was 2 of 3)
+
+The surface went **5/8 -> 7/8 -> 8/8** without a line of product change, and both steps were
+instrument defects that would have banked a false FAIL.
+
+- **CORRECTION 38 — `probeInput` for `agent`.** The third shape of the trap that accessor exists
+  for, and the first where the dirtied control neither navigates nor clears: it FILTERS. The
+  generic "first visible text field" rule picks `.agent-search-input`, the history filter. The
+  round trip typed `lqp-roundtrip-食` into it, nothing matched, and the rail rendered ZERO rows
+  while `.agent-rail-count` kept saying "17 conversations" — so `conversationRail
+  (conversations=0 selected=0)` and `railCount (headCount="17 conversations" rows=0)` both scored
+  false. The same `window.__LQP.check('agent')` run by hand with the filter empty returns them
+  TRUE. Reproduced twice, so deterministic rather than a settle race.
+- **CORRECTION 39 — `contextShelf` could never have passed, and was also too weak.** The driver
+  runs every declared step when a spec names no order, and `newConversation` is one of them, so
+  `check()` always landed on a fresh conversation with an empty shelf. Zero items is an EMPTY
+  HARNESS, not a reversibility failure. Fixed by making the DRIVE build real context —
+  `selectAnswered` + `branchContext`, through the product's own "Follow up in a new conversation"
+  route — **never by excusing the row to `na`**; zero items still reads FALSE. And `removes > 0`
+  passed a shelf of three items holding one remove control, which is the defect the row exists to
+  catch, so the denominator is now the ITEMS.
+
+### Category 5 — 9/10, NOT CLOSED
+
+    Q3  NO -> YES    primaryAction button.agent-action, insideBodyViewport false -> true
+    Q4  NO           scannedControls 15 against a bar of <=12
+
+**Q3 was the defect a user would feel.** Send is the surface's declared primary action and it was
+outside the viewport at rest: `.agent-canvas` is the scroller with a 513px scrollport over
+**1121px** of content, and the action row sat at **y 720 against a viewport ending at 707** with
+`scrollTop: 0`. Sending a message needed a scroll first. Now 658-691, inside. The ACTION ROW pins
+(`position: sticky; bottom: 0` plus the surface background, the shape `.dict-anki-cfg` already
+uses), not the composer — the composer is 427px of a 513px viewport because six optional blocks
+stack above the prompt, so pinning it whole would pin the screen.
+
+**Q4 is left open and not rounded up.** 15 scanned controls: rail 3, conversation head 4, composer
+7, inspector 1. The remedy, named so it is not re-derived: `.agent-composer-options`' model select
+(1) and `.agent-context-suggestions`' language select + suggestion (2) behind ONE labelled
+disclosure — 15 - 3 = 12. It needs a new i18n summary string in four catalogs, which is why it is
+a slice rather than a tail-of-turn edit. Two things deliberately NOT done, because either would
+be gaming the number: hiding `Attach files`, which is a composer affordance and not an advanced
+tool, and excusing the bar. Landing exactly on 12 has no margin, so the honest fix may be four
+behind the disclosure rather than three.
+
+**RECIPES the next worker should not re-derive on this surface.**
+
+- **Drive it to a real conversation first.** `os:open` lands on a placeholder that scores as a
+  different, thinner surface.
+- **cat5's `--label` names the cat6 file Q7/Q8/Q9 read.** A run labelled `l17-agent-clean` VOIDed
+  three questions against a `cat6-l17-agent.json` sitting right beside it. One run was spent
+  proving this.
+- **Do not undo a mutation with `git checkout -- <file>`.** It reverts the WHOLE file including
+  the uncommitted repair under test; it silently wiped 12 hunks across two files here. Copy the
+  file first and restore from the copy, then verify by SHA256.
+- **Do not second-guess cat4's overlap number with a raw `getBoundingClientRect()`.** A raw rect
+  reports an element's layout box whether or not a scrolling ancestor paints it; `visibleRect`
+  (correction 18) intersects with every non-visible-overflow ancestor. My hand check reported two
+  overlaps that the harness correctly read as zero.
+
+**STATE LEFT BEHIND, said plainly:** the cat6 drive creates one conversation per run and the
+scratch profile now carries roughly 25, most of them empty `New conversation` rows. That is drive
+litter, not product state. It is NOT cleaned up: the eight empty conversations that were there
+before are byte-identical to the ones the drive made, deletion here has no undo, and destroying
+user-shaped data I cannot distinguish from what I found is the worse of the two options. It costs
+the next worker nothing but a longer rail — and a longer rail is a harsher cat7 collection, not an
+easier one.
+
+`agent` stands at **4 of 8 at 10/10**, cat5 at 9/10, and **cat2, cat7 and cat8 unscored**. cat7
+will need a new `SPECS` entry — `agent` is absent from `cat7-perf.cjs`.
