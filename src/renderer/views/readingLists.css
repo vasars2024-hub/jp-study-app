@@ -113,7 +113,13 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* The floor is CLAMPED to the container, not left bare. A bare 220px floor reads like
+     "at least 220px, more if there is room" and is not: 220 is a HARD minimum, so in the
+     212px content box the shell's own 260px window minimum produces, the track keeps its
+     220px and 8px of every card leaves the frame -- with no way back, because `.fwin-body`
+     is `overflow-x: hidden`. Same shape, same fix as the floors category 4 already clamped;
+     `gridTrackFloorsFitTheWindow` is the guard that caught this one. */
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
   gap: var(--lq-space-3, 12px);
 }
 
