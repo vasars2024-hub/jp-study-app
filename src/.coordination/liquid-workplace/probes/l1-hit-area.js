@@ -171,7 +171,24 @@
     return (hosts || hostsOf(el)).some((h) => got === h || h.contains(got)) ? true : got;
   };
 
-  // Walk outward until the control stops owning the point. Returns the reach and the blocker.
+  // Walk outward until the control stops owning the point, then REFINE the boundary by
+  // bisection. Returns the reach and the blocker.
+  //
+  // WHY THE REFINEMENT, and it is the difference between three findings and one. A coarse
+  // 0.5px walk cannot resolve an edge better than 0.5px, so a control whose true extent is
+  // EXACTLY the 32px floor is measured at 31.5 and filed below its own bar. Live on `files`
+  // 2026-09-04 that was two of the three remaining rows -- `div.fa-row` (rect 364x32, read
+  // 31.5) and `input.fa-bulk-check` (rect 32x32, read 31) -- both flush 32px boxes in a 32px
+  // row grid, and neither is reachable-in-31px by any user. `hit-walk-step-caps-at-31-5`
+  // records a previous attempt to answer this in CSS by inflating the target: it cost 24
+  // STOLEN rows, because a control cannot grow into its neighbour without taking its clicks.
+  // The number was the instrument's, so the instrument is where it is repaired.
+  //
+  // Bisection, not a tolerance. A tolerance would loosen the bar and let a genuinely 31.6px
+  // control through; this narrows the uncertainty from +/-STEP to +/-FINE and leaves the bar
+  // at 32. The proof that it did not simply widen everything is that `button.fa-cell-size`,
+  // whose RECT is 31px, must still fail after it -- see the entry in LIQUID_SCORECARD.md.
+  const FINE = 0.05;
   const walk = (cx, cy, dx, dy, el, hosts) => {
     let last = 0;
     let blocker = null;
@@ -183,6 +200,17 @@
         break;
       }
       last = d;
+    }
+    if (blocker) {
+      // `last` is owned, `last + STEP` is not. Halve the bracket until it is under FINE.
+      let lo = last;
+      let hi = Math.min(last + STEP, REACH);
+      while (hi - lo > FINE) {
+        const mid = (lo + hi) / 2;
+        if (owns(cx + dx * mid, cy + dy * mid, el, hosts) === true) lo = mid;
+        else hi = mid;
+      }
+      last = Math.round(lo * 100) / 100;
     }
     // A walk that ran out of REACH is not a walk that hit something. Conflating the two turned
     // every control wider than 52px into a false "stolen" row on this probe's first run.
@@ -300,8 +328,12 @@
     const right = walk(cx, cy, 1, 0, el, hosts);
     const up = walk(cx, cy, 0, -1, el, hosts);
     const down = walk(cx, cy, 0, 1, el, hosts);
-    const hitW = left.reach + right.reach + STEP;
-    const hitH = up.reach + down.reach + STEP;
+    // `+ FINE`, not `+ STEP`: the trailing term stands for the unresolved sliver past the last
+    // owned sample on each side, and after the bisection above that sliver is FINE wide, not
+    // STEP. Keeping `+ STEP` here would hand back as slack exactly what the refinement bought.
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const hitW = round2(left.reach + right.reach + FINE);
+    const hitH = round2(up.reach + down.reach + FINE);
     rows.push({
       el: label(el) + (target === el ? '' : ` via ${label(target)}`),
       rect: `${Math.round(r.width)}x${Math.round(r.height)}`,

@@ -3079,3 +3079,65 @@ mistake in three costumes: reading a child's box, or an unfocused window, as the
 
 **Running total unchanged: 14 of 25 sections at 80/80.** `files` is **7 of 8 categories UNRUN**
 with cat1 measured and FAILING. **90 category cells remain.**
+
+## 2026-09-04 · primary2 — `files` cat1: 25 of 103 controls were never scored, and the row that failed loudest was the instrument's
+
+The 2026-09-03 cell and my 2026-09-04 reproduction of it both read **FAIL on `targets32`
+alone**, 103 controls, **78 measured**, 25 `occluded`, four rows below the 32px floor at
+26.5 / 31.5 / 31.5 / 31.0. Both entries described the 26.5 row as a scroller's fold and
+proposed loosening the walk to forgive it. **That was the wrong repair on a correct number
+about the wrong thing**, and the live measurement that settles it is worth more than either
+description.
+
+**`div.fa-tree` is 52px wide over 172px of content and does not scroll vertically at all** —
+`scrollHeight === clientHeight`; `nav.lq-scaffold-rail`, 399 over 1,657, is the real vertical
+scroller. `l1-hit-area.js` resolved ONE scroll parent for both axes and wrote both offsets on
+it, so all 32 `.fa-tree-node` centred against a horizontal-only element, the vertical write
+was a no-op, and 25 of them stayed below the fold and were filed `occluded by div.os-desktop`
+— **outside the window**. The run scored 53 against its own VOID threshold of 51.5: one and a
+half controls from voiding, and it had read as a clean measurement twice.
+
+**Two repairs, `8c5bc2f0` (product) and `49755620` + this turn's refinement (instrument).**
+
+- The product half is why `.fa-tree` was a horizontal scroller at all: five rail controls with
+  intrinsic min-content widths — "Save this search" 108px, "Delete folder" 90px, the move
+  `label`+`select` 77px, "New folder" 46px — painted **105 / 25 / 12 / 33 px past the rail's
+  own right edge**, chopped mid-word, and `.fa-tree` clipped them into a 120px sideways scroll
+  region with no scrollbar. Contained, ellipsized, `title`-carried. After: **0 past the rail**,
+  `.fa-tree` 59/52, all six control classes at 48px inside the 52px box.
+- The instrument half resolves the scroll parent PER AXIS. Its control names its victim: a
+  120px vertical scroller containing a horizontal-ONLY scroller containing a 40x40
+  `button.hitNestPlant` 400px below the fold — clickable, over the floor. **HEAD filed it
+  `occluded by div.os-desktop`; this version measures it.**
+
+**`files`, re-read clean with the plant removed and two consecutive runs agreeing
+(`stable: true`): measured 78 → 103 of 103, occluded 25 → 0, stolen 1 → 0.** The
+`button.fa-tree-node` 26.5 row is GONE — it was never a property of the control.
+
+**The refinement, and it disproved my own hypothesis, which is the point of running it.** The
+0.5px walk cannot resolve an edge better than 0.5px, so I expected the two 31.5s to be flush
+32px boxes losing exactly one STEP. The walk now bisects the last bracket to 0.05px. They did
+not go up. `div.fa-row` went **31.5 → 31.05** and `input.fa-bulk-check` **31.0 → 30.55**:
+those regions are genuinely ~1 and ~1.45px short of the 32px boxes they render, and the
+hypothesis was wrong. `button.fa-cell-size` went the other way, **31.5 → 31.93**, and still
+fails — which is the control on the refinement itself: it did not simply widen everything, and
+`hit-walk-step-caps-at-31-5` records what inflating targets in CSS cost last time (24 stolen
+rows). The cat1 negative control still caught **2 of 2** 12x12 plants by pointer, so nothing
+small was laundered.
+
+**`files` cat1 = FAIL, and it stays FAIL.** Four of five bars pass — contrast minRatio
+**4.65**, WCAG 2.5.8 **0**, keyboard unreachable **0**, motion **0 of 21** — and `targets32`
+fails on three rows that are now real rather than artefacts:
+
+| control | rect | pointer region | short by |
+| --- | --- | --- | --- |
+| `button.fa-cell.fa-cell-size` | **31**x32 | 31.93 x 32.99 | its own rect is under the floor |
+| `div.fa-row` | 364x32 | 52.05 x **31.05** | 0.95px vertically, to the next row |
+| `input.fa-bulk-check` | 32x32 | 32.99 x **30.55** | 1.45px vertically, inside its own cell |
+
+Negative control: **6 of 6 moved**, `backToBaseline` true, plants caught 2. Baseline banked as
+`baselines/cat1-files-r2.json` — a NEW path. `cat1-files.json` is TRACKED at `ff866dfd` and
+pointing `--out` at it is how the previous turn destroyed the file its own entry cited.
+
+**Running total unchanged: 14 of 25 sections at 80/80.** `files` is 7 of 8 categories UNRUN,
+cat1 measured and FAILING on three named rows. **90 category cells remain.**
