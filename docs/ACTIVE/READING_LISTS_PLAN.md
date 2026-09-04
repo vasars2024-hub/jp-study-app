@@ -424,6 +424,49 @@ and a user, and it is also what makes `readingListsClient.ts` stop being a
 triage strip + dropped-lines disclosure first; merge, split and reorder-in-preview
 are a follow-up, and `reorderReadingListEntries` already exists for the last one.
 
+**2026-09-04, `primary2`. P1 CLOSES — all three done-when clauses.**
+
+- `6ff47c06` — **§2.5's sheet.** `shared/readingListPreview.ts` (the model, no DOM)
+  + `ReadingListPastePreview.tsx` (renders it, owns only draft state and the
+  keyboard). Edit, drop, triage strip, dropped-lines disclosure, Ctrl+Z, Reset,
+  per-row Revert. Three decisions not to re-derive: a triage row is INCLUDED
+  (§2.5 says flagged, not silently dropped); a dropped row is KEPT unticked so
+  `lineIndex` never shifts under a pending edit; Ctrl+Z inside a text field is
+  left to the caret. The confirm is disabled AND names its reason, and the
+  blank-title exclusion also lives in `readingPreviewImport` so a caller that
+  ignores the button still cannot mint a nameless work. Built on L2's **Work**
+  tokens, not Liquid — the transformation plan keeps editable tables opaque.
+  Control: a triage row starting unticked → 11 of 33 RED; dropping the
+  blank-title exclusion → 1 of 33 RED. Restored, sha256 `C5AD696F`.
+- `a4c5d6e8` — **`ReadingListPasteFlow.tsx`**, the sheet joined to the store.
+  Found and fixed a real defect in the same commit: a failed load degraded to an
+  EMPTY document, the import found no list on it and never reached IPC, so a
+  missing bridge was reported to the user as *"that list no longer exists"*.
+  6 tests against a fake main doing real CAS — two refusals → 3 writes, ONE
+  surviving import, 3 entries not 9; the attempt limit → a conflict message with
+  the sheet still standing; a re-paste reports added 0 / skipped 3. Control:
+  `attemptLimit` 1 → the retry test RED by name, restored, sha256 `A900F813`.
+  `readingListsClient.ts` stops being a `test-only-module`; the pending baseline
+  entry moves up to this flow, which **P4 §6 mounts verbatim**.
+- `dd7c1e8f` — **the third clause: a mutation test per parser RULE**, not per
+  defect. `readingListParserMutations.test.ts` is a real mutation harness: 26
+  rows, each breaking one rule *in the parser's own source*, transpiling it in
+  memory (the parser's single import is `import type`, so a mutant needs no temp
+  file in `src/` — several suites here scan the tree) and asserting the property
+  is violated. Every row asserts its anchor is present first, and asserts the
+  property on the REAL parser first. Control: making one row's replacement
+  identical to its anchor → that row RED on "the property SURVIVED".
+
+Three inputs had to be built rather than borrowed, and each is a trap: the
+inline split drops a one-character piece (`鼻` never reaches the threshold); the
+URL-before-split defect needs a message that is ONLY a link, because a numbered
+list recovers on its own; and the overlong penalty needs a real rival —
+`quoted-prose` with no competitor passes either way.
+
+**Exact next slice: P2, §3 matching + §3.1 late binding.** Hook the fingerprint
+in `src/main/library.ts` on the item-added path, in one place, not per importer.
+Its done-when is an integration test that adds the item SECOND.
+
 ---
 
 ## 10. Traps, stated up front
