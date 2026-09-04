@@ -110,7 +110,9 @@ export function GrammarDetail({ point }: { point: GrammarPoint }) {
 
   return (
     <article className="gram-card">
-      <header className="gram-card-head">
+      {/* `lq-hit-scope`: the Ask-agent button measured 209x31 live — half a pixel
+          under the floor, which no reviewer would ever see and the walk reports. */}
+      <header className="gram-card-head lq-hit-scope">
         <h2 lang="ja">{point.title}</h2>
         <span className={`gram-badge lv-${point.level}`}>{point.level}</span>
         <button type="button" className="gram-ask-agent" onClick={askAgent}>

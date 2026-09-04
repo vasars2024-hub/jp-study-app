@@ -23,7 +23,15 @@ export default function GrammarBandControl({
 }) {
   const { t } = useT();
   return (
-    <div className="wk-grade gram-x-band" role="group" aria-label={t('grammar.familiarity.legend')}>
+    // `lq-hit-scope` floors the five band buttons from the container: they measured
+    // 92x25 live, so only the block axis is short and the expander cannot reach a
+    // horizontal neighbour. Scoped here rather than on `.wk-grade`, which
+    // `DictionaryPopup` also owns and which has its own geometry.
+    <div
+      className="wk-grade gram-x-band lq-hit-scope"
+      role="group"
+      aria-label={t('grammar.familiarity.legend')}
+    >
       {GX_LEVELS.map((_label, i) => {
         const band = i as GxLevel;
         const active = level === band;

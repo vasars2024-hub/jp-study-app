@@ -7962,12 +7962,28 @@ mark.lookup-mark,
   gap: 6px;
   margin-bottom: 8px;
 }
+/* `.gram-x-detail` is `overflow: auto`, so it CLIPS the scope's expander back to its
+   own padding box: with `lq-hit-scope` on this row the walk still read 29.5 of 32 and
+   named `div.gram-x-detail` as the blocker. That is the clipper obstacle the sheet
+   documents, and its stated fallback is the only thing that works here — the control
+   takes the floor on its own box. */
+.gram-x-detail-actions .ui-btn {
+  min-height: var(--lq-hit-target);
+}
 .gram-x-row {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   padding: 4px 6px;
   border-radius: 7px;
+}
+/* The one control `.lq-check` alone could not lift: the row is ~30px tall, so the
+   expander centred on a 20px checkbox bled into the NEXT row's title and the walk
+   read 30, not 32 — `span.gram-x-title` is named as its blocker. The floor goes on
+   the LABEL, which is transparent and not a replaced element, so the row grows and
+   the tick box does not. */
+.gram-x-row .lq-check {
+  min-height: var(--lq-hit-target);
 }
 .gram-x-row.focused {
   background: color-mix(in srgb, var(--accent-2) 16%, transparent);
@@ -8017,6 +8033,13 @@ mark.lookup-mark,
 }
 .gram-x-preset-name {
   min-width: 140px;
+  /* Replaced elements: `::after` generates no box on them, so `.lq-hit-scope` on
+     `.gram-x-presets` provably cannot reach these two. Measured live at 21.5 and
+     19.5 against the 32px floor; the floor goes on their own boxes. */
+  min-height: var(--lq-hit-target);
+}
+.gram-x-preset-select {
+  min-height: var(--lq-hit-target);
 }
 .gram-x-status {
   font-size: 12px;

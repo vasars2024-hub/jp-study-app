@@ -3370,3 +3370,98 @@ and the qualification is recorded here so the next worker re-runs
 `cat1-accessibility.cjs` on `files` before quoting that 10/10. If it fails, the
 cell comes back on the board — the same way `c7fa2df7`'s and `c7b9c21d`'s did.
 
+## 2026-09-04 · backup — `grammar` category 1 closes at 10/10, and the floor had no primitive for half the controls
+
+`7b3b2207`, `31c157b2`. Surface `@.fwin:has(.gram-view)`, window 1, 820x580, standard
+presentation. **PASS 10/10, controlled.**
+
+    belowFloorByHit   27 -> 11 -> 2 -> 0      stolen 0 throughout      occluded 0 throughout
+
+Four numbers, four steps, because the 27 were three DIFFERENT obstacles and the walk named
+each blocker rather than leaving it to be guessed:
+
+| n | blocker named by the walk | remedy |
+|---|---|---|
+| 16 | none — `input[type=checkbox]`, 13px, no class | `.lq-check`, new primitive |
+| 1 | `span.gram-x-title` | `.gram-x-row .lq-check` min-height |
+| 2 | `div.gram-x-presets` (a select and a text field) | min-height on their own boxes |
+| 4+1+1 | none — plain buttons | `lq-hit-scope` on their containers |
+| 2 | `div.gram-x-detail` (`overflow: auto`) | min-height on the control |
+
+**THE FINDING WORTH CARRYING, and it is not about Grammar.** `liquid-controls.css` has said
+since the floor was written that `input` and `select` are excluded from `.lq-hit-scope`
+because `::after` generates no box on a replaced element, and that the floor is therefore
+"a `min-height` on the control, written where the control lives". It is written where the
+control lives in **zero** places. There are **245 native checkboxes across 97 renderer files**
+and not one carries a floor. The sheet named the hole and then left 97 call sites to each
+remember it — which is the failure mode RULE C exists for, and it is why this scored FAIL on
+a surface nobody would have suspected (WCAG 2.5.8 passes cleanly here, 0 fails, nearest
+neighbour 58px, so it reads as fine until it is walked).
+
+`.lq-check` fills it. The construction is the finding: the floor CANNOT go on the checkbox,
+because `min-height` on a tick box is visual growth and `css-measure` §2 already records that
+as damage. It goes on a `<label>` WRAPPING the control — label activation forwards the click,
+so the label carries 32px and the checkbox does not change size. **On a `span` the same
+expander is a dead region that SWALLOWS the click while still reading as a 32px target to
+`elementFromPoint`** — fixed to the instrument, a regression to a pointer. That span is the
+unit test's negative control, and it asserts the box stays unchecked.
+
+Control run, all six legs: contrast, targets-by-pointer, targets-by-rect, 2.5.8, keyboard and
+decorative-exemption **all MOVED**; `plantCaughtByPointer: 2`; `backToBaseline: true`,
+`rectDrift: 0`. Other four bars already true and still true: contrast min **5.35**, unreachable
+**0**, motionAfter **0**, 2.5.8 fails **0**.
+
+`belowFloorByRect` finishes at **28** and that is the correct answer, not a half-fix: the floor
+is a pointer region. Only two rules here grow a box, each because a clipper or a replaced
+element makes an expander impossible.
+
+**TRAP THAT COST ME A FALSE "NOTHING MOVED".** The `targets32` bar is
+`belowFloorByHit === 0 && stolenCount === 0`. `targets.under32Count` and `targets.smallest`
+are RECT numbers and do not move when a floor lands — they read 36 and "input 13px" both
+before and after, identically. Read `hit.belowFloorByHit`; a diff of the `targets` block alone
+says the fix did nothing.
+
+**THE PREVIOUS HANDOFF'S "no way to drive the app" IS WRONG, and this is the cheap fix.** A
+bridge token lives in the instance's OWN `cwd/debug/bridge.json` — the worktree app's token was
+sitting in `jp-wt-filesapp/debug/bridge.json` the whole time, readable and valid. But do not
+drive another worker's app: `JP_DEBUG_PORT` alone is NOT enough for a second instance, because
+Electron's single-instance lock keys on the userData path, so the second copy quits into the
+first and its bridge never binds. `JP_USER_DATA_DIR` (dev-only, `main.ts:145`, written for
+exactly this) is the missing half. The full recipe, ~3 minutes:
+
+    $env:JP_DEBUG_PORT="39274"; $env:PORT="5174"
+    $env:JP_USER_DATA_DIR="$env:USERPROFILE\.claude-runs\backup-scratch-profile"
+    npm start
+
+A scratch profile is a FIRST RUN, so it lands on the consent gate with the shell unmounted —
+hiding the node reveals nothing. Record the DECLINE instead (`jp-telemetry-consent` = `no`,
+no network call) and complete the tour (`jp-study.onboarding.v1.completedAt`), then reload.
+
+## 2026-09-04 · backup — `grammar` category 2 is NOT closed, and five failed drives say exactly why
+
+No score. Recorded so the next worker does not spend the same five attempts. `cat2` is the
+one harness whose `--task` cannot be lifted from another surface, and Grammar breaks the
+usual shape in three ways:
+
+1. **`--undo` must restore FOCUS, not just the filter.** `clear:.gram-search` alone
+   round-trips the text but not the selected point, so a task that clicks any row returns
+   `VOID - undo did not restore the surface` with a changed `textHash`. The one drive that
+   completed did so only because it clicked the row that was ALREADY focused — which then
+   scored its own single dead end (`moved.any: false`). That dead end is an **instrument
+   artifact, not a product defect**: after a filter, `focused` falls back to `list[0]`, so
+   the detail already shows what was clicked. Do not bank it as a finding.
+2. **`nth-of-type` cannot address a row.** `VirtualList` gives every `.gram-x-row` its own
+   unclassed wrapper `div`, so each row is `:nth-of-type(1)` of its own parent and
+   `.gram-x-row:nth-of-type(4)` matches **0**. `.gram-x-row:not(.focused)` addresses the
+   right element and is the selector to use.
+3. **…and that selector then fails `centre resolves to null`** at 820x580, because the
+   first non-focused row of a filtered list falls below the visible body. The drive needs a
+   `scroll:` step, or a filter term that leaves the target on screen.
+
+Measured before the VOID, and true as far as it goes: `modalTraps` 0, `scrollTraps` 0,
+`latency` within bar, `openDialogs` 0. `costParity` UNMEASURED — it needs `--compare`.
+**Four bars true is not 10/10 and this is not scored.** Next drive to try, in one line:
+
+    --task "type:.gram-search=ば >> wait:600 >> scroll:.gram-x-list=0 >> click:.gram-x-row:not(.focused) .gram-x-row-main"
+
+State restored: filter cleared, 17 rows, 0 dialogs open.
