@@ -1104,7 +1104,7 @@ export default function ReadingListsView({
             {t('readingLists.view.library.noMatch', { query: pickFilter.trim() })}
           </p>
         ) : (
-          <ul className="rlv__picker-list">
+          <ul className="rlv__picker-list" aria-label={t('readingLists.view.library.listLabel')}>
             {candidates.map((item) => (
               <li key={item.id}>
                 <button
@@ -1330,7 +1330,7 @@ export default function ReadingListsView({
         ) : visibleRows.length === 0 ? (
           <p className="rlv__state">{t('readingLists.view.filterEmpty', { query: filter.trim() })}</p>
         ) : (
-          <ul className="rlv__rows">
+          <ul className="rlv__rows" aria-label={t('readingLists.view.rowsLabel', { name: list.name })}>
             {visibleRows.map((row) => {
               const suggested = row.suggestion ? row.work?.suggestion : undefined;
               return (
@@ -1492,7 +1492,9 @@ export default function ReadingListsView({
           {exampleHint}
         </form>
       ) : (
-        <ul className="rlv__grid">
+        // Named, because "list, 3 items" with no name is what a reader says
+        // about an unlabelled <ul>, and this surface has three of them.
+        <ul className="rlv__grid" aria-label={t('readingLists.view.title')}>
           {summaries.map((summary) => (
             <li key={summary.listId} className="rlv__card" data-archived={summary.archived}>
               <button
@@ -1527,13 +1529,17 @@ export default function ReadingListsView({
                     counted: summary.counted,
                   })}
                 </span>
-                <span
-                  className="rlv__bar"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={summary.counted}
-                  aria-valuenow={summary.finished}
-                >
+                {/*
+                  DECORATIVE, and it used to claim `role="progressbar"` with
+                  `aria-valuenow`. ARIA gives `button` presentational children,
+                  so that role was stripped from the accessibility tree in every
+                  browser — it announced nothing while making the source read as
+                  covered. §11.4 asks for progress "announced as text rather
+                  than colour alone", and the sentence directly above this bar
+                  is that text, inside the same button, so it is already part of
+                  the name the card is announced with.
+                */}
+                <span className="rlv__bar" aria-hidden="true">
                   <span
                     className="rlv__bar-fill"
                     style={{ width: `${Math.round(summary.progress * 100)}%` }}

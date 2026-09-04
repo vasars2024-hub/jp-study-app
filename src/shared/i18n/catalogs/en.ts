@@ -11858,6 +11858,7 @@ export const en: Catalog = {
   'readingLists.view.library.label': 'Pick a book you already have',
   'readingLists.view.library.filterPlaceholder': 'Search your library',
   'readingLists.view.library.showing': 'Showing {shown} of {total}.',
+  'readingLists.view.library.listLabel': 'Books in your library',
   'readingLists.view.library.emptyLibrary':
     'Your library is empty, so there is nothing to add from it yet.',
   'readingLists.view.library.noMatch': 'Nothing in your library matches “{query}”.',
@@ -11927,6 +11928,7 @@ export const en: Catalog = {
   'readingLists.view.pasteSubmit': 'Preview',
   'readingLists.view.pasteCancel': 'Cancel',
   'readingLists.view.filterLabel': 'Filter this list',
+  'readingLists.view.rowsLabel': 'Books in {name}',
   'readingLists.view.filterPlaceholder': 'Filter by title',
   'readingLists.view.filterCount': '{shown} of {total} shown',
   'readingLists.view.filterEmpty': 'Nothing in this list matches “{query}”.',
