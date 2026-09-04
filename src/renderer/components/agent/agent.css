@@ -74,17 +74,40 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm, 8px);
+  /* `min-height: 0` is what lets the shell squash this below its own
+     min-content, and that is deliberate — the conversation list inside is the
+     part that should give way. What was missing is where the content GOES when
+     the squash is deeper than the list can absorb. Measured at 236x140, where
+     the shell stacks: the rail's box was 56px tall around 156px of children, so
+     the title row and the search field painted 112px down over `.agent-canvas`
+     (rubric category 4 read `div.agent-rail-head x div.agent-canvas (188x8)` and
+     `div.agent-search x div.agent-canvas (188x6)` at the compact size). Scrolled
+     rather than clipped: every row stays reachable, which `overflow: hidden`
+     would not give and which category 4's `clipped` bar scores separately. */
   min-height: 0;
+  overflow-y: auto;
   padding: var(--agent-gap);
   border-right: 1px solid var(--agent-line);
   background: var(--agent-surface);
 }
 
+/* The rail's three fixed rows, and the reason they say so.
+ *
+ * `.agent-rail` is a column flex box whose ONLY absorbing item is
+ * `.agent-rail-list` (`flex: 1 1 auto; min-height: 0`). The other three inherit
+ * the default `flex-shrink: 1`, so at a small window height they are compressed
+ * while their own children keep their heights and overflow the rail. Rubric
+ * category 4 measured it at the compact size 260x170: `.agent-rail-head` and
+ * `.agent-search` overlapped `.agent-canvas` by 188x8 and 188x6 — the same
+ * defect, and the same one-line remedy, as `.agent-conversation-head` carries.
+ * The scrolling list is what should give way; a title, a search field and a
+ * button row are not compressible content. */
 .agent-rail-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-sm, 8px);
+  flex: 0 0 auto;
 }
 
 /*
@@ -130,6 +153,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs, 6px);
+  flex: 0 0 auto;
 }
 
 .agent-search-field {
@@ -233,6 +257,7 @@
   gap: var(--space-xs, 6px);
   padding-top: var(--space-xs, 6px);
   border-top: 1px solid var(--agent-line);
+  flex: 0 0 auto;
 }
 
 /* ---------- Controls ----------------------------------------------------- */

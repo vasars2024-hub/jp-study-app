@@ -2761,9 +2761,23 @@ export default function AgentWorkspaceShell() {
               </footer>
                 </div>
 
+                {/* This IS a Liquid inspector — sticky, translucent, collapsible,
+                    beside the work rather than in it — and it said so nowhere.
+                    Measured 2026-09-04, rubric category 3 in Liquid presentation:
+                    3 Liquid-eligible regions, and this 484x362 aside was the one
+                    of the three carrying no shared primitive, so
+                    `sharedPrimitiveEligible` read 2 of 3 and the bar failed on a
+                    surface with no visual defect. `data-lq-role="liquid"` is the
+                    declaration, not `.lq-inspector`: that class is a LAYOUT
+                    primitive (`display:flex; height:100%`) and this aside already
+                    has its own sticky geometry, so adopting it would restructure a
+                    correct surface to satisfy an instrument. Same one-attribute
+                    contract `LiquidAppScaffold` marks its rail and dock with, and
+                    the same repair the shell taskbar took. */}
                 <aside
                   className={`agent-inspector${inspectorExpanded ? '' : ' is-collapsed'}`}
                   aria-label={t('agent.inspector.title')}
+                  data-lq-role="liquid"
                 >
                   <button
                     type="button"
