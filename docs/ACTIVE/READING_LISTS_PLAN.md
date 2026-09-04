@@ -572,6 +572,45 @@ import error), and re-applies the intent on a CAS refusal. 16 tests, 4 negative 
 name. `tools/architecture-baseline.json` loses `test-only-module:readingListMatching.ts`,
 exactly as that entry's own escape clause said it would.
 
+**2026-09-04, `primary`. THE FORK IS CLOSED (`120a838a`) and P4 is open (`97f00f6f`).**
+**4 of 6 phases, on ONE branch** — see §9.2 for what the merge cost and what it caught.
+
+`shared/readingListViews.ts` is the pure model §6's two surfaces draw from, landed
+before any component for the same reason P1b landed the mutation layer before any
+surface: three callers want it (the view, §11.2's widgets, P5's smart lists) and a
+count computed inside a component is a count two surfaces will eventually disagree
+about. Two decisions, both load-bearing:
+
+- **`abandoned` and `skipped` are OUT of the progress denominator.** §5.9 makes
+  abandoned first-class precisely so a book put down on purpose stays out of the
+  pace maths, and a bar a deliberate abandonment drags down IS the shame column
+  that clause exists to delete. Ten entries, two abandoned, eight finished reads
+  **8/8** — so `total` and `counted` are separate fields and a card can say both.
+  An all-abandoned list reads 0, never `NaN`.
+- **Row order is TOTAL** — `order`, then `addedAt`, then `id`. Two entries can
+  share an `order` (an import racing a reorder produces exactly that) and a list
+  that reshuffles between renders is indistinguishable from data loss to the
+  person watching it. The test re-sorts the already-sorted array, which is what a
+  re-render actually does.
+
+Smaller, and each one a defect avoided: triage counts per **work**, so a book
+pasted twice onto one list does not claim two decisions; the mosaic takes at most
+four covers and never one item id twice; `readingListRows` never yields a blank
+title (it falls back to the pasted raw line) and never drops a row whose work is
+missing. `itemId: null` is documented as a **destination** — §11.1's acquisition
+path — not as a missing one.
+
+Controls: emptying `EXCLUDED_FROM_PROGRESS` and flattening the order tiebreak to
+`return 0` → **3 RED**, each by the name of the rule it breaks. Restored
+byte-identical, 15/15 green.
+
+**Exact next slice: P4b — the `ReadingListsView` surface, plus i18n ×4.** Grid of
+cards off `summarizeReadingLists`, detail rows off `readingListRows`, and then
+mount `ReadingListPasteFlow.tsx` **verbatim**: `tools/architecture-baseline.json`
+holds it PENDING as a route with no consumer, and that entry's own escape clause
+says to re-key it to accepted the moment a P4 surface renders it. §11 is the
+larger half of P4 and it is a gate.
+
 ### 9.2 FORK — RESOLVED 2026-09-04 by `primary`. Do not re-derive it.
 
 **The integration merge is on `feat/nyaa-subtitles`.** `wt/files-app` merged in whole, the
