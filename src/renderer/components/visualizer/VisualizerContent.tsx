@@ -82,7 +82,26 @@ export function VizStage({
   return (
     <div className={classes.root}>
       <VisualizerCanvas className={classes.canvas} settings={settings} idleBaseline />
-      {!playing && <span className={classes.hint}>{hint}</span>}
+      {/* The idle hint READ like an action long before it was one: a music glyph and the
+          words "Open Music", painted `pointer-events: none`, while the only real route sat
+          in a dock that is quiet until hover or focus. Rubric category 5 scored the surface
+          7/10 for exactly that — 0 entry points and no primary action — and a label shaped
+          like a button that does nothing is the honest-states defect, not a layout one. It
+          is now the surface's declared primary action wherever a route exists; Blanc passes
+          no handler, so it degrades to the same painted text it always was. */}
+      {!playing &&
+        (onOpenMusic ? (
+          <button
+            type="button"
+            className={`${classes.hint} viz-widget-hint-action lq-hit-placed`}
+            data-primary
+            onClick={onOpenMusic}
+          >
+            {hint}
+          </button>
+        ) : (
+          <span className={classes.hint}>{hint}</span>
+        ))}
       {(onOpenMusic || onOpenSettings) && (
         <ContextualSurface
           className="viz-widget-dock"

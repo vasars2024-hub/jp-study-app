@@ -642,6 +642,32 @@ const SNAP = `(function(){
       : (rq('h1,h2,[role="heading"],[class*="-title"],[class*="-header"] [class*="name"]').filter(function(e){
           return painted(e) && (e.textContent || '').trim().length > 0; })[0] || null);
   var titleText = titleEl ? (titleEl.textContent || '').trim() : '';
+  /*
+   * A LOCATION LABEL THE PRODUCT AUTHORS, not only one it PAINTS -- measured 2026-09-04 on
+   * the Visualizer widget. Three desktop trinkets (visualizer, music widget, Mooncap garden)
+   * deliberately paint no title text: DesktopShell returns the empty string for them so a
+   * 380x200 ambient window does not carry a title bar's worth of chrome, and the taskbar
+   * names them. The probe read the fwin title span only, so it scored those three as
+   * UNLOCATED -- a NO whose remedy would have been to add back the chrome the design
+   * deliberately removed. That is fixing the instrument's art, not the product's defect.
+   *
+   * The real defect the run exposed is narrower and worth keeping: a section element with no
+   * accessible name is not a region landmark, so all three were unnamed to assistive tech.
+   * That is repaired in the product, with an aria-label on the untitled window only. The bar
+   * widens to match: an AUTHORED name counts, painted or announced.
+   *
+   * STRICT SUPERSET, so nothing already banked can move: the fallback is reached only when
+   * titleText is empty, and an empty titleText already scored NO. It can turn a NO into a
+   * YES and can never turn a YES into a NO. titleFrom records which of the two answered, so
+   * a reader can still see that this surface has no PAINTED title.
+   *
+   * NO BACKTICKS in this block: it lives inside the SNAP template literal, and one closes it.
+   */
+  var titleFrom = titleEl ? name(titleEl) : null;
+  if (!titleText && isFwin) {
+    var ariaName = (root.getAttribute('aria-label') || '').trim();
+    if (ariaName) { titleText = ariaName; titleFrom = name(root) + '[aria-label]'; }
+  }
   var backAffordances = controls.filter(function(e){
     var l = (e.getAttribute('aria-label') || e.title || e.textContent || '').trim();
     return /^(back|home|close|exit|×|✕|返回|назад|戻る|閉じる)$/i.test(l)
@@ -1126,7 +1152,7 @@ const SNAP = `(function(){
     q1: { entryPoints: entryPoints, primaryInputs: primaryInputs.length, accentButtons: accentButtons.length,
           accentList: accentButtons.map(function(e){ return name(e) + '::' + (e.textContent||'').trim().slice(0,18); }),
           inputList: primaryInputs.map(name) },
-    q2: { titleText: titleText, titleFrom: titleEl ? name(titleEl) : null, backAffordances: backAffordances.length,
+    q2: { titleText: titleText, titleFrom: titleFrom, backAffordances: backAffordances.length,
           backList: backAffordances.slice(0,6).map(function(e){ return (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0,20) || name(e); }) },
     q3: { primaryAction: primaryAction ? name(primaryAction) : null, insideBodyViewport: primaryVisible,
           explicitlyMarked: !!explicitPrimary },
@@ -1238,6 +1264,25 @@ const PLANT_JS = `(function(){
   });
   var titleEl = titleEls[0] || null;
   var savedTitle = titleEl ? titleEl.getAttribute(${A(PLANT)} + '-text') : null;
+  /*
+   * THE AUTHORED NAME IS PART OF THE Q2 TERM, so the plant has to take that too. SNAP now
+   * falls back to the root's aria-label when nothing is painted -- the three untitled desktop
+   * trinkets -- and a plant that blanks only painted titles cannot make the widened term
+   * answer NO. Measured 2026-09-04 on the Visualizer: the first control run after the
+   * widening reported CONTROL DID NOT FAIL on Q2 on a question that had just been
+   * falsifiable, which is exactly what this control exists to catch, and it caught it.
+   *
+   * The marker is a SUFFIXED attribute and never the bare plant attribute: SNAP's notPlant
+   * term is closest(plant-attr), so tagging the ROOT would make every control inside the
+   * surface read as the harness's own and would silently null Q3's primaryAction. The
+   * residue sweep below is widened by the same suffix, so an unrestored name still counts.
+   */
+  var ariaStripped = false;
+  if (isFwin && root.hasAttribute('aria-label')) {
+    root.setAttribute(${A(PLANT)} + '-aria', root.getAttribute('aria-label'));
+    root.removeAttribute('aria-label');
+    ariaStripped = true;
+  }
 
   // Q3 — push EVERY primary-capable control far below the body's visible box.
   var NAV = 'nav,[role="tablist"],[class*="rail"],[class*="sidebar"],[class*="-nav"],[class*="tabs"]';
@@ -1363,6 +1408,7 @@ const PLANT_JS = `(function(){
     // Same reporting as the Q3 disjunction, for the same reason: a control that blanked one
     // of two title-shaped nodes measured nothing, so the count is stated rather than assumed.
     titlesBlanked: titleEls.length,
+    ariaNameStripped: ariaStripped,
     titleList: titleEls.map(function(e){ return e.tagName.toLowerCase() + '.' + String(e.className||'').split(' ')[0]; }),
     dashboardCards: kinds.length, expect: { Q2: 'NO', Q3: 'NO', Q4: 'NO', Q5: 'NO', Q10: 'NO' } });
 })()`;
@@ -1387,6 +1433,12 @@ const unplantJs = (savedTitle) => `(function(){
     t.removeAttribute('${PLANT}-text');
     t.removeAttribute(${A(PLANT)});
   });
+  // The stripped accessible name, restored from the node that carries it rather than from a
+  // captured variable, for the same reason the titles are.
+  [].slice.call(document.querySelectorAll('[${PLANT}-aria]')).forEach(function(r){
+    r.setAttribute('aria-label', r.getAttribute('${PLANT}-aria'));
+    r.removeAttribute('${PLANT}-aria');
+  });
   // Each moved node carries its OWN previous inline transform, so a plant that attacked
   // three nodes restores three, and none of them is restored to another one's value.
   var moved = [].slice.call(document.querySelectorAll('[${PLANT}="moved"]'));
@@ -1400,7 +1452,7 @@ const unplantJs = (savedTitle) => `(function(){
     // The whole marker family, including \`-html\`. A residue count that does not sweep every
     // attribute the plant writes reports 0 while the app still carries one, which is the
     // exact shape of the restore defect this directory already paid for once.
-    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform],[${PLANT}-text],[${PLANT}-html]').length });
+    residue: document.querySelectorAll('[${PLANT}],[${PLANT}-transform],[${PLANT}-text],[${PLANT}-html],[${PLANT}-aria]').length });
 })()`;
 
 // ---------------------------------------------------------------------------- scoring
