@@ -663,6 +663,24 @@
     agent: {
       titleRe: /Agent|エージェント|代理|Агент/i,
       rootSel: '.agent-root, .agent-shell',
+      // CORRECTION 2026-09-04 — the third shape of the trap `__probeInput` exists for, and
+      // the first where the dirtied control neither navigates nor clears: it FILTERS.
+      //
+      // The generic "first visible text field" rule picks `.agent-search-input`, the
+      // conversation-history filter, because it sits at the top of the rail. Typing
+      // `lqp-roundtrip-食` into it matches nothing, so the rail renders zero rows while
+      // `.agent-rail-count` keeps saying "17 conversations" — and `check()` then scores
+      // `conversationRail (conversations=0 selected=0)` and
+      // `railCount (headCount="17 conversations" rows=0)` as FALSE. Both are live and
+      // correct: the SAME `window.__LQP.check('agent')` run by hand with the filter empty
+      // returns 7/8 with both rows true. Reproduced on two consecutive runs before this
+      // was written, so it is deterministic, not a settle race.
+      //
+      // The composer is the right field instead: a real uncontrolled textarea whose value
+      // must survive a presentation round trip, which is what the leg is for, and it filters
+      // nothing. The `composer` row asserts only `value.length > 0`, so the round trip's own
+      // mark satisfies it exactly as the drive's text does.
+      probeInput: (w) => qa(w, 'textarea').find((x) => /agent|Ask about/i.test(`${x.className} ${x.placeholder || ''}`)),
       features: [
         {
           // The rail is the conversation list. Exactly one selected, or the canvas
@@ -709,12 +727,25 @@
         {
           // L5's retention half from the Agent's side: every context item carries a
           // remove control, i.e. every add has an intentional reverse.
+          //
+          // CORRECTED 2026-09-04, and the correction is one row strengthened and one
+          // instrument bug removed. `removes > 0` passes a shelf of three items holding one
+          // remove control, which is the exact defect this row exists to catch — the
+          // denominator has to be the ITEMS. And the row could never pass at all: the
+          // driver ran every declared step, `newConversation` was one of them, so `check()`
+          // always landed on a fresh conversation whose shelf is empty. Zero items is an
+          // EMPTY HARNESS, not a reversibility failure, and the rubric caps a category
+          // measured on one at 0 — so this is fixed by making the DRIVE establish real
+          // context (`selectAnswered` then `branchContext` below), never by excusing the
+          // row. Zero items still reads FALSE here rather than `na`, so an empty shelf can
+          // never be mistaken for a pass.
           id: 'contextShelf',
           f: (w) => {
             const removes = qa(w, 'button').filter((b) =>
               /Remove .* from context/i.test(`${txt(b)} ${b.getAttribute('aria-label') || ''}`),
             ).length;
-            return { ok: removes > 0, ev: `removeControls=${removes}` };
+            const items = qa(w, '.agent-context-item').length;
+            return { ok: items > 0 && removes === items, ev: `contextItems=${items} removeControls=${removes}` };
           },
         },
         {
@@ -738,12 +769,43 @@
         },
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
+      // ORDER IS DECLARED, not inherited from `Object.keys(steps)`. The default runs every
+      // step, and `newConversation` leaves the surface on an empty conversation — which is
+      // exactly the state `contextShelf` cannot be measured in. The two context steps run
+      // LAST so the shelf the check reads is the one the drive built.
+      drive: ['type', 'newConversation', 'selectAnswered', 'branchContext'],
       steps: {
         type: (w, text) => {
           const t = qa(w, 'textarea').find((x) => /agent|Ask about/i.test(`${x.className} ${x.placeholder || ''}`));
           if (!t) return { refused: 'no composer' };
           typeInto(t, text == null ? 'parity probe text' : text);
           return { typed: t.value };
+        },
+        // Two steps, not one, because of trap "A STEP MAY NOT READ THE STATE IT JUST
+        // CHANGED": React commits after the dispatching task, so a single step that clicked
+        // a rail entry and then looked for that conversation's branch chip would be reading
+        // the PREVIOUS conversation's DOM.
+        selectAnswered: (w) => {
+          const row = qa(w, '.agent-rail-item').find((li) => {
+            const n = (txt(q(li, '.agent-rail-entry-meta')).match(/(\d+)\s*message/) || [])[1];
+            return n != null && Number(n) > 0;
+          });
+          if (!row) return { refused: 'no conversation with messages on this profile' };
+          const entry = q(row, '.agent-rail-entry');
+          if (!entry) return { refused: 'row has no entry control' };
+          entry.click();
+          return { selected: txt(q(row, '.agent-rail-entry-title')).slice(0, 40) };
+        },
+        // The product's OWN route into the context shelf: "Follow up in a new conversation"
+        // branches the selected message into a fresh conversation carrying that message as
+        // context, which is an ordinary add with its ordinary remove control. Nothing here
+        // reaches past the UI into a store — an attach synthesised by calling a module
+        // function would prove the shelf renders, not that a user can fill it.
+        branchContext: (w) => {
+          const chip = q(w, '.agent-message-branch');
+          if (!chip) return { refused: 'selected conversation has no branchable message' };
+          chip.click();
+          return { branched: txt(chip).slice(0, 40) };
         },
         newConversation: (w) => {
           const b = btnByText(w, /^New conversation$/);
