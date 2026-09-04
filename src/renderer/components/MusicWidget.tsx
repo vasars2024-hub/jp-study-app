@@ -302,7 +302,13 @@ export default function MusicWidget() {
     art ? (
       <img className={cls} src={art} alt="" draggable={false} />
     ) : (
-      <div className={`${cls} mwidget-art-empty`} style={{ background: `linear-gradient(135deg, ${pal.primary}, ${pal.secondary})` }}>
+      // A generated cover, not one of the four honest states. It was called
+      // `mwidget-art-empty`, and category 8 finds state hosts by `[class*="empty"]`
+      // -- so a painted tile carrying an icon and no text scored as an empty state
+      // that renders no message, `statesNamed 0 of 1`, while the widget's REAL empty
+      // state (`.mwidget-empty`, translated, with a route) was off screen because a
+      // track was playing. The name was wrong before the probe read it.
+      <div className={`${cls} mwidget-art-fallback`} style={{ background: `linear-gradient(135deg, ${pal.primary}, ${pal.secondary})` }}>
         <Icon name="music" size={big ? 40 : 22} />
       </div>
     );

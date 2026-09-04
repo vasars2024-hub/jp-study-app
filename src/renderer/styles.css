@@ -13213,7 +13213,7 @@ mark.lookup-mark,
   border-radius: 8px;
   object-fit: cover;
 }
-.mwidget-art-empty {
+.mwidget-art-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
