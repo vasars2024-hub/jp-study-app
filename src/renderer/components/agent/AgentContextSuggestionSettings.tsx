@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
+  AGENT_CONTEXT_SUGGESTION_EXPLANATION_LANGUAGES,
   AGENT_CONTEXT_SUGGESTION_SOURCES,
+  type AgentContextSuggestionExplanationLanguage,
   type AgentContextSuggestionPreferences,
   type AgentContextSuggestionSource,
 } from '../../../shared/agentContextSuggestions';
+import { LANG_LABELS, LANG_TAGS } from '../../../shared/i18n/core';
 import {
   loadAgentContextSuggestionPreferences,
   onAgentContextSuggestionPreferencesChanged,
@@ -75,6 +78,32 @@ export function AgentContextSuggestionSettings({
             />
           </label>
         ))}
+        {/* The strip used to carry this as a select that forgot itself on every
+            remount. Here it persists, and it is beside the switches that decide
+            which suggestions exist at all. */}
+        <label className="agent-context-suggestion-language-field lq-check">
+          <span>{t('blanc.agent.suggestions.explanationLanguage')}</span>
+          <select
+            value={current.explanationLanguage}
+            disabled={!current.enabled}
+            onChange={(event) => commit({
+              explanationLanguage: event.currentTarget
+                .value as AgentContextSuggestionExplanationLanguage,
+            })}
+          >
+            {AGENT_CONTEXT_SUGGESTION_EXPLANATION_LANGUAGES.map((option) => (
+              <option
+                key={option}
+                value={option}
+                lang={option === 'ui' ? undefined : LANG_TAGS[option]}
+              >
+                {option === 'ui'
+                  ? t('blanc.agent.suggestions.explanationLanguage.ui')
+                  : LANG_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
     </section>
   );

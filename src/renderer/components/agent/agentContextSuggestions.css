@@ -32,25 +32,40 @@
   font-weight: 400;
 }
 
-.agent-context-suggestion-language select {
-  max-width: 9rem;
+/* The chooser lives in the settings panel now; the strip only prints the value.
+   These two rules followed the `<select>` there rather than being deleted and
+   rewritten, so the control looks the same in its new home. */
+.agent-context-suggestion-language-field select {
+  max-width: 11rem;
   min-height: 28px;
   border: 1px solid var(--agent-line, #493338);
   border-radius: 7px;
-  color: var(--agent-text, #f5edef);
-  background: var(--agent-surface, #171214);
+  color: var(--text, #f4edef);
+  background: var(--surface-2, #171214);
   font: inherit;
+  font-size: 0.76rem;
 }
 
-.agent-context-suggestion-language select:focus-visible {
-  outline: 2px solid var(--agent-accent, #c84b5f);
+.agent-context-suggestion-language-field select:focus-visible {
+  outline: 2px solid var(--accent, #b83d52);
   outline-offset: 2px;
 }
 
 .agent-context-suggestion-list {
   display: flex;
   flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
   gap: 6px;
+  list-style: none;
+}
+
+/* The li is a wrapper the list semantics need, not a box: it must not become a
+   second width constraint around a chip that already caps itself at 100%. */
+.agent-context-suggestion-list > li {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .agent-context-suggestion {

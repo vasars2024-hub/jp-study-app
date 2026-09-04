@@ -631,14 +631,17 @@ describe('Agent workspace shell', () => {
     const full = buttonWith('agent.view.full');
     expect(simple.getAttribute('aria-pressed')).toBe('true');
     expect(full.getAttribute('aria-pressed')).toBe('false');
-    expect((host.querySelector('.agent-composer-options') as HTMLElement).hidden).toBe(true);
+    // The provider picker lives inside `.agent-execution-limits` now, so the
+    // Full-only gate is on that disclosure rather than on the inner block.
+    expect(host.querySelector('.agent-execution-limits .agent-composer-options select')).toBeTruthy();
+    expect((host.querySelector('.agent-execution-limits') as HTMLElement).hidden).toBe(true);
     expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(true);
 
     await click(full);
 
     expect(simple.getAttribute('aria-pressed')).toBe('false');
     expect(full.getAttribute('aria-pressed')).toBe('true');
-    expect((host.querySelector('.agent-composer-options') as HTMLElement).hidden).toBe(false);
+    expect((host.querySelector('.agent-execution-limits') as HTMLElement).hidden).toBe(false);
     expect((host.querySelector('.agent-full-inspector') as HTMLElement).hidden).toBe(false);
   });
 

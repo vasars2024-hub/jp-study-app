@@ -31,6 +31,10 @@ const SRC = resolve(__dirname, '../..');
 const AGENT_CSS = resolve(SRC, 'renderer/components/agent/agent.css');
 const SHELL = resolve(SRC, 'renderer/components/agent/AgentWorkspaceShell.tsx');
 const SUGGESTIONS = resolve(SRC, 'renderer/components/agent/AgentContextSuggestions.tsx');
+const SUGGESTION_SETTINGS = resolve(
+  SRC,
+  'renderer/components/agent/AgentContextSuggestionSettings.tsx',
+);
 
 function code(text: string): string {
   return text
@@ -56,6 +60,7 @@ function block(css: string, selector: string): string {
 const css = code(readFileSync(AGENT_CSS, 'utf8'));
 const shell = code(readFileSync(SHELL, 'utf8'));
 const suggestions = code(readFileSync(SUGGESTIONS, 'utf8'));
+const suggestionSettings = code(readFileSync(SUGGESTION_SETTINGS, 'utf8'));
 
 describe('the conversation header contains its own controls', () => {
   /**
@@ -103,7 +108,7 @@ describe('the 32px pointer floor, by the route each control can actually take', 
   it('scopes the card list and the two context regions', () => {
     expect(shell).toContain('<ul className="agent-cards lq-hit-scope"');
     expect(shell).toContain('<div className="agent-context-item-head lq-hit-scope"');
-    expect(suggestions).toContain('<div className="agent-context-suggestion-list lq-hit-scope"');
+    expect(suggestions).toContain('<ul className="agent-context-suggestion-list lq-hit-scope"');
   });
 
   /**
@@ -114,7 +119,14 @@ describe('the 32px pointer floor, by the route each control can actually take', 
    */
   it('uses the label-wrapping form on both selects, never a scope', () => {
     expect(shell).toContain('<label className="agent-mode-picker lq-check"');
-    expect(suggestions).toContain('<label className="agent-context-suggestion-language lq-check"');
+    // The second select left the strip when the explanation language became a
+    // stored preference: the strip now PRINTS the language and the choice lives
+    // in the settings panel. The construction has to follow it, or the control
+    // simply loses its floor in its new home.
+    expect(suggestions).not.toContain('<select');
+    expect(suggestionSettings)
+      .toContain('<label className="agent-context-suggestion-language-field lq-check"');
+    expect(suggestionSettings).toContain('<select');
   });
 
   /**

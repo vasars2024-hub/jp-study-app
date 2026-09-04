@@ -2412,50 +2412,60 @@ export default function AgentWorkspaceShell() {
               ) : null}
 
               <form className="agent-composer" onSubmit={submitPrompt}>
-                <div className="agent-composer-options" hidden={viewMode === 'simple'}>
-                  <label className="agent-field">
-                    <span>{t('agent.execute.provider')}</span>
-                    <select
-                      value={target}
-                      onChange={(event) => {
-                        setTarget(event.target.value as AgentTargetChoice);
-                        setCloudSensitiveConsent(false);
-                      }}
-                      disabled={blocked}
-                    >
-                      <option value="local">{t('agent.execute.provider.local')}</option>
-                      {AGENT_CLOUD_TARGETS.map(({ providerId, labelKey }) => {
-                        const label = t(labelKey);
-                        return (
-                          <option key={providerId} value={providerId}>
-                            {providerNeedsKey(providerId)
-                              ? t('agent.execute.provider.noKey', { provider: label })
-                              : label}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </label>
-                  {targetNeedsKey ? (
-                    <p className="agent-cloud-notice agent-provider-no-key" role="status">
-                      {t('agent.execute.provider.noKeyHint')}
-                    </p>
-                  ) : null}
-                  {target !== 'local' ? (
-                    <label className="agent-check">
-                      <input
-                        type="checkbox"
-                        checked={allowLocalFallback}
-                        onChange={(event) => setAllowLocalFallback(event.target.checked)}
-                        disabled={blocked}
-                      />
-                      <span>{t('agent.execute.localFallback')}</span>
-                    </label>
-                  ) : null}
-                </div>
-
+                {/*
+                  The provider picker used to sit loose above this disclosure, so
+                  Full mode asked the reader to scan a model select before it asked
+                  for a prompt. It is the same class of tool as the budgets — how
+                  the request is executed, not what it says — so it lives in the one
+                  disclosure with them. Which provider is CURRENTLY selected is not
+                  hidden by this: `.agent-cloud-notice` below names it in both
+                  branches and is visible in Simple mode too, so the state stays on
+                  screen while the control tucks away.
+                */}
                 <details className="agent-execution-limits" hidden={viewMode === 'simple'}>
-                  <summary>{t('agent.execute.limits')}</summary>
+                  <summary>{t('agent.execute.modelAndLimits')}</summary>
+                  <div className="agent-composer-options">
+                    <label className="agent-field">
+                      <span>{t('agent.execute.provider')}</span>
+                      <select
+                        value={target}
+                        onChange={(event) => {
+                          setTarget(event.target.value as AgentTargetChoice);
+                          setCloudSensitiveConsent(false);
+                        }}
+                        disabled={blocked}
+                      >
+                        <option value="local">{t('agent.execute.provider.local')}</option>
+                        {AGENT_CLOUD_TARGETS.map(({ providerId, labelKey }) => {
+                          const label = t(labelKey);
+                          return (
+                            <option key={providerId} value={providerId}>
+                              {providerNeedsKey(providerId)
+                                ? t('agent.execute.provider.noKey', { provider: label })
+                                : label}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                    {targetNeedsKey ? (
+                      <p className="agent-cloud-notice agent-provider-no-key" role="status">
+                        {t('agent.execute.provider.noKeyHint')}
+                      </p>
+                    ) : null}
+                    {target !== 'local' ? (
+                      <label className="agent-check">
+                        <input
+                          type="checkbox"
+                          checked={allowLocalFallback}
+                          onChange={(event) => setAllowLocalFallback(event.target.checked)}
+                          disabled={blocked}
+                        />
+                        <span>{t('agent.execute.localFallback')}</span>
+                      </label>
+                    ) : null}
+                  </div>
+
                   <div className="agent-execution-limit-grid">
                     <label className="agent-field agent-budget-field">
                       <span>{t('agent.execute.inputBudget')}</span>

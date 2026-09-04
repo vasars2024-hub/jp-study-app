@@ -2,7 +2,7 @@ import type {
   AgentContextItem,
   AgentConversation,
 } from './agentWorkspace';
-import { LANG_LABELS, type UiLang } from './i18n/core';
+import { LANG_LABELS, UI_LANGS, type UiLang } from './i18n/core';
 
 export const AGENT_CONTEXT_SUGGESTION_PREFERENCES_VERSION = 1 as const;
 
@@ -18,10 +18,25 @@ export const AGENT_CONTEXT_SUGGESTION_SOURCES = [
 export type AgentContextSuggestionSource =
   (typeof AGENT_CONTEXT_SUGGESTION_SOURCES)[number];
 
+/**
+ * `'ui'` means "whatever the interface is set to", which is what the strip used
+ * to do implicitly by seeding a local select from the UI language. Keeping it as
+ * an explicit member rather than `undefined` is what lets a reader see that the
+ * setting exists and is deliberately following something else.
+ */
+export type AgentContextSuggestionExplanationLanguage = UiLang | 'ui';
+
 export interface AgentContextSuggestionPreferences {
   version: typeof AGENT_CONTEXT_SUGGESTION_PREFERENCES_VERSION;
   enabled: boolean;
   sources: Record<AgentContextSuggestionSource, boolean>;
+  /**
+   * Added after version 1 shipped. Every stored blob is run through
+   * `normalizeAgentContextSuggestionPreferences`, which is total, so an older
+   * blob without the field reads back as `'ui'` — the behaviour it already had.
+   * That is why the version is not bumped: there is nothing to migrate.
+   */
+  explanationLanguage: AgentContextSuggestionExplanationLanguage;
 }
 
 export const DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES: AgentContextSuggestionPreferences = {
@@ -35,7 +50,13 @@ export const DEFAULT_AGENT_CONTEXT_SUGGESTION_PREFERENCES: AgentContextSuggestio
     flashcards: true,
     settings: true,
   },
+  explanationLanguage: 'ui',
 };
+
+export const AGENT_CONTEXT_SUGGESTION_EXPLANATION_LANGUAGES = [
+  'ui',
+  ...UI_LANGS,
+] as const satisfies readonly AgentContextSuggestionExplanationLanguage[];
 
 export function normalizeAgentContextSuggestionPreferences(
   input: unknown,
@@ -49,6 +70,7 @@ export function normalizeAgentContextSuggestionPreferences(
   const raw = input as {
     enabled?: unknown;
     sources?: unknown;
+    explanationLanguage?: unknown;
   };
   const sourceInput = raw.sources && typeof raw.sources === 'object' && !Array.isArray(raw.sources)
     ? raw.sources as Record<string, unknown>
@@ -61,7 +83,19 @@ export function normalizeAgentContextSuggestionPreferences(
     version: AGENT_CONTEXT_SUGGESTION_PREFERENCES_VERSION,
     enabled: raw.enabled !== false,
     sources,
+    explanationLanguage: (AGENT_CONTEXT_SUGGESTION_EXPLANATION_LANGUAGES as readonly string[])
+      .includes(raw.explanationLanguage as string)
+      ? raw.explanationLanguage as AgentContextSuggestionExplanationLanguage
+      : 'ui',
   };
+}
+
+/** `'ui'` resolves against the interface language; anything else is an explicit override. */
+export function resolveAgentContextSuggestionExplanationLanguage(
+  preference: AgentContextSuggestionExplanationLanguage,
+  uiLang: UiLang,
+): UiLang {
+  return preference === 'ui' ? uiLang : preference;
 }
 
 function sourceText(item: AgentContextItem): string {

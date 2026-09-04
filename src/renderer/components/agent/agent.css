@@ -1334,6 +1334,12 @@
   font-weight: 600;
 }
 
+/* The provider block moved inside this disclosure, so it takes the same top gap
+   the limit grid already uses rather than the composer form's row gap. */
+.agent-execution-limits > .agent-composer-options {
+  margin-top: var(--space-sm, 8px);
+}
+
 .agent-execution-limit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
