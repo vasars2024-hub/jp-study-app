@@ -23,11 +23,18 @@
   padding: 10px;
 }
 
+/* Both icon buttons on this surface hardcoded a 26px box while every other control
+   in the same two headers took `--lq-hit-target` (32px, 96 call sites). cat1's hit
+   walk measured them at 26.99x26.99 with the header itself as the blocker, so they
+   were the only three controls below the floor on the whole surface — the window
+   chrome's 24px `.fwin-b` buttons are shared chrome and excluded from that walk.
+   The token, not another literal: a second hardcoded number is how the first one
+   survived. */
 .reading-captures-list-toggle {
   display: inline-flex;
   flex: 0 0 auto;
-  min-width: 26px;
-  min-height: 26px;
+  min-width: var(--lq-hit-target);
+  min-height: var(--lq-hit-target);
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -46,8 +53,8 @@
 
 .reading-captures-refresh {
   display: inline-flex;
-  min-width: 26px;
-  min-height: 26px;
+  min-width: var(--lq-hit-target);
+  min-height: var(--lq-hit-target);
   align-items: center;
   justify-content: center;
   padding: 0;
