@@ -6733,3 +6733,54 @@ Days to 2026-09-07 11:00 EDT, measured 14:16 EDT: **1.8639** (44 h 44 min).
 gap is now ~0.1 cells/day, the closest it has been, and this turn's 4 is the highest single-turn
 figure in that window. Numerator caveat unchanged: 4 of the 175 are `anki` cells on
 `wt/files-app`, so on `feat/nyaa-subtitles` alone it is 171.
+
+### Same turn, fourth slice — `reading-captures` **cat7 CLOSES 10/10. THE SURFACE IS 8 OF 8.**
+
+`cat7-perf.cjs --surface captures` VOIDed first, and the refusal was the harness being right:
+
+    VOID  heavy leg declares no proof, so "select every capture in turn" cannot be told apart
+          from an expression that refused: no proof, no claim
+
+The `captures` spec declared a `js` and neither `progress` nor `proof`. Its expression returned
+`'clicking N'` the instant it SCHEDULED its timeouts — it would have said exactly that with
+N = 0, with the capture list closed, with the timer throttled, or with every click landing on a
+detached node. The numbers underneath it (drag p50 **10.0 ms**, resize p50 **10.0**, theme p50
+**10.0** — flat 10s, a display cadence, not work) would then have described an IDLE renderer and
+read as a fast surface.
+
+**Correction 47** gives it `scrollAll`'s shape for a list whose work is SELECTION: clear the
+receipt before arming so a previous run cannot vouch for this one, refuse before arming when the
+subject is absent, count ticks the timer actually fired, count **distinct rendered passages**
+(a click that re-selects the same capture re-renders nothing), and restore the selection it
+found. Distinctness is hashed off `.reading-captures-passage` and not off the reader heading,
+because many captures share a `sourceLabel` and headings collapse.
+
+    heavyProof  "selected 20 of 20 rows, 7 distinct passages rendered, selection restored"
+    ceiling     p50 8.3  p95 8.5  max 9.1   over16 0   frames 225   main p95 3.7 ms
+    drag        p50 8.3  p95 8.5  max 8.6   over16 0
+    resize      p50 8.4  p95 16.8 max 25.1  over16 18
+    theme       p50 8.3  p95 8.5  max 25.1  over16 1
+    score 10 · voided [] · findings []
+
+**SENSITIVITY CONTROL (`--jank`), and it is what makes the numbers above mean anything.** The
+same drag leg re-run with the interaction probe's 120 ms renderer blocks: `dragJank` p95
+**116.7 ms**, max 116.8, `jank_blocks 10`, over16 10 — against the clean `drag` p95 of 8.5 with
+**0** frames over 16. The distribution gets far worse under injected blocking, so the recorder
+is seeing real frames rather than reporting a cadence.
+
+Also worth keeping: the three ceiling runs read p50 8.3 / 8.3 / 8.3 within this run — this is
+the paired in-process comparison the pin prefers over a quiet machine, and it held while a
+second worker was active in the same tree.
+
+**`reading-captures` is COMPLETE: cat1 ✓ cat2 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat7 ✓ cat8 ✓ — 8 of 8.**
+
+### RULE D — liquid. Closed by this worker: **5 cells (cat4, cat6, cat5, cat2, cat7). 176 of 192, 16 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:21 EDT: **1.8604** (44 h 39 min).
+`16 / 1.8604 = 8.60 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 8.60 against a trailing <=9: the required rate is BELOW the trailing rate for the
+first time — TARGET AT RISK is NOT declared this turn.** Stated with its caveat rather than as
+a headline: the trailing figure is an upper bound (`<=9`), so if the true trailing rate is 8 or
+lower the target is still at risk; and 4 of the 176 are `anki` cells on `wt/files-app`, so on
+`feat/nyaa-subtitles` alone the figure is 172 and 20 cells are outstanding there.
+The honest reading is that one surface finished 8 of 8 in a single turn, which has not happened
+before, and that the next surface starts from zero rather than from seven.
