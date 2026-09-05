@@ -115,6 +115,19 @@
  *     it). The exclusion is never taken on trust: the IDLE LEG samples the surface twice `--idle`
  *     ms apart with no input, at rest AND after the task, and VOIDs the run if anything UNDECLARED
  *     still moves, or if `--churn` excluded regions that never moved in either phase.
+ * 20. `--result` COUNTS RENDERED ROWS, AND A VIRTUALISED LIST ONLY RENDERS ITS VIEWPORT. Measured
+ *     live on Immersion, 2026-09-05, driving `.immersion-site-search input` over 1,199 saved sites
+ *     with `--result ".immersion-site-card"`: typing `red` narrowed the list from 1,199 rows to 356
+ *     and the harness scored the step a DEAD END, because the rendered count is pinned at the ~19
+ *     rows that fit and text/controls/results/scroll were all flat. The filter was never broken.
+ *     Negative control, same session: `zzzzqqq` -> 0 rendered, `quruli` -> 1 rendered, i.e. the
+ *     selector only reports the truth once the result set falls BELOW the viewport - which is the
+ *     one case a clunkiness run does not need help with. `scrollHeight` of the scrolling container
+ *     tracks the whole set (82,696 -> 24,555 -> 2,189 -> 69 -> 16 px across "", red, hltv, quruli,
+ *     zzzzqqq) and is now its own `resultVolume` channel. It is a SEPARATE channel, not folded into
+ *     `scroll`, so a report still says which fact made a step count; and it is restricted to
+ *     elements whose own `overflowY` is auto/scroll, so an ordinary reflow cannot manufacture
+ *     movement and hide a real dead end. Every VirtualList surface in the app shares this trap.
  * 10. A COMMENT INSIDE THE IN-PAGE TEMPLATE LITERAL MUST CONTAIN NO BACKTICK AND NO DOLLAR-BRACE.
  *     Both are a SyntaxError in the harness rather than in the browser, so the failure names the
  *     wrong file. Same trap the category-8 harness records.
@@ -483,6 +496,18 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     if (all[j].scrollTop || all[j].scrollLeft) scrollAcc.push(name(all[j]) + ':' + all[j].scrollTop + ',' + all[j].scrollLeft);
   }
 
+  // Correction 20. A VIRTUALISED LIST RENDERS ITS VIEWPORT, SO --result SATURATES.
+  // Only real scroll containers, and only their content height, so an ordinary reflow
+  // does not manufacture movement and mask a dead end.
+  var volumeAcc = [];
+  for (var v = 0; v < all.length; v++) {
+    var ve = all[v];
+    if (ve.scrollHeight - ve.clientHeight <= 2) continue;
+    var vcs = getComputedStyle(ve);
+    if (vcs.overflowY !== 'auto' && vcs.overflowY !== 'scroll') continue;
+    volumeAcc.push(name(ve) + ':' + ve.scrollHeight);
+  }
+
   // Correction 5's four exclusions. Each of them scored a real affordance as a defect once.
   var scrollTraps = [];
   var decorativeClips = [];
@@ -635,6 +660,7 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     scrollTraps: scrollTraps,
     decorativeClips: decorativeClips,
     scrollHash: hash(scrollAcc.join('\\u0001')),
+    volumeHash: hash(volumeAcc.join('\\u0001')),
     focus: ae ? name(ae) + '#' + (ae.id || '') : null,
     box: Math.round(WR.width) + 'x' + Math.round(WR.height),
     presentation: root.closest('.fwin') ? (root.closest('.fwin').getAttribute('data-presentation') || 'unset') : null
@@ -1040,6 +1066,8 @@ function movedBetween(a, b, opts) {
     results: a.results !== b.results,
     dialogs: a.dialogHash !== b.dialogHash,
     scroll: a.scrollHash !== b.scrollHash,
+    // Correction 20: the whole result set, not the rendered slice of it.
+    resultVolume: a.volumeHash !== b.volumeHash,
     focus: a.focus !== b.focus && !(opts && opts.maskFocus),
     box: a.box !== b.box,
   };
