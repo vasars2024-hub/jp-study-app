@@ -1747,3 +1747,51 @@ The guard is a rendered-DOM test, not a catalog scan, so it checks the string
 where a reader actually meets it, and it measures the write order in the same
 test rather than trusting the copy. Mutation control: restoring the old sentence
 turned **exactly 1 red, by name**; restored byte-identical (`b3012f32`), 78/78.
+
+## 2026-09-05, `primary` — Findings 6 and 8: a fallback that could not fire, and a control under the pointer floor
+
+**Finding 6, the pop-out seam.** `openListPoppedOut`'s own doc comment promised a
+fallback to opening in-window "whenever the hand-off cannot be staged or main
+refuses the window", and implemented only `.catch(...)`. `createPopoutWindow`
+returns a boolean; `ipcMain.handle('popout:open', ...)` was declared `: void` and
+dropped it, and both `preload.ts` and `window.d.ts` typed `popOut` as
+`Promise<void>`. A refusal therefore RESOLVED, so only a rejection could reach
+the fallback. Ctrl-click suppresses the normal open, which made a refusal a
+silent dead end — nothing popped out and nothing opened.
+
+Measured live against the running main (pid 20540, which predates the fix):
+`window.api.popOut('definitely-not-a-real-section')` — an id `createPopoutWindow`
+refuses — resolved `typeof 'undefined'`, not `false` and not a rejection, and the
+window count stayed at 1.
+
+The boolean now returns through main → preload → `window.d.ts`, and the renderer
+checks `opened === false` rather than falsy **on purpose**: main does not
+hot-reload, so a renderer on this build can be talking to an older main that
+resolves `undefined`, and that main DID open the window. Four new tests where
+there were none — refusal falls back, rejection falls back, success does NOT also
+route in-window, `undefined` counts as success. The last two are the controls.
+Mutation control: exactly 1 red, by name.
+
+Honest limit: `main.ts` is imported by no test in this repo, so the main-side half
+rests on the live probe, not a unit test.
+
+**Finding 8, the pointer floor.** `Try it with this` is a shared `Button size="sm"`,
+so growing the size would move every `sm` button in the app for one control.
+`.lq-hit` instead — the documented expander in `theme/liquid-controls.css`, which
+is imported unconditionally at `main.tsx:56`, so it is not gated behind a Liquid
+presentation. Both of that primitive's recorded failure modes were checked rather
+than assumed: `--lq-hit-target` resolves **32px** live (it has been dead before),
+and no ancestor of `.rlv__example` clips with `overflow: hidden`.
+
+Live, in the running renderer, with a negative control — the same node measured
+with and without the class:
+
+| | rect | `::after` height | `elementFromPoint` 1px inside the 32px band |
+| --- | --- | --- | --- |
+| without `lq-hit` | 103x26 | `auto` | **misses** → `DIV.rlv__example` |
+| with `lq-hit` | **103x26, unchanged** | **32px** | **hits the BUTTON** |
+
+That reproduces the audit's 103x26 independently and confirms the contract: the
+rendered rect does not grow, only the pointer target does. The probe node was
+removed. jsdom has no layout, so the committed test pins the OPT-IN, which is the
+realistic regression, and the geometry lives here.

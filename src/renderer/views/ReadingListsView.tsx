@@ -2030,6 +2030,15 @@ export default function ReadingListsView({
       <pre className="rlv__example-text">{READING_LIST_EXAMPLE_MESSAGE}</pre>
       <Button
         size="sm"
+        /*
+          Boss audit 2026-09-05 attempt 4, Finding 8: measured 103x26 live, under
+          the 32px pointer floor. `.lq-hit` rather than growing the control or
+          editing `size="sm"` — the shared size is used app-wide and this is one
+          button. The expander is an `::after` with `max(100%, var(--lq-hit-target))`,
+          so the RENDERED rect stays 26px and only the pointer target grows;
+          `theme/liquid-controls.css` documents that contract.
+        */
+        className="lq-hit"
         onClick={() => {
           setPasteText(READING_LIST_EXAMPLE_MESSAGE);
           setPasting(true);

@@ -605,6 +605,30 @@ describe('ReadingListsView', () => {
       expect(host.querySelector('.rl-preview')).not.toBeNull();
     });
 
+    it('opts the example button into the 32px pointer floor', async () => {
+      /**
+       * Boss audit 2026-09-05 attempt 4, Finding 8: `Try it with this` measured
+       * 103x26 live, under the floor this same window's commits (507248a3,
+       * 7b3b2207) spent effort enforcing elsewhere.
+       *
+       * jsdom has no layout, so the GEOMETRY cannot be proven here and was
+       * measured in the running renderer instead (rect stays 103x26, the
+       * `::after` becomes 32px, and `elementFromPoint` one pixel inside the band
+       * returns the BUTTON where it previously returned `DIV.rlv__example`).
+       * What this pins is the opt-in itself, because the realistic regression is
+       * someone dropping the class while editing the button.
+       */
+      const store = new FakeStore(sealReadingListsDocument(emptyReadingListsDocument()));
+      installBridge(store);
+      await render();
+
+      const example = host.querySelector('.rlv__example button');
+      expect(example).not.toBeNull();
+      expect(example?.classList.contains('lq-hit')).toBe(true);
+      // Not by growing the control: `sm` is shared app-wide and this is one button.
+      expect(example?.classList.contains('ui-btn--sm')).toBe(true);
+    });
+
     it('never shows a bare “No items”, and offers a route out of an empty list', async () => {
       const context = createReadingListsMutationContext(1_700_000_000_000);
       const made = createReadingList(emptyReadingListsDocument(), { name: 'Empty' }, context);
