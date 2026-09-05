@@ -1380,6 +1380,33 @@ file in it — disclose the skip count; and `qbitReapSubtitleOrphans` deletes th
 `jp-study-subtitles` category minus the in-flight hash, so drive it through
 `debug/qbit-basepath-proxy.cjs` with `G14_RECATEGORIZE=539c0886…` or lose the Kitsunekko archive.
 
+#### Gate 11's REAL constraint is the LIBRARY, not the index. Measured read-only 2026-09-05.
+
+This reframes the gate and it was found *before* paying for a transfer, which is the whole point of
+checking it. `attachSubtitleText` refuses with *"That media item is no longer in the library"* when
+`listItems()` has no match (`main/subtitleDiscovery.ts:975`) — so the gate's second and third
+clauses need a media item the cues honestly belong to. **`listMedia()` returns 39 items and ZERO
+match "conan"**: the library is `The Big O` (26 episodes + 3 creditless), `JoJo … Ougon no Kaze`
+(2 RAW episodes), `Date a Live II` (1 OVA), three Hana podcasts and four fixtures. So the Detective
+Conan packs prove the *fetch* half and cannot prove the record half.
+
+Searched the index for a Route A subject for the titles the user actually owns, with the language
+field read: `The Big O` → 75 rows, **3 under 90 MB and all three are different works** that merely
+share the words. `JoJo … Ougon no Kaze 字幕` → **0**. `Date a Live 字幕` → 26 rows, **0 under
+50 MB**. `Big O 字幕` → 22 under 50 MB and every one is a `幻樱字幕组` **video** release
+(`BIG5_MP4`), correctly scoring zero signals — a useful negative check that this turn's widening
+did not turn 22 video releases into packs.
+
+**So the honest next action is a re-listing, not another search.** The plan already records that
+`The Big O`'s 6 title-matched rows were **all dropped for `shape`** and `Date a Live II`'s 5 were
+2 `muxed` + 3 `shape` — and those verdicts were taken **before** the word-order fix. `shape` is
+exactly the bucket a release lands in when `subtitlePackSignals` returns `[]`, which is the defect
+this turn fixed. Re-run the listing for those three titles after the restart; if one converts to
+`sub-pack`, gate 11 has its true subject and the record clause is reachable. If none does, say so
+with the drop counts and record that Route A has no subject in this library — an honest result the
+gate can be closed or amended against, but **not** something to fake by attaching Conan cues to a
+Big O episode.
+
 **Attribution note, so the log is not read wrong.** The first fix's blobs are inside `971dc4d4`,
 a *concurrent* worker's liquid-scorecard commit. Two `primary` sessions share one git index here;
 mine were staged and that worker's `git commit` swept them in. The content is intact and verified
