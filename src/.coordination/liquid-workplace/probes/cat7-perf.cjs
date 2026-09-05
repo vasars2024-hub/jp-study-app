@@ -719,6 +719,47 @@ const SPECS = {
        * and the source text re-set afterwards -- restoring the pair alone is not restoring the
        * surface.
        */
+      /*
+       * ARM — re-establish the passage the leg needs. See the `arm` block at the heavy step for
+       * why this exists: the gesture legs take minutes and `.tr-textarea` is empty by the time
+       * the heavy leg fires, so the leg refused and the cell VOIDed on 2026-09-05.
+       *
+       * The text is set through the native value setter plus a bubbling `input`, which is how a
+       * React-controlled textarea is driven from outside React — `/type` is not usable here at
+       * all, because the bridge cannot carry Japanese (seven characters arrive as seven U+003F,
+       * a banked trap). Every non-ASCII character is written as a \uXXXX escape for the same
+       * reason: only ASCII may cross the shell boundary.
+       *
+       * It then WAITS for the interlinear rather than assuming it: the lookup is asynchronous
+       * and, post-`f9541e9e`, arms in well under 4 s (measured live: 22 tokens from a
+       * 60-character paragraph). It returns a REFUSE the outer block turns into a VOID if the
+       * tokens never appear, so an unarmable surface is never measured as a quiet one.
+       */
+      arm: `(() => {
+        const root = document.querySelector('.tr-view');
+        if (!root) return 'REFUSE: no .tr-view on screen';
+        const ta = root.querySelector('.tr-textarea');
+        if (!ta) return 'REFUSE: .tr-view has no .tr-textarea';
+        const already = document.querySelectorAll('.lexicon-sense-token').length;
+        if (ta.value.length > 0 && already > 0) return 'already armed: ' + already + ' tokens, taLen ' + ta.value.length;
+        const passage = '\\u732B\\u304C\\u597D\\u304D\\u3067\\u3059\\u3002\\u4ECA\\u65E5\\u306F\\u3044\\u3044\\u5929\\u6C17\\u3067\\u3059\\u306D\\u3002\\u660E\\u65E5\\u3082\\u6674\\u308C\\u308B\\u3068\\u3044\\u3044\\u3067\\u3059\\u304C\\u3001\\u96E8\\u304C\\u964D\\u308B\\u304B\\u3082\\u3057\\u308C\\u307E\\u305B\\u3093\\u3002';
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(ta, passage);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        return 'kicked: taLen ' + ta.value.length;
+      })()`,
+      /*
+       * The readiness half. `arm` CANNOT wait for the interlinear itself: /eval wraps its body in
+       * a synchronous JSON.stringify, so a Promise serializes to `{}` — a truthy, non-REFUSE
+       * value that would sail past the guard and measure an unarmed surface anyway. That is the
+       * banked `bridge-eval-is-synchronous` trap, and writing the arm as a Promise was this
+       * turn's first attempt at it. So `arm` kicks, and the harness POLLS this.
+       */
+      armReady: `(() => {
+        const ta = document.querySelector('.tr-view .tr-textarea');
+        const n = document.querySelectorAll('.lexicon-sense-token').length;
+        return n > 0 && ta && ta.value.length > 0 ? ('armed: ' + n + ' tokens, taLen ' + ta.value.length) : ''
+      })()`,
       label: 'swap the language pair 40 times through its own control',
       // 40 ticks at 120 ms is 4.8 s; the window is widened for the same reason `agent` widens
       // its own -- each swap re-renders the interlinear, so the interval slips, and a short
@@ -2772,6 +2813,47 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   }
 
   // --- 5. main availability under the surface's heaviest real work ------------------
+  /*
+   * OPTIONAL `arm`, added 2026-09-05 — a spec may need its surface put back into a measurable
+   * state immediately before the heavy leg, because the gesture legs above take MINUTES.
+   *
+   * Measured on `translate`: the surface was loaded with a 60-character paragraph and armed 22
+   * `.lexicon-sense-token`s, the run then spent ceiling x3 + theme control + drag x2 + resize x2
+   * + theme x2, and by the time the heavy leg fired `.tr-textarea` was back to length 0 — so the
+   * leg refused with "the load never armed" and the whole cell VOIDed after every gesture leg
+   * had been paid for. Which leg empties it is NOT established; that is why this is a re-arm
+   * rather than a fix aimed at a named culprit.
+   *
+   * THIS DOES NOT SOFTEN THE PROOF, and it must not. `arm` only restores the PRECONDITION the
+   * leg needs; `proof` still has to show the leg did real work afterwards, and for `translate`
+   * that remains ticks, driven, two distinct pairs, `restored`, and a recovered token count. An
+   * `arm` that returns a refusal VOIDs the run here, before the leg is paid for, so a surface
+   * that cannot be armed is loud rather than silently clean.
+   */
+  if (spec.heavy.arm) {
+    step('heavy arm: restore the leg precondition');
+    legs.heavyArm = await ev(spec.heavy.arm);
+    if (!legs.heavyArm || /^REFUSE/.test(String(legs.heavyArm))) {
+      voidedEarly.push(`heavy leg could not be armed: ${spec.heavy.label} answered ${JSON.stringify(legs.heavyArm)}`);
+    } else if (spec.heavy.armReady) {
+      // The arm only KICKS — see the spec's own note. Readiness is polled, never slept for: a
+      // fixed tail read is what correction 60 had to undo on this very surface.
+      const armT0 = Date.now();
+      let ready = '';
+      while (Date.now() - armT0 < 15000) {
+        ready = String((await ev(spec.heavy.armReady)) ?? '');
+        if (ready && !/^REFUSE/.test(ready)) break;
+        // Inline, not the `sleep` helper: that name is declared three times in this file and
+        // every one of them is inside an inner block (2026 / 2320 / 2539), so it is NOT in
+        // scope here. `node --check` passes either way — it checks syntax, not bindings.
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      legs.heavyArmReady = { answer: ready, waitedMs: Date.now() - armT0 };
+      if (!ready || /^REFUSE/.test(ready)) {
+        voidedEarly.push(`heavy leg armed but never became ready within 15000 ms: ${spec.heavy.label} answered ${JSON.stringify(ready)}`);
+      }
+    }
+  }
   step('heavy: ' + spec.heavy.label);
   // -DurationMs, not -Samples: 40 back-to-back /health calls at an idle p50 of 1.3 ms are
   // over in ~52 ms, so a fixed count samples a 240 ms operation across its first fiftieth
