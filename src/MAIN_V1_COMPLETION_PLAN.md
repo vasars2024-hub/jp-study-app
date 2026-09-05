@@ -1236,3 +1236,82 @@ schedules at `1f73d808`. The trust bullet's six controls are **6 of 6**, counted
 the bullet itself lists. Track 3's only remaining "still open" note is that animation level
 *Reduced* does not reach `.agent-root`, which is believed to be the design and whose ambiguity
 lives in another track's files.
+
+### GATE 12 CLOSES 2026-09-05 (primary), live, on a real 26.4 GB batch release
+
+**Route B has never once completed before today.** The plan's own note said the sidecar route
+went **0 for 10** on real data — every batch it reached turned out to be muxed MKVs with no
+sidecars, so the priority logic had never actually run against a daemon. It has now.
+
+**Subject, found through the product's own listing, not chosen by hand.**
+`【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock][01-12 + SPs][BDRIP 1920x1080 HEVC-YUV420P10 FLAC][MKV 简繁外挂字幕]`,
+`eea983d11588e5eb18be5e969696adf120097fcb`, **26,414,048,870 bytes**, 9 seeders, route
+**`batch-sidecar`**, reasons include **`signal:external-subs`** — and it ranked **first** of the
+3 candidates `subtitleHarvestNyaaList("Bocchi the Rock")` returned, so `subtitleHarvestNyaaFetch`
+on its id is Route B taken the way a user would take it.
+
+How the subject was found, so the next worker does not repeat the 0-for-10 hunt: batches that
+carry sidecars are the ones whose names say so, and the signal is CJK. `node debug/g14-live.cjs
+search "外挂字幕 BDRip"` returns 75 rows of which several are `isBatch: true` — that query is the
+instrument, not a guess.
+
+**RESULT — `ok: true`, 12 subtitle files, 91 s**, against the user's own daemon through the
+delete-refusing mount.
+
+**The gate's own assertion, scored off `torrents/files` as the daemon answered it** (banked
+verbatim by the mount in `debug/qbit-basepath-proxy-files.jsonl`, 90 replies; there is no
+`scraperQbitFiles` on preload, so the product cannot be asked again afterwards):
+
+- **166 files** — 121 video, 24 subtitle, 21 other.
+- **`byPriority`: 154 at 0 (skip), 12 at 1 (normal).** Every file the harvest did not want is
+  skipped, on a release where the unwanted part is 26.2 GB.
+- **`videoAtNonZeroPriority` = 0.** No video file was ever requested. That is the gate.
+- Disclosed rather than folded in: **12 video files carry a nonzero fraction**, max **0.32 %**,
+  **11,536,635 bytes of 26,236,186,257 (0.044 %)**. That is bittorrent piece-boundary spill on
+  files sharing a piece with a wanted `.ass` — the product never asked for it and cannot decline
+  it. It is reported separately from `videoAtNonZeroPriority` on purpose: merging the two would
+  either hide a real request or fail the gate for physics.
+
+**Wire log, the successful run alone — 187 entries, and the ordering is the whole safety
+argument.** `delete` refused by the mount, `add` **200** (stopped, `jp-study-subtitles`), `pause`
+404 → `stop` **200** (the v5 rename, fallback works), **`filePrio` ×2, both 200**, `resume` 404 →
+`start` **200**, then 90 × `files` / 90 × `info` polling to completion. **Both `filePrio` calls
+land before `start`**, so no window exists in which video could have been requested at all.
+
+**NEGATIVE CONTROL — fence `torrents/filePrio` at the mount and re-run.** The fetch stops there:
+`ok: false`, and the wire log is `delete` refused, `pause` 404, `stop` 200, **`filePrio` refused —
+and `start` 0**. So the 154 zeroes above are the product's own two calls doing the work, not a
+torrent that was never started. Instrument artifact, stated so nobody files it: the refusal the
+user sees reads *"qBittorrent rejected the API key"*, because the mount synthesises a **403** on a
+route qBittorrent never 403s, and 403 **is** an auth rejection in its API. Not a product defect.
+
+**Instrument defect found and fixed, and it had hidden itself for weeks.** The mount deleted
+`content-length` and let Node re-send the body chunked. qBittorrent 5.2.3 answers a chunked
+`torrents/add` with a bare **409 Conflict** — twice, on a magnet the same daemon accepts once the
+length is present. Every GET through the mount was unaffected, and gate 18's auth work drove the
+**stub** leg, so this was the first POST ever forwarded to the real daemon. A mount that silently
+breaks writes would have failed gates 11/13/15 too and looked like a product defect each time.
+
+**Cleanup, by the product's own reap, triple-guarded.** A gate-12 run leaves its torrent in
+`jp-study-subtitles`, and `qbitReapSubtitleOrphans` holds out its own in-flight hash — so the
+reap only removes it under a *different* target. Run with `G14_REFUSE_EXTRA=/api/v2/torrents/add`
+(nothing new can be added), `G14_RECATEGORIZE=539c0886…` (the Kitsunekko archive is hidden from
+the reap's own filter) and the new `G12_ALLOW_DELETE_HASH=eea983d1…` (delete is forwarded only
+when it names exactly that one hash, otherwise 403). Wire: `delete-allowed-exact eea983d1…` →
+200, `add` refused. **Both guards had to hold for a file to be lost, and the exact-hash one is
+the independent second.**
+
+**Client verified back at its baseline afterwards, at the real daemon with no mount: 10 rows,
+6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`, `539c0886…` still present, paused,
+progress 100.** Identical to the state gate 14 recorded this morning.
+
+**Product defect this run found, FIXED `520baecf`.** The release's 24 `.ass` files are twelve
+`.sc.ass` and twelve `.tc.ass`, and `languageFromFileName` knew `zh|chi|chs|cht` but not `sc`/`tc`
+— the pair CJK sidecar sets actually use. So all 24 read as **unlabelled**, which the documented
+policy keeps; a `ja` harvest would take twelve, pay for the transfer, and only then reject them on
+the kana floor. That is precisely the cost the name check exists to avoid. The pair is read only
+in the dotted slot before the extension, because two letters on the general rule would relabel a
+`[SC]` group tag, and a wrongly-`zh` file is *dropped* — a lost subtitle is worse than wasted
+bytes. See the ledger entry.
+
+**Track 9 is now 16 of 20: gates 11, 13, 15 remain as agent work, and gate 7 is external.**
