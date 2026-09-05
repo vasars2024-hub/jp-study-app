@@ -6187,11 +6187,20 @@ mark.lookup-mark,
   flex-direction: column;
   gap: 4px;
 }
+/* The row gap is the hit-target floor minus the chip, and it is split from the column gap
+   on purpose. `.lq-hit-scope` (liquid-controls.css) gives every chip in here a centred
+   32px pointer expander, but an expander only reaches as far as the next control: with a
+   22px chip and a 6px row gap the pitch is 28px, so rubric category 1 measured these at
+   `hitMin 28.02` against a 32 bar — the floor was declared and unreachable. 32 - 22 = 10
+   is the smallest row gap at which the expander a chip already has is the expander it
+   actually gets. Horizontally the neighbour is far enough away already (nearest 28.1px on
+   a 101px chip), so the column gap stays at 6 and the palette does not get wider. */
 .fm-palette {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
+  row-gap: 10px;
   margin-bottom: 8px;
 }
 .fm-palette-label {
@@ -6228,10 +6237,12 @@ mark.lookup-mark,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Same derivation as `.fm-palette` above, and this column was the worse of the two: every
+   gap here is a row gap, so all 17 language chips sat at `hitMin 27.02`. 32 - 22 = 10. */
 .fm-lang-col {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 10px;
   padding: 8px;
   background: var(--panel);
   border: 1px solid var(--border);

@@ -96,9 +96,35 @@
   justify-content: center;
 }
 
+/* `.lq-check-row` is the row-shaped half of `.lq-check`, and it exists because the four
+   declarations above are the wrong ones for the commonest checkbox in this app. The plain
+   `.lq-check` is written for a label that wraps a checkbox and NOTHING else, so it may own
+   its display; but `label.anki-check` and `label.fm-fallback-toggle` are already
+   `display: flex` rows carrying the checkbox AND its sentence, and `.anki-check` pairs
+   `align-items: flex-start` with a `margin-top: 2px` on the input so the box lines up with
+   the first line of a wrapping label. Applying `.lq-check` there overrides all three at
+   equal specificity — the outcome then depends on sheet import order, which is exactly the
+   drift `.lq-hit-placed` was split out to avoid.
+
+   So this variant declares ONLY the containing block. The label keeps its own display,
+   alignment and width; the pointer gets the same 32px floor through the same shared
+   `::after` below, so the two cannot drift apart. Everything else about `.lq-check`
+   applies unchanged, including the part that makes it work at all: it must be a `label`
+   that CONTAINS the control (or is wired by `for=`), because the floor is a real hit area
+   only if label activation forwards the click. On a `div` it is dead space that reads as
+   fixed to `elementFromPoint` and is a REGRESSION to a pointer.
+
+   Measured on the Anki window, rubric category 1: three labels at 18-19px rendered height
+   against the 32px bar, two of them `.anki-check`, and none reachable by any rule keyed on
+   the control — the inputs carry no class. */
+.lq-check-row {
+  position: relative;
+}
+
 .lq-hit::after,
 .lq-hit-placed::after,
 .lq-check::after,
+.lq-check-row::after,
 .lq-hit-scope :is(button, a[href], [role='button'], [role='tab'])::after {
   content: '';
   position: absolute;

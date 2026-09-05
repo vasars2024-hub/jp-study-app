@@ -1297,7 +1297,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
           {exp.filterBy === 'deck-frequency' && config.limits.maxCommonRank > 0 && (
             <p className="muted collapse-lead">{t('epub.mining.maxCommonRank.ignored')}</p>
           )}
-          <label className="field-row anki-check">
+          <label className="field-row anki-check lq-check-row">
             <input
               type="checkbox"
               checked={config.limits.useBuiltinJunkFilter !== false}
@@ -1342,7 +1342,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
             {!freqDictsLoading &&
               jaFreqDicts.map((dict) => (
                 <div key={dict.id} className="mining-freq-row">
-                  <label className="anki-check">
+                  <label className="anki-check lq-check-row">
                     <input
                       type="checkbox"
                       checked={dict.enabled}
@@ -1368,7 +1368,7 @@ export default function EpubMiningPanel({ onDeckSaved, initialBookId }: Props) {
               >
                 {otherLangFreqDicts.map((dict) => (
                   <div key={dict.id} className="mining-freq-row">
-                    <label className="anki-check">
+                    <label className="anki-check lq-check-row">
                       <input
                         type="checkbox"
                         checked={dict.enabled}

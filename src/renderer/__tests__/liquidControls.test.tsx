@@ -655,6 +655,110 @@ describe('the sheet stays a composition language, not a palette', () => {
     expect(boxOf(span).checked).toBe(false);
   });
 
+  /**
+   * `.lq-check-row` — the same floor for a checkbox label that is already a row.
+   *
+   * `.lq-check` owns four declarations (`display`, `flex`, `align-items`,
+   * `justify-content`) because it was written for a label that wraps a checkbox and
+   * nothing else. `label.anki-check` and `label.fm-fallback-toggle` are not that: they
+   * are `display: flex` rows carrying the box AND its sentence, and `.anki-check` pairs
+   * `align-items: flex-start` with a `margin-top` on the input so the box lines up with
+   * the first line of a wrapping label. At equal specificity `.lq-check` would decide
+   * that by sheet import order — the exact drift `.lq-hit-placed` was split out to avoid.
+   *
+   * So the variant is asserted to be display-NEUTRAL, and to share the one `::after`.
+   * Live: 40 controls under the floor on the Anki window fell to 18 when these landed
+   * (the residue was pitch, fixed separately in `styles.css`), and `.anki-check` still
+   * computed `display: flex` / `align-items: flex-start` afterwards.
+   */
+  it('gives a row-shaped checkbox label the floor without touching its own layout', () => {
+    const styles = CSS;
+    const at = styles.indexOf('.lq-hit::after');
+    const expander = styles.slice(at, styles.indexOf('}', at));
+    expect(expander).toContain('.lq-check-row::after');
+
+    const start = styles.indexOf('.lq-check-row {');
+    expect(start).toBeGreaterThan(-1);
+    const rule = styles.slice(start, styles.indexOf('}', start));
+    expect(rule).toMatch(/position:\s*relative/);
+    // THE POINT OF THE VARIANT. Any of these would silently re-lay-out the call sites.
+    expect(rule).not.toMatch(/display:/);
+    expect(rule).not.toMatch(/align-items:/);
+    expect(rule).not.toMatch(/justify-content:/);
+    // ...while `.lq-check` keeps them, so this is a second class and not a weakening.
+    const plain = styles.slice(
+      styles.indexOf('.lq-check {'),
+      styles.indexOf('}', styles.indexOf('.lq-check {')),
+    );
+    expect(plain).toMatch(/display:\s*inline-flex/);
+
+    // Forwarding, same as `.lq-check`: a label reaches its own control, a span swallows.
+    const mounted = render(
+      <>
+        <label className="anki-check lq-check-row">
+          <input type="checkbox" defaultChecked={false} aria-label="subject" />
+          <span>attach the image</span>
+        </label>
+        <span className="lq-check-row">
+          <input type="checkbox" defaultChecked={false} aria-label="control" />
+        </span>
+      </>,
+    );
+    const label = mounted.querySelector('label.lq-check-row') as HTMLLabelElement;
+    const span = mounted.querySelector('span.lq-check-row') as HTMLSpanElement;
+    const boxOf = (el: Element) => el.querySelector('input') as HTMLInputElement;
+
+    act(() => {
+      label.click();
+    });
+    expect(boxOf(label).checked).toBe(true);
+    act(() => {
+      span.click();
+    });
+    expect(boxOf(span).checked).toBe(false);
+  });
+
+  /**
+   * The other half of the same repair, and the half that is easy to lose: an expander
+   * only reaches as far as the NEXT control. Both variable palettes pack 22px chips at a
+   * 6px and a 5px gap, so the pitch was 28 and 27 and category 1 read `hitMin 28.02` /
+   * `27.02` against a 32 bar — a floor that was declared and unreachable. The gap is
+   * `--lq-hit-target` minus the chip, so it is derived, not chosen.
+   */
+  it('spaces the variable-palette chips far enough apart for the expander to reach 32', () => {
+    const sheet = readFileSync(resolve(__dirname, '..', 'styles.css'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    );
+    const ruleOf = (sel: string) => {
+      const at = sheet.indexOf(`${sel} {`);
+      expect(at).toBeGreaterThan(-1);
+      return sheet.slice(at, sheet.indexOf('}', at));
+    };
+    const palette = ruleOf('.fm-palette');
+    // 32 (--lq-hit-target) - 22 (rendered chip height) = 10.
+    expect(palette).toMatch(/row-gap:\s*10px/);
+    // The column axis was never the failing one (nearest neighbour 28.1px on a 101px
+    // chip), so it stays tight — a plain `gap` here would widen the palette for nothing.
+    expect(palette).toMatch(/column-gap:\s*6px/);
+    expect(palette).not.toMatch(/[^-]gap:\s*\d/);
+    // `.fm-lang-col` is `flex-direction: column`, so every gap in it is a row gap.
+    expect(ruleOf('.fm-lang-col')).toMatch(/gap:\s*10px/);
+
+    // The chips get their expander from the container, not from a per-chip class, so
+    // the scope has to be on all four palettes or a row of them is silently unfixed.
+    const fm = readFileSync(resolve(__dirname, '..', 'components/FieldMappingEditor.tsx'), 'utf8');
+    expect(fm.match(/fm-palette lq-hit-scope/g)).toHaveLength(2);
+    expect(fm).toMatch(/fm-translated lq-hit-scope/);
+    expect(fm).toMatch(/fm-fallback-toggle lq-check-row/);
+    const epub = readFileSync(resolve(__dirname, '..', 'components/EpubVariablePalette.tsx'), 'utf8');
+    expect(epub).toMatch(/fm-palette lq-hit-scope/);
+    expect(epub).toMatch(/fm-translated lq-hit-scope/);
+    const anki = readFileSync(resolve(__dirname, '..', 'components/anki/AnkiContent.tsx'), 'utf8');
+    expect(anki.match(/anki-check lq-check-row/g)).toHaveLength(2);
+    expect(anki).toMatch(/btn small lq-hit/);
+  });
+
   it('scales its one animation by --lq-motion-scale so reduced motion means no displacement', () => {
     const frames = CSS.slice(CSS.indexOf('@keyframes lq-toolbar-menu-in'));
     expect(frames).toContain('var(--lq-motion-scale)');

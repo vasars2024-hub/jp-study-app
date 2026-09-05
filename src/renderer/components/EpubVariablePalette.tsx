@@ -51,7 +51,7 @@ export default function EpubVariablePalette({ onInsert }: { onInsert: (token: st
   return (
     <CollapsibleSection title={t('epub.vars.title')} summary={t('epub.vars.summary')} defaultOpen>
       <p className="muted collapse-lead">{t('epub.vars.lead')}</p>
-      <div className="fm-palette" aria-label={t('epub.vars.aria.base')}>
+      <div className="fm-palette lq-hit-scope" aria-label={t('epub.vars.aria.base')}>
         <span className="fm-palette-label">{t('epub.vars.base')}</span>
         {baseVars.map((v) => (
           <button
@@ -66,7 +66,7 @@ export default function EpubVariablePalette({ onInsert }: { onInsert: (token: st
         ))}
       </div>
 
-      <div className="fm-translated" aria-label={t('epub.vars.aria.lang')}>
+      <div className="fm-translated lq-hit-scope" aria-label={t('epub.vars.aria.lang')}>
         <span className="fm-palette-label">{t('epub.vars.byLanguage')}</span>
         <div className="fm-translated-grid">
           {langs.map((code) => (

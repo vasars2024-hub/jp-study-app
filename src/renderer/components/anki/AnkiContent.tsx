@@ -357,7 +357,11 @@ export function AnkiDeckNoteType({ state }: { state: AnkiConfigState }) {
         <div className="anki-note-type-readonly">
           <span className="anki-note-type-label">{t('anki.noteType.label')}</span>
           <code className="anki-note-type-name">{model || '—'}</code>
-          <button className="btn small" type="button" onClick={() => void state.ensureNoteType()}>
+          <button
+            className="btn small lq-hit"
+            type="button"
+            onClick={() => void state.ensureNoteType()}
+          >
             {t('anki.noteType.create')}
           </button>
         </div>
@@ -466,7 +470,7 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
         />
       </div>
 
-      <label className="anki-check">
+      <label className="anki-check lq-check-row">
         <input
           type="checkbox"
           checked={state.attachImage}
@@ -478,7 +482,7 @@ export function AnkiManualCardForm({ state }: { state: AnkiConfigState }) {
         </span>
       </label>
 
-      <label className="anki-check">
+      <label className="anki-check lq-check-row">
         <input
           type="checkbox"
           checked={state.fetchAudio}

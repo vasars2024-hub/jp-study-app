@@ -242,7 +242,7 @@ export default function FieldMappingEditor({
           Focus a field above, then click a tag. Language suffixes like <code>{'{expression:ru}'}</code> pick
           which translation fills that Anki field — separate from language direction above.
         </p>
-        <div className="fm-palette" aria-label="Insert a variable">
+        <div className="fm-palette lq-hit-scope" aria-label="Insert a variable">
           <span className="fm-palette-label">Base</span>
           {MINING_VARS.map((v) => (
             <button
@@ -257,7 +257,7 @@ export default function FieldMappingEditor({
           ))}
         </div>
 
-        <div className="fm-translated" aria-label="Insert a translated variable">
+        <div className="fm-translated lq-hit-scope" aria-label="Insert a translated variable">
           <span className="fm-palette-label">Translated</span>
           <div className="fm-translated-grid">
             {MINING_LANGS.map((lang) => (
@@ -282,7 +282,7 @@ export default function FieldMappingEditor({
           </div>
         </div>
 
-        <div className="fm-palette" aria-label="Insert a pair variable">
+        <div className="fm-palette lq-hit-scope" aria-label="Insert a pair variable">
           <span className="fm-palette-label">Pairs</span>
           <button
             type="button"
@@ -340,7 +340,7 @@ export default function FieldMappingEditor({
         </div>
 
         <div className="fm-example-fallback">
-          <label className="fm-fallback-toggle">
+          <label className="fm-fallback-toggle lq-check-row">
             <input
               type="checkbox"
               checked={exampleFallback}
