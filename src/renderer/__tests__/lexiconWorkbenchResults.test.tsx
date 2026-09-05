@@ -118,6 +118,11 @@ describe('LexiconWorkbenchResults', () => {
     expect(line?.textContent?.length).toBeLessThanOrEqual(48);
     expect(line?.textContent?.endsWith('…')).toBe(true);
     expect(line?.getAttribute('title')).toBe(long);
+    // The character cap is absolute and a narrow window is not, so the line sits
+    // inside an inline-block the stylesheet caps at `100cqi`. An `rt` is
+    // `display: ruby-text` and ignores `max-width`; this wrapper is the only box
+    // in the annotation that can take one without leaving ruby layout.
+    expect(line?.parentElement?.className).toBe('lexicon-gloss-stack');
   });
 
   it('leaves a short gloss untouched and unmarked', async () => {

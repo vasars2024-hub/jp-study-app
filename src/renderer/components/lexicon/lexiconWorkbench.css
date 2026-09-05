@@ -37,6 +37,24 @@
   font-size: clamp(1.15rem, 2vw, 1.55rem);
   line-height: 2.5;
   overflow-wrap: anywhere;
+  /* The query container `.lexicon-gloss-stack` reads with `100cqi`. It has to be
+     here and not on `.lexicon-interlinear`, because the flow's width is the real
+     bound on a ruby: an annotation wider than this makes the passage wider than
+     the window, which `.fwin-body` then clips with `overflow-x: hidden`. */
+  container-type: inline-size;
+}
+
+/* An `rt` is `display: ruby-text`, so a `max-width` on it is ignored, and
+   blockifying it takes the annotation out of ruby layout. An inline-block INSIDE
+   the `rt` accepts one and leaves the ruby alone — measured at a 260px window,
+   this takes the widest ruby from 567px to at most the flow's own width. The
+   overflow is hidden rather than ellipsised because the lines inside already
+   carry their own ellipsis, and the full gloss is each line's `title`. */
+.lexicon-interlinear-flow rt .lexicon-gloss-stack {
+  display: inline-block;
+  max-width: 100cqi;
+  overflow: hidden;
+  vertical-align: top;
 }
 
 .lexicon-interlinear-flow ruby {
@@ -68,6 +86,11 @@
   display: block;
   line-height: 1.35;
   white-space: nowrap;
+  /* Ellipsised HERE and not by the stack around it, so a line the flow is too
+     narrow for ends in a visible ellipsis rather than being cut mid-glyph. */
+  max-width: 100cqi;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .lexicon-interlinear-flow rt .lexicon-gloss-lang {

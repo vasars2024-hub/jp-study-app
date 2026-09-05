@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   parallelGlossTargets,
   type LexiconInterlinearResult,
@@ -144,8 +144,17 @@ function clampGloss(text: string): string {
  */
 function glossRt(match: LexiconInterlinearMatch | undefined) {
   if (!match) return '';
+  // The 48-character cap above is ABSOLUTE and a narrow window is not: measured at
+  // a 260px window, two capped lines of 262px and 301px still stacked into a 567px
+  // annotation on a 180px flow. `rt` is `display: ruby-text`, so a `max-width` on it
+  // does nothing and blockifying it takes the annotation out of ruby layout — but an
+  // inline-block INSIDE the `rt` accepts one, and `100cqi` reads the flow's own width.
+  // That is what `.lexicon-gloss-stack` is; the styling stays on the lines.
+  const stack = (children: ReactNode) => (
+    <span className="lexicon-gloss-stack">{children}</span>
+  );
   if (match.parallel?.length) {
-    return match.parallel.map((group) => {
+    return stack(match.parallel.map((group) => {
       const full = group.glosses.map((gloss) => gloss.text).join('; ');
       return (
         <span className="lexicon-gloss-line" key={group.lang} title={full}>
@@ -153,11 +162,11 @@ function glossRt(match: LexiconInterlinearMatch | undefined) {
           {clampGloss(full)}
         </span>
       );
-    });
+    }));
   }
   const full = match.glosses.map((gloss) => gloss.text).join('; ') || match.reading || '';
   if (!full) return '';
-  return <span className="lexicon-gloss-line" title={full}>{clampGloss(full)}</span>;
+  return stack(<span className="lexicon-gloss-line" title={full}>{clampGloss(full)}</span>);
 }
 
 /** A pinned token stays grounded; the extra class only marks the reader's choice. */

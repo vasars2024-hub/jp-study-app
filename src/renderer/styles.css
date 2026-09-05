@@ -11915,6 +11915,12 @@ mark.lookup-mark,
 
 .tr-view {
   max-width: 1000px;
+  /* The stacking rule under `.tr-panes` was a VIEWPORT media query, and this
+     view's real width is its WINDOW. Measured 2026-09-05: a 260px `.fwin` inside
+     a 1264px viewport never fired `@media (max-width: 780px)`, so the two-column
+     grid stayed two columns and pushed 325px of content into a 248px body that
+     clips it with `overflow-x: hidden`. A container query asks the right box. */
+  container-type: inline-size;
 }
 .tr-dir {
   display: flex;
@@ -11940,13 +11946,21 @@ mark.lookup-mark,
 }
 .tr-panes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* `minmax(0, 1fr)`, not `1fr`: a bare `1fr` floors each track at the pane's
+     min-content, and a textarea's min-content is its default `cols`, which is how
+     two 106px panes ended up 325px apart. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
   margin-bottom: 14px;
 }
-@media (max-width: 780px) {
+/* 520px, not the old rule's 780px. That number was picked against a VIEWPORT, where
+   780px is a small screen; against this view's own box it is most of a default
+   820px window, and reusing it stacked the panes at the default size — a layout
+   change nobody asked for. 520px keeps each pane at ~253px, which is the point
+   below which two 16px textareas stop being worth showing side by side. */
+@container (max-width: 520px) {
   .tr-panes {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .tr-pane {
