@@ -265,6 +265,11 @@ describe('LexiconWorkbenchResults', () => {
 
     const mine = rows[0].querySelector<HTMLButtonElement>('.lexicon-harvest-mine');
     expect(mine?.textContent).toBe('lexicon.harvest.mine');
+    // Rubric category 1 measured this button at 87x28 live — under the 32px pointer
+    // floor on its short axis. The row is deliberately 28px tall (a 32px row would be
+    // taller than the word it is about), so the floor is reached by `.lq-hit`, whose
+    // ::after is max(100%, 32px) and leaves the rendered box exactly where it was.
+    expect(mine?.classList.contains('lq-hit'), 'the mine button opts into the pointer floor').toBe(true);
     await act(async () => {
       mine?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       await Promise.resolve();

@@ -1140,7 +1140,13 @@ function LexiconWorkbenchResults({
                             word: item.text,
                             action: mineLabel,
                           })}
-                          className="lexicon-harvest-mine"
+                          // 28px tall by deliberate design (see the rule's own
+                          // comment — a 32px row would be taller than the word it
+                          // is about). `.lq-hit` is the documented way to reach the
+                          // pointer floor without touching the rendered box: the
+                          // ::after is max(100%, 32px), so this stays 87x28 on
+                          // screen and grows 2px above and below to a pointer.
+                          className="lexicon-harvest-mine lq-hit"
                           disabled={mineState === 'adding' || mineState === 'added' || mineState === 'dup'}
                           onClick={() => void mineHarvestItem(item)}
                           type="button"

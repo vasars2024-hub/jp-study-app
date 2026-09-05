@@ -107,4 +107,15 @@ describe('Translate — the direction rows are declared radio groups', () => {
     expect(swap?.closest('[role="radiogroup"]')).toBeNull();
     expect(swap?.getAttribute('role')).not.toBe('radio');
   });
+
+  it('gives the swap button the 32px pointer floor', async () => {
+    const host = await mount();
+    const swap = host.querySelector('.tr-swap');
+    // Measured live 2026-09-05: 30x32 rendered, so 2px short on its narrow axis and
+    // filed under the rubric's 32px floor. `.lq-hit` reaches the floor with an
+    // ::after at max(100%, 32px) rather than resizing a square-ish icon button, and
+    // its neighbours are a 10px `.tr-dir` gap away, so it steals nothing (measured:
+    // stolenCount 0, belowFloorByHit 4 -> 0).
+    expect(swap?.classList.contains('lq-hit')).toBe(true);
+  });
 });
