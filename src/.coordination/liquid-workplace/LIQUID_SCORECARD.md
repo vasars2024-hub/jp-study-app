@@ -5566,3 +5566,118 @@ surface, the same judgement `agent` records for generating a reply.
 
 **Running total: 19 of 25 sections at 80/80** (unchanged — `translate` is at 6 of 8 and is not
 certified). **160 of 200 cells, 40 remaining.**
+
+---
+
+## 2026-09-05 09:45-12:00 UTC, `primary2` — `translate` cat7 stays OPEN, and the reason is a 3.4-second main-process block that a burst turns into 60
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki` `dictionary`** —
+seven, named. `translate` is continued, not newly chosen: RULE C closes a surface before opening
+another, and it was at 6 of 8 with a spec that had never been run.
+
+**No cell closed this turn. Say that first.** cat7 was the slice the last handoff named, it was
+run four times, and it is still open. What the turn produced instead is one product fix, three
+instrument corrections, and — the part worth the turn — a **number**.
+
+### The cell
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 7 | Performance under real load | **OPEN — harness returns VOID, and the finding under it is real** | Gestures all pass: drag p50 **8.3** / p95 **8.5** / max **25.0**, `over100` **0**, mainMax **24.8**; resize p50 **8.3** / p95 **16.7** / max **75.1**, `over100` **0**, mainMax **34.4**; theme p50 **8.3** / p95 **8.5** / max **41.6**, mainMax **352.7**, painted **18.2** apply / **64.4** restore. Heavy leg: **main blocked 60,092.8 ms** against a **500 ms** bar, and the interlinear had not returned **12,002 ms** after the last click | `--jank`: `jank_blocks` **10**, drag `frames_over_100` **0 → 10** and p95 **8.5 → 116.6** in the same session — the recorder demonstrably sees a worse distribution, so the clean gesture numbers are readable |
+
+Instrument: `probes/cat7-perf.cjs --surface translate --jank`, **zero new probes** (RULE 1).
+Scene held all run: **1 `.fwin`, 482 elements**, document 607, viewport `1264x821`, dpr 1,
+renderer heap 252 MB; `scene_stable true` and `stale_recorder false` on every leg. Process
+`pid 13316`, `uptimeSecAtStart` **87,302 s** — the rubric's settled-process requirement is met by
+a day-old main, not by a fresh boot. Session ceiling **p50 8.3 / p95 8.4** over 225 frames across
+3 runs; L0's 10.0 ms is recorded as provenance and is NOT the bar (this display is 120 Hz today).
+
+State driven: the surface was LOADED, not at rest — a 70-character Japanese paragraph in
+`.tr-textarea` producing **27 sense tokens**. An empty Translate window would have made the heavy
+leg refuse outright, and this repo already has "a surface at rest is not a measurement" banked.
+
+### THE FINDING — one interlinear lookup blocks main for 3.4 seconds
+
+The heavy leg's number is a burst number and burst numbers invite the "no user does that"
+answer, so it was attributed down to a **single** operation, driven through the same instrument:
+
+    pwsh -File tools/liquid-perf-probe.ps1 -Samples 40 -DurationMs 20000 -AsJson
+      -DuringJs  <clear .tr-textarea, restore the same 70 characters 400 ms later>
+
+    ONE real interlinear lookup   429 samples / 20,008 ms
+      min 1.1   p50 2.0   p95 57.1   max 3,448.2 ms      bar 500
+
+**3,448.2 ms of main-process unavailability for one 70-character passage.** That is the whole
+app frozen — every window, every input — while `lookupOfflineInterlinear` runs
+`withFrequency: true, withPartOfSpeech: true` across the gloss targets the installed dictionaries
+answer (EN and RU on this profile; the ruby stacks both). It is a category-7 failure on its own,
+with no burst involved.
+
+### The product fix that landed, what it removed, and what it did NOT
+
+`5da49a96`. The lookup effect dispatched **one main call per dependency change** and threw away
+superseded answers with an `alive` flag — but a discarded answer has already been paid for in
+main. Swapping the language pair changes `glossLang`, so `.tr-swap` is a one-click way to queue
+them. Now coalesced on the trailing edge: at most one request in flight, a burst collapses to the
+first plus the last, and there is deliberately **no debounce in front of the first call**, so a
+single change keeps exactly the latency it had. Two mutation controls, both fired:
+
+    remove the in-flight guard     5 main calls instead of 1
+    read glossLang from closure    the trailing call asks for "en", not "it"
+
+Restored byte-identical after each (58,289 bytes); 26/26 in `lexiconWorkbenchResults.test.tsx`.
+
+**It did not fix the cell, and the numbers say why.** Across three runs of the same 40-swap leg
+the block read **7,915.6 → 29,454 → 60,092.8 ms**, and `mainRssMbBefore` read **638.5 → 2,914.1 →
+1,416.8**. Removing 39 of 40 redundant calls cannot explain a number that GREW, and 2 remaining
+calls at 3.4 s each is ~7 s — which is roughly run 1's figure, i.e. the FLOOR. The escalation is
+main-side accumulation across repeated bursts, not call count. Two runs are not a trend and this
+is stated as an observation, not a leak diagnosis.
+
+**The honest reading: the coalescer is correct and necessary and is not sufficient.** The cost is
+per-call, in main, and the cell cannot pass until `lookupOfflineInterlinear` stops holding the
+main event loop — which is a main-process slice (chunk the passage and yield, or move it off the
+main thread), not a renderer one.
+
+### Three instrument corrections, and one of them cost a whole run
+
+**Correction 60 (`79220ab0`) — a fixed 250 ms tail read VOIDed a leg that ran perfectly.** The
+first run returned `ticks 40, driven 40, pairs 2, restored true` and `tokens1` **0** against
+`tokens0` **27**, so the proof reported "the interlinear was empty when the leg ended" on a
+surface that had 27 sense tokens again moments later. Correction 49's shape one leg over: a fixed
+sleep is not a settle. It now POLLS every 120 ms for up to 12 s, stops at the first non-empty
+read, and reports `recoveredMs` as a number rather than hiding it as a tolerance — so the check
+can still FAIL, which is the point.
+
+**Correction 60b (`23a007ae`) — the poll outlived the window the proof is read in.** cat7 reads
+`proof` immediately after the probe returns at `-DurationMs`, so a poll still running answered
+"the settle poll never finished" — the same VOID, one cause further along. The swap loop ends at
+4.8 s and the poll gives up at 12 s, so translate's heavy window is now **20 s**.
+
+**`5b24e5b0` — `.tr-swap` moves the TEXT, not only the pair, and that VOIDed run 3 entirely.**
+The source box takes the output pane's contents, so ONE hand-driven swap on a surface that has
+not been translated since it loaded leaves `.tr-textarea` at **length 0**. A one-click attribution
+probe run between two cat7 runs did exactly that; the next full run refused with "the load never
+armed" **after every gesture leg had already been paid for**. Restoring the pair is not restoring
+the surface — the text has to be re-set too.
+
+### An accounting discrepancy, published rather than resolved in my favour
+
+`19 of 25 sections at 80/80` is 19 × 8 = **152** certified cells. Adding the two open surfaces —
+`translate` 6 banked, `immersion` 5 banked, both enumerated in the merge-reconciliation block
+above — gives **163**, not the running total of **160**. The drift is visible at line 4815/4972 of
+this file: at 18 sections plus `novels` 3-of-8 the total was written as 144 (= 18 × 8, with
+`novels`' three banked cells not counted), and closing `novels` was then computed as 144 + 5
+instead of 144 + 8.
+
+**I am NOT quoting 163.** The higher number is the one that flatters me, the enumeration behind
+`19 of 25` has not itself been re-derived cell by cell, and line 3292 shows the same shape at
+14 sections (110 written, 112 by section count). **Quote 160.** What is owed is a one-pass
+enumeration of the certified surfaces by name with their 8 cells each — cheap, and nobody has
+done it.
+
+### Where `translate` stands
+
+**6 of 8 unchanged: cat1, cat2, cat3, cat4, cat5, cat6 at 10/10. cat7 OPEN with its number
+above. cat8 not run.** Running total **19 of 25 sections at 80/80**, **160 of 200 cells,
+40 remaining** — no cell moved this turn.
