@@ -1761,9 +1761,51 @@ function scoreSnapshot(s) {
   const presToggle = () => ev(`(function(){
     var b = ${OWN_LIQUID_BTN};
     if (!b) return 'no-control';
+    b.focus();
     b.click();
     return 'clicked';
   })()`);
+  /**
+   * CORRECTION 56, 2026-09-05: click, POLL for the mode asked for, and click again — six
+   * attempts. Both legs below were one click and one `sleep(900)` read, against a `.fwin`
+   * presentation toggle that is measured-intermittent (it lands roughly every other
+   * programmatic click, in both directions, on the same button within the same minute).
+   * `cat3-liquid-utilization.cjs` fixed this in `clickPresentationToggle` and
+   * `cat6-feature-parity.cjs` in `flip()` (correction 52); cat5 was the third file with
+   * the same single-shot read and never got it.
+   *
+   * What it cost, measured on `translate`: the Q6 leg refused with `toggle did not reach
+   * liquid; surface reads standard`, published `liquidRegions: 0` and scored the whole
+   * question NO-SUBJECT — an instrument miss that reads exactly like a surface with no
+   * Liquid material on it. Worse on the RESTORE leg, which is guarded to run even on a
+   * refusal precisely so the probe cannot strand app state: a single click that did not
+   * land left the window flipped and only emitted `restoreWarning`, i.e. the trap this
+   * file already documents two comments above was still reachable through a missed click.
+   *
+   * Polls for the mode ASKED FOR rather than for "any change", so a stale read cannot
+   * satisfy it, and returns the last state actually seen when the toggle genuinely does
+   * nothing.
+   */
+  const PRES_ATTEMPTS = 6;
+  const PRES_SETTLE_MS = 1500;
+  const presDriveTo = async (want) => {
+    let last = await presRead();
+    for (let attempt = 0; attempt < PRES_ATTEMPTS; attempt += 1) {
+      if (last === want) return { reached: last, attempts: attempt };
+      // eslint-disable-next-line no-await-in-loop
+      const clicked = await presToggle();
+      if (clicked !== 'clicked') return { clicked, reached: last, attempts: attempt };
+      const deadline = Date.now() + PRES_SETTLE_MS;
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(150);
+        // eslint-disable-next-line no-await-in-loop
+        last = await presRead();
+        if (last === want || Date.now() > deadline) break;
+      }
+    }
+    return { clicked: 'clicked', reached: last, attempts: PRES_ATTEMPTS };
+  };
 
   step('Q6: opt in to Liquid');
   const presBefore = await presRead();
@@ -1795,13 +1837,15 @@ function scoreSnapshot(s) {
   } else if (presBefore === 'liquid') {
     q6leg.note = 'surface was already in Liquid presentation; measured where it was found';
   } else {
-    const clicked = await presToggle();
+    const driven = await presDriveTo('liquid');
+    const clicked = driven.clicked || 'clicked';
     q6leg.toggle = clicked;
+    q6leg.toggleAttempts = driven.attempts;
     if (clicked === 'clicked') {
-      await sleep(900);
-      const now = await presRead();
-      q6leg.reached = now;
-      if (now !== 'liquid') q6leg.refused = `toggle did not reach liquid; surface reads ${now}`;
+      q6leg.reached = driven.reached;
+      if (driven.reached !== 'liquid') {
+        q6leg.refused = `toggle did not reach liquid across ${driven.attempts} attempts; surface reads ${driven.reached}`;
+      }
     } else {
       q6leg.refused = clicked === 'no-control' ? 'surface has no Liquid presentation control' : clicked;
     }
@@ -1815,9 +1859,12 @@ function scoreSnapshot(s) {
   // that did not land where it was aimed — left the app holding the probe's change, and
   // the next run recorded that damage as the user's setting.
   if (q6leg.toggle === 'clicked') {
-    await presToggle();
-    await sleep(900);
-    q6leg.restoredTo = await presRead();
+    // Drive back to the mode the surface was FOUND in, not to a fixed target: the restore
+    // must poll for what it owes the user, so a leg that refused on the way out still hands
+    // the window back the way it received it.
+    const back = await presDriveTo(presBefore);
+    q6leg.restoreAttempts = back.attempts;
+    q6leg.restoredTo = back.reached;
     if (q6leg.restoredTo !== presBefore) q6leg.restoreWarning = `presentation left as ${q6leg.restoredTo}, found ${presBefore}`;
   }
   out.q6leg = q6leg;

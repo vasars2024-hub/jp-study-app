@@ -388,19 +388,90 @@ async function settle(where) {
   };
 }
 
-/** Flip presentation and READ IT BACK. A toggle that did not land must not be scored. */
+/**
+ * Flip presentation and READ IT BACK. A toggle that did not land must not be scored.
+ *
+ * CORRECTION 52, 2026-09-05: this was ONE `toggleLiquid` and ONE `sleep(900)` read, and the
+ * `.fwin` presentation toggle is INTERMITTENT under a programmatic click — it lands roughly
+ * every other time, in both directions, on the same button within the same minute. That is
+ * already measured and already fixed once, in `cat3-liquid-utilization.cjs`'s
+ * `clickPresentationToggle` (six alternating click/poll attempts, which moved it on the
+ * second every time). cat6 never got the same treatment, so three consecutive `translate`
+ * runs died here with `toggle did not reach liquid; surface reads standard` and then the
+ * mirror-image message on the next attempt — a refusal that names the SURFACE while the
+ * defect is in the instrument, and the run before it had already scored fine.
+ *
+ * The retry is written to be safe against the OTHER failure mode, a toggle that landed but
+ * was read too early: each attempt polls for the mode it ASKED FOR for a full
+ * `FLIP_SETTLE_MS` before clicking again, and the loop returns the instant the surface reads
+ * `want` — including BEFORE the first click, so a leg that is already in the target mode
+ * never clicks at all. Polling for "any change" instead would accept a stale reading.
+ *
+ * This matters most on the RESTORE leg (`flip(undefined, startPres)`): a single-shot click
+ * there hands back a window in a presentation it was not found in, which is persisted state
+ * left changed under an exit code of 0.
+ */
+const FLIP_ATTEMPTS = 6;
+const FLIP_SETTLE_MS = 1500;
+
+async function readPresentation() {
+  const s = await call(`window.__LQP.snapshot(${A(APP)})`);
+  if (s.refused) return { refused: s.refused };
+  return { presentation: s.presentation };
+}
+
 async function flip(pres, want) {
-  const before = await call(`window.__LQP.toggleLiquid(${A(APP)}, ${A(pres)})`);
-  if (before.refused) return { refused: before.refused };
-  await sleep(900);
-  const settled = await settle(`flip -> ${want || '(either)'}`);
-  if (settled.refused) return { refused: settled.refused };
-  const now = settled.snapshot;
-  if (now.refused) return { refused: now.refused };
-  if (want && now.presentation !== want) {
-    return { refused: `toggle did not reach ${want}; surface reads ${now.presentation}` };
+  if (!want) {
+    const before = await call(`window.__LQP.toggleLiquid(${A(APP)}, ${A(pres)})`);
+    if (before.refused) return { refused: before.refused };
+    await sleep(900);
+    const settled = await settle('flip -> (either)');
+    if (settled.refused) return { refused: settled.refused };
+    const now = settled.snapshot;
+    if (now.refused) return { refused: now.refused };
+    return { presentation: now.presentation, snapshot: now, settled };
   }
-  return { presentation: now.presentation, snapshot: now, settled };
+
+  // The RE-CHECK IS AFTER `settle()`, not before it, and that is the whole point of the
+  // outer loop. The first draft of this correction polled for `want`, broke out the moment
+  // it saw it, and only then settled — and it still refused, with `toggle did not reach
+  // liquid after 1 attempts; surface reads standard`. The toggle HAD reached liquid; it fell
+  // back during the settle. A flip is not "landed" because some intermediate read saw it,
+  // it is landed if the snapshot that gets SCORED is in the mode we asked for, so that is
+  // the only reading allowed to end the loop.
+  let settled = null;
+  for (let attempt = 0; attempt < FLIP_ATTEMPTS; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const now = await readPresentation();
+    if (now.refused) return { refused: now.refused };
+    if (now.presentation !== want) {
+      // eslint-disable-next-line no-await-in-loop
+      const clicked = await call(`window.__LQP.toggleLiquid(${A(APP)}, ${A(pres)})`);
+      if (clicked.refused) return { refused: clicked.refused };
+      const deadline = Date.now() + FLIP_SETTLE_MS;
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(150);
+        // eslint-disable-next-line no-await-in-loop
+        const read = await readPresentation();
+        if (read.refused) return { refused: read.refused };
+        if (read.presentation === want) break;
+        if (Date.now() > deadline) break;
+      }
+    }
+    // eslint-disable-next-line no-await-in-loop
+    settled = await settle(`flip -> ${want}`);
+    if (settled.refused) return { refused: settled.refused };
+    const snap = settled.snapshot;
+    if (snap && snap.refused) return { refused: snap.refused };
+    if (snap && snap.presentation === want) {
+      return { presentation: snap.presentation, snapshot: snap, settled, flipAttempts: attempt + 1 };
+    }
+  }
+  const last = settled && settled.snapshot ? settled.snapshot.presentation : 'unreadable';
+  return {
+    refused: `toggle did not hold at ${want} across ${FLIP_ATTEMPTS} attempts; settled snapshot reads ${last}`,
+  };
 }
 
 /* ======================================================================= --mode duplication
@@ -1028,6 +1099,19 @@ async function runDuplication() {
           restored: A(restored.restored),
           afterRestore: after.refused ? null : `${after.reachable}/${after.total}`,
           returned: !after.refused && !pre.refused && after.reachable === pre.reachable,
+          // CORRECTION 54, 2026-09-05: the same "a VOID that names nothing" rule as above,
+          // applied to the OTHER half of the control. `returned: false` published only two
+          // counts — `7/7` before, `6/7` after — and said nothing about WHICH row is still
+          // down, so "a mutation did not restore" read exactly the same whether the undo
+          // was incomplete, the undo had a side effect of its own, or a row that depends on
+          // a recorded "before" had simply become unmeasurable. Diagnosing one instance of
+          // this by hand cost a whole re-run cycle; the rows are already in `after`.
+          ...(after.refused || pre.refused || after.reachable === pre.reachable ? {} : {
+            stillDownAfterRestore: (after.rows || [])
+              .filter((r) => r.reachable !== true
+                && ((pre.rows || []).find((p) => p.id === r.id) || {}).reachable === true)
+              .map((r) => `${r.id}=${rowState(r)} ${r.evidence}`),
+          }),
         });
       }
       const armedResults = results.filter((r) => r.armed);

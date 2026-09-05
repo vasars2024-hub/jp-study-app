@@ -552,11 +552,27 @@
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
+        // CORRECTION 55, 2026-09-05: the typed text ALTERNATES between drives, and that is
+        // load-bearing rather than cosmetic. The `output` row passes only if the pane text
+        // CHANGED from what `step('run')` recorded — a deliberate guard, because this pane's
+        // pre-first-run state is the sentence "Translation appears here." and a `length > 0`
+        // test scored a translate that never ran as a 10. But with one fixed input the guard
+        // has a false NEGATIVE that is just as bad: the control loop drives the surface once
+        // per mutation, so by the second drive the pane already holds the exact translation
+        // this run is about to produce, `after === before`, and a working translate is
+        // scored dead. Measured live: `outputChars=12 before="I like cats." after="I like
+        // cats."` on two of three mutations, which VOIDed the whole category on
+        // `returned: false` while every mutation had flipped exactly its own row.
+        // Two sentences with distinct translations, alternating, make "unchanged" mean only
+        // what it is supposed to mean. The guard is not weakened — the row still demands a
+        // change — it is simply given an input for which a correct app must produce one.
         type: (w, text) => {
           const t = q(w, '.tr-textarea');
           if (!t) return { refused: 'no textarea' };
-          typeInto(t, text == null ? '猫が好きです' : text);
-          return { typed: t.value };
+          const primary = text == null ? '猫が好きです' : text;
+          const n = (window.__LQP_TYPE_N = (window.__LQP_TYPE_N || 0) + 1);
+          typeInto(t, n % 2 === 1 ? primary : '犬が好きです');
+          return { typed: t.value, drive: n };
         },
         // Collapse the caret so the `agentHandoff` before-state is the no-selection
         // label. Must be its OWN call: `/eval` is synchronous, so React has not
@@ -632,7 +648,22 @@
       // view, the caret collapses, and `agentHandoff` reads its label back unchanged — a
       // live feature scored dead by the order it was driven in. Whatever records a "before"
       // for a row runs LAST among the steps that can disturb it.
-      drive: [['type', '猫が好きです'], 'swap', 'run', 'collapse', 'focus', ['highlight', '0,2']],
+      //
+      // CORRECTION 51, 2026-09-05: `swap` ran SECOND, straight after `type`, and
+      // `.tr-swap` does not only reverse the direction — it EXCHANGES the two texts.
+      // Measured live on the running window: input `猫が好きです` / output `I like cats.`
+      // → click → input `I like cats.` / output `猫が好きです`. So typing and then
+      // swapping handed the freshly typed text to the OUTPUT pane and left the input
+      // holding whatever the output used to be — empty on a cold view. Everything after
+      // it then measured an empty input: `run` translated nothing (`output` before ===
+      // after), `input` read `chars=0`, and `agentHandoff` was legitimately `disabled`
+      // because there was no text to send. Three live features scored dead, `4/7`, and
+      // the category VOIDed on `allRowsReachable` — the same class of order defect the
+      // note above records, one step earlier in the list.
+      // `swap` now runs FIRST, before there is anything to lose: it still records
+      // `__LQP_SWAP_BEFORE` for its own row, nothing later touches the direction, and
+      // `type` establishes the input AFTER the only step that can take it away.
+      drive: ['swap', ['type', '猫が好きです'], 'run', 'collapse', 'focus', ['highlight', '0,2']],
       undo: {
         input: (w) => {
           const t = q(w, '.tr-textarea');
@@ -646,6 +677,15 @@
         // `swap` is a DRIVE step, not a mutation, so `restore()` never used to undo it and
         // the driver left the translate direction reversed on the live desktop. A harness
         // that drives persisted UI state owes it back exactly as it found it.
+        // CORRECTION 53, 2026-09-05: this used to null `__LQP_SWAP_BEFORE` after clicking,
+        // and the `swap` FEATURE ROW reads that same global as its "before" — with it null
+        // the row is UNMEASURED by its own rule, so the post-restore re-check could never
+        // get back to the pre-mutation baseline. Every mutation therefore reported
+        // `returned: false` (`7/7` before, `6/7` after) and category 6 VOIDed on "a mutation
+        // did not restore" while all three had in fact flipped exactly their own row and
+        // restored it. The instrument was failing its own restore check, not the surface.
+        // The undo click IS a swap, so recording the actives it swapped FROM keeps the row
+        // measurable and keeps it honest: it still compares a real before to a real after.
         swap: (w) => {
           const before = window.__LQP_SWAP_BEFORE;
           if (!before) return null;
@@ -654,7 +694,7 @@
           const b = q(w, '.tr-swap');
           if (!b) return null;
           b.click();
-          window.__LQP_SWAP_BEFORE = null;
+          window.__LQP_SWAP_BEFORE = now;
           return 'swap';
         },
       },

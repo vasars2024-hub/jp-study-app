@@ -5102,3 +5102,132 @@ anything measured here.
 deterministic drive). cat2 and cat7 NOT RUN this turn.** Running total **19 of 25 sections at
 80/80** — unchanged, `immersion` is NOT certified — and **47 category cells remain**: 51 at the
 start of this turn minus cat1, cat3, cat5 and cat6. **153 of 200.**
+---
+
+## 2026-09-05 02:20-03:30 EDT, `primary2` — `translate` opens: cat6 closes 10/10, cat5 lands 9/10, and six instrument corrections
+
+**Why `translate`.** RULE C's next surface off the seven sampled-out. `city` and
+`immersion`/`reading` were left for the other liquid worker — the previous handoff steers
+them there explicitly — and `translate` is the densest of the rest that already carries a
+mature `l6-parity.js` spec (7 features), so cat6 was reachable without authoring one.
+`files` was NOT taken: the pin forbids scoring the Files app on this matrix at all, its 37
+gates are its rubric.
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki`** — six.
+`anki` is now unblocked at the data end (AnkiConnect answers, 84 decks) but has **no
+`l6-parity.js` spec**, so cat6 there is a spec-authoring slice, not a scoring one. `player`
+and `reading` likewise have no spec. That is the real cost driver on the remaining sections
+and the next worker should price it in rather than discover it.
+
+### The cells
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat6 feature parity and reversibility | **PASS 10/10** | parity standard **7/7** = liquid **7/7**, `rowsAgree`, `onlyInOne` empty, `na` 0. Round trip standard->liquid->standard with `.tr-textarea` dirtied FIRST: `fieldsHeld` true, `shellHeld` true, **zero diffs**. Control: all three declared mutations flip EXACTLY their own row — `direction` 7->6, `input` 7->5 taking only its declared `agentHandoff` cascade, `windowLifecycle` 7->6 — and each restores to 7/7. `CONTROL FAILED AS REQUIRED - category 6 instrument is proven`. `failedBars` empty. |
+| cat5 UI clarity | **9/10 — NOT closed** | Q1,Q2,Q3,Q6,Q7,Q8,Q9,Q10 YES; **Q5 repaired this turn** (below); **Q4 NO**. Control run first, separately: `CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10`. |
+
+### The product defect cat5 found, and it was not small
+
+`.lexicon-interlinear` set `background: var(--surface, rgba(255, 255, 255, 0.72))`, and
+**`--surface` is declared nowhere in this repo** — no CSS rule, no `setProperty`, empty at
+`:root` and on the element. So the fallback was the value, and the value was a light-theme
+literal. Under the default dark theme that is a pale wash beneath `--text: #f5f4f7`, on the
+densest reading surface the app has.
+
+    before  dark  78 runs measured, 0 unmeasurable, 57 FAILING, min 1.48:1 (bar 4.5)
+            light 78 measured, 0 failing, min 5.71:1
+    after   dark  78 measured, 0 FAILING, min 5.35:1
+            light 78 measured, 0 failing, min 5.71:1 — unchanged, and that is the point
+
+All 57 failures were inside that one container; the light theme passing untouched is the
+tell that the cause was a hardcoded light literal. Fixed at `31bd541b` with
+`--lq-anchor-bg` (`var(--panel)` on `:root`, so theme-correct and opaque in every theme),
+which is what the plan's non-negotiable asks for — reading on a stable opaque anchor, never
+on glass. Scope was checked before narrowing: 256 `var(--surface*)` uses exist, but
+`--surface-1`/`--surface-2` DO resolve; only 14 use the bare token and this is the only one
+whose fallback is light. One line.
+
+### Six instrument corrections — 51 to 56
+
+> **These were written as 49–54 and renumbered to 51–56 at merge time.** `backup` took 49 and
+> 50 for `cat8-honest-states.cjs` in the main tree during the same hours, and neither worker
+> could see the other's number. Both are real and both are kept; only mine moved, because
+> theirs reached the integration branch first. **The four commit MESSAGES below still say
+> 49–54** — they are immutable history, and the mapping is exactly `49→51, 50→52, 51→53,
+> 52→54, 53→55, 54→56`. The code comments and this entry carry the final numbers. If a future
+> turn cites "correction 49" or "correction 50", it means cat8's language/drive settles, not
+> anything here.
+
+`85b70263` (49, 51, 53 translate-specific; 50, 52 shared cat6 driver), `3603fad7` (54).
+
+- **51** the drive typed FIRST and swapped SECOND, and `.tr-swap` does not only reverse the
+  direction, it **exchanges the two texts** (measured: input `猫が好きです` / output `I like
+  cats.` -> click -> the reverse). So the freshly typed text was handed to the output pane and
+  the input kept the old output — empty on a cold view. `input`, `output` and `agentHandoff`
+  were all scored dead on a live surface: **4/7**, category VOID.
+- **52** `flip()` was one toggle + one `sleep(900)` read against a known-intermittent
+  control. Six attempts now, and **the re-check is AFTER `settle()`** — the first draft
+  polled, broke early and still refused `did not reach liquid after 1 attempts`, because it
+  HAD reached liquid and fell back during the settle. Only the snapshot that gets scored may
+  end the loop.
+- **53** `undo.swap` nulled `__LQP_SWAP_BEFORE`, which the `swap` row reads as its own
+  "before", so no restore could ever reach baseline.
+- **54** `returned: false` published two counts and named no row. `stillDownAfterRestore`
+  now names it — the same rule this file already applied to `whyNotFalsified`.
+- **55** the real cause behind 51's symptom. The `output` row demands the pane CHANGED from
+  what `run` recorded — a deliberate guard, since the pre-run pane reads "Translation appears
+  here." and a `length > 0` test scored a translate that never ran as a 10. With ONE fixed
+  input that guard has an equally bad false negative: the control drives once per mutation,
+  so by the second drive the pane already holds the exact translation the run is about to
+  produce (`outputChars=12 before="I like cats." after="I like cats."`, on two of three
+  mutations). The typed text now alternates between two sentences with distinct
+  translations. The guard is not weakened; it is given an input a correct app must move.
+- **56** cat5's Q6 leg was the **third** file with the single-shot toggle (cat3 fixed it in
+  `clickPresentationToggle`, cat6 in `flip()`). It refused, published `liquidRegions: 0` and
+  scored Q6 **NO-SUBJECT** — which reads exactly like a surface with no Liquid material.
+  With the retry the same surface reaches liquid on attempt 1 and answers **YES**,
+  `liquidRegions: 1`, `byContextualPaint: 1`. Its RESTORE leg mattered more: it is guarded to
+  run even on a refusal precisely so a probe cannot strand app state, but a single missed
+  click only emitted `restoreWarning` and left the window flipped.
+
+**The click intermittency is NOT specific to the Liquid toggle.** Closing the Translate
+window at the end of this turn took **three** clicks on `.fwin-close`, polled the same way.
+Any harness that drives `.fwin` chrome with one click and one sleep is exposed.
+
+### Q4 is OPEN, and it is an instrument defect, not clutter — this is the next slice
+
+Q4 ("advanced tools discoverable without cluttering") reads `scannedControls: 16` against a
+bar of `<=12`, with `collapsedDisclosures: 5`, `disclosures {total:5, open:3}` and
+`behindDisclosure: 0`. Its `scannedList` includes `Choose the sense of 猫 used h`,
+`Choose the sense of が used h`, `Explain 好きです` — the interlinear's per-token
+`.lexicon-sense-token` affordances, which are inline, box-less, `font: inherit` and part of
+the reading flow by design.
+
+**Measured, decisively, by typing two sentences into the live surface:**
+
+    猫が好きです                                    senseTokens  3   buttons 28
+    昨日の午後、友達と一緒に近所の図書館へ行って…    senseTokens 15   buttons 48
+
+The population scales with **content**, not with tool density. So any surface that makes its
+content interactive — an interlinear gloss, a tokenised subtitle line, a clickable transcript
+— fails Q4 automatically, and fails harder the more the user reads. That is not what the
+question asks.
+
+Deliberately NOT fixed in this turn rather than half-applied: the exclusion has to be narrow
+(by a declared marker such as `.lexicon-sense-token`, not a heuristic) **and** re-verified
+against the Q4 plant, which currently falsifies by adding real controls — widening the term
+is exactly how a plant gets disarmed here. That is the opening slice of the next liquid
+turn, and closing it should close cat5 `translate` at 10/10.
+
+**Running total: 19 of 25 sections at 80/80** (unchanged — `translate` is 1 of 8 banked,
+cat5 at 9/10 pending Q4). **46 category cells remain**, 154 of 200.
+
+> **Merge note, written while resolving this file's only conflict.** This entry and the
+> `immersion` entry directly above it were produced CONCURRENTLY — `backup` in the main tree,
+> `primary2` in `jp-wt-filesapp` — and both appended to the end of this file, so git could not
+> order them. Nothing was dropped; both sections are intact and `immersion` is placed first
+> because it landed on the integration branch first. The arithmetic is the union, taken once:
+> 149 before either turn, plus `immersion` cat1/cat3/cat5/cat6 (4) plus `translate` cat6 (1) =
+> **154 of 200, 46 remaining**. This entry first said "50 remain, 150 of 200", which was correct
+> against a 151 denominator it could not see; that is corrected here rather than left to be
+> discovered.
