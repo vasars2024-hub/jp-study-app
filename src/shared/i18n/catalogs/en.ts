@@ -8688,6 +8688,8 @@ export const en: Catalog = {
   'mediaWorkspace.sidecar.offline': 'offline',
   'mediaWorkspace.sidecar.failed': 'failed',
   'mediaWorkspace.notifications': 'Media notifications',
+  'mediaWorkspace.localPlayback.noPath': 'This episode has no local file to play.',
+  'mediaWorkspace.localPlayback.noHost': 'Open the media workspace in this window to play local episodes.',
   'mediaWorkspace.viewLabel': 'Media view',
   'mediaWorkspace.viewLibrary': 'Library',
   'mediaWorkspace.backToLibrary': 'Back to the library',

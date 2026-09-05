@@ -16,7 +16,11 @@ export default defineConfig({
   // (tools/architecture-audit.cjs) walks src/ only. Third-party source should not be
   // hand-edited to satisfy this repo's own lint and layering rules.
   resolve: {
-    alias: { '@': resolve(__dirname, 'vendor/seanime-web') },
+    alias: {
+      // Adapt local library playback to the host's request lifecycle, not Denshi's.
+      '@/app/(main)/entry/_lib/handle-play-media': resolve(__dirname, 'src/media/seanimeLocalPlayback.tsx'),
+      '@': resolve(__dirname, 'vendor/seanime-web'),
+    },
   },
   // Bind the dev server to IPv4 loopback. By default Vite listens on
   // "localhost", which on this machine resolves to IPv6 (::1) — and the Electron

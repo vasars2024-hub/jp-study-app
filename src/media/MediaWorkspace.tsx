@@ -15,10 +15,21 @@ import { useHandleLibraryCollection } from '@/app/(main)/_features/anime-library
 import { LibraryView } from '@/app/(main)/_features/anime-library/_screens/library-view';
 import { useHostLocation, useRouter } from '@/lib/navigation';
 import type { SeanimeConnection } from '../shared/seanime';
-import type { MediaWorkspacePlaybackRequest } from '../shared/mediaWorkspace';
+import {
+  MEDIA_WORKSPACE_OPEN_EVENT,
+  mediaWorkspaceHostExists,
+  type MediaWorkspacePlaybackRequest,
+} from '../shared/mediaWorkspace';
 import { useT } from '../renderer/i18n';
 import MediaSurfaceShell from './MediaSurfaceShell';
 import StudyPlayerSlice from './StudyPlayerSlice';
+import { LocalPlaybackProvider } from './seanimeLocalPlayback';
+
+function openLocalLibraryFile(localFilePath: string): boolean {
+  if (!mediaWorkspaceHostExists()) return false;
+  window.dispatchEvent(new CustomEvent(MEDIA_WORKSPACE_OPEN_EVENT, { detail: { localFilePath } }));
+  return true;
+}
 
 /**
  * The adopted entry screen is behind `React.lazy` for the same reason the host lazies this
@@ -110,8 +121,10 @@ export default function MediaWorkspace({
 }): React.ReactElement {
   return (
     <MediaSurfaceShell conn={conn} surface="workspace">
-      <RoutedLibrary />
-      <StudyPlayerSlice conn={conn} playbackRequest={playbackRequest} />
+      <LocalPlaybackProvider onOpen={openLocalLibraryFile}>
+        <RoutedLibrary />
+        <StudyPlayerSlice conn={conn} playbackRequest={playbackRequest} />
+      </LocalPlaybackProvider>
     </MediaSurfaceShell>
   );
 }
