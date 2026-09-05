@@ -7844,3 +7844,32 @@ Not one `opacity` remains in any of them, `translateX(-50%)` survives in BOTH `m
 frames as intended, and the deleted keyframes are genuinely gone from the running app. Together
 with the earlier paired arm (opacity 1 / painted 56-of-68 with the rule, 0 / 0-of-68 without) the
 fix is verified in the product, not only in the file.
+
+### `immersion` cat2 — the cause is found, and it is NOT the drive path. Two findings, one of them about the instrument.
+
+I said above the remaining question was `/type` vs the native setter. **It is neither.** Chased to
+the end, with the numbers:
+
+**FINDING A — `/type` REPORTS SUCCESS WHILE TYPING NOTHING, and that invalidated my own earlier
+"clean round trip".** Sequence, all four facts read back in the same breath: `/focus` returned
+`{ok:true, focused:true}`; `document.hasFocus()` **true**; `document.activeElement === the input`
+**true**; `POST /type {text:'red'}` returned **`{ok:true, typed:3}`**; and the input's value was
+**`[]`** — empty — with the card count unmoved. `sendInputEvent({type:'char'})`
+(`debugBridge.ts:604`) needs real OS keyboard focus, which an Electron-focused-but-not-foreground
+window does not have, and **the route cannot tell and reports 3 characters typed either way.**
+So my earlier "77 runs before, 77 after, zero differences" was **vacuous — nothing was typed.**
+I am withdrawing it as evidence. Any `type:` task is silently a no-op in this condition and the
+harness then measures a task that never happened. This is worse than
+`type-route-cannot-send-japanese` (7 chars arriving as `?`): here zero arrive, with a receipt.
+
+**FINDING B — the saved-sites rail is SHARED MUTABLE STATE and a concurrent worker writes to it.**
+`.immersion-site-card` count went **13 -> 19 during this turn**, and the visit counters move with
+it (the 2026-09-05 cat8 entry saw the same class, "166 -> 246 visits"). Every page another worker
+browses is saved into this rail. That is what moved the harness's `baseHash xqiwj8` ->
+`afterHash d8w9is` — not the undo, which the product performs correctly (verified directly:
+`searchValue=[]`, all cards back, correct first card).
+
+**So `immersion` cat2 and cat8 are not measurable while another worker drives this app**, on this
+surface specifically, for a reason nothing in the harness can control. They need either a quiet
+window (`relay-quiet.ps1`) or a private instance with its own userData. Both cells stay OPEN and
+this is the reason, stated so the next turn does not spend itself rediscovering it.
