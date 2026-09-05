@@ -7739,3 +7739,26 @@ means restructuring `BootScreen.tsx`, not editing a keyframe. **Recorded as a kn
 The remaining 11 (`cover-level-badge--flash`, `media-gen-dot`, `mwidget-lyrics-track`,
 `os-companion-spark`, `os-set-pane-anim`, five `game-*`, `scifi-loader`) are user- or
 playback-driven and decorative; none gates content or takes clicks.
+
+### LIVE VERIFICATION of `afe88e35`, as a paired positive/negative on the running app
+
+The fix is CSS in my worktree; the live instance runs from `jp-study-app` and does not carry it
+yet (mergeback pending). So the shipped rule was reproduced at runtime — a `<style id="p2-verify">`
+redefining `@keyframes fwinIn` with the transform-only body, which wins on document order — and the
+same window was opened covered, twice, once with it and once without:
+
+    WITH the shipped keyframes:  opacity 1   painted 56/68   fwinIn:running:0
+    WITHOUT (plant removed):     opacity 0   painted  0/68   plantGone: true
+
+**Same window, same occlusion, same frozen animation** — `fwinIn` is still stuck at
+`running:0` in the passing arm, which is the point: the fix does not unfreeze anything, it makes
+the frozen state a visible one. Only the keyframe body differs between the two arms.
+
+**Disclosed as a plant, not scored as a cell.** Injecting the rule reproduces the committed change
+exactly, but it is still a doctored surface, and closing a rubric cell on one is the false-credit
+shape this repo has been bitten by before. It verifies the FIX; `immersion` cat2 stays open and
+should be measured on an instance that carries `afe88e35` for real.
+
+**State restored:** the three windows the desk held at the start of my turn (Translate, Reading
+Finder, Anki) were closed by the verification and reopened by `os:open`; the desk reads
+`Translate ;; Reading Finder ;; Anki` and the injected style is gone, both confirmed by read-back.
