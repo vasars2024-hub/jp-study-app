@@ -187,6 +187,114 @@ const scrollProof = `(() => {
 const scrollProgress = `(window.__lqScrollLoad ? window.__lqScrollLoad.ticks : -1)`;
 
 /**
+ * CORRECTION 46 — A PAGED READER HAS NO SCROLLER, so `scrollAll` is the wrong load for it.
+ *
+ * `novels` declared `scrollAll('.novel-scroller')` and VOIDed on 2026-09-05 with "the scroll
+ * load never armed". That refusal is CORRECT and it is not a product defect. Measured live on
+ * `悪の教典 02`, the open volume: `.novel-scroller` is 1262x712 with `scrollHeight === clientHeight
+ * === 712`, `scrollWidth` 2522, and `overflow-x: hidden`. It is a CSS multi-column flow whose
+ * pages are moved by the transport buttons, not by an offset. `scrollAll` ranks by VERTICAL
+ * overflow, found 0 on the root, 0 on every descendant and 0 on every ancestor, and refused.
+ * Writing `scrollTop` on an `overflow:hidden` box is a no-op, so had it not refused the leg
+ * would have sampled main during an idle renderer and reported a paged reader as fast.
+ *
+ * So the rubric's "heaviest real operation" for this surface is PAGING, which is also the
+ * heavier of the two: each page re-lays out the column flow and re-runs the reader's furigana
+ * and token decoration over fresh text. This is that load, written once and parameterised, so
+ * `manga` — whose heavy leg is a hand-rolled pager with NO `proof` at all, and which therefore
+ * VOIDs by construction under the rule above — can adopt it as soon as a volume is open to
+ * verify it against. It is not silently switched here: an unverified spec change is worse than
+ * an honest VOID.
+ *
+ * Two things it does that `scrollAll` does not have to:
+ *  - IT DRIVES REAL USER STATE. Reading position is persisted. The load is symmetric — exactly
+ *    `fwd` clicks forward, then exactly `fwd` back — so a book that does not hit its end
+ *    returns to the page it started on, and `restored` is READ BACK rather than assumed.
+ *  - IT CANNOT USE THE SEEK VALUE AS ITS ODOMETER. `.reader-seek` is a 0..1000 integer over a
+ *    ~166-part book, so consecutive pages share one value; counting moves from it would report
+ *    a working pager as stuck. The signature is `.reader-pagecount` plus the head of
+ *    `.novel-content` — the same pair `l6-parity.js:179` uses — fingerprinted so the record
+ *    stays small, and DISTINCT fingerprints are what prove the document actually moved.
+ *
+ * The click and the read are one tick apart on purpose: React commits after the dispatching
+ * task, so a signature read in the same expression as its own click is the PRE-change value.
+ * Each tick reads what the PREVIOUS tick's click produced. The final reading is taken 150 ms
+ * after the last click for the same reason.
+ */
+const NEXT_RE_SRC = 'Next|\\u6b21|\\u4e0b\\u4e00|\\u0412\\u043f\\u0435\\u0440';
+const PREV_RE_SRC = 'Prev|\\u524d|\\u4e0a\\u4e00|\\u041d\\u0430\\u0437\\u0430\\u0434';
+const pageAll = (rootSel, o = {}) => {
+  const fwd = o.fwd || 20;
+  const interval = o.intervalMs || 70;
+  const sigSel = o.sigSel || '.reader-pagecount';
+  const bodySel = o.bodySel || '.novel-content';
+  return `(() => {
+  delete window.__lqPageLoad;
+  const root = document.querySelector(${JSON.stringify(rootSel)});
+  if (!root) return 'REFUSE: no ' + ${JSON.stringify(rootSel)};
+  const NX = new RegExp(${JSON.stringify(NEXT_RE_SRC)}, 'i');
+  const PV = new RegExp(${JSON.stringify(PREV_RE_SRC)}, 'i');
+  const btns = Array.from(document.querySelectorAll('button'));
+  const next = btns.find((b) => NX.test((b.textContent || '').trim()));
+  const prev = btns.find((b) => PV.test((b.textContent || '').trim()));
+  if (!next || !prev) return 'REFUSE: ' + ${JSON.stringify(rootSel)} + ' has no forward/back page transport to drive';
+  if (next.disabled || prev.disabled) return 'REFUSE: page transport is disabled - this volume cannot be paged from where it sits';
+  const body = document.querySelector(${JSON.stringify(bodySel)});
+  if (!body) return 'REFUSE: no ' + ${JSON.stringify(bodySel)} + ' to prove the page changed';
+  const sig = () => {
+    const c = document.querySelector(${JSON.stringify(sigSel)});
+    const s = ((c ? c.textContent : '') || '') + '|'
+      + ((document.querySelector(${JSON.stringify(bodySel)}) || {}).textContent || '').slice(0, 160);
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  };
+  const rec = {
+    sel: ${JSON.stringify(rootSel)}, fwdPlanned: ${fwd}, start: sig(), ticks: 0,
+    fwd: 0, back: 0, distinct: [], final: null, restored: false, done: false,
+  };
+  rec.distinct.push(rec.start);
+  window.__lqPageLoad = rec;
+  let n = 0;
+  const t = setInterval(() => {
+    const s = sig();
+    if (rec.distinct.indexOf(s) < 0) rec.distinct.push(s);
+    if (n < ${fwd}) { next.click(); rec.fwd++; } else { prev.click(); rec.back++; }
+    rec.ticks++;
+    if (++n >= ${fwd * 2}) {
+      clearInterval(t);
+      setTimeout(() => { rec.final = sig(); rec.restored = rec.final === rec.start; rec.done = true; }, 150);
+    }
+  }, ${interval});
+  return 'paging ' + rec.sel + ' from fingerprint ' + rec.start;
+})()`;
+};
+
+/**
+ * The receipt for every `pageAll` leg. Same contract as `scrollProof` and for the same reason:
+ * `liquid-perf-probe.ps1` never reads what `-DuringJs` returned, so a pager that refused
+ * produces a distribution indistinguishable from a fast surface.
+ *
+ * `distinct` is the bar that matters. A pager whose button exists, is enabled, and is clicked
+ * 20 times while the document never changes is exactly the false pass this whole block exists
+ * to prevent — and it is not hypothetical: the reader debounces, and a spec that counted CLICKS
+ * would have scored that as a full load.
+ */
+const pageProof = `(() => {
+  const s = window.__lqPageLoad;
+  if (!s) return 'REFUSE: the page load never armed - nothing recorded a receipt';
+  if (!s.done) return 'REFUSE: the page load was still running when its receipt was read (' + s.ticks + ' ticks)';
+  if (s.ticks < s.fwdPlanned) return 'REFUSE: the page load ticked only ' + s.ticks + ' times of ' + (s.fwdPlanned * 2) + '; its timer was throttled or cleared';
+  if (s.fwd !== s.back) return 'REFUSE: the page load was not symmetric (' + s.fwd + ' forward, ' + s.back + ' back) so it cannot claim to have restored the position';
+  if (s.distinct.length < 4) return 'REFUSE: ' + s.fwd + ' forward clicks produced only ' + s.distinct.length + ' distinct page(s) on ' + s.sel + ' - the transport did not move the document';
+  if (!s.restored) return 'REFUSE: the page load did not return to its starting page (' + s.start + ' -> ' + s.final + ') on ' + s.sel;
+  return 'paged ' + s.sel + ': ' + s.fwd + ' forward + ' + s.back + ' back over ' + s.ticks
+    + ' ticks, ' + s.distinct.length + ' distinct pages, restored to the starting page';
+})()`;
+
+const pageProgress = `(window.__lqPageLoad ? window.__lqPageLoad.ticks : -1)`;
+
+/**
  * `--under-load` — L11 bullet 3's own words, which no leg above answers.
  *
  * The bullet is "drag/resize at target frame rate WHILE media, dictionaries, and large lists are
@@ -485,7 +593,10 @@ const SPECS = {
     // `.novel-scroller` has no `.fwin` ancestor because the reader replaces the desktop shell,
     // so the runner selects the root-window gesture path from the DOM fact above.
     root: '.novel-scroller',
-    heavy: { label: 'scroll the rendered volume', durationMs: 3000, js: scrollAll('.novel-scroller'), progress: scrollProgress, proof: scrollProof },
+    // CORRECTION 46. Was `scrollAll('.novel-scroller')`, which refused: the reader is a CSS
+    // multi-column flow at `overflow: hidden`, so it has no vertical overflow to drive and
+    // writing an offset to it is a no-op. Paging is its transport and its heaviest real work.
+    heavy: { label: 'page through the rendered volume', durationMs: 3000, js: pageAll('.novel-scroller'), progress: pageProgress, proof: pageProof },
     collection: { container: '.novel-scroller', row: '.novel-content p' },
   },
   manga: {
