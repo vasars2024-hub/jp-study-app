@@ -6477,3 +6477,79 @@ was clean in all six runs. The mechanism is confirmed; only the size of the win 
 **This does not change cat7's status — it was already OPEN and stays OPEN** — but it does change
 what the next worker must do: `primary2`'s three-repeats-per-arm protocol is now mandatory here,
 and it needs a QUIET machine. Two relay dispatches were Running throughout this turn.
+
+---
+
+## 2026-09-05 09:05-09:35 EDT, `backup` — the owed one-pass enumeration. The running total was UNDERCOUNTING, and the correction goes in my favour
+
+**sampled-out this turn: every surface.** This entry scores no cell and measures no surface. It
+pays the debt line 5666 of this file recorded and nobody had settled: *"what is owed is a one-pass
+enumeration of the certified surfaces by name with their 8 cells each — cheap, and nobody has
+done it."*
+
+**Read the direction of the correction first: it moves the number UP, which is the direction that
+flatters whoever publishes it.** The turn that found the discrepancy explicitly refused to quote
+the higher figure without a cell-by-cell derivation, and was right to. This is that derivation, so
+the higher number is now earned rather than assumed — but the burden was on me and I state it
+plainly rather than burying it in a total.
+
+### Method, so it can be re-run rather than believed
+
+Denominator from source, not from this file: `DESKTOP_WIN_SECTIONS` (`src/shared/desktop.ts:23-49`)
+has **25** members. Each surface's state resolved from its own `^## ` headings here (append-only,
+so the LAST one wins) and cross-checked against the per-surface `N of 8 banked` lines. Six headings
+spot-verified by name rather than assumed: `musicwidget` (:2989), `library` (:1997), `scraper`
+(:3659), `visualizer` (:2784), `note` (:2561), `stats` (:2210 — filed as **"Statistics"**, which is
+why a grep for `stats` finds nothing and is the aliasing trap here, the twin of `reading`/`captures`).
+
+### The enumeration
+
+**Certified at 80/80 — 19 sections, 8 cells each = 152 cells.** `agent` `library` `novels`
+`dictionary` `grammar` `video` `music` `flashcards` `games` `stats` `resources` `settings` `note`
+`visualizer` `musicwidget` `city` `calendar` `youtube` `scraper`.
+
+**Open, with their banked cells enumerated:**
+
+| surface | banked | which | open |
+| - | - | - | - |
+| `translate` | **7** | cat1 cat2 cat3 cat4 cat5 cat6 cat8 | cat7 |
+| `immersion` | **5** | cat1 cat3 cat4 cat5 cat6 | cat2 cat7 cat8 |
+| `reading` | **0** | — (its probe specs are filed as `captures`, complete, but no cell is banked to the surface) | all 8 |
+| `player` | **0** | — (no `l6-parity.js` app spec) | all 8 |
+| `anki` | **0** | — (needs both a cat6 spec and a cat7 SPECS entry) | all 8 |
+| `files` | **out of the matrix** | cat3 10/10 exists as provenance; cat1 and cat4 are recorded FAILs | see the decision below |
+
+### Decision — `files` leaves the matrix, so the denominator is 192, not 200
+
+Reversible accounting choice, made under the relay's standing auto-approval and recorded here
+rather than asked. The pin is explicit that files-app's **37 gates ARE its rubric** and that
+scoring it on the 8-category matrix is forbidden; line 5244 of this file already says
+"`files` must not be scored on this matrix at all". Those two cannot both hold while `files`
+contributes 8 cells to a 200 denominator. So:
+
+- The matrix is **24 sections × 8 = 192 cells**.
+- `files` is certified by its own gate list (**37 of 37**, landed on the branch), not by cells.
+- Its stray `cat3` 10/10 and its two `cat1`/`cat4` FAILs stay on the record as provenance and
+  count toward nothing. They were measured before the ruling; deleting them would be worse.
+
+### The number
+
+    certified 19 × 8                        152
+    translate banked                          7
+    immersion banked                          5
+    reading + player + anki                   0
+    ------------------------------------------
+                                            164 of 192, 28 remaining
+
+**Quote `164 of 192, 28 remaining` from here forward.** The superseded series was
+`161 of 200, 39 remaining`; the 11-cell gap is entirely accounting — 8 from removing `files`'
+never-scoreable cells from the denominator, and 3 from `immersion`'s and `translate`'s banked
+cells that the running total had lost at the `18 sections + novels 3-of-8 → 144` drift line 5670
+identifies. **No cell moved. This is COUNTING, not building, and it must never be quoted as a
+rate** — the same warning RULE E carries about its own 6 → 25 jump.
+
+### What this changes for RULE D, stated because it lowers the required rate
+
+Required rate falls from `39 / 1.90 = 20.5` to `28 / 1.87 = 15.0` cells/day. That is still far
+above any trailing rate this track has recorded, so **TARGET AT RISK is unchanged** and the
+correction rescues nothing. It only makes the gap the true one.
