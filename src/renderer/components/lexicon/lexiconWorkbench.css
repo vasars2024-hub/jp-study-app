@@ -1,7 +1,27 @@
+/* The interlinear passage is the densest READING surface this app has — a sentence
+   with a stacked per-token gloss under every word — so by the transformation plan's
+   own non-negotiable it belongs on a stable opaque anchor, not on glass.
+
+   It was on neither. `--surface` is declared NOWHERE in this repo (no CSS rule, no
+   `setProperty`), so the fallback was not a fallback, it was the value, and the value
+   was a light-theme literal: white at 72%. Under the default dark theme that painted a
+   pale wash beneath `--text: #f5f4f7`, i.e. near-white text on near-white.
+
+   Measured live by `cat5-ui-clarity.cjs` on `translate`, compositing through the real
+   stack rather than reading one background-color: 78 text runs measured, **57 failing**,
+   worst 1.48:1 against a 4.5 bar (`span.muted` on `div.lexicon-interlinear@72% over
+   section.fwin@100%`), and every single failing run was inside this container. The same
+   walk in `classic-light` reported 0 failing at min 5.71:1 — which is exactly the tell
+   that the defect was a hardcoded light literal rather than anything theme-aware.
+
+   `--lq-anchor-bg` is `var(--panel)` on `:root`, so it is the theme's own panel colour
+   in every theme (dark `#1a1823`, classic-light `#ffffff`) and it is opaque. That keeps
+   the light theme rendering what it already rendered and gives the dark theme a real
+   anchor instead of a wash. */
 .lexicon-interlinear {
   padding: 16px;
   border-radius: 16px;
-  background: var(--surface, rgba(255, 255, 255, 0.72));
+  background: var(--lq-anchor-bg, var(--panel, #1a1823));
 }
 
 .lexicon-interlinear-meta {
