@@ -8283,6 +8283,8 @@ export const ja: Catalog = {
   'mediaWorkspace.sidecar.offline': 'オフライン',
   'mediaWorkspace.sidecar.failed': '失敗',
   'mediaWorkspace.notifications': 'メディアの通知',
+  'mediaWorkspace.localPlayback.noPath': 'このエピソードには再生できるローカルファイルがありません。',
+  'mediaWorkspace.localPlayback.noHost': 'ローカルのエピソードを再生するには、このウィンドウでメディアワークスペースを開いてください。',
   'mediaWorkspace.viewLabel': 'メディア表示',
   'mediaWorkspace.viewLibrary': 'ライブラリ',
   'mediaWorkspace.backToLibrary': 'ライブラリに戻る',

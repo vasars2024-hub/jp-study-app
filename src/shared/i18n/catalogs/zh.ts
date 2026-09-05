@@ -8243,6 +8243,8 @@ export const zh: Catalog = {
   'mediaWorkspace.sidecar.offline': '离线',
   'mediaWorkspace.sidecar.failed': '失败',
   'mediaWorkspace.notifications': '媒体通知',
+  'mediaWorkspace.localPlayback.noPath': '此剧集没有可播放的本地文件。',
+  'mediaWorkspace.localPlayback.noHost': '请在此窗口中打开媒体工作区，以播放本地剧集。',
   'mediaWorkspace.viewLabel': '媒体视图',
   'mediaWorkspace.viewLibrary': '媒体库',
   'mediaWorkspace.backToLibrary': '返回媒体库',

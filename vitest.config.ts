@@ -24,7 +24,10 @@ const REAL_MODULES = realpathSync(resolve(__dirname, 'node_modules'));
 export default defineConfig({
   server: { fs: { allow: [searchForWorkspaceRoot(__dirname), REAL_MODULES] } },
   // Match the renderer's adopted-media alias so shell tests link the real component.
-  resolve: { alias: { '@': resolve(__dirname, 'vendor/seanime-web') } },
+  resolve: { alias: {
+    '@/app/(main)/entry/_lib/handle-play-media': resolve(__dirname, 'src/media/seanimeLocalPlayback.tsx'),
+    '@': resolve(__dirname, 'vendor/seanime-web'),
+  } },
   test: {
     include: [
       'src/shared/__tests__/**/*.test.ts',

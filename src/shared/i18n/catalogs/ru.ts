@@ -9026,6 +9026,8 @@ export const ru: Catalog = {
   'mediaWorkspace.sidecar.offline': 'недоступен',
   'mediaWorkspace.sidecar.failed': 'сбой',
   'mediaWorkspace.notifications': 'Уведомления медиатеки',
+  'mediaWorkspace.localPlayback.noPath': 'У этого эпизода нет локального файла для воспроизведения.',
+  'mediaWorkspace.localPlayback.noHost': 'Чтобы воспроизвести локальные эпизоды, откройте медиапространство в этом окне.',
   'mediaWorkspace.viewLabel': 'Вид медиатеки',
   'mediaWorkspace.viewLibrary': 'Медиатека',
   'mediaWorkspace.backToLibrary': 'Назад в медиатеку',
