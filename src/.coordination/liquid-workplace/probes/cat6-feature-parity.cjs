@@ -184,12 +184,22 @@ async function dirtyField(pres) {
       return !w.classList.contains('os-desktop') || !x.closest('.fwin');
     });
     var declared = window.__LQP.__probeInput(${A(APP)}, ${A(pres)});
-    var el = declared || all.filter(function(x){
+    // The escape hatch's third shape. A spec may say it has no field this mark can
+    // safely go in - not "no field", but "none that is not the filter the rows are
+    // scored on". Without it the driver empties the surface it is scoring and both
+    // presentations then agree on a wrong 4/6. See __noSafeInput in l6-parity.js.
+    var noSafe = !declared && window.__LQP.__noSafeInput(${A(APP)});
+    var el = declared || (noSafe ? null : all.filter(function(x){
       var b = x.getBoundingClientRect();
       return b.width > 0 && b.height > 0 && !x.disabled && !x.readOnly
         && (x.tagName === 'TEXTAREA' || !x.type || /^(text|search)$/i.test(x.type));
-    })[0];
-    if (!el) return { field: null, note: 'surface has no editable text field' };
+    })[0]);
+    if (!el) return {
+      field: null,
+      note: noSafe
+        ? 'spec declares no SAFE text field - the only one filters the rows this app is scored on'
+        : 'surface has no editable text field',
+    };
     var proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
     var was = el.value;
     Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, ${A(DIRTY_MARK)});

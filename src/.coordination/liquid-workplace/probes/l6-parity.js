@@ -896,6 +896,12 @@
     captures: {
       titleRe: /Reading Finder|Captures|読書|阅读|Чтен/i,
       rootSel: '.reading-captures',
+      // The only text field on this surface is `.reading-captures-search`, which
+      // FILTERS the rows `captureList` and `selection` are scored on. See
+      // `__noSafeInput`: measured 2026-09-05, the round-trip mark took parity to
+      // 4/6 in both presentations by emptying the list, and both refusals in the
+      // drive log ("only 0 rows", "nothing scrollable") are the same cause.
+      noSafeInput: true,
       features: [
         {
           id: 'captureList',
@@ -7383,6 +7389,24 @@
       if (!s || !s.probeInput || !win) return null;
       return s.probeInput(win) || null;
     },
+    /**
+     * The THIRD shape of the same trap, and the one `probeInput` cannot answer.
+     *
+     * `probeInput` redirects the round-trip mark to a safe field. `captures` has
+     * no safe field to redirect it TO: its only text input is the index filter,
+     * so the mark filtered the list to nothing and the two rows scored on that
+     * list — `captureList` and `selection` — read `rows=0` and `selected=""` in
+     * BOTH presentations. Measured 2026-09-05: parity 4/6 with `select` refusing
+     * "only 0 rows" and `scroll` refusing "nothing scrollable", i.e. the driver
+     * had emptied the surface it was scoring, exactly as it once deleted Video's.
+     *
+     * A spec sets `noSafeInput` to say so, and `dirtyField` then records
+     * `field: null` — the weaker, already-supported outcome the harness documents
+     * for a surface with no editable field at all. The round trip carries no
+     * user-entered state for this app, which is the honest report; inventing one
+     * by dirtying a filter is not.
+     */
+    __noSafeInput: (app) => !!(SPECS[app] && SPECS[app].noSafeInput),
   };
 
   return JSON.stringify({

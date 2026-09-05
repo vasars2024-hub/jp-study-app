@@ -6627,3 +6627,66 @@ and the novel reader all sit on the branch that had no overflow declared at all.
 **sampled-out (RULE C):** no other surface was scored this turn. cat2 and cat5/cat6 on
 `reading-captures` remain open exactly as the 13:45 entry left them — cat2 needs a `--compare`
 surface for `costParity`, cat5+cat6 need an `l6-parity.js` spec entry.
+
+### Same turn, second slice — `reading-captures` **cat6 and cat5 both CLOSE 10/10.**
+
+Two cells for one piece of scaffolding, exactly as the 13:45 entry predicted, though not for
+the reason it gave: the `captures` spec in `l6-parity.js` **already existed** (line 896, six
+feature rows). What was missing was a harness escape hatch and a cat6 baseline for cat5 to read.
+
+#### cat6 — Feature parity, PASS 10/10
+
+`cat6-feature-parity.cjs --app captures --win 1 --label reading-captures`.
+
+    parity  standard 6/6 · liquid 6/6 · na 0 · equal true · rowsAgree true · onlyInOne []
+    drive   openSection{Captures} · toggleList{true} · toggleList{false}
+            select{picked "clipboard"} · scroll{reading-captures-rows top 240 of range 1809}
+    roundTrip  standard -> liquid -> standard, fieldsHeld true, shellHeld true, diffs []
+    CONTROL    3 of 3 mutations armed, each flipped EXACTLY its own row: "CONTROL FAILED AS
+               REQUIRED - category 6 instrument is proven"
+
+**FIRST RUN WAS 4/6 IN BOTH PRESENTATIONS, AND IT WAS THE INSTRUMENT.** `captureList` read
+`rows=0 withSource=0` and `selection` read `selected="" heading="clipboard"`; the drive log
+carried two refusals, `select` "only 0 rows" and `scroll` "nothing scrollable". Cause: the
+harness's round-trip step types `lqp-roundtrip-食` into the first visible text field, and this
+surface's only text field is `.reading-captures-search` — **the filter over the very rows those
+two questions score**. The driver emptied the surface it was scoring, and because it did so in
+both presentations the two halves agreed and `parityEqual` stayed true. A wrong number that
+looks like a finding.
+
+Fixed as the documented escape hatch's **third shape**: `probeInput` redirects the mark to a
+safe field, and `captures` has none to redirect it to, so the spec now declares
+`noSafeInput: true` and `dirtyField` records `field: null` with the reason — the weaker,
+already-supported outcome the harness defines for a surface with no editable field. `video`'s
+`probeInput` and every other spec are untouched, and the round trip for this app now honestly
+reports that it carries no user-entered state rather than inventing some.
+
+#### cat5 — UI clarity, PASS 10/10
+
+`cat5-ui-clarity.cjs --surface "Reading Finder" --label reading-captures`.
+**All ten questions YES, `voided: []`, `findings: []`, 48 painted controls.**
+`--control`: **"CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10"**, `plantResidue 0`,
+restored to `presentation standard`, `820x580`.
+
+**TWO INVOCATION TRAPS, both of which produced a VOID that reads like a defect.**
+1. `--surface "@.reading-captures"` scores the SECTION, and the Liquid presentation button
+   lives in the `.fwin` chrome — an **ancestor** of that root, not a descendant. `OWN_LIQUID_BTN`
+   queries inside the root, found nothing, and Q6 refused `surface has no Liquid presentation
+   control` -> `NO-SUBJECT` -> whole category VOID. Q6 has to be asked with the WINDOW as the
+   root, which is what cat3 already did. cat1, cat4 and cat8 keep the `@` form.
+2. Q7/Q8/Q9 are `MEASURE` until `baselines/cat6-<label>.json` exists, so cat6 must run FIRST and
+   write it — and `--out` must name that path, because cat6 writes only where `--out` points.
+   `--label` alone writes nothing. That file is **gitignored** (`.gitignore:232`), which is why
+   every number above is in this entry rather than behind a path no other worker can open.
+
+### RULE D — liquid. Closed by this worker: **3 cells (cat4, cat6, cat5). 174 of 192, 18 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:12 EDT: **1.8667** (44 h 48 min).
+`18 / 1.8667 = 9.64 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 9.64 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn** — but by
+the narrowest margin yet, and this turn's 3 is above the trailing rate rather than below it.
+Numerator caveat unchanged: 4 of the 174 are `anki` cells on `wt/files-app`, so on
+`feat/nyaa-subtitles` alone it is 170.
+
+**`reading-captures` now stands at cat1 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat8 ✓ — 6 of 8.**
+Open: **cat2** (`costParity` unmeasured without a `--compare` surface) and **cat7** (never run
+here). **sampled-out (RULE C):** no other surface was scored this turn.
