@@ -775,6 +775,66 @@ async function raise() {
   return r;
 }
 
+/**
+ * CORRECTION 63 — `raise()` IS NOT PROOF THE SURFACE PAINTS, AND THIS CATEGORY HAS ALREADY
+ * BANKED A FALSE 10 BECAUSE OF IT.
+ *
+ * Correction 34 above added `/focus` precisely because a frozen fade-in makes
+ * `checkVisibility({checkOpacity:true})` false, and correction 33 records the outcome in its own
+ * words: "City measured ONE text record and TWO controls and still read 10/10." Both corrections
+ * treat focusing as the cure. **Measured 2026-09-05, it is not.** On a `.fwin` opened while the
+ * OS window was covered by another APPLICATION's window, `/focus` returned `focused: true` and
+ * `document.hasFocus()` was `true`, and the animation still read `fwinIn:running:0` with the root
+ * at opacity 0 — three seconds later, i.e. 21x the 0.14s duration. `/screenshot` and
+ * close-and-reopen did not move it either. Electron focus does not guarantee the compositor is
+ * producing frames for that window, and an animation frozen at t=0 pins the `from` keyframe.
+ *
+ * A fraction of a surface scored as the whole of it is the worst failure this harness has, because
+ * it BANKS. So the residual case is refused by name rather than left to correction 34's hope: if
+ * the root holds text and none of it paints, this is a MEASUREMENT failure, not an accessible
+ * surface. cat2 correction 61 and cat8 correction 51 are the same guard on the same predicate.
+ */
+async function assertPaints() {
+  const why = JSON.parse(await ev(`(function(){
+    var root = ${ROOT_EXPR};
+    if (!root) return JSON.stringify({ refuse: 'surface not found' });
+    var raw = 0, painted = 0;
+    var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (var t = tw.nextNode(); t; t = tw.nextNode()) {
+      var s = t.nodeValue && t.nodeValue.trim();
+      if (!s || !t.parentElement) continue;
+      raw++;
+      if (typeof t.parentElement.checkVisibility !== 'function'
+        || t.parentElement.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })) painted++;
+    }
+    var frozen = [];
+    var scan = root.getAnimations ? root.getAnimations({ subtree: true }) : [];
+    for (var i = 0; i < scan.length; i++) {
+      var a = scan[i];
+      if (a.playState === 'running' && (a.currentTime || 0) === 0) frozen.push(a.animationName || a.transitionProperty || '?');
+    }
+    return JSON.stringify({
+      rawTextNodes: raw, paintedTextNodes: painted,
+      rootOpacity: getComputedStyle(root).opacity,
+      frozenAtZero: frozen.slice(0, 6), hasFocus: document.hasFocus()
+    })
+  })()`));
+  if (why.refuse) return why;
+  if (why.rawTextNodes > 0 && why.paintedTextNodes === 0) {
+    return {
+      ...why,
+      refuse: `NOT MEASURABLE - ${why.rawTextNodes} text nodes are present and NONE paints. `
+        + `root opacity ${why.rootOpacity}, animations stuck at currentTime 0: `
+        + `${why.frozenAtZero.length ? why.frozenAtZero.join(', ') : 'none'} `
+        + `(document.hasFocus ${why.hasFocus}). raise()/focus did NOT make this window paint; the `
+        + `compositor does not advance animations in a window it is not producing frames for. `
+        + `Scoring here banks a fraction of the surface as the whole of it - uncover the OS window `
+        + `and re-run. This is a MEASUREMENT refusal, not a score.`,
+    };
+  }
+  return why;
+}
+
 const run = async () => {
   const result = JSON.parse(await ev(PROBE));
   const deferredRestore = await settleDeferredStyles('__cat1CoreDeferredRestore');
@@ -1096,6 +1156,12 @@ async function runKeyboard() {
     return;
   }
   const raised = await raise();
+  const paints = await assertPaints();
+  if (paints.refuse) {
+    console.error(`REFUSE - ${paints.refuse}`);
+    process.exitCode = 2;
+    return;
+  }
   // CORRECTION 33 - open in PASSES, and read the closed count back rather than trusting one
   // sweep. Two independent reasons, both measured on City:
   //  (a) `raise()` presses the surface to bring it forward, and an outside press is exactly what

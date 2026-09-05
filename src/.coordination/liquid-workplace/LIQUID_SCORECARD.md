@@ -7787,3 +7787,42 @@ predicate but do not carry this refusal, so they were left alone rather than edi
 
 **State:** the injected div and the `p2-verify` style are removed and the desk reads
 `Translate ;; Reading Finder ;; Anki`, all three confirmed by read-back.
+
+### Fourth slice — `cat1` gets the same paint guard, and `immersion` cat2 is narrowed to ONE question
+
+**`cat1` correction 63 (`0477a304`'s sibling, committed below).** cat1 already knew this class:
+correction 34 added `/focus` because "an entry animation that never advances" fails its painted
+predicate, and correction 33 records the outcome in its own words — **"City measured ONE text
+record and TWO controls and still read 10/10."** Both treat focusing as the cure. **Measured today,
+it is not**: `/focus` returned `focused: true`, `document.hasFocus()` was `true`, and the root
+still sat at `fwinIn:running:0` / opacity 0 three seconds later. A fraction of a surface scored as
+the whole of it is the worst failure this harness has, because **it BANKS** — so `assertPaints()`
+now refuses by name when the root holds text and none of it paints.
+**Negative arm proven:** on a painting Immersion window cat1 ran straight past the guard into its
+parser self-test and measurement, so it does not over-fire.
+
+### CORRECTION — the freeze is INTERMITTENT, and I nearly built on the wrong reading
+
+I reproduced it ~6 times running, then it stopped reproducing and I briefly read `op=1` as "the
+defect is gone". It was a **different window** — `backup` began dispatching in the main tree and
+restored its own desk (Translate / Reading Finder / Anki), and a concurrently-driving process
+keeps the window compositing, which masks the freeze. So: the freeze happens **when nothing is
+causing that window to composite**, not on every open. The fix and both commits stand; the word
+"deterministic" does not, and this is probably why earlier turns never caught it.
+
+### `immersion` cat2 — STILL OPEN, and now down to one isolated question
+
+`.immersion-site-search input` is a local filter over 13 cards with no network. I called it "the
+deterministic local driver cat8 lacked" **before testing its restore, and that was premature.**
+Measured: the harness VOIDs on `undo did not restore` (`baseHash xqiwj8` vs `afterHash d8w9is`),
+but **the product restores correctly** — read back directly, `searchValue=[]`, `cards=13`, correct
+first card. And a full text diff across type→clear, using the harness's own painted predicate, is
+**77 runs before, 77 after, zero differences in either direction.**
+`--churn ".immersion-site-card"` was **correctly REFUSED** by the harness's own guard ("excluded
+regions that never changed on their own in either idle phase") — the visit counter is not a clock,
+so the cat8 entry's counter theory does not explain this one.
+
+**The one remaining difference is the DRIVE PATH:** the harness types with `/type` (real char
+events) and clears through React's native setter; my clean round trip used the native setter for
+both. So the next turn compares those two paths on this field — not another surface, not another
+task. That is a 15-minute question, and it unlocks cat2 **and** cat8 on this surface.
