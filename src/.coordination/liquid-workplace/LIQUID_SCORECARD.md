@@ -6690,3 +6690,46 @@ Numerator caveat unchanged: 4 of the 174 are `anki` cells on `wt/files-app`, so 
 **`reading-captures` now stands at cat1 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat8 ✓ — 6 of 8.**
 Open: **cat2** (`costParity` unmeasured without a `--compare` surface) and **cat7** (never run
 here). **sampled-out (RULE C):** no other surface was scored this turn.
+
+### Same turn, third slice — `reading-captures` **cat2 CLOSES 10/10.** Surface is 7 of 8.
+
+The 13:45 entry left cat2 open on one term: "`costParity` is UNMEASURED without a `--compare`
+surface". **It does not need one.** `cat2-clunkiness.cjs` has `--both-presentations`, which
+measures the same task in the same window at the same geometry in Standard and in Liquid — a
+strictly better second operand than a different surface, and this window has a Liquid toggle so
+the `N/A-single-path` branch does not apply either.
+
+`cat2-clunkiness.cjs --surface "Reading Finder" --win 1 --both-presentations
+--task "click:.reading-captures-list-toggle >> wait:500"
+--undo "click:.reading-captures-list-toggle" --result ".lq-reading-tool"`
+
+    deadEnds 0 · modalTraps 0 · scrollTraps 0 · latency ok · costParity TRUE
+    costParity  standard total 1, worstRecv 20.4 ms  ·  liquid total 1, worstRecv 17.4 ms
+                flipAttempts 4, restoreAttempts 1, restored true, back to standard at 820x580
+    undo        baseHash lzh52g -> afterHash lzh52g, restored true, no live-region residue
+    unmeasuredBars []   failedBars []
+
+**CONTROL:** all three plants moved their own number and only their own —
+`deadEnd`, `modalTrap`, `scrollTrap` each `base 0 -> dirty 1 -> restored 0`,
+`backToBaseline true`, inert-click recv 0.3 ms.
+
+**THE TASK CHANGED BETWEEN THE FIRST RUN AND THE CONTROL, AND THE FIRST TASK IS THE LESSON.**
+The scored run first used `click:.reading-captures-next-row` — the continuation this turn added —
+and PASSED 10/10 with the same bars. The control then REFUSED:
+`occluded: .reading-captures-next-row centre resolves to null`. That is correct product
+behaviour, not a defect: the first run's click selected a different, longer capture, so the
+continuation moved below the fold and has to be scrolled to. A control that cannot run leaves
+the score VOID rather than 10, so **both** legs were re-run on a target that is always visible —
+the reader header's list toggle, which is also a genuine reversible gesture with a real undo.
+A task whose reachability depends on what the previous step selected is not a stable cat2 task.
+
+`reading-captures`: **cat1 ✓ cat2 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat8 ✓ — 7 of 8. Only cat7
+(performance under real load) has never been run here.**
+
+### RULE D — liquid. Closed by this worker: **4 cells (cat4, cat6, cat5, cat2). 175 of 192, 17 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:16 EDT: **1.8639** (44 h 44 min).
+`17 / 1.8639 = 9.12 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 9.12 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn** — but the
+gap is now ~0.1 cells/day, the closest it has been, and this turn's 4 is the highest single-turn
+figure in that window. Numerator caveat unchanged: 4 of the 175 are `anki` cells on
+`wt/files-app`, so on `feat/nyaa-subtitles` alone it is 171.

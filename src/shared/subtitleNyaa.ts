@@ -395,6 +395,31 @@ function withoutReleaseGroup(name: string): string {
 }
 
 /**
+ * "This release is subtitles and nothing else", in **either word order**.
+ *
+ * English puts the qualifier on either side of the noun and the index carries
+ * both: `(subs only)` and `(Only subs)` are the same claim. Only the first was
+ * recognised, and the cost was measured rather than imagined —
+ * `Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs]
+ * [EN-MS-TH-ID-VI-ZH-JA]`, **5.3 MB with 12 seeders and a Japanese track**, and
+ * its 19.8 MB / 14-seeder sibling covering 520 episodes, were the only two rows
+ * under the ceiling in that title's whole listing and both scored **zero
+ * signals**. They were dropped for `shape` — the verdict that means "nothing
+ * here is fetchable" — while being exactly what Route A exists to fetch.
+ *
+ * Reversing the order carries no new risk, because it is the same claim the
+ * forward order already makes and the same guard already covers it: the size
+ * ceiling. A video release calling itself "only subs" is still hundreds of
+ * megabytes and never reaches `looksLikeSubtitleOnly`.
+ *
+ * Split into its two halves so `subtitlePackSignals` can attribute which claim
+ * it saw, and recombined here so there is one source of truth for the phrase.
+ */
+const SUBS_ONLY_RE = /\b(?:sub(?:title)?s?\s*only|only\s*sub(?:title)?s?)\b/i;
+
+const SUB_PACK_RE = /\bsub(?:title)?\s*pack\b/i;
+
+/**
  * A phrase that states the release *is* subtitles, as opposed to one that says
  * a video release has them.
  *
@@ -402,7 +427,7 @@ function withoutReleaseGroup(name: string): string {
  * protects a leading bracket from the group strip above, and it outranks
  * `VIDEO_WITH_SUBS_RE` inside `subtitlePackSignals`.
  */
-const STATED_PAYLOAD_RE = /\b(?:sub(?:title)?s?\s*only|sub(?:title)?\s*pack)\b/i;
+const STATED_PAYLOAD_RE = new RegExp(`${SUBS_ONLY_RE.source}|${SUB_PACK_RE.source}`, 'i');
 
 /**
  * Phrases that describe *a video release that has subtitles*, not a subtitle
@@ -509,10 +534,11 @@ export function subtitlePackSignals(name: string): string[] {
   // of megabytes and never reaches `looksLikeSubtitleOnly`.
   if (!STATED_PAYLOAD_RE.test(text) && VIDEO_WITH_SUBS_RE.test(text)) return found;
 
-  if (/\bsub(?:title)?\s*pack\b/i.test(text)) found.push('sub-pack');
+  if (SUB_PACK_RE.test(text)) found.push('sub-pack');
   // `subtitles only` spelled out, not just `subs only` — same claim, and the
-  // longer form is what the one real release in this library uses.
-  if (/\bsub(?:title)?s?\s*only\b/i.test(text)) found.push('subs-only');
+  // longer form is what the one real release in this library uses. Either word
+  // order, for the reason written on `SUBS_ONLY_RE`.
+  if (SUBS_ONLY_RE.test(text)) found.push('subs-only');
   // Bare "subtitles" survives only because the video-release phrasings above
   // were already excluded.
   if (/\bsubtitles?\b/i.test(text)) found.push('subtitles');

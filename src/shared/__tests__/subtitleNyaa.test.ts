@@ -121,6 +121,34 @@ describe('subtitlePackSignals', () => {
     expect(subtitlePackSignals('[Subtitle Pack] Show 01-24')).toContain('sub-pack');
   });
 
+  it('reads "only subs" as the same claim as "subs only"', () => {
+    // Measured live 2026-09-05 against the running app's own classifier: these
+    // two rows are the ONLY ones under the 50 MB ceiling in the whole
+    // `Detective Conan` listing — 5.3 MB / 12 seeders and 19.8 MB / 14 seeders,
+    // both carrying a Japanese track — and both scored zero signals, so the
+    // listing dropped them for `shape` and offered a 6.1 GB whole-site archive
+    // instead. Nothing about them is unusual except English word order.
+    const movies = 'Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]';
+    expect(subtitlePackSignals(movies)).toContain('subs-only');
+    expect(looksLikeSubtitleOnly(row({ name: movies, sizeBytes: 5_557_452 }))).toBe(true);
+    expect(subtitlePackSignals('Show - only subtitles')).toContain('subs-only');
+    // The forward order is unchanged; this is an addition, not a replacement.
+    expect(subtitlePackSignals('Show - subs only')).toContain('subs-only');
+  });
+
+  it('NEGATIVE CONTROL: "only" next to no subtitle word is still nothing', () => {
+    // The word this rule newly leans on is one of the commonest in English, so
+    // the rival is a real release name that carries it beside a DIFFERENT noun.
+    // If `only\s*sub` were loosened to "only … sub anywhere", this 370 KB row
+    // would become a pack on the strength of a disc-source tag.
+    expect(subtitlePackSignals('Sing a Bit of Harmony English Subs V2 [BD ONLY]')).toEqual([]);
+    expect(subtitlePackSignals('Show S01 [Dual Audio] [Sub and Dub] [BD ONLY]')).toEqual([]);
+    // And the ceiling — not the phrase — is what keeps a video release honest:
+    // the claim is read, and the size still refuses it.
+    expect(subtitlePackSignals('Show S01-S03 Only Subs Edition')).toContain('subs-only');
+    expect(looksLikeSubtitleOnly(row({ name: 'Show S01-S03 Only Subs Edition', sizeBytes: 15 * 1024 * MB }))).toBe(false);
+  });
+
   it('NEGATIVE CONTROL: a leading group tag is still stripped, phrase or not', () => {
     // The exemption is the phrase, not the vocabulary. If it leaked, every
     // `[SubsPlease]` episode on the index would read as a subtitle pack.
