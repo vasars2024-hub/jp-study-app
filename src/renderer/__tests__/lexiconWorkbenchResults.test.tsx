@@ -1273,4 +1273,65 @@ describe('LexiconWorkbenchResults', () => {
     expect(host.querySelector('.lexicon-concordance-terms')?.textContent).toBe('猫');
     expect(host.textContent).toContain('lexicon.concordance.scope');
   });
+
+  /**
+   * `lookupOfflineInterlinear` is a MAIN-process call — dictionary rows,
+   * frequency lists and morphological analysis over the whole passage — and the
+   * effect used to dispatch one per dependency change, discarding superseded
+   * ANSWERS with an `alive` flag. A discarded answer has already been paid for
+   * in main, where every window's input is queued behind it.
+   *
+   * Swapping the language pair changes `glossLang`, so the app's own `.tr-swap`
+   * is a one-click way to queue them. Measured live 2026-09-05 by rubric
+   * category 7's heavy leg — 40 swaps at 120 ms over a 70-character passage,
+   * 27 sense tokens: main's event loop was unavailable for **7915.6 ms** against
+   * a 500 ms bar, and the interlinear was still empty 250 ms after the last
+   * click (27 sense tokens at arm, 0 at the end).
+   *
+   * The bar here is TWO calls, not one: the first request is dispatched with no
+   * debounce in front of it, so a single change keeps exactly the latency it had.
+   */
+  it('coalesces a burst of gloss-language changes into two main calls and keeps the last', async () => {
+    const settle: Array<(value: unknown) => void> = [];
+    const lookup = vi.fn().mockImplementation(
+      () => new Promise((resolve) => { settle.push(resolve); }),
+    );
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    const flush = async (times: number) => {
+      for (let i = 0; i < times; i++) await Promise.resolve();
+    };
+    const swapTo = async (glossLang: string) => {
+      await act(async () => {
+        root?.render(
+          <LexiconWorkbenchResults query="猫を見た。" lang="ja" lookupAttempt={1} glossLang={glossLang} />,
+        );
+        await flush(4);
+      });
+    };
+
+    await swapTo('en');
+    expect(lookup).toHaveBeenCalledTimes(1);
+
+    // Four more swaps land while main is still holding the first request.
+    for (const target of ['de', 'fr', 'es', 'it']) await swapTo(target);
+    expect(lookup).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      settle[0]?.({
+        text: '猫を見た。', detectedLangs: ['ja'], glossLangs: ['en'],
+        tokenCount: 0, matchedCount: 0, truncated: false, parts: [],
+      });
+      await flush(8);
+    });
+
+    expect(lookup).toHaveBeenCalledTimes(2);
+    // The trailing edge is the LAST requested pair, not the one the burst opened
+    // on: `args` travels in the ref precisely so the tail re-dispatch cannot run
+    // from the stale closure of the render that started the burst.
+    expect((lookup.mock.calls[1]?.[1] as { glossLangs: string[] }).glossLangs).toEqual(['it']);
+  });
 });

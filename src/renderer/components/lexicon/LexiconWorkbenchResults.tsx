@@ -240,8 +240,18 @@ function LexiconWorkbenchResults({
   const [wildState, setWildState] = useState<ConcordanceState>('idle');
   const [wildCachedAt, setWildCachedAt] = useState<number | null>(null);
   const wildRun = useRef(0);
+  // Coalescer for the interlinear lookup. See `dispatchInterlinear()`.
+  const interlinearRun = useRef<{
+    running: boolean;
+    want: string | null;
+    sent: string | null;
+    args: { query: string; lang: DictLang; glossLang: GlossLang } | null;
+  }>({ running: false, want: null, sent: null, args: null });
 
   useEffect(() => setSelectedLens(lens), [lens]);
+  // Unmount clears `want`, so an answer that lands after the surface is gone
+  // finds nothing to request next and cannot set state on a dead component.
+  useEffect(() => () => { interlinearRun.current.want = null; }, []);
 
   // The pinned result is what the rest of the surface reads, so a pinned sense
   // reaches the ruby line, the harvest row and the mined card from one place.
@@ -419,6 +429,74 @@ function LexiconWorkbenchResults({
     setRoundTripState('idle');
   }
 
+  /**
+   * Dispatch the interlinear lookup, at most ONE in flight, trailing edge kept.
+   *
+   * `lookupOfflineInterlinear` is a MAIN-process call: dictionary rows, frequency
+   * lists and morphological analysis over the whole passage. The previous shape
+   * fired one per dependency change and discarded superseded answers with an
+   * `alive` flag — but a discarded answer has already been paid for in full, in
+   * main, where every window's input is queued behind it. Swapping the language
+   * pair changes `glossLang`, so the app's own `.tr-swap` control is a one-click
+   * way to queue them.
+   *
+   * Measured live on this surface, 2026-09-05, by category 7's heavy leg — 40
+   * swaps at 120 ms over a 70-character passage (27 sense tokens):
+   *   before   main event loop unavailable 7915.6 ms (bar 500), 8 samples in 9357 ms
+   *   before   interlinear still empty 250 ms after the last click (27 -> 0)
+   *
+   * `want` is the newest requested key and `sent` the one main is working on;
+   * they differ exactly when the inputs moved mid-flight, and then `.finally`
+   * issues ONE more request rather than the N that were skipped. A burst of 40
+   * costs main 2 calls, and a single change costs the same as it always did —
+   * there is no debounce delay in front of the first one, which is why this is
+   * a coalescer and not a `setTimeout`.
+   *
+   * `args` travels in the ref, never in this closure: the tail re-dispatch runs
+   * from an OLD render's closure, so reading `query`/`glossLang` directly there
+   * would re-request the values the burst started with. Stale closures are
+   * hand-enforced in this repo — `exhaustive-deps` is not a configured rule.
+   */
+  function dispatchInterlinear() {
+    const run = interlinearRun.current;
+    const want = run.want;
+    const args = run.args;
+    if (want === null || args === null) {
+      run.running = false;
+      return;
+    }
+    run.running = true;
+    run.sent = want;
+    const primary = args.glossLang.trim().toLowerCase() || 'en';
+    // The extra targets are whatever the installed dictionaries can actually
+    // answer offline, so a user with only one dictionary keeps the exact
+    // single-target request — and response shape — they had before.
+    void Promise.resolve(window.api.dictListYomitan?.())
+      .then((dicts) => parallelGlossTargets(primary, dicts ?? []))
+      .catch(() => [primary])
+      // The Workbench is the surface that renders a difficulty profile, so it is
+      // the one that asks main to pay for the frequency lists — and for the
+      // morphological analysis that keeps particles out of that profile.
+      .then((glossLangs) => window.api.lookupOfflineInterlinear(args.query, {
+        sourceLangs: [args.lang],
+        glossLangs,
+        withFrequency: true,
+        withPartOfSpeech: true,
+      }))
+      .then((next) => {
+        if (run.want !== run.sent) return;
+        setResult(next);
+        setState('idle');
+      })
+      .catch(() => {
+        if (run.want === run.sent) setState('error');
+      })
+      .finally(() => {
+        run.running = false;
+        if (run.want !== null && run.want !== run.sent) dispatchInterlinear();
+      });
+  }
+
   function pinSense(key: string, senseIndex: number | null) {
     clearRetranslation();
     setPins((prev) => {
@@ -430,41 +508,23 @@ function LexiconWorkbenchResults({
   }
 
   useEffect(() => {
+    const run = interlinearRun.current;
     if (!interlinear) {
+      run.want = null;
       setResult(null);
       setState('idle');
       clearPassageState();
       return;
     }
-    let alive = true;
+    run.want = `${lang} ${glossLang} ${lookupAttempt} ${query}`;
+    run.args = { query, lang, glossLang };
     setState('loading');
     setResult(null);
     clearPassageState();
-    const primary = glossLang.trim().toLowerCase() || 'en';
-    // The extra targets are whatever the installed dictionaries can actually
-    // answer offline, so a user with only one dictionary keeps the exact
-    // single-target request — and response shape — they had before.
-    void Promise.resolve(window.api.dictListYomitan?.())
-      .then((dicts) => parallelGlossTargets(primary, dicts ?? []))
-      .catch(() => [primary])
-      // The Workbench is the surface that renders a difficulty profile, so it is
-      // the one that asks main to pay for the frequency lists — and for the
-      // morphological analysis that keeps particles out of that profile.
-      .then((glossLangs) => window.api.lookupOfflineInterlinear(query, {
-        sourceLangs: [lang],
-        glossLangs,
-        withFrequency: true,
-        withPartOfSpeech: true,
-      }))
-      .then((next) => {
-        if (!alive) return;
-        setResult(next);
-        setState('idle');
-      })
-      .catch(() => {
-        if (alive) setState('error');
-      });
-    return () => { alive = false; };
+    // A request is already with main. Do NOT start a second one: `.finally`
+    // below picks `want` up the moment the first answer lands.
+    if (run.running) return;
+    dispatchInterlinear();
   }, [glossLang, interlinear, lang, lookupAttempt, query]);
 
   /**
