@@ -6784,3 +6784,161 @@ theme (`data-materials` null, no `.aero-anki-chrome`).
 **cat4** (one bar) and **cat6/cat7** (which genuinely do need the `l6-parity.js` app spec and
 the `cat7-perf.cjs` SPECS entry the enumeration names). The same reading applies to `player`
 and `reading`: their missing specs block **two** cells each, not eight.
+
+---
+
+## 2026-09-05 11:00-12:20 EDT — primary2 — `anki` cat1 and cat2 CLOSE; cat8 is four bars of five and is reported UNMEASURED, not 10
+
+**sampled-out this turn: `city` `immersion` `reading` `translate` `files` `player` `novels`
+`dictionary` `music`** — nine, named, not silently truncated. `anki` again, because the
+previous turn's correction stands: most of its cells need no scaffolding, and it is the only
+open surface with a live subject (AnkiConnect answering, **84 decks**, 35 note types, five
+`.anki-card` regions — not an empty harness).
+
+Environment: a private instance, not the shared app —
+`JP_USER_DATA_DIR=~\.claude-runs\p2-anki-profile` + `JP_DEBUG_PORT=39350`, bridge answering in
+about a minute on a warm profile. The user's own production Electron (pid 36988, `electron .`
+from `jp-study-app`, no debug bridge by design) was never touched.
+
+### CORRECTION to the previous handoff: `cat5` is NOT one of the free cells
+
+That handoff said "cat1/cat2/cat3/cat4/cat5/cat8 all take `--surface` and need no scaffolding
+at all", and priced `anki` at six reachable cells. **`cat5` is not reachable.** Its own header
+states the rule and the harness enforces it: *"NO CATEGORY-6 BASELINE, NO SCORE. When
+`baselines/cat6-<label>.json` is absent, Q7/Q8/Q9 read `MEASURE` and the run is VOID."* Q7/Q8/Q9
+are read out of category 6's committed baseline rather than re-driven, so cat5 inherits cat6's
+`l6-parity.js` app-spec dependency in full.
+
+So the honest pricing for `anki` is **five free cells, not six** — cat1 cat2 cat3 cat4 cat8 —
+and **three blocked** — cat5 and cat6 on the parity spec, cat7 on the `cat7-perf.cjs` SPECS
+entry. That is one cell of the correction given back. The same arithmetic has to be re-checked
+before it is quoted for `player` and `reading`.
+
+### TRAP — four PASS 10/10 baselines for `anki` are already on this disk and NONE of them counts
+
+`baselines/cat{1,2,3,4}-l7-anki.json` exist, all written **2026-08-31 21:38**, all reading
+`PASS 10/10`. They are not banked cells and must not be mistaken for them. `cat1-l7-anki.json`
+names its own subject: `minOwner` is `p.anki-setup-msg "Can not reach Anki. Open A"` — the run
+was made while **AnkiConnect was down**, so it scored the disconnected shell: 83 controls, 5
+under the floor, no field mapping, no deck workbench, no palette. Today's live run of the same
+harness on the same surface with Anki reachable measured **103 controls and 40 under the floor**.
+That is `minimal-surface-zeroes-the-denominator` with a receipt, and it is exactly why the
+scorecard's enumeration records `anki` as **banked 0** rather than 4. Baselines are gitignored,
+so these are local artifacts of this worktree; leave them, do not read them as history.
+
+### cat1 — FAIL -> **PASS 10/10**, and the repair had two separate causes
+
+First run, live, standard theme, 1264x773: `belowFloorByHit` **40 of 90**, `targets32` FAIL,
+the other four bars already clean (`minRatio` 4.94, `unreachable` 0, `wcag258Fails` 0,
+`motionAfter` 0).
+
+The 40 were five families, and the second cause is the one a re-read of the CSS would have
+missed:
+
+| family | n | rect | hitMin | why |
+| - | - | - | - | - |
+| `button.fm-chip` | 19 | 101x22 | 22.8 | no expander |
+| `button.fm-chip.fm-chip-lang` | 17 | 148x22 | 22.8 | no expander |
+| `input via label.anki-check` | 2 | 694x18 | 18.99 | no expander |
+| `input via label.fm-fallback-toggle` | 1 | 668x19 | 19.99 | no expander |
+| `button.btn.small` | 1 | 102x26 | 26.58 | no expander |
+
+**`78b18608` part 1 — the missing expanders, and a primitive the sheet had left a hole for.**
+`.lq-check` cannot be used on `label.anki-check`: it owns `display`, `flex`, `align-items` and
+`justify-content`, while that label is a `display: flex` ROW carrying the box and its sentence,
+and pairs `align-items: flex-start` with a `margin-top: 2px` on the input so the box lines up
+with the first line of a wrapping label. At equal specificity the outcome would have been
+decided by sheet import order — the drift `.lq-hit-placed` was split out to avoid. Added
+`.lq-check-row`: the same shared `::after`, `position: relative`, and nothing else. The four
+variable palettes took `.lq-hit-scope`; the note-type button took `.lq-hit`. Measured after:
+**40 -> 18**, and `.anki-check` still computed `display: flex` / `align-items: flex-start`.
+
+**`78b18608` part 2 — the residual 18 already HAD their expander.** An expander only reaches as
+far as the next control. A 22px chip at a 6px row gap has a **28px pitch**, so the walk read
+`hitMin 28.02` in `.fm-palette` and `27.02` in `.fm-lang-col` (5px gap) against a 32 bar — a
+floor that was declared and unreachable, and invisible to anything that reads the declaration
+instead of the pointer. Row gap is now `32 - 22 = 10`, **derived, not chosen**; the column gap
+stays at 6 because that axis never failed (nearest horizontal neighbour 28.1px on a 101px chip),
+so the palette did not get wider.
+
+Re-run, same window, same theme: `belowFloorByHit` **0**, `stolenCount` **0**, `occludedCount`
+**0**, `smallestHit` 32.02 (the window chrome, not this surface). **PASS 10/10.** The negative
+control moved all six of its axes — contrast, targetsByPointer, targetsByRect, wcag258,
+keyboard, decorativeExemptionIsNarrow — `plantCaughtByPointer` 2, and `backToBaseline` true.
+
+Five mutation controls, each verified applied and byte-identically restored, **all five RED**:
+drop `.lq-check-row` from the shared `::after`; give it a `display`; revert either gap; drop the
+scope from one call site.
+
+### cat2 — **PASS 10/10** with both presentations driven
+
+Scored task, and why this one: `--task "scroll >> click:.anki-card:nth-child(5)
+.collapse-header >> scroll >> type:...=t >> wait >> type:=a >> wait >> type:=b"`, i.e. **open
+"Add a card by hand" and name the term until the preview says what the card will carry**.
+`--undo "clear >> scroll >> click(header) >> scroll:.fwin-body=0"`.
+
+The field-mapping task was tried first and **cannot be the scored one**, which is itself worth
+recording: any edit to a field template sets a `dirty` flag, and there is no undo that returns
+the surface to baseline — `clear:`+`type:` restores the text but leaves the Save button enabled
+and reading "Save mapping" instead of disabled and reading "Saved", so the round trip hashes
+differently and the run VOIDs. "Reset to automatic" is the product's only way back and it
+discards every saved template, not the one edit.
+
+Numbers: `inputCost` **1 click + 3 keystrokes = 4**; `deadEndCount` **0** of 4 counted steps;
+`modalTrapCount` **0**; `scrollTrapCount` **0**; `overBar100` **0** with `worstRecv` **44.3 ms**
+(`clickRecv` 17.9; `inputRecv` 44.3 / 41.7 / 39.6). `sharedPaintSamples` **0** in 4 frames —
+the per-character `type:` split with `wait:200` is what bought that, per the recorded
+`/type` burst trap; a single three-character `type:` step would have put all three in one paint
+and been UNSCOREABLE. Idle leg clean in both phases (`rawChurns` false at rest and after the
+task), so no `--churn` exclusion was taken.
+
+`costParity` measured with `--both-presentations`, same window and same 1264x773 box:
+**standard 4, liquid 4**, `deadEnds` 0 in both, `worstRecv` 44.3 vs 47.4, presentation and
+geometry restored (`restored: true`). Liquid costs no more than standard. Negative control:
+deadEnd, modalTrap and scrollTrap all moved 0 -> 1 and all returned to 0; the inert plant's own
+`recvMs` was **0.3**, which is the floor this category is scored against.
+
+### cat8 — four bars of five, and it is reported **UNMEASURED**
+
+First run: `mutePairCount` **1** of `disabledTotal` 2. The survivor was the field-mapping Save
+button, whose only account of itself was its own label, "Saved". The other disabled control in
+the same window already carried a real reason ("The default profile cannot be deleted"), which
+is what made this one the outlier rather than the norm. The harness deliberately ignores a
+control's own text (its correction 11), and that rule is right here: "Saved" reports what
+happened, not why the button will not respond.
+
+**`4c939b83`** gives it a `title` for both ways it goes dead — clean, and a save already in
+flight — with no title on the enabled branch, so it is a disabled REASON and not a permanent
+tooltip. Four catalogs; `FieldMappingEditor.tsx` had no `t()` call at all before this, so a raw
+English title would also have tripped the hardcoded-string ratchet at `i18n.test.ts:380`. Three
+mutation controls (drop the title, give the enabled branch one, cut the English reason under
+the harness's 12-character weight bar) all RED, all byte-identically restored.
+
+Re-run: `mutePairCount` **1 -> 0**. Bars now `rawKeys` true (0 raw keys, max 0 across all four
+languages), `placeholders` true (0), `mutePairs` true, `languagesDiffer` true — **4 distinct
+text hashes**, `diffShare` 0.407, `restored` true. Control moved all three axes and returned.
+
+`statesNamed` is **UNMEASURED**, so the cell does not close and is **not** scored 10. With Anki
+reachable the surface renders no `empty`, `loading`, `error` or `offline` host at all — all four
+are `notObservable`, so the denominator is zero — and it has no filter or chip set for
+`--drive-input` / `--drive-click` to press. The two states it CAN show (`div.form-msg.err` from
+a failed save, and the `p.anki-setup-msg` disconnected panel) are both reachable only by making
+something fail that no control on this surface can make fail. **What would close it:** a drive
+leg that can reach the AnkiConnect endpoint setting, or a surface-local control that produces
+one of the four states. Recording it as UNMEASURED rather than inventing a tenth answer is the
+whole point of the bar.
+
+### The number
+
+`anki` banked **3 of 8** — cat3 (previous turn), cat1, cat2. Open: cat4 (one bar,
+`contentGrowsNotChrome`), cat8 (one bar, UNMEASURED), cat5+cat6 (parity spec), cat7 (SPECS entry).
+
+    certified 19 x 8                        152
+    translate banked                          7
+    immersion banked                          5
+    anki banked                               3
+    reading + player                          0
+    ------------------------------------------
+                                            167 of 192, 25 remaining
+
+**Quote `167 of 192, 25 remaining` from here forward.**
