@@ -136,4 +136,48 @@ describe('gate 7 — the Notebook streams were absorbed, not dropped', () => {
       expect(checkRow({ ...base, symbol: 'zzNotARealExportName' }, sources)).toHaveLength(1);
     });
   });
+  /*
+   * The consumer. Until this landed, `unindexedNotebookStreams()` was evidence
+   * only this file read: the Files app printed counts that silently omitted the
+   * two streams it cannot see, which reads as a complete index. These pin the
+   * call site and the i18n families it borrows, so the diagnostic cannot be
+   * quietly dropped or re-labelled with a second vocabulary.
+   */
+  describe('the Files app actually reports the gap', () => {
+    const FILES_APP = read('src/renderer/components/filesapp/FilesApp.tsx');
+    const EN = read('src/shared/i18n/catalogs/en.ts');
+
+    it('calls the reader and renders one row per unindexed stream', () => {
+      expect(FILES_APP).toContain('unindexedNotebookStreams()');
+      expect(FILES_APP).toContain("t('filesApp.summary.unindexed', { count: UNINDEXED_STREAMS.length })");
+      expect(FILES_APP).toContain('filesApp.summary.unindexedStream');
+      expect(FILES_APP).toContain('`notebook.stream.${row.stream}`');
+      expect(FILES_APP).toContain('`palette.section.${row.route}`');
+    });
+
+    it('every label it can ask for exists in the English catalog', () => {
+      // Re-derived from the table, so a fifteenth stream or a new route cannot
+      // ship a raw i18n key into the summary.
+      for (const row of unindexedNotebookStreams()) {
+        expect(EN, row.stream).toContain(`'notebook.stream.${row.stream}':`);
+        expect(EN, row.route).toContain(`'palette.section.${row.route}':`);
+      }
+      expect(EN).toContain("'filesApp.summary.unindexedStream':");
+    });
+
+    it('NEGATIVE CONTROL: the reader is selective, not a pass-through', () => {
+      // If `unindexedNotebookStreams` returned every row, the summary would name
+      // twelve indexed streams as invisible -- a louder lie than omitting two.
+      const all = NOTEBOOK_STREAM_ABSORPTION.length;
+      const gaps = unindexedNotebookStreams();
+      expect(gaps.length).toBeGreaterThan(0);
+      expect(gaps.length).toBeLessThan(all);
+      expect(gaps.every((r) => r.source === null)).toBe(true);
+      expect(gaps.map((r) => r.stream)).toEqual(['plan', 'transcript']);
+      // ...and each one still names a real route, which is why this is an index
+      // gap and not a lost capability.
+      expect(gaps.every((r) => (DESKTOP_WIN_SECTIONS as readonly string[]).includes(r.route)))
+        .toBe(true);
+    });
+  });
 });

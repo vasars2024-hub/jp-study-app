@@ -58,6 +58,13 @@ import {
 } from '../../../shared/filesApp/catalog';
 import { FILES_MINE_MAX_CARDS, mineabilityOf } from '../../../shared/filesApp/mining';
 import { filesReachability } from '../../../shared/filesApp/routeParity';
+import { unindexedNotebookStreams } from '../../../shared/filesApp/notebookAbsorption';
+
+/**
+ * Computed once at module scope: the table is a frozen constant, so recomputing
+ * it per render would be work with no possible different answer.
+ */
+const UNINDEXED_STREAMS = unindexedNotebookStreams();
 // The mine chain moved out of this file for gate 10: the Flashcards Mining
 // surface hosts the same catalogue, and two copies of the walk would drift.
 import { mineFilesItem, type MineState, type SettledMineState } from './filesMineChain';
@@ -2221,6 +2228,34 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
         <p className="fa-details-note fa-summary-broken">
           {t('filesApp.summary.broken', { count: folderSummary.broken })}
         </p>
+      ) : null}
+      {/* Gate 7's other half, said out loud. `NOTEBOOK_STREAM_ABSORPTION` has
+          recorded since the Notebook was deleted that two of its fourteen
+          streams have no Files enumerator at all — the Jiten plan-to-read store
+          and live-caption scripts. A count that silently omits them looks
+          complete, which is the dishonest state: the whole point of the table is
+          that "indexed" and "reachable" are different columns. So each one is
+          named here WITH the app that still owns it, which is also why this is
+          not a defect report — nothing was lost, only not indexed. */}
+      {UNINDEXED_STREAMS.length > 0 ? (
+        <div className="fa-summary-unindexed">
+          <p className="fa-details-note">
+            {t('filesApp.summary.unindexed', { count: UNINDEXED_STREAMS.length })}
+          </p>
+          <ul>
+            {UNINDEXED_STREAMS.map((row) => (
+              <li key={row.stream} data-stream={row.stream}>
+                {t('filesApp.summary.unindexedStream', {
+                  // The Notebook's own labels, which outlived its section on
+                  // purpose; a second set of names for the same fourteen streams
+                  // is exactly the drift i18n hides well.
+                  name: t(`notebook.stream.${row.stream}`),
+                  app: t(`palette.section.${row.route}`),
+                })}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
       {/* The original empty state, kept verbatim and kept LAST: the summary
           answers "what is in here", this answers "why is there nothing else". */}

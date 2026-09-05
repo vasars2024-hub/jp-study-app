@@ -12085,6 +12085,13 @@ export const ru: Catalog = {
   'filesApp.summary.shown': 'Показано',
   'filesApp.summary.totalSize': 'Общий размер',
   'filesApp.summary.otherKinds': 'Другие виды',
+  'filesApp.summary.unindexed': {
+    one: '{count} вид материалов не входит в этот индекс.',
+    few: '{count} вида материалов не входят в этот индекс.',
+    many: '{count} видов материалов не входят в этот индекс.',
+    other: '{count} вида материалов не входят в этот индекс.',
+  },
+  'filesApp.summary.unindexedStream': '{name} — по-прежнему в разделе «{app}»',
   'filesApp.summary.itemCount': {
     one: '{count} элемент',
     few: '{count} элемента',

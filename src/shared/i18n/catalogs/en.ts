@@ -11652,6 +11652,11 @@ export const en: Catalog = {
   'filesApp.summary.shown': 'Shown',
   'filesApp.summary.totalSize': 'Total size',
   'filesApp.summary.otherKinds': 'Other kinds',
+  'filesApp.summary.unindexed': {
+    one: '{count} kind of material is not in this index.',
+    other: '{count} kinds of material are not in this index.',
+  },
+  'filesApp.summary.unindexedStream': '{name} — still in {app}',
   'filesApp.summary.itemCount': {
     one: '{count} item',
     other: '{count} items',

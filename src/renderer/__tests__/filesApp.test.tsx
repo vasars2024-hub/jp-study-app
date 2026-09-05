@@ -667,6 +667,31 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
         .toBe('Reachability Fixture');
     });
 
+    it('names the material the index cannot see, and where it still lives', async () => {
+      // Gate 7's other column. Two of the deleted Notebook's fourteen streams
+      // have no Files enumerator at all, and a summary that omitted them would
+      // read as complete. Each is named WITH the app that still owns it, because
+      // nothing was lost -- only not indexed.
+      await mount(<FilesApp />);
+      await settle();
+      // No selection: the summary pane is what is showing.
+      expect(host?.querySelector('.fa-details-summary')).not.toBeNull();
+
+      const box = host?.querySelector('.fa-summary-unindexed');
+      expect(box).not.toBeNull();
+      expect(box?.textContent).toContain('2 kinds of material are not in this index.');
+
+      const rows = Array.from(box?.querySelectorAll('li') ?? []);
+      expect(rows.map((li) => li.getAttribute('data-stream')).sort())
+        .toEqual(['plan', 'transcript']);
+      // The Notebook's own labels, and the palette's own app names -- not a
+      // second vocabulary invented here.
+      expect(rows.map((li) => li.textContent)).toEqual([
+        'Plan to read — still in Novels',
+        'Live captions — still in Reading Finder',
+      ]);
+    });
+
     it('CONTROL: a source the table does not carry gets no route either', async () => {
       // Separate `it` rather than a second `openFixture` inside the one above:
       // mounting twice in one test orphans the first React root, and an orphaned

@@ -11170,6 +11170,10 @@ export const ja: Catalog = {
   'filesApp.summary.shown': '表示中',
   'filesApp.summary.totalSize': '合計サイズ',
   'filesApp.summary.otherKinds': 'その他の種類',
+  'filesApp.summary.unindexed': {
+    other: 'この索引に含まれない種類が {count} 件あります。',
+  },
+  'filesApp.summary.unindexedStream': '{name} — {app} にあります',
   'filesApp.summary.itemCount': {
     other: '{count} 件',
   },

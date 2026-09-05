@@ -11062,6 +11062,10 @@ export const zh: Catalog = {
   'filesApp.summary.shown': '已显示',
   'filesApp.summary.totalSize': '总大小',
   'filesApp.summary.otherKinds': '其他类型',
+  'filesApp.summary.unindexed': {
+    other: '有 {count} 类内容不在此索引中。',
+  },
+  'filesApp.summary.unindexedStream': '{name} — 仍在{app}中',
   'filesApp.summary.itemCount': {
     other: '{count} 项',
   },
