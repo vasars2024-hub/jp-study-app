@@ -5859,7 +5859,7 @@ sampled-out: every other scorecard surface; this entry scores exactly one cell, 
 
 ---
 
-## 2026-09-05 ~12:40-13:10 EDT, `backup` — the line directly above is WRONG: `translate` is 7 of 8, not 5 of 8
+## 2026-09-05 08:00-08:10 EDT, `backup` — the line directly above is WRONG: `translate` is 7 of 8, not 5 of 8
 
 **This is a bookkeeping correction, not a cell.** No score changes and the running total does not
 move. It is written down because the error was about to cost a whole turn: the handoff built on
@@ -5908,7 +5908,7 @@ standing count and the sections above it disagree, the count is the thing to dis
 
 ---
 
-## 2026-09-05 ~13:10-14:20 EDT, `backup` — `translate` cat7 STAYS OPEN. `f9541e9e` is worth 6.5x and it is still 8.5x over the bar.
+## 2026-09-05 08:10-08:25 EDT, `backup` — `translate` cat7 STAYS OPEN. `f9541e9e` is worth 6.5x and it is still 8.5x over the bar.
 
 **sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki` `dictionary` `music`
 `flashcards`** — this entry measures exactly one cell, `translate` cat7, because the previous
@@ -6043,3 +6043,13 @@ shape of cold index pages on a 375 MB `dict.db` rather than of query planning, w
 and re-measure with the SAME eight-swap sequence — swap 2 is the cell that has to move. Budget a
 restart per measurement: main does not hot-reload, and the perf harness refuses a process under
 120 s old.
+
+**Clock note, because two sections above now disagree with each other.** My own headings were
+first written as `~12:40-13:10` and `~13:10-14:20 EDT`, copied from the previous handoff's stated
+time. The machine clock says otherwise: `date` reports **2026-09-05 08:25 EDT / 12:25 UTC**, and
+this turn's own artifacts agree — the relay task is `ClaudeRelay-backup-20260905-075754`, the app
+rebuild logged `08:06:51`, the new unit tests ran at `08:12:22` and the full suite started at
+`08:20:38`. Mine are corrected to real time. The `primary` section at line 5818 claims
+`07:35-08:45 EDT`, which ends twenty minutes after the present moment and overlaps this turn, so
+that clock is skewed too — left as its author wrote it, since I cannot know which offset was
+intended, but **do not order these sections by their headings.** Order them by commit timestamp.
