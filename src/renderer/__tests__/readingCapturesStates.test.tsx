@@ -19,6 +19,7 @@
  * the empty branch — are one character apart, and only a genuinely empty store
  * distinguishes them.
  */
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 import ReadingCapturesView from '../views/ReadingCapturesView';
@@ -98,6 +99,54 @@ describe('Captures list states are mutually exclusive', () => {
     expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(1);
     expect(text(h)).not.toContain(EMPTY);
     expect(text(h)).not.toContain(FAILED);
+  });
+
+  it.each([null, {}])('reports a malformed history result (%j) as a read failure', async (result) => {
+    const h = await mountWith(() => Promise.resolve(result as unknown as ReadingLensHistoryEntry[]));
+    expect(text(h)).toContain(FAILED);
+    expect(text(h)).not.toContain(EMPTY);
+  });
+
+  it('handles a bridge that throws before returning its promise', async () => {
+    const h = await mountWith(() => { throw new Error('bridge unavailable'); });
+    expect(text(h)).toContain(FAILED);
+    expect(text(h)).not.toContain(EMPTY);
+  });
+
+  it.each(['resolve', 'reject'] as const)('ignores an older refresh that completes by %s', async (completion) => {
+    const pending: Array<{ resolve: (entries: ReadingLensHistoryEntry[]) => void; reject: (error: Error) => void }> = [];
+    const list = vi.fn(() => Promise.resolve([ENTRY]));
+    const h = await mountWith(list);
+    list.mockImplementation(() => new Promise((resolve, reject) => pending.push({ resolve, reject })));
+    await h.click('.reading-captures-refresh');
+    await h.click('.reading-captures-refresh');
+
+    // The in-flight state must keep the reader and its selected row intact.
+    expect(text(h)).toContain(LOADING);
+    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
+    const newer = { ...ENTRY, text: '最新の文章です。' };
+    await act(async () => pending[1].resolve([newer]));
+    await act(async () => {
+      if (completion === 'resolve') pending[0].resolve([]);
+      else pending[0].reject(new Error('older request failed'));
+    });
+    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(newer.text);
+    expect(text(h)).not.toContain(FAILED);
+    expect(text(h)).not.toContain(EMPTY);
+    expect(text(h)).not.toContain(LOADING);
+  });
+
+  it('keeps the passage on refresh failure and recovers with the next successful read', async () => {
+    const list = vi.fn(() => Promise.resolve([ENTRY]));
+    const h = await mountWith(list);
+    list.mockRejectedValueOnce(new Error('temporary failure'));
+    await h.click('.reading-captures-refresh');
+    expect(text(h)).toContain(FAILED);
+    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
+    expect(text(h)).not.toContain(EMPTY);
+    await h.click('.reading-captures-refresh');
+    expect(text(h)).not.toContain(FAILED);
+    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
   });
 
   /*
