@@ -6546,7 +6546,7 @@ repairs the scoring forced (a hit floor and a dead control), which is the work, 
 
 ---
 
-## 2026-09-05 13:37-14:45 EDT — primary. `reading-captures` **cat4 CLOSES 10/10.**
+## 2026-09-05 13:37-14:05 EDT — primary. `reading-captures` **cat4 CLOSES 10/10.**
 
 Same surface the 13:45 entry left failing, same harness, same window (user's app pid 36988,
 bridge 39273, window 1, `Reading Finder` fwin at 820x580). No new probe: `cat4-use-of-space.cjs
@@ -6577,7 +6577,7 @@ rather than scored.
 
 ### Two product defects, both fixed, both with the numbers that found them
 
-**1. `cc9209b4` — the reader ended in nothing.** deadRegion is not fixable by shrinking a panel;
+**1. `cc9209b4` (13:58) — the reader ended in nothing.** deadRegion is not fixable by shrinking a panel;
 the detector counts text and interactive nodes, so an emptier smaller panel leaves the identical
 rectangle. The honest reading is that a reader with nothing after the passage IS a dead end, and
 this surface's only other way onward was a 260px side list that a covering sheet removes at a
@@ -6588,7 +6588,7 @@ Same commit: `.reading-workspace-nav` wrapped with no ceiling, so at 260x170
 `.reading-captures` painted outside the frame at 202x20. `max-height: 45%` + `overflow-y: auto`
 -> nav 46px, panel 222x57, inside the window. That collapse hit **all nine** workspace sections.
 
-**2. `<COMMIT2>` — a tool shorter than its own head swallowed it.** `.lq-reading-tool-head`
+**2. `f155d576` — a tool shorter than its own head swallowed it.** `.lq-reading-tool-head`
 cannot shrink below a 32px `--lq-hit-target` button plus padding (~49px). The docked branch was
 `overflow: hidden` and cut the head off; the **sheet branch declared no overflow at all**, so it
 was `visible` and painted the head outside the canvas. At the compact leg the canvas is 37px and
@@ -6615,9 +6615,9 @@ tool, the sheet, and `.reading-captures-reader`: `clipped 12 -> 0`.
   Filter rules by selector-list membership, not by the first regex hit.
 
 ### RULE D — liquid. Closed by this worker: **1 cell. 172 of 192, 20 remaining.**
-Days to 2026-09-07 11:00 EDT, measured 14:45 EDT: **1.8438**.
-`20 / 1.8438 = 10.85 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
-**Required 10.85 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn.**
+Days to 2026-09-07 11:00 EDT, measured 14:05 EDT: **1.8715** (44 h 55 min).
+`20 / 1.8715 = 10.69 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 10.69 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn.**
 The numerator caveat from the 13:45 entry still stands: 4 of these are `anki` cells that live on
 `wt/files-app` and are NOT on `feat/nyaa-subtitles`; on this branch alone the figure is 168.
 Biggest cause this turn: closing one cell took two product repairs plus a third in the shared
