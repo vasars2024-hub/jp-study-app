@@ -110,6 +110,33 @@ const LENS_LABEL_KEYS: Record<(typeof LENS_OPTIONS)[number], string> = {
 };
 
 /**
+ * A ruby annotation is sized by its own content and a `<ruby>` cannot break, so
+ * ONE long gloss makes the whole passage as wide as that gloss.
+ *
+ * Measured live 2026-09-05 on `猫が好きです。` — seven characters:
+ *   the が gloss ("indicates the subject of a sentence; …")   2482px
+ *   the ruby it annotates                                     2850px
+ *   div.fwin-body            scrollWidth 2884  clientWidth 808
+ * and `.fwin-body` is `overflow-x: hidden`, so everything past 808px was CLIPPED
+ * with no scrollbar to reach it. Rubric category 4 filed 12 clipped elements at
+ * the default size and 12 more maximized; the reader simply could not see the
+ * rest of their own sentence.
+ *
+ * The cap is on the TEXT and not on the box, deliberately: a CSS `max-width` on
+ * an `rt` resolves against a containing block that the annotation itself sizes,
+ * and `white-space: nowrap` on the gloss line (which is what made this
+ * unbreakable) is what gives each target language its own line. Nothing is lost —
+ * the untruncated gloss is the `title`, and clicking the token opens the sense
+ * panel with the full list.
+ */
+const GLOSS_RT_MAX = 48;
+
+function clampGloss(text: string): string {
+  if (text.length <= GLOSS_RT_MAX) return text;
+  return `${text.slice(0, GLOSS_RT_MAX - 1).trimEnd()}…`;
+}
+
+/**
  * One gloss line per requested target, each tagged with the language code the
  * dictionary itself stores. The code is registry data — the same value Settings
  * prints for an installed dictionary — not translatable chrome. A single-target
@@ -118,14 +145,19 @@ const LENS_LABEL_KEYS: Record<(typeof LENS_OPTIONS)[number], string> = {
 function glossRt(match: LexiconInterlinearMatch | undefined) {
   if (!match) return '';
   if (match.parallel?.length) {
-    return match.parallel.map((group) => (
-      <span className="lexicon-gloss-line" key={group.lang}>
-        <span className="lexicon-gloss-lang">{group.lang.toUpperCase()}</span>
-        {group.glosses.map((gloss) => gloss.text).join('; ')}
-      </span>
-    ));
+    return match.parallel.map((group) => {
+      const full = group.glosses.map((gloss) => gloss.text).join('; ');
+      return (
+        <span className="lexicon-gloss-line" key={group.lang} title={full}>
+          <span className="lexicon-gloss-lang">{group.lang.toUpperCase()}</span>
+          {clampGloss(full)}
+        </span>
+      );
+    });
   }
-  return match.glosses.map((gloss) => gloss.text).join('; ') || match.reading || '';
+  const full = match.glosses.map((gloss) => gloss.text).join('; ') || match.reading || '';
+  if (!full) return '';
+  return <span className="lexicon-gloss-line" title={full}>{clampGloss(full)}</span>;
 }
 
 /** A pinned token stays grounded; the extra class only marks the reader's choice. */

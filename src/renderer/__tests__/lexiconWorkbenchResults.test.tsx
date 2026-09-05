@@ -89,6 +89,60 @@ describe('LexiconWorkbenchResults', () => {
     );
   });
 
+  it('caps a long ruby gloss and keeps the whole of it in the title', async () => {
+    // A `<ruby>` cannot break, so an unbroken annotation makes the WHOLE passage as
+    // wide as itself. Measured live on `猫が好きです。` before this cap: one gloss
+    // rendered 2482px inside a 740px flow and `div.fwin-body` reported scrollWidth
+    // 2884 against clientWidth 808 — with `overflow-x: hidden`, so the rest of the
+    // sentence was clipped and unreachable. Rubric category 4 filed 12 clipped
+    // elements at the default window size; after the cap, 0.
+    const long = 'indicates the subject of a sentence; indicates possession; adds emphasis';
+    const lookup = vi.fn().mockResolvedValue({
+      text: 'が', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        { kind: 'token', text: 'が', start: 0, end: 1, match: { reading: 'が', glosses: [{ lang: 'en', text: long }] } },
+      ],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="が" lang="ja" lookupAttempt={7} lens="translate" />);
+      await Promise.resolve();
+    });
+    const line = host.querySelector('.lexicon-gloss-line');
+    expect(line, 'the gloss line').not.toBeNull();
+    // The rendered text is bounded and says so; the untruncated gloss is still there.
+    expect(line?.textContent?.length).toBeLessThanOrEqual(48);
+    expect(line?.textContent?.endsWith('…')).toBe(true);
+    expect(line?.getAttribute('title')).toBe(long);
+  });
+
+  it('leaves a short gloss untouched and unmarked', async () => {
+    const lookup = vi.fn().mockResolvedValue({
+      text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 1,
+      truncated: false,
+      parts: [
+        { kind: 'token', text: '猫', start: 0, end: 1, match: { reading: 'ねこ', glosses: [{ lang: 'en', text: 'cat' }] } },
+      ],
+    });
+    Object.defineProperty(window, 'api', { configurable: true, value: { lookupOfflineInterlinear: lookup } });
+    const host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(<LexiconWorkbenchResults query="猫" lang="ja" lookupAttempt={8} lens="translate" />);
+      await Promise.resolve();
+    });
+    const line = host.querySelector('.lexicon-gloss-line');
+    // No ellipsis on a gloss that never needed one — a cap that always fires would
+    // read as working while quietly truncating every annotation in the app.
+    expect(line?.textContent).toBe('cat');
+    expect(line?.getAttribute('title')).toBe('cat');
+  });
+
   it('lets the user override an ambiguous automatic lens', async () => {
     const lookup = vi.fn().mockResolvedValue({
       text: '猫', detectedLangs: ['ja'], glossLangs: ['en'], tokenCount: 1, matchedCount: 0,
