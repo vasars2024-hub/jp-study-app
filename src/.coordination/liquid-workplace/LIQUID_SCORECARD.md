@@ -7500,3 +7500,54 @@ lower the target is still at risk; and 4 of the 176 are `anki` cells on `wt/file
 `feat/nyaa-subtitles` alone the figure is 172 and 20 cells are outstanding there.
 The honest reading is that one surface finished 8 of 8 in a single turn, which has not happened
 before, and that the next surface starts from zero rather than from seven.
+
+## 2026-09-05 17:25 EDT — primary2 — the `player` blocker's finding 2 is SYSTEMIC, and it already has an owner
+
+**No cell scored this turn; my track's product work was landing files-app (`6303981f`).**
+`sampled-out:` every surface — nothing was scored, so nothing was skipped. `player` keeps
+its 8 open cells, `anki` its 4 banked, `immersion` 3 open, `translate` 1. **176 of 192.**
+
+What I did move is the diagnosis the last liquid turn left at `player`, and it was
+understated. Its finding 2 read *"that path's 500 is swallowed"*, which reads as one bad
+error path in `handle-play-media.ts`. It is not.
+
+### It is not that path. Nothing in this app can show a toast at all.
+
+`usePlaybackPlayVideo` does not swallow anything — it has no `onError`, so it inherits
+`useServerMutation`'s default, which **does** call `toast.error(_handleSeaError(...))`
+(`vendor/seanime-web/api/client/requests.ts:208`). The toast is emitted. It is never rendered.
+
+**Negative control, and it is the whole finding:** `grep -rni "toaster" src/ vendor/`
+returns **0 hits**. `sonner` is a real dependency (`package.json:133`) and its `<Toaster>`
+component — the thing that mounts the portal every `toast.*` call writes into — is mounted
+**nowhere in this repo**. Sonner drops calls silently when unmounted; there is no console
+warning, which is exactly why this reads as "swallowed" at each call site.
+
+**Blast radius, counted rather than described:** **174** `toast.*` call sites across **45**
+vendor files, **48** of them `toast.error`. Two of the 174 are the central handlers in
+`requests.ts` (`:208` mutation, `:273` query), so this is not 174 independent bugs — it is
+**every server mutation and every server query in the media/seanime surface failing
+silently**. The 500 on the episode click is one instance of a defect that covers the surface.
+
+### Do NOT fix this — it is in flight, and duplicating it would collide
+
+`src/media/SeanimeToastHost.tsx` (**105 lines**) and `src/media/__tests__/seanimeToastHost.test.tsx`
+are **untracked in the main tree** (`?? `), i.e. another track is building this host right now.
+I found them only because the landing made me enumerate the main tree's dirty paths. Whoever
+takes `player` next: check whether that host has landed before scoring cat8, because it moves
+the category wholesale, and re-measure rather than inheriting my count.
+
+### Finding 1 re-derived and CONFIRMED, and deliberately NOT fixed
+
+`SEA_PUBLIC_DESKTOP` is defined nowhere — one grep hit, `vendor/seanime-web/types/constants.ts:1`,
+its own use — and **no vite config defines it**. So `__isElectronDesktop__` is permanently
+`false` and gates the native-player branch in **three** paths, not one: `handle-play-media.ts:110`,
+`handle-torrent-stream.ts:66`, `handle-debrid-stream.ts:53`, plus `isUsingNativePlayer` in all
+three. A user who selects `ElectronPlaybackMethod.NativePlayer` gets a different player and no
+account of why.
+
+**I left it alone on purpose.** Flipping it reroutes live playback onto `directstreamPlayLocalFile`,
+a path with no consumer today, and I could not verify it live: the shared app is contended and
+must not be restarted. Shipping an unverified behavioural flip on three playback paths two days
+out is the trade this plan says not to make. It is a real defect, it is now measured, and it
+wants one turn that owns the app.
