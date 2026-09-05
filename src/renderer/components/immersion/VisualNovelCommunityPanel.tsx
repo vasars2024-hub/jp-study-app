@@ -233,8 +233,8 @@ export default function VisualNovelCommunityPanel({
       <summary>Community and study sharing</summary>
       <div className="visual-novel-community-summary">
         <span>{entry.communityReports.length} reports</span>
-        <span>{reportSummary.rating == null ? 'No rating' : `${reportSummary.rating.toFixed(1)}/10 rating`}</span>
-        <span>{reportSummary.difficulty == null ? 'No difficulty rating' : `${reportSummary.difficulty.toFixed(1)}/5 language difficulty`}</span>
+        <span>{reportSummary.rating == null ? t('vnCommunity.noRating') : t('vnCommunity.ratingValue', { value: Math.round(reportSummary.rating * 10) / 10 })}</span>
+        <span>{reportSummary.difficulty == null ? t('vnCommunity.noDifficulty') : t('vnCommunity.difficultyValue', { value: Math.round(reportSummary.difficulty * 10) / 10 })}</span>
       </div>
       <div className="visual-novel-community-form">
         <label>Author<input value={draft.author} onChange={(event) => field('author', event.target.value)} placeholder="Anonymous learner" /></label>
