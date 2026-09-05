@@ -90,6 +90,20 @@ export interface ImmersionVisitInput {
   chars?: number;
   completionPct?: number;
   estimatedDifficulty?: number;
+  /**
+   * Whether this call is a NEW VISIT, or an accumulation onto the one already in
+   * progress. Defaults to `true`, so the extension bridge and every other existing
+   * caller keep their old semantics.
+   *
+   * It exists because the periodic stats flush is not a visit. `useImmersion` calls
+   * `immersionRecordVisit` from a 5-second interval to bank reading seconds and
+   * characters, and main incremented `visitCount` on every one of those — so the
+   * counter measured "how many five-second flushes happened while this tab was open",
+   * not visits. Measured on the real profile before the fix: one row read **7,692
+   * visits** against 416,216 recorded seconds, and the whole store of 1,560 sites is
+   * inflated the same way. The rail prints that number to the user.
+   */
+  countVisit?: boolean;
 }
 
 export interface ImmersionMetricsDelta {

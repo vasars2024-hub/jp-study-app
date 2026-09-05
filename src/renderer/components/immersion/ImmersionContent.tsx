@@ -211,11 +211,16 @@ export function useImmersion() {
     charsAcc.current = 0;
     recordReading(id, activeTitle.current, secs, chars);
     if (currentUrl) {
+      // `countVisit: false` — this is the 5-second stats flush, not an arrival. Without
+      // it main incremented `visitCount` on every flush, so the rail's "N visits" was
+      // really "N five-second ticks with this tab open": one row in the real profile
+      // read 7,692. The visit itself is counted once, in `navigate`.
       void window.api.immersionRecordVisit({
         url: currentUrl,
         title: activeTitle.current,
         seconds: secs,
         chars,
+        countVisit: false,
       });
     }
   }, [currentUrl]);
@@ -307,7 +312,9 @@ export function useImmersion() {
       activeTitle.current = art.title;
       charsAcc.current += Math.min(5000, art.html.replace(/<[^>]+>/g, '').length);
       setStatus(null);
-      void window.api.immersionRecordVisit({ url: art.url, title: art.title });
+      // The reader pass re-states the row's real title and canonical URL after a redirect.
+      // It is the SAME arrival `navigate` already counted, so it must not count a second one.
+      void window.api.immersionRecordVisit({ url: art.url, title: art.title, countVisit: false });
       setLoading(false);
     } catch (e) {
       setError(
@@ -328,6 +335,17 @@ export function useImmersion() {
       }
       flushStats();
       pageOpenAt.current = Date.now();
+      // THE arrival, counted exactly once, and only when the page actually changes.
+      // `activeStatsId` still holds the OUTGOING page here, which is why the comparison
+      // is made before it is reassigned two lines down — and why it is a ref rather than
+      // `currentUrl`: reading state here would put it in this callback's dep list for a
+      // value that only ever moves together with `flushStats`.
+      // The guard is load-bearing, not tidiness: switching to Live mode re-enters
+      // `navigate` with the SAME url (see `applyMode`), as does Reload, and neither is a
+      // new visit. Back and Forward reach a different page and correctly do count.
+      if (immersionStatsId(url) !== activeStatsId.current) {
+        void window.api.immersionRecordVisit({ url });
+      }
       // A fresh attempt, so the previous one's failure stops speaking for it — including a retry
       // of the same URL, where `did-start-loading` may not fire before the reader pass is due.
       loadFailure.current = null;

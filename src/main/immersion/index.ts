@@ -140,6 +140,10 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
   const now = Date.now();
   const today = immersionDayKey();
   let site = findSiteByUrl(store, url);
+  // An accumulation is not an arrival. `countVisit: false` banks the seconds and
+  // characters onto the row and leaves the counter alone; anything that omits it
+  // — the extension bridge included — still counts one, as it always did.
+  const counts = input.countVisit !== false;
   if (!site) {
     const streak = nextSiteStreak(0, undefined, today);
     site = {
@@ -150,7 +154,7 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
       tags: [],
       completionPct: input.completionPct ?? 0,
       lastVisited: now,
-      visitCount: 1,
+      visitCount: counts ? 1 : 0,
       estimatedDifficulty: input.estimatedDifficulty ?? 0,
       streakDays: streak.streakDays,
       lastStreakDay: streak.lastStreakDay,
@@ -165,7 +169,7 @@ function upsertVisit(input: ImmersionVisitInput): ImmersionSite {
     site.title = (input.title || site.title || url).trim();
     if (input.lang) site.lang = input.lang;
     site.lastVisited = now;
-    site.visitCount += 1;
+    if (counts) site.visitCount += 1;
     site.streakDays = streak.streakDays;
     site.lastStreakDay = streak.lastStreakDay;
     if (typeof input.seconds === 'number') site.totalSeconds += Math.max(0, input.seconds);
