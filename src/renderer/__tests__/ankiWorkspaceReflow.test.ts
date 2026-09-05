@@ -53,14 +53,14 @@ describe('anki workspace reflow', () => {
     const query = /@container\s+ankiview\s*\(max-width:\s*(\d+)px\)\s*\{\s*\.anki-workspace\s*\{([^{}]*)\}/.exec(
       CSS,
     );
-    expect(query).not.toBeNull();
-    expect(query![2]).toMatch(/grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*;/);
+    if (!query) throw new Error('no `@container ankiview { .anki-workspace }` rule in styles.css');
+    expect(query[2]).toMatch(/grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*;/);
 
     // 866 is the derived floor: `.anki-selects label` min-width 180 x2 + its 14 gap + the
     // 48 px `.anki-card` pads = 422 for the main column, + 24 gap + the preview's 420 max.
     // Anything below that and the two-column split cannot seat the main column's own primary
     // control row, which is the whole reason the split exists.
-    expect(Number(query![1])).toBeGreaterThanOrEqual(866);
+    expect(Number(query[1])).toBeGreaterThanOrEqual(866);
   });
 
   it('places the query AFTER the base rule, so it is not lost on source order', () => {
