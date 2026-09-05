@@ -5856,3 +5856,45 @@ did not. This unblocks the `languagesDiffer` bar for every remaining title-named
 
 sampled-out: every other scorecard surface; this entry scores exactly one cell, `translate` cat8.
 **`translate` is now 5 of 8 banked (cat1, cat3, cat5, cat6, cat8); cat4 open, cat2 and cat7 not run.**
+
+---
+
+## 2026-09-05 13:20 UTC, `primary2` — CORRECTION to the line directly above: `translate` is 7 of 8, and two closed cells were being handed out as the next slice
+
+**The line immediately above is wrong by two cells, and it propagated into three places that
+between them would have sent this turn to re-run work that finished six hours earlier.** No cell
+moved to produce this block; it is a recount, and it is published because the error was
+*load-bearing*, not because recounting is progress.
+
+**What it says:** `cat4 open, cat2 and cat7 not run`. **What the tree says:**
+
+| cell | commit | subject line |
+| --- | --- | --- |
+| `translate` cat4 | `2b8b73a2` | "translate cat4 closes 10/10 on a loaded surface — 158 of 200, 5 of 8 for this surface" |
+| `translate` cat2 | `5c6aab25` | "translate cat2 closes 10/10 — 160 of 200, 6 of 8 for this surface" |
+
+Both are real commits against this file (+53 and +84 lines). And **this same file already says so
+three times**, in the three `### Where translate stands` blocks written after them — at lines
+5558, 5679 and 5783, each reading verbatim **"cat1, cat2, cat3, cat4, cat5, cat6 at 10/10"**.
+
+**How it happened, because the shape will recur.** The stale list `(cat1, cat3, cat4, cat5, cat6)`
+at line 5432 is the *04:40* state. Closing cat8 at 12:55 edited that list rather than the current
+one — cat4 was dropped out of it and cat2 was never added back in. A per-turn "where it stands"
+line is safe to *append*; it is not safe to *edit a copy of an older one*.
+
+**Where it propagated.** `relay-handoff.md` named "EXACT NEXT SLICE — translate cat2" and
+`progress-state.json`'s `liquid.next` named the same, with a suggested task DSL for a cell that
+was already banked at 10/10. A turn that trusted either would have spent itself re-measuring a
+closed cell. Both are corrected in this turn's bookkeeping.
+
+**True state, re-derived from commits and not from any prose summary:**
+
+    translate  7 of 8 banked — cat1 cat2 cat3 cat4 cat5 cat6 cat8 at 10/10
+               cat7 OPEN, and it is the ONLY open cell on this surface
+
+**Running total is therefore 161 of 200, 39 remaining** — 160 as of `5c6aab25`, plus cat8. That
+matches what the handoff quoted; the arithmetic was right and only the *enumeration* was wrong,
+which is precisely why nobody caught it.
+
+The 163-vs-160 discrepancy recorded at line 5665 is untouched by this and is still owed. `160` and
+now `161` remain the deliberately conservative quote.
