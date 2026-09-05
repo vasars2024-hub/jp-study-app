@@ -1252,6 +1252,21 @@ export function episodeFromFileName(name: string): number | null {
 }
 
 /**
+ * The simplified/traditional pair a CJK sidecar set names its tracks with,
+ * taken only from the tag immediately before the extension.
+ *
+ * `sc` and `tc` are two letters and would collide freely with the general rule
+ * above — a release group `[SC]`, a `- tc -` in a title. In the dotted-tag slot
+ * they do not: `…FLAC].sc.ass` is a language tag and nothing else uses that
+ * position. Measured on the release that produced it, live on 2026-09-05:
+ * `【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock]…MKV 简繁外挂字幕`, whose 24 `.ass`
+ * files are twelve `.sc.ass` and twelve `.tc.ass` and which `languageFromFileName`
+ * read as **unlabelled**, so a `ja` harvest kept all 24, paid for the transfer,
+ * and only then rejected them on kana count.
+ */
+const CJK_TRACK_TAG_RE = /\.(sc|tc|chs|cht|big5|gb)\.[a-z0-9]+$/;
+
+/**
  * A language hinted by a file's path.
  *
  * Packs signal language by directory (`Subs/ja/`), by a dotted tag
@@ -1262,7 +1277,11 @@ export function languageFromFileName(name: string): string | null {
   const text = (name ?? '').toLowerCase();
   if (/(^|[\\/._[( -])(ja|jpn|jp)([\\/._\])  -]|$)/.test(text) || /japanese|日本語/.test(text)) return 'ja';
   if (/(^|[\\/._[( -])(en|eng)([\\/._\])  -]|$)/.test(text) || /english/.test(text)) return 'en';
-  if (/(^|[\\/._[( -])(zh|chi|chs|cht)([\\/._\])  -]|$)/.test(text) || /chinese|中文/.test(text)) return 'zh';
+  if (
+    /(^|[\\/._[( -])(zh|chi|chs|cht)([\\/._\])  -]|$)/.test(text)
+    || /chinese|中文|简体|繁體|简中|繁中/.test(text)
+    || CJK_TRACK_TAG_RE.test(text)
+  ) return 'zh';
   if (/(^|[\\/._[( -])(ru|rus)([\\/._\])  -]|$)/.test(text) || /russian|русск/.test(text)) return 'ru';
   return null;
 }

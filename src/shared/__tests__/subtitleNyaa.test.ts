@@ -1034,6 +1034,35 @@ describe('episodeFromFileName / languageFromFileName', () => {
     expect(languageFromFileName('Subs/eng/Show.srt')).toBe('en');
     expect(languageFromFileName('Show - 07.ass')).toBeNull();
   });
+
+  it('reads the simplified/traditional tag a CJK sidecar set uses', () => {
+    // The exact names off the live gate-12 release, 2026-09-05: 24 `.ass`
+    // files, twelve `.sc.ass` and twelve `.tc.ass`, all previously unlabelled —
+    // so a `ja` harvest kept every one and only found out after paying for the
+    // transfer.
+    expect(
+      languageFromFileName('【悠哈璃羽字幕组】[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass'),
+    ).toBe('zh');
+    expect(
+      languageFromFileName('【悠哈璃羽字幕组】[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass'),
+    ).toBe('zh');
+    expect(languageFromFileName('Show - 07.big5.ass')).toBe('zh');
+    expect(languageFromFileName('Subs/简体/Show.ass')).toBe('zh');
+    expect(languageFromFileName('Subs/繁體/Show.ass')).toBe('zh');
+  });
+
+  it('takes the two-letter CJK tag only in the slot before the extension', () => {
+    // `sc` and `tc` are too short for the general delimiter rule: widening that
+    // rule instead would relabel a release group and a hyphenated title, and a
+    // wrongly-`zh` file is DROPPED from a `ja` harvest — a lost subtitle, which
+    // is worse than the wasted transfer this fix is removing.
+    expect(languageFromFileName('[SC] Show - 07.ass')).toBeNull();
+    expect(languageFromFileName('Show - tc - 07.ass')).toBeNull();
+    expect(languageFromFileName('Discs/sc/Show.ass')).toBeNull();
+    // Still Japanese: a name that states `ja` outranks a trailing tag, because
+    // the Japanese branch is asked first.
+    expect(languageFromFileName('Show - 07.ja.ass')).toBe('ja');
+  });
 });
 
 describe('buildSubtitleQuery', () => {
