@@ -380,9 +380,19 @@ export default function ReadingGardenSkyEvents() {
     const resize = () => {
       const rect = measureHost();
       if (!rect || rect.width < 2 || rect.height < 2) return;
-      dpr = Math.min(2, window.devicePixelRatio || 1);
-      width = Math.max(1, Math.floor(rect.width));
-      height = Math.max(1, Math.floor(rect.height));
+      const nextDpr = Math.min(2, window.devicePixelRatio || 1);
+      const nextWidth = Math.max(1, Math.floor(rect.width));
+      const nextHeight = Math.max(1, Math.floor(rect.height));
+      // The observer below watches TWO boxes that always move together, and the writes
+      // beneath dirty layout from inside the observation phase, so an unguarded resize()
+      // is re-delivered within the same frame and reallocates a backing store whose size
+      // never changed. Measured while dragging City's window edge: 116 callbacks over 59
+      // frames — two per frame — costing 338.6 ms, 83% of every ResizeObserver on the
+      // surface. Floored integers, so sub-pixel jitter is a no-op rather than a realloc.
+      if (nextWidth === width && nextHeight === height && nextDpr === dpr) return;
+      dpr = nextDpr;
+      width = nextWidth;
+      height = nextHeight;
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = "100%";
