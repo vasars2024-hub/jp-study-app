@@ -420,6 +420,23 @@ const SUBS_ONLY_RE = /\b(?:sub(?:title)?s?\s*only|only\s*sub(?:title)?s?)\b/i;
 const SUB_PACK_RE = /\bsub(?:title)?\s*pack\b/i;
 
 /**
+ * The same payload claim made in the *format's* vocabulary instead of the
+ * word "subtitle": `[ASS FILE ONLY]`, `[SRT only]`.
+ *
+ * Found by the same corpus scan as `SUBS_ONLY_RE` and it is the only other
+ * genuine miss in 53 live rows: `[ASS FILE ONLY] Goodbye Don Glees English
+ * Subs` scored **zero** signals, because the leading bracket was stripped as a
+ * release group — taking the one format tag with it — and what remained,
+ * `English Subs`, is a video-release phrase. Two guards firing in sequence on a
+ * release that is 0.1 MB of `.ass`.
+ *
+ * `\b` on the format token is what keeps `Cassiopeia` out, the same anchoring
+ * the `format-tag` signal already uses, and `only` must follow within one word
+ * so a release merely *containing* `[ASS]` cannot claim to be one.
+ */
+const FORMAT_ONLY_RE = /\b(?:ass|srt|ssa|vtt)(?:\s+files?)?\s+only\b/i;
+
+/**
  * A phrase that states the release *is* subtitles, as opposed to one that says
  * a video release has them.
  *
@@ -427,7 +444,10 @@ const SUB_PACK_RE = /\bsub(?:title)?\s*pack\b/i;
  * protects a leading bracket from the group strip above, and it outranks
  * `VIDEO_WITH_SUBS_RE` inside `subtitlePackSignals`.
  */
-const STATED_PAYLOAD_RE = new RegExp(`${SUBS_ONLY_RE.source}|${SUB_PACK_RE.source}`, 'i');
+const STATED_PAYLOAD_RE = new RegExp(
+  `${SUBS_ONLY_RE.source}|${SUB_PACK_RE.source}|${FORMAT_ONLY_RE.source}`,
+  'i',
+);
 
 /**
  * Phrases that describe *a video release that has subtitles*, not a subtitle

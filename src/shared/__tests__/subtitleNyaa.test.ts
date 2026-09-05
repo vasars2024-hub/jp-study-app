@@ -136,6 +136,29 @@ describe('subtitlePackSignals', () => {
     expect(subtitlePackSignals('Show - subs only')).toContain('subs-only');
   });
 
+  it('reads a payload stated in the format\'s own vocabulary', () => {
+    // The second and last genuine miss in the same 53-row live scan:
+    // `[ASS FILE ONLY] Goodbye Don Glees English Subs`, 0.1 MB, scored zero.
+    // Two guards fired in sequence — the group strip ate the leading bracket
+    // (and with it the only format tag), and what remained, `English Subs`,
+    // is a video-release phrase. The release is 0.1 MB of `.ass`.
+    const donGlees = '[ASS FILE ONLY] Goodbye Don Glees English Subs';
+    expect(subtitlePackSignals(donGlees)).toContain('format-tag');
+    expect(looksLikeSubtitleOnly(row({ name: donGlees, sizeBytes: 104_857 }))).toBe(true);
+    expect(subtitlePackSignals('Show 01-12 [SRT only]')).toContain('format-tag');
+  });
+
+  it('NEGATIVE CONTROL: a format tag alone does not claim the payload', () => {
+    // `only` has to follow the format within one word, or every soft-subbed
+    // episode that mentions its subtitle format becomes a pack.
+    expect(subtitlePackSignals('[Erai-raws] Show - 01 [1080p][ASS][Multi-Sub]')).toEqual([]);
+    // A leading bracket naming only the FORMAT is still a group tag: it is
+    // stripped, and the `English Subs` that remains vetoes the whole row. If
+    // the exemption keyed on the format token instead of the claim, this 1.4 GB
+    // episode would read as a subtitle pack.
+    expect(subtitlePackSignals('[ASS] Show - 01 [1080p] English Subs')).toEqual([]);
+  });
+
   it('NEGATIVE CONTROL: "only" next to no subtitle word is still nothing', () => {
     // The word this rule newly leans on is one of the commonest in English, so
     // the rival is a real release name that carries it beside a DIFFERENT noun.
