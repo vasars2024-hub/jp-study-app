@@ -886,6 +886,43 @@ control beside it.
 release was dropped for `shape` was told "No release on the index looks like it carries subtitles
 for this title" while the index held that exact release.
 
+#### Gate 14 RE-DERIVED 2026-09-05 (primary). Still open, and the blocker has CHANGED — read this before re-running the probe.
+
+The relay pin says gate 14 is unblocked because "the listing returns 10 real torrents". The
+transfers half is true; the **listing** half is not, and the two are different calls.
+
+Measured through `debug/g14-live.cjs` against the live app (pid 36988, port 39273, profile
+`balanced`, `scraperHasCredential('qbittorent')` **true** so this instance owns the store):
+
+- `transfers` → **10 rows**, by category **6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`**
+  (was 7 on 2026-08-19).
+- `match` → **10 nyaa searches, 0 results each.** Not "0 matched" — **0 returned**, in ~1 s,
+  because `st.sources.entries` on this profile is **length 0**. `scraperSearchTorrents` filters to
+  enabled torrent indexers, finds none, logs and returns `[]` (`scraper/torrents.ts:272`).
+
+So the cross-match instrument has **no input**, and gate 14 is blocked on profile state, not on
+subject availability. **The 0-of-7 finding of 2026-08-19 is not reproduced and not refuted — it
+was not re-measured**, because no search ran. Do not quote it as current.
+
+**Correction to the block above:** the `jp-study-subtitles` torrent is now
+`539c0886ab62f6ffb25affe7c96b28340cadd8b4` `[PeepoHappy] Kitsunekko Archive 16/07/2021`, at
+progress 1, paused. **`07ea0e8a…` is no longer in the client at all.** Every warning above about
+`qbitReapSubtitleOrphans` deleting the gate-31 evidence still stands — it now points at
+`539c0886…`, and a run naming the old hash would protect the wrong torrent.
+
+**Exact next slice, and it needs no settings write.** `g14-live.cjs` already takes the qBittorrent
+block as a call-time override (`qbitOverride()`); give `search`/`match` the same treatment for
+`indexers`, so a nyaa entry is passed **on the request** rather than stored. Every scraper call
+takes its config on the call, so this leaves the user's profile byte-identical — the same
+technique gates 17 and 18 used. Then re-run `match`, and only then is 0-of-N a measurement.
+
+**Product defect found by this run and FIXED, `01991211`.** The empty indexer list is the SHIPPED
+DEFAULT (`shared/scraperSourceSettings.ts:84`), and `TorrentManagerPage` rendered it as
+"0 matching releases" — the same sentence a query that genuinely matched nothing produces. The
+nyaa harvest path already tells the truth here (`nyaaAvailability` → `no-indexer`, driven live
+this turn: "No torrent index is enabled in this profile."), and `MalDownloadDialog` guards too;
+the Torrent Manager was the one consumer that did not. Category 8. 4 tests, 2 mutation controls.
+
 ### Phase 9.4 — portability gates (the "any user, not just this machine" requirement)
 
 16. A clean profile with no vault entry, no key, and no qBittorrent configured shows an honest
