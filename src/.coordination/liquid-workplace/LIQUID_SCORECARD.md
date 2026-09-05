@@ -4814,3 +4814,122 @@ clause 3, which closed two days ago. It needs its own slice with those tests in 
 
 **Running total: 18 of 25 sections at 80/80** (unchanged — `novels` is 3 of 8 banked, cat3 VOID,
 cat5/6/7/8 unrun). **56 category cells remain** — the handoff's 59 minus cat1, cat2 and cat4.
+
+## 2026-09-05 · primary2 — `novels` takes cat5/6/7/8: four cells, two instrument repairs, and a branch that could not boot
+
+Opened on the slice the last handoff named, in the order it forced (**cat6 before cat5** —
+`cat5-ui-clarity.cjs` reads Q7/Q8/Q9 out of `baselines/cat6-<label>.json` and is VOID without
+it). The handoff was also right that cat6/cat7 target an **open volume**, not the section
+window: opened `悪の教典 02` from the Library's 24 books, drove both there, and restored it.
+
+**sampled-out this turn: `city` `immersion` `reading` `translate` `files` `player` `anki`** —
+seven, named, unchanged from the last entry.
+
+### WHICH HOST EACH CELL WAS SCORED ON — this surface has two, and the split is deliberate
+
+`novels` answers to two hosts and they cannot co-exist: opening a book **replaces the desktop
+shell**. Measured while the reader was up: **0 `.fwin`, no `.os-desktop`, `document.body` has
+three children**. So this is not a probe limitation to work around, it is the product's own
+architecture, and each cell is scored on the host its own question needs:
+
+| host | cells | why |
+| --- | --- | --- |
+| the reader (`@.reader`, 1264x821) | cat5, cat6, cat7 | cat6's spec and cat7's `SPECS` entry both name `.novel-scroller`; cat5 inherits Q7/Q8/Q9 from cat6 and must therefore be the same host |
+| the section window (`@.fwin[data-section="novels"]`, 820x580) | cat1, cat2, cat4 (last entry), cat8 | cat8's four-language leg needs the Settings ui-language control **on screen**, and inside the reader there is no such control: one `select` (`.chapter-select`, 0 lang-tagged options), 0 `.sp-seg-btn`, no `[data-setting-id="ui-language"]`. `clickLang`'s refusal is correct and structural. |
+
+`--surface` for cat8 is the **selector** form, not the title: correction 15 already records that
+a title-named surface disappears the moment the language leg translates its own window title.
+`data-section` is language-independent.
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat6 feature parity | **PASS 10/10** | parity **9/9 standard = 9/9 liquid**, `na` 0, `rowsAgree` true, `onlyInOne` []. Round trip standard→liquid→standard: 0 field diffs, 0 shell diffs, other-presentation box 1264x821 (no editable text field to dirty — recorded as such rather than skipped). Control: **5 of 5 mutations armed, each fell EXACTLY its own row**, 0 unexpected rows, all restored to 9/9 — "CONTROL FAILED AS REQUIRED". |
+| cat7 perf | **PASS 10/10** | drag / resize / theme each **p50 8.3 ms, p95 8.4, max 8.6, 0 frames over 16, 0 over 100** across 223/226/224 frames. Heavy leg (page the volume) main **p50 2.2 / p95 3.0 / max 10.0** over 98 samples in 3,002 ms vs idle **2.2 / 3.0 / 8.9** — main stays available under the surface's heaviest work. `--jank` sensitivity control: 10 × 120 ms blocks take p95 8.4 → **108.4 ms**, max 116.7, 10 frames over 100, so the recorder demonstrably sees the frames. |
+| cat5 UI clarity | **PASS 10/10** | all ten questions YES. Q2 location `悪の教典 02` from `div.reader-title` with 1 way back; Q4 12 controls scanned at rest; Q6 2 Liquid regions, 1 carrying a transition, 0 infinite; Q10 3 identity markers of the chromeless set of 4 (bar 3), bespoke prefixes `reader:5` `novel:3`, cards 0. `storeIdentical` true, presentation restored to `standard`, plant residue 0. Control arm: **CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10**. |
+| cat8 honest states | **PASS 10/10** | 86 text runs / 76 word runs, **rawKeys 0, placeholders 0, mutePairs 0**, 2 disabled controls, statesNamed "1 of 1 observable". Four-language leg: en/ja/zh/ru all 86 runs with **15 runs moved** in each non-base language (`Novels`→`小説`/`小说`, `Reading lists`→`読書リスト`, …), and the language restored to the profile's original ABSENCE of `ui-lang` (`before {html:'en',stored:null}` = `after`). Control moved all three terms 0,0,0 → 1,1,1 → 0,0,0, `backToBaseline` true. |
+
+`statesNotObservable: ['loading','error','offline']` is carried honestly rather than scored —
+those three need a profile this run did not have, and the harness declines to invent them.
+
+### Two instrument repairs, both forced by a VOID, both with their own control
+
+**`ad960649` — cat7 correction 46: a paged reader has no scroller.** The first cat7 run VOIDed
+on "the scroll load never armed", and the refusal was CORRECT. Measured live: `.novel-scroller`
+is 1262x712 with `scrollHeight === clientHeight === 712`, `scrollWidth` 2522, `overflow-x:
+hidden` — a CSS multi-column flow whose pages move by transport buttons, not by an offset.
+`scrollAll` ranks by VERTICAL overflow, found 0 on the root, every descendant and every
+ancestor, and refused. Writing `scrollTop` to an `overflow:hidden` box is a no-op, so without
+that refusal the leg would have sampled main during an **idle** renderer and reported a paged
+reader as fast. `pageAll`/`pageProof`/`pageProgress` replace it: symmetric (N forward, N back,
+because reading position is persisted user state), fingerprinting `.reader-pagecount` + the
+head of `.novel-content` rather than `.reader-seek` (a 0..1000 integer over ~166 parts — 20
+pages can share one value, so a seek odometer would report a working pager as stuck), and
+reading each signature one tick after its own click because React commits later. Live receipt:
+**20 forward + 20 back over 40 ticks, 21 distinct pages, restored to the starting page**;
+seek read `18` and pagecount `2/2` both before and after. Receipt mutation control, four bars,
+each REFUSING and green again on restore: distinct→1, restored→false, back-count asymmetric,
+done→false. `manga`'s heavy leg is a hand-rolled pager with **no proof at all**, so it VOIDs by
+construction under this file's own "no proof, no claim" rule — named in the comment, not
+switched blind.
+
+**`f8989da9` — cat8 correction 47: a format hint in a `placeholder` attribute is not fake
+data.** cat8 first failed on ONE string, `https://example.com/book.epub` at
+`NovelsContent.tsx:992`. Correction 7's own words are "wrong on ANY profile" and the harm it
+names is content masquerading as the user's data; a URL-shaped hint in an empty URL field is
+the opposite, and scoring it dishonest pushes the product toward a WORSE placeholder (the
+convention next door is `https://api.jiten.moe/api`, a plausible-looking host, strictly more
+confusable with real data). Narrowed to the `placeholder` attribute and the example-host terms
+only. **The plant is not disarmed** — checked, because that is a recorded false pass here: the
+control plants `Lorem ipsum` as TEXT CONTENT (`:513`/`:543`), a path this leaves fatal, and it
+still moved 0→1→0.
+
+### THE BRANCH COULD NOT BOOT, and this is the finding of the turn — `02494b21`
+
+Opening `grammar` to characterise something else threw
+
+    SyntaxError: The requested module '/src/renderer/grammarCuration.ts'
+                 does not provide an export named 'onCurationChanged'
+
+`AppErrorBoundary` blanked the ENTIRE app — both windows fell to 74 elements and "Something
+went wrong." And because the desktop layout persists its open windows, every subsequent boot
+re-mounted Grammar and crashed again: **a reload does not recover it.** Fixing that one exposed
+the identical defect one module over, `grammarPresets.ts` / `sameFilters`.
+
+Both are the missing halves of changes whose CONSUMERS were committed — `cb58977c` and
+`31c157b2`, two of this very track's own grammar cells. On `feat/nyaa-subtitles`, `git show`
+counts the importers 2 and 2 and the exports **0 and 0**.
+
+**Why nobody saw it, which is the part worth keeping: the shared tree BOOTS.** Both producers
+exist there as another track's uncommitted hunks, so every live check every worker has run for
+days was against code that is not on the branch. Only a clean checkout is broken. Both blocks
+were taken from that tree byte-for-byte (verified `===` before writing) so the owner's eventual
+commit is a no-op rather than a conflict.
+
+Swept the branch rather than fixing two and hoping — every relative named import in `src/`
+against its target's exports, **2,631 files: 2 runtime-breaking before, 0 after** — and landed
+the sweep as `tools/import-export-check.cjs` (`e99979bd`), because nothing in the repo could
+have caught this: `tsc --noEmit` is not a gate here, vitest never imported the two components,
+and `architecture-audit.cjs` reasons about module boundaries rather than symbols. Its control
+is worth repeating: dropping `export` from `sameFilters` did **not** fire, correctly — the
+identifier was still in the file, outside the checker's own stated scope. Attacking the term
+actually scored (removing the function, 946 bytes) fires with exit 1.
+
+Live after both fixes: reload → **600 elements, taskbar `Novels, Grammar`, 2 `.fwin`, no error
+boundary, no SyntaxError in `/logs`**. Suites grammarCuration + grammarPresets +
+grammarPracticeFilters + grammarLiquidRegions + grammarExplorerVirtualisation: **5 files / 84
+tests, exit 0**.
+
+### Corrections to what I wrote LAST turn
+
+- **The "something reverted the presentation 109 ms later" hypothesis is withdrawn as stated.**
+  The same shape reproduced this turn (`os:open dictionary` mounted at 26 ms, gone at 66 ms)
+  and the cause was the crash above, not the two-shells-one-desktop race I blamed. The
+  two-shells fact is still true and still unenforced (`DesktopShell.tsx:668`) — it is simply
+  not what those measurements showed.
+- Window 2 remains a second shell rendering `?desk=0`, unchanged and unrepaired.
+
+**Running total: 18 of 25 sections at 80/80.** `novels` is now **7 of 8 banked** — only cat3
+remains, still VOID on its own dense plant from last turn, and its diagnosis is unchanged:
+`.fwin-body` is pinned OPAQUE under Liquid by rule 1 of `liquid-window.css`, so the plant's
+backing may never have been translucent and the earlier pass may itself have been luck.
+**52 category cells remain** — 56 minus cat5, cat6, cat7 and cat8.
