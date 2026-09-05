@@ -3010,6 +3010,25 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   for (const v of voided) console.log(`  VOID     ${v}`);
   for (const e of environment) console.log(`  ENV      ${e}`);
   if (out.sessionCeiling.environmentNote.startsWith('THE MACHINE')) console.log(`  ENV      ${out.sessionCeiling.environmentNote}`);
+  /*
+   * CORRECTION 61 - THIS BRANCH EXITED 0 ON EVERY VERDICT, INCLUDING VOID.
+   *
+   * `process.exitCode = 1` existed at exactly one place in this file (the `player-frames`
+   * branch), so the branch that every NON-VIDEO surface uses - which is all but one of them -
+   * reported success to its caller whether it scored 10, raised findings, or VOIDed. Measured
+   * 2026-09-05 on `translate`: score VOID, `voided` one entry, shell exit code **0**.
+   *
+   * That is the banked `piped-exit-code-hides-red-suite` shape. A wrapper of the form
+   * `node cat7-perf.cjs --surface X && <bank the cell>` banks a VOID as a PASS, and the run
+   * that produced this comment was very nearly reported as a 10 off its exit code alone
+   * before the log was read.
+   *
+   * VOID and a finding are deliberately the SAME exit code here. Both mean "this run did not
+   * earn the cell", which is the only distinction an exit code can carry; the score, the
+   * findings and the void reasons are all in the JSON and on stdout for anything that needs
+   * to tell them apart.
+   */
+  if (score !== 10) process.exitCode = 1;
 })().catch((e) => {
   console.error(String(e && e.stack ? e.stack : e));
   if (e && e.cause) console.error('cause:', e.cause.code || '', e.cause.message || String(e.cause));

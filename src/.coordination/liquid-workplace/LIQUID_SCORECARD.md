@@ -5898,3 +5898,82 @@ which is precisely why nobody caught it.
 
 The 163-vs-160 discrepancy recorded at line 5665 is untouched by this and is still owed. `160` and
 now `161` remain the deliberately conservative quote.
+
+---
+
+## 2026-09-05 12:10-13:15 UTC, `primary2` — `f9541e9e` VERIFIED LIVE at last (12,640 ms -> 43 ms), `translate` cat7 still VOID, and correction 61: this harness exited 0 on every verdict
+
+**`translate` cat7 did NOT close. It VOIDed, and the cell stays OPEN.** Reported first because
+the two good results below would otherwise read like a closure.
+
+### The fix `f9541e9e` works in the running product. This is its first live measurement.
+
+Three previous entries left this as "cause fixed, awaiting one post-restart probe run" — the SQL
+repair was proven offline against the database and by 532 unit tests, never in the app. Main does
+not hot-reload, so it needed a restart nobody had paid for. Driven through the debug bridge,
+`window.api.lookupOfflineInterlinear` on the SAME 43-character Japanese passage, kicked and polled
+(`/eval` cannot await), the query verified as `len 43` so the shell did not mangle it into `??`:
+
+| main process | uptime at measurement | result |
+| --- | --- | --- |
+| pid 13316, **pre-fix** (booted 2026-09-04 06:04) | 93,710 s | **12,640.5 ms** |
+| pid 33100, **post-fix** (booted for this run) | 135 s | **806.7 ms** cold, then **46.4** and **40.1** ms |
+
+**~294x on the warm path.** The result is a real interlinear, not an empty success — the returned
+object carries `text, detectedLangs, glossLangs, parts, tokenCount, matchedCount`. Corroborated by
+the product itself: loading a 60-character paragraph into `.tr-textarea` armed **22
+`.lexicon-sense-token`s in under 4 seconds**, where one pre-fix lookup alone cost 12.6 s.
+
+**The 806.7 ms first call is recorded rather than smoothed away.** It is over the 500 ms
+`mainBlockBarMs`, so a surface whose FIRST interlinear happens under measurement can still breach
+the bar. It does not affect cat7's heavy leg, which runs on an already-loaded surface.
+
+### Why cat7 VOIDed, and what is NOT yet known
+
+    VOID  heavy leg left no proof it ran: swap the language pair 40 times through its own
+          control answered "REFUSE: the load never armed"
+
+The heavy leg refused at its first line, before any swap, because `.lexicon-sense-token` was 0.
+Read live afterwards: `.tr-view` present and visible, `taLen` **0** — **the source text was gone
+before the heavy leg started.** The gesture legs (ceiling x3, theme control, drag x2, resize x2,
+theme x2) run first and take several minutes, and something in them emptied the textarea.
+
+Timing was still collected and is recorded for the next run, but it scores nothing: main's longest
+block during the leg was **219.4 ms** over 631 samples (p50 2.1, p95 3.2) against the 500 ms bar —
+which is main being *idle*, because the swap loop never ran. A number from a leg that refused is
+not evidence, and it is exactly the shape this harness VOIDs on purpose.
+
+**Not diagnosed, and NOT guessed at here.** The theme leg is the obvious suspect but I did not
+demonstrate it: my attempt to reproduce it by hand failed to switch the theme at all
+(`data-theme` stayed `none` and the toggle returned empty), so that test was inconclusive and is
+reported as inconclusive. What IS established is that the text does not decay on its own — set
+and left alone across 9 s it held at `taLen 43` with 15 tokens. The next run must bisect the
+gesture legs rather than assume.
+
+**The likely repair is an `arm` hook on the spec's heavy leg** — an expression run immediately
+before `-DuringJs` that puts the surface into the state the leg requires — because the load has
+to survive, or be re-established after, several minutes of gestures. `spec.heavy` today has only
+`label`/`durationMs`/`js`/`proof` (line 2775-2800) and no such hook. That is ~10 spec lines, not
+a new probe (RULE 1). The proof stays exactly as strict: it already demands ticks, driven, two
+distinct pairs, `restored`, and a recovered token count.
+
+### CORRECTION 61 — this harness reported success to its caller on every verdict
+
+`process.exitCode = 1` existed at **one** place in `cat7-perf.cjs`: line 2432, inside the
+`player-frames` branch. The main branch — used by every surface except the video one — never set
+it. Measured this turn: `translate` scored **VOID** and the shell exit code was **0**.
+
+This is the banked `piped-exit-code-hides-red-suite` shape, and it nearly landed here: the
+background run returned "exit code 0" and that was very nearly read as a pass before the log was
+opened. Any wrapper of the form `node cat7-perf.cjs --surface X && <bank the cell>` would have
+banked a VOID as a 10. Fixed by setting the same exit code at the end of the main branch. VOID and
+a finding deliberately share it — both mean "this run did not earn the cell", which is all an exit
+code can carry; the score, findings and void reasons are in the JSON and on stdout.
+
+**How many past cat7 cells this touches is NOT claimed.** Every cat7 entry in this file quotes its
+numbers and its control, so they were read, not gated on. The defect is that the guard did not
+exist, not a claim that any specific cell is wrong.
+
+sampled-out: every other scorecard surface; this entry scores NO cell.
+**`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
+39 remaining, unchanged this turn.**
