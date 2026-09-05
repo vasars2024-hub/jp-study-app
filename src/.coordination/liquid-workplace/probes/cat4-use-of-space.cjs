@@ -1382,6 +1382,38 @@ async function atSize(kind) {
   if (was.refuse) return { kind, refuse: was.refuse };
 
   if (kind === 'maximized') {
+    /**
+     * CORRECTION 45 — A DROPPED CHROME CLICK SHIFTS BOTH READINGS BY ONE, AND THE LEG STILL
+     * REPORTS NUMBERS.
+     *
+     * Measured on `novels`, 2026-09-04. The leg clicked Maximize, waited SETTLE, and measured
+     * **820x580** — the window's pre-maximize box, because the click had not landed. It then
+     * clicked again to "restore", and THAT click maximized it: `restoredTo` read
+     * `0,0 1264x773` against a `restoredFrom` of `60,24 820x580`, so the category FAILed its
+     * `restored` bar and left the window maximized on the user's desk. Every other bar in the
+     * run was measured on the WRONG BOX and passed anyway, which is the worse half.
+     *
+     * Same root cause as cat2's correction 44 and the same remedy: the window's own `fwin-max`
+     * class is the truth, so click until it says what was asked, up to four times, and publish
+     * the attempt counts. It cannot fabricate a pass — a leg that never reaches the asked-for
+     * state returns a refusal instead of a measurement.
+     */
+    const maxTo = async (want) => {
+      const attempts = [];
+      for (let i = 0; i < 4; i += 1) {
+        const now = JSON.parse(await ev(FWIN_STYLE_READ(SURFACE)));
+        if (now.refuse) return { refuse: now.refuse, attempts };
+        if (now.max === want) return { ok: true, read: now, attempts };
+        const c = JSON.parse(await ev(FWIN_MAX_CLICK(SURFACE)));
+        if (c.refuse) return { refuse: c.refuse, click: c, attempts };
+        await sleep(SETTLE);
+        const after = JSON.parse(await ev(FWIN_STYLE_READ(SURFACE)));
+        attempts.push({ attempt: i + 1, from: now.max, to: after.max });
+        if (after.max === want) return { ok: true, read: after, attempts };
+      }
+      return { refuse: `maximize did not reach ${want} after ${attempts.length} clicks`, attempts };
+    };
+
     const click = JSON.parse(await ev(FWIN_MAX_CLICK(SURFACE)));
     if (click.refuse) {
       return {
@@ -1394,13 +1426,17 @@ async function atSize(kind) {
       };
     }
     await sleep(SETTLE);
+    const grew = await maxTo(true);
+    if (grew.refuse) return { kind, refuse: grew.refuse, maximizeAttempts: grew.attempts };
     const m = await read();
-    await ev(FWIN_MAX_CLICK(SURFACE));
-    await sleep(SETTLE);
-    const back = JSON.parse(await ev(FWIN_STYLE_READ(SURFACE)));
+    const home = await maxTo(was.max === true);
+    const back = home.read || JSON.parse(await ev(FWIN_STYLE_READ(SURFACE)));
     return {
       kind,
       sizeMechanism: 'the product\'s own .fwin-b[title="Maximize"] (never an inline width: .fwin-max changes the applied CSS)',
+      // The unconditional click above is attempt 1; `maxTo` only adds the ones it had to retry.
+      maximizeAttempts: 1 + grew.attempts.length,
+      restoreAttempts: home.attempts ? home.attempts.length : null,
       measurement: m,
       // The product stores the pre-maximize box and restores from it, so this is its round trip,
       // not the harness's. CORRECTION 9: z-index legitimately moves because restoring a window
@@ -1649,6 +1685,10 @@ const BARS_OF = (m) => ({
       clampedByOsMinimum: l.clampedByOsMinimum === undefined ? null : l.clampedByOsMinimum,
       restoredFrom: l.restoredFrom || null,
       restoredTo: l.restoredTo || null,
+      // Correction 45 publishes how many clicks the maximize round trip actually cost, so a leg
+      // that needed a retry can never be read as one that landed first time.
+      maximizeAttempts: l.maximizeAttempts === undefined ? null : l.maximizeAttempts,
+      restoreAttempts: l.restoreAttempts === undefined ? null : l.restoreAttempts,
       clippedList: l.measurement && l.measurement.clippedList,
       overlapList: l.measurement && l.measurement.overlapList,
       horizontalScrollerList: l.measurement && l.measurement.horizontalScrollerList,
