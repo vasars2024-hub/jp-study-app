@@ -3647,6 +3647,9 @@ export const zh: Catalog = {
   'reading.captures.lineCount': {
     other: '{count} 行',
   },
+  'reading.captures.refreshed': {
+    other: '已刷新 — {count} 条捕获',
+  },
 
   'search.reading': '阅读设置',
   'search.reading.desc': '阅读器排版与布局',

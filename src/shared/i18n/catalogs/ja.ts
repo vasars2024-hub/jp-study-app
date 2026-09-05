@@ -3665,6 +3665,9 @@ export const ja: Catalog = {
   'reading.captures.lineCount': {
     other: '{count} 行',
   },
+  'reading.captures.refreshed': {
+    other: '更新しました — {count} 件のキャプチャ',
+  },
 
   'search.reading': '読書設定',
   'search.reading.desc': 'リーダーの文字表示とレイアウト',

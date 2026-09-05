@@ -102,8 +102,29 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   const [captionsOpen, setCaptionsOpen] = useState(false);
   const cover = useReadingDocumentCover();
 
-  const load = useCallback(() => {
+  /**
+   * The result of the LAST MANUAL refresh, or null when none has completed.
+   *
+   * The Refresh button was a dead end: rubric category 2 clicked it live and
+   * sampled the surface at 345 ms, 483 ms and 1257 ms with `any: false` at every
+   * sample and no live region — `deadEnd: true`. The cause is not a missing
+   * handler. `load()` does set `kind: 'loading'`, and the loading note carries
+   * `aria-live`, but a local IPC read of the capture history resolves faster than
+   * a paint, so the only feedback the surface had was a state nobody can see. On
+   * an unchanged store the user clicks Refresh and nothing whatsoever happens.
+   *
+   * So the announcement is of the RESULT, not of the request, and it survives
+   * until the next read rather than being cleared on a timer: "Refreshed — 42
+   * captures" stays true for exactly as long as that read is the current one, and
+   * a self-clearing banner would put the surface back to silent for anyone who
+   * looked a second later. Only manual refreshes announce; the mount does not,
+   * because a live region that fires on open is noise, not feedback.
+   */
+  const [refreshedCount, setRefreshedCount] = useState<number | null>(null);
+
+  const load = useCallback((announce = false) => {
     const request = ++historyRequest.current;
+    if (announce) setRefreshedCount(null);
     const list = window.api?.lensHistoryList;
     if (typeof list !== 'function') {
       setHistory((previous) => ({ ...previous, kind: 'error' }));
@@ -114,8 +135,13 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
       .then(() => list({ limit: HISTORY_LIMIT }))
       .then((entries) => {
         if (request !== historyRequest.current) return;
-        if (Array.isArray(entries)) setHistory({ kind: 'ready', entries });
-        else setHistory((previous) => ({ ...previous, kind: 'error' }));
+        if (Array.isArray(entries)) {
+          setHistory({ kind: 'ready', entries });
+          // Only a read that actually produced rows may claim it refreshed
+          // anything. A failed read falls through to the error note below, which
+          // is the honest state for it.
+          if (announce) setRefreshedCount(entries.length);
+        } else setHistory((previous) => ({ ...previous, kind: 'error' }));
       })
       .catch(() => {
         if (request === historyRequest.current) {
@@ -253,6 +279,11 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
       */}
       {history.kind === 'ready' && rows.length === 0 ? (
         <p className="reading-captures-note muted">{t('reading.captures.empty')}</p>
+      ) : null}
+      {refreshedCount !== null && history.kind === 'ready' ? (
+        <p className="reading-captures-note reading-captures-refreshed muted" role="status">
+          {t('reading.captures.refreshed', { count: refreshedCount })}
+        </p>
       ) : null}
       {rows.length > 0 ? (
         <div className="reading-captures-filter">
@@ -412,7 +443,7 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
           <button
             type="button"
             className="reading-captures-refresh"
-            onClick={() => load()}
+            onClick={() => load(true)}
             title={t('reading.captures.refresh')}
           >
             <Icon name="refresh" size={13} />

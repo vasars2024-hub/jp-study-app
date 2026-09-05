@@ -3579,6 +3579,10 @@ export const en: Catalog = {
     one: '{count} line',
     other: '{count} lines',
   },
+  'reading.captures.refreshed': {
+    one: 'Refreshed — {count} capture',
+    other: 'Refreshed — {count} captures',
+  },
 
   'search.reading': 'Reading settings',
   'search.reading.desc': 'Reader typography and layout',

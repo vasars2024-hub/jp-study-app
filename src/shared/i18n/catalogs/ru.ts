@@ -3925,6 +3925,12 @@ export const ru: Catalog = {
     many: '{count} строк',
     other: '{count} строки',
   },
+  'reading.captures.refreshed': {
+    one: 'Обновлено — {count} захват',
+    few: 'Обновлено — {count} захвата',
+    many: 'Обновлено — {count} захватов',
+    other: 'Обновлено — {count} захвата',
+  },
 
   'search.reading': 'Настройки чтения',
   'search.reading.desc': 'Типографика и разметка читалки',
