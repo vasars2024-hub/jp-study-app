@@ -8201,3 +8201,56 @@ correction-62 figure), `aria-setsize` restored, filter empty. `"1,207 visits"` r
 group separator, which is `c77f9628` working in the live renderer.
 
 `sampled-out:` no surface was scored this turn, so no surface was skipped.
+
+## 2026-09-05 19:30-19:50 EDT — primary2 — cat7's episodic block has a MECHANISM: it is main's own major GC on a permanently-retained ~660 MB old space
+
+**Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** `sampled-out:` no surface was
+scored, so none was skipped. `player` keeps its 8, `immersion` 3, `anki` 4, `translate` cat7.
+What moved is the diagnosis `backup` explicitly handed on at 09:45: *"stop optimising the
+translate path; the next slice is to sample main during a leg where the surface is idle and
+find out what is running."* Done, and it is not "what is running" — it is what is **retained**.
+
+### The measurement, on a SECOND instance and a SCRATCH profile
+
+pid 25124, bridge 39280, `JP_USER_DATA_DIR=C:\tmp\jp-p2-profile` — a different instance and
+different data from `backup`'s pid 41072. `/health` is served on MAIN's event loop, so its
+latency IS main's blocked time. 180 s, **2,695 samples, nothing driven, no GC requested**:
+
+    p50 1 ms   p95 2 ms   p99 138 ms   MAX 496 ms   19 over 150 ms   0 over 500
+
+So the block reproduces with **no profile data, no dictionary content and no Translate
+surface**. That is the control the last three attributions were missing: it is not per-swap
+cost, not cold gloss-language statements, not a warming curve, and not the user's data.
+
+### The mechanism, measured rather than reasoned
+
+    old_space        661.2 / 676.3 MB   — ~98% of its size, i.e. at V8's major-GC trigger
+    forced full GC   heapUsed 711.9 -> 668.2 MB (freed 43.7), old_space 661.2 -> 639.3
+    that GC's cost   477 ms wall, timed at the caller, gcRan true, gcSource "borrowed"
+    detachedContexts 0    nativeContexts 2    llamaModels 0    llamaContexts 0
+
+A major GC on this heap costs **477 ms** — the same magnitude as the 500 ms bar the idle leg
+keeps failing, and as `backup`'s 510.7 and 948.3 ms. And the heap is **RETAINED**: a forced
+full collection freed 6% of it. So V8 sits at its trigger, collects, frees almost nothing, and
+does it again. `detachedContexts 0` rules out the classic stale-context leak.
+
+### NEGATIVE CONTROL — this is not the harness collecting on itself
+
+`cat7-perf.cjs` does fire `/mem {gc:true}`, which I have now measured at 477 ms of main-thread
+block. But it fires it at **`:2226` and `:2294` only**, bracketing the `longSession` leg — not
+inside the frame legs. And **my sampler never requested a GC at all** and still read p99 138 /
+max 496. The stalls are V8's own cadence, not instrument-injected. Do not re-run that theory.
+
+### What I did NOT establish, said plainly
+
+Main's working set swung **3,338 -> 988 -> 3,005 MB** and `externalMb` **169.9 -> 1,048.3**
+across three idle reads minutes apart. That is a loud correlate and I am **not** attributing
+it; `arrayBuffersMb` read 0 in the same breath, which I cannot yet reconcile.
+
+### EXACT NEXT SLICE — name the retainer, with the route that now exists
+
+`d6b3c9eb` adds **`/heap-snapshot`** to the debug bridge, because `/mem` can say how much main
+retains and structurally cannot say by what. Take one on an idle instance and find what holds
+~640 MB of live old_space in MAIN. Two traps already paid for: the route is **inert until the
+app restarts** (main-process change), and it **blocks main for seconds** — the response calls
+that `blockedMs`, so do not sample a surface across your own snapshot.
