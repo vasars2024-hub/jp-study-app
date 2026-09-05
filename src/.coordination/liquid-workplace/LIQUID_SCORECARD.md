@@ -4539,3 +4539,91 @@ it. Its heavy leg is unprompted (13 canvas layers, 48 stars, 22 dust motes paint
 sky console's Star / Asteroid / Ice-barrage buttons are `data-dev-only` and must NOT be fired.
 
 **App state left as found:** window `680x657` at `(162,114)`, presentation STANDARD, dossier CLOSED.
+
+## 2026-09-04 · primary2 — City cat7 is NOT a 10, and its 2026-08-31 PASS was taken on a 60 Hz panel
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged.
+City stays **7 of 8** (cat1, cat2, cat3, cat4, cat5, cat6, cat8 closed). cat7 is the open cell and
+this entry says exactly why, with the hypotheses I tested and disproved, so the next turn does not
+re-buy them.
+
+Instrument: `probes/cat7-perf.cjs --surface city --win 1 --jank`, zero new probes (RULE 1). Scene
+1 window / 132 window elements / 258 document elements, `dpr 1`, viewport 1264x821, theme null,
+dossier CLOSED, pid 13316 uptime 57,565 s. Sensitivity control fired both runs: `--jank` produced
+**16** frames over 100 ms and p95 133.3 against the clean drag's **0** and 25.0.
+
+| leg | p50 | p95 | max | >100 | control | verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| ceiling (City at rest) | 16.7 | 25.0 | 25.3 | 0 | — | 3 runs, all 16.7 |
+| drag | 16.7 | 25.0 | 41.8 | 0 | ceiling 16.7 / 25.0 | clean |
+| theme | 16.7 | 25.0 | 25.1 | 0 | ceiling, **substituted** | clean |
+| **resize** | **33.3** | **58.3** | 125 | **1** | ceiling 16.7 / 25.0 | **3 findings** |
+
+heavy leg (dossier opened and closed 20 times over 13 animating canvases, restored): main
+p50/p95/max **2.6 / 10.0 / 21.2 ms** over 3,016 ms against an idle control of 2.8 / 4.1 / 18.7 —
+nowhere near the 500 ms bar. Every gesture a closed loop, every scene stable.
+
+**CORRECTION 43 — hiding the root of a continuously animating surface subtracts the surface, not
+the theme swap.** The theme control hides `spec.root` and re-measures; that assumes the resting
+cadence is unchanged, which is true for a static surface and false for a canvas scene. Measured:
+the hidden-root control ran **8.3 / 8.5 ms**, FASTER than City's own resting ceiling of 16.7 / 25.0,
+because thirteen canvases had stopped painting and the 120 Hz panel was free. The theme leg then
+measured 16.7 / 25.0 — byte-identical to the resting ceiling, i.e. the swap costs **nothing** — and
+was scored a FINDING twice over. The guard fires only when the control is FASTER than the ceiling,
+so it can never soften a real theme regression, and the substitution is always published to
+`environment` and to a new `themeControl` block in the JSON.
+**Its control is seven banked baselines**, re-read this turn: `calendar` 8.3=8.3, `flashcards`
+8.3=8.3, `musicwidget` 8.3=8.3, `settings` 16.7=16.7, `shell` 16.7=16.7, `youtube` 16.7=16.7 —
+control equals ceiling EXACTLY on every one. City is the only surface in nine where it does not.
+**5 findings -> 3** on the re-run, and none of the three is the theme.
+
+**One product repair, measured, `9641dbeb`.** `ReadingGardenSkyEvents` hands ONE ResizeObserver two
+boxes that always move together and its callback read a rect then wrote the canvas from inside the
+observation phase. Instrumented by wrapping `window.ResizeObserver` with a timing + call-site
+recorder and driving a 60-step rAF-paced edge drag (680x747 -> +140px -> 680x747, closed loop):
+**116 callbacks over 59 frames — two per frame — 338.6 ms, 83% of the surface's 409.4 ms of
+observer work. After: 20.5 ms**, surface-wide 409.4 -> 131.2 ms. Mutation control: the one guard
+line removed turns all four tests RED. It did NOT move the score, and the entry says so.
+
+**THE OPEN FINDING IS A REGRESSION, not a design floor, and that is the thing to carry forward.**
+`baselines/cat7-l9-city.json`, 2026-08-31T11:32Z, recorded City's resize at **p50 16.7 / p95 17.1 /
+max 66.5 / 0 over 100**, findings `[]`, score 10 — on a HEAVIER desk (3 windows / 1,115 elements,
+theme `forest-night`) than today's 1 / 258. Same instrument, comparable window (131 elements then,
+132 now). Today it is 33.3 / 58.3 / 125 / 1.
+
+Five hypotheses, each driven and each disproved — do not re-buy them:
+
+| hypothesis | test | result |
+| --- | --- | --- |
+| HMR debris in a 16 h renderer | `/reload`, re-measure twice | 33.3, 33.3 — unchanged |
+| the window `backdrop-filter: blur(10px)` that `bfba48af` newly made apply | set it to `none` live, re-measure twice, restore and verify `blur(10px)` | 33.3, 33.3 — not it |
+| window taller than the viewport at +140px | re-measure at the 2026-08-31 height (680x679) | 33.3 — not it |
+| the ResizeObserver JS itself | the repair above, 409.4 -> 131.2 ms | 33.3 — not it |
+| an rAF hop out of the observation phase, on all three child observers | written, measured, **REVERTED in the same turn** | 33.3 with and without |
+
+Two ablations that DO move it, each by exactly one 8.3 ms step, and they are additive: hiding all
+13 canvases -> **25.0**; dropping the 232 `--garden-world-*` custom-property writes -> **25.0**
+(and observer deliveries collapse 291 -> 116, because the children only resize once the world vars
+move). So the cost is the canvas re-projection cascade plus the window's own resize, roughly evenly.
+
+**And the provenance fact that reframes the August PASS: that panel was running at 60 Hz.**
+`cat7-l9-city.json` records `frame_min_ms` 14.9–16.2 and a hidden-root theme control of **16.7/16.6**
+— hiding the garden freed nothing. Today `frame_min_ms` is **8.2** and the same control reads 8.3:
+**120 Hz.** At 60 Hz, 16.7 ms is the floor, so any per-resize cost under 16.7 ms scored a perfect
+pass. That is not the whole story though, and I checked rather than assuming: driving the resize at
+a 60 Hz cadence on today's panel (mutate every other frame) still yields **p50 25.0**, i.e. ~40 fps
+where August achieved 60. The work per resize really has grown.
+
+**EXACT NEXT SLICE: bisect City's resize between 2026-08-31 and HEAD.** Seven commits touch
+`reading-garden/` in that window (`2b5a73cf`, `a01c8787`, `45ddf61d`, `f0b76b55`, `f24133c7`,
+`e2194e28`, `9641dbeb`) plus the merged `bfba48af`/`b5c8b3bd` chrome work. It needs a second dev
+app in a detached worktree — do NOT restart or check out under the shared instance. The measurement
+is 90 seconds per commit with the driver described above; the harness run is not needed until the
+end. If the bisect lands on `2b5a73cf` (City became a Liquid host, `ContextualSurface` around the
+dossier) note the dossier is CLOSED in both readings, so the cost would have to be in cascade, not
+in that subtree.
+
+**App state left exactly as found:** 0 `.fwin` open, `data-theme` null, 121 document elements,
+City's persisted geometry put back to `680x747` at `(60,24)` after the ablations moved it. All live
+patches removed and identity-verified: `window.ResizeObserver`, `CSSStyleDeclaration.prototype.setProperty`,
+the window's inline `backdrop-filter`. Baselines written (gitignored): `cat7-city-perf.json`.
