@@ -40,6 +40,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { logDiagnostic } from '../errorLog';
 
 /**
  * Above this the file is not warmed at all.
@@ -48,7 +49,9 @@ import path from 'node:path';
  * and pulling all of it through the cache would evict more than it warms -- on a
  * machine whose standby list is ~1.9 GB, a 2 GB read is a cache *flush* wearing a
  * warm-up's clothes. Skipping is the honest outcome and it is reported as
- * `skipped`, never as a success.
+ * `too-large`, never as a success. (This said `skipped` until 2026-09-05 — no
+ * such status has ever existed, so anyone grepping the reason out of the log
+ * found nothing and could reasonably conclude the refusal was unreachable.)
  */
 export const DICT_WARM_MAX_BYTES = 1_500_000_000;
 
@@ -77,8 +80,38 @@ let cancelled = false;
  */
 export function warmDictionaryPages(dir: string): Promise<DictWarmResult> {
   if (running) return running;
-  running = runWarm(dir);
+  running = runWarm(dir).then((result) => {
+    logDictionaryWarmup(result);
+    return result;
+  });
   return running;
+}
+
+/**
+ * The receipt. Written here, by the producer, every time — never by the caller.
+ *
+ * It used to be the caller's job and the caller did not do it: the one
+ * production call site (`registerDictionaryIpc`) scheduled the warm-up with no
+ * `onDone`, so `missing`, `too-large`, `failed` and `cancelled` were all
+ * indistinguishable from success, and from each other, from outside the process.
+ * Three consecutive turns then argued about whether a 4.2 s first-lookup block
+ * was cold pages, with no way to ask whether the thing that warms those pages
+ * had run at all. A receipt a caller can forget is not a receipt, which is why
+ * this is not an `onDone` default.
+ *
+ * A warm-up that did not warm is a `warn`: nothing is broken, but the next
+ * lookup is about to pay a cost the user was supposed to be spared, and that
+ * belongs in the log rather than in the next worker's stopwatch. `cancelled` is
+ * `info` — it means the app is quitting, which is not a fault.
+ */
+export function logDictionaryWarmup(result: DictWarmResult): void {
+  logDiagnostic(
+    result.status === 'warmed' || result.status === 'cancelled' ? 'info' : 'warn',
+    'dictionary',
+    'page-warmup',
+    `status=${result.status} bytesRead=${result.bytesRead} fileBytes=${result.fileBytes} ` +
+      `ms=${result.ms}${result.error ? ` error=${result.error}` : ''}`,
+  );
 }
 
 /** Stops an in-flight warm-up at the next chunk boundary. Used on quit. */

@@ -11,6 +11,14 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+const logDiagnostic = vi.fn();
+vi.mock('../errorLog', () => ({
+  get logDiagnostic() {
+    return logDiagnostic;
+  },
+}));
+
 import {
   DICT_WARM_MAX_BYTES,
   cancelDictionaryWarmup,
@@ -23,6 +31,7 @@ let dir = '';
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jp-dictwarm-'));
   resetDictionaryWarmupForTests();
+  logDiagnostic.mockReset();
 });
 
 afterEach(() => {
@@ -106,5 +115,96 @@ describe('warmDictionaryPages', () => {
     expect(result.error).toContain('EIO simulated');
     expect(closed.count).toBe(1);
     openSpy.mockRestore();
+  });
+});
+
+/**
+ * The receipt.
+ *
+ * These are here rather than at the call site on purpose. The outcome used to be
+ * the caller's to report and the one production caller reported nothing, so a
+ * warm-up that never warmed looked exactly like one that did. Asserting the
+ * producer writes it is what makes that unrepeatable; asserting a caller passes a
+ * callback would only re-test the thing that was already forgotten once.
+ */
+describe('warm-up receipt', () => {
+  const lastCall = () => logDiagnostic.mock.calls.at(-1) as [string, string, string, string];
+
+  it('records a successful warm-up with the byte count, at info', async () => {
+    writeDb(3 * 1024 * 1024);
+    const result = await warmDictionaryPages(dir);
+
+    expect(logDiagnostic).toHaveBeenCalledTimes(1);
+    const [severity, subsystem, operation, detail] = lastCall();
+    expect(severity).toBe('info');
+    expect(subsystem).toBe('dictionary');
+    expect(operation).toBe('page-warmup');
+    expect(detail).toContain('status=warmed');
+    // The numbers are the point: "it ran" cannot distinguish a full read from a
+    // read that stopped after one chunk.
+    expect(detail).toContain(`bytesRead=${result.bytesRead}`);
+    expect(detail).toContain(`fileBytes=${3 * 1024 * 1024}`);
+  });
+
+  it('records a missing database as a WARNING, not silence', async () => {
+    await warmDictionaryPages(dir);
+
+    const [severity, , , detail] = lastCall();
+    expect(severity).toBe('warn');
+    expect(detail).toContain('status=missing');
+  });
+
+  it('records a refused oversized database as a warning, with the size that refused it', async () => {
+    writeDb(2048);
+    const statSpy = vi.spyOn(fs.promises, 'stat').mockResolvedValue({
+      size: DICT_WARM_MAX_BYTES + 1,
+    } as unknown as fs.Stats);
+
+    await warmDictionaryPages(dir);
+
+    const [severity, , , detail] = lastCall();
+    expect(severity).toBe('warn');
+    expect(detail).toContain('status=too-large');
+    expect(detail).toContain(`fileBytes=${DICT_WARM_MAX_BYTES + 1}`);
+    statSpy.mockRestore();
+  });
+
+  it('carries the underlying error message into the log on a read failure', async () => {
+    writeDb(8 * 1024 * 1024);
+    const openSpy = vi.spyOn(fs.promises, 'open');
+    openSpy.mockImplementation(async () => ({
+      read: async () => { throw new Error('EIO simulated'); },
+      close: async () => undefined,
+    }) as unknown as fs.promises.FileHandle);
+
+    await warmDictionaryPages(dir);
+
+    const [severity, , , detail] = lastCall();
+    expect(severity).toBe('warn');
+    expect(detail).toContain('status=failed');
+    expect(detail).toContain('error=EIO simulated');
+    openSpy.mockRestore();
+  });
+
+  it('treats cancellation as info — quitting is not a fault', async () => {
+    writeDb(20 * 1024 * 1024);
+    const pending = warmDictionaryPages(dir);
+    cancelDictionaryWarmup();
+    await pending;
+
+    const [severity, , , detail] = lastCall();
+    expect(severity).toBe('info');
+    expect(detail).toContain('status=cancelled');
+  });
+
+  it('writes exactly one receipt per process, however many callers join', async () => {
+    writeDb(1024);
+    await Promise.all([
+      warmDictionaryPages(dir),
+      warmDictionaryPages(dir),
+    ]);
+    await warmDictionaryPages(dir);
+
+    expect(logDiagnostic).toHaveBeenCalledTimes(1);
   });
 });

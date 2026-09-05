@@ -732,6 +732,10 @@ export function scheduleDictionaryWarmup(
   if (warmupTimer) return;
   warmupTimer = setTimeout(() => {
     warmupTimer = null;
+    // `warmDictionaryPages` writes its own receipt to the diagnostic log — see the
+    // note on `logDictionaryWarmup` in `dictionary/warmup.ts` for why that moved
+    // in there rather than living at this call site. `onDone` stays a pure test
+    // seam, so forgetting it can no longer make the outcome unobservable.
     void warmDictionaryPages(dictionaryDir()).then(
       (result) => onDone?.(result),
       // A warm-up that fails changes nothing a reader can see: the next lookup pays
