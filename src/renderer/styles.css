@@ -6025,7 +6025,13 @@ mark.lookup-mark,
 /* ---- Anki workspace layout ---- */
 .anki-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  /* The preview track is a SHARE, not a fixed band. `minmax(320px, 420px)` made it greedy in
+     the exact way rubric §4.1 forbids: measured 2026-09-05 on the live Anki window, the
+     editing column was `772px` at the window's own default 820x580 AND `772px` maximized at
+     1264x773 — the window gained 444 px of width and the work gained ZERO of it, all 444
+     going to the read-only preview (420) and the gap (24). A percentage cap makes the two
+     tracks grow together: 32% of 1216 is 389, so the editor takes 803. */
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 32%);
   gap: 24px;
   align-items: start;
 }
@@ -6045,16 +6051,28 @@ mark.lookup-mark,
    the track beside it is `minmax(0, 1fr)` and goes to 0. Same shape as the dock status that
    deleted the routes next to it (`4f49860d`).
 
-   880px is derived, not chosen: `.anki-selects label` carries `min-width: 180px` and its own
-   row is the main column's primary control, so two-up costs 180 + 14 gap + 180 = 374 plus
-   `.anki-card`'s 48 px of padding = 422. With the preview at its 420 maximum and the 24 gap
-   that is 866; 880 leaves the main column a little over its bare floor rather than exactly on
-   it. This deliberately collapses at the window's OWN default size too — measured there the
-   tracks were `328px 420px`, i.e. the read-only preview was larger than the entire editing
-   column. */
-@container ankiview (max-width: 880px) {
+   The floor is derived, not chosen: `.anki-selects label` carries `min-width: 180px` and its
+   own row is the main column's primary control, so two-up costs 180 + 14 gap + 180 = 374 plus
+   `.anki-card`'s 48 px of padding = 422. Plus the 24 gap and the preview's 300 px minimum
+   that is 746; 760 leaves the main column a little over its bare floor rather than exactly on
+   it.
+
+   REVISED 2026-09-05, second measurement. The threshold used to be 880, deliberately, so the
+   split collapsed at the window's OWN default size — because under `minmax(320px, 420px)` the
+   tracks there were `328px 420px` and the read-only preview was larger than the whole editing
+   column. The proportional track above answers that objection directly (at container 772 the
+   split is editor 448 / preview 300, so the editor is the larger of the two), and collapsing
+   was costing more than it bought: at 820x580 the preview landed at y=1751 in a body whose
+   viewport ends at y=603, i.e. 1148 px below the fold, while `anki.fieldMapping.subSuffix`
+   tells the user in so many words that "the preview panel on the right updates as you edit".
+   At the app's own default window size that sentence was false. */
+@container ankiview (max-width: 760px) {
   .anki-workspace {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* Nothing to stick to in one column: the preview is the last item, below the work. */
+  .card-preview {
+    position: static;
   }
 }
 .anki-workspace-main {
