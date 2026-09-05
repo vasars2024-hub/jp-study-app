@@ -679,6 +679,94 @@ const SPECS = {
     },
     collection: { container: '.stats-view', row: '.stats-book-row' },
   },
+  translate: {
+    title: 'Translate',
+    root: '.tr-view',
+    heavy: {
+      /*
+       * THE MODEL RUN IS NOT THIS SURFACE'S HEAVY LEG, and that is a measured rejection rather
+       * than a convenience. Driven live 2026-09-05 through the product's own Translate button
+       * on `猫が好きです。` (7 characters), the run took **~45 s** end to end and produced 12
+       * characters of output. Nearly all of that is the local Qwen3-1.7B generating in another
+       * process: the renderer's own work is one `busy` flip at the start and one text commit at
+       * the end. Timing it would report the MODEL, not the surface, and category 7 scores the
+       * surface. It is also the same judgement `agent` above records for generating a reply, and
+       * `immersion` records for navigating the embedded browser -- the heaviest real operation
+       * never means "the one with the longest side effect".
+       *
+       * THE HEAVIEST REPEATABLE RENDERER WORK IS SWAPPING THE PAIR, through `.tr-swap`, which is
+       * the product's own control. One swap changes `source` AND `target`, so it re-filters both
+       * `role="radiogroup"` rows, re-stamps `lang` on the textarea and the output pane, and --
+       * the expensive part -- re-runs `LexiconWorkbenchResults` with a new `glossLang`, which
+       * rebuilds the entire interlinear: every `.lexicon-sense-token` button, its ruby annotation
+       * and its gloss stack. That subtree scales with the passage (29 sense tokens and 27 harvest
+       * rows on the 71-character paragraph this surface's cat4 cell was loaded with), so it is
+       * genuinely the biggest thing on the surface that a user can repeat.
+       *
+       * It is also FREE TO RESTORE, which scrolling and typing are not here: an EVEN number of
+       * swaps returns the pair to exactly where it started, so the leg needs no capture-restore
+       * and cannot leave the surface changed. The proof refuses unless the pair actually came
+       * back AND unless at least two distinct pairs were observed -- a swap control wired to
+       * nothing would otherwise report 40 clean ticks of doing nothing at all.
+       */
+      label: 'swap the language pair 40 times through its own control',
+      // 40 ticks at 120 ms is 4.8 s; the window is widened to 7 s for the same reason `agent`
+      // widens its own -- each swap re-renders the interlinear, so the interval slips, and a
+      // short count must refuse rather than pass as a complete run.
+      durationMs: 7000,
+      js: `(() => {
+        delete window.__lqTranslateLoad;
+        const root = document.querySelector('.tr-view');
+        if (!root) return 'REFUSE: no .tr-view on screen';
+        const swap = root.querySelector('.tr-swap');
+        if (!swap) return 'REFUSE: .tr-view has no .tr-swap control';
+        const pairOf = () => Array.from(root.querySelectorAll('.dict-lang-toggle')).map((g) => {
+          const on = g.querySelector('[role="radio"][aria-checked="true"]');
+          return on ? (on.textContent || '').trim() : '?';
+        }).join('>');
+        const tokens = () => document.querySelectorAll('.lexicon-sense-token').length;
+        const tokens0 = tokens();
+        if (tokens0 < 1) {
+          return 'REFUSE: the interlinear is empty, so a swap re-renders nothing - load source text first';
+        }
+        const start = pairOf();
+        const rec = { start, tokens0, ticks: 0, driven: 0, pairs: [start], restored: false, tokens1: -1 };
+        window.__lqTranslateLoad = rec;
+        const total = 40;
+        const timer = setInterval(() => {
+          const b = document.querySelector('.tr-view .tr-swap');
+          if (b) { b.click(); rec.driven += 1; }
+          rec.ticks += 1;
+          const p = pairOf();
+          if (rec.pairs.indexOf(p) < 0) rec.pairs.push(p);
+          if (rec.ticks >= total) {
+            clearInterval(timer);
+            setTimeout(() => { rec.restored = pairOf() === rec.start; rec.tokens1 = tokens(); }, 250);
+          }
+        }, 120);
+        return 'swapping ' + start + ' x' + total + ' over ' + tokens0 + ' sense tokens';
+      })()`,
+      progress: `(window.__lqTranslateLoad ? window.__lqTranslateLoad.ticks : -1)`,
+      proof: `(() => {
+        const r = window.__lqTranslateLoad;
+        if (!r) return 'REFUSE: the load never armed';
+        if (r.ticks < 40) return 'REFUSE: only ' + r.ticks + ' of 40 swaps ran';
+        if (r.driven < r.ticks) return 'REFUSE: ' + (r.ticks - r.driven) + ' tick(s) found no .tr-swap to click';
+        if (r.pairs.length < 2) return 'REFUSE: the pair never changed across ' + r.driven + ' clicks, so no swap did any work';
+        if (!r.restored) return 'REFUSE: the pair did not return to ' + r.start;
+        if (r.tokens1 < 1) return 'REFUSE: the interlinear was empty when the leg ended (' + r.tokens0 + ' at arm)';
+        return r.driven + ' swaps across ' + r.pairs.length + ' pairs over ' + r.tokens0 + '->' + r.tokens1 + ' sense tokens, back at ' + r.start;
+      })()`,
+    },
+    /*
+     * The interlinear flow, NOT the history list. Both are real collections on this surface and
+     * the history one is the unbounded one -- `.tr-history-list` / `.tr-history-item`, which
+     * grows a row per translation -- but it lives behind the `history` tab, so it is absent from
+     * the default view and a collection leg pointed at it reads zero rows on a surface that has
+     * them. Declared here is the one that is on screen when the surface is.
+     */
+    collection: { container: '.lexicon-interlinear-flow', row: '.lexicon-sense-token' },
+  },
   note: {
     title: 'Sticky note',
     root: '.desk-note-text',
