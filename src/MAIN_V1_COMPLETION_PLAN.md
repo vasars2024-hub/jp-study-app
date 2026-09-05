@@ -1356,8 +1356,20 @@ subject and its blocker both now known.
 
 ```
 node debug/g14-live.cjs list  "Detective Conan"                    # expect route sub-pack, rank 1
-node debug/g14-live.cjs fetch "Detective Conan" <infoHash of the 5.3 MB row>
+node debug/g14-live.cjs fetch "Detective Conan" 22d2e2e6fb301f7dc0b32ed04c5e678a6c6e27ba
 ```
+
+**The hash and the ranking arithmetic are pre-checked, so no turn spends a lap on them.** Read
+off the live index this turn (read-only, no restart needed, `g14-live.cjs search` now reports the
+field): the 5.3 MB row is `22d2e2e6fb301f7dc0b32ed04c5e678a6c6e27ba`, **11–12 seeders**,
+`isBatch: true`, and — the part that could have silently killed it — `subtitleLanguages:
+["en","ja"]`. That matters because the ranker **drops** a row outright when it advertises
+languages and none is wanted (`dropped.language`); `ja` is advertised, so it is kept and scores
+`language:ja` **+40** on top of `route:sub-pack` **+50** and `batch` **+5**, against the
+Kitsunekko archive's measured **39**. The pack ranks first. Both size guards clear either way:
+`packCoversEpisodeCount` wants 26 × 6 KB = 156 KB and the row is 5.3 MB; the ceiling is 50 MB flat
+with no episode count, or 78 MB with one. The 19.8 MB / 14-seeder sibling
+(`45921c38c5c45ae5b0d67116894b1880dd587967`, 520 episodes) is the fallback.
 
 `5.3 MB / 12 seeders` is the one to take — smallest with healthy seeds, per the standing rule.
 Then `attachSubtitleText({mediaId, text, format, lang:'ja', ...})`, which is the same call
