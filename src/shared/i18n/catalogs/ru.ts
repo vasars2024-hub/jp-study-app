@@ -4371,6 +4371,8 @@ export const ru: Catalog = {
   'translate.toolbar.label': 'Команды перевода',
   'translate.lang.from': 'Из',
   'translate.lang.to': 'В',
+  'translate.lang.sourceGroup': 'Язык оригинала',
+  'translate.lang.targetGroup': 'Язык перевода',
   'translate.status.pair': '{source} → {target}',
   'translate.status.sourceChars': 'Символов в исходнике: {count}',
   'translate.status.ready': 'Готово к работе',

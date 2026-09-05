@@ -4048,6 +4048,8 @@ export const ja: Catalog = {
   'translate.toolbar.label': '翻訳コマンド',
   'translate.lang.from': '原文',
   'translate.lang.to': '訳文',
+  'translate.lang.sourceGroup': '原文の言語',
+  'translate.lang.targetGroup': '訳文の言語',
   'translate.status.pair': '{source} → {target}',
   'translate.status.sourceChars': '原文 {count} 文字',
   'translate.status.ready': '待機中',

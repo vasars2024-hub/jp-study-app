@@ -3984,6 +3984,8 @@ export const en: Catalog = {
   'translate.toolbar.label': 'Translation commands',
   'translate.lang.from': 'From',
   'translate.lang.to': 'To',
+  'translate.lang.sourceGroup': 'Source language',
+  'translate.lang.targetGroup': 'Target language',
   'translate.status.pair': '{source} to {target}',
   'translate.status.sourceChars': '{count} source chars',
   'translate.status.ready': 'Ready',

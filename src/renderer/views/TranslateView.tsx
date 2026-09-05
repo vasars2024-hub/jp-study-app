@@ -342,10 +342,23 @@ export default function TranslateView() {
           {tabBar}
           {tab === 'translate' && (
             <div className="tr-dir">
-              <div className="dict-lang-toggle">
+              {/* Each row is ONE choice out of N, not N unrelated buttons — a screen
+                  reader was announcing six plain buttons with no hint that picking
+                  one unpicks another. The repo already spells this pattern out five
+                  times (LensClipboardPassage, ReadingLensOverlay, AiAnalysisSection
+                  ×2, FormalityToggle): radiogroup + role=radio + aria-checked, no
+                  roving tabindex. */}
+              <div
+                className="dict-lang-toggle"
+                role="radiogroup"
+                aria-label={t('translate.lang.sourceGroup')}
+              >
                 {LANG_ORDER.filter((l) => l !== target).map((l) => (
                   <button
                     key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={source === l}
                     className={`gram-level-btn ${source === l ? 'active' : ''}`}
                     onClick={() => state.pickSource(l)}
                   >
@@ -361,10 +374,17 @@ export default function TranslateView() {
               >
                 <Icon name="globe" size={14} />
               </button>
-              <div className="dict-lang-toggle">
+              <div
+                className="dict-lang-toggle"
+                role="radiogroup"
+                aria-label={t('translate.lang.targetGroup')}
+              >
                 {LANG_ORDER.filter((l) => l !== source).map((l) => (
                   <button
                     key={l}
+                    type="button"
+                    role="radio"
+                    aria-checked={target === l}
                     className={`gram-level-btn ${target === l ? 'active' : ''}`}
                     onClick={() => state.pickTarget(l)}
                   >
