@@ -5636,6 +5636,9 @@ export const ru: Catalog = {
   'anki.noteType.label': 'Тип заметки',
   'anki.noteType.create': 'Создать в Anki',
   'anki.recommendedDicts': 'Рекомендуемые словари и данные',
+  'anki.fieldMapping.saveDisabled.clean':
+    'Сохранять нечего — эти шаблоны уже совпадают с тем, что сохранено в профиле.',
+  'anki.fieldMapping.saveDisabled.saving': 'Шаблоны сохраняются в профиль…',
   'anki.fieldMapping.title': 'Сопоставление полей',
   'anki.fieldMapping.subPrefix': 'Настройте содержимое каждого поля типа заметки',
   'anki.fieldMapping.subSuffix': '. Панель предпросмотра справа обновляется по мере редактирования.',

@@ -5129,6 +5129,9 @@ export const ja: Catalog = {
   'anki.noteType.label': 'ノートタイプ',
   'anki.noteType.create': 'Ankiに作成',
   'anki.recommendedDicts': 'おすすめの辞書とデータ',
+  'anki.fieldMapping.saveDisabled.clean':
+    '保存する変更はありません。これらのテンプレートはこのプロファイルに保存されている内容と一致しています。',
+  'anki.fieldMapping.saveDisabled.saving': 'これらのテンプレートをプロファイルに保存しています…',
   'anki.fieldMapping.title': 'フィールドマッピング',
   'anki.fieldMapping.subPrefix': '次のノートタイプの各フィールドに入る内容を設定します：',
   'anki.fieldMapping.subSuffix': '。右側のプレビューが編集内容に合わせて更新されます。',

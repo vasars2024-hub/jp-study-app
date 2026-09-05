@@ -5125,6 +5125,9 @@ export const en: Catalog = {
   'anki.noteType.label': 'Note type',
   'anki.noteType.create': 'Create in Anki',
   'anki.recommendedDicts': 'Recommended dictionaries & data',
+  'anki.fieldMapping.saveDisabled.clean':
+    'Nothing to save — these templates already match what is stored on this profile.',
+  'anki.fieldMapping.saveDisabled.saving': 'Saving these templates to the profile…',
   'anki.fieldMapping.title': 'Field mapping',
   'anki.fieldMapping.subPrefix': 'Control what goes into each field of',
   'anki.fieldMapping.subSuffix': '. The preview panel on the right updates as you edit.',

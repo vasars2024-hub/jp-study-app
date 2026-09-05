@@ -13,6 +13,7 @@ import {
 } from '../../shared/profileFields';
 import { SEED_PROFILES, type SeedProfileId } from '../../shared/seedProfiles';
 import type { StudyProfile } from '../../shared/profiles';
+import { useT } from '../i18n';
 import { updateProfile } from '../profileState';
 import type { MappingPreviewState } from './AnkiCardPreview';
 import CollapsibleSection from './CollapsibleSection';
@@ -102,6 +103,7 @@ export default function FieldMappingEditor({
   });
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { t } = useT();
 
   useEffect(() => {
     onChange?.({ templates, fallbackTemplates, exampleFallback });
@@ -228,7 +230,24 @@ export default function FieldMappingEditor({
           ))}
         </div>
         <div className="fm-actions">
-          <button className="btn primary" type="button" onClick={save} disabled={saving || !dirty}>
+          {/* Rubric category 8 measured this as the surface's one mute pair: a disabled
+              control whose only account of itself is its own label. "Saved" says what
+              happened, not why the button will not respond, and the harness ignores a
+              control's own text for exactly that reason. The title carries the reason
+              instead, for both ways this button goes dead. */}
+          <button
+            className="btn primary"
+            type="button"
+            onClick={save}
+            disabled={saving || !dirty}
+            title={
+              saving
+                ? t('anki.fieldMapping.saveDisabled.saving')
+                : dirty
+                  ? undefined
+                  : t('anki.fieldMapping.saveDisabled.clean')
+            }
+          >
             {saving ? 'Saving…' : dirty ? 'Save mapping' : 'Saved'}
           </button>
           <button className="btn" type="button" onClick={resetToAuto} disabled={saving}>

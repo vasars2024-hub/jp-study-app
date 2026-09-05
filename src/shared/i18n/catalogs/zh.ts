@@ -5104,6 +5104,8 @@ export const zh: Catalog = {
   'anki.noteType.label': '笔记类型',
   'anki.noteType.create': '在 Anki 中创建',
   'anki.recommendedDicts': '推荐词典与数据',
+  'anki.fieldMapping.saveDisabled.clean': '没有需要保存的更改——这些模板与该配置文件中已保存的内容一致。',
+  'anki.fieldMapping.saveDisabled.saving': '正在将这些模板保存到配置文件…',
   'anki.fieldMapping.title': '字段映射',
   'anki.fieldMapping.subPrefix': '设置以下笔记类型每个字段的内容：',
   'anki.fieldMapping.subSuffix': '。右侧预览面板会随编辑内容实时更新。',
