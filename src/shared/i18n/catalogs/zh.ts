@@ -4028,6 +4028,8 @@ export const zh: Catalog = {
   'translate.toolbar.label': '翻译命令',
   'translate.lang.from': '源语言',
   'translate.lang.to': '目标语言',
+  'translate.lang.sourceGroup': '源语言',
+  'translate.lang.targetGroup': '目标语言',
   'translate.status.pair': '{source} → {target}',
   'translate.status.sourceChars': '源文本 {count} 个字符',
   'translate.status.ready': '就绪',
