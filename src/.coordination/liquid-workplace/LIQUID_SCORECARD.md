@@ -5859,6 +5859,15 @@ sampled-out: every other scorecard surface; this entry scores exactly one cell, 
 
 ---
 
+> **Merge note, `primary2`, resolving the `wt/files-app` -> `feat/nyaa-subtitles` conflict.** The
+> two blocks below were written CONCURRENTLY and independently — `primary2`'s `597e7ae6` (committed
+> 08:03:24 EDT) and `backup`'s `72352ea3` (08:07:03 EDT) — and both correct the SAME `5 of 8` line
+> at the end of the section directly above this note. Neither corrects the other. Both are kept,
+> ordered by first commit timestamp, so **"the line directly above" in each block means that
+> `5 of 8` line, not the preceding block.** The two workers' remaining sections interleave by
+> commit time (`a131b6ca` 08:17:28, `1dff81b8` 08:18:13, `1cd6874e` 08:20:20); each block is kept
+> contiguous rather than split. Two independent derivations agreeing is worth more than either.
+
 ## 2026-09-05 13:20 UTC, `primary2` — CORRECTION to the line directly above: `translate` is 7 of 8, and two closed cells were being handed out as the next slice
 
 **The line immediately above is wrong by two cells, and it propagated into three places that
@@ -5977,3 +5986,200 @@ exist, not a claim that any specific cell is wrong.
 sampled-out: every other scorecard surface; this entry scores NO cell.
 **`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
 39 remaining, unchanged this turn.**
+
+---
+
+## 2026-09-05 08:00-08:10 EDT, `backup` — the line directly above is WRONG: `translate` is 7 of 8, not 5 of 8
+
+**This is a bookkeeping correction, not a cell.** No score changes and the running total does not
+move. It is written down because the error was about to cost a whole turn: the handoff built on
+that line named **`translate` cat2 as the exact next slice**, and cat2 has been closed at 10/10
+since 05:00-06:30 EDT the same day. I opened this turn on cat2, enumerated the Translate window's
+17 controls live, and only then found the closing section already sitting at line 5487.
+
+**What the line dropped, and the evidence each is closed on:**
+
+| cell | closed by | where | corroboration that is not prose |
+| ---- | --------- | ----- | ------------------------------- |
+| cat2 | `primary2`, 05:00-06:30 EDT | scorecard §"`translate` cat2 closes 10/10" | `522470d3` — "correction 59: a step whose work finished inside the settle window read as a dead end". That correction exists **because** of that run; it is the run's own artifact. The run named no `--out`, which is why no `cat2-translate.json` was banked. |
+| cat4 | `primary2`, 05:00-06:00 EDT | scorecard §"cat1 and cat3 close; cat4 finds a clipped, unreachable passage" | `baselines/cat4-translate.json` **and** `cat4-translate-control.json` exist — on `wt/files-app`, which is where primary2 works, not in this tree. Line 5471 says so explicitly. |
+
+**The chronology, which is what makes the error legible rather than mysterious.** Four sections
+landed within about four hours, and they were appended in the order the work finished, not in the
+order the surface's own cells are numbered:
+
+    05:00-06:00 EDT  primary2   cat1 cat3 cat4     -> 5 of 8 (cat1 cat3 cat4 cat5 cat6)
+    05:00-06:30 EDT  primary2   cat2               -> 6 of 8
+    05:45-08:00 EDT  primary2   cat7 OPEN, fixed   -> 6 of 8, no cell moved
+    07:35-08:45 EDT  primary    cat8               -> 7 of 8  <-- written as "5 of 8"
+
+`primary`'s closing line reads like a restatement of the 05:00-06:00 enumeration with cat8 added
+and cat2/cat4 silently absent. It is the same shape as the 163-vs-160 discrepancy recorded above:
+a standing total re-typed by hand instead of re-counted.
+
+**THE STATE OF `translate`, re-derived cell by cell this turn:**
+
+    cat1  10/10  banked   baselines/cat1-translate.json (+ control)   wt/files-app
+    cat2  10/10  banked   scorecard section + 522470d3               no --out file
+    cat3  10/10  banked   scorecard section
+    cat4  10/10  banked   baselines/cat4-translate.json (+ control)   wt/files-app
+    cat5  10/10  banked   baselines/cat5-translate.json (+ control)   wt/files-app
+    cat6  10/10  banked   baselines/cat6-translate.json               both trees
+    cat7  OPEN            cause fixed in f9541e9e, awaiting one post-restart run
+    cat8  10/10  banked   baselines/cat8-translate-20260905.json      this tree
+
+**7 of 8. cat7 is the only open cell, and closing it certifies the surface.** Running total is
+unchanged at **161 of 200 cells** — the 161 was already correct, because the base of 160 was struck
+*after* cat2 landed; only the per-surface enumeration was wrong. Nothing needs re-running.
+
+**The lesson, and it is the same one the boss-audit instrument taught on 2026-08-31:** when a
+standing count and the sections above it disagree, the count is the thing to distrust. Re-derive a
+"where X stands" line from the sections, never from the previous "where X stands" line.
+
+---
+
+## 2026-09-05 08:10-08:25 EDT, `backup` — `translate` cat7 STAYS OPEN. `f9541e9e` is worth 6.5x and it is still 8.5x over the bar.
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki` `dictionary` `music`
+`flashcards`** — this entry measures exactly one cell, `translate` cat7, because the previous
+handoff named it as needing "ONE `cat7-perf.cjs` run after an app restart and nothing else".
+That was true about the *procedure* and wrong about the *outcome*: the run happened and the cell
+does not close.
+
+Instrument: `probes/cat7-perf.cjs --surface translate`, **zero new probes** (RULE 1).
+
+### The restart IS the mutation control, and it is a better one than the fix's own unit tests
+
+`f9541e9e` is a main-process change, so it was inert in the running app. Rather than restart and
+measure once, I measured the SAME passage, in the SAME profile, on the SAME 6-window scene, on
+the old main and then on the new one. The restart is the only thing that changed between them.
+
+    passage   猫が好きです。毎朝公園を散歩しながら、野良猫を見つけるのが楽しみです。彼らは自由に生きています。
+              48 characters, 20 `.lexicon-sense-token` at arm — IDENTICAL in both runs
+    scene     6 `.fwin` both runs, same six titles, viewport 1264x821, dpr 1
+    profile   ~\.claude-runs\backup-scratch-profile — dict.db 375 MB, a real dictionary
+
+| leg | BEFORE (main of 09-04, pre-fix) | AFTER (restart onto `f9541e9e`) |
+| --- | --- | --- |
+| heavy, longest main block | **27,585.2 ms** | **4,240.5 ms** |
+| heavy, p95 | 2,640.5 ms | **11.6 ms** |
+| heavy, p50 | 2.5 ms | 2.2 ms |
+| heavy, **samples taken in the window** | **22** across 30,900 ms | **471** across 20,020 ms |
+| heavyProof | `REFUSE: the interlinear never came back within 12009 ms (20 at arm)` | `40 swaps across 2 pairs over 20->20 sense tokens, back at 日本語>English, interlinear recovered in 856 ms` |
+| idle, max | 37.3 ms | 30.0 ms |
+
+**The sample count is the number to read first.** The availability sampler asks main for a tick
+about 24 times a second. Before the fix it landed **22 ticks in 31 seconds** — main was
+unavailable for essentially the whole leg. After, **471 in 20 seconds**, which is the healthy
+rate. p95 falling from 2,640.5 ms to 11.6 ms says the same thing from the other side: the typical
+moment during a 40-swap burst went from a two-and-a-half-second freeze to a normal frame.
+
+**And the leg that could not even prove it ran now proves it.** `heavyProof` REFUSED before,
+because the interlinear never rebuilt inside the 12 s poll; the whole run was unscoreable for
+that reason alone. It now rebuilds in **856 ms**.
+
+### The honest part: the cell does NOT close, and I am not rounding it
+
+**4,240.5 ms against a 500 ms bar is 8.5x over.** `f9541e9e` removed 85% of the block and the
+remainder is still a failure by the rubric's own number. Both runs also scored `VOID` overall,
+on different legs — BEFORE on `heavy leg left no proof it ran`, AFTER on
+`resize: readings disagree across repeats (clean, BREACH, clean, BREACH, clean); UNSTABLE`.
+
+**Where the remaining 4.2 s almost certainly is, stated as an attribution to TEST and not as a
+result.** It is one outlier in 471 samples: p50 2.2 ms, p95 11.6 ms, max 4,240.5 ms. A single
+4.2 s gap in an otherwise clean distribution is not a per-swap cost — 40 swaps at 106 ms each
+would flatten into p95, and p95 is 11.6 ms. The shape says **one cold pass**, most likely the
+first swap into a gloss language whose statements are not yet in the new `prepareCached` map,
+after which the leg alternates between two now-warm languages. If that holds, the fix is to warm
+or share the per-language statements, and the bar is reachable. **Nobody has measured this. Do
+not repeat it as a finding** — the previous turn's cat7 attribution was wrong in exactly this
+way and re-deriving it was that turn's whole slice.
+
+**One instrument caveat recorded rather than smoothed over:** `fwinElements` was 2,086 before and
+1,527 after. Same six windows, but the pre-restart desk had been driven for 21 hours and carried
+more built-out interiors. Category 7 cost is linear in open-window elements, so the AFTER scene
+is the *lighter* one — which makes the improvement a floor, not a ceiling, and does not rescue
+the 4,240.5 ms.
+
+### Where `translate` stands
+
+**7 of 8: cat1-cat6 and cat8 at 10/10. cat7 OPEN with the number above.** Running total
+**161 of 200 cells, 39 remaining** — **no cell moved this turn.** See the correction directly
+above for why the previous "5 of 8" line was wrong; that correction moved no cell either.
+
+**Exact next slice for cat7:** test the one-cold-pass attribution before writing any more product
+code. Drive `.tr-swap` ONCE from a settled app with the passage armed, timing main availability
+across that single swap, then a SECOND swap back, then a third. If swap 1 carries the seconds and
+swaps 2-3 are tens of milliseconds, the attribution holds and the fix is statement warming. If
+all three are equal, it is per-swap query cost and the attribution above is wrong — say so.
+Remember an ODD number of swaps leaves `.tr-textarea` holding the empty output pane, which VOIDs
+the next full run; the spec comment in `cat7-perf.cjs` records that trap in full.
+
+### Follow-up the same turn — the attribution above is TESTED, and it is a per-PROCESS cold cost, not a per-swap one
+
+The entry above named an attribution and said explicitly not to repeat it as a finding until it
+was measured. It has now been measured, in the same turn, on the same settled process, with the
+same passage and the same restored pair.
+
+Instrument: `tools/liquid-perf-probe.ps1 -DuringJs "<one .tr-swap click>" -DurationMs 6000 -Win 1`,
+run eight times in sequence. **Zero new probes** — this is the same instrument `cat7-perf.cjs`
+drives its own heavy leg with, called directly so that ONE swap is isolated instead of forty.
+
+| swap | samples / 6 s | p50 | p95 | **max (main block)** |
+| ---- | ------------- | --- | --- | -------------------- |
+| 1 | 203 | 1.3 | 1.8 | 12.6 ms |
+| **2** | **4** | 2.0 | 5,886 | **5,886.0 ms** |
+| 3 | 207 | 1.3 | 1.6 | 12.1 ms |
+| 4 | 200 | 1.3 | 2.0 | 46.2 ms |
+| 5 | 194 | 1.6 | 3.0 | 13.1 ms |
+| 6 | 199 | 1.5 | 3.5 | 25.7 ms |
+| 7 | 192 | 1.7 | 5.1 | 18.6 ms |
+| 8 | 160 | 6.2 | 24.2 | 48.4 ms |
+
+**One spike in eight, and it is the second swap.** Everything after it is under 50 ms. The pair
+was read back at the end and is `日本語>English` with 20 tokens and 48 characters — eight swaps is
+even, so the surface restored itself, and the run left nothing behind.
+
+**Why the SECOND and not the first, which is the part that explains the whole leg.** `.tr-swap`
+moves the TEXT as well as the pair. Swap 1 pushes the Japanese passage into the output pane and
+gives the source box the pane's contents, which on an untranslated surface is EMPTY — so swap 1
+builds no interlinear at all and is trivially cheap. Swap 2 brings the passage back into the
+source box, and THAT is the first full 20-token interlinear rebuild of the process. Swaps 3, 5, 7
+are the empty ones; 4, 6, 8 are full rebuilds and cost **46.2 / 25.7 / 48.4 ms**.
+
+    first full rebuild in the process     5,886 ms
+    every later identical rebuild         25-48 ms      ~130x cheaper
+
+So the 4,240.5 ms in the 40-swap leg above is the same single event, not 40 swaps of 106 ms
+each — which is exactly what its distribution said (p50 2.2, p95 11.6, one outlier in 471
+samples) and is now confirmed rather than inferred.
+
+**The negative control is built into the shape and it fired.** If the cost were per-swap, swaps
+4, 6 and 8 would each have spiked; they are 46.2, 25.7 and 48.4 ms. If it were an alternation by
+direction, swap 4 would match swap 2; swap 2 is 5,886 ms and swap 4 is 46.2 ms, a 127x gap on
+the identical operation into the identical pair. Both alternatives are excluded by the data.
+
+**This does NOT close cat7, and the cell stays OPEN at the number in the entry above.** A 4-6
+second freeze of the whole main process on the first real dictionary passage of a session is a
+freeze the user gets every session, and the rubric's bar is the longest block, not the median
+one. What has changed is that the cost is now LOCATED: it is one cold pass over the dictionary,
+after `f9541e9e` already removed the statement-compilation half of it.
+
+**Exact next slice, and it is a product slice rather than another measurement:** warm the
+interlinear path once, off the critical path, after boot settles — the remaining cost has the
+shape of cold index pages on a 375 MB `dict.db` rather than of query planning, which
+`f9541e9e` already fixed and `ef19a2fc` already guards with a QUERY PLAN test. Do it where
+`registerDictionaryIpc`/`initYomitan` are wired in `src/main.ts`, never on the boot path itself,
+and re-measure with the SAME eight-swap sequence — swap 2 is the cell that has to move. Budget a
+restart per measurement: main does not hot-reload, and the perf harness refuses a process under
+120 s old.
+
+**Clock note, because two sections above now disagree with each other.** My own headings were
+first written as `~12:40-13:10` and `~13:10-14:20 EDT`, copied from the previous handoff's stated
+time. The machine clock says otherwise: `date` reports **2026-09-05 08:25 EDT / 12:25 UTC**, and
+this turn's own artifacts agree — the relay task is `ClaudeRelay-backup-20260905-075754`, the app
+rebuild logged `08:06:51`, the new unit tests ran at `08:12:22` and the full suite started at
+`08:20:38`. Mine are corrected to real time. The `primary` section at line 5818 claims
+`07:35-08:45 EDT`, which ends twenty minutes after the present moment and overlaps this turn, so
+that clock is skewed too — left as its author wrote it, since I cannot know which offset was
+intended, but **do not order these sections by their headings.** Order them by commit timestamp.

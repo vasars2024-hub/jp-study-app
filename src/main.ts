@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { registerLibraryIpc, registerLocalFileProtocol, ensureLibrary, libraryRoot, listLibraryItems, onLibraryItemsAdded } from './main/library';
+import { loadAfterCacheClear } from './main/bootLoad';
 import { registerReadingListsIpc } from './main/readingListsIpc';
 import { registerReadingListsLateBinding } from './main/readingListsBinding';
 import { registerReadingRemindersIpc } from './main/readingListsReminders';
@@ -791,7 +792,22 @@ const createWindow = (restore?: {
   attachNavGuards(mainWindow);
 
   if (isDevServer()) {
-    mainWindow.webContents.session.clearCache().finally(() => mainWindow!.loadURL(rendererUrl()));
+    // The cache clear keeps a stale renderer bundle from surviving a rebuild, but
+    // it runs through the network service — and when that crashes mid-boot the
+    // promise never settles, so `.finally()` never ran and the window sat blank
+    // for the life of the process (observed live 2026-09-05; see `bootLoad.ts`).
+    // Showing the app is not optional; clearing the cache is.
+    const boot = mainWindow.webContents.session;
+    void loadAfterCacheClear(
+      () => boot.clearCache(),
+      () => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(rendererUrl());
+      },
+    ).then((r) => {
+      if (r.reason !== 'cleared') {
+        console.log(`[main] boot: cache clear ${r.reason} after ${r.waitedMs} ms; loading anyway`);
+      }
+    });
     mainWindow.webContents.openDevTools({ mode: 'detach' });
     forwardRendererConsole(mainWindow);
   } else {
