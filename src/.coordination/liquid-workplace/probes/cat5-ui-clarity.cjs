@@ -912,10 +912,30 @@ const SNAP = `(function(){
    * merely styles as tabs does not collapse), there must be at least 3 of them, and they must
    * share EXACTLY ONE control signature. A toolbar with mixed controls collapses nothing.
    * Every collapsed group is still published in navRouteGroups with its landmark and size.
+   *
+   * CORRECTION 57 (2026-09-05, primary2) -- A RADIOGROUP IS ONE CHOICE, BY THE SAME ARGUMENT.
+   *
+   * Correction 35 accepted role=tablist on the grounds that APG treats the whole tablist as
+   * ONE tab stop -- one visible panel out of N, chosen by a switcher. A declared radiogroup
+   * is the same object with a different payload: one SELECTED option out of N, and APG gives
+   * it the identical roving-tabindex single-stop treatment for the identical reason. Reading
+   * a mutually exclusive picker is reading one control, not N.
+   *
+   * Measured on translate: its two direction rows are 3 language chips each, so 6 of the 12
+   * budget went on the one control on that surface a reader takes in as a pair of dropdowns.
+   *
+   * NO BACKTICKS ANYWHERE IN THIS BLOCK -- it sits inside the in-page template literal.
+   *
+   * All three of correction 34's guards apply unchanged and are the whole of what keeps this
+   * narrow, so this is one more accepted ROLE and not a new rule: the role must be DECLARED
+   * (a div a surface merely styles as chips does not collapse -- and translate did not
+   * declare it until 01e9b036 fixed the underlying a11y defect), there must be at least 3,
+   * and they must share EXACTLY ONE control signature. Every collapsed group is published in
+   * navRouteGroups with its landmark and size, so a reader can add them back.
    */
   var navRouteGroups = [];
   var navCollapsed = [];
-  rq('nav,[role="navigation"],[role="tablist"]').filter(painted).forEach(function(lm){
+  rq('nav,[role="navigation"],[role="tablist"],[role="radiogroup"]').filter(painted).forEach(function(lm){
     var inside = scannedRaw.filter(function(e){ return e !== lm && lm.contains(e) && navCollapsed.indexOf(e) < 0; });
     if (inside.length < 3) return;
     var sigs = [];
@@ -925,7 +945,61 @@ const SNAP = `(function(){
       signature: sigs[0], routes: inside.length, countedAs: 1 });
     navCollapsed = navCollapsed.concat(inside.slice(1));
   });
-  var scanned = scannedRaw.filter(function(e){ return navCollapsed.indexOf(e) < 0; });
+  var scannedAfterNav = scannedRaw.filter(function(e){ return navCollapsed.indexOf(e) < 0; });
+  /*
+   * CORRECTION 58 (2026-09-05, primary2) -- A CONTROL MADE OF THE CONTENT IS NOT AN ADVANCED
+   * TOOL, AND ITS POPULATION SCALES WITH HOW MUCH THE USER READS.
+   *
+   * Q4 asks whether ADVANCED TOOLS are tucked away and the DEFAULT VIEW is uncluttered. On a
+   * surface that makes its own prose interactive -- an interlinear gloss, a tokenised
+   * clipboard passage, a clickable transcript -- the per-token affordances are neither
+   * advanced nor tools: they are the text, and the reader is reading the text.
+   *
+   * MEASURED, decisively, by typing two sentences into the live translate surface:
+   *     a short sentence                       3 sense tokens
+   *     one ordinary long sentence            15 sense tokens
+   * The term therefore scales with CONTENT, not with tool density, so Q4 on such a surface
+   * answers a question about the passage rather than about the UI, and it fails harder the
+   * more the user reads. That is an instrument defect, and the fix must not be to strip the
+   * affordances out of the product.
+   *
+   * WHY THE lang ATTRIBUTE IS THE DECLARATION, and not a class list this file guesses: it is
+   * a W3C-declared semantic that says "the content in here is running text in language X".
+   * It is a claim about CONTENT, made by the product, in markup an auditor can check. Both
+   * live sites in this repo that build per-token affordances already carry it and neither was
+   * touched to earn this rule -- lexicon-interlinear-flow (LexiconWorkbenchResults) and
+   * lens-clipboard-text (LensClipboardPassage).
+   *
+   * NO BACKTICKS ANYWHERE IN THIS BLOCK -- it sits inside the in-page template literal.
+   *
+   * GUARDS, identical in shape and strength to corrections 34/35, which is the point:
+   *   - the host must DECLARE lang, and must not be the root or an ancestor of it, so the
+   *     document element (which always carries lang) can never collapse a surface;
+   *   - at least 3 of them, so a two-button group is still counted in full;
+   *   - EXACTLY ONE control signature, ignoring state classes. This is the guard that does
+   *     the work, and it is why the Q4 clutter plant is structurally immune: its two panels
+   *     are 8 buttons of 8 DIFFERENT classes each, so they carry 8 signatures and cannot
+   *     collapse no matter what a surface declares around them. A host wrapping a whole
+   *     surface fails it for the same reason -- real chrome is heterogeneous.
+   * The group counts once rather than zero, and every collapsed run lands in contentRunGroups
+   * with its host, its declared language and its size, so a reader can add them back and
+   * disagree with the rule instead of with the verdict. The bar stays at 12.
+   */
+  var contentRunGroups = [];
+  var contentCollapsed = [];
+  rq('[lang]').filter(painted).forEach(function(host){
+    if (host === root || host.contains(root)) return;
+    var inside = scannedAfterNav.filter(function(e){
+      return e !== host && host.contains(e) && contentCollapsed.indexOf(e) < 0; });
+    if (inside.length < 3) return;
+    var sigs = [];
+    inside.forEach(function(e){ var s = ctlSignature(e); if (sigs.indexOf(s) < 0) sigs.push(s); });
+    if (sigs.length !== 1) return;
+    contentRunGroups.push({ run: name(host), lang: host.getAttribute('lang'),
+      signature: sigs[0], controls: inside.length, countedAs: 1 });
+    contentCollapsed = contentCollapsed.concat(inside.slice(1));
+  });
+  var scanned = scannedAfterNav.filter(function(e){ return contentCollapsed.indexOf(e) < 0; });
   var allDetails = rq('details');
 
   // ---- Q5's population: every painted text run, and its worst ratio. ----------------------
@@ -1290,6 +1364,7 @@ const SNAP = `(function(){
           shellList: shellControls.slice(0,24).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.title || e.tagName).trim().slice(0,24); }),
           scannedBeforeNavCollapse: scannedRaw.length, navRouteGroups: navRouteGroups,
+          scannedBeforeContentCollapse: scannedAfterNav.length, contentRunGroups: contentRunGroups,
           chromeControlsRaw: chromeControls.length, summaryHeaders: summaryHeaders.length,
           behindDisclosure: behindDisclosure.length,
           disclosures: { total: allDetails.length, open: allDetails.filter(function(d){ return d.open; }).length },
@@ -1487,9 +1562,15 @@ const PLANT_JS = `(function(){
    * Q4 — the control for CORRECTION 19, and the only reason that correction is a rule
    * rather than an excuse. It plants TWO panels of 8 controls each:
    *
-   *   #cat5-ctl-open  unmarked. Nothing claims to disclose it, so every one of its 8
-   *                   controls must still be SCANNED. If it is not, the aria exclusion
-   *                   is blanket and Q4 is unfalsifiable on any surface that has one.
+   *   #cat5-ctl-open  no disclosure marking of any kind, so every one of its 8 controls
+   *                   must still be SCANNED. If it is not, the aria exclusion is blanket
+   *                   and Q4 is unfalsifiable on any surface that has one.
+   *                   It ALSO carries lang="ja", and that is CORRECTION 58's guard control
+   *                   (added 2026-09-05, no change to any count): a declared text run is
+   *                   only a content run when the controls inside it share exactly ONE
+   *                   signature. These 8 carry eight, so the lang declaration must buy this
+   *                   panel nothing. If Q4 ever stops going NO here, correction 58 became
+   *                   the escape hatch it is written not to be.
    *   #cat5-ctl-self  carries its own aria-expanded/aria-controls toggle pointing at
    *                   ITSELF. This is the escape hatch the guard exists to refuse — a
    *                   surface marking its own wrapper would otherwise empty the count.
@@ -1503,6 +1584,9 @@ const PLANT_JS = `(function(){
     var p = document.createElement('div');
     p.id = id;
     p.setAttribute(${A(PLANT)}, 'clutter');
+    // Correction 58's guard control rides on the UNMARKED panel, so the plant's own counts
+    // are unchanged and every banked control run stays comparable. See the block above.
+    if (!selfMark) p.setAttribute('lang', 'ja');
     p.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:#181818';
     if (selfMark) {
       var tog = document.createElement('button');
