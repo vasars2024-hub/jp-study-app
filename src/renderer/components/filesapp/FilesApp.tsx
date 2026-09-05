@@ -30,6 +30,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent,
@@ -40,6 +41,7 @@ import { summarizeFolder } from './folderSummary';
 import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
 import { LiquidDock } from '../liquid/LiquidDock';
+import { LiquidInspector } from '../liquid/LiquidInspector';
 import { type RailItem } from '../liquid/AdaptiveRail';
 import VirtualList from '../VirtualList';
 import {
@@ -547,6 +549,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     );
     return sortItems(filtered, sortColumn, sortDirection);
   }, [allItems, scope, scopedCollection, scopedSmart, query, sortColumn, sortDirection]);
+
+  /** The selected row, so closing the inspector returns focus to what opened it. */
+  const selectedRowRef = useRef<HTMLElement | null>(null);
 
   const selected = useMemo(
     () => visible.find((i) => i.id === selectedId) ?? null,
@@ -1771,6 +1776,9 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           <div
             role="row"
             className="fa-row"
+            // Only the SELECTED row takes the ref, so closing the inspector
+            // returns focus to the row that opened it rather than to body.
+            ref={item.id === selectedId ? selectedRowRef : undefined}
             // VirtualList marks its own slots `presentation` in grid mode, so the
             // real row count CANNOT come from it — a 4,000-row list windowed to 20
             // announces twenty rows unless the caller supplies these. Row 1 is the
@@ -2045,9 +2053,35 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
    */
   const folderSummary = useMemo(() => summarizeFolder(visible), [visible]);
 
+  /*
+   * An inspector that opens can be closed -- CLAUDE.md's cross-surface rule, and
+   * the one contract `LiquidInspector` exists to enforce, which is why `onClose`
+   * and `closeLabel` are required props on it rather than options.
+   *
+   * This app had no close path at all. `setSelectedId(null)` was called from
+   * NOWHERE: one click opened the details pane and it stayed for the session,
+   * because the only way to change it was to select a different row. The folder
+   * summary -- totals, the broken-enumerator note, and the unindexed-stream
+   * diagnostic -- became unreachable after the first click, which is a worse
+   * outcome than the missing button, since that pane is where the index admits
+   * what it cannot see.
+   *
+   * `autoFocus` is OFF, deliberately and against the primitive's default: a row
+   * list drives this, so pulling focus to the heading on every selection would
+   * take a keyboard user out of the list on every arrow press. Focus is returned
+   * on CLOSE instead, to the row that opened it, which is the half that actually
+   * matters here -- without it focus falls to `document.body` and the next Tab
+   * restarts the window from the top.
+   */
   const inspector = selected && mineability ? (
-    <div className="fa-details">
-      <h2 className="fa-details-title">{selected.name}</h2>
+    <LiquidInspector
+      className="fa-details"
+      title={selected.name}
+      closeLabel={t('filesApp.details.close')}
+      onClose={() => setSelectedId(null)}
+      returnFocusTo={selectedRowRef}
+      autoFocus={false}
+    >
       <dl className="fa-details-list">
         <dt>{t('filesApp.column.kind')}</dt>
         <dd>{t(`filesApp.kind.${selected.kind}`)}</dd>
@@ -2194,7 +2228,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
           {revealNote}
         </p>
       ) : null}
-    </div>
+    </LiquidInspector>
   ) : (
     <div className="fa-details fa-details-summary">
       <h2 className="fa-details-title">{scopeLabel ?? t('filesApp.summary.title')}</h2>

@@ -617,6 +617,68 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
    * these stub the rect rather than mock ResizeObserver: the hook measures once
    * from `getBoundingClientRect()` on mount, which is the path that runs here.
    */
+  /*
+   * An inspector that opens can be closed. `setSelectedId(null)` was called from
+   * NOWHERE before this: one click opened the details pane and it stayed for the
+   * session, because the only way to change it was to select a different row.
+   * That made the folder summary -- totals, the broken-enumerator note and the
+   * unindexed-stream diagnostic -- unreachable after the first click, which is
+   * worse than the missing button, since that pane is where the index admits
+   * what it cannot see.
+   */
+  describe('the details pane can be closed again', () => {
+    const openRow = async (name: string) => {
+      await mount(<FilesApp />);
+      await settle();
+      await click(bodyRows().find((r) => r.textContent?.includes(name)));
+    };
+
+    it('offers a close control, and closing returns to the folder summary', async () => {
+      await openRow('JMdict');
+      expect(host?.querySelector('.lq-inspector-title')?.textContent).toBe('JMdict');
+      expect(host?.querySelector('.fa-details-summary')).toBeNull();
+
+      const close = host?.querySelector('.lq-inspector-close') as HTMLElement | null;
+      expect(close?.getAttribute('aria-label')).toBe('Close details');
+      await click(close);
+
+      // Back to the summary -- the pane that carries the honest index states.
+      expect(host?.querySelector('.lq-inspector-title')).toBeNull();
+      expect(host?.querySelector('.fa-details-summary')).not.toBeNull();
+      expect(host?.querySelector('.fa-summary-unindexed')).not.toBeNull();
+      // And the row is no longer marked selected, so the list agrees with it.
+      expect(host?.querySelector('.fa-row[data-selected="true"]')).toBeNull();
+    });
+
+    it('Escape inside the inspector closes it too', async () => {
+      await openRow('JMdict');
+      const panel = host?.querySelector('.lq-inspector') as HTMLElement;
+      await act(async () => {
+        panel.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+        );
+      });
+      expect(host?.querySelector('.fa-details-summary')).not.toBeNull();
+    });
+
+    it('closing returns focus to the row that opened it, not to body', async () => {
+      // Without `returnFocusTo` focus falls to `document.body` and the next Tab
+      // restarts the window from the top.
+      await openRow('JMdict');
+      await click(host?.querySelector('.lq-inspector-close') as HTMLElement);
+      expect(document.activeElement?.className).toContain('fa-row');
+      expect(document.activeElement?.textContent).toContain('JMdict');
+    });
+
+    it('CONTROL: selecting does NOT steal focus from the list', async () => {
+      // `LiquidInspector` focuses its heading on open by default, which would
+      // take a keyboard user out of the row list on every arrow press. This app
+      // turns that off on purpose, so the default must not creep back in.
+      await openRow('JMdict');
+      expect(document.activeElement?.className).not.toContain('lq-inspector-title');
+    });
+  });
+
   describe('keeps its navigation when the window is too narrow for a rail', () => {
     let rect: (this: Element) => DOMRect;
     const widthIs = (px: number) => {
@@ -740,7 +802,7 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
       expect(hasText('Also reachable in')).toBe(false);
       // ...and the surrounding details list still rendered, so the absence above
       // is the line's own decision and not an unmounted inspector.
-      expect(host?.querySelector('.fa-details-title')?.textContent)
+      expect(host?.querySelector('.lq-inspector-title')?.textContent)
         .toBe('Reachability Fixture');
     });
 
@@ -776,7 +838,7 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
       // from under the next test. Five gate-5 assertions died that way once.
       await openFixture('not-a-real-store');
       expect(host?.querySelector('.fa-details-also')).toBeNull();
-      expect(host?.querySelector('.fa-details-title')?.textContent)
+      expect(host?.querySelector('.lq-inspector-title')?.textContent)
         .toBe('Reachability Fixture');
     });
   });
@@ -1154,7 +1216,7 @@ describe('Files app — context entry from another page (gate 5)', () => {
     expect(names()).toEqual(['A Novel', 'Another Novel']);
     expect(railButton(/^Books$/)?.getAttribute('data-selected')).toBe('true');
     // ...and the inspector opens on the book the caller actually meant.
-    expect(host?.querySelector('.fa-details-title')?.textContent).toBe('A Novel');
+    expect(host?.querySelector('.lq-inspector-title')?.textContent).toBe('A Novel');
   });
 
   it('clearing the scope reveals the whole tree in the SAME window', async () => {

@@ -312,7 +312,7 @@ describe('gate 18 — Favorites', () => {
     await click(railNode('Dictionaries'));
     await click(favoriteNode('Episode 01'));
 
-    expect(q('.fa-details-title')?.textContent).toBe('Episode 01');
+    expect(q('.lq-inspector-title')?.textContent).toBe('Episode 01');
   });
 
   it('a pinned location leads back to itself', async () => {

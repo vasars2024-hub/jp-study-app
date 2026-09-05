@@ -10806,6 +10806,7 @@ export const ja: Catalog = {
   'filesApp.details.location': '場所',
   'filesApp.details.source': 'インデックス元',
   'filesApp.dock.label': 'ファイルのナビゲーションとステータス',
+  'filesApp.details.close': '詳細を閉じる',
   'filesApp.details.alsoIn': '他からも開けます',
   'filesApp.details.alsoInGlobal': 'どこからでも — ファイル専用ではありません。',
   'filesApp.details.onlyHere': 'ここだけです。ファイルへ移動したため、他に置き場所はありません。',

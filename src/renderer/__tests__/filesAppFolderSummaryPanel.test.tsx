@@ -321,7 +321,7 @@ describe('files — the inspector with nothing selected summarises the folder', 
     // Selecting swaps the whole panel for the item inspector.
     await click(all('[role="row"]').find((r) => !r.classList.contains('fa-head')));
     expect(q('.fa-details-summary')).toBeNull();
-    expect(q('.fa-details-title')?.textContent).toBe('alpha.mkv');
+    expect(q('.lq-inspector-title')?.textContent).toBe('alpha.mkv');
 
     // Leaving the folder drops the selection, and the summary comes back.
     await openFolder('Audio');
