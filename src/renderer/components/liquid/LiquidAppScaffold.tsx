@@ -65,6 +65,23 @@ type ScaffoldProps = Omit<HTMLAttributes<HTMLElement>, 'children'> & {
   inspector?: ReactNode;
   /** Transport / command sheet pinned to the foot of the spine. */
   dock?: ReactNode;
+  /**
+   * The dock to render INSTEAD of `dock` once the rail has left the spine.
+   *
+   * `railInSpine` exists so a caller knows when to relocate its routes, but a
+   * caller had no way to learn the width the scaffold settled on — the observer
+   * is in here — so the honest fallback was unbuildable and the one product
+   * caller shipped a routeless status bar as its dock. Below `medium` that left
+   * its whole navigation with no home at all.
+   *
+   * Passing it here rather than exporting the observer keeps ONE reader of the
+   * breakpoint. Two observers on the same element settle a frame apart, and a
+   * dock that swaps a frame after the rail vanishes is a visible flash of a
+   * surface with no navigation.
+   *
+   * Omitted, nothing changes: `dock` renders at every width, exactly as before.
+   */
+  compactDock?: ReactNode;
   /** Icons-only rail. Ignored when there is no rail. */
   railCollapsed?: boolean;
   /**
@@ -115,6 +132,7 @@ export function LiquidAppScaffold({
   children,
   inspector,
   dock,
+  compactDock,
   railCollapsed,
   widthClass,
   railLabel,
@@ -132,6 +150,11 @@ export function LiquidAppScaffold({
   const railHidden = !railInSpine(effective);
   const collapsed = Boolean(railCollapsed) || effective === 'medium';
 
+  // One reader of the breakpoint, so the rail and its fallback can never both
+  // be absent for a frame. `compactDock` REPLACES `dock` rather than joining it:
+  // two docks would be two landmarks reading the same status twice.
+  const activeDock = railHidden && compactDock !== undefined ? compactDock : dock;
+
   return (
     <As
       ref={ref}
@@ -140,7 +163,8 @@ export function LiquidAppScaffold({
       data-has-rail={rail && !railHidden ? 'true' : undefined}
       data-has-toolbar={toolbar ? 'true' : undefined}
       data-has-inspector={inspector ? 'true' : undefined}
-      data-has-dock={dock ? 'true' : undefined}
+      data-has-dock={activeDock ? 'true' : undefined}
+      data-dock-compact={railHidden && compactDock !== undefined ? 'true' : undefined}
       data-rail-collapsed={rail && !railHidden && collapsed ? 'true' : undefined}
       {...rest}
     >
@@ -166,9 +190,9 @@ export function LiquidAppScaffold({
           {inspector}
         </aside>
       ) : null}
-      {dock ? (
+      {activeDock ? (
         <div className="lq-scaffold-dock lq-liquid" data-lq-role="liquid" data-highlight="true">
-          {dock}
+          {activeDock}
         </div>
       ) : null}
     </As>

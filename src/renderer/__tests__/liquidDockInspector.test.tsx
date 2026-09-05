@@ -108,6 +108,74 @@ describe('LiquidDock — the rail’s routes survive the compact reflow', () => 
     expect(container.querySelectorAll('nav').length).toBe(1);
   });
 
+  it('swaps to `compactDock` exactly when the rail leaves the spine', () => {
+    // `railInSpine` told a caller WHEN to relocate its routes but never told it
+    // the width the scaffold settled on -- the observer is inside the scaffold --
+    // so the honest fallback was unbuildable, and the one product caller shipped
+    // a routeless status bar as its dock. `compactDock` closes that: one reader
+    // of the breakpoint, so the rail and its fallback are never both absent.
+    const seen: Record<string, { rail: boolean; dock: string | null; flag: string | null }> = {};
+    for (const widthClass of LIQUID_WIDTH_CLASSES) {
+      const container = render(
+        <LiquidAppScaffold
+          widthClass={widthClass}
+          railLabel="Sections"
+          rail={<AdaptiveRail items={ROUTES} />}
+          dock={<p data-dock="wide">status only</p>}
+          compactDock={<LiquidDock label="Transport" routes={ROUTES} routesLabel="Sections" />}
+        >
+          body
+        </LiquidAppScaffold>,
+      );
+      seen[widthClass] = {
+        rail: container.querySelector('.lq-scaffold-rail') !== null,
+        dock: container.querySelector('[data-dock="wide"]') ? 'wide' : (
+          container.querySelector('.lq-dock-route') ? 'compact' : null
+        ),
+        flag: container.querySelector('.lq-scaffold')?.getAttribute('data-dock-compact') ?? null,
+      };
+    }
+    expect(seen).toEqual({
+      compact: { rail: false, dock: 'compact', flag: 'true' },
+      medium: { rail: true, dock: 'wide', flag: null },
+      wide: { rail: true, dock: 'wide', flag: null },
+    });
+  });
+
+  it('is exactly one navigation landmark at every width, never zero and never two', () => {
+    // The whole point of swapping rather than adding. Two docks would announce
+    // the same routes twice; no fallback would announce them nowhere.
+    for (const widthClass of LIQUID_WIDTH_CLASSES) {
+      const container = render(
+        <LiquidAppScaffold
+          widthClass={widthClass}
+          railLabel="Sections"
+          rail={<AdaptiveRail items={ROUTES} />}
+          dock={<p>status only</p>}
+          compactDock={<LiquidDock label="Transport" routes={ROUTES} routesLabel="Sections" />}
+        >
+          body
+        </LiquidAppScaffold>,
+      );
+      expect(container.querySelectorAll('nav').length, widthClass).toBe(1);
+      expect(container.querySelectorAll('.lq-scaffold-dock').length, widthClass).toBe(1);
+    }
+  });
+
+  it('CONTROL: omitting `compactDock` leaves every width exactly as it was', () => {
+    // The prop must be additive. A caller that never heard of it keeps its dock
+    // at compact -- otherwise this "repair" would delete a status bar app-wide.
+    for (const widthClass of LIQUID_WIDTH_CLASSES) {
+      const container = render(
+        <LiquidAppScaffold widthClass={widthClass} dock={<p data-dock="wide">status only</p>}>
+          body
+        </LiquidAppScaffold>,
+      );
+      expect(container.querySelector('[data-dock="wide"]'), widthClass).not.toBeNull();
+      expect(container.querySelector('.lq-scaffold')?.getAttribute('data-dock-compact')).toBeNull();
+    }
+  });
+
   it('tells the caller when to stop handing it routes, so one nav does not become two', () => {
     // Measured live before this existed: passing routes to the dock at every
     // width renders two navigation landmarks for one set of routes.

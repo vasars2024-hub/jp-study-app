@@ -11267,6 +11267,7 @@ export const en: Catalog = {
   'filesApp.details.label': 'Details',
   'filesApp.details.location': 'Location',
   'filesApp.details.source': 'Indexed by',
+  'filesApp.dock.label': 'Files navigation and status',
   'filesApp.details.alsoIn': 'Also reachable in',
   'filesApp.details.alsoInGlobal': 'Everywhere — this is not only in Files.',
   'filesApp.details.onlyHere': 'Only here. This moved into Files and has no other home.',

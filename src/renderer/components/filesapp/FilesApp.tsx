@@ -39,6 +39,8 @@ import { LANG_TAGS } from '../../../shared/i18n/core';
 import { summarizeFolder } from './folderSummary';
 import { formatDate, formatSize } from './format';
 import { LiquidAppScaffold } from '../liquid/LiquidAppScaffold';
+import { LiquidDock } from '../liquid/LiquidDock';
+import { type RailItem } from '../liquid/AdaptiveRail';
 import VirtualList from '../VirtualList';
 import {
   FILES_SORT_COLUMNS,
@@ -65,6 +67,13 @@ import { unindexedNotebookStreams } from '../../../shared/filesApp/notebookAbsor
  * it per render would be work with no possible different answer.
  */
 const UNINDEXED_STREAMS = unindexedNotebookStreams();
+
+/**
+ * The compact dock's id for "Everything", which is a rail ROOT rather than a
+ * category. Cannot collide with a real one: every `FILES_TREE` id is a slash
+ * path, and the leading `#` is not legal in one.
+ */
+const ROOT_ROUTE_ID = '#root';
 // The mine chain moved out of this file for gate 10: the Flashcards Mining
 // surface hosts the same catalogue, and two copies of the walk would drift.
 import { mineFilesItem, type MineState, type SettledMineState } from './filesMineChain';
@@ -2292,7 +2301,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     </span>
   ) : null;
 
-  const dock = (
+  const statusLine = (
     <div className="fa-status" role="status">
       {onPanel ? (
         // "0 items, total 0 B" is true of a panel and says nothing; the honest
@@ -2324,6 +2333,77 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
     </div>
   );
 
+  const dock = statusLine;
+
+  /*
+   * The compact fallback, and it is a REPAIR, not a flourish.
+   *
+   * `LiquidAppScaffold` drops the rail from the spine entirely below 720px --
+   * its own comment says the app "is expected to surface the same routes from
+   * its dock or toolbar" -- and this app's dock was a status bar carrying no
+   * routes at all. So under 720px the whole folder tree had no home: not
+   * collapsed, not behind a menu, absent. That is the exact regression
+   * FILES_APP_PLAN's anti-gatekeeper rule forbids, arrived at from the other
+   * direction: a capability that works at 1200px and not at 700px is lost just
+   * as surely as one that moved.
+   *
+   * ROOT_ROUTE_ID is not a category id and cannot collide with one: every
+   * FILES_TREE id is a slash path. The panel leaves keep their `>` mark's
+   * meaning by carrying no badge -- they hold no enumerable rows, so a 0 there
+   * would be an honest number answering a question nobody asked, the same
+   * reasoning the rail records.
+   *
+   * The smart-folder and collection sections are deliberately NOT relocated:
+   * they are user-created and unbounded, a dock is short-lived horizontal
+   * space, and the derived tree is what a user needs to get anywhere at all.
+   * Widening the window restores them, which is the reversible half.
+   */
+  const compactRoutes: RailItem[] = [
+    {
+      id: ROOT_ROUTE_ID,
+      label: t('filesApp.tree.everything'),
+      badge: allItems.length.toLocaleString(LANG_TAGS[lang]),
+    },
+    ...FILES_TREE.map((node) => ({
+      id: node.id,
+      label: t(node.labelKey),
+      badge: isFilesPanelCategory(node.id)
+        ? undefined
+        : countFor(node.id).toLocaleString(LANG_TAGS[lang]),
+    })),
+  ];
+
+  const compactActiveRouteId =
+    folderSelection.kind === 'root'
+      ? ROOT_ROUTE_ID
+      : folderSelection.kind === 'derived'
+        ? folderSelection.id
+        : undefined;
+
+  const onSelectCompactRoute = (id: string) => {
+    // The rail's own two handlers, not a third path: root clears every scope,
+    // a derived node sets one and drops the search highlight.
+    setCollectionScope(null);
+    setSmartScope(null);
+    if (id === ROOT_ROUTE_ID) {
+      setScope(null);
+      return;
+    }
+    setScope(id);
+    setFocusCardId(null);
+  };
+
+  const compactDock = (
+    <LiquidDock
+      label={t('filesApp.dock.label')}
+      routes={compactRoutes}
+      routesLabel={t('filesApp.tree.label')}
+      activeRouteId={compactActiveRouteId}
+      onSelectRoute={onSelectCompactRoute}
+      status={statusLine}
+    />
+  );
+
   return (
     <>
     <LiquidAppScaffold
@@ -2337,6 +2417,7 @@ export function FilesApp({ initialScope = null, initialFocusItemId = null }: Fil
       inspector={onPanel ? undefined : inspector}
       inspectorLabel={t('filesApp.details.label')}
       dock={dock}
+      compactDock={compactDock}
     >
       {canvas}
     </LiquidAppScaffold>

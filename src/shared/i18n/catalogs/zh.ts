@@ -10712,6 +10712,7 @@ export const zh: Catalog = {
   'filesApp.details.label': '详情',
   'filesApp.details.location': '位置',
   'filesApp.details.source': '索引来源',
+  'filesApp.dock.label': '文件导航与状态',
   'filesApp.details.alsoIn': '也可在此处打开',
   'filesApp.details.alsoInGlobal': '随处可用 — 并非仅限于文件。',
   'filesApp.details.onlyHere': '仅在此处。它已迁入文件，没有其他位置。',

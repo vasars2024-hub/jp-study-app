@@ -609,6 +609,83 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
    * arms, driven through the real component, and the fourth is the control: an
    * item with no recorded prior route renders NO row rather than an empty one.
    */
+  /*
+   * The compact-width repair. `LiquidAppScaffold` drops the rail from the spine
+   * entirely below 720px, and this app's dock was a status bar with no routes,
+   * so under 720px the folder tree had NO home -- not collapsed, not behind a
+   * menu, absent. jsdom reports width 0, which the scaffold reads as `wide`, so
+   * these stub the rect rather than mock ResizeObserver: the hook measures once
+   * from `getBoundingClientRect()` on mount, which is the path that runs here.
+   */
+  describe('keeps its navigation when the window is too narrow for a rail', () => {
+    let rect: (this: Element) => DOMRect;
+    const widthIs = (px: number) => {
+      rect = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function stub(this: Element) {
+        return { ...rect.call(this), width: px } as DOMRect;
+      };
+    };
+    afterEach(() => {
+      if (rect) Element.prototype.getBoundingClientRect = rect;
+    });
+
+    const dockRoutes = () =>
+      Array.from(host?.querySelectorAll('.lq-scaffold-dock .lq-dock-route') ?? []);
+
+    it('relocates the folder routes into the dock once the rail is gone', async () => {
+      widthIs(500);
+      await mount(<FilesApp />);
+      await settle();
+
+      // The scaffold really did drop the rail at this width...
+      expect(host?.querySelector('.lq-scaffold')?.getAttribute('data-width')).toBe('compact');
+      expect(host?.querySelector('.lq-scaffold-rail')).toBeNull();
+      // ...and the routes are still there, in the dock, as one nav landmark.
+      const ids = dockRoutes().map((el) => el.getAttribute('data-item-id'));
+      expect(ids.length).toBeGreaterThan(5);
+      expect(ids[0]).toBe('#root');
+      expect(ids).toContain('sources/video');
+      expect(host?.querySelector('.lq-scaffold')?.getAttribute('data-dock-compact')).toBe('true');
+      // The status readout survived the swap rather than being replaced by it.
+      expect(host?.querySelector('.lq-scaffold-dock .fa-status')).not.toBeNull();
+    });
+
+    it('a relocated route actually navigates -- it is a route, not decoration', async () => {
+      widthIs(500);
+      await mount(<FilesApp />);
+      await settle();
+      expect([...names()].sort()).toEqual(['Episode 01', 'Episode 02', 'JMdict', 'abc123']);
+
+      const video = dockRoutes().find((el) => el.getAttribute('data-item-id') === 'sources/video');
+      await click(video as HTMLElement);
+      // Scoped, exactly as the rail button would have.
+      expect(names()).toEqual(['Episode 01', 'Episode 02']);
+      expect(video?.getAttribute('aria-current')).toBe('page');
+
+      // ...and the way back out is reachable from the same dock.
+      const root = dockRoutes().find((el) => el.getAttribute('data-item-id') === '#root');
+      await click(root as HTMLElement);
+      expect([...names()].sort()).toEqual(['Episode 01', 'Episode 02', 'JMdict', 'abc123']);
+    });
+
+    it('CONTROL: at a normal width the rail is back and the dock carries NO routes', async () => {
+      // Without this a dock that showed routes at every width would pass every
+      // assertion above while rendering two navigation landmarks for one set of
+      // routes -- the exact failure `railInSpine` was written to prevent.
+      widthIs(1400);
+      await mount(<FilesApp />);
+      await settle();
+
+      expect(host?.querySelector('.lq-scaffold')?.getAttribute('data-width')).toBe('wide');
+      expect(host?.querySelector('.lq-scaffold-rail')).not.toBeNull();
+      expect(dockRoutes()).toHaveLength(0);
+      expect(host?.querySelector('.lq-scaffold')?.getAttribute('data-dock-compact')).toBeNull();
+      expect(host?.querySelectorAll('.lq-scaffold nav')).toHaveLength(1);
+      // The status readout is unchanged at this width, so the swap cost nothing.
+      expect(host?.querySelector('.lq-scaffold-dock .fa-status')).not.toBeNull();
+    });
+  });
+
   describe('says where else each item is reachable', () => {
     const withSource = (source: string) => [
       item({
