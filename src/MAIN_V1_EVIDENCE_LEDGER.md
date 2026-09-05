@@ -27816,3 +27816,44 @@ in a new panel is invisible to targeted runs and only the FULL suite catches it 
 lens — `猫が好きです` with no `。` classifies as a word and the panel is genuinely absent.
 (d) The Write tool put five raw NUL bytes where `\0` was intended, which made `grep` call the
 module binary; only PowerShell repairs it.
+
+## 2026-09-05 — `primary2` (worktree `jp-wt-filesapp`). Boss audit findings 1 and 4, both fixed.
+
+The audit dated 2026-09-05 06:44 MSK returned **BLOCKED with one CONFIRMED P0 and one
+HYPOTHESIS**. Both are addressed; neither needed the user.
+
+**Finding 1, P0, `aff0eba0` — a corrupt reading-lists file destroyed the restore point.**
+`readDocument` rejected `null`, arrays and scalars, then trusted
+`normalizeReadingListsDocument`, which is deliberately **total** — so `{}` normalized to a
+valid document with zero lists, was served as health `ok`, and `snapshot()` promoted it over
+`reading-lists.last-good.json`. One read of a half-written file and both copies were empty.
+The write seam had the same hole: `isReadingListsWriteRequest` required only
+`typeof document === 'object'`, so a caller holding the CORRECT revision could commit `{}` and
+have the wipe applied and broadcast as healthy. One predicate,
+`isReadingListsDocumentShape`, now guards both — `lists` required and an array, everything
+else checked only WHEN PRESENT so an older build's document is still readable. Mutation
+control: the old body turns exactly **3 RED**, both controls stay GREEN. Suites 47 → 52.
+
+**Finding 4, `<this commit>` — the leader release did nothing on the one path it advertised.**
+`releasePlayerLeaderIfGone`'s own comment claimed it covered a renderer lost to
+`render-process-gone`. It did not. It built its live set from `!w.isDestroyed()`, and **a
+renderer crash leaves the `BrowserWindow` alive** with a dead `webContents` — so the crashed
+window stayed live, `releasePlayerLeadership` saw its `sourceId` and returned `null`, and every
+survivor kept forwarding play/next/seek into a process that no longer existed. Exactly the
+silent dead transport the release was written to end, reached by the route it never checked.
+`livePlayerWindowIds` (in `shared/playerSync.ts`, structural window type so it is testable
+without Electron) adds `webContents.isCrashed()`. The broadcast that follows is now restricted
+to that same live set: it runs precisely when one window is dead, and an unguarded `send` into
+it would throw and cost the survivors their release.
+
+**What is NOT claimed.** A real `render-process-gone` was never induced — the audit was right
+to refuse source reasoning as live proof, and the shared dev app must not be crashed. What is
+proven is the discrimination and the consequence, at the unit level: crashed host → id absent
+from the live set → release fires, with a negative control that two healthy windows keep the
+leader. Mutation control: removing `isCrashed()` turns exactly the **2** crash tests RED and
+leaves the 3 controls GREEN. The live crash remains unobserved.
+
+**Findings 2 and 3 are not this branch's.** Both are dirty-only in the main tree
+(`SeanimeDevPanel.tsx` hardcoded strings, `VisualNovelCommunityPanel.tsx` `toFixed`). Re-derived
+here at HEAD: `i18n.test.ts` + `i18nNumberFormatting.test.ts` = **29 passed**, and
+`node tools/i18n-check.cjs` exit 0 on 12,509 keys. They belong to their dirty-hunk owners.

@@ -45,6 +45,49 @@ export function releasePlayerLeadership(
   return { ...snap, sourceId: 0, playing: false, mediaUrl: '' };
 }
 
+/**
+ * The minimum of a `BrowserWindow` this file needs. Structural, so the live set
+ * can be falsified without an Electron window — inducing a real renderer crash to
+ * test the crash path is exactly the sort of thing that never gets run.
+ */
+export interface PlayerHostWindow {
+  isDestroyed(): boolean;
+  readonly webContents?: { readonly id: number; isCrashed(): boolean } | null;
+}
+
+/**
+ * Which windows can still OWN the `<audio>` element.
+ *
+ * The caller used to build this from `!w.isDestroyed()` alone, while its own doc
+ * comment claimed that covered a renderer disappearing through
+ * `render-process-gone`. **It did not.** A renderer crash leaves the
+ * `BrowserWindow` perfectly alive with a dead `webContents` — `isDestroyed()` is
+ * false — so the crashed window stayed in the live set, `releasePlayerLeadership`
+ * saw its `sourceId` and returned `null`, and every survivor went on forwarding
+ * play/next/seek into a process that no longer existed. That is the same silent
+ * dead-transport the release mechanism was written to end, reached by the one
+ * route it did not check. Boss audit 2026-09-05, Finding 4.
+ *
+ * `webContents.isCrashed()` is the state that actually separates them.
+ */
+export function livePlayerWindowIds(windows: readonly PlayerHostWindow[]): number[] {
+  const out: number[] = [];
+  for (const win of windows) {
+    try {
+      if (win.isDestroyed()) continue;
+      const contents = win.webContents;
+      // A window torn down between the destroyed check and this read has no
+      // contents. Skipping it is right, and it must not throw: one bad window
+      // would otherwise abort the release for every other window in the list.
+      if (!contents || contents.isCrashed()) continue;
+      out.push(contents.id);
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
 export type PlayerCommand =
   | { type: 'toggle' }
   | { type: 'next' }

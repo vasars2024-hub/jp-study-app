@@ -74,7 +74,7 @@ import {
 import { contentSecurityPolicyHeader } from './shared/contentSecurityPolicy';
 import { buildImmersionGuestPreload } from './shared/immersionGuestBridge';
 import type { PlayerCommand, PlayerSnapshot } from './shared/playerSync';
-import { releasePlayerLeadership } from './shared/playerSync';
+import { livePlayerWindowIds, releasePlayerLeadership } from './shared/playerSync';
 import type { AgentNavigationDestination } from './shared/agentNavigation';
 import { LEGACY_WIN_SECTION_ALIASES } from './shared/desktop';
 import {
@@ -1614,15 +1614,23 @@ let playerSnapshot: PlayerSnapshot | null = null;
  * transport delegates into nothing — see `releasePlayerLeadership` for the measurement.
  * Called both when a window closes and on every snapshot read, because a renderer can
  * also disappear through `render-process-gone` without a `closed` event we saw.
+ *
+ * That second case is why the live set comes from `livePlayerWindowIds` and not from
+ * `isDestroyed()`: a crashed renderer leaves its window alive, so the old filter kept
+ * the dead leader and this function did nothing on the exact path its comment
+ * promised to cover. Boss audit 2026-09-05, Finding 4.
  */
 function releasePlayerLeaderIfGone(): void {
-  const live = BrowserWindow.getAllWindows()
-    .filter((w) => !w.isDestroyed())
-    .map((w) => w.webContents.id);
+  const live = livePlayerWindowIds(BrowserWindow.getAllWindows());
   const released = releasePlayerLeadership(playerSnapshot, live);
   if (!released) return;
   playerSnapshot = released;
+  // Only the windows that can still receive it — this runs precisely when one
+  // window is dead, and an unguarded `send` into it would throw and abort the
+  // broadcast for the survivors, leaving them delegating into nobody.
+  const reachable = new Set(live);
   for (const win of BrowserWindow.getAllWindows()) {
+    if (!reachable.has(win.webContents?.id ?? -1)) continue;
     win.webContents.send('player:sync', released);
   }
 }
