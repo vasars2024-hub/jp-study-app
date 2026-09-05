@@ -115,7 +115,7 @@
  *     it). The exclusion is never taken on trust: the IDLE LEG samples the surface twice `--idle`
  *     ms apart with no input, at rest AND after the task, and VOIDs the run if anything UNDECLARED
  *     still moves, or if `--churn` excluded regions that never moved in either phase.
- * 20. `--result` COUNTS RENDERED ROWS, AND A VIRTUALISED LIST ONLY RENDERS ITS VIEWPORT. Measured
+ * 62. `--result` COUNTS RENDERED ROWS, AND A VIRTUALISED LIST ONLY RENDERS ITS VIEWPORT. Measured
  *     live on Immersion, 2026-09-05, driving `.immersion-site-search input` over 1,199 saved sites
  *     with `--result ".immersion-site-card"`: typing `red` narrowed the list from 1,199 rows to 356
  *     and the harness scored the step a DEAD END, because the rendered count is pinned at the ~19
@@ -496,7 +496,7 @@ const SNAP = (surface, churn = CHURN) => `(function(){
     if (all[j].scrollTop || all[j].scrollLeft) scrollAcc.push(name(all[j]) + ':' + all[j].scrollTop + ',' + all[j].scrollLeft);
   }
 
-  // Correction 20. A VIRTUALISED LIST RENDERS ITS VIEWPORT, SO --result SATURATES.
+  // CORRECTION 62 — A VIRTUALISED LIST RENDERS ITS VIEWPORT, SO --result SATURATES.
   // Only real scroll containers, and only their content height, so an ordinary reflow
   // does not manufacture movement and mask a dead end.
   var volumeAcc = [];
@@ -1066,7 +1066,7 @@ function movedBetween(a, b, opts) {
     results: a.results !== b.results,
     dialogs: a.dialogHash !== b.dialogHash,
     scroll: a.scrollHash !== b.scrollHash,
-    // Correction 20: the whole result set, not the rendered slice of it.
+    // Correction 62: the whole result set, not the rendered slice of it.
     resultVolume: a.volumeHash !== b.volumeHash,
     focus: a.focus !== b.focus && !(opts && opts.maskFocus),
     box: a.box !== b.box,
