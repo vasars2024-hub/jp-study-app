@@ -27192,6 +27192,47 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
 }
 .seanime-host-pane[hidden] { display: none; }
 
+/* The Media workspace's in-host routes (see src/media/MediaWorkspace.tsx). The library is
+   kept mounted and hidden behind an entry, so its collection query, filters and scroll
+   position survive the round trip -- the same rule the panes above already follow.
+   No `overflow` here on purpose: `.seanime-host-pane` is the scroller, and a second one
+   nested inside it shadows the real scroll parent (banked as `one-overflow-axis-makes-both-auto`). */
+.media-workspace-route { min-height: 100%; }
+.media-workspace-route[hidden] { display: none; }
+
+/* The way back out of an entry. The adopted entry screen has no back control of its own --
+   upstream reaches it from a page shell that carries one -- so without this the route is a
+   dead end, which is a category-2 failure, not a cosmetic gap. It floats over the entry's
+   own banner rather than pushing it down, because that banner is a full-bleed hero. */
+.media-workspace-back {
+  position: sticky;
+  top: var(--lq-space-2);
+  z-index: 5;
+  margin: var(--lq-space-2) 0 0 var(--lq-space-2);
+  /* Written in L2's Liquid role because that is what it is: a control floating over content
+     that moves under it. Tokens, never one shell's hardcoded colours. */
+  /* `--lq-hit-target` is 32px and `.lq-hit`'s max(100%, 32px) is a FLOOR, not a margin
+     (banked as `lq-hit-gives-nothing-at-exactly-32`), so the box is sized past it. */
+  min-height: calc(var(--lq-hit-target) + 2px);
+  padding: var(--lq-space-2) var(--lq-space-3);
+  border: 1px solid var(--lq-liquid-border);
+  border-radius: var(--lq-liquid-radius);
+  background: var(--lq-liquid-bg);
+  box-shadow: var(--lq-liquid-shadow);
+  -webkit-backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate));
+  backdrop-filter: blur(var(--lq-liquid-blur)) saturate(var(--lq-liquid-saturate));
+  color: var(--lq-liquid-text);
+  font: inherit;
+  cursor: pointer;
+}
+.media-workspace-back:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--lq-liquid-border));
+}
+.media-workspace-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .seanime-host-state {
   display: grid;
   gap: 10px;

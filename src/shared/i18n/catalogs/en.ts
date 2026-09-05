@@ -8684,6 +8684,7 @@ export const en: Catalog = {
   'mediaWorkspace.sidecar.failed': 'failed',
   'mediaWorkspace.viewLabel': 'Media view',
   'mediaWorkspace.viewLibrary': 'Library',
+  'mediaWorkspace.backToLibrary': 'Back to the library',
   'mediaWorkspace.viewReadiness': 'Readiness',
   'mediaWorkspace.viewReview': 'Review',
   'mediaWorkspace.openLocal': 'Open local video',

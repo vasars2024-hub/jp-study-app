@@ -8240,6 +8240,7 @@ export const zh: Catalog = {
   'mediaWorkspace.sidecar.failed': '失败',
   'mediaWorkspace.viewLabel': '媒体视图',
   'mediaWorkspace.viewLibrary': '媒体库',
+  'mediaWorkspace.backToLibrary': '返回媒体库',
   'mediaWorkspace.viewReadiness': '就绪状态',
   'mediaWorkspace.viewReview': '复习',
   'mediaWorkspace.openLocal': '打开本地视频',

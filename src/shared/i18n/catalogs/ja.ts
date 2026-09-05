@@ -8280,6 +8280,7 @@ export const ja: Catalog = {
   'mediaWorkspace.sidecar.failed': '失敗',
   'mediaWorkspace.viewLabel': 'メディア表示',
   'mediaWorkspace.viewLibrary': 'ライブラリ',
+  'mediaWorkspace.backToLibrary': 'ライブラリに戻る',
   'mediaWorkspace.viewReadiness': '学習準備',
   'mediaWorkspace.viewReview': '復習',
   'mediaWorkspace.openLocal': 'ローカル動画を開く',

@@ -30,6 +30,9 @@ import { useWorkspacePresentation } from '../renderer/workspacePresentation';
 // header states.
 import { useStudyReadiness } from '../renderer/useStudyReadiness';
 import { useSeanimeConnection } from './useSeanimeConnection';
+// The adopted surface's in-host location, owned by `vendor/seanime-web/lib/navigation.ts`.
+// Imported through the same `@/` alias the adopted tree uses so there is exactly one store.
+import { resetHostLocation } from '@/lib/navigation';
 
 const MediaWorkspace = React.lazy(() => import('./MediaWorkspace'));
 /** Phase 6. Lazy for the same reason as the workspace: it stays out of the boot path. */
@@ -146,7 +149,12 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
     };
   }, []);
 
-  const close = useCallback(() => setOpen(false), []);
+  // Closing drops the in-host route too, so reopening lands on the library rather than on
+  // whatever entry happened to be showing when the user shut the workspace an hour ago.
+  const close = useCallback(() => {
+    setOpen(false);
+    resetHostLocation();
+  }, []);
 
   // Escape closes the workspace, but never out from under an active player: the adopted
   // VideoCore owns that layer and its own exit path, and yanking the host would drop a
@@ -270,7 +278,13 @@ export default function MediaWorkspaceHost(): React.ReactElement | null {
             type="button"
             className="seanime-host-btn"
             aria-pressed={view === 'library'}
-            onClick={() => setView('library')}
+            // Also clears the in-host route. Without this, pressing Library while an entry
+            // is open is a control that visibly does nothing: `view` is already 'library',
+            // so the state never changes and the entry keeps the pane.
+            onClick={() => {
+              setView('library');
+              resetHostLocation();
+            }}
           >
             {t('mediaWorkspace.viewLibrary')}
           </button>

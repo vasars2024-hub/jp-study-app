@@ -9020,6 +9020,7 @@ export const ru: Catalog = {
   'mediaWorkspace.sidecar.failed': 'сбой',
   'mediaWorkspace.viewLabel': 'Вид медиатеки',
   'mediaWorkspace.viewLibrary': 'Медиатека',
+  'mediaWorkspace.backToLibrary': 'Назад в медиатеку',
   'mediaWorkspace.viewReadiness': 'Готовность',
   'mediaWorkspace.viewReview': 'Повторение',
   'mediaWorkspace.openLocal': 'Открыть локальное видео',
