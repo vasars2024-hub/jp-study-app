@@ -5984,3 +5984,62 @@ swaps 2-3 are tens of milliseconds, the attribution holds and the fix is stateme
 all three are equal, it is per-swap query cost and the attribution above is wrong — say so.
 Remember an ODD number of swaps leaves `.tr-textarea` holding the empty output pane, which VOIDs
 the next full run; the spec comment in `cat7-perf.cjs` records that trap in full.
+
+### Follow-up the same turn — the attribution above is TESTED, and it is a per-PROCESS cold cost, not a per-swap one
+
+The entry above named an attribution and said explicitly not to repeat it as a finding until it
+was measured. It has now been measured, in the same turn, on the same settled process, with the
+same passage and the same restored pair.
+
+Instrument: `tools/liquid-perf-probe.ps1 -DuringJs "<one .tr-swap click>" -DurationMs 6000 -Win 1`,
+run eight times in sequence. **Zero new probes** — this is the same instrument `cat7-perf.cjs`
+drives its own heavy leg with, called directly so that ONE swap is isolated instead of forty.
+
+| swap | samples / 6 s | p50 | p95 | **max (main block)** |
+| ---- | ------------- | --- | --- | -------------------- |
+| 1 | 203 | 1.3 | 1.8 | 12.6 ms |
+| **2** | **4** | 2.0 | 5,886 | **5,886.0 ms** |
+| 3 | 207 | 1.3 | 1.6 | 12.1 ms |
+| 4 | 200 | 1.3 | 2.0 | 46.2 ms |
+| 5 | 194 | 1.6 | 3.0 | 13.1 ms |
+| 6 | 199 | 1.5 | 3.5 | 25.7 ms |
+| 7 | 192 | 1.7 | 5.1 | 18.6 ms |
+| 8 | 160 | 6.2 | 24.2 | 48.4 ms |
+
+**One spike in eight, and it is the second swap.** Everything after it is under 50 ms. The pair
+was read back at the end and is `日本語>English` with 20 tokens and 48 characters — eight swaps is
+even, so the surface restored itself, and the run left nothing behind.
+
+**Why the SECOND and not the first, which is the part that explains the whole leg.** `.tr-swap`
+moves the TEXT as well as the pair. Swap 1 pushes the Japanese passage into the output pane and
+gives the source box the pane's contents, which on an untranslated surface is EMPTY — so swap 1
+builds no interlinear at all and is trivially cheap. Swap 2 brings the passage back into the
+source box, and THAT is the first full 20-token interlinear rebuild of the process. Swaps 3, 5, 7
+are the empty ones; 4, 6, 8 are full rebuilds and cost **46.2 / 25.7 / 48.4 ms**.
+
+    first full rebuild in the process     5,886 ms
+    every later identical rebuild         25-48 ms      ~130x cheaper
+
+So the 4,240.5 ms in the 40-swap leg above is the same single event, not 40 swaps of 106 ms
+each — which is exactly what its distribution said (p50 2.2, p95 11.6, one outlier in 471
+samples) and is now confirmed rather than inferred.
+
+**The negative control is built into the shape and it fired.** If the cost were per-swap, swaps
+4, 6 and 8 would each have spiked; they are 46.2, 25.7 and 48.4 ms. If it were an alternation by
+direction, swap 4 would match swap 2; swap 2 is 5,886 ms and swap 4 is 46.2 ms, a 127x gap on
+the identical operation into the identical pair. Both alternatives are excluded by the data.
+
+**This does NOT close cat7, and the cell stays OPEN at the number in the entry above.** A 4-6
+second freeze of the whole main process on the first real dictionary passage of a session is a
+freeze the user gets every session, and the rubric's bar is the longest block, not the median
+one. What has changed is that the cost is now LOCATED: it is one cold pass over the dictionary,
+after `f9541e9e` already removed the statement-compilation half of it.
+
+**Exact next slice, and it is a product slice rather than another measurement:** warm the
+interlinear path once, off the critical path, after boot settles — the remaining cost has the
+shape of cold index pages on a 375 MB `dict.db` rather than of query planning, which
+`f9541e9e` already fixed and `ef19a2fc` already guards with a QUERY PLAN test. Do it where
+`registerDictionaryIpc`/`initYomitan` are wired in `src/main.ts`, never on the boot path itself,
+and re-measure with the SAME eight-swap sequence — swap 2 is the cell that has to move. Budget a
+restart per measurement: main does not hot-reload, and the perf harness refuses a process under
+120 s old.
