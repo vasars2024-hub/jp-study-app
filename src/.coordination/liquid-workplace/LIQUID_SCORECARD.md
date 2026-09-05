@@ -7655,3 +7655,39 @@ main process on a timer, i.e. precisely when nobody is looking at the window. `c
 third: first-run, at boot, before the user has necessarily raised the window. Changing 15
 animations without a gate run two days out is not a trade I would take; changing the one under
 every window in the app is.
+
+### Same turn, second slice — `e0cb25b8` takes the three openers that fire while nobody is looking
+
+I said above I would not sweep the class. I swept the part of it that is **not user-driven**, which
+is where the defect can actually reach a user, and left the rest.
+
+- **`buddy-toast-in`** — verified, not assumed: `buddyScheduler.ts:2` "Single main-process
+  scheduler", `setInterval` at `:17`, `w.webContents.send('buddy:trigger')` at `:35`, and
+  `BuddyToast.tsx` renders `.buddy-toast` off that event and **auto-dismisses after 2200 ms**. So
+  a frozen fade means the reminder arrives and leaves having never been visible once. `translateY`
+  kept, so the slide-in survives.
+- **`mini-toast-in`** — same shape. `translateX(-50%)` is the CENTERING and is kept in BOTH
+  keyframes deliberately: a frozen `from` has to be the correct POSITION, not merely a visible one.
+- **`consent-fade`** — **deleted**, and it is the worst instance in the app. Opacity-only over a
+  `z-index: 40000` full-screen backdrop that keeps `pointer-events`, so a frozen fade left an
+  invisible overlay still taking every click and the whole application read as hung. No transform
+  half to keep, and a blocking first-run gate appearing instantly is correct anyway.
+
+The inert `to { opacity: 1 }` went with them — animating from the base value to itself is noise.
+The other **12** `opacity: 0` openers in `styles.css` are user-driven, so the window is being
+looked at when they run; they are left alone rather than swept, and the test encodes that list as
+`NOT_USER_DRIVEN` so the judgement is reviewable instead of implicit.
+
+**Guard: 10 cases. Restoring the three keyframes fails exactly 3 of 10; the restore returns 10/10.**
+
+### Gates, at my tip, all four
+
+`npx vitest run` **EXIT 0 — 1107 files passed / 1 skipped, 14,207 tests passed / 6 skipped, ZERO
+failures.** i18n EXIT 0 at **12,537** keys. architecture EXIT 0, "Nothing new", 2 pending. eslint
+EXIT 0 on the new test.
+
+An earlier full run in this same turn reported 6 failed files; **all 6 passed on a serial rerun,
+49/49** (`scraperSources`, `paletteSettingsReach`, `studyProperNameReviewOpportunity`, two VN
+suites, `i18n`) — the known parallel-run flake class, named in the 2026-09-05 boss audit as
+explicitly not committed regressions. The clean run above is the one that counts, and it is
+**after** both CSS slices.
