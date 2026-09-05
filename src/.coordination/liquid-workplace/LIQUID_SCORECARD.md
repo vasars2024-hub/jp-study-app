@@ -4308,8 +4308,8 @@ worth a run. cat7 is the heaviest and should be last.
 > | `readingGardenChromeContrast.test.ts` | **deleted** — `liquidChromeContrast.test.ts` now guards the same pair with a stricter model (composite over WHITE). |
 > | cat5 correction 36, dev-only exclusion | **dropped**, identical to backup's 38; two overlapping exclusions of one subtree would double-report it. |
 > | cat5 correction 38, the axis witness | **dropped**, backup's 39 needs no `--fixed-material` flag and covers strictly more. |
-> | cat5 correction 37, the Q4 aria-disclosure verdict | **KEPT, renumbered 40.** Unique. |
-> | cat5 correction 39, the parked-cursor refusal | **KEPT, renumbered 41.** Unique. |
+> | cat5 correction 37, the Q4 aria-disclosure verdict | **KEPT, renumbered 41.** Unique. |
+> | cat5 correction 39, the parked-cursor refusal | **KEPT, renumbered 42.** Unique. (Shifted once more after backup took 40 for cat2 in `9a01a52d` — the correction sequence is SHARED across all eight liquid harnesses, not per file: `cat2-clunkiness.cjs` carries exactly one correction and it is numbered 40.) |
 > | `data-primary` on the mushroom hitbox (`f24133c7`) | **KEPT.** Unique. |
 > | the `:focus-visible` outline colour | **KEPT**, re-guarded `:not(.fwin-liquid)` to match. `a11y.css` gives the ring `var(--text)`, so it was still near-black on a near-black plate after `bfba48af` — the glyph half of Q5 was repaired and the keyboard half was not. |
 >

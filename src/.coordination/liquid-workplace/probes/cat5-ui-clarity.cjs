@@ -125,7 +125,7 @@ const CONTROL = has('control');
  * every snapshot either way, so a run taken with it stays attributable rather than silent.
  */
 const ALLOW_SCROLL = has('allow-scroll');
-/** `--allow-hover` — score with the pointer parked on a control (correction 41). */
+/** `--allow-hover` — score with the pointer parked on a control (correction 42). */
 const ALLOW_HOVER = has('allow-hover');
 /**
  * `--shell-chrome "<selector list>"` — DEFAULT EMPTY, and every baseline taken before this
@@ -533,7 +533,7 @@ const SNAP = `(function(){
   if (bodyScrollTop > 0 && !${ALLOW_SCROLL})
     return JSON.stringify({ refuse: 'body is scrolled ' + bodyScrollTop + 'px off its resting position - "at rest" (Q3) and "the default state" (Q4) are undefined here. Scroll it to the top, or pass --allow-scroll to score it where it stands.' });
   /*
-   * CORRECTION 41 (2026-09-04, primary2) -- A PARKED CURSOR MANUFACTURES AN ENTRY POINT.
+   * CORRECTION 42 (2026-09-04, primary2) -- A PARKED CURSOR MANUFACTURES AN ENTRY POINT.
    *
    * filled() is "paints a background and separates from its host by >= 1.2:1". A hover fill
    * satisfies it, and the pointer stays wherever the last bridge /click left it: an operator
@@ -1608,7 +1608,7 @@ function scoreSnapshot(s) {
     q2: s.q2.titleText && s.q2.backAffordances >= 1 ? 'YES' : 'NO',
     q3: s.q3.insideBodyViewport ? 'YES' : 'NO',
     /*
-     * CORRECTION 40 (2026-09-04, primary2) -- THE VERDICT NEVER FOLLOWED ITS OWN INSTRUMENT.
+     * CORRECTION 41 (2026-09-04, primary2) -- THE VERDICT NEVER FOLLOWED ITS OWN INSTRUMENT.
      *
      * `inDisclosure` was extended to the APG `aria-expanded`/`aria-controls` pattern because
      * scoring a surface on `<details>` alone charged it for a rule its markup could not
