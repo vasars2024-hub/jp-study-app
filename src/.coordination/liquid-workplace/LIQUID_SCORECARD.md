@@ -4933,3 +4933,41 @@ remains, still VOID on its own dense plant from last turn, and its diagnosis is 
 `.fwin-body` is pinned OPAQUE under Liquid by rule 1 of `liquid-window.css`, so the plant's
 backing may never have been translucent and the earlier pass may itself have been luck.
 **52 category cells remain** — 56 minus cat5, cat6, cat7 and cat8.
+
+### Addendum, same turn — cat3 closes too, and the VOID was the instrument
+
+`novels` cat3 VOIDed on `movedDense: false` last turn and again on the first re-run. **The bar
+was passing honestly all along; the CONTROL could not falsify it** — and could not have
+falsified it on any windowed surface.
+
+Diagnosed by measuring rather than reasoning: installed `__lqScoreSurfaces` and re-ran
+`l1-surface-roles.js` itself against the live window with the plant mounted. Its own row:
+
+    div.   role=Work   area 2.0   ownAlpha 0.5   grounded TRUE   "opaque ground at div.fwin-body=1"
+
+Plant D self-tints (alpha 0.5) because the bar *used* to ask whether a region sits on a
+translucent material. **CORRECTION 35 changed the bar to `!r.grounded`** — does it reach an
+opaque GROUND — and nothing updated the plant. Under Liquid `.fwin-body` is pinned OPAQUE by
+rule 1 of `liquid-window.css`, so the plant's own alpha is irrelevant: `backingOf` hits alpha 1
+one level above it and settles `grounded: true`. `byRole.Work` went 3 → 4, so the plant was
+SEEN; it just could not move the scored term. Last turn's guess — "its backing may never have
+been translucent" — was the right instinct and the wrong term: the plant IS translucent
+(`translucentBacking: true`), it is simply *grounded*.
+
+**Scope, because this is not only about `novels`.** The plant is the fallback used when controls
+A/B/E have nothing to perturb, i.e. when every real Work region already has `translucentBacking`
+truthy. `novels` has three such regions and so fell through to the plant on every run. Any other
+windowed surface in that shape has been VOIDing for the same reason.
+
+`ad82592f` gives plant D its own `backdrop-filter`, which is the truthful expression of "dense
+work on glass" and one of the three triggers `backingOf` settles ungrounded on. Verified by hand
+on a live plant BEFORE landing: `denseWorkOnTranslucent` 0 → exactly 1, the plant flipping to
+`grounded false, "backdrop-filter on div.=0.5+blur"`, all three REAL Work regions unchanged at
+`grounded true, "opaque ground at div.reading-workspace=1"`.
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat3 liquid utilization | **PASS 10/10** | driven to Liquid from Standard and restored. 46 regions — Work 3 / Liquid-eligible 4 / Anchor 37 / Ambient 2. `denseWorkOnTranslucent` **0**, eligible **4 of 4 treated** and **4 of 4 on a shared primitive**. Control: base [0,4,4,4,3] → planted [1,4,4,5,4] → restored [0,4,4,4,3]; `movedDense` true, `movedEligible` true, `sharedHeld` true, `cleaned` true, and `barsWhilePlanted` **denseWorkAnchored false, sharedPrimitives false** — "CONTROL FAILED AS REQUIRED - category 3 instrument is proven by plant". |
+
+**`novels` is 8 of 8 — 80/80, the 19th section.** Running total **19 of 25 sections at 80/80**;
+**48 category cells remain**.
