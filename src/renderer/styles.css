@@ -17732,6 +17732,19 @@ html[data-taskbar-size='large'] .os-tray-btn {
   justify-content: flex-start;
   text-align: left;
   white-space: nowrap;
+  /* Category 1's 32px pointer floor, put on the BOX and not left to a `.lq-hit-scope`
+     `::after`. Measured on Immersion's More menu: the rows are 26px in a 4px-gap column, so
+     each row's 32px expander meets its neighbour's INSIDE the gap and `elementFromPoint`
+     hands the overlap to the sibling. The hit band settles at 26 + 4 = 30.02px and all
+     seven items read below the floor while the scope class is present and computing as
+     landed. A row that is 32px on its own cannot be stolen from by the row above it. */
+  min-height: var(--lq-hit-target);
+}
+/* The one body whose children carry their own geometry: a highlight chip is 14x14 by design
+   and `min-height` would stretch it into a bar. Its floor comes from the `.lq-hit-scope`
+   expander, which in a wrapped 6px-gap ROW has room to land without colliding. */
+.reader-anno-menu > .lq-overflow-body > button {
+  min-height: 0;
 }
 /* The novel reader's highlight palette. A column of six colour chips would be a strange
    menu, so this one body opts back into a row; the summary paints the ACTIVE chip, which is
