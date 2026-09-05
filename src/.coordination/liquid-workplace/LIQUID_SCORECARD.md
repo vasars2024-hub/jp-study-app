@@ -7826,3 +7826,21 @@ so the cat8 entry's counter theory does not explain this one.
 events) and clears through React's native setter; my clean round trip used the native setter for
 both. So the next turn compares those two paths on this field — not another surface, not another
 task. That is a 15-minute question, and it unlocks cat2 **and** cat8 on this surface.
+
+### END-TO-END, no plant — the mergeback landed and the LIVE renderer carries the fix
+
+`0981f9b5` merged `wt/files-app` into `feat/nyaa-subtitles` at ~18:05, the main tree's
+`styles.css` picked it up, and Vite HMR'd it into the running app. Read back out of the live
+CSSOM (`document.styleSheets`, `CSSKeyframesRule`), **not from source and not from an injected
+style**:
+
+    fwinIn         => @keyframes fwinIn { 0% { transform: scale(0.98); } 100% { transform: scale(1); } }
+    buddy-toast-in => @keyframes buddy-toast-in { 0% { transform: translateY(8px); } 100% { transform: none; } }
+    mini-toast-in  => @keyframes mini-toast-in { 0% { transform: translateX(-50%) translateY(-4px); }
+                                                 100% { transform: translateX(-50%) translateY(0px); } }
+    consent-fade   => ABSENT (the probe reports it by name if present; it did not)
+
+Not one `opacity` remains in any of them, `translateX(-50%)` survives in BOTH `mini-toast-in`
+frames as intended, and the deleted keyframes are genuinely gone from the running app. Together
+with the earlier paired arm (opacity 1 / painted 56-of-68 with the rule, 0 / 0-of-68 without) the
+fix is verified in the product, not only in the file.
