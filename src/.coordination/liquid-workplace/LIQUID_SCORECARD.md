@@ -7033,3 +7033,54 @@ without writing a spec. That is the cheapest unopened surface on the board.
 neighbours are `video`, `mediaCenter` and `mediaWorkspace`. Writing a `player` spec would unlock
 cat5+cat6 as a pair, which is 2 cells for one piece of scaffolding — the best ratio available,
 but it is scaffolding, so RULE 1 applies: extend the existing spec table, never a new probe.
+
+---
+
+## 2026-09-05 — `player`: the surface was UNREACHABLE, and the first repair is the reason it now isn't
+
+**No cell closed this turn. 168 of 192, 24 remaining, unchanged.** What moved is the
+precondition for all six of `player`'s free cells: you could not get to the player through
+the product's own path, so nothing on it could honestly be scored.
+
+### The defect, measured before it was believed
+
+Driven on a private instance (`JP_USER_DATA_DIR=~\.claude-runs\jp-fresh-p2`,
+`JP_DEBUG_PORT=39352`, pid 31808) with the bridge's `/click`, which sends a **real
+`sendInputEvent`**, not a synthetic `.click()`:
+
+One click on any library card in the Media workspace →
+`location.href` = `http://localhost:5174/entry?id=102883`, `#media-workspace` **gone**,
+`document.querySelectorAll('.fwin').length` = **0** — every window on the desk destroyed —
+and the app re-ran first-run consent and the tour on the way back up. The app then rendered
+the desktop at a URL its own router does not serve, so nothing on screen said what happened.
+
+Cause: `SeaLink` and `lib/navigation.ts` are both Study OS whole-file substitutions and both
+still said *"entry routes are not adopted until Phase 3"*. `ADOPTION.md` records Phase 3
+complete **2026-07-28** — five weeks stale. `SeaLink` rendered a bare `<a href>` and let the
+browser have it; `useRouter().push` was a no-op, `back()` called `window.history.back()` and
+`refresh()` called `window.location.reload()`. All three move the SHELL, not this surface.
+
+Fixed in `b8859a77`: `lib/navigation.ts` owns an in-host location behind
+`useSyncExternalStore`; the adopted entry screen renders in-pane with the library kept
+mounted and hidden; the host supplies the back control the adopted screen has none of.
+**Verified live with a second trusted click** — entry renders in-host, URL unchanged,
+workspace intact, "Back to the library" returns with the collection still there.
+13 tests; mutation control inverts the internal-href guard and 4 of 13 fail.
+
+### The blocker that is left, named precisely so the next turn opens on it
+
+An episode click reaches `handle-play-media.ts:105` (`[PLAY MEDIA] Playing media file
+C:\Users\Arseniy\Downloads\jp-study\[Anime Land] JoJo … 38 … .mp4`) and then answers
+`AxiosError: Request failed with status code 500` — **with no toast, no alert, no state
+change** (`.study-player-slice[data-study-player]` stayed `idle`). Two findings in one:
+
+1. The in-app player branch at `handle-play-media.ts:110` is gated on
+   `__isElectronDesktop__`, which is `import.meta.env.SEA_PUBLIC_DESKTOP === "electron"` —
+   and **`SEA_PUBLIC_DESKTOP` is defined nowhere in this repo** (one grep hit, the
+   definition itself). So it is permanently `false`, `directstreamPlayLocalFile` is dead
+   code, and every episode click falls through to the external-player/mpv path.
+2. That path's 500 is swallowed. A failure rendered as nothing is a category-8 defect on
+   its own, independent of (1).
+
+`sampled-out:` for this turn — no surface was scored, so nothing was skipped; `player`'s
+eight cells stay open and `anki` keeps its four banked.
