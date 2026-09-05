@@ -5304,3 +5304,77 @@ That is why 58 was not deferred as "the surface passes anyway".
 
 **Running total: 19 of 25 sections at 80/80.** `translate` is now **2 of 8** cells banked
 (cat5, cat6). **155 of 200 cells, 45 remaining.**
+
+## 2026-09-05 05:00-06:00 EDT, `primary2` — `translate` cat1 and cat3 close; cat4 finds a clipped, unreachable passage
+
+Three more cells attempted on the same surface. Two closed, one is left open with its
+numbers. Every product defect below was found by the rubric and fixed in the same turn,
+which is what the rubric is for.
+
+### The cells
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat1 accessibility | **PASS 10/10** (was FAIL) | `belowFloorByHit` **4 -> 0** of 24 measured controls; `targets32` false -> true; contrast, WCAG 2.5.8, keyboard and motion bars already passing. `stolenCount` 0, `occluded` 2 unchanged, `stable` true. Control moved all six axes (contrast, pointer, rect, 2.5.8, keyboard, decorative exemption) and `backToBaseline` true. |
+| cat3 Liquid utilization | **PASS 10/10** | 52 regions, 27 controls skipped; `byRole` Work 8 / Liquid-eligible 1 / Anchor 24 / Anchor(holds work) 14 / Ambient 5. `denseWorkOnTranslucent` **0**, `liquidTreatedEligible` 1 of 1, `sharedPrimitiveEligible` 1. Driven with `--presentation liquid`. Control: `CONTROL FAILED AS REQUIRED - category 3 instrument is proven`, and both restore legs returned. |
+| cat4 use of space | **FAIL — 2 of 3 failing bars fixed, 1 bar and 1 size still open** | Below. |
+
+### The pointer floor — two controls, both deliberately sized, both repaired without resizing
+
+`belowFloorByHit` named exactly four: `button.lexicon-harvest-mine` x3 (rect 87x28, pointer
+52.05x28.96) and `button.tr-swap` x1 (rect 30x32, pointer 30.86x32.52). Neither takes a size
+change — the mine row's own CSS comment says a 32px row would be taller than the word it is
+about, and `.tr-swap` is a square-ish icon button — so both take `.lq-hit` at `9547c213`,
+whose `::after` is `max(100%, 32px)` and leaves the rendered box untouched. The primitive's
+three recorded failure modes were checked rather than assumed: `--lq-hit-target` resolves
+32px live, the nearest overflow clipper on both chains is `div.fwin-body` far above either
+control, and the re-run reports `stolenCount` 0 with `occluded` unchanged — neither expander
+reaches over a neighbour.
+
+### The defect cat4 found, and it is the largest of the turn
+
+**One long gloss made the whole passage 2884px wide, behind `overflow-x: hidden`.**
+
+A `<ruby>` cannot break, so an unbroken annotation makes the entire interlinear as wide as
+itself. Measured live on the seven characters `猫が好きです。`:
+
+    the が gloss ("indicates the subject of a sentence; ...")   2482px
+    the ruby it annotates                                       2850px
+    div.fwin-body   scrollWidth 2884   clientWidth 808          overflow-x: hidden
+
+Everything past 808px was **clipped, with no scrollbar to reach it** — on the densest reading
+surface the app has, and at the default window size. cat4 filed 12 clipped elements at the
+default size and 12 more maximized; cat1 had already reported two `button.lexicon-sense-token`
+as `occluded` at x=2081 and x=2850 without naming why.
+
+Fixed at `fbb0c9e5`. **The cap is on the TEXT, not the box, and that was measured rather than
+assumed**: capping `.lexicon-gloss-line` at `100cqi` still left the `rt` at 364px on a 180px
+flow, because the `rt` takes the **sum** of its two language lines — a `max-width` on an `rt`
+resolves against a containing block the annotation itself sizes. `clampGloss` caps at 48
+characters and the untruncated gloss becomes the `title`, so nothing is lost; the sense panel
+already carries the full list one click away.
+
+    after   bodyScrollWidth  2884 -> 808, exactly clientWidth
+            widest gloss     2482 -> 270      widest ruby   2850 -> 567
+            cat4 clipped     12 -> 0 at default AND maximized; the horizontal bar passes at both
+
+### What cat4 still fails, with the numbers, so the next turn does not re-derive it
+
+1. **compact 260x170** — `clipped` 16, `hiddenOverflowX` `div.fwin-body 601>248`. Still the
+   ruby: two capped gloss lines of 262 and 301px stack to a 567px annotation on a 180px flow.
+   The 48-character cap is absolute, and at this width it is still too wide. **The measured
+   route:** `container-type: inline-size` on `.lexicon-interlinear-flow` plus `display: block;
+   max-width: 100cqi; overflow: hidden` on the `rt` itself took the widest ruby to 182px and
+   `bodyScrollWidth` 601 -> **325** (client 248) — better, not closed, and `display: block` on
+   an `rt` takes it out of ruby layout, which is a visual change that needs its own look. Both
+   figures were taken live through an injected stylesheet, which was removed.
+2. **maximized deadRegion 17.9%** against a 15 bar, dead box `631x295 at grid 20,12`. Default
+   is 12.9% and compact 0.9%, so this is specifically the maximized read: the two-pane grid
+   keeps its 1fr/1fr proportions and the space below the panes is not claimed. Untouched this
+   turn.
+
+`overlaps`, `contentGrowsNotChrome`, `allThreeSizes` and `restored` all pass at every size.
+
+**Running total: 19 of 25 sections at 80/80.** `translate` is now **4 of 8** cells banked
+(cat1, cat3, cat5, cat6); cat4 attempted and open; cat2, cat7, cat8 not run.
+**157 of 200 cells, 43 remaining.**
