@@ -4973,3 +4973,132 @@ on a live plant BEFORE landing: `denseWorkOnTranslucent` 0 → exactly 1, the pl
 **51 category cells remain** — 56 at the start of this turn, minus cat5, cat6, cat7, cat8 and
 cat3. (Corrected in the same turn: this line first read 48, which was 52 − 4 instead of 52 − 1.
 The five cells closed are five, and 144 + 5 = **149 of 200**.)
+
+## 2026-09-05 · backup — `immersion` opens as the 20th surface: 4 cells, one product repair, and two harness corrections a fixed sleep had been hiding
+
+**sampled-out: `city` (cat7 still open) `reading` `translate` `files` `player` `anki`** — six,
+named, not silently truncated. `immersion` was taken because `83da5c12`'s routing table records
+it as fully scaffolded on both sides (cat6 app spec + cat7 `SPECS`), and because it is the only
+open surface whose content is a LIVE REMOTE PAGE — which turned out to be the whole story of the
+turn.
+
+Live throughout on pid 20540 / bridge 39274, one window, `820x580` at `196,144`. The desk was
+found holding exactly four windows (scraper, settings, agent, city) and was left holding exactly
+those four; `ui-lang` was found ABSENT and was left absent; `/logs?level=error` returns
+`{"ok":true,"total":0,"entries":[]}` for the entire pass.
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat1 accessibility | **PASS 10/10** (after a product repair, `7101b1f1`) | 20 controls measured of 23. `belowFloorByHit` **7 → 0**, `belowFloorByRect` 19 → 11, `stolenCount` 0, `stable: true`, smallest hit now `button.fwin-b.lq-hit` at **32.02**. contrast: 97 text runs, minRatio **5.9** (`button.immersion-mode-btn "Live" 11px`), 0 failing. wcag258 0. keyboard 17 controls, 0 unreachable. Control: contrast / targetsByPointer / targetsByRect / wcag258 / keyboard / decorativeExemptionIsNarrow **all moved**, `plantCaughtByPointer` 2, `backToBaseline` true, `rectDrift` 0. |
+| cat3 liquid utilization | **PASS 10/10** | driven Standard → Liquid (`presentationAsFound: standard`, `presentationDriven: true`) and restored. Window own paint alpha **0.72**, `blur(8px) saturate(1.25)`. 43 regions — Work 2 / Liquid-eligible 1 / Anchor 20 / Anchor(holds work) 9 / Ambient 11. `denseWorkOnTranslucent` **0**, eligible **1 of 1** treated and **1 of 1** on a shared primitive. Control: `movedOne`, `allWorkFailed`, `ungroundedAllFailed` all true, `ungroundVacuous` false, `ungroundMarked` 10 with its one survivor named (`form.lq-anchor.immersion-url-form`, "opaque ground at form.lq-anchor=1") — "CONTROL FAILED AS REQUIRED". |
+| cat5 UI clarity | **PASS 10/10** | 18 controls painted, `findings: []`, `voided: []`. Q10 identity 5 of 5 markers ("chromed (5 markers, bar 3 = 60%)"), one bespoke prefix `immersion:14`. Liquid material total 1 (`aside.lq-reading-tool`), `infiniteAnimationsOnLiquid` **0**, `decoratedLeaves` 0, `withoutTransition` 0. Control run separately: "CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10" — five of the ten questions falsified, over 41 painted controls. |
+| cat6 feature parity | **PASS 10/10** | parity **7/7 standard = 7/7 liquid**, `na` 0, `rowsAgree` true, `onlyInOne` []. Round trip standard → liquid → standard with `immersion-url` dirtied first: `fieldsHeld` true, `shellHeld` true, `diffs` []. Control **5 armed of 5 declared**, every mutation felling EXACTLY its own row (`urlAndWebview`, `modeSwitch`, `readerExtraction`, `railReversibility`, `windowLifecycle`), `unexpectedRows` [] on all five, `afterRestore` 7/7 each time. |
+
+### cat6 first FAILED, and the positive/negative pair that says why — read this before re-running it
+
+The first run of the turn returned **FAIL, parity 5/7**, failing `modeSwitch (readerChars=0)` and
+`readerExtraction (readerChars=0)`. It was tempting to re-run and take the pass; instead the cold
+state was reproduced deliberately — close the window, reopen it, run — and it failed identically,
+with the spec's `open` step reporting its own diagnosis: `{"navigating":"NHK Easy","note":"give
+this one a long --step-ms; a real page is loading"}`. The same cold sequence at `--step-ms 6000`
+returns **7/7 with the control still 5 armed of 5**. So the FAIL is the network, the PASS is real,
+and the pair is on the record rather than the second number alone. **Any future cat6 run on
+`immersion` needs `--step-ms 6000`; the 700ms default measures a page that has not arrived.**
+
+### The product repair — `7101b1f1`, and why the class was present
+
+cat1 read `belowFloorByHit 7` and all seven were rows of ONE control: Immersion's `More` overflow
+menu. `button.btn.small` ×6 and `button.btn.small.immersion-close-page` ×1, each `rect 204x26`,
+each `hit 52.05x30.02`, each naming a SIBLING as its blocker.
+
+The cause is not a missing `.lq-hit-scope`. The class is present on `.immersion-toolbar` and its
+32px `::after` computes as landed. The body is a **26px-row column with `gap: 4px`**, so each
+row's expander overruns its own box by 3px top and bottom, meets its neighbour's inside the 4px
+gap, and `elementFromPoint` hands the overlap to whichever sibling paints later. Each row keeps
+26 + 4 = **30.02px**. Two expanders cannot both own the overlap between them.
+
+Fixed on the box, in the shared primitive rather than at the call site: `min-height:
+var(--lq-hit-target)` on `.lq-overflow-body > button|label`, which the manga reader's two menus
+and the novel reader's palette alias. The palette is exempted deliberately —
+`.reader-anno-menu`'s body is the one that opts back into a wrapped ROW and its chips fix
+`height: 14px`, which `min-height` beats; without the exemption a surface already certified at
+80/80 would have had its 14x14 swatches stretched into 14x32 bars. Five tests ship with it;
+deleting the declaration turns **2 of the 5 red by name**.
+
+### cat4 — FAIL, and the bar fails at exactly one size
+
+`deadRegionPctOfViewport` against a **15** ceiling: default **10.9%**, compact **0.6%**,
+maximized **15.6%**. clipped 0, overlaps 0, horizontal scrollers 0, hiddenOverflowX 0 at all
+three sizes; `contentGrowsNotChrome` true; all three legs restored.
+
+The dead box is `284x572 at grid 31,9`, and it is the **Sites rail**. Measured live at
+maximized (`1264x773`): the reading document is `19..1013` and the rail `aside.lq-reading-tool`
+is `1025..1245` — a fixed **220px** column, **610px** tall, holding **one** 49px row. The
+document absorbs every pixel of the window's growth and the rail absorbs none, so the empty share
+of that band grows with the window. At 820x580 it is under the bar; at maximized it is 0.6 points
+over.
+
+**Read the harness before choosing a fix, because the obvious one does not work.** Coverage is
+marked from **text nodes and interactive/media elements** (`cat4-use-of-space.cjs:933-957`), plus
+`background-image: url(...)`. A panel's own fill marks nothing. So giving the aside a content
+height would shrink the PANEL and not the dead RECTANGLE — the band would stay exactly as empty.
+Only two things move this number: narrow the band, or put real content in it. Narrowing the rail
+to make a metric pass is gaming; the honest fix is content, and the candidate already exists —
+the curated destinations (NHK Easy, Wikipedia JP, and the three behind `More destinations`) are
+reachable ONLY from the stage's starter state, i.e. **not reachable at all once a page is open**,
+which `ImmersionContent.tsx`'s own `closePage` comment already names as the reason that button
+had to exist. That is the next slice on this surface, and it is a feature win rather than a
+metric one.
+
+### cat8 — VOID, and both causes are measured rather than guessed
+
+The language leg passed only after **correction 49** below. The DRIVE leg then VOIDed on
+`restored: false` under three different drives, and the reason is the surface itself:
+
+1. `--drive-click .immersion-close-page --drive-undo .immersion-starters button`, rail OPEN. The
+   rail row's text carries a visit counter that the undo increments — measured **166 → 246
+   visits** across this turn's runs — so the base text hash can never return.
+2. The same drive with the rail CLOSED, which takes the counter out of the measured text. Still
+   `restored: false`: the undo re-navigates a REAL remote page and the reader extraction does not
+   reproduce (`readerChars` **322** on the restored read, against a materially longer article on
+   the base read).
+3. `--drive-input .immersion-url --drive-value いぬ`, chosen because its undo is local. Refused on
+   `restoredAfterEscape: false` — this product does not put the previous URL back on Escape.
+
+So cat8 is not closeable here with any navigating drive, and the honest statement is that it
+needs a **deterministic local state driver**, not another attempt at the same one. Its other bars
+passed on every run: `rawKeys` true / **0** raw keys against 10,476 catalog keys in 109
+namespaces, `placeholders` true / 0, `mutePairs` true / 0.
+
+### Correction 49 — a fixed sleep is not a settle, and this one left the app in Japanese
+
+`cat8-honest-states.cjs`'s language leg clicked a tag and then `await sleep(1400)`. On this run
+the `ja` leg refused with "`<html lang>` says en" — while 日本語 was in fact the active segment by
+the time a human looked at it. The catalog is a dynamic import and its resolution time is a
+function of machine load, which a relay run maximises. Worse, the `finally` restore used the same
+guess, so it clicked English INSIDE the window the ja import was still resolving in, the ja
+import won, and **the app was left in Japanese** — the exact residue correction 15 exists to
+prevent, arriving through a door correction 15 did not cover.
+
+`settleLang(tag, stored)` polls `<html lang>` and the effective stored language (absent === `en`,
+per correction 37) until both name the tag ASKED FOR, 24 × 250ms, and returns anyway on
+exhaustion so the existing guard still refuses with the real values. It never waits for a language
+nobody asked for, so a click that hit the wrong control still refuses. **Evidence: the `ja` leg
+went from VOID to passing on the same surface with no other change, and the restore now lands.**
+
+### Correction 50 — the same shape one leg over, landed on 49's evidence and NOT on its own
+
+`driveLeg`'s `await sleep(600)` after the drive click and after the undo is the same stopwatch.
+`settleUntil(read, pred)` polls the caller's own `run()` until the surface has changed / has
+returned, 16 × 400ms, returning the LAST read on exhaustion so a drive that genuinely does not
+restore still VOIDs with the numbers it always did. **Said plainly: this did NOT change
+Immersion's outcome** — the three VOIDs above survived 6.4s of polling and are real. It is landed
+because it is the identical defect class to 49 and strictly widens a wait, not because it fixed
+anything measured here.
+
+### Where `immersion` stands
+
+**4 of 8: cat1, cat3, cat5, cat6 at 10/10. cat4 FAIL (deadRegion, maximized only). cat8 VOID (no
+deterministic drive). cat2 and cat7 NOT RUN this turn.** Running total **19 of 25 sections at
+80/80** — unchanged, `immersion` is NOT certified — and **47 category cells remain**: 51 at the
+start of this turn minus cat1, cat3, cat5 and cat6. **153 of 200.**
