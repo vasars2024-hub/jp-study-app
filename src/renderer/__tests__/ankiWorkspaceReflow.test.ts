@@ -80,6 +80,19 @@ describe('anki workspace reflow', () => {
     expect(body).toMatch(/grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s+minmax\(\s*320px\s*,\s*420px\s*\)/);
   });
 
+  it('lets the field-mapping action row wrap instead of pushing Reset out of the frame', () => {
+    // A nowrap flex row's min-content is the SUM of its items. `.fm-actions` has two consumers
+    // (FieldMappingEditor, NoteCssEditor) and both put a "Save …" primary beside a "Reset to …"
+    // secondary: 90 + 10 gap + 92 = 192 against the 134 px the row gets inside the "Field
+    // templates" section at the 260 px window minimum. Measured 2026-09-05: scrollWidth 168 vs
+    // clientWidth 134, Reset's box ending 19 px past the section edge, behind
+    // `.fwin-body { overflow-x: hidden }` — so no scrollbar could reach it.
+    const body = ruleBody(CSS, '.fm-actions');
+    expect(body).not.toBeNull();
+    expect(body).toMatch(/display:\s*flex/);
+    expect(body).toMatch(/flex-wrap:\s*wrap/);
+  });
+
   it('reads the rule, not the prose that documents it', () => {
     // The negative control for this file's own instrument. The comment above the query names
     // `grid-template-columns`, `minmax(320px, 420px)` and `@container ankiview` in prose; if

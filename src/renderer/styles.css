@@ -6347,8 +6347,17 @@ mark.lookup-mark,
   color: var(--muted);
   font-family: inherit;
 }
+/* `flex-wrap: wrap`: both consumers (FieldMappingEditor, NoteCssEditor) put a "Save …" primary
+   and a "Reset to …" secondary in this row, and a nowrap flex row's min-content is the SUM of
+   its items — 90 + 10 gap + 92 = 192 against the 134 px this row actually gets inside the
+   "Field templates" section at the 260 px window minimum. Measured 2026-09-05 by rubric
+   category 4: `div.fm-actions` scrollWidth 168 vs clientWidth 134, with the Reset button's box
+   ending 19 px past the section's right edge — and `.fwin-body` is `overflow-x: hidden`, so
+   there was no scrollbar that could reach it. Same repair, and the same reason, as
+   `.dict-search` one screen up. */
 .fm-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
 }
