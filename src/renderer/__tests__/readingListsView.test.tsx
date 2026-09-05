@@ -483,6 +483,40 @@ describe('ReadingListsView', () => {
       expect(host.querySelector('.rl-preview')).not.toBeNull();
     });
 
+    it('does not promise the preview comes before the save, because it does not', async () => {
+      /**
+       * Boss audit 2026-09-05 attempt 4, Finding 4. The empty state read "you
+       * will see what it found before anything is saved", while
+       * `createListWithPaste` writes FIRST and previews in the `.then()` — the
+       * test above pins that order on purpose, so the copy was the wrong half,
+       * not the code. A user who cancelled the preview was left holding a named
+       * empty list they never confirmed.
+       *
+       * Guarded against what actually RENDERS rather than by scanning the
+       * catalog source, so a reworded string is checked in the same place a
+       * reader sees it.
+       */
+      const store = new FakeStore(sealReadingListsDocument(emptyReadingListsDocument()));
+      installBridge(store);
+      await render();
+
+      const empty = host.querySelector<HTMLElement>('[data-testid="rlv-empty-grid"]');
+      expect(empty).not.toBeNull();
+      expect(empty?.textContent ?? '').not.toMatch(/before anything is saved|nothing is saved/i);
+
+      // ...and the reason it must not say that: the write lands before the
+      // preview does. Measured here rather than asserted from the copy.
+      await click(byText('Try it with this'));
+      await typeInto(host.querySelector<HTMLInputElement>('#rlv-empty-name'), 'From a friend');
+      await click(
+        host.querySelector<HTMLButtonElement>(
+          '[data-testid="rlv-empty-grid"] .rlv__paste-actions button',
+        ),
+      );
+      expect(store.writes).toBe(1);
+      expect(host.querySelector('.rl-preview')).not.toBeNull();
+    });
+
     it('never shows a bare “No items”, and offers a route out of an empty list', async () => {
       const context = createReadingListsMutationContext(1_700_000_000_000);
       const made = createReadingList(emptyReadingListsDocument(), { name: 'Empty' }, context);

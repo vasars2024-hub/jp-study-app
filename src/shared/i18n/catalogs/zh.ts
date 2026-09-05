@@ -11223,7 +11223,7 @@ export const zh: Catalog = {
     '无法读取你的阅读清单文件，也没有更早的副本可以回退，因此从空白开始。无法读取的文件仍在磁盘上，并未被删除。',
   'readingLists.view.health.dismiss': '关闭',
   'readingLists.view.empty.grid':
-    '还没有书单。取个名字，再把别人发给你的消息粘贴进来——保存之前你可以先看看识别出了什么。',
+    '还没有书单。取个名字，再把别人发给你的消息粘贴进来——书单会先创建好，然后你就能看到识别出了什么。',
   'readingLists.view.empty.list':
     '这个书单里还什么都没有。粘贴一段别人发给你的消息，或者添加一本你已经有的书。',
   'readingLists.view.library.add': '从书库添加',

@@ -1725,3 +1725,25 @@ entry immediately above is correct about `{}`; it is one level too shallow.
 
 The lesson that generalizes: **a guard written against the literal that produced the
 bug is not a guard against the bug.** `{}` was the example, not the class.
+
+## 2026-09-05, `primary` — Finding 4: the first-run copy promised the preview came before the save
+
+Same audit, §11's own surface. `readingLists.view.empty.grid` read *"you will see
+what it found before anything is saved."* `createListWithPaste`
+(`ReadingListsView.tsx:1219-1239`) calls `write(...)` to mint and PERSIST the list
+and only previews in the `.then()`; `readingListsView.test.tsx:449-484` pins that
+order deliberately, asserting `store.writes === 1` at the moment the preview
+stands. So the code and its test agreed with each other and disagreed with the
+sentence on screen, and a user who cancelled the preview was left holding a named
+empty list they never confirmed.
+
+The write-then-preview order is load-bearing — it is what lands the user *inside*
+the list so the result is visible and removable in one action instead of
+create-then-find-then-paste. So the copy moved, not the flow: *"the list is
+created first, then you will see what it found."* All four catalogs;
+`i18n-check` exit 0, 12,509 keys.
+
+The guard is a rendered-DOM test, not a catalog scan, so it checks the string
+where a reader actually meets it, and it measures the write order in the same
+test rather than trusting the copy. Mutation control: restoring the old sentence
+turned **exactly 1 red, by name**; restored byte-identical (`b3012f32`), 78/78.

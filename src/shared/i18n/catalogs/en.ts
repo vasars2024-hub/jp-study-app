@@ -11856,7 +11856,7 @@ export const en: Catalog = {
     'Your reading-lists file could not be read and there was no earlier copy to fall back on, so this is starting empty. The unreadable file is still on disk and has not been deleted.',
   'readingLists.view.health.dismiss': 'Dismiss',
   'readingLists.view.empty.grid':
-    'No lists yet. Name one and paste the message someone sent you — you will see what it found before anything is saved.',
+    'No lists yet. Name one and paste the message someone sent you — the list is created first, then you will see what it found.',
   'readingLists.view.empty.list':
     'Nothing in this list yet. Paste a message someone sent you, or add a book you already have.',
   'readingLists.view.library.add': 'Add from library',
