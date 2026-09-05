@@ -132,9 +132,23 @@ export function useImmersion() {
   const [sites, setSites] = useState<ImmersionSite[]>([]);
   const [siteQuery, setSiteQuery] = useState('');
   const normalizedSiteQuery = siteQuery.trim().normalize('NFKC').toLowerCase();
-  const filteredSites = useMemo(() => sites.filter((site) =>
-    `${site.title} ${site.url}`.normalize('NFKC').toLowerCase().includes(normalizedSiteQuery),
-  ), [sites, normalizedSiteQuery]);
+  /**
+   * The haystack depends on `sites` alone, so it is folded ONCE per rail change
+   * rather than once per keystroke. `String.prototype.normalize('NFKC')` is an ICU
+   * call that allocates a new string every time, and this rail is ~1,200 sites on a
+   * real profile — re-folding all of them on every character is work the query
+   * cannot change the answer to.
+   */
+  const siteHaystacks = useMemo(
+    () => sites.map((site) => `${site.title} ${site.url}`.normalize('NFKC').toLowerCase()),
+    [sites],
+  );
+  const filteredSites = useMemo(
+    () => (normalizedSiteQuery
+      ? sites.filter((_, index) => siteHaystacks[index].includes(normalizedSiteQuery))
+      : sites),
+    [sites, siteHaystacks, normalizedSiteQuery],
+  );
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const [popup, setPopup] = useState<PopupState>(null);
@@ -1182,7 +1196,10 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
       <ImmersionSiteSearch state={state} />
       {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
       <VirtualList
-        key={siteQuery.trim().normalize('NFKC').toLowerCase()}
+        /* Was `key={normalizedQuery}`, which reset the scroll offset by REMOUNTING the
+           scroller and every windowed row on every keystroke. `resetScrollKey` is the
+           same behaviour in place — see the prop's own note for the measurement. */
+        resetScrollKey={siteQuery.trim().normalize('NFKC').toLowerCase()}
         items={filteredSites}
         itemHeight={IMMERSION_SITE_ROW_HEIGHT}
         /* `lq-hit-scope` on the list, not on 20 identical rows: the remove button renders
