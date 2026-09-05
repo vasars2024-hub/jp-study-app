@@ -4365,3 +4365,41 @@ button, so only 2 of 3 gesture legs run. cat7 is the heaviest and stays last.
 
 **App state left as found:** dossier CLOSED, presentation STANDARD, window `680x657` at
 `(162,114)`. All in-page recorder globals (`__ck`, `__ckh`, `__ev`) deleted.
+
+## 2026-09-04 · backup — City cat4 PASS 10/10; the art-plate exclusion was already ported, and its control proves it is not a free pass
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged.
+
+City is now **7 of 8 categories closed** (cat1, cat2, cat3, cat4, cat5, cat6, cat8). **Only cat7
+remains.**
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 4 | Use of space | **10/10** | 2 of 2 reachable sizes: default `680x657` and compact `260x170`, each `clipped 0` / `overlaps 0` / `horizontalScrollers 0` / `hiddenOverflowX 0` / `deadPctViewport 0%`; `dominantCanvasPct` **99.4** default, **98.1** compact; `chromePct 0`; every leg `restored true`, `visibleAtEveryRead true` | four, three applicable and all fired: injected clip `clipped 0→1→0`; **art-plate exclusion** plant hanging out by **279 px** counted as a plate with `clipped` correctly NOT rising and the box named in `artPlateClips` (21→23); backdrop plant `overlaps 0→3→0` and **not** excused as a backdrop; sub-minimum shrink to `200x140` held at 0/0/0/0 |
+
+**The handoff's instruction to "port cat2's art-plate exclusion into cat4 FIRST" is STALE — it was
+already there, and I checked before writing code rather than after.** `cat4-use-of-space.cjs`
+carries it at its own corrections 19/20 and again in `overflowIsAllPlates` (lines 573-599 and
+878-915), and those comments cite City's `main.reading-garden` and the 39-layer scene **by name**,
+so the port had already been made by the worker that hit it. Zero harness lines changed this cell.
+
+What makes it a judgement rather than an escape hatch is its own control, which is why the number
+above is quotable: a planted box that hangs out by 279 px **is** a plate, so `clipped` must not
+rise — and separately the plain injected clip **must**, which it does, `0 → 1 → 0`. Both halves
+measured in the same run.
+
+**The missing Maximize is refused, not faked, and not silently dropped from the denominator.**
+`sizesExpected 2`, `sizesRan 2`, and `sizesUnreachable` names the reason with the evidence beside
+it: `chromeButtonTitles` = `["Pop out into its own window", "Make Liquid", "Minimize", "Close"]`,
+`frameless true`, `noMaximizeAffordance true`. `contentGrowsNotChromePair` therefore reads
+`compact -> default` rather than pretending a third size ran. A `.fwin-max` faked with an inline
+width would measure a size the product never paints.
+
+**EXACT NEXT SLICE: City cat7 (performance under real load) — the last cell, and City closes at
+8 of 8 if it holds.** Note for whoever runs it: an earlier L9 cat7 run scored City PASS 10/10 on
+2026-08-31 (p50 16.6 / p95 17.1, `noiseFloorOver100 0`, 131 elements), but that was the RULE C
+pair for a different bullet and is **not** transferable to this surface's 8-category card — re-run
+it. Its heavy leg is unprompted (13 canvas layers, 48 stars, 22 dust motes paint untouched) and the
+sky console's Star / Asteroid / Ice-barrage buttons are `data-dev-only` and must NOT be fired.
+
+**App state left as found:** window `680x657` at `(162,114)`, presentation STANDARD, dossier CLOSED.
