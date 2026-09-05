@@ -64,7 +64,7 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
   const content = (
     <div className="jiten-novels" data-novels-mode={mode}>
       {!sourcesMode ? (
-        <Toolbar className="jiten-novels-toolbar" aria-label={t('novelsView.aria.commands')}>
+        <Toolbar className="jiten-novels-toolbar lq-contextual" aria-label={t('novelsView.aria.commands')}>
           <div className="jiten-search-wrap">
             <Icon name="search" size={15} />
             <input
@@ -100,7 +100,7 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
       {status && <div className="jiten-status banner">{status}</div>}
 
       <div className="jiten-workbench">
-        <aside className="jiten-filters" aria-label={t('novelsView.aria.filters')}>
+        <aside className="jiten-filters lq-contextual" aria-label={t('novelsView.aria.filters')}>
           <NovelsFilters state={state} />
         </aside>
 
@@ -110,7 +110,7 @@ export default function NovelsView({ mode = 'plan' }: NovelsViewProps) {
               <NovelsTable state={state} />
             </main>
 
-            <aside className="jiten-inspector" aria-label={t('novelsView.aria.inspector')}>
+            <aside className="jiten-inspector lq-contextual" aria-label={t('novelsView.aria.inspector')}>
               <NovelsInspector state={state} />
             </aside>
           </>

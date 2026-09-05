@@ -10571,6 +10571,17 @@ mark.lookup-mark,
   align-items: center;
   flex-wrap: wrap;
 }
+/* `.lq-contextual` deliberately relaxes `min-height` to 0 so a migrated region can
+   shrink inside whatever host it was placed in (`theme/liquid-surfaces.css`). On a
+   toolbar that is a flex ITEM of a height-constrained column, that permission is
+   wrong, and the base rule is NOT gated on Liquid so it applies in both
+   presentations. Measured live 2026-09-04 the moment the primitive went on: this
+   strip went 772x45 -> 772x18, its 32px controls squeezed by the column above the
+   table. A toolbar is the one contextual region that must keep its content height. */
+.jiten-novels-toolbar.lq-contextual {
+  flex: 0 0 auto;
+  min-height: auto;
+}
 .jiten-search-wrap {
   min-width: 240px;
   flex: 1;
