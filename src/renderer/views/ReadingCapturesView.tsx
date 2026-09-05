@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReadingLensHistoryEntry } from '../../shared/readingLensHistory';
 import type { ReadingPassageHandoff } from '../../shared/readingPassageHandoff';
 import Icon from '../components/Icons';
@@ -36,10 +36,11 @@ export const READING_CAPTURE_ROW_HEIGHT = 52;
 export const ALL_SOURCES = 'all';
 export type CaptureOrder = 'newest' | 'oldest';
 
-type HistoryState =
-  | { kind: 'loading' }
-  | { kind: 'ready'; entries: ReadingLensHistoryEntry[] }
-  | { kind: 'error' };
+type HistoryState = {
+  kind: 'loading' | 'ready' | 'error';
+  /** Keep the last successful read visible while refreshing or recovering. */
+  entries: ReadingLensHistoryEntry[];
+};
 
 /** The just-handed-off passage, projected into the same row shape as history. */
 interface PassageRow {
@@ -87,7 +88,8 @@ export interface ReadingCapturesViewProps {
 
 export default function ReadingCapturesView({ passage }: ReadingCapturesViewProps) {
   const { t } = useT();
-  const [history, setHistory] = useState<HistoryState>({ kind: 'loading' });
+  const [history, setHistory] = useState<HistoryState>({ kind: 'loading', entries: [] });
+  const historyRequest = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Open by default: this is the section's navigation, and a cold open with the
   // list closed shows an empty reader and no visible way to fill it.
@@ -101,27 +103,35 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   const cover = useReadingDocumentCover();
 
   const load = useCallback(() => {
+    const request = ++historyRequest.current;
     const list = window.api?.lensHistoryList;
     if (typeof list !== 'function') {
-      setHistory({ kind: 'error' });
+      setHistory((previous) => ({ ...previous, kind: 'error' }));
       return () => undefined;
     }
-    let cancelled = false;
-    setHistory({ kind: 'loading' });
-    void Promise.resolve(list({ limit: HISTORY_LIMIT }))
+    setHistory((previous) => ({ ...previous, kind: 'loading' }));
+    void Promise.resolve()
+      .then(() => list({ limit: HISTORY_LIMIT }))
       .then((entries) => {
-        if (cancelled) return;
-        setHistory({ kind: 'ready', entries: Array.isArray(entries) ? entries : [] });
+        if (request !== historyRequest.current) return;
+        if (Array.isArray(entries)) setHistory({ kind: 'ready', entries });
+        else setHistory((previous) => ({ ...previous, kind: 'error' }));
       })
       .catch(() => {
-        if (!cancelled) setHistory({ kind: 'error' });
+        if (request === historyRequest.current) {
+          setHistory((previous) => ({ ...previous, kind: 'error' }));
+        }
       });
     return () => {
-      cancelled = true;
+      if (request === historyRequest.current) historyRequest.current += 1;
     };
   }, []);
 
-  useEffect(() => load(), [load]);
+  useEffect(() => {
+    load();
+    // This also invalidates manual refreshes, whose cleanup is not an effect.
+    return () => { historyRequest.current += 1; };
+  }, [load]);
 
   // A newly arrived passage is recorded into history by the lens, so refresh
   // rather than splicing: the stored row carries the seen-count and pinned flag
@@ -152,7 +162,7 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
   }, [passage, load, cover]);
 
   const rows = useMemo<PassageRow[]>(() => {
-    const stored = history.kind === 'ready' ? history.entries.map(rowFromHistory) : [];
+    const stored = history.entries.map(rowFromHistory);
     if (!passage) return stored;
     const live = rowFromHandoff(passage);
     return [live, ...stored.filter((row) => row.captureId !== live.captureId)];
@@ -223,7 +233,7 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
 
   const listBody = (
     <>
-      {history.kind === 'loading' && rows.length === 0 ? (
+      {history.kind === 'loading' ? (
         <p className="reading-captures-note muted" aria-live="polite">
           {t('reading.captures.loading')}
         </p>
