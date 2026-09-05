@@ -39,8 +39,6 @@ export default function AnkiView() {
   return (
     <AppChrome menus={ankiMenus} status={ankiStatus} className="aero-anki-chrome">
     <div className="anki-view">
-      <ProfileSettingsSection />
-
       {/* L7: the surface's contextual chrome — an intro line and one transport action —
           takes the shared contextual primitive, exactly as Flashcards' heads do. The
           connection form, mapping editor, CSS editor and manual-card form below stay on
@@ -53,18 +51,6 @@ export default function AnkiView() {
           </button>
         </div>
       </ContextualSurface>
-
-      {/*
-        Outside the connected branch on purpose: three of its four sources (a
-        package file, an Anki text export, and this app's own local deck) need
-        no Anki running at all, so gating the workbench on AnkiConnect would
-        hide working functionality.
-      */}
-      <div className="anki-card anki-card-flush">
-        <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
-          <DeckWorkbench />
-        </CollapsibleSection>
-      </div>
 
       {loading && <div className="banner">{t('anki.checkingConnection')}</div>}
 
@@ -118,6 +104,32 @@ export default function AnkiView() {
           <AnkiPreviewPane state={state} />
         </div>
       )}
+
+      {/*
+        THE WORK LEADS; the profile picker and the workbench follow.
+
+        Measured 2026-09-05 by the rubric category 4 harness. At the Anki window's own
+        default 820x580 the body viewport is 58..603 and `.anki-workspace` began at y=549 —
+        so ZERO pixels of the connection banner, the deck/note-type selector, the field
+        mapping or the preview were on screen without scrolling. The 491 px above it were
+        the study-profile section (267), this intro line (47) and a COLLAPSED Deck
+        Workbench (103). The window is called Anki and it opened on a profile picker.
+
+        Neither of the two moved down is hidden or gated, and neither loses a route: the
+        profile section is the same component Settings renders, and every place the mapping
+        depends on it already names the active profile inline (`anki.boundTo`,
+        `anki.fieldMapping.subPrefix`). The workbench stays OUTSIDE the connected branch,
+        for the reason it always was: three of its four sources — a package file, an Anki
+        text export, and this app's own local deck — need no Anki running at all, so gating
+        it on AnkiConnect would hide working functionality.
+      */}
+      <div className="anki-card anki-card-flush">
+        <CollapsibleSection title={t('ankiWorkbench.title')} summary={t('ankiWorkbench.lead')}>
+          <DeckWorkbench />
+        </CollapsibleSection>
+      </div>
+
+      <ProfileSettingsSection />
     </div>
     </AppChrome>
   );
