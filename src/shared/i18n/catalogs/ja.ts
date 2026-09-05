@@ -3661,6 +3661,7 @@ export const ja: Catalog = {
     'まだキャプチャはありません。リーディングレンズで文章を読み取り、ここへ送ってください。',
   'reading.captures.justCaptured': '送信直後',
   'reading.captures.selectHint': '読むキャプチャを選んでください。',
+  'reading.captures.moreCaptures': 'ほかのキャプチャ',
   'reading.captures.untitled': '画面キャプチャ',
   'reading.captures.lineCount': {
     other: '{count} 行',

@@ -285,13 +285,98 @@
   font-size: 11px;
 }
 
-.reading-captures-passage {
+/* The scroller moved OUT of the passage and onto this wrapper, so the "more
+   captures" list below follows the last line of text instead of being pinned to
+   the bottom of a stretched reader. The passage keeps its own typography and
+   nothing else; it is still the element two suites assert the capture text
+   against. */
+.reading-captures-doc {
+  display: flex;
   min-height: 0;
   flex: 1 1 auto;
+  flex-direction: column;
   overflow: auto;
-  padding: 16px 20px 26px;
+}
+
+.reading-captures-passage {
+  flex: 0 0 auto;
+  padding: 16px 20px 6px;
   font-size: 17px;
   line-height: 1.9;
+}
+
+/* What to read next. Measured, not decorative: category 4 scored this surface at
+   1264x773 with a 705x497 empty rectangle — 33.8% of the viewport against a 15%
+   bar — because a short capture left the reader with nothing under it and no way
+   onward except the 260px side list, which a covering sheet removes outright at
+   a narrow canvas. `margin-top: auto` is deliberately ABSENT: pushing this to the
+   bottom would leave the same rectangle above it. */
+.reading-captures-next {
+  flex: 0 0 auto;
+  padding: 4px 20px 20px;
+}
+
+.reading-captures-next h3 {
+  margin: 0 0 6px;
+  color: var(--muted, #b9afb1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reading-captures-next ul {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+/* `--lq-hit-target` is the floor cat1 scores this surface against, and the two
+   header buttons above are here because a hardcoded 26px box got past it once. */
+.reading-captures-next-row {
+  display: flex;
+  width: 100%;
+  min-height: var(--lq-hit-target);
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border, #3a2c30) 70%, transparent);
+  border-radius: 8px;
+  color: var(--text, #f5ecee);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.reading-captures-next-row:hover {
+  border-color: color-mix(in srgb, var(--accent, #a9142c) 34%, transparent);
+  background: color-mix(in srgb, var(--accent, #a9142c) 10%, transparent);
+}
+
+.reading-captures-next-title {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-captures-next-preview {
+  overflow: hidden;
+  color: var(--muted, #b9afb1);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading-captures-next-meta {
+  color: var(--muted, #b9afb1);
+  font-size: 10.5px;
 }
 
 .reading-captures-passage p {

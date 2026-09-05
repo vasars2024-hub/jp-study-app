@@ -3574,6 +3574,7 @@ export const en: Catalog = {
     'Nothing captured yet. Scan a passage with the Reading Lens and send it here.',
   'reading.captures.justCaptured': 'Just sent',
   'reading.captures.selectHint': 'Select a capture to read it.',
+  'reading.captures.moreCaptures': 'More captures',
   'reading.captures.untitled': 'Screen capture',
   'reading.captures.lineCount': {
     one: '{count} line',

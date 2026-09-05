@@ -3918,6 +3918,7 @@ export const ru: Catalog = {
     'Захватов пока нет. Отсканируйте фрагмент Читающей линзой и отправьте его сюда.',
   'reading.captures.justCaptured': 'Только что отправлено',
   'reading.captures.selectHint': 'Выберите захват, чтобы прочитать его.',
+  'reading.captures.moreCaptures': 'Другие захваты',
   'reading.captures.untitled': 'Снимок экрана',
   'reading.captures.lineCount': {
     one: '{count} строка',

@@ -97,4 +97,39 @@ describe('the Reading Finder reflows to its own pane', () => {
     const narrow = bodiesOf(BARE, /@container\s+rfwork[^{]*\(\s*max-width/).join('\n');
     expect(narrow).toMatch(/flex-wrap:\s*wrap/);
   });
+
+  /**
+   * The wrap above had no ceiling, and that is a different defect from the one
+   * this file was opened for.
+   *
+   * Measured live 2026-09-05 at the 260x170 the category-4 harness scores as
+   * compact: the container is 212x103, nine tabs wrap to ~187px of nav, and
+   * `main.reading-workspace-panel` comes out at **height 0, laid out 84px below
+   * the window's own bottom edge**. `.reading-captures` inside it measured
+   * 202x20 and painted outside the frame — 9 clipped nodes. After the ceiling:
+   * nav 46px, panel **222x57 inside the workspace**, and the section is back in
+   * the window.
+   *
+   * jsdom lays nothing out, so the live numbers are the score and this guards
+   * the two declarations that produce them. Both are required: a `max-height`
+   * without `overflow-y` would hide the wrapped rows with no way to reach them,
+   * which trades a collapsed panel for lost navigation.
+   */
+  it('caps the wrapped strip so the panel cannot be squeezed to nothing', () => {
+    const narrow = bodiesOf(BARE, /@container\s+rfwork[^{]*\(\s*max-width/).join('\n');
+    const nav = /\.reading-workspace-nav\s*\{[^}]*\}/.exec(narrow);
+    expect(nav, 'the narrow @container block no longer styles .reading-workspace-nav').not.toBeNull();
+    expect(nav![0], 'a wrapping strip with no ceiling collapses the panel').toMatch(
+      /max-height:\s*\d+%/,
+    );
+    expect(nav![0], 'capped height with no scroll loses the wrapped rows').toMatch(
+      /overflow-y:\s*auto/,
+    );
+  });
+
+  it('keeps one row of tabs as the floor, so the cap cannot hide the strip entirely', () => {
+    const base = /\.reading-workspace-nav\s*\{[^}]*\}/.exec(BARE);
+    expect(base, '.reading-workspace-nav base rule set not found').not.toBeNull();
+    expect(base![0]).toMatch(/min-height:\s*\d+px/);
+  });
 });

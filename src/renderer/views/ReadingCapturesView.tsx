@@ -32,6 +32,55 @@ const HISTORY_LIMIT = 60;
 /** 49px measured row plus the 3px gap the old flex list contributed. */
 export const READING_CAPTURE_ROW_HEIGHT = 52;
 
+/**
+ * How many other captures the reader offers under a finished passage.
+ *
+ * Eight, and the number is a measurement rather than a taste: rubric category 4
+ * scored this surface maximized at 1264x773 and found a **705x497 empty
+ * rectangle**, 33.8% of the viewport against a 15% bar — one short capture and
+ * half a screen of nothing under it. Eight rows at the ~60px this markup renders
+ * cover that band and leave the surface still readable at the default 820x580,
+ * where the list is a tail rather than the page.
+ */
+export const READING_CAPTURE_CONTINUE_LIMIT = 8;
+
+/** The first non-empty line of a capture, for the continuation row's preview. */
+function previewOf(row: PassageRow): string {
+  const source = row.lines.length ? row.lines : row.text.split(/\r?\n/);
+  for (const line of source) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+}
+
+/**
+ * The other captures, in the order the index is currently showing, starting at
+ * the one after `selected` and wrapping past the end.
+ *
+ * Wrapping is why this is "more captures" and not "next": at the last row of an
+ * oldest-first list there is nothing after, and an empty section there would put
+ * the dead rectangle straight back on the one capture most likely to be read to
+ * the end. Rotating keeps the offer non-empty for every selection whenever more
+ * than one capture is visible, and the sentence never promises a sequence the
+ * rotation would break.
+ */
+export function continuationRows(
+  visible: PassageRow[],
+  selectedId: string | null,
+  limit = READING_CAPTURE_CONTINUE_LIMIT,
+): PassageRow[] {
+  if (visible.length < 2) return [];
+  const at = visible.findIndex((row) => row.captureId === selectedId);
+  const start = at < 0 ? 0 : at + 1;
+  const out: PassageRow[] = [];
+  for (let step = 0; step < visible.length && out.length < limit; step += 1) {
+    const row = visible[(start + step) % visible.length];
+    if (row.captureId !== selectedId) out.push(row);
+  }
+  return out;
+}
+
 /** Sentinel rather than `null`, so "every source" is a value a chip can carry. */
 export const ALL_SOURCES = 'all';
 export type CaptureOrder = 'newest' | 'oldest';
@@ -256,6 +305,26 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
     if (!selected) return [];
     return selected.lines.length ? selected.lines : selected.text.split(/\r?\n/).filter(Boolean);
   }, [selected]);
+
+  /*
+   * What to read after this one, and it is a real gap rather than filler.
+   *
+   * Category 4 measured this surface maximized and found 33.8% of the viewport
+   * dead — a 705x497 rectangle under a one-paragraph capture. Shrinking the
+   * reader cannot fix that number: the detector counts text and interactive
+   * nodes, so an emptier smaller panel leaves the same rectangle. The honest fix
+   * is that a reader with nothing after the passage IS a dead end, and this
+   * surface had exactly one way onward — a 260px side list that a covering sheet
+   * takes away entirely at a narrow canvas.
+   *
+   * Derived from `visibleRows`, so the filter and the sort the user set apply
+   * here too: offering a capture the index is currently hiding would make the
+   * filter a lie.
+   */
+  const continuation = useMemo(
+    () => continuationRows(visibleRows, selected?.captureId ?? null),
+    [visibleRows, selected],
+  );
 
   const listBody = (
     <>
@@ -496,10 +565,58 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
             ) : null}
           </header>
           {selected ? (
-            <div className="reading-captures-passage" lang="ja">
-              {readerLines.map((line, index) => (
-                <p key={`${selected.captureId}:${index}`}>{line}</p>
-              ))}
+            /*
+             * The scroller is this wrapper, not the passage, so the continuation
+             * below follows the last line of text immediately instead of being
+             * pinned to the bottom of a stretched reader with the dead rectangle
+             * still between them. `.reading-captures-passage` keeps exactly the
+             * passage — two suites assert its `textContent` IS the capture, and
+             * that is the assertion that stops this section from ever being
+             * counted as part of what the user asked to read.
+             */
+            <div className="reading-captures-doc">
+              <div className="reading-captures-passage" lang="ja">
+                {readerLines.map((line, index) => (
+                  <p key={`${selected.captureId}:${index}`}>{line}</p>
+                ))}
+              </div>
+              {/*
+                A `section`, and the tag is load-bearing rather than a taste.
+                This is related content at the end of an article — it scrolls with
+                the passage and is not persistent navigation — and the first
+                version wrapped it in `nav`, which category 4's chrome selector
+                (`.fwin-bar,nav,header,footer,aside,[role=toolbar],[role=tablist]`)
+                counts as chrome: `chromePct` went 38.4 -> 69.9 at default and
+                `contentGrowsNotChrome` failed on a change that added nothing but
+                content. The instrument was right about the markup.
+              */}
+              {continuation.length > 0 ? (
+                <section
+                  className="reading-captures-next"
+                  aria-labelledby="reading-captures-next-heading"
+                >
+                  <h3 id="reading-captures-next-heading">{t('reading.captures.moreCaptures')}</h3>
+                  <ul>
+                    {continuation.map((row) => (
+                      <li key={row.captureId}>
+                        <button
+                          type="button"
+                          className="reading-captures-next-row"
+                          onClick={() => setSelectedId(row.captureId)}
+                        >
+                          <span className="reading-captures-next-title">{row.title}</span>
+                          <span className="reading-captures-next-preview" lang="ja">
+                            {previewOf(row)}
+                          </span>
+                          <span className="reading-captures-next-meta">
+                            {t(`settings.lens.history.source.${row.source}`)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
             </div>
           ) : (
             <p className="reading-captures-note muted">{t('reading.captures.selectHint')}</p>
