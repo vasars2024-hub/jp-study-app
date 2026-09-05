@@ -5696,6 +5696,7 @@ export const ja: Catalog = {
   'immersion.hint': '検索するとライブで開く · F8でモード切替 · F6でフォーカス · Ctrl+LでURLバー',
   'immersion.sites': 'サイト',
   'immersion.rail.empty': '保存したサイトがここに表示されます。どのページもブックマークできます。',
+  'immersion.rail.destinations': 'おすすめのサイト',
   'immersion.visitsCount': {
     other: '訪問{count}回',
   },

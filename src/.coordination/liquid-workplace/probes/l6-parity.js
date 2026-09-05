@@ -552,7 +552,7 @@
         { id: 'windowLifecycle', f: (w) => lifecycle(w) },
       ],
       steps: {
-        // CORRECTION 53, 2026-09-05: the typed text ALTERNATES between drives, and that is
+        // CORRECTION 55, 2026-09-05: the typed text ALTERNATES between drives, and that is
         // load-bearing rather than cosmetic. The `output` row passes only if the pane text
         // CHANGED from what `step('run')` recorded — a deliberate guard, because this pane's
         // pre-first-run state is the sentence "Translation appears here." and a `length > 0`
@@ -649,7 +649,7 @@
       // live feature scored dead by the order it was driven in. Whatever records a "before"
       // for a row runs LAST among the steps that can disturb it.
       //
-      // CORRECTION 49, 2026-09-05: `swap` ran SECOND, straight after `type`, and
+      // CORRECTION 51, 2026-09-05: `swap` ran SECOND, straight after `type`, and
       // `.tr-swap` does not only reverse the direction — it EXCHANGES the two texts.
       // Measured live on the running window: input `猫が好きです` / output `I like cats.`
       // → click → input `I like cats.` / output `猫が好きです`. So typing and then
@@ -677,7 +677,7 @@
         // `swap` is a DRIVE step, not a mutation, so `restore()` never used to undo it and
         // the driver left the translate direction reversed on the live desktop. A harness
         // that drives persisted UI state owes it back exactly as it found it.
-        // CORRECTION 51, 2026-09-05: this used to null `__LQP_SWAP_BEFORE` after clicking,
+        // CORRECTION 53, 2026-09-05: this used to null `__LQP_SWAP_BEFORE` after clicking,
         // and the `swap` FEATURE ROW reads that same global as its "before" — with it null
         // the row is UNMEASURED by its own rule, so the post-restore re-check could never
         // get back to the pre-mutation baseline. Every mutation therefore reported

@@ -6245,6 +6245,7 @@ export const ru: Catalog = {
   'immersion.hint': 'Поиск открывается в прямом режиме · F8 — смена режима · F6 — фокус · Ctrl+L — строка адреса',
   'immersion.sites': 'Сайты',
   'immersion.rail.empty': 'Сохранённые сайты появятся здесь. Добавьте в закладки любую страницу.',
+  'immersion.rail.destinations': 'Куда пойти читать',
   'immersion.visitsCount': {
     one: '{count} посещение',
     few: '{count} посещения',

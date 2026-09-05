@@ -1766,12 +1766,12 @@ function scoreSnapshot(s) {
     return 'clicked';
   })()`);
   /**
-   * CORRECTION 54, 2026-09-05: click, POLL for the mode asked for, and click again — six
+   * CORRECTION 56, 2026-09-05: click, POLL for the mode asked for, and click again — six
    * attempts. Both legs below were one click and one `sleep(900)` read, against a `.fwin`
    * presentation toggle that is measured-intermittent (it lands roughly every other
    * programmatic click, in both directions, on the same button within the same minute).
    * `cat3-liquid-utilization.cjs` fixed this in `clickPresentationToggle` and
-   * `cat6-feature-parity.cjs` in `flip()` (correction 50); cat5 was the third file with
+   * `cat6-feature-parity.cjs` in `flip()` (correction 52); cat5 was the third file with
    * the same single-shot read and never got it.
    *
    * What it cost, measured on `translate`: the Q6 leg refused with `toggle did not reach

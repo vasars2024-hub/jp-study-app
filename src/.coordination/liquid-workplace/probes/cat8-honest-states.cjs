@@ -808,6 +808,24 @@ const churnWitness = (base, driven, restored) => (CHURN
  * asserted against the RESTING text hash — so a disclosure left open fails the restore exactly
  * as a stranded query does. Neither leg alone changes behaviour.
  */
+/**
+ * Read the surface until `pred` holds, then return that read; return the LAST read if the budget
+ * runs out. The read is the caller's own `run()`, so nothing about what is measured changes -
+ * only when. Deliberately returns rather than throws on exhaustion: the caller's guards already
+ * report `surfaceChanged` and `restored` with real values, and a drive that truly never restores
+ * must still VOID with those values rather than with a timeout.
+ */
+async function settleUntil(read, pred, tries = 16, everyMs = 400) {
+  let last = null;
+  for (let i = 0; i < tries; i += 1) {
+    await sleep(everyMs);
+    last = await read();
+    if (last && last.refuse) return last;
+    if (pred(last)) return last;
+  }
+  return last;
+}
+
 async function driveLeg(base) {
   let opener = null;
   if (DRIVE_CLICK && DRIVE_INPUT) {
@@ -823,11 +841,17 @@ async function driveLeg(base) {
   } else if (DRIVE_CLICK) {
     const hit = JSON.parse(await ev(clickEl(DRIVE_CLICK, 'click')));
     if (hit.refuse) return { refuse: hit.refuse };
-    await sleep(600);
-    const driven = await run();
+    // CORRECTION 50, the same lesson as 49 one leg over: 600ms is a stopwatch, not a settle.
+    // Immersion's undo re-opens a REAL page over the network, so `restored` was read while the
+    // navigation was still in flight and the leg VOIDed with `surfaceChanged: true,
+    // restored: false` on a round trip that had in fact restored - the exact false negative the
+    // header at line 131 already warns about, arriving through a different door. Both waits are
+    // now polls for the condition each one is actually waiting for, and both return the LAST
+    // read when the budget runs out, so a drive that genuinely does not restore still VOIDs
+    // with the same numbers it always did.
+    const driven = await settleUntil(run, (r) => r.textHash !== base.textHash);
     const undo = JSON.parse(await ev(clickEl(DRIVE_UNDO || DRIVE_CLICK, 'undo')));
-    await sleep(600);
-    const restored = await run();
+    const restored = await settleUntil(run, (r) => r.textHash === base.textHash);
     if (driven.refuse) return { refuse: `driven: ${driven.refuse}` };
     return {
       click: DRIVE_CLICK,
@@ -991,6 +1015,29 @@ const langRuns = (isBase) => `(function(){
  * repo has now shipped twice. Two languages whose text hashes are identical on a surface with
  * text runs are either both untranslated or both the same language, and neither is a pass.
  */
+/**
+ * Wait for a language click to LAND, rather than for a stopwatch. Polls `<html lang>` and the
+ * effective stored language (absent === 'en', correction 37) until both name the tag that was
+ * asked for, or the budget runs out - in which case it returns anyway and the caller's guard
+ * reports the refusal with the real values, exactly as it did before. It never waits for a
+ * language nobody asked for, so a click that hit the wrong control still refuses immediately
+ * after the budget rather than being polled into a pass.
+ */
+async function settleLang(tag, stored, tries = 24, everyMs = 250) {
+  for (let i = 0; i < tries; i += 1) {
+    await sleep(everyMs);
+    let s;
+    try {
+      s = JSON.parse(await ev(
+        "JSON.stringify({html:document.documentElement.lang,stored:localStorage.getItem('ui-lang')})",
+      ));
+    } catch (e) { continue; }
+    const effective = s.stored === null || s.stored === undefined ? 'en' : s.stored;
+    if (s.html === tag && effective === stored) return { landed: true, afterMs: (i + 1) * everyMs };
+  }
+  return { landed: false, afterMs: tries * everyMs };
+}
+
 async function langLeg() {
   const tags = [
     { tag: 'en', stored: 'en' },
@@ -1013,8 +1060,16 @@ async function langLeg() {
     for (const l of tags) {
       const clicked = JSON.parse(await ev(clickLang(l.tag)));
       if (clicked.refuse) return { refuse: `${clicked.refuse} (${l.tag}) - the Settings language control must be on screen` };
-      // The catalog is a dynamic import; the switch lands on its resolution, not on the click.
-      await sleep(1400);
+      // CORRECTION 49. A FIXED SLEEP IS NOT A SETTLE, and this one produced BOTH failure modes
+      // in one run on 2026-09-05: the `ja` leg refused with `<html lang> says en` while 日本語
+      // was in fact the active segment by the time a human looked, and the `finally` restore
+      // then clicked English INSIDE the window the ja import was still resolving in, so the app
+      // was left in Japanese - the exact residue correction 15 exists to prevent. The catalog is
+      // a dynamic import and its resolution time is a function of machine load, so 1400ms is a
+      // guess that gets slower under exactly the conditions a relay run creates. Poll for the
+      // landing instead; the guard below is unchanged and still fires when the click genuinely
+      // hit the wrong control, because the poll only ever waits for the tag that was asked for.
+      await settleLang(l.tag, l.stored);
       const r = await run();
       if (r.refuse) return { refuse: `${l.tag}: ${r.refuse}` };
       // Correction 37: AN ABSENT `ui-lang` IS ENGLISH, and reading it as "the switch did not
@@ -1047,7 +1102,11 @@ async function langLeg() {
     }
   } finally {
     await ev(clickLang(restoreTag));
-    await sleep(1400);
+    // Correction 49, second half and the half that actually caused damage: the restore used the
+    // same 1400ms guess, so when a refusal fired mid-loop the restore click landed INSIDE the
+    // window the refused language's import was still resolving in, and that import then won.
+    // The app was left in Japanese by a leg whose whole purpose was to put it back.
+    await settleLang(restoreTag, restoreTag === 'zh-Hans' ? 'zh' : restoreTag);
     // Correction 37, second half: the leg must put back the ABSENCE of the key too. When the
     // profile arrived with no `ui-lang` at all, clicking English restores the language but
     // leaves `ui-lang: "en"` written — the same effective state, a different profile. The repo

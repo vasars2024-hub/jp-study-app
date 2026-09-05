@@ -391,7 +391,7 @@ async function settle(where) {
 /**
  * Flip presentation and READ IT BACK. A toggle that did not land must not be scored.
  *
- * CORRECTION 50, 2026-09-05: this was ONE `toggleLiquid` and ONE `sleep(900)` read, and the
+ * CORRECTION 52, 2026-09-05: this was ONE `toggleLiquid` and ONE `sleep(900)` read, and the
  * `.fwin` presentation toggle is INTERMITTENT under a programmatic click — it lands roughly
  * every other time, in both directions, on the same button within the same minute. That is
  * already measured and already fixed once, in `cat3-liquid-utilization.cjs`'s
@@ -1099,7 +1099,7 @@ async function runDuplication() {
           restored: A(restored.restored),
           afterRestore: after.refused ? null : `${after.reachable}/${after.total}`,
           returned: !after.refused && !pre.refused && after.reachable === pre.reachable,
-          // CORRECTION 52, 2026-09-05: the same "a VOID that names nothing" rule as above,
+          // CORRECTION 54, 2026-09-05: the same "a VOID that names nothing" rule as above,
           // applied to the OTHER half of the control. `returned: false` published only two
           // counts — `7/7` before, `6/7` after — and said nothing about WHICH row is still
           // down, so "a mutation did not restore" read exactly the same whether the undo

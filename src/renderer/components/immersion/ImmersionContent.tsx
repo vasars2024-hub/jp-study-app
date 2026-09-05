@@ -1123,7 +1123,7 @@ export const IMMERSION_SITE_ROW_HEIGHT = 53;
  * 112x overdraw and 6,182 elements — with every row in the DOM.
  */
 export function ImmersionSiteList({ state }: { state: ImmersionState }) {
-  const { t, sites } = state;
+  const { t, sites, currentUrl } = state;
   return (
     <div className="immersion-rail">
       {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
@@ -1165,6 +1165,49 @@ export function ImmersionSiteList({ state }: { state: ImmersionState }) {
           </div>
         )}
       />
+      {/*
+       * The curated destinations, in the rail, and ONLY once a page is open.
+       *
+       * Measured: `IMMERSION_STARTERS` had exactly two routes — `ImmersionStage`'s
+       * empty state and `ImmersionView`'s aero Sites menu — and the empty state is
+       * by definition gone the moment a page loads. So on the surface this rail
+       * belongs to, the five destinations were reachable only by CLOSING the page
+       * you were reading, which discards the current page's extraction. Putting
+       * them here makes the route non-destructive, and the `currentUrl` guard is
+       * what keeps them from rendering twice: with no page open the stage already
+       * shows them, larger and with its own disclosure split.
+       *
+       * This is also the honest fill for category 4's dead region on this surface.
+       * The rail is a fixed 220px column whose one saved-site row left 572px of it
+       * empty at maximize (15.6% dead against a 15 bar). `cat4-use-of-space.cjs`
+       * marks coverage from text nodes and interactive elements, so a panel's own
+       * background marks nothing — only real content moves that number.
+       */}
+      {currentUrl && (
+        <div className="immersion-rail-destinations lq-hit-scope">
+          <h4 className="immersion-rail-destinations-head">{t('immersion.rail.destinations')}</h4>
+          <ul className="immersion-rail-destination-list">
+            {IMMERSION_STARTERS.map((s) => (
+              <li key={s.url}>
+                <button
+                  type="button"
+                  className="immersion-rail-destination"
+                  title={s.url}
+                  onClick={() => {
+                    state.setMode('reader');
+                    state.navigate(s.url, { mode: 'reader' });
+                  }}
+                >
+                  <span className="immersion-rail-destination-label">{s.label}</span>
+                  {s.lang !== 'auto' && (
+                    <span className="immersion-rail-destination-lang muted">{s.lang.toUpperCase()}</span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

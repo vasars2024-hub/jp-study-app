@@ -5711,6 +5711,7 @@ export const en: Catalog = {
   'immersion.hint': 'Search opens Live · F8 cycles modes · F6 Focus · Ctrl+L URL bar',
   'immersion.sites': 'Sites',
   'immersion.rail.empty': 'Saved sites appear here. Bookmark any page.',
+  'immersion.rail.destinations': 'Destinations',
   'immersion.visitsCount': {
     one: '{count} visit',
     other: '{count} visits',
