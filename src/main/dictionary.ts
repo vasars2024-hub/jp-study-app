@@ -79,6 +79,10 @@ import { normalizePolicy } from '../shared/agentExecutionBridge';
 import { dictionaryDir } from './dictionary/db';
 import { disposeDictionaryReads, readDictionary } from './dictionary/readIpc';
 import { warmDictionaryPages, type DictWarmResult } from './dictionary/warmup';
+import {
+  scheduleDictionaryCacheWarmup,
+  type CacheWarmupLeg,
+} from './dictionary/cacheWarmup';
 import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
 import {
   notesToCsv,
@@ -749,11 +753,50 @@ export function cancelScheduledDictionaryWarmup(): void {
   warmupTimer = null;
 }
 
+/**
+ * A short, ordinary Japanese sentence for the warm-up's own lookup. Its content
+ * does not matter — the measurement in `dictionary/cacheWarmup.ts` showed a
+ * disjoint passage warms the path as well as the scored one — only that it has
+ * kana, so `analyzeInterlinearPartOfSpeech`'s kana gate opens and the tokenizer
+ * leg is genuinely exercised rather than skipped.
+ */
+export const DICT_CACHE_WARMUP_PASSAGE = '猫が窓の外を見ている。';
+
+/**
+ * The three caches the first interlinear otherwise builds mid-interaction.
+ *
+ * `interlinear` runs LAST on purpose: by then the other two are warm, so its
+ * recorded time is the *residual*. A large residual means the warm-up is aimed
+ * at the wrong things and says so in its own log line, rather than needing a
+ * separate probe to find out.
+ */
+export function dictionaryCacheWarmupLegs(): CacheWarmupLeg[] {
+  return [
+    // One resolve is enough: the 551,605-rank tables are parsed on the first
+    // call and held in `freqDictFilesCache` for the life of the process.
+    { name: 'frequency', run: () => resolveCustomFrequencyRanks('猫', undefined, 'ja') },
+    { name: 'tokenizer', run: () => getMainJapaneseTokenizer() },
+    {
+      name: 'interlinear',
+      run: () =>
+        lookupOfflineInterlinearMerged(DICT_CACHE_WARMUP_PASSAGE, {
+          sourceLangs: ['ja'],
+          withFrequency: true,
+          withPartOfSpeech: true,
+        }),
+    },
+  ];
+}
+
 export function registerDictionaryIpc(): void {
   // The read worker (`dictionary/readIpc.ts`) is spawned on first use; this is
   // the one place that knows the app is leaving, so it is where it is reaped.
   app.on('before-quit', disposeDictionaryReads);
   scheduleDictionaryWarmup();
+  // ...and the in-process half of the same problem, armed later so the page
+  // warm-up above has already put dict.db in the file cache. See
+  // `dictionary/cacheWarmup.ts` for the measurement that separates the two.
+  scheduleDictionaryCacheWarmup({ legs: dictionaryCacheWarmupLegs() });
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number) => lookupTerm(query, limit));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
