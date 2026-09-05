@@ -6683,3 +6683,104 @@ per the enumeration entry above (`b815d159`) — **no cell moved this turn.**
   not every possible main-loop pause. No absolute timing improvement or cat7 closure claimed.
 - Next: Anki's five-minute poll retains every note's full HTML fields until the final fold;
   reduce that retained payload while preserving note counts, interval merge and profile cancellation.
+
+## 2026-09-05 10:20-11:15 EDT — primary2 — `anki`, the 20th surface: the "most expensive of the eight to open" was the cheapest available, and cat4 found two unreachable-control defects
+
+**sampled-out this turn: `city` `immersion` `reading` `translate` `files` `player` `novels`
+`dictionary` `music`** — nine, named, not silently truncated. `anki` was taken because the
+09:05 enumeration (`b815d159`) records it at **0 of 8 banked** — the largest single block of
+open cells anywhere on this matrix — and because the pin's 2026-09-05 02:20 note cleared its
+data blocker. Re-derived live rather than inherited: the surface's own banner read
+**"Connected — 84 decks, 35 note types."**, `.anki-selects select` held **84** options and
+five `.anki-card` regions rendered. This is not an empty harness.
+
+### The instrument, and why nobody had to author a spec after all
+
+The enumeration prices `anki` as "needs both a cat6 spec and a cat7 SPECS entry — the most
+expensive of the eight to open". True, and it is exactly why nobody opened it. But that prices
+only **two** of the eight cells: cat1/cat2/cat3/cat4/cat5/cat8 take a surface argument and need
+no spec at all. **Six of `anki`'s eight cells were reachable with no scaffolding whatsoever**,
+and that reading of the routing table had gone unmade for six turns.
+
+No new probe was written this turn. RULE 1 holds: `cat4-use-of-space.cjs` and
+`cat3-liquid-utilization.cjs` were run as-is, with `--surface "Anki" --win 1`.
+
+### Environment — a second Electron, because the only app running was a PRODUCTION boot
+
+`Get-ScheduledTask ClaudeRelay-*` showed `codexB` dispatched; the only Electron on the box was
+`electron .` from `jp-study-app` — a **production** boot, which has no debug bridge by design,
+so no port in 39270-39330 answered. Rather than touch it I started my own on
+`JP_USER_DATA_DIR=~\.claude-runs\p2-anki-profile` + `JP_DEBUG_PORT=39350` per the recorded
+fresh-profile recipe. Consent modal and the 8-step tour both dismissed before any capture.
+**A fresh profile does not weaken this surface**: the Anki data arrives over AnkiConnect on
+127.0.0.1:8765, not from the profile, which is why `anki` is the one section a scratch instance
+can score honestly.
+
+### The cells
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat3 Liquid utilization | **PASS 10/10** | `--presentation liquid` (it REFUSED at `standard`, correctly: a standard window is meant to be opaque). 49 regions — Work 5, Liquid-eligible 2, Anchor 19, Anchor(holds work) 9, Ambient 14; 26 controls skipped. `denseWorkOnTranslucent` **0**, `liquidTreatedEligible` 2 of `eligibleTotal` 2, `sharedPrimitiveEligible` 2. All three bars true. Control run separately: **`CONTROL FAILED AS REQUIRED — category 3 instrument is proven`**, `denseWorkOnTranslucent` **0 -> 1 (one region glassed) -> 5 (all glass) -> 0 restored**, `ungroundMarked` 11 with **0 survivors**, `ungroundVacuous` **false**, `returned`/`oneMaterialReturned`/`allGlassReturned` all true. |
+| cat4 Use of space | **FAIL — 6 of 7 bars, and NOT claimed** | First run: `clipped` `horizontal` `contentGrowsNotChrome` all FAILED. Two product repairs landed (below). After them: `clipped` `overlaps` `horizontal` `deadRegion` `allThreeSizes` `restored` all PASS; **`contentGrowsNotChrome` still FAILS** — `chromePct` **5.7** at default 820x580 against **16.3** at maximized 1264x773, so the chrome share RISES with the window. `dominantCanvasPct` is fine and rises with it, 93.7 -> 95.3. |
+
+**Running total 164 -> 165 of 192, 27 remaining.** One cell, not two. cat4 stays open.
+
+### Two product defects, both controls the user could not reach, both fixed and re-measured
+
+`50cf0628` **the preview column deleted the editing column beside it.** `.anki-workspace` is
+`minmax(0, 1fr) minmax(320px, 420px)`; the second track cannot shrink, so the grid floors at
+320 + 24 gap while the track beside it is free to reach **0**. At the 260px window minimum
+(`MIN_W`, `DesktopShell.tsx:322`) five `section.collapse-section` reported `182>0`, `83>0`,
+`92>0`, `74>0`, `64>0` — a client width of ZERO for the deck picker, note type, field mapping,
+note CSS, manual card form and the whole deck workbench — with `div.fwin-body 362>248` and six
+nodes painted outside a frame whose `overflow-x` is `hidden`. At the window's **own default**
+size the tracks resolved to `328px 420px`: the read-only preview wider than the entire editing
+column. Repaired with the container-query idiom `.visual-novel-workspace` already uses in this
+sheet; 880px is derived from `.anki-selects label`'s own 180px floor, not chosen. Re-measured:
+clipped **6 -> 0**, hidden-overflow **6 -> 1**, tracks `328px 420px` -> `772px`, deck labels
+**280 -> 339** each. 5 tests, **M1/M2/M3 all applied and all red**, styles.css restored
+byte-identical (sha256).
+
+`de6bb1b0` **"Reset to automatic" sat 19px outside the frame with no scrollbar.** The residual
+`section.collapse-section 182>162`. No single child was wider than the section, so the overflow
+was a row's own min-content: `div.fm-actions` at scrollWidth **168** vs clientWidth **134**,
+its second `button.btn` ending **19px** past the section edge. A nowrap flex row's min-content
+is the SUM of its items (90 + 10 + 92 = 192), and both consumers — `FieldMappingEditor.tsx:230`
+and `NoteCssEditor.tsx:61` — put a "Save …" primary beside a "Reset to …" secondary, so the
+secondary is always the one pushed out. `flex-wrap: wrap`, same repair as `.dict-search`.
+Re-measured: `.fm-actions` 168 -> **134** against 134, and **zero** overflowing collapse
+sections at compact. **M4 red**, restored byte-identical.
+
+### The one bar left open, stated plainly rather than excused
+
+`contentGrowsNotChrome` asks that chrome share not RISE from default to maximized.
+`chromeSel` counts `aside`, and `AnkiPreviewPane` renders `<aside class="lq-contextual
+card-preview">` — correct HTML for a complementary region. After the reflow the preview stacks
+BELOW the fold at 820px (so it clips to almost no area and chrome reads 5.7 = the `.fwin-bar`
+alone) and sits beside the main column at 1264px (420x538 visible, chrome 16.3). **My own fix
+widened this gap**: default chromePct was 9.1 before it and is 5.7 after. The bar was already
+failing at 9.1 vs 16.3, so this is not a regression I introduced — but it is a number that
+moved against me and it is published rather than buried.
+
+Whether that is a product defect or a stacked-vs-side-by-side discontinuity in the metric is
+**not settled here, and must not be settled by excluding the element** — RULE 1 forbids a
+surface-specific exception and correction 17 already records what happens when this metric
+picks its denominator to suit. The next worker on `anki` should decide it against the harness's
+own definition, with the compact->default pair as the cross-check.
+
+### Deliberately NOT changed, so it is not mistaken for an oversight
+
+`:root[data-materials='aero'] .aero-anki-chrome .anki-workspace` carries the **same**
+unshrinkable-track shape (260px at `aero-apps.css:2396`, then 286px at :5762) — but a different
+scroll model: `overflow: hidden` on the workspace with each column `overflow-y: auto`.
+Collapsing that to one column could put the preview inside a hidden-overflow flex child and
+make it unreachable, which is the defect it would be fixing. It needs its own measurement in
+that theme and is left open rather than copied blind. The live app measured on the DEFAULT
+theme (`data-materials` null, no `.aero-anki-chrome`).
+
+### For the next worker on this surface, so the six-turn oversight is not repeated
+
+`anki`'s remaining cells are **cat1, cat2, cat5, cat8** (no spec needed — run them) plus
+**cat4** (one bar) and **cat6/cat7** (which genuinely do need the `l6-parity.js` app spec and
+the `cat7-perf.cjs` SPECS entry the enumeration names). The same reading applies to `player`
+and `reading`: their missing specs block **two** cells each, not eight.
