@@ -105,6 +105,24 @@ export default function TorrentManagerPage() {
   const settings = useMemo(() => resolveScraperSettings(doc), [doc]);
   const qbit = settings.qbittorrent;
 
+  // Which indexes a search would actually reach. This is the EFFECTIVE filter,
+  // not one side of it: `ipcScraperPort` narrows by kind and by `indexerIds`,
+  // and `searchTorrents` in main narrows again by `enabled` — so a profile whose
+  // only index is switched off reaches nothing while passing the port's half.
+  //
+  // Why the page needs it at all: with nothing surviving, main returns `[]`
+  // without a request and this row rendered "0 matching releases", which is the
+  // same sentence as a query that genuinely matched nothing — and only the
+  // second of those is worth retyping. `sources.entries` ships as `[]`
+  // (`shared/scraperSourceSettings.ts`), so that is every new profile.
+  const reachableIndexers = useMemo(() => {
+    const wanted = new Set(settings.torrents.indexerIds);
+    return settings.sources.entries.filter(
+      (entry) =>
+        entry.kind === 'torrent' && entry.enabled && (!wanted.size || wanted.has(entry.id)),
+    );
+  }, [settings]);
+
   // Only the mode in force is asked about: with a key stored and a stale
   // password ref left behind, reporting on both is two answers to one question.
   const credentialRef = qbit.authMode === 'apiKey' ? qbit.apiKeyRef : qbit.passwordRef;
@@ -137,13 +155,20 @@ export default function TorrentManagerPage() {
   const credentialPresence = resolveCredentialPresence({ ref: credentialRef, vaultHas });
 
   const search = useCallback(async () => {
+    // No reachable index, no request. Main would refuse it into `[]` anyway; not
+    // asking keeps the empty table and the reason beside it from disagreeing
+    // about whether a search ever ran.
+    if (!reachableIndexers.length) {
+      setResults([]);
+      return;
+    }
     const rows = await port.searchTorrents({
       text: query,
       minSeeders: minSeeders ? Number(minSeeders) : undefined,
       resolution: resolution || undefined,
     });
     setResults(rows);
-  }, [port, query, minSeeders, resolution]);
+  }, [port, query, minSeeders, resolution, reachableIndexers.length]);
 
   useEffect(() => {
     void search();
@@ -590,7 +615,18 @@ export default function TorrentManagerPage() {
               { value: '720p', label: '720p' },
             ]}
           />
-          <span className="scr-muted">{sxn('torrent.matches', results.length)}</span>
+          {reachableIndexers.length ? (
+            <span className="scr-muted">{sxn('torrent.matches', results.length)}</span>
+          ) : (
+            // Two causes, two different fixes: nothing to search versus something
+            // that is switched off. Collapsing them would send a user with no
+            // sources at all hunting for a toggle that does not exist.
+            <Pill tone="warn">
+              {settings.sources.entries.some((entry) => entry.kind === 'torrent')
+                ? sx('torrent.indexersAllOff')
+                : sx('torrent.noIndexers')}
+            </Pill>
+          )}
         </div>
 
         {sendReport && (
