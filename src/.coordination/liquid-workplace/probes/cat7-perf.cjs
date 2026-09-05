@@ -710,10 +710,18 @@ const SPECS = {
        * nothing would otherwise report 40 clean ticks of doing nothing at all.
        */
       label: 'swap the language pair 40 times through its own control',
-      // 40 ticks at 120 ms is 4.8 s; the window is widened to 7 s for the same reason `agent`
-      // widens its own -- each swap re-renders the interlinear, so the interval slips, and a
-      // short count must refuse rather than pass as a complete run.
-      durationMs: 7000,
+      // 40 ticks at 120 ms is 4.8 s; the window is widened for the same reason `agent` widens
+      // its own -- each swap re-renders the interlinear, so the interval slips, and a short
+      // count must refuse rather than pass as a complete run.
+      //
+      // 7000 was not enough once correction 60 replaced the fixed 250 ms tail read with a poll:
+      // the probe returns at `durationMs` and the proof is read immediately after it, so a poll
+      // still running at that moment answers "the settle poll never finished" and VOIDs a leg
+      // that ran. The swap loop ends at 4.8 s and the poll gives up at 12 s, so the window has
+      // to cover 16.8 s. The extra seconds are SAMPLED, not idle padding -- `-DurationMs` sets
+      // how long main availability is watched, and the idle leg beside it uses the same number,
+      // so the comparison stays like-for-like.
+      durationMs: 20000,
       js: `(() => {
         delete window.__lqTranslateLoad;
         const root = document.querySelector('.tr-view');
