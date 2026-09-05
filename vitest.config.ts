@@ -23,6 +23,8 @@ const REAL_MODULES = realpathSync(resolve(__dirname, 'node_modules'));
 
 export default defineConfig({
   server: { fs: { allow: [searchForWorkspaceRoot(__dirname), REAL_MODULES] } },
+  // Match the renderer's adopted-media alias so shell tests link the real component.
+  resolve: { alias: { '@': resolve(__dirname, 'vendor/seanime-web') } },
   test: {
     include: [
       'src/shared/__tests__/**/*.test.ts',
@@ -52,7 +54,12 @@ export default defineConfig({
       // They now live beside their only consumer. Node-env applies here too: a test in this
       // tree may import the pure modules, never `StudyPlayerSlice.tsx` itself, which pulls
       // React and the adopted bundle.
-      'src/media/**/*.test.ts',
+      //
+      // `.tsx` added 2026-09-05 for exactly the reason audit U9 added it to
+      // `src/renderer/__tests__` a month earlier: a `.tsx` test placed here would not be
+      // skipped, it would be SILENTLY never collected and read as passing. There were no
+      // such files at the time, so this adds one and strands none.
+      'src/media/**/*.test.{ts,tsx}',
     ],
     environment: 'node',
     testTimeout: 20000,

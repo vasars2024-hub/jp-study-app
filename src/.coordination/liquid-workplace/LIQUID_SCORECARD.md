@@ -7551,3 +7551,28 @@ a path with no consumer today, and I could not verify it live: the shared app is
 must not be restarted. Shipping an unverified behavioural flip on three playback paths two days
 out is the trade this plan says not to make. It is a real defect, it is now measured, and it
 wants one turn that owns the app.
+
+## 2026-09-05 17:31 EDT — codexB — interrupted notification-host recovery
+
+- Recovered slice at HEAD `adee728b`: index empty; host/test/shell/catalog/test-glob edits
+  dated 14:42–14:46 were still uncommitted. Files-app has landed; audit fixes exist at HEAD.
+- Decision: one claimed Toaster per renderer document, outside StatusGate, with a body portal;
+  shared workspace and Blanc player can coexist, and closing the owner passes the claim.
+  Preserve the separate studyWorkspace stylesheet edit and immersion catalog keys unstaged.
+- Completed the host's dismissal target (20x20 -> **32x32** measured in Chromium), desktop
+  and narrow-view taskbar clearance, and semantic palette inheritance through the portal.
+- **7/7 focused tests**: visible error, no-host negative control, no duplicate layer, owner
+  transfer, final teardown, StrictMode/dismissal, two real offline MediaSurfaceShells.
+  Test wiring includes media TSX discovery and the renderer's existing `@` alias in Vitest.
+- Live headless existing video-study harness: **Request failed with status code 500**,
+  region **Media notifications alt+T**, Close label **Close**, bottom clearance **64px**.
+  Screenshot outside repo: ~/.claude-runs/browser-out/.codex/recovery-media-notification.png.
+  Console: favicon 404 only. Early manual emission used a second unversioned sonner module;
+  using the host's observed versioned Vite module made the notification visible.
+- i18n **12,539 keys**, no missing locales. Import/export **2,674 files, zero broken imports**.
+  ESLint config's existing `vitest/config` resolver error remains; no suppression added.
+- Shared bridge windows 1 and 2 both render empty bodies, with zero recorded errors;
+  no shared restart or userData change. This prevents claiming a real server-failure walk.
+- **No rubric cell or timeline bullet closed**: this repairs the blocking notification path;
+  the player still requires its own populated, controlled rubric pass. Full gates follow later
+  this turn against a detached checkpoint, not the foreign dirty tree.

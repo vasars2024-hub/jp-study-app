@@ -8687,6 +8687,7 @@ export const en: Catalog = {
   'mediaWorkspace.sidecar.ready': 'ready',
   'mediaWorkspace.sidecar.offline': 'offline',
   'mediaWorkspace.sidecar.failed': 'failed',
+  'mediaWorkspace.notifications': 'Media notifications',
   'mediaWorkspace.viewLabel': 'Media view',
   'mediaWorkspace.viewLibrary': 'Library',
   'mediaWorkspace.backToLibrary': 'Back to the library',

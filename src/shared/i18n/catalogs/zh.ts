@@ -8242,6 +8242,7 @@ export const zh: Catalog = {
   'mediaWorkspace.sidecar.ready': '就绪',
   'mediaWorkspace.sidecar.offline': '离线',
   'mediaWorkspace.sidecar.failed': '失败',
+  'mediaWorkspace.notifications': '媒体通知',
   'mediaWorkspace.viewLabel': '媒体视图',
   'mediaWorkspace.viewLibrary': '媒体库',
   'mediaWorkspace.backToLibrary': '返回媒体库',

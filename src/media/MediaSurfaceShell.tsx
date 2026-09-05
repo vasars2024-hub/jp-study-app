@@ -40,6 +40,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import type { Status } from '../../vendor/seanime/generated/types';
 import type { SeanimeConnection } from '../shared/seanime';
 import { useT } from '../renderer/i18n';
+import SeanimeToastHost from './SeanimeToastHost';
 import StudyWebsocketProvider from './StudyWebsocketProvider';
 import './mediaWorkspace.css';
 
@@ -156,6 +157,13 @@ export default function MediaSurfaceShell({
       data-media-surface={surface}
       className={className ? `dark ${className}` : 'dark'}
     >
+      {/*
+        Above `StatusGate` on purpose: an offline sidecar is exactly when the adopted code
+        has something to say, and the gate's error branch would otherwise unmount the only
+        thing that can say it. It portals to `document.body`, so its position here costs
+        this element no layout — see `SeanimeToastHost`.
+      */}
+      <SeanimeToastHost />
       <QueryClientProvider client={queryClient}>
         <StatusGate conn={conn}>
           <StudyWebsocketProvider conn={conn}>{children}</StudyWebsocketProvider>

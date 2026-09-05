@@ -8282,6 +8282,7 @@ export const ja: Catalog = {
   'mediaWorkspace.sidecar.ready': '準備完了',
   'mediaWorkspace.sidecar.offline': 'オフライン',
   'mediaWorkspace.sidecar.failed': '失敗',
+  'mediaWorkspace.notifications': 'メディアの通知',
   'mediaWorkspace.viewLabel': 'メディア表示',
   'mediaWorkspace.viewLibrary': 'ライブラリ',
   'mediaWorkspace.backToLibrary': 'ライブラリに戻る',

@@ -9025,6 +9025,7 @@ export const ru: Catalog = {
   'mediaWorkspace.sidecar.ready': 'готов',
   'mediaWorkspace.sidecar.offline': 'недоступен',
   'mediaWorkspace.sidecar.failed': 'сбой',
+  'mediaWorkspace.notifications': 'Уведомления медиатеки',
   'mediaWorkspace.viewLabel': 'Вид медиатеки',
   'mediaWorkspace.viewLibrary': 'Медиатека',
   'mediaWorkspace.backToLibrary': 'Назад в медиатеку',

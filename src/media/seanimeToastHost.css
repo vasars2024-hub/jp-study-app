@@ -1,0 +1,11 @@
+/* The portal inherits the active shell's semantic palette from the document. */
+.seanime-toast-host [data-sonner-toast] {
+  background: var(--lq-anchor-bg, var(--panel));
+  color: var(--lq-anchor-text, var(--text));
+  border-color: var(--lq-anchor-border, var(--border));
+}
+
+.seanime-toast-host [data-sonner-toast] [data-close-button] {
+  width: var(--lq-hit-target, 32px);
+  height: var(--lq-hit-target, 32px);
+}
