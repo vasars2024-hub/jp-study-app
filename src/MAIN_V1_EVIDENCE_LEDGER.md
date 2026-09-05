@@ -27900,3 +27900,50 @@ mutation (refuse every entry) reddens **10 of 42** including the rival, restored
 **Instrument note:** `debug/g14-live.cjs` now injects a real nyaa indexer **on the request** when
 the profile carries none — every scraper call takes its config on the request, so the stored
 profile is never written to. Without it every step here is unmeasurable.
+
+## 2026-09-05 (primary) — Track 9 gate 12 closes live; the sidecar-language hole it exposed
+
+**Gate 12 CLOSES.** Route B ran end to end for the first time — the plan's own record was
+0 for 10 on real batches. Subject `eea983d1…`, `【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock]…简繁外挂字幕`,
+26,414,048,870 bytes, ranked **first** of 3 by the product's own listing. `ok: true`, **12
+subtitle files, 91 s**. Off the daemon's own `torrents/files`: **166 files, byPriority 154:0 /
+12:1, `videoAtNonZeroPriority` = 0.** Disclosed separately: 12 video files carry piece-boundary
+spill, max 0.32 %, **11.5 MB of 26.24 GB (0.044 %)** — block granularity, not a request, and kept
+apart from the scored term so neither claim can hide the other.
+**CONTROL** — fence `filePrio` at the mount: `ok: false`, `filePrio` refused, **`start` 0**. So
+the 154 zeroes are the product's two calls, not a torrent that never started. Both `filePrio`
+calls precede `start`, so no window for video exists. Plan `1f236c71`.
+
+**Finding a Route B subject is a query, not luck.** Batches that carry sidecars say so, in CJK:
+`node debug/g14-live.cjs search "外挂字幕 BDRip"` → 75 rows, several `isBatch: true`. Searching by
+anime title alone will keep reproducing 0-for-10, because the shipped-default profile carries
+**no torrent index at all** and the muxing groups dominate what is left.
+
+**PRODUCT, `520baecf`.** The release's 24 `.ass` are twelve `.sc.ass` + twelve `.tc.ass`, and
+`languageFromFileName` had `zh|chi|chs|cht` but not `sc`/`tc`. All 24 read **unlabelled**, and the
+documented policy KEEPS unlabelled — so a `ja` harvest takes twelve, pays for the transfer, and
+only the post-download kana floor rejects them. Exactly the waste the name check exists to
+prevent, and the reasoning `declaresMuxedSubtitles` already applies to muxing.
+Tradeoff, and it is why the fix is narrow: `sc`/`tc` on the general delimiter rule would relabel a
+`[SC]` group tag and a hyphenated title, and a wrongly-`zh` file is **dropped** from a `ja`
+harvest. A lost subtitle is worse than wasted bytes, so the pair is read only in the dotted slot
+before the extension. MUTATION 1 of 127 red, the exact test; restored md5 `65c24821`.
+
+**TRAP — the mount silently broke every POST, and had done since it was written.** It deleted
+`content-length`, so Node re-sent bodies chunked, and qBittorrent 5.2.3 answers a chunked
+`torrents/add` with a bare **409 Conflict**. Twice. GETs were unaffected and gate 18 drove the
+**stub** leg, so today was the first POST ever forwarded to the real daemon. Gates 11/13/15 would
+each have failed against it and read as product defects. Fixed in the mount, with the measurement
+in the comment.
+
+**TRAP — the reap cannot delete the torrent its own run created**, because `inFlight` holds that
+hash out. Cleanup needs a second run against a *different* target with `add` fenced. The mount
+gained `G12_ALLOW_DELETE_HASH`: `torrents/delete` is forwarded only when it names exactly one
+hash and that hash matches. It is deliberately independent of `G14_RECATEGORIZE`, so the
+Kitsunekko archive (MAL gate 31's evidence) survives either guard failing alone. Verified after,
+no mount: **10 rows, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`, `539c0886…` present,
+paused, progress 100** — the morning's baseline exactly.
+
+**NOT a defect, stated so it is not filed as one:** the control's refusal reads *"qBittorrent
+rejected the API key"* because the mount synthesises a 403 on a route qBittorrent never 403s, and
+403 **is** an auth rejection in its API. Instrument artifact.
