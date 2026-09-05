@@ -7624,3 +7624,34 @@ the next turn's opening slice**, and it is ~10 minutes of work now that the caus
 
 `sampled-out:` no surface was scored, so nothing was skipped. `immersion` keeps cat2/cat7/cat8
 open, `player` its 8, `anki` its 4, `translate` cat7.
+
+### Same turn — the fix landed as `afe88e35`, and two facts that would otherwise cost the next worker an hour
+
+`fwinIn` now animates **transform only** (`styles.css:14887`). Guard:
+`entryAnimationCannotHideAWindow.test.ts`, 4 cases, asserting on the PROPERTY not the value;
+restoring `from { opacity: 0 }` fails 1 of 4. i18n EXIT 0 at 12,537 keys, architecture EXIT 0
+"Nothing new", eslint EXIT 0 on the new test.
+
+**TRAP 1 — `backgroundThrottling: false` IS ALREADY SET and does NOT cover this.** It is on every
+main window (`main.ts:907`, `:1178`, `:1313`, plus `companionHost.ts:107`, `readingLens.ts:327`,
+`systemDictionary.ts:219`). The freeze is **occlusion**, not background throttling: Chromium stops
+producing frames for a covered window whatever that flag says. A worker who reads
+`animations-freeze-in-unfocused-window` and reaches for this flag will add one that is already
+there and conclude the finding was wrong. Also measured: `/focus` returning `focused: true`,
+`document.hasFocus() === true`, a `/screenshot`, and close-and-reopen **all** left it at
+`fwinIn:running:0`. It is not recoverable from the renderer.
+
+**TRAP 2 — this is why harness runs on a covered window refuse, and the refusal names the wrong
+thing.** `cat2-clunkiness.cjs:408` gates every text run on
+`checkVisibility({ checkOpacity: true })`, so a frozen entry animation makes a fully populated
+surface report `0 rendered text runs; an empty surface scores 0, not 10`. Three runs of mine were
+spent on that message before the cause was found. `cat1`/`cat4`/`cat8` share the predicate.
+
+**The class is wider than `.fwin`, and I deliberately did not sweep it.** 15 other keyframes in
+`styles.css` open at `opacity: 0`. Most are user-driven, so the window is being looked at when
+they start. The two that are **not** user-driven, and are therefore the same defect waiting to be
+measured, are `buddy-toast-in` and `mini-toast-in` — `main/buddyScheduler.ts` fires those from the
+main process on a timer, i.e. precisely when nobody is looking at the window. `consent-fade` is
+third: first-run, at boot, before the user has necessarily raised the window. Changing 15
+animations without a gate run two days out is not a trade I would take; changing the one under
+every window in the app is.
