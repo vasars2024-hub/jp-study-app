@@ -6928,17 +6928,85 @@ leg that can reach the AnkiConnect endpoint setting, or a surface-local control 
 one of the four states. Recording it as UNMEASURED rather than inventing a tenth answer is the
 whole point of the bar.
 
+### cat4 — the window grew 444 px and the editing column got none of it. **PASS 10/10**
+
+Two commits, because the first was a real repair that did **not** close the bar and was
+published saying so.
+
+**`f236804c`** — `.anki-workspace` had `grid-template-columns: minmax(0, 1fr) minmax(320px,
+420px)`. A fixed band, so the preview track took the whole gain:
+
+    820x580   container 772   cols "772px"          editor 772
+    1264x773  container 1216  cols "772px 420px"    editor 772
+
+The editor is the same 772 px at both sizes; all 444 px of new width went to a read-only
+preview (420) plus the gap (24). That is §4.1's defect verbatim, and a fixed band can never
+satisfy the bar. The track became a SHARE, `minmax(300px, 32%)` — editor **448 -> 803**,
+preview 300 -> 389 — and the collapse threshold dropped 880 -> **760**, derived: 422 (the
+existing two-up `.anki-selects` derivation) + 24 gap + the preview's 300 minimum = 746.
+
+The 880 threshold had existed because under the old band the tracks at 820 were `328px 420px`
+and the preview outgrew the editor. The proportional track answers that on its own terms
+(448 / 300). And collapsing cost more than it bought: at 820x580 the preview sat at y=1751 in
+a body whose viewport ends at 603 — **1148 px below the fold** — while
+`anki.fieldMapping.subSuffix` tells the user "the preview panel on the right updates as you
+edit". At the app's own default window size that sentence was false.
+
+Re-scored in that commit: 6 bars of 7, no regression at any size, and
+`contentGrowsNotChrome` still FAILED — chromePct 5.7 -> **8.1** default, 16.3 -> **15.4**
+maximized. The gap narrowed 10.6 -> 7.3 points and did not close. Published, not buried.
+
+**`27cd6234`** — what actually blocked it, measured at 820x580, body viewport 58..603:
+
+    set-section  "Study profile"    267 px   y  96
+    view-head    intro + Recheck     47 px   y 363
+    anki-card    Deck Workbench     103 px   y 428   (COLLAPSED)
+    anki-workspace                          y 549   <- below the fold
+
+491 px of a 545 px viewport, so **zero** pixels of the connection banner, the deck/note-type
+selector, the field mapping or the preview were reachable without scrolling. A window called
+Anki opened on a profile picker. The bar cannot pass while the workspace begins below the fold
+at the small size and above it at the large one — this is not a metric artifact, it is the
+metric reading the surface correctly.
+
+The work now leads: view-head, workspace, then the workbench, then the profile section.
+Workspace top **549 -> 139**. Nothing hidden, gated or removed — the profile section is the
+same component Settings renders and the mapping already names the active profile inline
+(`anki.boundTo`, `anki.fieldMapping.subPrefix`); the workbench stays outside the connected
+branch because three of its four sources need no Anki running.
+
+    size        box        chromePct   dominantCanvas   deadRegion
+    default     820x580    34.0        93.7             3.2  (was 6.9)
+    compact     260x170    19.3        78.8             1.0
+    maximized   1264x773   25.7        95.3             8.4  (was 10.1)
+
+Chrome share FALLS 34.0 -> 25.7 and the canvas RISES 93.7 -> 95.3. clipped 0 / overlaps 0 /
+horizontalScrollers 0 / hiddenOverflowX 0 at all three sizes, allThreeSizes true, restored
+true, visibleAtEveryRead true. **failedBars [] and unmeasuredBars [].**
+
+Control, all three plants moved and returned: injectedClip `clipped` 0 -> 1 -> 0
+removalProven; backdropExclusion `overlaps` 0 -> 11 -> 0, plant painted in front and NOT
+excused as a backdrop, removalProven; artPlateExclusion hung its plant out by 269 px, the
+exclusion caught it by name (`artPlateClipCount` 0 -> 1 -> 0) with `clipped` correctly not
+rising. The sub-minimum 200x140 leg is recorded as measured, not scored: clipped 2 /
+hiddenOverflowX 3 below the product's own 260 px minimum.
+
+`325aab04` rewrote `ankiWorkspaceReflow.test.ts`, which encoded the fixed band as literals.
+It now asserts the invariant: the preview's px minimum is still >= 300, the maximum's UNIT is
+`%` and <= 40, and the threshold is bounded on both sides (>= 746, < 880). Mutation control:
+putting `minmax(320px, 420px)` back fails **only** the new SHARE case, 1 of 7.
+
 ### The number
 
-`anki` banked **3 of 8** — cat3 (previous turn), cat1, cat2. Open: cat4 (one bar,
-`contentGrowsNotChrome`), cat8 (one bar, UNMEASURED), cat5+cat6 (parity spec), cat7 (SPECS entry).
+`anki` banked **4 of 8** — cat3 (previous turn), cat1, cat2, cat4. Open: cat8 (one bar,
+UNMEASURED), cat5+cat6 (parity spec), cat7 (SPECS entry).
 
     certified 19 x 8                        152
     translate banked                          7
     immersion banked                          5
-    anki banked                               3
+    anki banked                               4
     reading + player                          0
     ------------------------------------------
-                                            167 of 192, 25 remaining
+                                            168 of 192, 24 remaining
 
-**Quote `167 of 192, 25 remaining` from here forward.**
+**Quote `168 of 192, 24 remaining` from here forward.**
