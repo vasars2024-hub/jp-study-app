@@ -899,6 +899,14 @@ for this title" while the index held that exact release.
 
 #### Gate 14 RE-DERIVED 2026-09-05 (primary). Still open, and the blocker has CHANGED — read this before re-running the probe.
 
+> **SUPERSEDED the same day — gate 14 CLOSED at `ad493a19`, further down this file under
+> "GATE 14 CLOSES 2026-09-05".** This section is correct as written and is kept because its
+> diagnosis is what made the close possible; a second `primary` session, running concurrently in
+> the same tree, reached the identical `sources.entries` length 0 finding minutes apart and then
+> built the fix this section names — passing the indexer on the request. Do not read this heading
+> alone and report the gate as open. (This plan is a chronological log, so a gate can read "still
+> open" here and "closed" ninety lines later; the later entry wins.)
+
 The relay pin says gate 14 is unblocked because "the listing returns 10 real torrents". The
 transfers half is true; the **listing** half is not, and the two are different calls.
 
