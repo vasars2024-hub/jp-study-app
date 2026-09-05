@@ -739,8 +739,39 @@ const SNAP = `(function(){
   window.__cat5primaries = [].concat(explicitPrimary ? [explicitPrimary] : [], accentButtons, primaryInputs)
     .filter(function(e, i, a){ return e && a.indexOf(e) === i; });
 
+  /*
+   * CORRECTION 38 (2026-09-04, backup) -- THIS HARNESS WAS THE LAST ONE STILL SCORING
+   * DEBUG CONTROLS NO PACKAGED BUILD SHIPS.
+   *
+   * The product marks a development-only subtree data-dev-only next to its own
+   * import.meta.env.DEV guard -- an attribute, deliberately machine-readable, written for
+   * exactly this (ReadingGardenSkyEvents.tsx:300-309). cat4 (isDevOnly, line 555), cat7
+   * (correction 28) and cat8 (correction 28, both the text walk and the language leg) all
+   * honour it. cat5 did not, and it is the only harness that still charged those controls to
+   * a product score.
+   *
+   * Measured live on City through the bridge before the change: the frameless root holds ONE
+   * [data-dev-only] root, DIV.lq-hit-scope reading-garden-sky-console, and 4 of the surface's
+   * 9 painted controls sit inside it -- Sky sim, Star, Asteroid, Ice barrage. Q6's ONLY
+   * untreated Liquid region was div.reading-garden-sky-console-body, that same subtree's
+   * panel: the whole category turned on motion the user can never see.
+   *
+   * THIS IS NOT AN ESCAPE HATCH, and the difference from --shell-chrome is the point:
+   * --shell-chrome is a RUN parameter, so a run can name anything it likes and empty the
+   * count. This reads an attribute the PRODUCT writes beside a real build-time guard -- a
+   * surface cannot opt out of its score without also removing the control from the shipped
+   * build, which is the honest version of the same move. Both counts are published
+   * (devOnlyControls, devOnlyLiquidRegions) so a reader can add them back and disagree with
+   * the rule rather than with the verdict.
+   *
+   * NO BACKTICKS IN THIS BLOCK -- it sits inside the in-page template literal, and writing
+   * them here is exactly how this correction failed to parse on its first run.
+   */
+  function devOnly(e){ return !!e.closest('[data-dev-only]'); }
+  var devOnlyControls = controls.filter(devOnly).length;
+
   // ---- Q4: advanced tools tucked away, default view not cluttered. ------------------------
-  var collapsed = rq('details:not([open]),[aria-expanded="false"]').filter(painted);
+  var collapsed = rq('details:not([open]),[aria-expanded="false"]').filter(painted).filter(function(e){ return !devOnly(e); });
   function repeatingRow(e){
     return e.closest('.dict-entry,[class*="-row"],[class*="-card"],[class*="-item"],[class*="-spotlight"],li'); }
   // --shell-chrome: the same rule as the .fwin-bar exclusion below, extended to the selectors
@@ -749,7 +780,7 @@ const SNAP = `(function(){
   // template literal and one backtick ends it — that cost a run.)
   var SHELL_SEL = ${A(SHELL_CHROME)};
   function shellChrome(e){ return !!SHELL_SEL && !!e.closest(SHELL_SEL); }
-  var notPageControls = controls.filter(function(e){ return !repeatingRow(e) && !e.closest('.fwin-bar'); });
+  var notPageControls = controls.filter(function(e){ return !repeatingRow(e) && !e.closest('.fwin-bar') && !devOnly(e); });
   var shellControls = notPageControls.filter(shellChrome);
   var chromeControls = notPageControls.filter(function(e){ return !shellChrome(e); });
   /*
@@ -902,6 +933,47 @@ const SNAP = `(function(){
   function digest(str){
     for (var di = 0; di < str.length; di++) paintKey = ((paintKey * 33) ^ str.charCodeAt(di)) >>> 0;
   }
+  /*
+   * CORRECTION 39 (2026-09-04, backup) -- A THIRD WITNESS, BECAUSE THE FIRST TWO CANNOT TELL
+   * "THE SWAP NEVER HAPPENED" FROM "THIS SURFACE DOES NOT READ THE PALETTE".
+   *
+   * Both existing witnesses are properties of THIS SURFACE's own paint: minRatio, and the
+   * djb2 digest above. That is deliberate, and it is why the guard is a VOID rather than a
+   * pass -- from the surface alone the two cases are genuinely indistinguishable, and this
+   * repo has a recorded incident of a dataset theme flip reporting the OPPOSITE background.
+   *
+   * But it means a surface can be VOIDed for being CORRECT. City is that case: its chrome is
+   * a fixed rgba plate over a night-sky canvas, so after the frameless-glyph repair
+   * (bfba48af) nothing it paints depends on the palette -- both cells report minRatio 12.42
+   * and the same paint digest, and the run VOIDed on the very property the fix was for.
+   *
+   * The witness that separates them is not on the surface at all: it is whether the SWAP
+   * REACHED THE CASCADE. This resolves a fixed list of palette custom properties on
+   * documentElement -- the tokens every themed surface derives from -- and digests them. If
+   * those moved and the surface's paint did not, the surface provably does not read the
+   * palette, which is an ANSWER to "stable contrast", not an absence of one. Measured on
+   * City: --bg #0d0c12 -> #ffffff and --text #f5f4f7 -> #1e1e1e across the two cells.
+   *
+   * IT CANNOT MANUFACTURE A PASS, and that is checkable rather than asserted: it only ever
+   * retires a VOID, the failing-run bar is untouched (failingCount must still be 0 in BOTH
+   * cells for Q5 to read YES), both cells must have measured something so it cannot rescue an
+   * empty harness, and a run whose theme attribute never changed leaves this digest identical
+   * too -- which is the negative control recorded with this correction. The resolved values
+   * are published per cell so a reader can check the swap by eye.
+   *
+   * NO BACKTICKS IN THIS BLOCK -- it sits inside the in-page template literal.
+   */
+  var PALETTE_TOKENS = ['--bg','--text','--muted','--panel','--panel-2','--border','--accent','--accent-2'];
+  var paletteValues = {}, paletteKey = 5381;
+  (function(){
+    var rootCs = getComputedStyle(document.documentElement);
+    PALETTE_TOKENS.forEach(function(tok){
+      var v = (rootCs.getPropertyValue(tok) || '').trim();
+      paletteValues[tok] = v;
+      var s = tok + '=' + v + ';';
+      for (var pi = 0; pi < s.length; pi++) paletteKey = ((paletteKey * 33) ^ s.charCodeAt(pi)) >>> 0;
+    });
+  })();
   for (var t = walker.nextNode(); t; t = walker.nextNode()) {
     var s = (t.nodeValue || '').trim();
     if (!s) continue;
@@ -952,7 +1024,12 @@ const SNAP = `(function(){
   function isControl(e){ return e.matches(CTRL); }
   function holdsContent(e){
     return [].slice.call(e.children).some(function(c){ return c.nodeType === 1 && painted(c); }); }
-  var liquidMaterial = blurRegions.concat(contextualPainted).filter(function(e, i, a){ return a.indexOf(e) === i; });
+  var liquidMaterialAll = blurRegions.concat(contextualPainted).filter(function(e, i, a){ return a.indexOf(e) === i; });
+  // CORRECTION 38's other half. City's only untreated Liquid region was the sky console's
+  // panel, which is inside the [data-dev-only] root -- a NO whose only possible repair would
+  // have been putting motion on a debug panel no user will ever open.
+  var devOnlyLiquid = liquidMaterialAll.filter(devOnly);
+  var liquidMaterial = liquidMaterialAll.filter(function(e){ return !devOnly(e); });
   var liquidRegions = liquidMaterial.filter(function(e){ return !isControl(e) && holdsContent(e); });
   var decoratedLeaves = liquidMaterial.filter(function(e){ return isControl(e) || !holdsContent(e); });
   var withTransition = liquidRegions.filter(function(e){
@@ -1177,6 +1254,7 @@ const SNAP = `(function(){
     q3: { primaryAction: primaryAction ? name(primaryAction) : null, insideBodyViewport: primaryVisible,
           explicitlyMarked: !!explicitPrimary },
     q4: { collapsedDisclosures: collapsed.length, scannedControls: scanned.length,
+          devOnlyControls: devOnlyControls,
           shellChromeSelector: SHELL_SEL || null, shellControls: shellControls.length,
           shellList: shellControls.slice(0,24).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.title || e.tagName).trim().slice(0,24); }),
@@ -1189,10 +1267,13 @@ const SNAP = `(function(){
           scannedList: scanned.slice(0,20).map(function(e){
             return (e.getAttribute('aria-label') || e.textContent || e.placeholder || e.tagName).trim().slice(0,28); }) },
     q5: { measured: seen.length, unmeasurable: unmeasurable, paintKey: paintKey,
+          paletteKey: paletteKey, paletteValues: paletteValues,
           fixedMaterialRuns: fixedMaterialRuns, fixedMaterialHosts: fixedMaterialHosts,
           minRatio: minRatio === 99 ? null : Math.round(minRatio*100)/100,
           failingCount: failing.length, worst: worst, failing: failing.slice(0,8) },
-    q6: { liquidRegions: liquidRegions.length, byBackdropFilter: blurRegions.length,
+    q6: { liquidRegions: liquidRegions.length, devOnlyLiquidRegions: devOnlyLiquid.length,
+          devOnlyLiquidList: devOnlyLiquid.slice(0,6).map(name),
+          byBackdropFilter: blurRegions.length,
           byContextualPaint: contextualPainted.length, carryingATransition: withTransition.length,
           infiniteAnimationsOnLiquid: infiniteOnLiquid.length,
           liquidMaterialTotal: liquidMaterial.length,
@@ -1482,7 +1563,7 @@ const BARS = {
   q2: 'a non-empty location label AND at least one way back',
   q3: 'the primary action is inside the body viewport at rest — "without hunting" means without scrolling',
   q4: '<=12 controls scanned in the default state AND (>=1 collapsed disclosure OR <=3 controls with none already behind a disclosure)',
-  q5: 'no failing text run in EITHER theme, with a moved paint digest OR a declared fixed material owning every measured run',
+  q5: 'no failing text run in EITHER theme, with a moved paint digest OR moved palette tokens on documentElement OR a declared fixed material owning every measured run',
   q6: 'every Liquid-treated region carries a state-change transition and none loops forever',
   q7: "category 6's parity: the same features reachable in standard as in Liquid",
   q8: "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
@@ -1792,17 +1873,29 @@ function scoreSnapshot(s) {
     && A_CELL.q5.measured > 0 && B_CELL.q5.measured > 0
     && A_CELL.q5.fixedMaterialRuns === A_CELL.q5.measured
     && B_CELL.q5.fixedMaterialRuns === B_CELL.q5.measured;
-  const q5AxisProved = q5Moved || q5FixedProved;
+  // CORRECTION 39 — the third witness. Needs no flag, because unlike --fixed-material it is
+  // not the run ASSERTING anything: the two cells either resolved different palette tokens on
+  // documentElement or they did not. Both cells must have measured something, so it cannot
+  // rescue an empty harness, and the failing-run bar above is untouched.
+  const q5PaletteMoved = A_CELL.q5.paletteKey !== undefined
+    && B_CELL.q5.paletteKey !== undefined
+    && A_CELL.q5.paletteKey !== B_CELL.q5.paletteKey;
+  const q5PaletteProved = q5PaletteMoved
+    && A_CELL.theme !== B_CELL.theme
+    && A_CELL.q5.measured > 0 && B_CELL.q5.measured > 0;
+  const q5AxisProved = q5Moved || q5FixedProved || q5PaletteProved;
   const q5 = {
     verdict: q5Failing === 0 ? 'YES' : 'NO',
     cells: cells.map((c) => ({ cell: c.cell, theme: c.theme, measured: c.q5.measured, unmeasurable: c.q5.unmeasurable,
       minRatio: c.q5.minRatio, failingCount: c.q5.failingCount, worst: c.q5.worst,
-      fixedMaterialRuns: c.q5.fixedMaterialRuns, fixedMaterialHosts: c.q5.fixedMaterialHosts })),
+      fixedMaterialRuns: c.q5.fixedMaterialRuns, fixedMaterialHosts: c.q5.fixedMaterialHosts,
+      paletteValues: c.q5.paletteValues })),
     failing: [...A_CELL.q5.failing, ...B_CELL.q5.failing].slice(0, 12),
     themeAxisMoved: q5Moved,
     fixedMaterialProved: q5FixedProved,
+    paletteAxisProved: q5PaletteProved,
     axisWitness: { minRatioMoved: q5MovedRatio, paintDigestMoved: q5MovedPaint,
-      fixedMaterialRequested: FIXED_MATERIAL },
+      paletteTokensMoved: q5PaletteMoved, fixedMaterialRequested: FIXED_MATERIAL },
   };
 
   const fromC6 = (term, ok) => (c6 ? (ok ? 'YES' : 'NO') : 'MEASURE');
@@ -1874,7 +1967,7 @@ function scoreSnapshot(s) {
   const unscored = questions.filter((x) => x.verdict === 'MEASURE' || x.verdict === 'NO-SUBJECT');
   for (const u of unscored) voided.push(`Q${u.id} is ${u.verdict} — ${u.verdict === 'MEASURE' ? `no category-6 baseline at ${path.relative(process.cwd(), c6path)}` : 'the surface has no subject for this question'}`);
   if (!q5AxisProved && !CONTROL) {
-    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : ALT_CLASS ? ('.' + ALT_CLASS) : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}) and no declared fixed material owned every measured run; contrast stability measured nothing`);
+    voided.push(`Q5's ${ALT_ATTR ? ALT_ATTR_NAME : ALT_CLASS ? ('.' + ALT_CLASS) : 'theme'} axis did not move (both of ${A_CELL.cell} / ${B_CELL.cell} report minRatio ${A_CELL.q5.minRatio}), the palette tokens on documentElement did not move either, and no declared fixed material owned every measured run; contrast stability measured nothing`);
   }
   if (out.storeIdentical === false) voided.push('persisted theme state was NOT restored byte-identical');
   if (out.restoreWarning) voided.push(out.restoreWarning);
