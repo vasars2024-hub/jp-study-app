@@ -11527,4 +11527,6 @@ export const ja: Catalog = {
   'readingLists.view.coverReveal': '「{title}」をライブラリで表示',
   'seanimeDev.collapse': 'サイドカーパネルを折りたたむ',
   'seanimeDev.expand': 'サイドカーパネルを展開',
+  'immersion.rail.search': '保存したサイトを検索',
+  'immersion.rail.noMatches': '一致するサイトがありません。検索を消すとすべて表示されます。',
 };

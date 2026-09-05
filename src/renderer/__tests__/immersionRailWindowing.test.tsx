@@ -24,7 +24,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createElement } from 'react';
+import { act, createElement } from 'react';
 import {
   createReadingSurfaceHarness,
   installReadingSurfaceApi,
@@ -103,6 +103,16 @@ const rows = (h: ReadingSurfaceHarness): HTMLElement[] =>
   Array.from(h.container.querySelectorAll<HTMLElement>('.immersion-site-row'));
 const slots = (h: ReadingSurfaceHarness): HTMLElement[] =>
   Array.from(h.container.querySelectorAll<HTMLElement>('.immersion-site-list [role="listitem"]'));
+
+async function searchSites(h: ReadingSurfaceHarness, query: string): Promise<HTMLInputElement> {
+  const input = h.container.querySelector<HTMLInputElement>('.immersion-site-search input')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, query);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await h.flush();
+  return input;
+}
 
 beforeEach(() => {
   railViewport = RAIL_VIEWPORT;
@@ -184,6 +194,41 @@ describe('the Immersion sites rail under real load', () => {
     expect(rows(h)[0].textContent).toContain('Site 371');
     // Still a window, not a growing list: nothing accumulated on the way down.
     expect(rows(h).length).toBe(20);
+  });
+
+  it('searches the whole collection after scrolling, by title and URL', async () => {
+    const h = await mountImmersion();
+    const list = h.container.querySelector<HTMLElement>('.immersion-site-list')!;
+    list.scrollTop = 20_000;
+    list.dispatchEvent(new Event('scroll'));
+    await h.flush();
+    expect(rows(h)[0].textContent).toContain('Site 371');
+
+    // A full-width pasted title matches outside the old virtual window.
+    await searchSites(h, '  ＳＩＴＥ ８８２  ');
+    expect(rows(h)).toHaveLength(1);
+    expect(rows(h)[0].textContent).toContain('Site 882');
+    expect(slots(h)[0].getAttribute('aria-setsize')).toBe('1');
+    await searchSites(h, 'EXAMPLE.TEST/712');
+    expect(rows(h)).toHaveLength(1);
+    expect(rows(h)[0].textContent).toContain('Site 712');
+  });
+
+  it('names an empty result and Escape restores the list without closing the rail', async () => {
+    const h = await mountImmersion();
+    const input = await searchSites(h, 'no-such-saved-site');
+    expect(rows(h)).toHaveLength(0);
+    expect(h.container.querySelector('[role="status"]')?.textContent).toContain('No saved sites match');
+    await act(async () => {
+      input.focus();
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    await h.flush();
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(h.container.querySelector('.immersion-rail')).not.toBeNull();
+    expect(rows(h)).toHaveLength(20);
+    expect(h.container.querySelector('[role="status"]')).toBeNull();
   });
 
   it('the completion bar costs no height, so every slot is the same row', async () => {

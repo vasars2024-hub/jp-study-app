@@ -27567,3 +27567,24 @@ html[data-seanime-dev-panel] .seanime-host-launcher {
 .os-set-quick-grid {
   grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
 }
+
+/* Saved-site search: stable input anchor, shared by dock, sheet and Aero rail. */
+.immersion-site-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin: 6px;
+  padding: 0 8px;
+  min-width: 0;
+}
+.immersion-site-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--lq-hit-target, 32px);
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
