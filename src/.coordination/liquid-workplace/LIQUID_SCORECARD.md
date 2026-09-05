@@ -5814,3 +5814,45 @@ textual order) and downgrading the inner join to a LEFT JOIN (63/63 still pass �
 it back, because `i.form = ?` is strict). Only the full revert to `in (select ...)` fails the
 guard, and it fails on the plan assertion itself rather than on a SQL error, which is why
 `INFLECTION_PROBE_SQL` exports the whole statement instead of just its FROM half.
+
+## 2026-09-05 07:35-08:45 EDT, `primary` — `translate` cat8 closes 10/10, and correction 59: a title is translated, a section id is not
+
+**cat8 `translate` — PASS 10/10.** Driven live through the debug bridge on pid 20540, port
+39274, renderer `localhost:5174`, the Translate `.fwin` at 820x580, opened for this run by a
+trusted `/click` on the Start tile (48,798 then 324,317) rather than by a synthetic dispatch.
+Baseline `cat8-translate-20260905.json` (gitignored, so these numbers are the record).
+
+- `rawKeyCount` **0**, `placeholderCount` **0**, `mutePairCount` **0**, and 0 in every language
+  — `rawKeyCountMax` across the four legs is **0**. `disabledTotal` 2, both paired with a reason.
+- `statesNamed` **1 of 1 observable**. The empty state was surfaced by the `--drive-input
+  ".tr-textarea"` leg and renders a real message; loading/error/offline are not observable on
+  this surface and are recorded as such rather than counted as passes.
+- `languagesDiffer` **true, and measured rather than assumed**: **4 distinct text hashes** over
+  en/ja/zh/ru, **7 of 21 runs** changed per language (diffShare **0.3333**), `restored: true`.
+- **Negative control falsified**: injected raw key / placeholder / mute pair moved the counts
+  `[0,0,0] -> [1,1,1] -> [0,0,0]`, `backToBaseline: true`. Without that the 10 would be VOID.
+
+**The 2026-08-26 run of this same cell read `UNMEASURED - statesNamed` and could not be closed,
+because `--langs` could not run at all on this surface.** That is the harness defect below.
+
+**CORRECTION 59 — `--langs` was unreachable for nearly every surface in the app.** `ROOT_EXPR`
+re-found the window by matching the ENGLISH title passed to `--surface`. The language leg
+switches the app to ja, every `.fwin-title` re-renders in Japanese, and the next resolve found
+nothing: `VOID - language leg: ja: surface not found: Translate`, which is exactly what this
+turn hit first. **Correction 15 already met this failure and its comment names the cause
+verbatim** — but it only made the RESTORE survive the refusal, so the leg still could not run,
+and `languagesDiffer` could only ever read `UNMEASURED` on a title-named surface. The title is
+not even universally present: `city` is frameless and renders an EMPTY `.fwin-title`, so title
+matching cannot address it in ANY language.
+
+Fixed by resolving the title ONCE, in whatever language the run starts in, then pinning that
+window's `data-section` — the id the product routes by, never localized — and preferring the pin
+thereafter. The title path stays as the fallback and is what establishes the pin, so `--surface`
+keeps its documented meaning and a surface with no `data-section` behaves exactly as before.
+The pin is cleared at the TOP of every run, not only on exit, so a run that dies mid-leg cannot
+leave the next run silently measuring the previous surface. `pinnedSection: "translate"` is
+published in the baseline, so a run that fell back to the title is distinguishable from one that
+did not. This unblocks the `languagesDiffer` bar for every remaining title-named surface.
+
+sampled-out: every other scorecard surface; this entry scores exactly one cell, `translate` cat8.
+**`translate` is now 5 of 8 banked (cat1, cat3, cat5, cat6, cat8); cat4 open, cat2 and cat7 not run.**

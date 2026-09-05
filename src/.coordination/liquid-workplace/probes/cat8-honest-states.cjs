@@ -188,14 +188,44 @@ async function ev(js) {
 }
 const sleep = (ms) => new Promise((s) => { setTimeout(s, ms); });
 
+/*
+ * CORRECTION 59. A TITLE IS TRANSLATED; A SECTION ID IS NOT. `--langs` switches the app to ja,
+ * every `.fwin-title` re-renders in Japanese, and the next `ROOT_EXPR` — which matched on the
+ * ENGLISH title the run was invoked with — found nothing. Measured 2026-09-05 on Translate:
+ * `VOID - language leg: ja: surface not found: Translate`. Correction 15 already met this exact
+ * failure and its comment names the cause verbatim ("a title-named surface cannot be found once
+ * its window title is translated"), but it only made the RESTORE survive the refusal; the leg
+ * itself still could not run. So `--langs` was unreachable for every title-named surface, which
+ * is nearly all of them, and `languagesDiffer` could only ever read UNMEASURED.
+ *
+ * The title is not even universally present: the `city` window is frameless and renders an EMPTY
+ * `.fwin-title`, so title-matching cannot address it in ANY language. `data-section` is on every
+ * `.fwin`, is the id the product routes by, and is never localized.
+ *
+ * So: resolve by title ONCE, in whatever language the run starts in, then pin that window's
+ * `data-section` and prefer the pin from then on. The title path is kept as the fallback and is
+ * what establishes the pin, so `--surface` keeps its documented meaning and a surface with no
+ * `data-section` still works exactly as before. The pin is CLEARED at the top of every run rather
+ * than only on exit: a run that dies mid-leg would otherwise leave the next run — on a DIFFERENT
+ * surface — silently measuring this one. (No backtick or dollar-brace in page code; correction 8.)
+ */
 const ROOT_EXPR = IS_SELECTOR
   ? `document.querySelector(${JSON.stringify(SELECTOR)})`
-  : `[].slice.call(document.querySelectorAll('.fwin')).filter(function(w){
-       var r = w.getBoundingClientRect();
-       if (!(r.width > 0 && r.height > 0)) return false;
-       var t = w.querySelector('.fwin-title-text, .fwin-title');
-       return !!t && (t.textContent || '').indexOf(${JSON.stringify(SURFACE)}) >= 0;
-     })[0]`;
+  : `(function(){
+       var vis = [].slice.call(document.querySelectorAll('.fwin')).filter(function(w){
+         var r = w.getBoundingClientRect();
+         return r.width > 0 && r.height > 0;
+       });
+       var pin = window.__cat8PinnedSection;
+       if (pin) {
+         var byPin = vis.filter(function(w){ return w.getAttribute('data-section') === pin; })[0];
+         if (byPin) return byPin;
+       }
+       return vis.filter(function(w){
+         var t = w.querySelector('.fwin-title-text, .fwin-title');
+         return !!t && (t.textContent || '').indexOf(${JSON.stringify(SURFACE)}) >= 0;
+       })[0];
+     })()`;
 
 const PROBE = `(function(){
   var root = ${ROOT_EXPR};
@@ -1142,10 +1172,22 @@ async function langLeg() {
 }
 
 (async () => {
+  // Correction 59: clear any pin a previous run died holding, BEFORE the first resolve, so this
+  // run's own title match is what establishes it. A stale pin would resolve another surface and
+  // the run would report clean numbers for a window nobody asked about.
+  await ev('(delete window.__cat8PinnedSection, true)');
   const raised = await raise();
   const base = await run();
   if (base.refuse) { console.error(`REFUSE - ${base.refuse}`); process.exit(2); }
   base.raised = raised;
+  // Correction 59: pin now, off the window the TITLE just resolved, so every later leg —
+  // the language leg above all — addresses this same window by an id that does not translate.
+  base.pinnedSection = IS_SELECTOR ? null : await ev(`(function(){
+    var w = ${ROOT_EXPR};
+    var s = w && w.getAttribute('data-section');
+    if (s) window.__cat8PinnedSection = s;
+    return s || null;
+  })()`);
   // Correction 4's sibling: a surface with nothing rendered has not been measured, and the rubric
   // caps an empty measurement at 0 rather than letting it read as four clean zeros.
   if (base.textRuns === 0) {
@@ -1300,6 +1342,10 @@ async function langLeg() {
       out.verdict = 'VOID - negative control did not falsify';
     }
   }
+
+  // Correction 59: drop the pin on the way out. The clear at the top of the run is what makes a
+  // crashed run safe; this one keeps the page clean for anything that is not this harness.
+  await ev('(delete window.__cat8PinnedSection, true)');
 
   const text = JSON.stringify(out, null, 2);
   if (OUT) fs.writeFileSync(OUT, text);
