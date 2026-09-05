@@ -7594,3 +7594,196 @@ wants one turn that owns the app.
   and Anki, and its media launcher opens five real library entries with **one** toast host.
 - No rubric cell or timeline bullet closed. Next: the local episode player-routing failure;
   `StudyPlayerSlice` DOES consume native-player watch events, contrary to the older handoff.
+
+## 2026-09-05 17:29-17:50 EDT — primary2 — `fwinIn` freezes at t=0 and leaves a window **invisible forever**. No cell closed; the cause of a whole class of harness refusals is now named.
+
+**Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** What moved is a product defect
+that has been silently VOIDing runs on every surface, mine included.
+
+### The measurement, and the control that proves it
+
+Shared instance, bridge 39273 / pid 36988, window 1. `os:open` -> `immersion`, then
+`cat2-clunkiness.cjs --surface Immersion --win 1` refused **three times** with
+`0 rendered text runs; an empty surface scores 0, not 10` — on a window holding
+**13 `.immersion-site-card`s and 68 text nodes.**
+
+    document.querySelector('.fwin').getAnimations()  ->  ["fwinIn:running:0"]
+    getComputedStyle(w).opacity                      ->  0
+    document.hasFocus()                              ->  true
+
+`playState` is **running** and `currentTime` is **0**, and it stays there. The compositor never
+advances the animation while the OS window is occluded, so the `from` keyframe
+(`opacity: 0; scale(0.98)`, `styles.css:14887`) is what paints — permanently.
+
+**Control (a real mutation, applied and restored):** setting `animation: none` on the stuck
+window read `opacity` **0 -> 1** and painted text runs **0 -> 56 of 68**; removing the plant read
+`opacity` back to **0**. So `.fwin`'s base style is visible and the frozen animation is the sole
+cause. `w.style` was captured and restored; no residue.
+
+### Why this is a PRODUCT defect and not a probe artifact
+
+`animation: fwinIn var(--motion-duration, 0.14s) ease` (`styles.css:14882`) has no fill-mode, so
+`fill: none` — the base `.fwin` carries no `opacity` and rests at 1. The window is invisible
+*only while the animation is running*, and it never finishes. **Re-focusing does not recover it**:
+measured with `hasFocus=true` after an explicit `/focus`, and again after close-and-reopen while
+focused. Any `.fwin` opened while the app is behind another window is a blank desk to the user
+until something else forces that window to repaint. `.os-start` carries the same rule at `:15288`.
+
+### The fix, and why I did not land it in this turn's last ten minutes
+
+Animate **transform only** and drop `opacity` from the `fwinIn` keyframes. A frozen transform at
+`scale(0.98)` is a 2% shrink — visible and usable — so the worst case becomes correct rather than
+merely less bad. Starting the fade from a nonzero opacity only makes "invisible forever" into
+"faint forever" and is not a fix.
+
+`.fwin` is the shared primitive under every window in the app and `secretIdentityScope.test.ts:18`
+asserts `fwinIn`/0.14s -> `none`/0s under reduce-motion, so this needs the full gate run. **That is
+the next turn's opening slice**, and it is ~10 minutes of work now that the cause is measured.
+
+`sampled-out:` no surface was scored, so nothing was skipped. `immersion` keeps cat2/cat7/cat8
+open, `player` its 8, `anki` its 4, `translate` cat7.
+
+### Same turn — the fix landed as `afe88e35`, and two facts that would otherwise cost the next worker an hour
+
+`fwinIn` now animates **transform only** (`styles.css:14887`). Guard:
+`entryAnimationCannotHideAWindow.test.ts`, 4 cases, asserting on the PROPERTY not the value;
+restoring `from { opacity: 0 }` fails 1 of 4. i18n EXIT 0 at 12,537 keys, architecture EXIT 0
+"Nothing new", eslint EXIT 0 on the new test.
+
+**TRAP 1 — `backgroundThrottling: false` IS ALREADY SET and does NOT cover this.** It is on every
+main window (`main.ts:907`, `:1178`, `:1313`, plus `companionHost.ts:107`, `readingLens.ts:327`,
+`systemDictionary.ts:219`). The freeze is **occlusion**, not background throttling: Chromium stops
+producing frames for a covered window whatever that flag says. A worker who reads
+`animations-freeze-in-unfocused-window` and reaches for this flag will add one that is already
+there and conclude the finding was wrong. Also measured: `/focus` returning `focused: true`,
+`document.hasFocus() === true`, a `/screenshot`, and close-and-reopen **all** left it at
+`fwinIn:running:0`. It is not recoverable from the renderer.
+
+**TRAP 2 — this is why harness runs on a covered window refuse, and the refusal names the wrong
+thing.** `cat2-clunkiness.cjs:408` gates every text run on
+`checkVisibility({ checkOpacity: true })`, so a frozen entry animation makes a fully populated
+surface report `0 rendered text runs; an empty surface scores 0, not 10`. Three runs of mine were
+spent on that message before the cause was found. `cat1`/`cat4`/`cat8` share the predicate.
+
+**The class is wider than `.fwin`, and I deliberately did not sweep it.** 15 other keyframes in
+`styles.css` open at `opacity: 0`. Most are user-driven, so the window is being looked at when
+they start. The two that are **not** user-driven, and are therefore the same defect waiting to be
+measured, are `buddy-toast-in` and `mini-toast-in` — `main/buddyScheduler.ts` fires those from the
+main process on a timer, i.e. precisely when nobody is looking at the window. `consent-fade` is
+third: first-run, at boot, before the user has necessarily raised the window. Changing 15
+animations without a gate run two days out is not a trade I would take; changing the one under
+every window in the app is.
+
+### Same turn, second slice — `e0cb25b8` takes the three openers that fire while nobody is looking
+
+I said above I would not sweep the class. I swept the part of it that is **not user-driven**, which
+is where the defect can actually reach a user, and left the rest.
+
+- **`buddy-toast-in`** — verified, not assumed: `buddyScheduler.ts:2` "Single main-process
+  scheduler", `setInterval` at `:17`, `w.webContents.send('buddy:trigger')` at `:35`, and
+  `BuddyToast.tsx` renders `.buddy-toast` off that event and **auto-dismisses after 2200 ms**. So
+  a frozen fade means the reminder arrives and leaves having never been visible once. `translateY`
+  kept, so the slide-in survives.
+- **`mini-toast-in`** — same shape. `translateX(-50%)` is the CENTERING and is kept in BOTH
+  keyframes deliberately: a frozen `from` has to be the correct POSITION, not merely a visible one.
+- **`consent-fade`** — **deleted**, and it is the worst instance in the app. Opacity-only over a
+  `z-index: 40000` full-screen backdrop that keeps `pointer-events`, so a frozen fade left an
+  invisible overlay still taking every click and the whole application read as hung. No transform
+  half to keep, and a blocking first-run gate appearing instantly is correct anyway.
+
+The inert `to { opacity: 1 }` went with them — animating from the base value to itself is noise.
+The other **12** `opacity: 0` openers in `styles.css` are user-driven, so the window is being
+looked at when they run; they are left alone rather than swept, and the test encodes that list as
+`NOT_USER_DRIVEN` so the judgement is reviewable instead of implicit.
+
+**Guard: 10 cases. Restoring the three keyframes fails exactly 3 of 10; the restore returns 10/10.**
+
+### Gates, at my tip, all four
+
+`npx vitest run` **EXIT 0 — 1107 files passed / 1 skipped, 14,207 tests passed / 6 skipped, ZERO
+failures.** i18n EXIT 0 at **12,537** keys. architecture EXIT 0, "Nothing new", 2 pending. eslint
+EXIT 0 on the new test.
+
+An earlier full run in this same turn reported 6 failed files; **all 6 passed on a serial rerun,
+49/49** (`scraperSources`, `paletteSettingsReach`, `studyProperNameReviewOpportunity`, two VN
+suites, `i18n`) — the known parallel-run flake class, named in the 2026-09-05 boss audit as
+explicitly not committed regressions. The clean run above is the one that counts, and it is
+**after** both CSS slices.
+
+### CORRECTION to my own headline, same turn — "invisible **forever**" is stronger than my evidence
+
+`afe88e35`'s commit subject says the window "stayed invisible forever". **What I actually measured
+is narrower and I am withdrawing the stronger half.** Evidence I have: `/focus` returning
+`focused: true`, `document.hasFocus() === true`, a `/screenshot`, and close-and-reopen all left it
+at `fwinIn:running:0` — read 3 s later, i.e. 21x the 0.14 s duration, so a painting window would
+have finished and dropped the animation from `getAnimations()`. Evidence I do **not** have: what a
+physical raise by a human does. An animation resumes when frames resume, so the supportable claim
+is **"invisible until that window next paints, and I could not make it paint from the bridge"** —
+not "forever". The body of the commit and the scorecard entry above both state the narrow version;
+only the subject line overreaches, and this is the correction rather than an amend.
+
+**The fix is unaffected.** A window that is invisible until some unknown later repaint is a defect
+on either reading, and `consent-fade`'s blocking invisible backdrop is worse under both.
+
+### `.boot-logo` was checked and deliberately NOT included — it is a DIFFERENT construction
+
+Auditing the `NOT_USER_DRIVEN` list I encoded in the test: `.boot-logo` runs at launch, so it is
+plainly not user-driven and my first classification of it as "the other 12 are user-driven" was
+loose. It is excluded for a better reason. `styles.css:1223` puts **`opacity: 0` in the BASE rule**
+and `:1224` runs `bootLogo 2.7s ease forwards` to reveal it — so unlike `fwinIn`, whose base rests
+at 1, the base state here is genuinely invisible and removing the keyframe's opacity would fix
+nothing. Its parent at `:1216` is `bootOut 0.5s ease 2.2s forwards`, so a frozen boot leaves the
+`z-index: 9999` splash up rather than blank. Both self-heal when frames resume, and correcting it
+means restructuring `BootScreen.tsx`, not editing a keyframe. **Recorded as a known, bounded gap.**
+
+The remaining 11 (`cover-level-badge--flash`, `media-gen-dot`, `mwidget-lyrics-track`,
+`os-companion-spark`, `os-set-pane-anim`, five `game-*`, `scifi-loader`) are user- or
+playback-driven and decorative; none gates content or takes clicks.
+
+### LIVE VERIFICATION of `afe88e35`, as a paired positive/negative on the running app
+
+The fix is CSS in my worktree; the live instance runs from `jp-study-app` and does not carry it
+yet (mergeback pending). So the shipped rule was reproduced at runtime — a `<style id="p2-verify">`
+redefining `@keyframes fwinIn` with the transform-only body, which wins on document order — and the
+same window was opened covered, twice, once with it and once without:
+
+    WITH the shipped keyframes:  opacity 1   painted 56/68   fwinIn:running:0
+    WITHOUT (plant removed):     opacity 0   painted  0/68   plantGone: true
+
+**Same window, same occlusion, same frozen animation** — `fwinIn` is still stuck at
+`running:0` in the passing arm, which is the point: the fix does not unfreeze anything, it makes
+the frozen state a visible one. Only the keyframe body differs between the two arms.
+
+**Disclosed as a plant, not scored as a cell.** Injecting the rule reproduces the committed change
+exactly, but it is still a doctored surface, and closing a rubric cell on one is the false-credit
+shape this repo has been bitten by before. It verifies the FIX; `immersion` cat2 stays open and
+should be measured on an instance that carries `afe88e35` for real.
+
+**State restored:** the three windows the desk held at the start of my turn (Translate, Reading
+Finder, Anki) were closed by the verification and reopened by `os:open`; the desk reads
+`Translate ;; Reading Finder ;; Anki` and the injected style is gone, both confirmed by read-back.
+
+### Same turn, third slice — the harness refusal that misnames this, fixed in BOTH harnesses that carry it
+
+`cat2` correction 61 / `cat8` correction 51. The refusal `0 rendered text runs; an empty surface
+scores 0, not 10` blamed the SURFACE for what is a frozen entry animation. It cost me three runs
+this turn, and it is the same predicate in both files (`cat2:408`, `cat8:237`,
+`checkVisibility({ checkOpacity: true })`). Both now diagnose after the refusal has already fired,
+so a passing run pays nothing.
+
+**Positive arm — populated surface, frozen animation, reproduced deliberately:**
+
+    REFUSE - NOT EMPTY - 68 text nodes are present but none PAINTS. root opacity 0,
+    animations stuck at currentTime 0: fwinIn (document.hasFocus true). The compositor does not
+    advance an animation in a window it is not painting; raise/uncover the OS window and re-run.
+    This is a MEASUREMENT refusal, not a score of 0.
+
+`cat8` prints the same as a VOID. **Negative arm — a genuinely empty surface** (`@#p2-empty`, an
+injected 200x100 div with `textContent.length === 0`) still gets the ORIGINAL message on both,
+unchanged. So the new branch cannot swallow a real emptiness cap.
+
+**RULE 1:** both are existing parameterised harnesses; no new probe. `cat1` and `cat4` share the
+predicate but do not carry this refusal, so they were left alone rather than edited speculatively.
+
+**State:** the injected div and the `p2-verify` style are removed and the desk reads
+`Translate ;; Reading Finder ;; Anki`, all three confirmed by read-back.

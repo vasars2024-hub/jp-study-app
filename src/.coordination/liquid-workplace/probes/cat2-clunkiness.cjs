@@ -1404,7 +1404,47 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   const base = await snapOf(surface);
   if (base.refuse) return { refuse: base.refuse };
   // Correction 8's sibling: an empty surface has not been measured; the rubric caps it at 0.
-  if (base.textRuns === 0) return { refuse: '0 rendered text runs; an empty surface scores 0, not 10' };
+  //
+  // CORRECTION 61 — "empty" IS THE WRONG WORD FOR THE COMMONEST CAUSE, AND IT COST THREE RUNS.
+  // `painted()` gates every text run on `checkVisibility({ checkOpacity: true })`, so a fully
+  // populated surface reports zero when its ENTRY ANIMATION IS FROZEN. Measured 2026-09-05: a
+  // `.fwin` opened while the OS window was covered sat at `fwinIn:running:0` with opacity 0 and
+  // 68 unpainted text nodes, and this refusal blamed the surface. The distinction is cheap to
+  // make and only made once the refusal has already fired, so it costs a live run nothing.
+  if (base.textRuns === 0) {
+    const why = JSON.parse(await ev(`(function(){
+      var root = ${rootExpr(surface)};
+      if (!root) return JSON.stringify({ rootGone: true });
+      var raw = 0;
+      var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (var t = tw.nextNode(); t; t = tw.nextNode()) if (t.nodeValue && t.nodeValue.trim()) raw++;
+      var frozen = [];
+      var scan = root.getAnimations ? root.getAnimations({ subtree: true }) : [];
+      for (var i = 0; i < scan.length; i++) {
+        var a = scan[i];
+        if (a.playState === 'running' && (a.currentTime || 0) === 0) {
+          frozen.push(a.animationName || a.transitionProperty || '?');
+        }
+      }
+      return JSON.stringify({
+        rawTextNodes: raw,
+        rootOpacity: getComputedStyle(root).opacity,
+        frozenAtZero: frozen.slice(0, 6),
+        hasFocus: document.hasFocus()
+      })
+    })()`));
+    if (why.rawTextNodes > 0) {
+      return {
+        refuse: `NOT EMPTY - ${why.rawTextNodes} text nodes are present but none PAINTS. `
+          + `root opacity ${why.rootOpacity}, animations stuck at currentTime 0: `
+          + `${why.frozenAtZero.length ? why.frozenAtZero.join(', ') : 'none'} `
+          + `(document.hasFocus ${why.hasFocus}). The compositor does not advance an animation in `
+          + `a window it is not painting; raise/uncover the OS window and re-run. This is a `
+          + `MEASUREMENT refusal, not a score of 0.`,
+      };
+    }
+    return { refuse: '0 rendered text runs; an empty surface scores 0, not 10' };
+  }
 
   // Correction 19: sampled at rest AND after the task, because a surface can be still until the
   // task starts something - a transport clock only ticks once a track is playing.

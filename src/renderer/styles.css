@@ -14005,13 +14005,14 @@ html.os-interacting .os-companion {
 .reduce-motion .buddy-toast {
   animation: none;
 }
+/* Transform only — see the note on `fwinIn`. `buddyScheduler.ts` fires this from the MAIN
+   process on a timer, i.e. exactly when the window is covered and the compositor is not
+   advancing animations, so an opacity keyframe drops the reminder silently. */
 @keyframes buddy-toast-in {
   from {
-    opacity: 0;
     transform: translateY(8px);
   }
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -14884,9 +14885,21 @@ html[data-icon-size='large'] .os-desk-icon-img { width: 52px; height: 52px; }
   contain: layout style paint;
   transform: translateZ(0);
 }
+/*
+ * TRANSFORM ONLY, DELIBERATELY — an opacity keyframe here made windows invisible FOREVER.
+ * Measured 2026-09-05 on the running app: a `.fwin` opened while the OS window was occluded
+ * reported `getAnimations() -> ["fwinIn:running:0"]` with `opacity: 0` and stayed there, because
+ * the compositor never advances an animation in a window it is not painting. `fill` is `none`
+ * and `.fwin` rests at opacity 1, so the window was invisible ONLY while the animation ran —
+ * and it never finished. Re-focusing did not recover it. Control: `animation: none` on the stuck
+ * window read opacity 0 -> 1 and painted text runs 0 -> 56 of 68; removing the plant read 0 back.
+ * A frozen `scale(0.98)` is a 2% shrink, i.e. visible and usable, so the worst case is correct
+ * rather than merely less bad. Starting the fade from a nonzero opacity is NOT a fix: it turns
+ * "invisible forever" into "faint forever".
+ */
 @keyframes fwinIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+  from { transform: scale(0.98); }
+  to { transform: scale(1); }
 }
 .fwin.focused {
   border-color: var(--accent);
@@ -21160,13 +21173,14 @@ html[data-taskbar-size='large'] .os-tray-btn {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   animation: mini-toast-in 0.22s var(--mini-ease);
 }
+/* Transform only — see the note on `fwinIn`. `translateX(-50%)` is the CENTERING and is kept in
+   both keyframes on purpose: dropping it from `from` would slide the toast sideways, and a
+   frozen `from` must still be the correct position, not merely a visible one. */
 @keyframes mini-toast-in {
   from {
-    opacity: 0;
     transform: translateX(-50%) translateY(-4px);
   }
   to {
-    opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
 }
@@ -22693,11 +22707,14 @@ html.lockscreen-widget-root #root {
   justify-content: center;
   background: rgba(6, 6, 8, 0.92);
   backdrop-filter: blur(6px);
-  animation: consent-fade 0.3s ease;
-}
-@keyframes consent-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  /*
+   * NO ENTRY ANIMATION, DELIBERATELY. This was `animation: consent-fade 0.3s ease` over
+   * `from { opacity: 0 }`, and it is the worst instance of the `fwinIn` defect in the app: a
+   * frozen fade leaves a `z-index: 40000` full-screen backdrop at opacity 0 that still takes
+   * every click, so the whole application reads as hung with nothing on screen to say why.
+   * `consent-fade` was opacity ONLY, so unlike `fwinIn` there is no transform half to keep —
+   * a blocking first-run gate appearing instantly is the correct behaviour anyway.
+   */
 }
 .consent-card {
   width: min(440px, 92vw);
