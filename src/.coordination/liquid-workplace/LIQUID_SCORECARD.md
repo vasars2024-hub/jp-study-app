@@ -5785,3 +5785,32 @@ consumer multiplied it by token count. So the repair is app-wide, not translate-
 **6 of 8 unchanged: cat1-cat6 at 10/10. cat7 OPEN — cause fixed, awaiting one post-restart probe
 run. cat8 not run.** Running total **19 of 25 sections at 80/80**, **160 of 200 cells,
 40 remaining** — no cell moved this turn.
+
+### Follow-up the same turn — the blast radius is much wider than `translate` (`ef19a2fc`)
+
+`lookup()` is not translate's. Three renderer consumers call the interlinear, and one of them
+loops:
+
+- `LexiconWorkbenchResults.tsx:480` and `:602` — the Workbench interlinear, one call per passage.
+- **`lexiconWildSearch.ts:174`, inside `levelShortlist()`, one call PER CITATION**, sequentially,
+  with `withFrequency` and `withPartOfSpeech` both on. The shortlist is capped at
+  `MAX_WILD_CITATIONS = 24` (`shared/lexiconWild.ts:106`).
+
+At the measured 3,572.9 ms per 47-character passage, **one wild search could block the main
+process for up to ~86 seconds** — every window, every input, for the whole run. After the fix
+the same 24 calls are ~0.7 s. Nobody filed this; it was never attributed to the dictionary
+because the pop-up path it shares a name with is 0.4 ms.
+
+**A regression guard now exists, because none of the 532 dictionary tests could see this.** A
+mis-planned query returns the right rows — correctness tests are blind to it by construction.
+`dictionaryLookup.test.ts` asserts the probe's PLAN: first step `idx_infl_form`, headwords
+reached by INTEGER PRIMARY KEY, and no `SEARCH h USING INDEX idx_hw_* (lang=?)` step. A second
+test EXPLAINs the old `in (select ...)` shape and asserts it DOES produce that bad signature, so
+the first test cannot pass vacuously.
+
+**Two of three mutation controls FAILED TO FALSIFY, published because that is the finding:**
+swapping the FROM order to headwords-first (63/63 still pass — SQLite plans on join shape, not
+textual order) and downgrading the inner join to a LEFT JOIN (63/63 still pass — SQLite converts
+it back, because `i.form = ?` is strict). Only the full revert to `in (select ...)` fails the
+guard, and it fails on the plan assertion itself rather than on a SQL error, which is why
+`INFLECTION_PROBE_SQL` exports the whole statement instead of just its FROM half.
