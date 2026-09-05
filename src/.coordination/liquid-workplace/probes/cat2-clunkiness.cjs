@@ -175,6 +175,11 @@ const ANCHOR_TOL = Number(arg('anchor-tol', '2'));
 // Long enough that a once-a-second clock is certain to tick inside the window.
 const IDLE_MS = Number(arg('idle', '1600')) || 1600;
 const SETTLE = Number(arg('settle', '600')) || 600;
+// Correction 59's sampling gap. Each sample is a bridge round trip, so this is a cost/resolution
+// trade and not a free knob: 120 ms gives ~4 samples inside the default 600 ms settle, which is
+// enough to catch the 91-342 ms round trip that produced the correction. Lower it for a surface
+// whose acknowledgement is shorter than that; the extra samples only ever cost time.
+const TRANSIENT_STEP = Number(arg('transient-step', '120')) || 120;
 // Correction 32: the gap between characters of a `type:` step. Anything under one 60 Hz frame
 // makes every keystroke in a word share one paint, which is not a latency — see the recorder.
 // `|| 40` would be wrong here: `--key-spacing 0` is the falsifier that reproduces the burst this
@@ -719,6 +724,64 @@ const CLEAR = (surface, sel) => `(function(){
   return JSON.stringify({ was: was, now: el.value })
 })()`;
 
+/*
+ * CORRECTION 59 — A STEP WHOSE WORK FINISHES INSIDE THE SETTLE WINDOW READ AS A DEAD END.
+ *
+ * `driveStep` clicks, sleeps `SETTLE` (600 ms), then snapshots ONCE. That compares two instants
+ * and calls the step dead if they match — which silently assumes the step's result PERSISTS past
+ * 600 ms. A round trip that starts and ends in the same state is invisible to it.
+ *
+ * Measured on Translate, 2026-09-05, with a per-frame sampler in the page while the bridge drove
+ * the real button. `run()` (`TranslateContent.tsx:130`) has no cache guard: it synchronously
+ * clears the output and sets `state:'loading'`, so the button becomes a disabled "Working…" and
+ * `.tr-status` appears. On a WARM model that whole trip is:
+ *
+ *     .tr-status present   frames 32 of 959     first 91 ms     last 342 ms
+ *     output showing its placeholder for exactly those same 32 frames
+ *
+ * so by 600 ms the busy state is gone and the output has been rewritten with the SAME string.
+ * `moved` was false on every channel — text, controls, results, dialogs, scroll, focus, box — and
+ * the step scored `deadEnd`, failing the surface. The click was not dead: a capture-phase recorder
+ * caught pointerdown/mousedown/mouseup/click all on `BUTTON.btn primary`, and the product's own
+ * receipt moved — `jp-grammarx-translation-history-v1` went from **41 entries to 42**. The
+ * acknowledgement was 91 ms, i.e. inside the rubric's own 100 ms bar, and the harness scored it 0.
+ *
+ * So the settle window is SAMPLED rather than merely waited out: `snapOf` + `movedBetween` at
+ * `--transient-step` (120 ms) intervals across it, and a step that moved the surface at ANY
+ * sample is not a dead end even if it came back to where it started by the final snapshot.
+ *
+ * IT MUST BE THE SAME INSTRUMENT, NOT A MORE SENSITIVE ONE, and that took two failed attempts to
+ * get right. Both are recorded because the failure mode is the interesting part:
+ *
+ *   1. A MutationObserver over the surface root. It rescued the Translate click correctly (19
+ *      mutations, first at 124 ms, last at 596 ms) and ALSO rescued the harness's own
+ *      handler-less plant, so `--control` reported `moved.deadEnd false`, `counts.dirty [0,1,1]`,
+ *      and the run VOIDed. Correct behaviour by the control, and it caught the relaxation.
+ *   2. The same observer, excluding the clicked control's own subtree. Still VOIDed, identically.
+ *      An inert button appended to `.tr-view` and clicked through the bridge in isolation
+ *      produced **0 mutations**, so the plant was not rescuing itself -- the SURFACE was moving
+ *      underneath it. React re-renders that change no text, no control state and no geometry
+ *      still rewrite DOM nodes, so a raw mutation count is strictly more sensitive than the five
+ *      channels the bar is actually defined on, and on any React surface it would eventually
+ *      keep a genuinely dead button alive.
+ *
+ * Hence: no new signal at all. Same `snapOf`, same `movedBetween`, same `maskFocus`, sampled more
+ * than once. Anything a sample sees, the end-of-step snapshot would have seen too had it landed
+ * at that instant, so this cannot rescue anything the bar would not already have called alive.
+ *
+ * WHY IT CANNOT BECOME A FREE PASS, which is the only thing that matters about a relaxation:
+ *   - It is exactly as sensitive as `moved`, by construction, so a control that answers nothing
+ *     reads dead at every sample. The harness's plant still reports it, and a `--control` run in
+ *     which the dead-end counter does not move still VOIDs the score. Required every run.
+ *   - It only ever rescues a step that already ran; `counted` and the `caretOnly` mask are
+ *     untouched.
+ *   - `--churn` regions are already excluded from the hashes, so a ticking clock cannot keep a
+ *     dead button alive, and the idle leg still VOIDs on anything undeclared that moves.
+ *   - `transient` is reported on every step next to `moved`, with each sample's offset and
+ *     verdict, so a reader can see exactly which steps were saved by it and audit the call.
+ */
+// Correction 59 samples the settle window through the SAME channels as movedBetween(); see driveStep.
+
 /**
  * Correction 18's primitive. `scrollTop` is assigned directly rather than driven, because a
  * restore must not be billed as input and must not depend on a wheel landing where it is aimed.
@@ -1024,12 +1087,38 @@ async function driveStep(surface, step, before) {
     // Correction 7: refuse by name rather than clicking whatever is on top.
     if (!pt.mine) return { ...out, refuse: `occluded: ${rem} centre resolves to ${pt.topEl}; raise the target first` };
     out.target = { sel: rem, label: pt.label, disabled: pt.disabled, at: `${pt.x},${pt.y}` };
+    const clickedAt = Date.now();
     await post('/click', { x: pt.x, y: pt.y });
-    await sleep(SETTLE);
-    out.after = await snapOf(surface);
     // Correction 11: mask the focus channel when focus merely landed on the control just pressed.
+    // Read once, immediately, and reuse for every sample below: the mask is a property of the
+    // gesture, and re-reading it per sample would let a later focus change flip it mid-window.
     const focusState = JSON.parse(await ev(FOCUS_IS(surface, rem)));
     const selfFocus = focusState.self === true;
+    /*
+     * Correction 59: WATCH the settle window rather than only waiting it out. Deliberately the
+     * SAME instrument as the end-of-step comparison -- `snapOf` + `movedBetween`, with the same
+     * focus mask -- just sampled more than once, so this can never be more sensitive than the
+     * bar it feeds. Anything a sample sees, the final snapshot would also have seen had it landed
+     * at that instant.
+     */
+    const samples = [];
+    let sawMove = false;
+    let last = null;
+    while (Date.now() - clickedAt < SETTLE) {
+      await sleep(TRANSIENT_STEP);
+      last = await snapOf(surface);
+      if (last.refuse) break;
+      const mv = movedBetween(before, last, { maskFocus: selfFocus });
+      samples.push({ atMs: Date.now() - clickedAt, any: mv.any });
+      if (mv.any) sawMove = true;
+    }
+    out.transient = {
+      channel: 'snapOf + movedBetween (identical to the end-of-step comparison)',
+      samples,
+      sawMove,
+      firstMoveAtMs: sawMove ? samples.find((s) => s.any).atMs : -1,
+    };
+    out.after = await snapOf(surface);
     out.moved = movedBetween(before, out.after, { maskFocus: selfFocus });
     out.selfFocus = selfFocus;
     // Correction 40 — see `caretOnly` at the dead-end verdict.
@@ -1203,7 +1292,15 @@ async function runTask(surface, spec) {
        * real OS click at the field's centre focuses it, and focusing an empty box changes
        * nothing else on the pane — 45 controls and 903 characters before and after.
        */
-      deadEnd: r.counted === true && r.moved.any === false && r.caretOnly !== true,
+      // Correction 59 — see TRANSIENT_ARM. A step that mutated the surface during the settle
+      // window did something, even if the surface came back to where it started by the snapshot.
+      // Narrower than `moved`: a handler-less button mutates nothing at any instant, so the
+      // required `--control` still moves this counter and still VOIDs a run that it does not.
+      transient: r.transient || null,
+      deadEnd: r.counted === true
+        && r.moved.any === false
+        && r.caretOnly !== true
+        && !(r.transient && r.transient.sawMove === true),
       // L7 bullet 997, measured across THIS step's own state advance. `before` is still the
       // pre-step snapshot here; it is reassigned two lines below.
       anchorShift: ANCHORS ? anchorDelta(before, r.after) : null,
