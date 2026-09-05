@@ -2375,3 +2375,44 @@ a whole-file `status: closed` grep returns 38.
 integration branch: `git rev-list --left-right --count feat/nyaa-subtitles...wt/files-app`
 read `2 11` at the time of writing, so eleven commits are unmerged. Do not merge by hand —
 `ClaudeRelayMergeback` owns that and refuses while a main-tree dispatch is running.
+
+## 2026-09-05 17:05 EDT — primary2 — **files-app IS ON THE INTEGRATION BRANCH.** `6303981f`
+
+The one thing 37/37 gates could not deliver by themselves. `feat/nyaa-subtitles` now reads
+`git rev-list --count feat/nyaa-subtitles..wt/files-app` = **0**. Every gate the user reads
+on Monday is on the branch they will read it from.
+
+**How, and why the 44-attempt automated refusal was right to refuse.** The forward merge is a
+pure fast-forward — there was never a tree merge to resolve. What blocked it for five days was
+that a ff *checkout* cannot overwrite a locally-modified file, and 9 incoming paths were dirty
+in the main tree with other tracks' uncommitted work. `relay-mergeback.ps1` correctly refuses
+that unattended. `~\.claude-runs\land-files-app.ps1 -Execute` (written 2026-09-01 for exactly
+this) took the window: backed the 9 up literally **and** as a patch, cleared them, ff'd, then
+3-way re-applied the other tracks' work and unstaged it.
+
+**Result: 36 commits landed. 6 of 9 re-applied clean — including all four i18n catalogs,
+the collision everyone predicted would be the hard one.** 3 needed hand resolution:
+
+- `MediaWorkspaceHost.tsx` — UNION. Theirs publishes real open state (audit F15); ours resets
+  the in-host route on close. Independent additions, both kept, both symbols already imported.
+- `FieldMappingEditor.tsx` — UNION. Ours adds `lq-hit-scope` + the cat8 disabled-reason
+  `title`; theirs translates the raw `Base`/`Translated`/`Pairs` labels. Kept both.
+- `AnkiCardPreview.tsx` — took OURS whole.
+
+**The trap that nearly made me delete a working conversion.** Theirs referenced
+`cardPreview.*` / `fm.*`; I grepped `src/shared/i18n/catalogs/` for those keys, found **zero**,
+and was one command from discarding their work as unwired. It is wired — the keys live in
+`src/shared/i18n/miningUi/{en,ja,ru,zh}.ts`, a *separate committed module* that
+`catalogs/{en,ja,ru,zh}.ts:15` imports. **Grepping `catalogs/` is not grepping the catalog.**
+Both namespaces are real and both render; the duplication is untidy, not broken.
+
+**Nothing of anyone else's was lost, proven rather than assumed:** set-difference of the
+357 other-track dirty paths before against after = **EMPTY**. (The naive comparison first
+reported ~300 lost — `Set-Content` wrote CRLF, so no line matched. A diff that says everything
+changed is a line-ending bug, not a catastrophe.) Literal backups remain at
+`~\.claude-runs\land-backup-20260905-165413\`. Index left empty; the 8 collision files left
+UNSTAGED and dirty, exactly as found.
+
+Verified at the new tip `6303981f` in a detached worktree, not the shared dirty tree:
+`i18n-check` EXIT 0 at **12,536** keys; `architecture-audit` EXIT 0, "Nothing new", 2 pending;
+`eslint` EXIT 0 on all three resolved paths; the four suites covering them **26/26 passed**.
