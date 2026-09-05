@@ -6475,3 +6475,71 @@ unchanged. TARGET AT RISK stands, twelfth consecutive turn.
 the same never-scored surface within twenty minutes of each other because nothing announced it.
 `git log --oneline -5` before claiming a cell costs one second and would have caught this before
 it reached a commit message.
+
+## 2026-09-05 12:56-13:45 EDT — backup — `reading` cat3 closes; cat4 and cat2 FAIL with their numbers
+
+**sampled-out this turn: every surface except `reading`.** Recovery turn: codexB died at
+12:54:43 and its slice was already committed as `7d962c2b` (complete, 21 tests, two mutation
+controls) — nothing was half-applied, so no reconstruction was owed. The scorecard entry it never
+wrote is what was missing, and the section directly above pays it.
+
+**Measured against the USER'S live app** (pid 36988, bridge 39273, 42 real captures, window 1 at
+820x580) — not a scratch profile. Two workers opened this same never-scored surface within the
+same hour; see the trap below.
+
+**One cell closed by this worker: cat3. 170 → 171 of 192, 21 remaining.** cat1 is
+`d132787d`, mine, earlier in this turn and already counted at 169 above. cat8 I ran
+independently and it reproduced their exact figures — that is a cross-check, not a cell.
+
+### cat3 — Liquid utilization, PASS 10/10
+
+`cat3-liquid-utilization.cjs --surface "Reading Finder" --win 1 --presentation liquid`. Zero new
+probes. `--presentation as-is` REFUSED first, correctly: the window was standard, and a standard
+window is correctly opaque.
+
+    regions 40   Work 1 · Liquid-eligible 2 · Anchor 10 · Anchor(holds work) 3 · Ambient 24
+    denseWorkOnTranslucent 0   liquidTreatedEligible 2 of 2   sharedPrimitiveEligible 2 of 2
+    window own paint: alpha 0.72, backdrop blur(8px) saturate(1.25)
+
+The passage pane reads as `Anchor(holds work)` and the list as Liquid — which is the rule
+CLAUDE.md states, holding on a surface nobody had scored. Control: `movedOne`, `allWorkFailed`,
+`ungroundedAllFailed`, `ungroundVacuous: false`, `ungroundMarked 9 / survivors 0`, and every
+`returned` flag true. Presentation verified back to `standard` afterwards.
+
+### cat4 — FAIL, and the number is `deadRegion` at maximized
+
+`deadPctViewport` **default 9% · compact 0.5% · maximized 36.1%** — one 726x517 empty rectangle
+at 1264x773. Every other bar passed at all three sizes: clipped 0, overlaps 0, horizontal
+scrollers 0, hiddenOverflowX 0, `contentGrowsNotChrome` true, `restored` true, chrome 42.4 →
+101.1 → 30.9. **Do not "fix" this by shrinking a panel** — the dead region counts text and
+interactive nodes, so an emptier smaller panel leaves the rectangle identical. The passage pane
+stretches an under-filled document across the freed width; the fix is a bounded measure with the
+freed width going to the index, and it is the next slice on this surface.
+
+### cat2 — FAIL `deadEnds`, REPAIRED in `a7ea2f71`, cell STAYS OPEN
+
+Refresh sampled `any:false` at 345/483/1257 ms, `sawMove:false`, no live region. Repaired; live
+after: absent → "Refreshed — 42 captures", `role="status"`. The cell does not close, because
+`costParity` is UNMEASURED without a `--compare` surface. Also VOID, and it is the INSTRUMENT:
+the chip round trip (`more > summary` → Clipboard → All sources → close) reported
+`restored:false`, and a hand-driven replay of the identical four clicks returned **67 leaf text
+nodes, add 0 / gone 0** — the surface round-trips exactly. A 25 s idle re-read gave an identical
+hash, so it is not a clock in the surface either.
+
+### TRAP — the shared repo's `debug/bridge.json` is overwritten by anyone's private instance
+
+A concurrent worker's scratch Electron (pid 40104, port 39360) wrote its own token into
+`jp-study-app/debug/bridge.json`, so every probe in the MAIN tree — which reads that path — began
+answering `fetch failed` against a dead process while the user's app was fine on 39273. Repointed
+it at the live instance. Two workers also drove window 1 at once; a `Translate` window appeared
+inside my run and the `Reading Finder` closed under me. **`git log --oneline -3` before claiming a
+cell**, as the correction above says, and re-read `bridge.json` before believing a bridge failure.
+
+### RULE D — liquid. Closed by this worker: **1 cell. 171 of 192, 21 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 13:45 EDT: **1.8854**.
+`21 / 1.8854 = 11.14 cells/day` required. Trailing: **≤9 cells across the last 10 liquid turns**.
+**Required 11.14 against ≤9-per-10-turns: TARGET AT RISK, thirteenth consecutive turn.**
+Caveat on the numerator, stated because it inflates the total: **4 of the 170 are `anki` cells
+that live on `wt/files-app` and are NOT on `feat/nyaa-subtitles`.** On this branch alone the
+figure is 167. Single biggest cause, again: this turn spent two of its four slices on product
+repairs the scoring forced (a hit floor and a dead control), which is the work, not overhead.
