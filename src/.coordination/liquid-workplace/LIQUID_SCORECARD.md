@@ -5681,3 +5681,107 @@ done it.
 **6 of 8 unchanged: cat1, cat2, cat3, cat4, cat5, cat6 at 10/10. cat7 OPEN with its number
 above. cat8 not run.** Running total **19 of 25 sections at 80/80**, **160 of 200 cells,
 40 remaining** — no cell moved this turn.
+
+---
+
+## 2026-09-05 — primary2 — translate cat7: the cause is FOUND, FIXED and MEASURED (`f9541e9e`)
+
+The previous turn left cat7 OPEN with "one interlinear lookup blocks main for 3.4 s" and named
+the next slice as a MAIN slice — chunk the passage and yield, or move the lookup off-thread.
+**Neither was needed.** The block was a single mis-planned SQL query, and it is gone.
+
+### The previous turn's attribution was wrong, and re-deriving it was the whole slice
+
+It read the cost as `lookupOfflineInterlinear` with `withFrequency` + `withPartOfSpeech` across
+EN and RU. Measured live through the bridge on the running app, before any change, one option
+at a time (`__ilr`, 2 passes, 8 calls):
+
+| withFrequency | withPartOfSpeech | pass 0 | pass 1 |
+| --- | --- | --- | --- |
+| false | false | 15,338 ms | **2,897 ms** |
+| true | false | 2,951 ms | 3,041 ms |
+| false | true | 2,983 ms | 3,209 ms |
+| true | true | 3,336 ms | 2,913 ms |
+
+**The bare call with both options OFF costs the same as both ON.** The options are worth ~100-300
+ms of a ~2,900 ms call. pass 0's 15.3 s is one-time warmup; pass 1 proves the rest is not.
+
+Second live measurement (`__ils`) — the cost is **linear in passage length**, ~63 ms per
+character: 1 char 96 ms, 2 → 226, 6 → 250, 11 → 796, 24 → 1,512, **47 → 2,960 ms**. So it is
+per-token, not fixed overhead, and not warmup.
+
+Third live measurement (`__ilt`) — the same ten words through `lookupTermOffline`, the pop-up
+dictionary's path, answered in **0.4 ms mean** with real entries (10, 6, 2, 5, 3, 13, 2, 6, 3, 4).
+That is what made the target unmistakable: the dictionary is fast; the interlinear's extra probe
+is not.
+
+### The defect
+
+`lookup()`'s inflection probe, run once per language per token:
+
+    ${HEADWORD_SELECT} and h.lang = ?
+    and h.id in (select headword_id from inflections where form = ?)
+
+plans as `SEARCH h USING INDEX idx_hw_reading (lang=?)` — it walks **every headword in the
+language** (842,500 rows in the file) and bloom-filters each against the subquery. The subquery
+alone answers in **8.6 us**; the statement took **64,000-84,000 us**, and paid it in full for
+words with **zero** inflection rows (猫 has 0 rows and cost 84,511 us).
+
+`in (...)` is a filter to the planner and never a driver. Both alternatives were measured and
+both failed: `json_each` on an explicit id list still planned `SEARCH h ... (lang=?)` and still
+cost ~60,000 us. Only moving `inflections` into the FROM clause changes the plan.
+
+### The fix and its control
+
+`INFLECTION_HEADWORD_SELECT` joins from `inflections`, `distinct` to preserve the row count the
+subquery collapsed for free. New plan: `SEARCH i USING INDEX idx_infl_form (form=?)` then
+`SEARCH h USING INTEGER PRIMARY KEY (rowid=?)`. Ten probes **696,159 us → 643.6 us, 1,082x**,
+returning **byte-identical id sets on all ten**.
+
+End-to-end on the real 537 MB userData database, same harness, warm (pass 2 of 3), HEAD~1 vs
+HEAD — this is the before/after, not a projection:
+
+| chars | tokens | before | after | speedup |
+| --- | --- | --- | --- | --- |
+| 1 | 1 | 68.4 ms | 1.3 ms | 53x |
+| 2 | 2 | 212.9 ms | 2.8 ms | 76x |
+| 6 | 3 | 264.9 ms | 2.5 ms | 106x |
+| 11 | 6 | 808.0 ms | 6.6 ms | 122x |
+| 24 | 9 | 1,863.1 ms | 14.6 ms | 128x |
+| 47 | 17 | **3,572.9 ms** | **29.2 ms** | **122x** |
+
+`tokenCount` and `matchedCount` are identical in both columns (17/17 at 47 chars), so this is a
+plan change and not a result change.
+
+**Mutation control:** `and i.form = ?` → a literal matching nothing → **103 failed tests across
+12 files**. The rewritten path is genuinely covered, so the 532-pass green run is evidence rather
+than silence. Restored byte-identical (md5 `1c49e963`, verified both ways).
+
+**A measurement that went against my own first hypothesis, published:** I opened by assuming
+per-call `db.prepare()` compilation was the cost and wrote a statement cache for it. Compilation
+measured **15-66 us** — negligible. The cache is committed because it is correct and free, but
+**it is not the fix**, and its doc comment says so.
+
+### What this does and does not close
+
+**cat7 is NOT scored closed here.** The change is main-process, so it is inert in the running
+app until a restart, and I did not restart: pid 13316 owns the default-partition localStorage
+that currently holds the user's working qBittorrent apiKey config, and a restart has destroyed
+localStorage keys on this machine before. The cause cat7 named is fixed and measured at 122x
+below the 500 ms bar; **the cell needs one `cat7-perf.cjs` run after the next restart** and
+nothing else.
+
+**Trap for the next worker — cold vs warm.** The first read of each passage against the 537 MB
+mmap'd file costs 400-2,100 ms of page-cache I/O even WITH the fix. That is disk, not CPU, and
+it decays to the warm numbers above. Warm every passage before timing anything, or the fix will
+read as if it did nothing.
+
+**Scope note, deliberately not narrowed:** this probe is in `lookup()`, which every dictionary
+consumer uses. A single-word pop-up paid one probe and never noticed; only a passage-level
+consumer multiplied it by token count. So the repair is app-wide, not translate-only.
+
+### Where `translate` stands
+
+**6 of 8 unchanged: cat1-cat6 at 10/10. cat7 OPEN — cause fixed, awaiting one post-restart probe
+run. cat8 not run.** Running total **19 of 25 sections at 80/80**, **160 of 200 cells,
+40 remaining** — no cell moved this turn.
