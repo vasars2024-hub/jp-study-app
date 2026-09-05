@@ -4540,6 +4540,64 @@ sky console's Star / Asteroid / Ice-barrage buttons are `data-dev-only` and must
 
 **App state left as found:** window `680x657` at `(162,114)`, presentation STANDARD, dossier CLOSED.
 
+## 2026-09-04 · backup — City cat7: NOT closed, and the resize cost is attributed and partly repaired
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged.
+
+City stays at **7 of 8**. cat7 is the one open cell and it is open honestly: **resize p50 16.6 ms
+against an 8.3 ms compositor ceiling from the same run.** No score is claimed for it.
+
+| leg | before | after this turn | ceiling control | verdict |
+| --- | --- | --- | --- | --- |
+| drag | p50 8.3 / p95 16.7 | unchanged | p50 8.3 / p95 8.4–16.6 | clean |
+| **resize** | **p50 25.1 / p95 41.7 / max 66.8**, repeats `(25.1,41.7)` `(25.0,41.7)` | **p50 16.6 / p95 33.5 / max 41.8**, repeats `(16.6,33.5)` `(16.7,33.3)` | p50 8.3 / p95 8.4 | **still a FINDING** |
+| theme | unstable: `BREACH, clean, clean, clean, BREACH` → whole run VOID | 2 frames over 100 ms against a control that produced 1 | max 108.4–141.6 | **still a FINDING** |
+
+**THE DIAGNOSIS, and the thing that made it findable: main was IDLE.** The resize leg's main
+thread read p50 **2.8** / max **4.8** ms while its frames ran 25 ms. Long frames with an idle main
+thread are compositor raster, not JavaScript — which is why the existing per-frame rAF clamp in
+`resizeStart` (already there, already correct) could not help, and why a `filter` was the suspect.
+The garden is 13 canvas layers plus a 910x1137 background plate, and its cloud, fog, moonbeam,
+hero-focus and mushroom-aura plates each carry their own `filter: blur()`; every resize step
+re-rasterises all of them at a new size.
+
+**Attributed before it was repaired, not after.** A live style neutralising every `filter` under
+`.reading-garden` and a re-run of the identical harness took the resize leg to **p50 16.6 / p95
+33.4**. The shipped fix then measured **p50 16.6 / p95 33.5** — the same numbers to 0.1 ms, which
+is what makes it a confirmed attribution rather than a coincidence. The override was removed and
+`filter` re-verified back on 11 elements before any code was written.
+
+**The repair.** `DesktopShell.tsx`'s `resizeStart` adds `fwin-resizing` to the window node and its
+`up` removes it — imperative on purpose, because that gesture deliberately never re-renders and a
+`setState` per pointermove would reintroduce the reflow storm the rAF clamp exists to prevent.
+`readingGarden.css` responds by dropping `filter` on the five decorative plate hooks for the
+duration of the drag only. Live round trip through the harness's own gesture shape:
+**11 blurred → class added → 0 blurred → class removed → 11 blurred**, box `680x657` unchanged.
+
+**A trap paid for here.** The first draft named `.reading-garden-world [class*='cloud-sprite']`
+and matched **2** elements — the cloud sprites are children of `.reading-garden` itself, not of
+`.reading-garden-world`. **A degradation rule that matches nothing is indistinguishable from one
+that works**: the harness would simply have reported no improvement and the fix would have been
+called ineffective. The five hooks now in the rule were enumerated LIVE (11 elements computing a
+`blur()` filter under `.fwin-frameless`), not read off the stylesheet. `.reading-garden-info`'s
+`backdrop-filter` is deliberately excluded — it is a Liquid material on a temporary inspector,
+not scene decoration.
+
+**WHAT IS STILL OWED, and it is why cat7 is not closed.** 16.6 ms is still double the 8.3 ms
+ceiling. The remaining cost is the 13 canvases' `ResizeObserver → paint()` path and the 910x1137
+background plate re-rastering per step; neither is touched here. The theme leg is a second,
+independent finding — its instability across five repeats (`BREACH, clean, clean, clean, BREACH`)
+VOIDed the first run outright, and it is a shared theme-switch cost rather than City's.
+
+**EXACT NEXT SLICE: City cat7's remaining resize gap.** Take the canvas layers next, not the
+theme leg: `ReadingGardenLifeCanvas`/`MushroomStage` repaint from a bare
+`new ResizeObserver(() => paint())` (`ReadingGarden.tsx:440-443`) with no coalescing, so 60 resize
+steps are 60 full repaints per canvas. The same `fwin-resizing` seam this turn added is already
+available to gate them on. Re-run `cat7-perf.cjs --surface city --win 1 --jank` and require the
+resize FINDING to clear before claiming the cell.
+
+**App state left as found:** window `680x657` at `(162,114)`, presentation STANDARD, dossier
+CLOSED, the live `filter` override removed and verified removed.
 ## 2026-09-04 · primary2 — City cat7 is NOT a 10, and its 2026-08-31 PASS was taken on a 60 Hz panel
 
 **sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged.

@@ -3951,6 +3951,22 @@ const FloatingWindow = memo(function FloatingWindow({
     const maxH = Math.max(MIN_H, dh - win.y - 2);
     let curW = ow, curH = oh;
     let raf: number | null = null;
+    /*
+     * `fwin-resizing` marks the window for the duration of the gesture ONLY, so a
+     * surface whose decoration is expensive to re-rasterise can stand down while the
+     * user is dragging and come straight back on release. Measured on the Mooncap
+     * Garden (cat7, 2026-09-04): its parallax plates carry per-layer `filter: blur()`
+     * and the resize leg read p50 25.1 ms / p95 41.7 ms against an 8.3 ms compositor
+     * ceiling, with the main thread idle at 2.8 ms — compositor raster, not JS.
+     * Neutralising those filters live took the same leg to p50 16.6 ms.
+     *
+     * Written imperatively on the node rather than through state on purpose: this
+     * gesture deliberately never re-renders (it writes inline width/height inside a
+     * rAF for exactly that reason), and a `setState` per pointermove would reintroduce
+     * the reflow storm the clamp above exists to prevent. `up` always removes it,
+     * including on the early-return paths, because it is the same node reference.
+     */
+    winRef.current?.classList.add('fwin-resizing');
     const move = (ev: PointerEvent) => {
       if (mode !== 'bottom') curW = Math.max(MIN_W, Math.min(ow + (ev.clientX - sx) / z, maxW));
       if (mode !== 'right') curH = Math.max(MIN_H, Math.min(oh + (ev.clientY - sy) / z, maxH));
@@ -3973,6 +3989,7 @@ const FloatingWindow = memo(function FloatingWindow({
       el.removeEventListener('pointerup', up);
       if (raf != null) cancelAnimationFrame(raf);
       const node = winRef.current;
+      node?.classList.remove('fwin-resizing');
       if (node) {
         // Cancelling the pending rAF above leaves the DOM on whatever frame
         // painted last, which is not necessarily the size being committed. If

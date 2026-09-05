@@ -1783,3 +1783,45 @@
   .fwin-b:focus-visible {
   outline-color: rgba(233, 247, 249, 0.92);
 }
+
+/* ---------------------------------------------------------------------------
+   Stand the decorative blur down for the duration of a window resize.
+
+   `.fwin-resizing` is written by DesktopShell's `resizeStart` and removed by its
+   `up`, so this lasts exactly as long as the user's pointer is down on the grip.
+
+   Why the garden specifically (cat7, 2026-09-04): the parallax scene is 13 canvas
+   layers plus a 910x1137 background plate, and the cloud/horizon plates each carry
+   their own `filter: blur()`. Every resize step re-rasterises all of them at a new
+   size. Measured through `probes/cat7-perf.cjs`, `--surface city --jank`: the resize
+   leg read p50 25.1 / p95 41.7 ms against an 8.3 ms compositor ceiling from the same
+   run, reproduced across both repeats (25.1/41.7 and 25.0/41.7), while the main
+   thread stayed idle at p50 2.8 / max 4.8 ms. Main idle with long frames is raster
+   cost, not JS, which is what makes a filter the suspect and a rAF clamp useless.
+   Neutralising these filters live and re-running the identical harness took the same
+   leg to p50 16.6 / p95 33.4 ms — so this is a measured contributor, NOT the whole
+   gap, and cat7 is not claimed closed on the strength of it.
+
+   Scoped to `filter` and to this surface deliberately. It is not a general "drop all
+   effects while resizing" tier: `--glass-blur`/`data-perf` already own that question
+   app-wide, the dossier's `backdrop-filter` is a Liquid material rather than
+   decoration, and animation is left running because pausing it mid-gesture reads as a
+   stutter rather than as smoothness. Reversible by construction — the class is gone
+   on pointerup and the plates re-rasterise once, not per frame.
+   --------------------------------------------------------------------------- */
+/* The five hooks below are the surface's ACTUAL blurred plates, enumerated live rather
+   than guessed from the stylesheet: 11 elements under `.fwin-frameless` compute a
+   `filter` containing `blur()`, and these five class hooks cover all 11. A first draft
+   of this rule named `.reading-garden-world [class*='cloud-sprite']` and matched TWO
+   elements, because the cloud sprites are children of `.reading-garden` itself, not of
+   `.reading-garden-world`. A degradation rule that matches nothing is indistinguishable
+   from one that works — the harness would simply have reported no improvement.
+   `.reading-garden-info`'s `backdrop-filter` is deliberately NOT here: it is a Liquid
+   material on a temporary inspector, not scene decoration. */
+.fwin-resizing .reading-garden-cloud-sprite,
+.fwin-resizing .reading-garden-distant-fog,
+.fwin-resizing .reading-garden-moonbeam,
+.fwin-resizing .reading-garden-hero-focus,
+.fwin-resizing .reading-garden-mushroom-aura {
+  filter: none;
+}
