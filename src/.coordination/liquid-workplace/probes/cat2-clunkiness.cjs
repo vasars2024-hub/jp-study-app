@@ -1494,6 +1494,46 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     }
   }
 
+  /**
+   * CORRECTION 44 — THE PRESENTATION TOGGLE DROPS CLICKS, SO ONE CLICK IS NOT A MEASUREMENT.
+   *
+   * Measured live on `novels`, 2026-09-04, before this was written. Six consecutive synthetic
+   * clicks on `button.fwin-b-liquid` two seconds apart flipped six times for six; three earlier
+   * clicks at ~1 s spacing flipped ONCE; and one click watched by a MutationObserver on
+   * `data-presentation` produced no mutation at all across 4.25 s of 250 ms polling, then the very
+   * next click flipped immediately. So the flip is FLAKY, not slow — a longer sleep does not fix
+   * it, which is why `liquid-toggle-lands-every-other-click` says retry rather than wait.
+   *
+   * The single click + 900 ms read this replaces VOIDed the whole cell on a surface that was fine.
+   * It cannot fabricate a pass: the window's own `data-presentation` is still the only accepted
+   * evidence, and a leg that never reaches the asked-for presentation still VOIDs. The attempt
+   * count is PUBLISHED into `presentationLeg`, so a cell that needed three clicks can never be
+   * read as one that flipped cleanly.
+   */
+  const flipTo = async (want) => {
+    const attempts = [];
+    for (let i = 0; i < 4; i += 1) {
+      const before = JSON.parse(await ev(PRESENT_READ(SURFACE)));
+      if (before.presentation === want) {
+        attempts.push({ attempt: i + 1, alreadyAt: want });
+        return { ok: true, read: before, attempts };
+      }
+      const t = JSON.parse(await ev(PRESENT_TOGGLE(SURFACE, want)));
+      if (t.refuse) return { ok: false, refuse: t.refuse, attempts };
+      await sleep(900);
+      const after = JSON.parse(await ev(PRESENT_READ(SURFACE)));
+      attempts.push({ attempt: i + 1, from: before.presentation, to: after.presentation });
+      if (after.presentation === want) return { ok: true, read: after, attempts };
+    }
+    const final = JSON.parse(await ev(PRESENT_READ(SURFACE)));
+    return {
+      ok: false,
+      refuse: `asked ${want}, window reports ${final.presentation} after ${attempts.length} clicks`,
+      read: final,
+      attempts,
+    };
+  };
+
   // Correction 9: the second term is read factually and never invented.
   let costParity = 'UNMEASURED';
   let compare = null;
@@ -1521,19 +1561,15 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
     // Correction 12: same window, same geometry, same task, both presentations.
     const was = JSON.parse(await ev(PRESENT_READ(SURFACE)));
     const other = was.presentation === 'liquid' ? 'standard' : 'liquid';
-    const flip = JSON.parse(await ev(PRESENT_TOGGLE(SURFACE, other)));
-    if (flip.refuse) { console.error(`VOID - presentation leg: ${flip.refuse}`); process.exit(3); }
-    await sleep(900);
-    const now = JSON.parse(await ev(PRESENT_READ(SURFACE)));
-    if (now.presentation !== other) {
-      console.error(`VOID - presentation did not flip: asked ${other}, window reports ${now.presentation}`);
-      process.exit(3);
-    }
+    const flip = await flipTo(other);
+    if (!flip.ok) { console.error(`VOID - presentation leg: ${flip.refuse}`); process.exit(3); }
+    const now = flip.read;
     const alt = await measure(SURFACE, TASK);
-    await ev(PRESENT_TOGGLE(SURFACE, was.presentation));
-    await sleep(900);
-    const back = JSON.parse(await ev(PRESENT_READ(SURFACE)));
+    const home = await flipTo(was.presentation);
+    const back = home.read || JSON.parse(await ev(PRESENT_READ(SURFACE)));
     presentationLeg = {
+      flipAttempts: flip.attempts.length,
+      restoreAttempts: home.attempts.length,
       first: { presentation: was.presentation, box: was.box, total: m.cost.clicks + m.cost.keystrokes, deadEnds: m.deadEnds.length, worstRecv: m.cost.worstRecv },
       second: alt.refuse ? { refuse: alt.refuse } : {
         presentation: other, box: now.box, total: alt.cost.clicks + alt.cost.keystrokes,
