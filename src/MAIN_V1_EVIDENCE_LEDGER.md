@@ -27947,3 +27947,46 @@ paused, progress 100** — the morning's baseline exactly.
 **NOT a defect, stated so it is not filed as one:** the control's refusal reads *"qBittorrent
 rejected the API key"* because the mount synthesises a 403 on a route qBittorrent never 403s, and
 403 **is** an auth rejection in its API. Instrument artifact.
+
+## 2026-09-05 — `primary` — Track 9 gate 11: the index had subjects; the detector could not see them
+
+**`971dc4d4` (attribution below) + `70a8941c`.** Gate 11 wants a subtitle-only release under
+50 MB. Every prior turn treated "no Route A subject" as a fact about nyaa. It was a fact about
+`subtitlePackSignals`.
+
+**Measured in this order, so the finding is falsifiable.** The product's own listing for
+`Detective Conan` → **1 candidate**, the 6.1 GB Kitsunekko archive (`sub-archive`). The raw index
+search for the same title → **75 rows, 2 under 50 MB**: `… Movies 01-26 (Only subs) [Netflix SEA]
+[Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]` at **5.3 MB / 12 seeders**, and its **19.8 MB / 14-seeder**
+sibling over 520 episodes. Both subtitles-only, both carrying **JA** — which the harvest needs,
+`subtitleHarvest.ts:511` hardcoding `languages: ['ja']`. Fed to the classifier **inside the
+running app** (dynamic import of the real module, not a reimplementation): both `[]`, while
+`(subs only)` scored `subs-only`. The difference is English word order.
+
+**Two guards, one cause.** `STATED_PAYLOAD_RE` knew `subs only`, not `only subs`. So the payload
+claim went unread, and — because nothing outranked it — `[Multi-Subs]` fired the video-release
+veto on a name where it means "many subtitle languages". One regex fixes both halves; the 50 MB
+ceiling is unchanged and is still what makes it safe.
+
+**The second fix is what the widened measurement bought.** Scanning **all 53** under-50 MB rows
+returned live today: **49/53** accept after fix 1, **50/53** after fix 2. The extra miss was
+`[ASS FILE ONLY] Goodbye Don Glees English Subs`, 0.1 MB of `.ass` — the group strip ate the
+bracket holding its only format tag, then `English Subs` vetoed what remained. Of the 3 still
+refused, 1 is correct (`[BD ONLY]` is a *source* claim, now a committed control), 1 is my own
+search output truncating at 90 chars, 1 is `pack subs fr` (reversed `sub pack`, one French row,
+not chased). MUTATIONS: drop the reversed order → **2 of 130** red; drop `FORMAT_ONLY_RE` →
+**1 of 132** red. Both files restored byte-identical.
+
+**GATE 11 IS OPEN. The acquisition did not run, and the reason is not a product one.** Both fixes
+are in `src/shared/`, read by main, and main does not hot-reload. A **second live `primary`
+session** (pid 29032, 13:36) was in this tree driving `cat7-perf.cjs` against the shared app —
+its own commit `971dc4d4` at 14:17:18 proves it. A restart would have destroyed its measurements.
+
+**TRAPS, both of which cost real minutes here.**
+1. **My first corpus scan read `PACK 0/53`** — including rows the committed test proves are packs.
+   The helper set `id: name` and never `name`, so every row classified an empty string. A scan
+   that disagrees with a green test is the scan being wrong. Fixed → 49/53.
+2. **The shared git index swept my blobs into a stranger's commit.** `git add` then `git commit`
+   in two tool calls: between them the sibling committed, and my two files rode into its
+   liquid-scorecard commit `971dc4d4`. Content verified intact at HEAD; history NOT rewritten,
+   which with a live sibling is the more dangerous option. Stage and commit in one call.

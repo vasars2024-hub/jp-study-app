@@ -1315,3 +1315,60 @@ in the dotted slot before the extension, because two letters on the general rule
 bytes. See the ledger entry.
 
 **Track 9 is now 16 of 20: gates 11, 13, 15 remain as agent work, and gate 7 is external.**
+
+#### Gate 11 (Route A) — SUBJECT FOUND, and the reason it had none is FIXED. Still OPEN; the acquisition itself did not run.
+
+**2026-09-05 (primary).** Gate 11 asks for a subtitle-only release under the 50 MB ceiling. The
+honest reason no turn had ever driven it is not that the index carries none — it is that the
+**detector could not see the ones it carries.** Measured, not inferred, and in that order:
+
+1. The product's own listing for `Detective Conan` returned **1 candidate**: the 6.1 GB
+   `[PeepoHappy] Kitsunekko Archive`, route `sub-archive`. Not a Route A subject.
+2. The raw index search for the same title returned **75 rows, 2 of them under 50 MB** —
+   `Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]`
+   at **5.3 MB / 12 seeders**, and its **19.8 MB / 14-seeder** sibling covering 520 episodes.
+   Both are subtitles and nothing else, and **both carry a Japanese track** — which the `ja`
+   harvest needs, since `subtitleHarvest.ts:511` hardcodes `languages: ['ja']`.
+3. Run through `subtitlePackSignals` **in the running app** (dynamic import of the product's own
+   module, not a reimplementation): both scored `[]`. `(subs only)` → pack; `(Only subs)` → not a
+   pack. Same claim, reversed English word order. They were dropped for `shape`, the verdict that
+   means "nothing here is fetchable".
+
+**FIXED, and the second fix came from widening the same measurement.** `971dc4d4` (see below on
+its attribution) teaches `STATED_PAYLOAD_RE` the reversed order, which also stops `[Multi-Subs]`
+firing the video-release veto on a name where it means "many subtitle languages". `70a8941c` adds
+`FORMAT_ONLY_RE` after scanning **all 53 under-50 MB rows nyaa returned live today**: the scan
+read **49/53** after the first fix and **50/53** after the second, and the one further miss was
+`[ASS FILE ONLY] Goodbye Don Glees English Subs` — 0.1 MB of `.ass`, refused because the group
+strip ate its only format tag and the remaining `English Subs` vetoed the row. Of the 3 rows still
+refused: `[BD ONLY]` is correct and is now a committed control; one is my own search output
+truncating the name at 90 chars; one is `pack subs fr`, the reversed `sub pack` order, a single
+French row, deliberately not chased.
+
+**WHAT DID NOT HAPPEN, stated plainly: the acquisition.** Both fixes are in `src/shared/`, read by
+**main**, and main does not hot-reload. Driving the gate needs an app restart, and this turn had
+no right to one — a **second live `primary` session** (pid 29032, started 13:36) was in the same
+tree running `cat7-perf.cjs` against the shared app, and its commit `971dc4d4` at 14:17:18 proves
+it was live. Restarting would have destroyed its measurements. So gate 11 is **OPEN**, with its
+subject and its blocker both now known.
+
+**EXACT NEXT SLICE, for a turn that owns the app.** Restart, then:
+
+```
+node debug/g14-live.cjs list  "Detective Conan"                    # expect route sub-pack, rank 1
+node debug/g14-live.cjs fetch "Detective Conan" <infoHash of the 5.3 MB row>
+```
+
+`5.3 MB / 12 seeders` is the one to take — smallest with healthy seeds, per the standing rule.
+Then `attachSubtitleText({mediaId, text, format, lang:'ja', ...})`, which is the same call
+`SubtitleHarvestPanel.tsx:507` makes, to land the `SubtitleRecord` and satisfy the gate's second
+and third clauses. Two things to expect rather than misread: the multi-language pack means
+`selectSubtitleFiles` will skip the non-`ja` files, so "taken whole" is the *release*, not every
+file in it — disclose the skip count; and `qbitReapSubtitleOrphans` deletes the whole
+`jp-study-subtitles` category minus the in-flight hash, so drive it through
+`debug/qbit-basepath-proxy.cjs` with `G14_RECATEGORIZE=539c0886…` or lose the Kitsunekko archive.
+
+**Attribution note, so the log is not read wrong.** The first fix's blobs are inside `971dc4d4`,
+a *concurrent* worker's liquid-scorecard commit. Two `primary` sessions share one git index here;
+mine were staged and that worker's `git commit` swept them in. The content is intact and verified
+at HEAD. History was not rewritten — with a live sibling that is the more dangerous option.
