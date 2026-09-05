@@ -18171,7 +18171,69 @@ html[data-taskbar-size='large'] .os-tray-btn {
   margin: 0;
   padding: 4px 6px 12px;
   overflow: auto;
-  flex: 1;
+  /* Was `flex: 1`, which made a one-row list claim the whole 610px column and
+     stranded anything below it at the far bottom of the rail. `0 1 auto` sizes
+     it to VirtualList's own spacer when the collection is short and still lets
+     it shrink and scroll when it is 883 rows long. */
+  flex: 0 1 auto;
+  min-height: 0;
+}
+/* The curated destinations group, directly under the saved sites. `flex-shrink: 0`
+   so a long saved-sites list scrolls instead of crushing it. */
+.immersion-rail-destinations {
+  flex-shrink: 0;
+  padding: 6px 6px 10px;
+  border-top: 1px solid var(--border);
+}
+.immersion-rail-destinations-head {
+  margin: 0 0 6px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.immersion-rail-destination-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.immersion-rail-destination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  /* Category 1's pointer floor, on the box: these rows sit in a 2px-gap column and
+     cannot borrow their neighbour's overlap the way a wider control can. */
+  min-height: var(--lq-hit-target);
+  padding: 0 8px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.immersion-rail-destination:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.immersion-rail-destination-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.immersion-rail-destination-lang {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }
 /* Was `.immersion-site-list li`. The list is windowed now (883 sites measured in
    one real profile), and a windowed row lives in VirtualList's fixed slot, not

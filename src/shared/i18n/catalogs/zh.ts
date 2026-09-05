@@ -5668,6 +5668,7 @@ export const zh: Catalog = {
   'immersion.hint': '搜索会以实时模式打开 · F8 切换模式 · F6 专注 · Ctrl+L 定位地址栏',
   'immersion.sites': '站点',
   'immersion.rail.empty': '已保存的站点会显示在这里。为任意页面添加书签即可。',
+  'immersion.rail.destinations': '推荐站点',
   'immersion.visitsCount': {
     other: '访问 {count} 次',
   },
