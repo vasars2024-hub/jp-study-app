@@ -7576,3 +7576,21 @@ wants one turn that owns the app.
 - **No rubric cell or timeline bullet closed**: this repairs the blocking notification path;
   the player still requires its own populated, controlled rubric pass. Full gates follow later
   this turn against a detached checkpoint, not the foreign dirty tree.
+
+## 2026-09-05 17:40 EDT — codexB — active errors survive closing a media shell
+
+- Follow-up to `36e29661`: two hosts, one active error, close the first host -> layer **1**,
+  visible notifications **0**. The surviving host remounted Sonner and lost its local state.
+- Keep one independent document root until the LAST shell closes. No history replay,
+  duplicate delivery, timer restart, or focus transfer; deferred teardown tolerates StrictMode.
+- Regression first failed on the recovered checkpoint (**1 failed / 7 skipped**); fixed
+  suite **8/8**. Browser: error text retained, **same DOM node**, **same focused Close button**,
+  **one layer** after first host removal. Final-shell teardown is covered by the suite.
+  ESLint on both changed TSX paths: **0 errors / 0 warnings**.
+- Recovered the live app too: Vite's shadow-root overlay named duplicate `t` in the foreign
+  FieldMappingEditor merge union. Removed only its added duplicate; all translated strings,
+  hit-scope classes and disabled reasons remain unstaged. HEAD already had one declaration,
+  so there is no HEAD fix to commit on that path. The app now renders Translate, Reading Finder
+  and Anki, and its media launcher opens five real library entries with **one** toast host.
+- No rubric cell or timeline bullet closed. Next: the local episode player-routing failure;
+  `StudyPlayerSlice` DOES consume native-player watch events, contrary to the older handoff.
