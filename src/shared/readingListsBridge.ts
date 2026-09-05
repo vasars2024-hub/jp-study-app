@@ -28,6 +28,7 @@
 import {
   isReadingListsDocumentShape,
   normalizeReadingListsDocument,
+  readingListsNormalizationWipes,
   type ReadingListEvent,
   type ReadingListsDocument,
 } from './readingLists';
@@ -175,7 +176,13 @@ export function isReadingListsWriteRequest(
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const raw = value as { baseRevision?: unknown; document?: unknown };
   if (typeof raw.baseRevision !== 'number' || !Number.isFinite(raw.baseRevision)) return false;
-  return isReadingListsDocumentShape(raw.document);
+  if (!isReadingListsDocumentShape(raw.document)) return false;
+  // Document-shaped is not enough on its own: `{lists:[{name:'no id'}]}` carries
+  // the shape, normalizes to zero lists, and `write` would apply and broadcast
+  // that as a healthy document (boss audit 2026-09-05 attempt 4, Finding 3). A
+  // caller deleting its last list sends `lists: []` and claims nothing, so it is
+  // unaffected; a caller that claims lists and can serve none is refused.
+  return !readingListsNormalizationWipes(raw.document);
 }
 
 export function normalizeReadingListsHealth(value: unknown): ReadingListsHealth {

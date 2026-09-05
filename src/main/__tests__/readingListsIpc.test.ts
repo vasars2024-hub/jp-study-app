@@ -222,6 +222,32 @@ describe('write', () => {
     expect(store.read().document.revision).toBe(1);
   });
 
+  it('refuses a document-SHAPED write whose every list would normalize away', () => {
+    // Boss audit 2026-09-05 attempt 4, Finding 3, attack C. The guard above only
+    // asked for the document shape, so `{lists:[{name:'no id'}]}` passed it and
+    // `write` returned `applied:true` with zero lists — the caller believes it
+    // sent a list, and the store commits and broadcasts the erasure.
+    store.write(0, document('from Kenji'));
+    expect(store.read().document.lists).toHaveLength(1);
+
+    for (const malformed of [
+      { lists: [{ name: 'no id' }] },
+      { schemaVersion: 1, revision: 7, works: [], lists: [{ name: 'from Kenji' }, { name: 'B' }] },
+      { revision: 7, lists: [1, 2, 'x', null] },
+    ]) {
+      expect(
+        invoke<ReadingListsResult>('readingLists:write', null, {
+          baseRevision: 1,
+          document: malformed,
+        }),
+        `${JSON.stringify(malformed)} was accepted as a document`,
+      ).toEqual({ ok: false, code: 'invalid-request' });
+    }
+
+    expect(store.read().document.lists).toHaveLength(1);
+    expect(store.read().document.revision).toBe(1);
+  });
+
   it('still accepts a genuinely empty library, which is not malformed', () => {
     // The control on the guard: `{lists: []}` is a user who deleted their last
     // list, and refusing it would make the product unable to reach empty.

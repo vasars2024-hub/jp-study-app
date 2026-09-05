@@ -222,6 +222,56 @@ describe('a corrupt document recovers to last-good, and says so', () => {
     expect(snapshot.document.lists).toHaveLength(1);
   });
 
+  it('does not serve a document whose lists are all unusable as a healthy library', () => {
+    // Boss audit 2026-09-05 attempt 4, Finding 3 — the residual hole in the fix
+    // above. The shape guard is DOCUMENT-level, so a file that keeps the shape
+    // and loses only its members walked straight past it: measured
+    // `{state:'ok', lists:0, lastGood:0, revision:7}` from a file still claiming
+    // revision 7. Same wipe as `{}`, one level down.
+    const store = createReadingListsStore(root);
+    store.write(0, fixture());
+    store.read();
+
+    const attacks = [
+      // A: document shape fully intact, every member missing its `id`.
+      '{"schemaVersion":1,"revision":7,"works":[],"lists":[{"name":"from Kenji"},{"name":"B"}]}',
+      // B: members that are not records at all.
+      '{"revision":7,"lists":[1,2,"x",null]}',
+    ];
+    for (const corruption of attacks) {
+      fs.writeFileSync(store.filePath, corruption, 'utf8');
+      const snapshot = createReadingListsStore(root).read();
+      expect(snapshot.health.state, `\`${corruption}\` was served as a document`)
+        .toBe('recovered');
+      expect(snapshot.document.lists).toHaveLength(1);
+
+      const lastGood = JSON.parse(fs.readFileSync(store.lastGoodPath, 'utf8')) as {
+        lists: unknown[];
+      };
+      expect(lastGood.lists, 'the restore point was overwritten').toHaveLength(1);
+    }
+  });
+
+  it('still accepts a document that legitimately has no lists, and one that loses only some', () => {
+    // The control on Finding 3's fix, and the reason it tests TOTAL loss only.
+    // An empty library claims nothing and must stay `ok`, or a user who deleted
+    // their last list can never read their own file again. And a file that loses
+    // SOME members to deduplication is being repaired, not destroyed.
+    const store = createReadingListsStore(root);
+    fs.mkdirSync(path.dirname(store.filePath), { recursive: true });
+
+    fs.writeFileSync(store.filePath, '{"schemaVersion":1,"revision":4,"lists":[],"works":[]}', 'utf8');
+    const empty = createReadingListsStore(root).read();
+    expect(empty.health.state).toBe('ok');
+    expect(empty.document.lists).toEqual([]);
+
+    const partial = { ...fixture(), lists: [fixture().lists[0], { name: 'no id' }] };
+    fs.writeFileSync(store.filePath, JSON.stringify(partial), 'utf8');
+    const kept = createReadingListsStore(root).read();
+    expect(kept.health.state).toBe('ok');
+    expect(kept.document.lists).toHaveLength(1);
+  });
+
   it('reports `reset` — not `recovered` — when there is no restore point', () => {
     const store = createReadingListsStore(root);
     fs.mkdirSync(path.dirname(store.filePath), { recursive: true });

@@ -650,6 +650,28 @@ export function isReadingListsDocumentShape(value: unknown): value is Partial<Re
   return true;
 }
 
+/**
+ * Whether normalizing `value` would destroy every list it claims to carry.
+ *
+ * `isReadingListsDocumentShape` answers the question at the DOCUMENT level and
+ * stops there, so `{lists:[{name:'from Kenji'},{name:'B'}]}` — document-shaped,
+ * every member corrupt — passes it, normalizes to zero lists, and was then served
+ * as healthy AND promoted over the restore point. Boss audit 2026-09-05 attempt 4,
+ * Finding 3 measured exactly that: `lists:0, lastGood:0` from a file that still
+ * said `revision:7`. It is the same data loss the Finding 1 fix closed, one level
+ * down, and `normalizeReadingList` returns null for any member without an `id`,
+ * so a rollback to a build that predates a field is a realistic trigger.
+ *
+ * Only a TOTAL loss counts. Normalization drops SOME members by design — a
+ * duplicate list id is deduplicated on purpose — and refusing a whole file over
+ * one repaired entry would be data loss of this guard's own making.
+ */
+export function readingListsNormalizationWipes(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (arr(value.lists).length === 0) return false;
+  return normalizeReadingListsDocument(value).lists.length === 0;
+}
+
 export function normalizeReadingListsDocument(value: unknown): ReadingListsDocument {
   if (!isRecord(value)) return emptyReadingListsDocument();
   const revision = num(value.revision);

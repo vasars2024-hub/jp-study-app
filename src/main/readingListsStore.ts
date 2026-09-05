@@ -43,6 +43,7 @@ import {
   emptyReadingListsDocument,
   isReadingListsDocumentShape,
   normalizeReadingListsDocument,
+  readingListsNormalizationWipes,
   type ReadingListEvent,
   type ReadingListsDocument,
 } from '../shared/readingLists';
@@ -129,6 +130,12 @@ function readDocument(filePath: string): ReadingListsDocument | 'absent' | 'unre
     // shape a half-written file most easily lands on — through as a healthy empty
     // library (boss audit 2026-09-05, Finding 1).
     if (!isReadingListsDocumentShape(parsed)) return 'unreadable';
+    // ...and the shape guard is document-level only, so a file whose `lists` are
+    // all unusable members still passes it, normalizes to zero, and would be
+    // promoted over the restore point exactly as `{}` used to be (boss audit
+    // 2026-09-05 attempt 4, Finding 3). A file that claims lists and can serve
+    // none of them is unreadable, not empty.
+    if (readingListsNormalizationWipes(parsed)) return 'unreadable';
     return normalizeReadingListsDocument(parsed);
   } catch {
     return 'unreadable';

@@ -1687,3 +1687,41 @@ P0's recovery clause is closed against its own words now, not against the word
 never be the document-level guard.** Totality is right per FIELD (repair a broken
 volume range) and wrong per DOCUMENT (`{}` is not an empty library, it is a file
 that lost its contents).
+
+---
+
+## 2026-09-05, `primary` — Finding 3: the shape guard was DOCUMENT-level, so a document-shaped corruption still wiped the restore point
+
+Boss audit 2026-09-05 attempt 4 re-attacked the fix above and got through it. The
+entry immediately above is correct about `{}`; it is one level too shallow.
+
+- **What got past it.** `{"schemaVersion":1,"revision":7,"works":[],"lists":[{"name":"from
+  Kenji"},{"name":"B"}]}` — document shape fully intact, only the *members* corrupt.
+  `isReadingListsDocumentShape` asks that `lists` be an array and says nothing about
+  what is in it, so the file was accepted, normalized to **zero lists**, served as
+  `state:'ok'`, and **promoted over `reading-lists.last-good.json`**. Measured by the
+  audit as `{state:'ok', lists:0, lastGood:0, revision:7}` from a file still claiming
+  revision 7. `{"revision":7,"lists":[1,2,"x",null]}` did the same. At the write seam,
+  `isReadingListsWriteRequest({baseRevision:0, document:{lists:[{name:'no id'}]}})`
+  returned TRUE and `write` returned `applied:true` with 0 lists.
+- **Realistic trigger, not an exotic one.** `normalizeReadingList` returns null for any
+  member without an `id`, so a rollback to a build that cannot normalize a newer list
+  record, or any caller assembling entries without ids, reproduces it.
+- **The fix** is a second predicate, `readingListsNormalizationWipes`, at the same two
+  seams. It refuses only a **TOTAL** loss — `lists` non-empty before normalization and
+  empty after. Partial loss stays accepted on purpose: duplicate list ids are
+  deduplicated by design, and refusing a whole file over one repaired member would be
+  data loss of this guard's own making. `lists: []` claims nothing, so a user deleting
+  their last list is unaffected.
+- **Evidence.** 3 new tests (store: attacks A and B with the restore point asserted
+  intact after each; IPC: attack C plus two document-shaped variants) and one new
+  two-part control (empty library still `ok`; a file losing only SOME members still
+  `ok` with the survivor served). Mutation control: neutralizing the predicate to
+  `return false` turned **exactly 2 RED, both by name** — `does not serve a document
+  whose lists are all unusable as a healthy library` and `refuses a document-SHAPED
+  write whose every list would normalize away` — while both controls stayed GREEN,
+  which is what proves the new tests reach the new rule rather than an older one.
+  Restored byte-identical (`00bc05fa`). Store + IPC suites **31 passing**.
+
+The lesson that generalizes: **a guard written against the literal that produced the
+bug is not a guard against the bug.** `{}` was the example, not the class.
