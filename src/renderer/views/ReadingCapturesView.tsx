@@ -326,7 +326,14 @@ export default function ReadingCapturesView({ passage }: ReadingCapturesViewProp
               type="button"
               className="reading-captures-row"
               aria-current={selected?.captureId === row.captureId}
-              onClick={() => setSelectedId(row.captureId)}
+              onClick={(event) => {
+                setSelectedId(row.captureId);
+                // Selecting a passage is the read gesture. Dismiss only this
+                // list's covering sheet; a docked list remains useful navigation.
+                if (event.currentTarget.closest('[data-reading-tool]')?.getAttribute('data-placement') === 'sheet') {
+                  setListOpen(false);
+                }
+              }}
             >
               <span className="reading-captures-row-title">{row.title}</span>
               <span className="reading-captures-row-meta">

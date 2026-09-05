@@ -6342,3 +6342,9 @@ port. Kill those too, then `npm start`. Second attempt loaded normally.
 
 **7 of 8: cat1-cat6 and cat8 at 10/10. cat7 OPEN.** Running total **164 of 192, 28 remaining**
 per the enumeration entry above (`b815d159`) — **no cell moved this turn.**
+
+## 2026-09-05 09:51 EDT — codexB — Reading Captures selection reveals the document
+- <!-- status: closed; evidence: this commit --> A row selected from the narrow list sheet left the document covered; selection now dismisses that sheet only.
+- Live browser: actual `ReadingCapturesView`, 42 entries read from `lensHistoryList`, existing motion harness on isolated Vite 5198 with Liquid styles; 600px NHK selection changes covered=true to no sheet, inert=false, 18-line passage visible. At 1280px the list stays docked; reopen retains selection.
+- Focused canvas + handoff suites: 14/14. Wide selection is the negative control. Screenshot inspected outside repo; console only favicon 404. Shared server stopped externally, so the first stale-page recheck was discarded.
+- No rubric cell or timeline bullet closed; advances reading cat6. Product files were clean before editing. Other workers own Translate/background-main attribution.
