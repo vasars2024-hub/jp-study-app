@@ -1190,7 +1190,44 @@ async function langLeg() {
   })()`);
   // Correction 4's sibling: a surface with nothing rendered has not been measured, and the rubric
   // caps an empty measurement at 0 rather than letting it read as four clean zeros.
+  //
+  // CORRECTION 51 — "empty" IS THE WRONG WORD FOR THE COMMONEST CAUSE. Same as cat2's correction
+  // 61: the painted predicate at :237 gates on `checkVisibility({ checkOpacity: true })`, so a
+  // fully populated surface reports zero when its ENTRY ANIMATION IS FROZEN. Measured 2026-09-05
+  // on a `.fwin` opened while the OS window was covered: `fwinIn:running:0`, opacity 0, 68
+  // unpainted text nodes, and the VOID blamed the surface. Diagnosed only after the VOID fires.
   if (base.textRuns === 0) {
+    const why = JSON.parse(await ev(`(function(){
+      var root = ${ROOT_EXPR};
+      if (!root) return JSON.stringify({ rootGone: true });
+      var raw = 0;
+      var tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (var t = tw.nextNode(); t; t = tw.nextNode()) if (t.nodeValue && t.nodeValue.trim()) raw++;
+      var frozen = [];
+      var scan = root.getAnimations ? root.getAnimations({ subtree: true }) : [];
+      for (var i = 0; i < scan.length; i++) {
+        var a = scan[i];
+        if (a.playState === 'running' && (a.currentTime || 0) === 0) {
+          frozen.push(a.animationName || a.transitionProperty || '?');
+        }
+      }
+      return JSON.stringify({
+        rawTextNodes: raw,
+        rootOpacity: getComputedStyle(root).opacity,
+        frozenAtZero: frozen.slice(0, 6),
+        hasFocus: document.hasFocus()
+      })
+    })()`));
+    if (why.rawTextNodes > 0) {
+      console.error(
+        `VOID - NOT EMPTY: ${why.rawTextNodes} text nodes are present but none PAINTS. `
+        + `root opacity ${why.rootOpacity}, animations stuck at currentTime 0: `
+        + `${why.frozenAtZero.length ? why.frozenAtZero.join(', ') : 'none'} `
+        + `(document.hasFocus ${why.hasFocus}). The compositor does not advance an animation in a `
+        + `window it is not painting; raise/uncover the OS window and re-run.`,
+      );
+      process.exit(3);
+    }
     console.error('VOID - 0 rendered text runs; an empty surface scores 0, not 10');
     process.exit(3);
   }

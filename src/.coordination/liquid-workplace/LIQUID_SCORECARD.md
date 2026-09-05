@@ -7762,3 +7762,28 @@ should be measured on an instance that carries `afe88e35` for real.
 **State restored:** the three windows the desk held at the start of my turn (Translate, Reading
 Finder, Anki) were closed by the verification and reopened by `os:open`; the desk reads
 `Translate ;; Reading Finder ;; Anki` and the injected style is gone, both confirmed by read-back.
+
+### Same turn, third slice — the harness refusal that misnames this, fixed in BOTH harnesses that carry it
+
+`cat2` correction 61 / `cat8` correction 51. The refusal `0 rendered text runs; an empty surface
+scores 0, not 10` blamed the SURFACE for what is a frozen entry animation. It cost me three runs
+this turn, and it is the same predicate in both files (`cat2:408`, `cat8:237`,
+`checkVisibility({ checkOpacity: true })`). Both now diagnose after the refusal has already fired,
+so a passing run pays nothing.
+
+**Positive arm — populated surface, frozen animation, reproduced deliberately:**
+
+    REFUSE - NOT EMPTY - 68 text nodes are present but none PAINTS. root opacity 0,
+    animations stuck at currentTime 0: fwinIn (document.hasFocus true). The compositor does not
+    advance an animation in a window it is not painting; raise/uncover the OS window and re-run.
+    This is a MEASUREMENT refusal, not a score of 0.
+
+`cat8` prints the same as a VOID. **Negative arm — a genuinely empty surface** (`@#p2-empty`, an
+injected 200x100 div with `textContent.length === 0`) still gets the ORIGINAL message on both,
+unchanged. So the new branch cannot swallow a real emptiness cap.
+
+**RULE 1:** both are existing parameterised harnesses; no new probe. `cat1` and `cat4` share the
+predicate but do not carry this refusal, so they were left alone rather than edited speculatively.
+
+**State:** the injected div and the `p2-verify` style are removed and the desk reads
+`Translate ;; Reading Finder ;; Anki`, all three confirmed by read-back.
