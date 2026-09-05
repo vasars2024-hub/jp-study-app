@@ -7935,3 +7935,86 @@ app had focused before my scratch node existed — not to `BODY` as intended. No
 (another worker unmounted that surface mid-turn and the input is gone), but the lesson is the one
 the previous entry already drew: **the second half of the handoff's slice — get a private
 instance — is still the right move, for the shared-mutable-rail reason, not for `/type`.**
+
+### Same turn, second slice — `immersion` cat2 is MEASURABLE again, and its latency bar is a REAL product cost
+
+**Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** `immersion` cat2 stays OPEN on
+one bar. What moved: the surface went from unmeasurable to measured with a control, the
+"failed undo" that blocked it for two turns is explained and gone, and ~20 ms per keystroke
+came off it (`5cecc8d3`). **sampled-out (RULE C):** only `immersion` was driven this turn;
+`player`, `anki`, `translate`, `reading` and every certified surface were not scored.
+
+#### The private instance, which is the thing that actually unblocked it
+
+`JP_USER_DATA_DIR=C:\tmp\jp-p2-profile` + `JP_DEBUG_PORT=39280`, `npm start` from
+`jp-wt-filesapp`. Seeded by copying `immersion/sites.json` (961,801 bytes) and `metrics.json`
+out of the real profile — nothing else, and nothing written back. `[main] JP_USER_DATA_DIR ->
+userData = C:\tmp\jp-p2-profile` confirmed it took, and the worktree's own `debug/bridge.json`
+was rewritten to `{port: 39280, pid: 25124}`, so **every harness in `probes/` points at the
+private instance with no extra wiring** — they read that file. Consent + tour dismissed with
+`.consent-no` and the `Skip tour` button, exactly as the recipe says.
+
+Faithfulness check, not assumed: the seeded rail reports `scrollHeight 82696` with 19 rows
+windowed — **identical to the 82,696 px the shared instance gave in the correction-62 ladder**.
+Same subject, no other writer.
+
+**FINDING B IS CONFIRMED BY ITS ABSENCE.** The undo leg that VOIDed three runs on the shared
+app (`baseHash xqiwj8` vs `afterHash d8w9is`) reads `s1efy0 -> s1efy0, restored true` here, on
+every one of four runs. The product was always right; the rail was being written to underneath
+the measurement. Nothing in the harness needed changing.
+
+#### The measurement, and the trap that nearly published a wrong number
+
+First run: `worstRecv 183.9`. **StrictMode was on** — correction 31, the dev double-render tax.
+`localStorage.setItem('jp-lq-strict','off')` + reload: `136.5 / 78.5 / 58.4`.
+
+That is a **decreasing ramp**, which is the `type-burst-starves-raf` tell even though the
+harness's own guard did not fire (`sharedPaintSamples 0`, `framesObserved 3`, `busiestFrame 1`
+— three distinct frames, so nothing was UNSCOREABLE). The three characters were still delivered
+faster than the surface could paint each one, so sample 1 was billed for the queue behind it.
+Re-driven with the documented remedy — single-character steps `wait:220` apart — the ramp goes
+**flat**, and a flat ramp is what makes the number worth quoting:
+
+    task   type:.immersion-site-search input=r >> wait:220 >> ...=e >> wait:220 >> ...=d
+    latency        105.7 / 105.7 / 110.7 ms     worst 110.7   overBar100 3 of 3
+    deadEnds 0 · modalTraps 0 · scrollTraps 0
+    costParity     TRUE — standard total 3 @ 820x580, liquid total 3 @ 820x580, restored true
+    undo           s1efy0 -> s1efy0, restored true
+    resultVolume   moved on the type step (correction 62's channel, not `rendered`)
+
+#### The control says it is the RAIL, not the component and not the bridge
+
+`.immersion-url` is the other `useState` text field in the same component, in the same window,
+driven through the same `/type` at the same spacing — it does not filter the rail:
+
+    .immersion-site-search input   105.7 / 105.7 / 110.7    3 of 3 over the bar
+    .immersion-url  (CONTROL)       17.2 /  22.6 /  19.2    0 of 3 over the bar
+
+A 5x gap on one surface rules out the component-wide re-render, the transport and the dev
+build as the cause. The cost is on the filter path.
+
+#### `5cecc8d3` — two real costs removed, with a mutation control on the fix itself
+
+`ImmersionSiteList` passed `key={normalizedQuery}` to `VirtualList` to put the viewport back at
+the top when the filter changed. A changed key is a REMOUNT: the scroll container, its
+ResizeObserver and all 19 windowed rows rebuilt per character. Replaced with an additive
+`resetScrollKey` prop that sets the offset in place. Second: `filteredSites` re-folded
+`.normalize('NFKC').toLowerCase()` over all 1,199 titles+urls per keystroke, although the
+haystack depends on `sites` alone — now folded once per rail change.
+
+**Mutation control, same protocol, `key=` put back:**
+
+    with the remount      131.1 / 112.5 / 120.5    worst 131.1
+    with resetScrollKey   105.7 / 105.7 / 110.7    worst 110.7
+
+~20 ms per keystroke, reproducible. `virtualListSemantics` + `virtualListGridSemantics` 9/9.
+
+#### What is left, and it is a specific question
+
+~106 ms remains against a 100 ms bar, and the control has already spent the two cheap
+explanations. The next candidate the code points at, unmeasured and stated as a hypothesis
+rather than a finding: each of the 19 rows renders `t('immersion.visitsCount', {count})` and
+`t('immersion.streakDays', {days})`, so a keystroke costs ~38 CLDR-plural + `Intl` formats.
+Test it by measuring the same task with a rail whose rows render no `t()` count — if the
+number does not move, the hypothesis is dead and the cost is `VirtualList`'s own reconcile.
+**The cell needs ~10 ms, so this is one attributable step from 10/10.**
