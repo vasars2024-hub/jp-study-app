@@ -53,6 +53,51 @@ describe('translate', () => {
     expect(t('storage.modelCount', 'en', { count: 1234 })).toBe('1,234 models installed');
     expect(t('storage.modelCount', 'ru', { count: 1234 })).toMatch(/1\s234/);
   });
+
+  /**
+   * `interpolate` memoises its `Intl.NumberFormat` per language (core.ts). The
+   * failure mode a cache introduces is serving one language's formatter to
+   * another, which is invisible in `en` and wrong everywhere else — so the
+   * interleaving below matters more than the counting does.
+   */
+  describe('the number formatter is cached per language, not per call', () => {
+    it('keeps each language correct when languages interleave', () => {
+      // Alternating forces a cache hit on a language OTHER than the last one
+      // constructed. A single shared formatter passes the en rows and fails ru.
+      for (let pass = 0; pass < 3; pass++) {
+        expect(t('storage.modelCount', 'en', { count: 1234 })).toBe('1,234 models installed');
+        expect(t('storage.modelCount', 'ru', { count: 1234 })).toMatch(/1\s234/);
+        expect(t('storage.modelCount', 'en', { count: 9876 })).toBe('9,876 models installed');
+        expect(t('storage.modelCount', 'ru', { count: 9876 })).toMatch(/9\s876/);
+      }
+    });
+
+    it('constructs at most one formatter per language however many times it renders', () => {
+      // The allocation IS the defect: this ran once per numeric placeholder per
+      // render, so a 19-row list showing two counts each rebuilt 38 per keystroke.
+      const Original = Intl.NumberFormat;
+      const built: string[] = [];
+      const spy = vi
+        .spyOn(Intl, 'NumberFormat')
+        .mockImplementation(((locale?: string, options?: Intl.NumberFormatOptions) => {
+          built.push(String(locale));
+          return new Original(locale, options);
+        }) as unknown as typeof Intl.NumberFormat);
+
+      try {
+        for (let i = 0; i < 40; i++) {
+          t('storage.modelCount', 'en', { count: i });
+          t('storage.modelCount', 'ru', { count: i });
+        }
+      } finally {
+        spy.mockRestore();
+      }
+
+      // Whatever the cache already held, 80 renders must not build 80 formatters.
+      expect(built.length).toBeLessThanOrEqual(2);
+      expect(new Set(built).size).toBe(built.length);
+    });
+  });
 });
 
 describe('fallback', () => {
