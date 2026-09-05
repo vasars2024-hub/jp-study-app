@@ -53,7 +53,17 @@
   font-size: 0.5em;
 }
 
-/* Parallel targets stack: one line per gloss language, primary first. */
+/* Targets stack: one line per gloss language, primary first — and a single-target
+   match uses the same wrapper, so the two render identically.
+
+   `white-space: nowrap` STAYS, and the width it used to blow up is now bounded at
+   the source instead. A `<ruby>` cannot break, so an unbroken annotation makes the
+   whole passage as wide as itself: measured 2026-09-05, one 2482px gloss inside a
+   740px flow put `div.fwin-body` at scrollWidth 2884 against clientWidth 808, and
+   that body is `overflow-x: hidden`. A `max-width` here would not have fixed it —
+   a percentage on an `rt` resolves against a containing block the annotation
+   itself sizes — so the cap is on the text, in `clampGloss`, with the full gloss
+   kept as the `title`. */
 .lexicon-interlinear-flow rt .lexicon-gloss-line {
   display: block;
   line-height: 1.35;

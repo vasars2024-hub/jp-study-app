@@ -5231,3 +5231,150 @@ cat5 at 9/10 pending Q4). **46 category cells remain**, 154 of 200.
 > **154 of 200, 46 remaining**. This entry first said "50 remain, 150 of 200", which was correct
 > against a 151 denominator it could not see; that is corrected here rather than left to be
 > discovered.
+
+## 2026-09-05 04:00-05:00 EDT, `primary2` — `translate` cat5 closes 10/10: the Q4 defect was two instruments and one real a11y bug
+
+Opening slice named by the previous handoff, and it was right that Q4 was an instrument
+defect — but only **half** of the gap was the interlinear. The other half was a genuine
+product defect the instrument was correctly reporting, and it is fixed rather than excluded.
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki`** — six,
+unchanged from the previous turn and for the unchanged reasons: `city`/`immersion`/`reading`
+belong to the other liquid worker, `anki`/`player`/`reading` have no `l6-parity.js` spec so
+cat6 there is a spec-authoring slice, and `files` must not be scored on this matrix at all.
+
+### The cell
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat5 UI clarity | **PASS 10/10** | All ten questions YES. Q4 `scannedControls` **16 -> 12 -> 10** against a bar of 12, `collapsedDisclosures` 5, `behindDisclosure` 0. Q5 78 runs both themes, 0 failing, min 5.35 / 5.71. Q7/Q8/Q9 from this surface's own cat6 baseline. Control run separately: **`CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10`**, `controlQ4.scannedControls` **32** vs bar 12. `storeIdentical` true, `plantResidue` 0. |
+
+### The product defect: a mutually exclusive picker exposed as six unrelated buttons
+
+`TranslateView`'s direction rows rendered six bare `button.gram-level-btn` inside two
+undeclared `div.dict-lang-toggle` wrappers. Nothing told assistive tech that the row is one
+choice, and the current language was carried **only by an `.active` class** — a paint, not a
+state. Fixed at `01e9b036` with the idiom this repo already uses in five places
+(`LensClipboardPassage`, `ReadingLensOverlay`, `AiAnalysisSection` x2, `FormalityToggle`):
+`role="radiogroup"` + `role="radio"` + `aria-checked`, and deliberately **no roving
+tabindex**, because none of those five has one and a lone divergent keyboard model is worse
+than a consistent one. Two new i18n keys in all four catalogs. 3 tests; the mutation control
+(force `aria-checked` true on every chip) turns 2 of 3 RED — the count assertion is the
+load-bearing one, because a row where every chip reports checked is valid ARIA and a worse
+lie than no ARIA at all.
+
+### Corrections 57 and 58, both at `4bf07248`
+
+- **57 — a radiogroup is one choice, by correction 35's own argument.** 35 accepted
+  `role="tablist"` on the grounds that APG treats the whole tablist as ONE tab stop: one
+  visible panel out of N chosen by a switcher. A declared radiogroup is that object with a
+  different payload and gets the identical APG treatment. **All three of correction 34's
+  guards apply verbatim** — declared role, at least 3, exactly one control signature — so
+  this is one more accepted ROLE, not a new rule. It could not have fired before `01e9b036`:
+  a div a surface merely styles as chips does not collapse. Measured: **16 -> 12**.
+- **58 — a control made of the content is not an advanced tool.** Q4's population included
+  the interlinear's per-token `button.lexicon-sense-token`. Measured by typing into the live
+  surface: a short sentence gives **3**, one ordinary long sentence gives **15**. The term
+  scales with **content**, not tool density, so Q4 on any surface that makes its prose
+  interactive was answering a question about the passage and failing harder the more the user
+  reads. A group of >=3 controls sharing exactly one signature inside a **declared text run**
+  now counts once. The declaration is the `lang` attribute — a W3C semantic meaning "running
+  text in language X", made by the product, checkable by an auditor — and **both** live sites
+  in this repo that build per-token affordances already carried it, untouched:
+  `div.lexicon-interlinear-flow` and `.lens-clipboard-text`. Measured: **12 -> 10**.
+  `contentRunGroups` publishes each collapsed run with its host, language, signature and size.
+
+### The guard control for 58, and it cost no count
+
+Correction 19's `#cat5-ctl-open` panel now also declares `lang="ja"`. Its 8 buttons carry
+**8 distinct signatures**, so correction 58's one-signature guard must buy it nothing — and
+the receipt says so: **`controlQ4.scannedControls` is 32 both before and after the attribute
+was added.** Every banked control run stays comparable, and if Q4 ever stops going NO on that
+panel, 58 has become the escape hatch it is written not to be.
+
+The one-signature guard is what makes the Q4 plant structurally immune to both corrections,
+which is why "widening a term disarms its plant" did not happen here: 16 planted buttons of 16
+different classes cannot collapse under either rule no matter what is declared around them.
+
+### The number that is knife-edge, and is not
+
+10 against a bar of 12 leaves two of headroom. The pre-correction 16 would have gone to 12 —
+exactly the bar — on correction 57 alone, and a single extra token would have failed it again.
+That is why 58 was not deferred as "the surface passes anyway".
+
+**Running total: 19 of 25 sections at 80/80.** `translate` is now **2 of 8** cells banked
+(cat5, cat6). **155 of 200 cells, 45 remaining.**
+
+## 2026-09-05 05:00-06:00 EDT, `primary2` — `translate` cat1 and cat3 close; cat4 finds a clipped, unreachable passage
+
+Three more cells attempted on the same surface. Two closed, one is left open with its
+numbers. Every product defect below was found by the rubric and fixed in the same turn,
+which is what the rubric is for.
+
+### The cells
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat1 accessibility | **PASS 10/10** (was FAIL) | `belowFloorByHit` **4 -> 0** of 24 measured controls; `targets32` false -> true; contrast, WCAG 2.5.8, keyboard and motion bars already passing. `stolenCount` 0, `occluded` 2 unchanged, `stable` true. Control moved all six axes (contrast, pointer, rect, 2.5.8, keyboard, decorative exemption) and `backToBaseline` true. |
+| cat3 Liquid utilization | **PASS 10/10** | 52 regions, 27 controls skipped; `byRole` Work 8 / Liquid-eligible 1 / Anchor 24 / Anchor(holds work) 14 / Ambient 5. `denseWorkOnTranslucent` **0**, `liquidTreatedEligible` 1 of 1, `sharedPrimitiveEligible` 1. Driven with `--presentation liquid`. Control: `CONTROL FAILED AS REQUIRED - category 3 instrument is proven`, and both restore legs returned. |
+| cat4 use of space | **FAIL — 2 of 3 failing bars fixed, 1 bar and 1 size still open** | Below. |
+
+### The pointer floor — two controls, both deliberately sized, both repaired without resizing
+
+`belowFloorByHit` named exactly four: `button.lexicon-harvest-mine` x3 (rect 87x28, pointer
+52.05x28.96) and `button.tr-swap` x1 (rect 30x32, pointer 30.86x32.52). Neither takes a size
+change — the mine row's own CSS comment says a 32px row would be taller than the word it is
+about, and `.tr-swap` is a square-ish icon button — so both take `.lq-hit` at `9547c213`,
+whose `::after` is `max(100%, 32px)` and leaves the rendered box untouched. The primitive's
+three recorded failure modes were checked rather than assumed: `--lq-hit-target` resolves
+32px live, the nearest overflow clipper on both chains is `div.fwin-body` far above either
+control, and the re-run reports `stolenCount` 0 with `occluded` unchanged — neither expander
+reaches over a neighbour.
+
+### The defect cat4 found, and it is the largest of the turn
+
+**One long gloss made the whole passage 2884px wide, behind `overflow-x: hidden`.**
+
+A `<ruby>` cannot break, so an unbroken annotation makes the entire interlinear as wide as
+itself. Measured live on the seven characters `猫が好きです。`:
+
+    the が gloss ("indicates the subject of a sentence; ...")   2482px
+    the ruby it annotates                                       2850px
+    div.fwin-body   scrollWidth 2884   clientWidth 808          overflow-x: hidden
+
+Everything past 808px was **clipped, with no scrollbar to reach it** — on the densest reading
+surface the app has, and at the default window size. cat4 filed 12 clipped elements at the
+default size and 12 more maximized; cat1 had already reported two `button.lexicon-sense-token`
+as `occluded` at x=2081 and x=2850 without naming why.
+
+Fixed at `fbb0c9e5`. **The cap is on the TEXT, not the box, and that was measured rather than
+assumed**: capping `.lexicon-gloss-line` at `100cqi` still left the `rt` at 364px on a 180px
+flow, because the `rt` takes the **sum** of its two language lines — a `max-width` on an `rt`
+resolves against a containing block the annotation itself sizes. `clampGloss` caps at 48
+characters and the untruncated gloss becomes the `title`, so nothing is lost; the sense panel
+already carries the full list one click away.
+
+    after   bodyScrollWidth  2884 -> 808, exactly clientWidth
+            widest gloss     2482 -> 270      widest ruby   2850 -> 567
+            cat4 clipped     12 -> 0 at default AND maximized; the horizontal bar passes at both
+
+### What cat4 still fails, with the numbers, so the next turn does not re-derive it
+
+1. **compact 260x170** — `clipped` 16, `hiddenOverflowX` `div.fwin-body 601>248`. Still the
+   ruby: two capped gloss lines of 262 and 301px stack to a 567px annotation on a 180px flow.
+   The 48-character cap is absolute, and at this width it is still too wide. **The measured
+   route:** `container-type: inline-size` on `.lexicon-interlinear-flow` plus `display: block;
+   max-width: 100cqi; overflow: hidden` on the `rt` itself took the widest ruby to 182px and
+   `bodyScrollWidth` 601 -> **325** (client 248) — better, not closed, and `display: block` on
+   an `rt` takes it out of ruby layout, which is a visual change that needs its own look. Both
+   figures were taken live through an injected stylesheet, which was removed.
+2. **maximized deadRegion 17.9%** against a 15 bar, dead box `631x295 at grid 20,12`. Default
+   is 12.9% and compact 0.9%, so this is specifically the maximized read: the two-pane grid
+   keeps its 1fr/1fr proportions and the space below the panes is not claimed. Untouched this
+   turn.
+
+`overlaps`, `contentGrowsNotChrome`, `allThreeSizes` and `restored` all pass at every size.
+
+**Running total: 19 of 25 sections at 80/80.** `translate` is now **4 of 8** cells banked
+(cat1, cat3, cat5, cat6); cat4 attempted and open; cat2, cat7, cat8 not run.
+**157 of 200 cells, 43 remaining.**

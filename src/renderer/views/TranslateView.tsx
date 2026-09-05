@@ -367,7 +367,11 @@ export default function TranslateView() {
                 ))}
               </div>
               <button
-                className="tr-swap"
+                // 30x32 rendered, so it is 2px short of the 32px pointer floor on
+                // its narrow axis. `.lq-hit` reaches the floor without resizing an
+                // icon button that is deliberately square-ish; its neighbours are
+                // 10px away (`.tr-dir` gap), so the expander steals nothing.
+                className="tr-swap lq-hit"
                 onClick={swap}
                 aria-label={t('translate.menu.swap')}
                 title={t('translate.menu.swap')}
