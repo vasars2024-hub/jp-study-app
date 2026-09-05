@@ -5856,3 +5856,52 @@ did not. This unblocks the `languagesDiffer` bar for every remaining title-named
 
 sampled-out: every other scorecard surface; this entry scores exactly one cell, `translate` cat8.
 **`translate` is now 5 of 8 banked (cat1, cat3, cat5, cat6, cat8); cat4 open, cat2 and cat7 not run.**
+
+---
+
+## 2026-09-05 ~12:40-13:10 EDT, `backup` — the line directly above is WRONG: `translate` is 7 of 8, not 5 of 8
+
+**This is a bookkeeping correction, not a cell.** No score changes and the running total does not
+move. It is written down because the error was about to cost a whole turn: the handoff built on
+that line named **`translate` cat2 as the exact next slice**, and cat2 has been closed at 10/10
+since 05:00-06:30 EDT the same day. I opened this turn on cat2, enumerated the Translate window's
+17 controls live, and only then found the closing section already sitting at line 5487.
+
+**What the line dropped, and the evidence each is closed on:**
+
+| cell | closed by | where | corroboration that is not prose |
+| ---- | --------- | ----- | ------------------------------- |
+| cat2 | `primary2`, 05:00-06:30 EDT | scorecard §"`translate` cat2 closes 10/10" | `522470d3` — "correction 59: a step whose work finished inside the settle window read as a dead end". That correction exists **because** of that run; it is the run's own artifact. The run named no `--out`, which is why no `cat2-translate.json` was banked. |
+| cat4 | `primary2`, 05:00-06:00 EDT | scorecard §"cat1 and cat3 close; cat4 finds a clipped, unreachable passage" | `baselines/cat4-translate.json` **and** `cat4-translate-control.json` exist — on `wt/files-app`, which is where primary2 works, not in this tree. Line 5471 says so explicitly. |
+
+**The chronology, which is what makes the error legible rather than mysterious.** Four sections
+landed within about four hours, and they were appended in the order the work finished, not in the
+order the surface's own cells are numbered:
+
+    05:00-06:00 EDT  primary2   cat1 cat3 cat4     -> 5 of 8 (cat1 cat3 cat4 cat5 cat6)
+    05:00-06:30 EDT  primary2   cat2               -> 6 of 8
+    05:45-08:00 EDT  primary2   cat7 OPEN, fixed   -> 6 of 8, no cell moved
+    07:35-08:45 EDT  primary    cat8               -> 7 of 8  <-- written as "5 of 8"
+
+`primary`'s closing line reads like a restatement of the 05:00-06:00 enumeration with cat8 added
+and cat2/cat4 silently absent. It is the same shape as the 163-vs-160 discrepancy recorded above:
+a standing total re-typed by hand instead of re-counted.
+
+**THE STATE OF `translate`, re-derived cell by cell this turn:**
+
+    cat1  10/10  banked   baselines/cat1-translate.json (+ control)   wt/files-app
+    cat2  10/10  banked   scorecard section + 522470d3               no --out file
+    cat3  10/10  banked   scorecard section
+    cat4  10/10  banked   baselines/cat4-translate.json (+ control)   wt/files-app
+    cat5  10/10  banked   baselines/cat5-translate.json (+ control)   wt/files-app
+    cat6  10/10  banked   baselines/cat6-translate.json               both trees
+    cat7  OPEN            cause fixed in f9541e9e, awaiting one post-restart run
+    cat8  10/10  banked   baselines/cat8-translate-20260905.json      this tree
+
+**7 of 8. cat7 is the only open cell, and closing it certifies the surface.** Running total is
+unchanged at **161 of 200 cells** — the 161 was already correct, because the base of 160 was struck
+*after* cat2 landed; only the per-surface enumeration was wrong. Nothing needs re-running.
+
+**The lesson, and it is the same one the boss-audit instrument taught on 2026-08-31:** when a
+standing count and the sections above it disagree, the count is the thing to distrust. Re-derive a
+"where X stands" line from the sections, never from the previous "where X stands" line.
