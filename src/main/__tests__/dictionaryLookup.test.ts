@@ -24,6 +24,7 @@ import {
   detectQueryLangs,
   ftsQuery,
   fuzzyDistanceBudget,
+  INFLECTION_PROBE_SQL,
   lookup,
   normalizeForLookup,
 } from '../dictionary/dictService';
@@ -267,6 +268,56 @@ describe('one code path, four languages', () => {
     expect(hit).toMatchObject({
       via: 'deinflected',
       reasons: ['past tense', 'irregular'],
+    });
+  });
+
+  // Every other test in this file passed while this probe took 64,000-84,000 us
+  // per call on the shipped database, because a mis-planned query returns exactly
+  // the right rows — just 1,082x too slowly. Correctness tests cannot see that,
+  // which is why the PLAN is asserted here as its own guard.
+  //
+  // Measured 2026-09-05: the `in (select ...)` shape below plans as `SEARCH h
+  // USING INDEX idx_hw_reading (lang=?)`, i.e. it walks every headword in the
+  // language and bloom-filters each one, and paid that even for a word with zero
+  // inflection rows. Driving from `inflections` instead took the Workbench
+  // interlinear from 3,572.9 ms to 29.2 ms on a 47-character passage.
+  //
+  // This fixture reproduces both plans exactly as the 842,500-headword file does,
+  // so it is a real guard and not a small-table artefact.
+  describe('the inflection probe plan', () => {
+    const planOf = (sql: string): string[] =>
+      (db.prepare(`explain query plan ${sql}`).all('en', 'ja', '食べた') as { detail: string }[])
+        .map((row) => row.detail);
+
+    it('drives from the inflections index, not from every headword in the language', () => {
+      const plan = planOf(INFLECTION_PROBE_SQL);
+
+      // The first step is what decides the cost: it is the outer loop.
+      expect(plan[0]).toContain('idx_infl_form');
+      expect(plan.some((step) => /SEARCH h USING INTEGER PRIMARY KEY/.test(step))).toBe(true);
+      // The signature of the slow shape: headwords driven by language alone.
+      expect(plan.some((step) => /SEARCH h USING INDEX idx_hw_\w+ \(lang=\?\)/.test(step))).toBe(false);
+    });
+
+    // Without this the assertions above could pass on any plan at all and nobody
+    // would know. It pins the exact shape they are defending against.
+    it('still recognises the slow shape, so the guard above is not vacuous', () => {
+      const slow = planOf(`
+        select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
+               h.variant_of, h.score, h.freq_rank,
+               coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
+        from headwords h
+        join dictionaries d on d.id = h.dict_id
+        left join dict_pair_priority pp
+          on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
+        where d.enabled = 1 and d.kind <> 'examples'
+        and h.lang = ?
+        and h.id in (select headword_id from inflections where form = ?)
+        order by priority, h.id
+      `);
+
+      expect(slow.some((step) => /SEARCH h USING INDEX idx_hw_\w+ \(lang=\?\)/.test(step))).toBe(true);
+      expect(slow[0]).not.toContain('idx_infl_form');
     });
   });
 

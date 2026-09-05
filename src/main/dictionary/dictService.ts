@@ -345,12 +345,22 @@ const HEADWORD_SELECT = `
  * per token, so the Workbench interlinear paid it for every token of a passage. A
  * 47-character paragraph blocked the main process for 2,960 ms because of it.
  */
-const INFLECTION_HEADWORD_SELECT = `
+/**
+ * Exported whole, tail included, so the plan guard in `dictionaryLookup.test.ts`
+ * can EXPLAIN the exact statement `lookup()` prepares. Exporting only the FROM
+ * half made a revert to the `in (...)` shape fail that test with `no such column:
+ * i.form` — the regression was caught, but by a syntax error rather than by the
+ * plan assertion that is the point of the guard.
+ */
+export const INFLECTION_PROBE_SQL = `
   select distinct ${HEADWORD_COLUMNS}
   from inflections i
   join headwords h on h.id = i.headword_id
   ${HEADWORD_JOINS}
   where ${WORD_SOURCE_WHERE}
+  and h.lang = ?
+  and i.form = ?
+  order by priority, h.id
 `;
 
 /**
@@ -620,12 +630,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     db,
     `${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`,
   );
-  const byInflection = prepareCached(db, `
-    ${INFLECTION_HEADWORD_SELECT}
-    and h.lang = ?
-    and i.form = ?
-    order by priority, h.id
-  `);
+  const byInflection = prepareCached(db, INFLECTION_PROBE_SQL);
   const byPrefix = prepareCached(
     db,
     `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), priority, h.id limit ?`,
