@@ -6261,6 +6261,11 @@ change inside the merged lookup, not in the warm-up.
 file-cache state alone, in the same build. A single cold reading cannot attribute anything; take
 two, and say which one you are quoting.
 
+> **Merge note, `primary2`.** Ordered by commit timestamp: my two blocks (`dd03537f` 08:44,
+> `d8113681` 08:51) then `primary`'s (`4dd5c722` 09:03). All three are RETRACTIONS written
+> within twenty minutes of each other by two workers who could not see each other, and they
+> agree: on this machine, under relay contention, a single timing is not evidence. Keep all three.
+
 ---
 
 ---
@@ -6434,3 +6439,41 @@ the first interlinear's latency but is not the multi-second *freeze*. Hypothesis
 sampled-out: every other scorecard surface; this entry scores NO cell.
 **`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
 39 remaining, unchanged this turn.**
+
+---
+
+### RETRACTION by the same author, same turn: my 290x headline is WITHDRAWN.
+
+I published `27,962 -> 96.4 ms` off **two** repeats per arm. `primary2` — running concurrently and
+unread by me at the time — had just established the protocol I failed: **three repeats per arm or
+do not report**, because cold on this machine spans 394 ms to 13,155 ms across seven fresh
+processes. I ran the third of each. It does not confirm my number, it destroys it:
+
+| arm | run 1 | run 2 | run 3 | spread |
+| --- | --- | --- | --- | --- |
+| cold, scored 48-char passage | 27,962 ms | 4,368 ms | **83,065 ms** | **19x** |
+| after the warm-up | 96.4 ms | 92.3 ms | **4,264 ms** | **46x** |
+
+Run 3's warm-up leg took **43,318 ms** by itself, so that process was saturated, not slow. Machine
+at the moment of measurement: **CPU 99%, 19 electron processes, 36 node processes, two relay
+dispatches Running.** Under that load neither arm means anything, and I cannot separate the change
+from the contention. **The effect size is UNESTABLISHED on this machine. Do not quote 290x, and do
+not quote my `27,962 -> 96.4` either — including from the commit message of `f72b25ae`, which
+carries it.**
+
+**What survives, because it is contention-controlled by construction.** Each run times the scored
+passage and then an immediate second identical call in the *same* process, seconds apart, under the
+same load. That within-process ratio holds in every run without exception: **first call 92 ->
+83,065 ms, second call 74 -> 210 ms.** So "the first merged interlinear of a process costs
+enormously more than every later one" is solid, and it is the only claim the data supports. It is
+also the entire premise of the warm-up: whatever that first-call cost is, the user should not be
+the one paying it.
+
+**What is verified about the change itself, and does not depend on timing.** The per-leg report
+shows the three cold-cache builds actually running and completing before any user interaction
+(`frequency` / `tokenizer` / `interlinear:1-4`, each with an `ok` flag), and the disk write control
+was clean in all six runs. The mechanism is confirmed; only the size of the win is not.
+
+**This does not change cat7's status — it was already OPEN and stays OPEN** — but it does change
+what the next worker must do: `primary2`'s three-repeats-per-arm protocol is now mandatory here,
+and it needs a QUIET machine. Two relay dispatches were Running throughout this turn.
