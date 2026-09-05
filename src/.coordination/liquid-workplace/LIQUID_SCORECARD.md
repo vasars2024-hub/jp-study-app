@@ -8107,3 +8107,97 @@ also removes the shared rail, not just the contention.
 the desk reads `Translate ;; Reading Finder ;; Anki`, as it did at the start.
 
 `sampled-out:` no surface was scored, so nothing was skipped.
+
+## primary2, 2026-09-05 19:00-20:05 EDT — immersion cat2's missing 10 ms is NOT where the last three handoffs said, and seven candidates are now dead
+
+**Closed this turn: 0 cells. 176 of 192, 16 left.** No cell banked, deliberately: the number I
+could bank moved 130 -> 200 ms under my own instrument during the session (see the last
+correction), and a bar scored on a drifting instrument is the failure this rubric exists to
+prevent. What this turn buys is that the next worker does not spend three turns on candidates
+that are already disproven.
+
+### The handoff's own hypothesis, measured and DEAD
+
+The last two handoffs both named it: 19 rows x `t('immersion.visitsCount')` +
+`t('immersion.streakDays')` = ~38 CLDR-plural + `Intl` formats per keystroke, offered as the
+explanation for the ~10 ms the cell is short. Measured two independent ways, it is not:
+
+1. **Microbenchmark, this machine's V8.** 38 constructed formats cost **0.52 ms** (14.72 us/call
+   against 1.10 us cached). That is ~5% of the gap, not the gap.
+2. **In the live app (bisect A).** `renderItem` replaced by a bare `<div>{s.title}</div>` — no
+   `t()`, no `Icon`, no buttons, confirmed by read-back (`nodesPerRow` 7 -> 0). Cost
+   **unchanged**: 124-155 ms against 132-172 before.
+
+The formatter allocation was still a real defect and is fixed on its own merits in `c77f9628`
+(app-wide: `translate()` sits under every rendered count). It is NOT this cell's fix and must
+not be reported as one.
+
+### The control that makes the rest of this readable
+
+Same instrument, same window, same hook, same commit — a keystroke into `.immersion-url`
+against one into `.immersion-site-search input`:
+
+    url field    12.8 / 18.0 / 15.1 / 19.6 / 18.1 ms
+    rail filter  170.3 / 159.4 / 174.6 / 159.5 / 157.0 ms
+
+Both drive state in the SAME `useImmersion()` hook and re-render the SAME view, so the whole-view
+re-render is ~15 ms and **~140 ms is rail-specific**. Instrument: native value setter + `input`
+event, timing the synchronous React flush (discrete events flush sync), `document.body.offsetHeight`
+between trials. `jp-lq-strict=off` confirmed by read-back, so no dev double-render tax.
+
+### Seven candidates, each killed by its own measurement
+
+| # | candidate | how it was killed | verdict |
+|---|---|---|---|
+| A | row content: `t()`, `Icon`, the two buttons | bare-title rows, `nodesPerRow` 7 -> 0 | **dead**, 124-155 ms |
+| B | tall scroll container (`total * itemHeight`) | spacer pinned 500px, `scrollHeight` 82,696 -> 1,011 | **dead**, 140-170 ms |
+| C | `aria-setsize` / `aria-posinset` per slot | attributes removed, absence read back | **dead**, 138-176 ms |
+| D | a render storm / re-entrant renders | counters: **VirtualList renders exactly 1, rows exactly 19** | **dead** |
+| E | `el.scrollTop = 0` forcing sync layout in the reset effect | the write removed, `setScrollTop` kept | **dead**, 121-155 ms |
+| G | `lq-hit-scope`'s hit-target CSS on the rail | class removed, `className` read back | **dead**, 163-201 ms |
+| — | the filter scan over the sites haystack | the 0-match transition costs **8.3-11.6 ms total**, which BOUNDS it | **dead** |
+
+The filter row is the cheapest and most useful of these: `'zzzzq' -> 'zzzzqx'` renders 0 rows and
+still runs all ~1,200 `.includes()` calls, so the entire upstream scan is under 12 ms including
+everything else. `siteHaystacks` was already folded once per rail change by `5cecc8d3`.
+
+### Where it actually is — bisect F, phase timestamps across one flush
+
+    total 136.8   beforeVirtualList 5.4   all 19 rows 3.6   AFTER VirtualList returned 131.4
+    total 154.6   beforeVirtualList 5.1   all 19 rows 4.6   AFTER VirtualList returned 149.4
+    total 116.1   beforeVirtualList 8.0   all 19 rows 5.2   AFTER VirtualList returned 108.1
+
+**~90% of the keystroke is spent after every render function has already returned**, with the
+whole upstream (hook, view, toolbar, filter) at 5-8 ms and all nineteen rows together at 3.6-5.2 ms.
+So it is not React's render phase at all — it is the commit: DOM mutation, style recalculation,
+layout invalidation. And the DOM is **154 nodes in the entire list, 6-7 per row**, which cannot
+be 130 ms of mutation. That leaves style/layout invalidation of the rail as the surviving
+candidate, and A/B/C/G have already cleared the four obvious CSS suspects.
+
+**The next worker's slice, stated as the one remaining question:** the cost survived removing the
+rows' content, the spacer's height, the ARIA attributes and the liquid hit-target class, while
+tracking the RENDERED-ROW COUNT (0 rows = 8 ms, 19 rows = 140 ms). Bisect the rail's own
+stylesheet next — `.immersion-site-row` / `.immersion-site-card` / `.immersion-site-list` and
+whatever liquid material they inherit — not the component tree, which is now exonerated.
+
+### CORRECTION 66 — this cell's absolute number is not stable, and that is why nothing was banked
+
+The same measurement, same instrument, same untouched app, read **157-175 ms early in the session
+and 163-201 ms late**, with the restored-to-baseline tree reading differently again. Absolute
+per-keystroke milliseconds on this rail drift upward as an instance ages. Per the pin's own
+guidance, prefer a **paired in-process control** — the scored call and an immediate identical
+second call under the same load — over an absolute number, and reach for the quiet window only
+when the absolute figure IS the claim. A 100 ms bar scored against a number that moves 40% under
+no change is not a score, and banking one would have been the third false pass this harness has
+produced.
+
+**RULE 1:** no new probe file was written. Every measurement above is `/eval` against the existing
+private instance, plus seven temporary source bisects, all reverted.
+
+**State:** both bisected files restored and verified **byte-identical to HEAD** (`git status`
+empty for each, zero `P2BISECT` markers anywhere under `src/`). Read back live afterwards:
+19 rows, 6 nodes/row, `immersion-site-list lq-hit-scope`, `scrollHeight` 82,696 (the banked
+correction-62 figure), `aria-setsize` restored, filter empty. `"1,207 visits"` renders with its
+group separator, which is `c77f9628` working in the live renderer.
+
+`sampled-out:` no surface was scored this turn, so no surface was skipped.
