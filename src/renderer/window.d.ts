@@ -671,7 +671,7 @@ declare global {
        */
       filesClipboardFolders?(): Promise<string[]>;
 
-      popOut(section: string): Promise<void>;
+      popOut(section: string): Promise<boolean>;
       popoutListOpen(): Promise<string[]>;
       onPopoutChanged(cb: (sections: string[]) => void): () => void;
       popoutControl(action: 'minimize' | 'maximize' | 'close'): Promise<void>;

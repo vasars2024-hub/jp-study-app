@@ -1589,8 +1589,15 @@ function registerPopoutIpc(): void {
     createPopoutWindow(pendingOpenSection);
     pendingOpenSection = null;
   }
-  ipcMain.handle('popout:open', (_e, section: unknown): void => {
-    if (typeof section === 'string') createPopoutWindow(section);
+  ipcMain.handle('popout:open', (_e, section: unknown): boolean => {
+    // Answers whether the window was actually opened or raised. This used to be
+    // typed `void` and drop `createPopoutWindow`'s boolean on the floor, so a
+    // refusal — an id that is not in POPOUT_SECTIONS — resolved exactly like a
+    // success. A caller cannot `.catch` a promise that resolves, so every
+    // documented "falls back to opening in-window when main refuses" path was
+    // unreachable (boss audit 2026-09-05 attempt 4, Finding 6).
+    if (typeof section !== 'string') return false;
+    return createPopoutWindow(section);
   });
   ipcMain.handle('popout:listOpen', (): string[] => [...popoutWindows.keys()]);
   // Window controls for the frameless pop-out: acts on the window that sent the

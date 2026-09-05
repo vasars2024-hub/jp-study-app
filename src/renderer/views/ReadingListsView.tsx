@@ -646,7 +646,17 @@ export default function ReadingListsView({
       setListId(targetListId);
       return;
     }
-    void Promise.resolve(popOut('reading')).catch(() => setListId(targetListId));
+    void Promise.resolve(popOut('reading'))
+      .then((opened) => {
+        // Explicitly `=== false`, not falsy. Main does not hot-reload, so a
+        // renderer that has picked up this build can still be talking to a main
+        // process that predates it and resolves `undefined` — and that older
+        // main DID open the window. Treating `undefined` as a refusal would
+        // pop the window out AND route in-window, which is worse than the dead
+        // end this fallback exists to remove.
+        if (opened === false) setListId(targetListId);
+      })
+      .catch(() => setListId(targetListId));
   }, []);
   const [sort, setSort] = useState<ReadingListSort>('recent');
   const [naming, setNaming] = useState(false);

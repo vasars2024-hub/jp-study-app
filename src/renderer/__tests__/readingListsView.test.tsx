@@ -210,6 +210,32 @@ async function click(node: Element | null) {
   });
 }
 
+/**
+ * `HTMLElement.click()` cannot carry a modifier, so the pop-out gesture is
+ * unreachable through the helper above — it would just open the list in-window
+ * and the test would pass for the wrong reason.
+ */
+async function ctrlClick(node: Element | null) {
+  expect(node).not.toBeNull();
+  await act(async () => {
+    node?.dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+/** Records what `popOut` was asked for and answers with `answer`. */
+function installPopOut(answer: boolean | undefined | Promise<never>): string[] {
+  const asked: string[] = [];
+  (window as unknown as { api: Record<string, unknown> }).api.popOut = (section: string) => {
+    asked.push(section);
+    return answer instanceof Promise ? answer : Promise.resolve(answer);
+  };
+  return asked;
+}
+
 beforeEach(() => {
   host = window.document.createElement('div');
   window.document.body.appendChild(host);
@@ -236,6 +262,68 @@ describe('ReadingListsView', () => {
     expect(host.textContent).toContain('From a friend');
     // Two entries, neither finished, and neither abandoned: 0 of 2.
     expect(host.textContent).toContain('0 of 2 finished');
+  });
+
+  /**
+   * Boss audit 2026-09-05 attempt 4, Finding 6. `openListPoppedOut`'s own doc
+   * comment promises it "falls back to opening in-window whenever the hand-off
+   * cannot be staged or main refuses the window", but `popout:open` was declared
+   * `void` in main and threw away `createPopoutWindow`'s boolean — so a REFUSAL
+   * resolved exactly like a success and only a rejection could reach the
+   * `.catch`. Ctrl-click suppresses the normal open, so a refusal was a silent
+   * dead end: nothing popped out, and nothing opened either.
+   */
+  describe('the pop-out gesture always goes somewhere', () => {
+    it('opens the list in-window when main REFUSES the pop-out', async () => {
+      const { document } = seeded();
+      installBridge(new FakeStore(document));
+      const asked = installPopOut(false);
+      await render();
+
+      await ctrlClick(host.querySelector('.rlv__card-open'));
+
+      expect(asked).toEqual(['reading']);
+      expect(host.querySelector('[data-mode="detail"]')).not.toBeNull();
+    });
+
+    it('opens the list in-window when the hand-off itself rejects', async () => {
+      const { document } = seeded();
+      installBridge(new FakeStore(document));
+      installPopOut(Promise.reject(new Error('no bridge')));
+      await render();
+
+      await ctrlClick(host.querySelector('.rlv__card-open'));
+
+      expect(host.querySelector('[data-mode="detail"]')).not.toBeNull();
+    });
+
+    it('does NOT also open in-window when the pop-out succeeded', async () => {
+      // The control. Without it, "always fall back" would score identically to
+      // the fix, while popping the window out AND routing in-window behind it.
+      const { document } = seeded();
+      installBridge(new FakeStore(document));
+      const asked = installPopOut(true);
+      await render();
+
+      await ctrlClick(host.querySelector('.rlv__card-open'));
+
+      expect(asked).toEqual(['reading']);
+      expect(host.querySelector('[data-mode="detail"]')).toBeNull();
+    });
+
+    it('treats a main that predates the boolean as a success, not a refusal', async () => {
+      // Main does not hot-reload. A renderer on this build can still be talking
+      // to an older main that resolves `undefined` — and that main DID open the
+      // window. This is why the check is `=== false` and not falsy.
+      const { document } = seeded();
+      installBridge(new FakeStore(document));
+      installPopOut(undefined);
+      await render();
+
+      await ctrlClick(host.querySelector('.rlv__card-open'));
+
+      expect(host.querySelector('[data-mode="detail"]')).toBeNull();
+    });
   });
 
   /**

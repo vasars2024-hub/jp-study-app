@@ -1123,7 +1123,7 @@ const api = {
   // Pop an app out into its own borderless OS window (same app, second window).
   // The main process dedupes by section â€” calling this again for an already-open
   // section just focuses that window instead of opening a duplicate.
-  popOut: (section: string): Promise<void> => ipcRenderer.invoke('popout:open', section),
+  popOut: (section: string): Promise<boolean> => ipcRenderer.invoke('popout:open', section),
   /** Sections currently open in their own pop-out window. */
   popoutListOpen: (): Promise<string[]> => ipcRenderer.invoke('popout:listOpen'),
   /** Subscribe to the set of popped-out sections changing (open/close anywhere). */
