@@ -4685,3 +4685,29 @@ in that subtree.
 City's persisted geometry put back to `680x747` at `(60,24)` after the ablations moved it. All live
 patches removed and identity-verified: `window.ResizeObserver`, `CSSStyleDeclaration.prototype.setProperty`,
 the window's inline `backdrop-filter`. Baselines written (gitignored): `cat7-city-perf.json`.
+
+### The JOINT re-run, after merging `b980c42e` — 3 findings -> 1, and the last one is p50 alone
+
+`0e4c38d4`, both repairs live, same instrument and same scene (1 window / 258 elements / 680x747 /
+theme null). Evidence `baselines/cat7-city-perf-joint.json`. Sensitivity control fired again: 16
+injected blocks -> **16** frames over 100 ms, p95 125.1, against the clean drag's 0 and 25.0.
+
+| leg | p50 | p95 | max | >100 | control | verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| drag | 16.7 | 25.0 | 66.7 | 0 | 16.7 / 25.0 | clean |
+| theme | 16.7 | 25.0 | 25.1 | 0 | ceiling, substituted (corr. 43) | clean |
+| **resize** | **33.3** | 50.0 | 58.4 | 0 | 16.7 / 25.0 | **1 finding, p50 only** |
+
+backup's blur stand-down cleared **two** of my three findings on this app: p95 58.3 -> 50.0 and
+over-100 **1 -> 0**, repeats agreeing (33.3/50.0 and 32.9/41.6). The p50 did not move.
+
+**What it now takes to close, stated as a number so nobody claims it on a near miss.** The p50 bar
+is `ceiling * 1.5` = **25.05 ms**. Today's resize is 33.3. My canvas ablation — all 13 `<canvas>`
+elements `display:none`, same driver — measured exactly **25.0**, which clears the bar by 0.05 ms.
+That is a knife-edge, not a pass: bank it only with a repeat and a margin, because a ceiling that
+moves 0.1 ms flips it. The remaining work is the canvas re-projection cascade, and backup's
+`.fwin-resizing` seam is already the hook for it — but note that a plain rAF **coalescing** of
+those observers is NOT it: I wrote that, measured 33.3 with and without, and reverted it. What is
+untried is *suspending* the canvas re-projection for the duration of the drag, which is a bigger
+behavioural change (the scene would hold its last projection while the edge moves) and needs to be
+decided on the art, not on the number alone.
