@@ -7887,3 +7887,51 @@ keyframes back out of the LIVE CSSOM, and how the bytes got there does not affec
 **What it does change:** nobody should infer from my entry that the mergeback is working now. It
 is not. `backup`'s handoff carries the two-minute manual recipe (patch out the one colliding dirty
 path, merge, patch it back); that is the working route.
+
+## 2026-09-05 18:30 EDT — primary2 — the `/type` blocker is ALREADY CLEARED. Verified live, with a control.
+
+**Closed this turn so far: 0 cells. 176 of 192, 16 left.** What changed is that the blocker the
+last handoff named as "the single blocker on every cat1/cat2 cell left" no longer exists, and no
+turn should spend itself on it again.
+
+### The handoff is stale on its own exact-next-slice
+
+`relay-handoff.md` (written 19:10) says: *"EXACT NEXT SLICE — Fix `/type` delivery, or get a
+private instance. Nothing else unblocks the remaining cells."* But `backup`'s own commit
+**`723433da`** (18:19:49) had already fixed it — it routes `/type`, `/key` and `/click` over the
+DevTools agent (`Input.dispatchKeyEvent` / `Input.dispatchMouseEvent`), which does not consult OS
+focus, and reports what the renderer actually observed instead of what was sent. The shared app
+restarted at **18:21:34** (`debug/bridge.json`, `started: 1788646894775`), so the fix has been
+live in the running main process since then. The handoff was written 50 minutes later and still
+names it open, presumably because it was never re-derived after that restart.
+
+### Measured, shared instance bridge 39273 / pid 26992, window 1
+
+A scratch `<input id="p2-scratch">` appended to `document.body` and `.focus()`ed
+(`activeElement.id === "p2-scratch"`, `document.hasFocus() === true`, `visibilityState visible`):
+
+    POST /type {"window":1,"text":"red7"}
+      -> {"ok":true,"sent":4,"delivered":4,"inserted":4,"transport":"cdp","text":"red7"}
+    readback  i.value === "red7"   (length 4)
+
+**Negative control — the receipt is not a rubber stamp.** With `document.activeElement` at `BODY`
+(nothing editable focused), the same route on the same window:
+
+    POST /type {"window":1,"text":"qq"}
+      -> {"ok":true,"sent":2,"delivered":2,"inserted":0,"transport":"cdp","text":"qq"}
+
+`delivered: 2` with `inserted: 0` is exactly the distinction the old route could not make: the
+characters reached the page, and nothing took them. The old behaviour — `{ok:true,typed:N}` over
+zero keydowns — cannot be produced any more, and `transport` names which of the two senders ran.
+
+So `inputCost.total` is measurable again and cat2's `latency,costParity` no longer VOID for this
+reason. **`type:` steps in the cat1/cat2/cat8 step DSL are real input again.**
+
+### A trap this cost me, worth two lines
+
+Driving the SHARED app to prove it is itself hazardous: the control's two characters landed in
+Immersion's live "Search saved sites" filter, because `i.blur()` returned focus to the field the
+app had focused before my scratch node existed — not to `BODY` as intended. No residue survived
+(another worker unmounted that surface mid-turn and the input is gone), but the lesson is the one
+the previous entry already drew: **the second half of the handoff's slice — get a private
+instance — is still the right move, for the shared-mutable-rail reason, not for `/type`.**
