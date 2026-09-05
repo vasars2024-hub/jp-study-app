@@ -1761,3 +1761,82 @@
     transition: none;
   }
 }
+
+/* ============================================================================
+   CATEGORY 5 Q5 — the garden's own window buttons, dark-on-dark in every LIGHT
+   palette. Measured 2026-09-04 on the live 680x747 window, `classic-light`:
+   `⧉ ◇ ─ ×` at **1.62:1** focused and **1.24:1** at rest, against a 4.5 bar.
+   Dark default is clean (4.84 at rest, 14.12 focused), which is why this hid.
+
+   THE CAUSE IS A SPLIT, not a plate. `.fwin-frameless-controls` (`styles.css`)
+   paints a HARDCODED dark pill, `rgba(16, 15, 21, 0.72)`, while the glyph takes
+   `shell.css`'s theme-owned `color-mix(in srgb, var(--text) 90%, var(--sidebar))`.
+   Swap to a light palette and the plate stays dark while the glyph turns dark
+   with it. This is the same defect `musicWidgetLiquid.css` records from the same
+   day, mirrored: there a hardcoded dark base composited LIGHT under fixed white
+   text; here a fixed dark base keeps its ground while the text walks away.
+
+   THE PLATE IS RIGHT AND THE GLYPH IS WRONG, and the scene settles it: this
+   cluster never sits on a theme surface. `.reading-garden-sky` above is a
+   hardcoded `linear-gradient(180deg, #060813, #0b1020 42%, #151329 70%,
+   #090d15)` over a `#050711` root, with no day phase anywhere in the component —
+   the garden is night in all thirteen palettes. Captured pixels agree: a 130x28
+   `capturePage` of the cluster in `classic-light` reports the pill painting
+   **(13,13,19)** and the glyph **(52,52,52)**, a true 1.65:1. So the fix is the
+   one `.popout-root-mooncap .popout-btn` already ships one file away in
+   `styles.css` — the SAME cluster in the pop-out window, which carries its own
+   `rgba(222, 242, 244, 0.72)` moonlight and has never had this bug.
+
+   TRAP FOR THE NEXT MEASUREMENT. A computed-style walk cannot see canvas paint,
+   so `effectiveBg` resolves past the transparent `.fwin-body` to
+   `section.fwin`, which is `rgb(255,255,255)` in `classic-light`. Every harness
+   in this repo therefore scores this cluster against WHITE, not against the sky
+   it visibly sits on. The verdict is the same either way — the numbers are not.
+   Both models are computed below so a re-scorer can tell which one they are
+   reading: harness model 6.32:1, true-pixel model 15.1:1, both focused.
+
+   Guarded exactly like `shell.css`'s rule so `aero` and `wired` keep their own
+   chrome identities (aero wins on specificity regardless at (0,5,0); wired's
+   `--wired-cyan` on its own opaque button plate is already correct). Liquid
+   presentation is untouched: `liquid-window.css` sets `--lq-liquid-text` here at
+   (0,4,0) and still wins.
+   ========================================================================== */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin
+  .fwin-frameless-controls
+  .fwin-b {
+  color: rgba(233, 244, 246, 0.94);
+}
+
+/* Hover keeps the fill cue the shell rule provides, in the cluster's own key —
+   `color-mix(in srgb, var(--text) 10%, transparent)` is a BLACK wash on a black
+   pill in a light palette, i.e. no cue at all. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin
+  .fwin-frameless-controls
+  .fwin-b:hover {
+  background: rgba(233, 244, 246, 0.16);
+  color: #f4fbfc;
+}
+
+/* Close stays destructive. Without this the hover rule above outranks
+   `shell.css`'s `.fwin-close:hover` and would quietly demote the one control
+   whose hover is meant to read as danger. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin
+  .fwin-frameless-controls
+  .fwin-b.fwin-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* `--focus-ring-color` is `var(--text)` (`a11y.css`), so keyboard focus drew a
+   near-black ring on a near-black pill in every light palette — the same split,
+   one property over. The ring is the cluster's own moonlight for the same
+   reason the glyph is. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin
+  .fwin-frameless-controls
+  .fwin-b:focus-visible {
+  outline-color: rgba(233, 244, 246, 0.92);
+}
