@@ -730,9 +730,26 @@ const SPECS = {
           return 'REFUSE: the interlinear is empty, so a swap re-renders nothing - load source text first';
         }
         const start = pairOf();
-        const rec = { start, tokens0, ticks: 0, driven: 0, pairs: [start], restored: false, tokens1: -1 };
+        const rec = { start, tokens0, ticks: 0, driven: 0, pairs: [start], restored: false, tokens1: -1, recoveredMs: -1 };
         window.__lqTranslateLoad = rec;
         const total = 40;
+        /*
+         * CORRECTION 60 - the tail read was a FIXED 250 ms and it VOIDed a leg that ran
+         * perfectly. NO BACKTICKS BELOW: this comment sits inside the js template literal,
+         * and one backtick here closes it (a banked trap in this repo).
+         *
+         * Measured 2026-09-05: ticks 40, driven 40, pairs 2, restored true, and tokens1 0
+         * against tokens0 27 - so the proof reported "the interlinear was empty when the leg
+         * ended" on a surface that had 27 sense tokens again moments later. Every swap
+         * re-dispatches lookupOfflineInterlinear into MAIN, so the rebuild is ASYNC and
+         * 250 ms after the fortieth click it simply had not landed yet. This is correction
+         * 49's shape one leg over: a fixed sleep is not a settle.
+         *
+         * The check still has to be able to FAIL - an interlinear that never comes back is
+         * exactly the damage worth catching - so it POLLS instead of widening: read every
+         * 120 ms for up to 12 s, stop at the first non-empty read, and record how long the
+         * recovery took. recoveredMs is a number the cell reports, not a hidden tolerance.
+         */
         const timer = setInterval(() => {
           const b = document.querySelector('.tr-view .tr-swap');
           if (b) { b.click(); rec.driven += 1; }
@@ -741,7 +758,16 @@ const SPECS = {
           if (rec.pairs.indexOf(p) < 0) rec.pairs.push(p);
           if (rec.ticks >= total) {
             clearInterval(timer);
-            setTimeout(() => { rec.restored = pairOf() === rec.start; rec.tokens1 = tokens(); }, 250);
+            const t0 = performance.now();
+            const settle = setInterval(() => {
+              rec.restored = pairOf() === rec.start;
+              const n = tokens();
+              if (n > 0 || performance.now() - t0 > 12000) {
+                clearInterval(settle);
+                rec.tokens1 = n;
+                rec.recoveredMs = Math.round(performance.now() - t0);
+              }
+            }, 120);
           }
         }, 120);
         return 'swapping ' + start + ' x' + total + ' over ' + tokens0 + ' sense tokens';
@@ -754,8 +780,9 @@ const SPECS = {
         if (r.driven < r.ticks) return 'REFUSE: ' + (r.ticks - r.driven) + ' tick(s) found no .tr-swap to click';
         if (r.pairs.length < 2) return 'REFUSE: the pair never changed across ' + r.driven + ' clicks, so no swap did any work';
         if (!r.restored) return 'REFUSE: the pair did not return to ' + r.start;
-        if (r.tokens1 < 1) return 'REFUSE: the interlinear was empty when the leg ended (' + r.tokens0 + ' at arm)';
-        return r.driven + ' swaps across ' + r.pairs.length + ' pairs over ' + r.tokens0 + '->' + r.tokens1 + ' sense tokens, back at ' + r.start;
+        if (r.recoveredMs < 0) return 'REFUSE: the settle poll never finished';
+        if (r.tokens1 < 1) return 'REFUSE: the interlinear never came back within ' + r.recoveredMs + ' ms (' + r.tokens0 + ' at arm)';
+        return r.driven + ' swaps across ' + r.pairs.length + ' pairs over ' + r.tokens0 + '->' + r.tokens1 + ' sense tokens, back at ' + r.start + ', interlinear recovered in ' + r.recoveredMs + ' ms';
       })()`,
     },
     /*
