@@ -54,15 +54,43 @@ function keyframeBody(name: string): string {
   return '';
 }
 
+/**
+ * The animations that can START while the window is covered, and are therefore the ones a frozen
+ * `from` keyframe can strand. Every other `opacity: 0` opener in this stylesheet is user-driven —
+ * the window is being looked at when it runs — and is deliberately left alone rather than swept.
+ */
+const NOT_USER_DRIVEN = [
+  // os:open reaches this from the extension bridge and from schedulers, not only from a click.
+  'fwinIn',
+  // main/buddyScheduler.ts fires this on a timer from the MAIN process.
+  'buddy-toast-in',
+  // The same shape, one surface over.
+  'mini-toast-in',
+];
+
 describe('an entry animation cannot leave a window invisible', () => {
-  it('still declares fwinIn, so a rename cannot make this suite vacuous', () => {
-    expect(keyframeBody('fwinIn').trim().length).toBeGreaterThan(0);
+  it.each(NOT_USER_DRIVEN)('%s is still declared, so a rename cannot make this vacuous', (name) => {
+    expect(keyframeBody(name).trim().length).toBeGreaterThan(0);
   });
 
-  it('fwinIn animates transform and never opacity', () => {
-    const body = keyframeBody('fwinIn');
+  it.each(NOT_USER_DRIVEN)('%s animates transform and never opacity', (name) => {
+    const body = keyframeBody(name);
     expect(body).toMatch(/transform\s*:/);
     expect(body).not.toMatch(/(^|[\s;{])opacity\s*:/);
+  });
+
+  it('mini-toast-in keeps its centering translateX in BOTH keyframes', () => {
+    // The centering is carried by the same transform the animation drives, so a frozen `from`
+    // has to be the correct POSITION and not merely a visible one.
+    const body = keyframeBody('mini-toast-in');
+    expect(body.match(/translateX\(-50%\)/g) ?? []).toHaveLength(2);
+  });
+
+  it('the consent gate has no entry animation at all', () => {
+    // consent-fade was opacity-only, so there is no transform half to keep. A frozen fade left a
+    // z-index 40000 backdrop invisible while it still took every click.
+    expect(CSS).not.toMatch(/@keyframes\s+consent-fade/);
+    expect(CSS).not.toMatch(/animation:\s*consent-fade/);
   });
 
   it('the surfaces that use fwinIn are the window shell and the start menu', () => {
