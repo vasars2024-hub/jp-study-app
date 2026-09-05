@@ -162,6 +162,26 @@ describe('LiquidDock — the rail’s routes survive the compact reflow', () => 
     }
   });
 
+  it('a long status cannot squeeze the routes out of the dock', () => {
+    // Read from the CSS because jsdom does no layout at all, and stated as the
+    // rule rather than a pixel: `.lq-dock-routes` carries `min-width: 0` and can
+    // therefore go to ZERO, so an unshrinkable status beside it deletes the
+    // navigation outright. `flex: none` gave the status exactly that, and it was
+    // unreachable until a real app filled the slot -- the Files app's status
+    // carries an item count, a total size, a selected name, a watch count and a
+    // delete receipt, in a `nowrap` row.
+    const status = CSS.slice(CSS.indexOf('.lq-dock-status {'));
+    const rule = status.slice(0, status.indexOf('}'));
+    expect(rule).not.toMatch(/flex:\s*none/);
+    expect(rule).toMatch(/flex:\s*0\s+1\s+auto/);
+    expect(rule).toMatch(/min-width:\s*0/);
+    // The routes keep the growth, so free space still goes to navigation.
+    const routes = CSS.slice(CSS.indexOf('.lq-dock-routes {'));
+    const routesRule = routes.slice(0, routes.indexOf('}'));
+    expect(routesRule).toMatch(/flex:\s*1\s+1\s+auto/);
+    expect(routesRule).toMatch(/overflow-x:\s*auto/);
+  });
+
   it('CONTROL: omitting `compactDock` leaves every width exactly as it was', () => {
     // The prop must be additive. A caller that never heard of it keeps its dock
     // at compact -- otherwise this "repair" would delete a status bar app-wide.

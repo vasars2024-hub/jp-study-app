@@ -511,8 +511,18 @@
   padding: 0;
 }
 
+/* `flex: none` here was a latent defect that only became reachable once a real
+   app used this slot. A status is `nowrap`, so `flex: none` gives it an
+   unshrinkable intrinsic width; a status with several readouts then pins the
+   dock wider than its container and squeezes `.lq-dock-routes` — which can go to
+   0 because it carries `min-width: 0` — down to nothing. The navigation would
+   simply not be there, which is the failure the compact dock exists to prevent.
+   It shrinks now. A status-only dock is unaffected: with nothing competing for
+   the row there is no shrink to apply. */
 .lq-dock-status {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   margin-left: auto;
   padding: 0 var(--lq-space-2);
   font-size: var(--font-size-xs);
