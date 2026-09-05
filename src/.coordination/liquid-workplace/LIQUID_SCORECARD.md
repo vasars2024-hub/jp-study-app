@@ -4197,3 +4197,112 @@ art-plate exclusion and cat4 still has none.
 **Baseline banked:** `baselines/cat6-city.json` (gitignored, like every baseline here). cat5's
 Q7/Q8/Q9 VOID without it and read `MEASURE`; with it they are all three YES. **Run cat6 before
 cat5, always.**
+
+## City (Mooncap Garden) — cat5 goes 5/10 → 9/10, and three of its five NOs were the instrument
+
+`f0b76b55` `c1a92618` `f24133c7`, 2026-09-04, primary2, worktree `wt/files-app`.
+Instrument: `probes/cat5-ui-clarity.cjs`, `--surface "@.fwin-frameless" --label city
+--fixed-material`, 680x747, dossier OPEN, pointer parked off the surface. cat6 baseline
+`baselines/cat6-city.json` **copied from the main tree** (`parity 9/9 = 9/9`, `roundTrip 0`,
+written 19:50 the same day at the same commit) rather than re-driven here — said plainly
+because Q7/Q8/Q9 read from it and this worktree had never run cat6.
+
+**THE PRODUCT DEFECT — Q5, and it was worse than the previous turn could see.**
+`.fwin-frameless-controls` (`styles.css`) paints a HARDCODED dark pill while `shell.css` gives
+`.fwin-b` a THEME-OWNED `color-mix(in srgb, var(--text) 90%, var(--sidebar))`. Swap to a light
+palette and only one of the two moves. Measured live in `classic-light`: **1.62:1 focused,
+1.24:1 at rest** against 4.5. Repaired in the garden's own sheet — `readingGarden.css`, because
+`styles.css` and `shell.css` are both dirty in the main tree and this is the
+`musicWidgetLiquid.css` precedent from the same day.
+
+**A computed-style walk cannot see canvas paint, and that changes the numbers but not the
+verdict.** `effectiveBg` resolves past the transparent `.fwin-body` to `section.fwin`, which is
+`rgb(255,255,255)` in `classic-light`, so every harness here scores this cluster against WHITE.
+A 130x28 `capturePage` says otherwise: pill **(13,13,19)**, glyph **(52,52,52)**, a true
+**1.65:1**. Both models are recorded in the CSS so a re-scorer knows which one they are reading.
+
+| cell | before | after |
+| --- | --- | --- |
+| classic-light focused, harness model | 1.62:1 | **6.95:1** |
+| classic-light focused, true pixels | 1.65:1 | **15.4:1** |
+| classic-light at rest, true pixels | glyph never rose above (52,52,52) | **5.3:1** at (123,133,138) on (8,9,15) |
+| dark default, rest / focused | 4.84 / 14.12 | **5.11 / 15.11** |
+
+The plate is right and the glyph was wrong: `.reading-garden-sky` is a hardcoded night gradient
+over a `#050711` root with **no day phase**, so the ground is dark in all thirteen palettes.
+`.popout-root-mooncap .popout-btn` — the SAME cluster in the pop-out window — already ships its
+own `rgba(222,242,244,.72)` moonlight and has never had this bug. Focus ring and hover fill got
+the same treatment (`--focus-ring-color` is `var(--text)`; the shell's `color-mix(--text 10%)`
+hover wash is invisible on a black pill), and `.fwin-close:hover` is restated so the new hover
+rule cannot demote the one control whose hover means danger. 5 tests, comments stripped;
+mutation controls **2 of 5 RED** (restoring the theme-owned colour) and **1 of 5 RED**
+(demoting the close hover), each exactly its own assertions.
+
+**FOUR HARNESS CORRECTIONS (36–39), all in the shared runner, none surface-specific.**
+
+- **36 — a dev-only overlay is not part of the surface.** cat4 (spec item 21) and cat7-perf
+  already honour the product's `data-dev-only`; cat5 was the one census that did not. Four of
+  City's nine scanned controls were the sky console's `Sky sim`/`Star`/`Asteroid`/`Ice barrage`,
+  and the ONLY Liquid region Q6 found without a transition was that console's body. **Q6 goes
+  YES.** Everything removed is named in `devOnlyExcluded`.
+- **37 — the Q4 verdict never followed its own instrument.** `inDisclosure` was extended to the
+  APG `aria-expanded`/`aria-controls` pattern; `collapsedDisclosures` stayed `allDetails.length`.
+  City's receipt reads `ariaDisclosures [{aside.lq-contextual, controlsTaken 4}]` beside
+  `collapsedDisclosures 0` — the mushroom IS the disclosure. **Q4 goes YES** at
+  `scannedControls 5`, `behindDisclosure 4`. Still falsifiable: the control's clutter plant
+  takes `scanned` to **27** against the unchanged bar of 12 and Q4 goes NO.
+- **38 — a surface that passes by being theme-independent was VOIDed for it.**
+  `--fixed-material` had one proof, "every run on an INLINE-authored opaque ground", i.e. the
+  sticky note it was written for. Repairing Q5 made City fully theme-independent, so both cells
+  report the same **12.6** minimum and the same paint digest — and the guard read that as "the
+  swap never reached the paint". Second proof, stricter: the swap must be shown to reach `:root`
+  (`themeWitness`, five palette tokens read off the document) while the surface's own `paintKey`
+  stays byte-identical. `--fixed-material` still required. **Q5 goes YES**, 27 runs measured per
+  cell, 0 failing, `fixedMaterialProved true`.
+- **39 — a parked cursor manufactures an entry point.** Caught the same turn, on my own fix: a
+  manual `/click` on the frameless Liquid toggle (restoring a presentation an earlier run had
+  stranded) left `button.fwin-b` in `:hover`, its new 16% hover wash was the only filled button
+  among its siblings, and Q1 scored `entryPoints 1` on an ambient scene with no accent control
+  at all — **PASS 10/10 with one term fabricated by the mouse**. A hovered element's resting
+  background cannot be read back, so it REFUSES, in `bodyScrollTop`'s shape, with `--allow-hover`.
+  The harness's own Q6 leg clicks synthetically and is not the culprit; this is inherited state.
+
+**THE PRODUCT DECISION — Q3.** The mushroom hitbox now carries `data-primary`
+(`ReadingGarden.tsx`). Everything else on City is window chrome or a control inside the dossier
+the mushroom opens, and the mushroom itself is art with an invisible hitbox over it: Q1 and Q3
+were right about the surface, not wrong about the bar. `data-primary` is the app's existing
+declaration (`DesktopShell.tsx:3310`, `MusicWidget.tsx:193`, `VisualizerContent.tsx:104` — the
+visualizer is the same shape of surface and settled it the same way), has no CSS hook, and
+changes no behaviour. **Q3 goes YES**: `primaryAction button.reading-garden-mushroom-hitbox`,
+`explicitlyMarked true`, `insideBodyViewport true`.
+
+**Q1 IS STILL NO, deliberately.** `candidates` gates on `entryBand()` — "top for an app" — BEFORE
+`declaredPrimary()` is consulted, while Q3's `explicitPrimary` honours a declaration wherever it
+sits. One of those is wrong and it is probably Q1: the band exists to gate INFERENCE from pixels,
+and `declaredPrimary`'s own comment is that an entry point is declared, not inferred. Left open
+because the additive form could move Q1 on banked baselines with accent-classed controls outside
+their band — and the survey found the case that makes this dangerous: `cat5-l1rd-video.json` is
+`ep=4 NO marked=true`, a surface whose declaration exists and whose inferred census overflowed
+the bar, later repaired in the PRODUCT (`l1rd2-video`, `ep=2 YES`). A rule where the declaration
+replaces the census would have retired that repair. Additive is the only defensible form, and it
+needs a re-derivation budget this turn did not have.
+
+**Negative control, re-run AFTER the `data-primary` change:** `CONTROL FAILED AS REQUIRED on Q2,
+Q3, Q4, Q5, Q10`. The Q3 plant translates the declared action 4000 px down and Q3 goes NO, so
+the declaration did not make it unfalsifiable.
+
+**cat2 is UNCLOSED and here is exactly why, so the next turn does not rediscover it.** Three
+VOIDs, all `undo did not restore the surface`. Measured: (a) the mushroom is **not idempotent as
+an undo** — with the dossier open, a real `/click` at its centre leaves
+`div.reading-garden-info-stage` in `liveRegionsAfter`, twice; (b) `.reading-garden-info-close`
+exists ONLY while the dossier is open, so it can be the `--undo` but never the `--task`; (c) the
+run inherits dossier state, and a run that starts OPEN scores the CLOSE as its dominant task —
+that is what the second VOID was; (d) with a closed start, one task click simply did not land
+(`baseHash === afterHash`), the every-other-click flakiness. A task spec that survives a round
+trip needs a retry or a longer settle on the open leg.
+
+**sampled-out:** cat4 and cat7 were not run on City this turn. cat4 is still expected to fail on
+the recorded parallax grounds (39 layers at 910x1137 in a 680x747 window ON PURPOSE, and a
+frameless window has no Maximize button so only 2 of 3 gesture legs run); `cat2-clunkiness.cjs`
+carries that art-plate exclusion and cat4 still has none. **City stands at 4 of 8 closed —
+cat1, cat3, cat6, cat8 closed; cat5 at 9/10; cat2 VOID; cat4 and cat7 not run.**
