@@ -6183,3 +6183,90 @@ rebuild logged `08:06:51`, the new unit tests ran at `08:12:22` and the full sui
 `07:35-08:45 EDT`, which ends twenty minutes after the present moment and overlaps this turn, so
 that clock is skewed too — left as its author wrote it, since I cannot know which offset was
 intended, but **do not order these sections by their headings.** Order them by commit timestamp.
+
+---
+
+## 2026-09-05 08:30-09:10 EDT, `primary2` — the cat7 "warm the interlinear" slice HAS BEEN SHIPPED SINCE 2026-08-25, and cold pages cannot account for the 4.2 s
+
+**This entry scores no cell.** It corrects the exact-next-slice both prior handoffs named, and
+it retires a hypothesis with a measurement rather than with an argument.
+
+### 1. The slice already exists. I wrote it, then found it committed.
+
+The handoff's opening instruction was *"warm the interlinear ONCE, off the critical path, after
+boot settles. Wire it near `registerDictionaryIpc` / `initYomitan` in `src/main.ts`."* I built
+exactly that — module, wiring, seven tests, a mutation control — and only then read
+`git status`, which showed ` M` and not `??`. **It is `9cee1e0e`, 2026-08-25T09:35:30-04:00,
+"the cold block was never the scan or the open -- it is lookup's pre-check, and it belongs in
+the file cache."** It reached `wt/files-app` in this turn's own sync-down merge, forty minutes
+before I started, which is why the handoff's author could not see it.
+
+It is not dormant. `registerDictionaryIpc()` calls `scheduleDictionaryWarmup()`
+(`src/main/dictionary.ts:760`), which fires 5 s later and streams the whole 537 MB `dict.db`
+through the OS file cache in 4 MB chunks, **on libuv's threadpool, never on the main loop.**
+That last property is why my version was the worse one and I discarded it: I warmed with
+`better-sqlite3` queries, and `better-sqlite3` is synchronous by construction, so it would have
+spent the cost on the very loop the exercise exists to unblock. `9cee1e0e`'s header says so
+already. My work is on the floor; this correction is what it bought.
+
+### 2. Cold `dict.db` pages are ~0.5 s, not ~5.9 s. Measured, with a control.
+
+Attributed outside Electron against the real 537 MB file, so a fresh process reproduces the
+cold condition without an app restart (`~/.claude-runs/p2-dictwarm-probe.cjs`, not committed —
+RULE P). Twenty tokens, the same `byNorm` / `byReading` / `inflections` / `INFLECTION_PROBE_SQL`
+probes `lookup()` runs, senses read per row:
+
+| arm | 20 tokens | note |
+| --- | --- | --- |
+| compile all six statements | **3.4 ms** | so it is NOT statement compilation |
+| pass 1, file cold on disk | **539.8 ms** | first run of the day |
+| pass 2, same process | 6.9 ms | |
+| pass 3, same process | 7.2 ms | |
+| **pass 1, FRESH process, file now OS-warm** | **13.7 ms** | the control |
+
+The control is the load-bearing row. A brand-new process, with no compiled statements and no
+SQLite page cache of its own, is **39x** faster than the first run purely because the OS holds
+the pages. That isolates the variable to file-cache residency and rules out per-process state.
+
+**And it is the wrong order of magnitude.** `backup` measured swap 2 at **5,886.0 ms** and a
+longest main block of **4,240.5 ms** against a 500 ms bar. Cold pages for the same 20 tokens
+cost 539.8 ms — about **9%** of the observed spike, and that 539.8 ms is already an
+**over**-estimate of what the app pays, because the app's warm-up has been reading the file at
+T+5s of every boot since 2026-08-25.
+
+**Stated honestly, because it bounds the claim:** my probe is a LOWER bound on the SQL leg. It
+omits `candidateForms` de-inflection (several probes per token, not one), the `byPrefix` probe,
+the legacy Yomitan fallback taken on every SQLite miss, `attachLexiconFrequency` and
+`analyzeInterlinearPartOfSpeech`. So the correct reading is not "the remaining cost is
+explained" — it is **"cold `dict.db` pages are too small to be the explanation, and the
+untested legs above are where the next run should look."** Those five are the open suspects.
+
+### 3. Why nobody could check any of this: the warm-up reported to nobody. FIXED — `8dd16ea6`.
+
+`scheduleDictionaryWarmup()` is called with no `onDone`, and the result was dropped. So
+`missing`, `too-large`, `failed` and `cancelled` were **indistinguishable from success, and
+from each other**, from outside the process. Three consecutive turns argued about whether a
+4.2 s first-lookup block was cold pages while the one number that settles it was being computed
+and discarded 5 s after every boot.
+
+The receipt now lives with the **producer** — `warmDictionaryPages` writes it itself — because
+a default `onDone` would have re-created the exact hazard that a call site can forget. It goes
+to `logDiagnostic`, i.e. `<userData>/logs/main.log`, which is production-real:
+
+    {"severity":"warn","subsystem":"dictionary","operation":"page-warmup",
+     "detail":"status=missing bytesRead=0 fileBytes=0 ms=1"}
+
+6 new tests, one per outcome plus "exactly one receipt however many callers join". **Mutation
+control: deleting the `logDictionaryWarmup(result)` call fails exactly those 6 and leaves the 7
+pre-existing tests green.** Also fixed a doc comment claiming the oversized refusal reports
+`skipped` — no such status exists, the value is `too-large`, so grepping the documented word
+found nothing and read like an unreachable branch.
+
+**What the next cat7 run must now do, and it is one line:** read `main.log` for `page-warmup`
+before quoting any cold-page number. If it says `status=warmed fileBytes=537…`, the pages were
+resident and the 4.2 s is somewhere in §2's five untested legs. That is the whole point of the
+receipt — the question stops being arguable.
+
+sampled-out: every other scorecard surface; this entry scores NO cell.
+**`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
+39 remaining, unchanged this turn.**
