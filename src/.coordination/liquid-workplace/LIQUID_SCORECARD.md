@@ -5482,3 +5482,87 @@ shared 157 gives **159 of 200 cells, 41 remaining**, and per-surface:
 **Sections at 80/80 stays 19 of 25** — neither surface is certified, both are 5 of 8, and
 neither worker claimed otherwise. Quote 159 from here forward, not either 158.
 
+
+---
+
+## 2026-09-05 05:00-06:30 EDT, `primary2` — `translate` cat2 closes 10/10, and the cell it closes was FAILING a correct surface
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki` `dictionary`** —
+seven. `translate` is continued rather than newly chosen: it was at 5 of 8 with a mature spec, and
+RULE C closes a surface before opening another.
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 2 | Clunkiness | **10/10** | input cost **1 click / 0 keystrokes** for the dominant task; `deadEnds` **0**, `modalTraps` **0**, `scrollTraps` **0**; worst `recvMs` **11.4** standard / **16.0** liquid, `overBar100` **0**, `sharedPaintSamples` **0**; costParity **1 = 1**, presentation round trip `restored true`, box `820x580` in both cells; idle leg quiet in both phases (`netChurns false` at rest AND after task, nothing declared to `--churn`) | harness `--control`: all three counters moved `[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`, inert-element floor **0.4 ms** in the same run |
+
+Instrument: `probes/cat2-clunkiness.cjs`, `--surface "Translate" --win 1 --both-presentations
+--control --task "click:.tr-actions .btn.primary >> wait:6000"`, **zero new probes** (RULE 1).
+
+**Dominant task, and why the text entry is not in it.** The task is *translate what is in the
+box* — one click. Getting Japanese INTO the box is not drivable here and that is an instrument
+fact, measured, not assumed: `/type` is `sendInputEvent({type:'char', keyCode: ch})`, which cannot
+carry non-Latin-1. Seven characters of `猫が好きです。` arrive as **seven U+003F**, confirmed by
+reading the codepoints back out of `.tr-textarea`. The source text is therefore set through
+React's native value setter as SETUP, uncounted, on the same footing as the `clear:` and `scroll:`
+restore primitives — and the `type:` step is left out of the cost rather than billed to the app.
+
+### THE FINDING IS THE INSTRUMENT, AND IT WAS FAILING A SURFACE THAT IS FINE
+
+The first run came back **`deadEnds` 1 — the Translate button itself.** Nothing moved on any of
+the seven channels, and the 55-second wait after it moved nothing either. Read as a product
+result that is a dead primary action on the app's own Translate screen.
+
+It is not. Driven by hand:
+
+    capture-phase recorder   pointerdown / mousedown / mouseup / click
+                             ALL on BUTTON.btn primary at 134,492
+    product's own receipt    jp-grammarx-translation-history-v1   41 entries -> 42
+    per-frame rAF sampler    .tr-status present for 32 of 959 frames
+                             first 91 ms      last 342 ms
+
+`run()` (`TranslateContent.tsx:130`) has **no cache guard** — it synchronously clears the output
+and sets `loading`, so the button becomes a disabled "Working…". Warm, the whole round trip is
+**~250 ms** and it ends by rewriting the output with the **same 12 characters**, `I like cats.`
+The harness's fixed 600 ms settle lands *after* the trip, between two identical states. The
+acknowledgement was **91 ms — inside the rubric's own 100 ms bar** — and the harness scored it 0.
+
+**Correction 59, `522470d3`:** the settle window is sampled at 120 ms instead of waited out, with
+`snapOf` + `movedBetween` + the same focus mask — the *same* instrument, more than once. The
+samples reproduce the rAF measurement from the other side:
+
+    any=true @165ms   any=true @301ms   any=false @438 / 564 / 714
+
+**Two failed attempts are on the record in the harness comment, because the failure mode is worth
+more than the fix.** A MutationObserver over the surface root rescued the Translate click (19
+mutations, 124→596 ms) **and also rescued the handler-less plant**, so `--control` reported
+`moved.deadEnd false`, `counts.dirty [0,1,1]`, and the run VOIDed — the control catching the
+relaxation, which is exactly what it is for. Excluding the clicked control's own subtree did not
+fix it: an inert button appended to `.tr-view` and clicked through the bridge in isolation
+produced **0 mutations**, so the plant was not rescuing itself, the SURFACE was moving under it.
+React re-renders rewrite DOM nodes while changing no text, no control state and no geometry — so a
+raw mutation count is strictly **more** sensitive than the five channels the bar is defined on,
+and on any React surface it would eventually keep a genuinely dead button alive. The rule that
+survived is the only one that cannot: no new signal, just denser sampling of the existing one.
+
+**One product observation, deliberately NOT inflated into a defect.** Pressing Translate on text
+that is already translated re-runs it and appends a **duplicate history row** (41 → 42, identical
+source and result) for ~250 ms of feedback. `translatedInput` is tracked, so the product knows the
+input is unchanged, yet the button stays enabled. That is a small honesty/clunkiness wrinkle, not
+a failure of any category-2 bar — the click IS acknowledged, at 91 ms — and it is recorded here
+rather than scored, because inventing a bar to fail is the same sin as rounding one to green.
+
+**A second run VOIDed on `presentation not restored`** (left `liquid`, expected `standard`) —
+the recorded every-other-click toggle. Fixed by retrying the toggle, not by sleeping: one retry
+put it back. Do not add a sleep here.
+
+### Where `translate` stands
+
+**6 of 8: cat1, cat2, cat3, cat4, cat5, cat6 at 10/10.** cat7 and cat8 not run — but cat7 is now
+*runnable*, which it was not at the start of this turn: `3484a565` gives it a `SPECS` entry
+(`cat7-perf.cjs` refused the surface outright before, it had none). The heavy leg is 40 pair
+swaps through `.tr-swap`, and the 45-second model run is REJECTED as the heavy leg with its
+number — that is the local Qwen3-1.7B in another process, so timing it reports the model, not the
+surface, the same judgement `agent` records for generating a reply.
+
+**Running total: 19 of 25 sections at 80/80** (unchanged — `translate` is at 6 of 8 and is not
+certified). **160 of 200 cells, 40 remaining.**
