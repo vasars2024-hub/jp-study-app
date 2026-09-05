@@ -906,6 +906,30 @@ describe('selectSubtitleFiles', () => {
     expect(chosen.files.map((f) => f.index)).toEqual([2, 0]);
   });
 
+  it('refuses a Chinese-only sidecar set before the transfer, not after it', () => {
+    // The other half of the pair above, and the distinction is the whole point:
+    // `sc_jp`/`tc_jp` is bilingual and IS Japanese, while a bare `sc`/`tc` is
+    // Chinese and is not. Verbatim from the live gate-12 release of 2026-09-05,
+    // which ships twelve of each and used to read as unlabelled — so a `ja`
+    // harvest kept twelve, paid for a 26.4 GB torrent's worth of handshake and
+    // transfer, and only the post-download kana floor said no.
+    const files = [
+      file(0, '[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass', 40_000),
+      file(1, '[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass', 40_000),
+      file(2, '[孤独摇滚][02][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass', 41_000),
+      file(3, '[孤独摇滚][02][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass', 41_000),
+    ];
+    const refused = selectSubtitleFiles(files, { languages: ['ja'] });
+    expect(refused.reason).toBe('wrong-language');
+    expect(refused.files).toHaveLength(0);
+
+    // RIVAL: the same release is exactly what a `zh` harvest wants, so the
+    // refusal has to be about the ask and not about the names.
+    const wanted = selectSubtitleFiles(files, { languages: ['zh'] });
+    expect(wanted.reason).toBe('ok');
+    expect(wanted.files).toHaveLength(2);
+  });
+
   it('NEGATIVE CONTROL: distinct episodes are never collapsed, and unnumbered files are all kept', () => {
     // The failure this dedupe could cause is silent cue loss, so both shapes it
     // could eat are pinned. A 3-episode pack must stay 3 files, and two files
