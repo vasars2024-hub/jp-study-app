@@ -8018,3 +8018,92 @@ rather than a finding: each of the 19 rows renders `t('immersion.visitsCount', {
 Test it by measuring the same task with a rail whose rows render no `t()` count — if the
 number does not move, the hypothesis is dead and the cost is `VirtualList`'s own reconcile.
 **The cell needs ~10 ms, so this is one attributable step from 10/10.**
+
+## backup, 2026-09-05 18:14-19:20 EDT — the harness could not deliver a keystroke, a click or a Tab
+
+**Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** What moved is the blocker the
+previous two turns both named: `/type` delivers nothing. It is fixed, and it was worse than
+reported.
+
+### The defect, measured before anything was changed
+
+Against the then-running app (pid 36988, window 1, `document.hasFocus()` **true**,
+`visibilityState` **visible**), with a capture-phase listener on `document` recording
+`keydown/keypress/beforeinput/input/keyup` and `mousedown/click`:
+
+    POST /type  {text:"abc"}   ->  {"ok":true,"typed":3}          events recorded: []
+    POST /key   {key:"a"}      ->  {"ok":true,"key":"a"}          events recorded: []
+    POST /click {x:200,y:300}  ->  {"ok":true,"x":200,"y":300}    events recorded: []
+
+The previous turn found the `/type` half. **`/key` and `/click` fail identically, and the mouse
+half is the worse one** — every rubric probe built on `/click` was scoring a surface it had never
+touched, and `ok:true` was returned unconditionally in all three cases.
+
+`sendInputEvent` routes through the platform widget host, which drops input for a window that is
+Electron-focused but is not the OS foreground window. The route had no way to tell that apart
+from success, so a dead surface and a dead harness were indistinguishable.
+
+### The fix — `723433da`, and the harnesses that must read it — `a54ae10f`
+
+Dispatch over the DevTools agent (`Input.dispatchKeyEvent` / `Input.dispatchMouseEvent`), which
+does not consult OS focus. `sendInputEvent` stays as the fallback for when a human has DevTools
+attached, and the receipt names which transport ran. And, separately and more importantly:
+**a send is never reported as a delivery.** Each receipt now carries what the renderer itself
+observed — `delivered`, `inserted`, `transport` — and `ok` is false when that is nothing.
+
+`inserted` is deliberately distinct from `delivered`: a key can arrive with nothing focused,
+which is a real and different outcome from not arriving.
+
+### Live proof, on the restarted app (pid 26992), into window 1 which was NOT the focused window
+
+    /type "abc"                     ok:true  sent 3  delivered 3   transport cdp
+    /key  a                         ok:true  sent 1  delivered 1
+    /click 200,300                  ok:true  sent 1  delivered 1
+    /type "red" into a focused field         delivered 3  inserted 3   value read back "red"
+    /key Backspace                           delivered 1  inserted 0   value read back "re"
+
+Independently of those receipts, the renderer's own witness read `keydown 4 / mousedown 1` after
+the first three calls — the numbers are not self-reported.
+
+**NEGATIVE CONTROL, and it is the one that matters:** with the witness frozen (`Object.freeze`)
+so it cannot record, the same calls return
+
+    ok:false  delivered 0  "sent 3 key event(s) over cdp and the renderer observed none"
+
+and unfreezing restores `ok:true`. The honesty gate is not a rubber stamp. Unit side:
+23 tests over the pure halves, and making `ok` follow `sent` instead of `delivered` fails 4.
+
+### `immersion` cat2 — MEASURABLE now, and deliberately NOT banked
+
+The step drove for the first time: `type:.immersion-site-search input=red`,
+`stepsDriven 1`, `deadEndCount 0`, `scrollTraps 0`, `modalTraps 0`, undo restored
+(`baseHash s1efy0 -> afterHash s1efy0`), **verdict FAIL on `latency` alone**, `costParity`
+UNMEASURED.
+
+Two further runs of the identical command VOIDed — once on a `focus` churn, once on
+`undo did not restore` (`s1efy0 -> 1dtdk7w`). The cause is the saved-sites rail, which the
+previous turn recorded as shared mutable state: **with the filter empty, its card count read 19
+before the runs and 12 after**, unprompted. So one clean reading exists and it does not reproduce
+on this contended instance. **A cell is not banked on a reading that does not repeat**, and one
+FAIL that two re-runs could not confirm is not a score. `immersion` keeps cat2/cat7/cat8 open.
+
+The next worker's cheapest route to a repeatable reading is a private instance with its own
+`JP_USER_DATA_DIR` — which the bridge already supports through `JP_DEBUG_PORT` — because that
+also removes the shared rail, not just the contention.
+
+### Two traps that cost time this turn
+
+1. **The dev app came up a HUSK.** `[debugBridge] listening`, `/health` `ok:true`, both windows
+   `visible`, Vite `connected` — and `document.getElementById('root').children.length === 0`,
+   `body.innerText.length === 0`, `/logs?level=error` total **0**. The log's only clue was
+   `Network service crashed or was terminated, restarting service`. A `location.reload()` on each
+   window mounted it (`kids 2`, `innerText 9,636`, 3 `.fwin`). Reload before concluding anything.
+2. **The restart did NOT eat localStorage this time.** Read back after: active profile `balanced`,
+   `qbittorrent.enabled true`, `authMode apiKey`, `apiKeyRef "qbittorent"` — the user's own
+   config, intact. The 2026-09-03 loss is very likely the three-instance LevelDB fallback the pin
+   describes, not restarting as such. A full localStorage snapshot was taken first regardless.
+
+**State:** the Immersion window this turn opened is closed and its filter emptied by read-back;
+the desk reads `Translate ;; Reading Finder ;; Anki`, as it did at the start.
+
+`sampled-out:` no surface was scored, so nothing was skipped.

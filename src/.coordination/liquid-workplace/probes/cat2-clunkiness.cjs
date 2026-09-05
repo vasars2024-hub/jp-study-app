@@ -247,6 +247,33 @@ async function post(route, body) {
   const t = await r.text();
   try { return JSON.parse(t); } catch { return { raw: t, status: r.status }; }
 }
+/**
+ * Correction 63: READ THE INPUT RECEIPT.
+ *
+ * Until 2026-09-05 `/click`, `/type` and `/key` answered `ok:true` unconditionally while the
+ * renderer received NOTHING. Measured that day against a window that was Electron-focused but
+ * was not the OS foreground window: `POST /type {text:"abc"}` returned `{ok:true,typed:3}` and
+ * a capture-phase listener on `document` recorded zero keydown/keypress/beforeinput events;
+ * `/key` and `/click` behaved identically. So every step below could spend a gesture, see the
+ * surface not move, and score that as a DEAD END -- when the gesture had never been delivered.
+ * A dead surface and a dead harness were indistinguishable, and only one of them is a defect.
+ *
+ * The bridge now dispatches over the DevTools agent and reports what the renderer actually saw.
+ * A step that spends input refuses unless something arrived.
+ *
+ * `delivered === undefined` is refused too: that is an OLD bridge (a dev app started before the
+ * fix), and an unverifiable transport is precisely the state this correction exists to stop.
+ * Silence must never read as success here -- that inversion is what cost the whole cell.
+ */
+async function sendInput(route, body) {
+  const r = await post(route, body);
+  if (r && r.delivered > 0) return null;
+  const seen = r && typeof r.delivered === 'number'
+    ? `delivered ${r.delivered} of ${r.sent} over ${r.transport}`
+    : 'the bridge did not report delivery at all — restart the dev app, it predates the 2026-09-05 fix';
+  return `INPUT NOT DELIVERED on ${route} — ${seen}. HARNESS failure, not a dead end; do not score it.`;
+}
+
 // One expression per /eval; a trailing `;` reads as "Script failed to execute".
 async function ev(js) {
   const t = await post('/eval', { js: js.replace(/\s*;\s*$/, '').trimEnd() });
@@ -1116,7 +1143,8 @@ async function driveStep(surface, step, before) {
     if (!pt.mine) return { ...out, refuse: `occluded: ${rem} centre resolves to ${pt.topEl}; raise the target first` };
     out.target = { sel: rem, label: pt.label, disabled: pt.disabled, at: `${pt.x},${pt.y}` };
     const clickedAt = Date.now();
-    await post('/click', { x: pt.x, y: pt.y });
+    const undelivered = await sendInput('/click', { x: pt.x, y: pt.y });
+    if (undelivered) return { ...out, refuse: undelivered };
     // Correction 11: mask the focus channel when focus merely landed on the control just pressed.
     // Read once, immediately, and reuse for every sample below: the mask is a property of the
     // gesture, and re-reading it per sample would let a later focus change flip it mid-window.
@@ -1174,7 +1202,8 @@ async function driveStep(surface, step, before) {
     // query in under 16 ms, and the bar being scored is whether ONE keystroke is acknowledged
     // within 100 ms. 40 ms clears a 60 Hz frame with margin and costs 40 ms per character.
     for (const ch of text) {
-      await post('/type', { text: ch });
+      const undelivered = await sendInput('/type', { text: ch });
+      if (undelivered) return { ...out, refuse: undelivered };
       await sleep(KEY_SPACING);
     }
     await sleep(SETTLE);

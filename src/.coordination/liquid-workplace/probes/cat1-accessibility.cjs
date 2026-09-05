@@ -1049,8 +1049,25 @@ async function keyboardWalk() {
     if (seen.has(key) && i > 0) { cycled = true; break; }
     seen.set(key, i);
     stops.push(stop);
+    // Correction: READ THE KEY RECEIPT. Until 2026-09-05 `/key` answered `ok:true` while the
+    // renderer received nothing (measured: a capture-phase listener on `document` saw zero
+    // keydowns against a window that was Electron-focused but not the OS foreground window).
+    // An undelivered Tab leaves focus exactly where it was, so the very next sample matches the
+    // previous stop and the walk reports `repeatOfPrevious` — a FALSE KEYBOARD TRAP against a
+    // surface that traverses correctly. Refuse instead: the bridge now reports what arrived, and
+    // a walk that cannot press Tab has measured nothing.
     // eslint-disable-next-line no-await-in-loop
-    await post('/key', { key: 'Tab' });
+    const press = await post('/key', { key: 'Tab' });
+    if (!(press && press.delivered > 0)) {
+      const seenNote = press && typeof press.delivered === 'number'
+        ? `delivered ${press.delivered} of ${press.sent} over ${press.transport}`
+        : 'the bridge did not report delivery — restart the dev app, it predates the 2026-09-05 fix';
+      return {
+        stops: stops.length,
+        refuse: `Tab NOT DELIVERED at stop ${i} — ${seenNote}. HARNESS failure, not a keyboard `
+          + 'trap; do not score this walk.',
+      };
+    }
     // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => { setTimeout(r, 60); });
   }
