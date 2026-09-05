@@ -4711,3 +4711,106 @@ those observers is NOT it: I wrote that, measured 33.3 with and without, and rev
 untried is *suspending* the canvas re-projection for the duration of the drag, which is a bigger
 behavioural change (the scene would hold its last projection while the edge moves) and needs to be
 decided on the art, not on the number alone.
+
+## 2026-09-04 · primary2 — `novels` opens as the 19th surface: 4 cells, one product repair, and the dropped chrome click was an AGED RENDERER
+
+Took slice (b) from the last handoff — a NEW surface — deliberately leaving City cat7 to the
+other worker, because "two workers spend a turn each on one cell" is the cause that handoff
+named for TARGET AT RISK. `novels` was chosen from the seven sampled-out because `83da5c12`'s
+routing table records it fully scaffolded.
+
+**sampled-out this turn: `city` (held by the other worker) `immersion` `reading` `translate`
+`files` `player` `anki`** — seven, named, not silently truncated.
+
+**WHICH `novels` WAS SCORED, because two different surfaces answer to that name.** The section
+window — `os:open novels`, the reading workspace, which lands on its **Plan** tab with 4
+`.jiten-row`s and the four `.aero-novels-command` buttons. That is what `DESKTOP_WIN_SECTIONS`
+names and what the Start menu opens. **cat6's app spec and cat7's `SPECS` entry both target a
+different thing**: `.novel-scroller` / `.novel-content`, i.e. an open VOLUME, which replaces the
+desktop shell. cat6 refused this turn with "the novels surface is not open" while the surface
+was plainly on screen, and that refusal is correct — it was looking for the reader. Those two
+cells are therefore NOT scored here and the surface is NOT closed. The library holds 24 books,
+so the reader is drivable; it is the next worker's opening slice.
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat1 accessibility | **PASS 10/10** | minRatio 5.08 (`span.nov-diff` 11px); 42 controls, 9 below the 32px floor by rect and **0 by hit**; unreachable 0; motion 13 over threshold → 0 under emulation, restored. Control moved all six terms and returned to baseline. |
+| cat2 clunkiness | **PASS 10/10** | dominant task = select a plan row; 1 click, 0 dead ends, 0 modal traps, 0 scroll traps, worstRecv 21.0 ms standard / 19.7 ms liquid, costParity 1 = 1. Control moved dead-end, modal-trap and scroll-trap and restored. **flipAttempts 3, restoreAttempts 3.** |
+| cat3 liquid utilization | **VOID** — see below | 46 regions, Work 3 / eligible 4 / Anchor 37 / Ambient 2. Eligible **1 of 4 treated → 4 of 4**, `untreatedEligible []`. |
+| cat4 use of space | **PASS 10/10** | clipped 0, overlaps 0, horizontal scrollers 0 at all three sizes; dead region **3.9% / 0.9% / 10.8%**; contentGrowsNotChrome default→maximized; restored. **maximizeAttempts 4, restoreAttempts 3.** |
+
+### The product repair — `0a0b6857`
+
+cat3 on the default panel failed `contextualTreated` and `sharedPrimitives`: 4 regions
+Liquid-eligible, 1 treated. `--detail` named them, and all three were fully opaque inside a
+window painting at alpha 0.72 with `backdrop-filter: blur(8px)`:
+
+    div.ui-toolbar.jiten-novels-toolbar   772x45     7.3%   contextual=true
+    aside.jiten-filters                   772x140   22.7%   contextual=true
+    aside.jiten-inspector                 772x865   94.1%   contextual=true
+
+`main.jiten-table-wrap` is the deliberate exclusion — a results table is one of the four things
+§2.3 puts on a stable opaque anchor, and the same walk classifies it `Anchor`. The test pins
+that as a decision so nobody later "completes" it.
+
+**A regression I caused and measured in the same minute.** `.lq-contextual` relaxes `min-height`
+to 0 (`liquid-surfaces.css`), and that base rule is NOT gated on Liquid. The toolbar is a flex
+ITEM of a height-constrained column, so the column squeezed it: **772x45 → 772x18**, its 32px
+controls collapsed, in BOTH presentations. Second recorded instance of this primitive collapsing
+a flex item. Fixed with `flex: 0 0 auto; min-height: auto` at (0,2,0).
+
+**The non-negotiable held, and it was measured rather than asserted.** In standard presentation
+the three regions read 772x140 / 772x870 / 772x45 at `rgb(26,24,35)` / `rgb(26,24,35)` /
+`rgba(0,0,0,0)` — identical to the readings taken before the class was added.
+
+### Why cat3 is VOID and must be re-scored
+
+The re-run measured 4 of 4 treated and `untreatedEligible []`, but the run **VOIDed on its own
+plant control**: `movedDense: false`, `denseWorkOnTranslucent` 0 → 0, so
+`barsWhilePlanted.sharedPrimitives` moved but the dense arm did not. The pre-repair run on the
+same panel PASSED its control ("CONTROL FAILED AS REQUIRED"), so something about 4-of-4 treated
+disarms the dense plant. **Do not bank the 10 on the measurement alone** — the number is real,
+the score is not. Diagnosis owed: the plant is a `div` with `rgba(30,30,40,0.5)` and one
+`<input>`, appended to the window's own body, and `.fwin-body` is pinned OPAQUE under Liquid by
+rule 1 of `liquid-window.css` — so its backing may never have been translucent and the earlier
+pass may itself have been luck.
+
+### CORRECTION TO MY OWN ATTRIBUTION — the dropped chrome click is an AGED RENDERER, not the toggle
+
+Corrections 44 (`1984032a`) and 45 (`0bc696b3`) are right and stay: a harness must survive a
+flaky chrome click, and both were forced by real VOIDs/FAILs. But their commit messages say
+"the presentation toggle drops clicks", and that attribution is **too narrow**. Measured after
+they landed:
+
+- A fully trusted `/click` reached `button.fwin-b-liquid` — pointerdown, mousedown, pointerup,
+  mouseup, click, `isTrusted: true`, `defaultPrevented: false`, `elementFromPoint` confirming
+  the button was topmost — and the presentation did not change.
+- **Minimize and Close behaved identically**, so it was never the Liquid toggle specifically.
+- Body controls kept working throughout: a real click on the Library tab flipped
+  `aria-selected` and swapped the panel, and cat2 drove `.jiten-row` clicks with 0 dead ends.
+- Five consecutive close clicks did nothing. **One `/reload`, and the very first click closed
+  the window.**
+
+So it is a stale React tree in a renderer that had been up **17 hours** accumulating HMR, and it
+is `hmr-keeps-mount-effect-closure` in a new place: the module hot-updates, the mounted chrome
+does not. **If window chrome stops responding, reload before diagnosing anything.**
+
+### The one thing that is NOT explained by the reload, and is worth a slice
+
+A MutationObserver on `data-presentation` caught the toggle **land and then be put back**:
+
+    278 ms  click (from liquid)
+    287 ms  data-presentation = standard     <- the toggle worked
+    396 ms  data-presentation = liquid       <- something reverted it, 109 ms later
+
+Only once in five clicks, and the other four stuck. There is a plausible writer for it:
+`/eval` in window 2 returns `?desk=0` **rendering the same `novels` window**, while window 1 is
+also on desktop 0 — so two shells own one desktop, which `DesktopShell.tsx:668` states as an
+invariant ("two shells never own one desktop") that nothing enforces. `pinnedDesktop = secondary
+? (pinnedDesktopProp ?? DESKTOP_STUDY) : null` and `DESKTOP_STUDY = 0`, so an unassigned
+secondary defaults onto the main window's own desktop. NOT repaired this turn: the fix is a
+desktop-ownership change in the shell's multi-monitor routing, with blast radius across L11 b4
+clause 3, which closed two days ago. It needs its own slice with those tests in scope.
+
+**Running total: 18 of 25 sections at 80/80** (unchanged — `novels` is 3 of 8 banked, cat3 VOID,
+cat5/6/7/8 unrun). **56 category cells remain** — the handoff's 59 minus cat1, cat2 and cat4.
