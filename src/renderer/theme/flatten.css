@@ -287,8 +287,14 @@
   -webkit-backdrop-filter: none;
 }
 
-/* MATERIAL — frameless window chrome and its floating control cluster. */
-:root[data-lq-flat] .fwin-frameless {
+/* MATERIAL — frameless window chrome and its floating control cluster.
+   `.fwin.fwin-frameless` tracks the census entry, which moved in `bfba48af`: at (0,1,0) the
+   source rule LOST to `.fwin { background: var(--bg) }` and painted nothing, so it was raised.
+   The flatten rule already outranked both and there was no runtime regression — but
+   `flattenCoverage.test.ts` maps a hardcoded `backdrop-filter` to the trigger that neutralises
+   it BY SELECTOR TEXT, and a one-to-one mapping is the whole point of that guard. Matching it
+   here keeps the pair explicit instead of relying on a specificity accident. */
+:root[data-lq-flat] .fwin.fwin-frameless {
   background:
     linear-gradient(rgba(8, 10, 18, 0.92), rgba(8, 10, 18, 0.92)),
     var(--lq-flat-base);

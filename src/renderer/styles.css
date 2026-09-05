@@ -13042,7 +13042,20 @@ mark.lookup-mark,
 .fwin-viz:not(:hover):not(.focused) .fwin-title {
   opacity: 0.45;
 }
-.fwin-frameless {
+/* `.fwin.fwin-frameless`, not `.fwin-frameless`: at (0,1,0) every declaration in here
+   LOST to `.fwin`'s own `background: var(--bg)` / `border` / `box-shadow` below (line
+   ~14799, same specificity, later in the file), so the night-window material computed to
+   nothing and the window painted the palette's `--bg` — white under classic-light. It was
+   invisible only because the garden canvas covers the body; the one place it showed was the
+   contrast model, where the frameless control cluster composited over WHITE and read 4.41:1
+   while a 130x28 capture of the same pixels read its plate as `rgb(13,13,19)`. At (0,2,0) the
+   two agree: composited backdrop `rgb(14,14,20)` against painted `rgb(13,13,19)`.
+   `border-color` and `box-shadow` still come from `shell.css`'s elevation ramp — that file is
+   imported later and its `.fwin` selector is also (0,2,0), so it keeps the tie. Only
+   `background` and `backdrop-filter`, which shell.css does not declare, newly apply.
+   `.focused` below is deliberately NOT raised: shell.css:835 replaced this red ring with the
+   neutral elevation treatment on purpose, and raising it here would reinstate the ring. */
+.fwin.fwin-frameless {
   background: rgba(8, 10, 18, 0.92);
   backdrop-filter: blur(10px);
   border-color: rgba(255, 255, 255, 0.1);

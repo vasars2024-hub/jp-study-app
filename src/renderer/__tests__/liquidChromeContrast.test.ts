@@ -21,7 +21,11 @@ import { describe, expect, it } from 'vitest';
  *    already happened once in this slice.
  */
 
-const read = (...p: string[]) => readFileSync(resolve(__dirname, '..', ...p), 'utf8');
+// `\r\n` normalised on the way in: the shared working tree carries `shell.css` fully CRLF
+// while a fresh `git worktree` checks it out LF, and a guard that greps raw CSS otherwise
+// passes only in the tree it was written in.
+const read = (...p: string[]) =>
+  readFileSync(resolve(__dirname, '..', ...p), 'utf8').replace(/\r\n/g, '\n');
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 
 const TOKENS = strip(read('theme', 'liquid-tokens.css'));
@@ -65,6 +69,11 @@ describe('Liquid window chrome contrast', () => {
   it('derives the window-control glyph from --text in the rule that actually wins', () => {
     const winning = [...SHELL.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .map((m) => ({ selector: m[1].trim().replace(/\s+/g, ' '), declarations: m[2] }))
+      // The frameless cluster is excluded ON PURPOSE and the test below is what governs it:
+      // its plate is a fixed dark chip over the garden canvas in EVERY palette, so a glyph
+      // derived from `--text` is the defect there rather than the fix. Live on the City
+      // window, classic-light: 1.60:1. See the block in `shell.css` for the full measurement.
+      .filter((b) => !b.selector.includes('.fwin-frameless-controls'))
       .filter((b) => /\.fwin-b\s*$/.test(b.selector) || /\.fwin-b\s*\{?$/.test(b.selector));
     expect(winning.length, 'the shell .fwin-b rule moved or was renamed').toBeGreaterThan(0);
 
@@ -81,6 +90,93 @@ describe('Liquid window chrome contrast', () => {
       colours.filter((c) => !c.includes('var(--text)')),
       'the glyph must read the palette; --muted measured 4.04-4.22:1 on the light six',
     ).toEqual([]);
+  });
+
+  it('keeps the frameless control glyphs legible on a plate no palette can lighten', () => {
+    // Four pieces hold this up and each one has already been broken in this tree:
+    //
+    //  1. `.fwin.fwin-frameless`, at (0,2,0). At (0,1,0) it LOST to `.fwin { background:
+    //     var(--bg) }` later in the same file, the window painted white under a light
+    //     palette, and the whole composite below was fiction.
+    //  2. the plate's own `rgba(16, 15, 21, 0.72)`.
+    //  3. an ink that does NOT read the palette — the point of the carve-out above.
+    //  4. `:not(.fwin-liquid)`, because Liquid presentation swaps the plate for a LIGHT
+    //     material and this ink would be invisible on it.
+    //
+    // The bound is computed against the LIGHTEST ground the plate can ever have: both
+    // layers are fixed rgba, so compositing them over white is the worst case for the
+    // ink, whatever is actually behind the window. Live-measured over the real garden
+    // canvas it is 8.91:1; this bound is deliberately stricter than that reading.
+    const rgba = (s: string) => {
+      const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,/\s]+([\d.]+))?\s*\)/.exec(s);
+      if (!m) return null;
+      return { r: +m[1], g: +m[2], b: +m[3], a: m[4] === undefined ? 1 : +m[4] };
+    };
+    const over = (f: { r: number; g: number; b: number; a: number }, b: readonly [number, number, number]) =>
+      [f.a * f.r + (1 - f.a) * b[0], f.a * f.g + (1 - f.a) * b[1], f.a * f.b + (1 - f.a) * b[2]] as [
+        number,
+        number,
+        number,
+      ];
+    const ratio = (x: readonly [number, number, number], y: readonly [number, number, number]) => {
+      const [a, b] = [relLum(x), relLum(y)];
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const declOf = (css: string, re: RegExp, what: string) => {
+      const m = css.match(re);
+      expect(m, `${what} moved or was renamed`).not.toBeNull();
+      return m ? m[1] : '';
+    };
+
+    // 1 — the window material, and the specificity that lets it apply at all.
+    expect(
+      STYLES,
+      'the frameless window material is back at (0,1,0), where `.fwin` outranks it and it ' +
+        'paints nothing',
+    ).toMatch(/\.fwin\.fwin-frameless\s*\{/);
+    const winBg = rgba(
+      declOf(STYLES, /\.fwin\.fwin-frameless\s*\{([^}]*)\}/, 'the frameless window rule').match(
+        /background:\s*([^;]+)/,
+      )?.[1] ?? '',
+    );
+    expect(winBg, 'the frameless window background is no longer a plain rgba').not.toBeNull();
+
+    // 2 — the plate.
+    const plate = rgba(
+      declOf(STYLES, /\.fwin-frameless-controls\s*\{([^}]*)\}/, 'the control cluster rule').match(
+        /background:\s*([^;]+)/,
+      )?.[1] ?? '',
+    );
+    expect(plate, 'the control plate background is no longer a plain rgba').not.toBeNull();
+
+    // 3 and 4 — the ink, and the guard that keeps it off the Liquid material.
+    const inkRules = [...SHELL.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map((m) => ({ selector: m[1].trim().replace(/\s+/g, ' '), declarations: m[2] }))
+      .filter((b) => b.selector.includes('.fwin-frameless-controls'));
+    expect(inkRules.length, 'shell.css no longer styles the frameless cluster at all').toBe(3);
+    expect(
+      inkRules.filter((b) => !b.selector.includes(':not(.fwin-liquid)')).map((b) => b.selector),
+      'an unguarded rule here also paints the LIGHT Liquid material and erases its hover cue',
+    ).toEqual([]);
+
+    const resting = inkRules.find((b) => /\.fwin-b\s*$/.test(b.selector));
+    expect(resting, 'the resting frameless glyph rule moved').toBeDefined();
+    const ink = rgba(resting?.declarations.match(/color:\s*([^;]+)/)?.[1] ?? '');
+    expect(ink, 'the frameless glyph colour is no longer a plain rgba').not.toBeNull();
+    expect(
+      resting?.declarations.includes('var(--text)'),
+      'the frameless glyph must NOT read the palette — that is the 1.60:1 defect',
+    ).toBe(false);
+
+    const white: [number, number, number] = [255, 255, 255];
+    const ground = over(plate!, over(winBg!, white));
+    const glyph = over(ink!, ground);
+    const worst = ratio(glyph, ground);
+    expect(
+      worst,
+      `frameless control glyph reaches only ${worst.toFixed(2)}:1 on the lightest ground its ` +
+        'own two fixed layers can produce',
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('never paints the liquid toggle glyph with the raw accent', () => {

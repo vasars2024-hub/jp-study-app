@@ -897,6 +897,57 @@ html.reduce-motion .os-aero-boot *::after,
   color: #fff;
 }
 
+/* THE FRAMELESS CLUSTER IS THE ONE PLACE THE MIX ABOVE POINTS THE WRONG WAY.
+   `.fwin-frameless-controls` (`styles.css`) paints `rgba(16, 15, 21, 0.72)` and blurs the
+   garden canvas behind it — a plate that is dark in EVERY palette, because the artwork it
+   floats on is a night sky and not a themed surface. The glyph above derives from `--text`,
+   which is dark in a light palette, so the two disagree exactly where the palette is light.
+   Measured live on the City window, classic-light, cluster at full opacity: glyph
+   `rgb(52,52,52)` on a composited `rgb(83,82,86)` = **1.60:1**, all four of `⧉ ◇ ─ ×`. The
+   painted pixels are worse than the composite says — a 130x28 capture of the cluster reads a
+   plate of `rgb(13,13,19)` (the real backdrop is the canvas, not `.fwin`'s white background)
+   against the same `rgb(52,52,52)` glyph = **1.56:1**. forest-night is clean at 12.6:1, which
+   is the tell: a defect that moves with the palette while the plate does not.
+
+   So the glyphs stop deriving from the palette here and take the plate's own ink, which is
+   `.popout-root-mooncap .popout-btn`'s value — the SAME cluster, in the garden's pop-out host,
+   where this was already solved (`styles.css`). Specificity is the point of the selector shape:
+   (0,3,0) beats the `--text` mix at (0,2,0) in every palette without an `!important` and
+   without depending on sheet order, and it stays under `liquid-window.css`'s (0,4,0) so the
+   Liquid presentation still owns its own tokens. Hover is restated because the rule above
+   would otherwise put `var(--text)` back on hover — a dark glyph on a dark plate again — and
+   the close button is restated after it so the destructive hover keeps `--danger` + `#fff`.
+
+   `:not(.fwin-liquid)` IS LOAD-BEARING AND WAS ADDED AFTER A MEASUREMENT, not for symmetry.
+   In Liquid presentation the plate is not this dark chip at all — `liquid-window.css` swaps it
+   for `--lq-liquid-bg`, which in classic-light composites to `rgb(251,251,251)` with
+   `--lq-liquid-text` `rgb(30,30,30)` on it, live-measured at **16.16:1**. That branch has no
+   defect. The first draft of this block left hover unguarded and put a 14% LIGHT wash on that
+   light plate: the hovered button measured `rgb(247,250,250)` against a `rgb(251,251,251)`
+   rest, i.e. the hover cue was destroyed on a surface that did not need fixing. The guard makes
+   these three and `liquid-window.css`'s rules mutually exclusive by construction rather than by
+   specificity, which is why the base rule is left free to be outranked there. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin-frameless:not(.fwin-liquid):where(:not(.blanc-root *))
+  .fwin-frameless-controls
+  .fwin-b {
+  color: rgba(222, 242, 244, 0.72);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin-frameless:not(.fwin-liquid):where(:not(.blanc-root *))
+  .fwin-frameless-controls
+  .fwin-b:hover {
+  background: rgba(222, 242, 244, 0.14);
+  color: rgb(233, 247, 249);
+}
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin-frameless:not(.fwin-liquid):where(:not(.blanc-root *))
+  .fwin-frameless-controls
+  .fwin-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
 html.reduce-motion .fwin,
 html.reduce-motion .fwin .fwin-bar,
 html.reduce-motion .fwin .fwin-title,
