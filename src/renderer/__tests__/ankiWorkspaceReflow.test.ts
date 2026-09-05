@@ -56,11 +56,20 @@ describe('anki workspace reflow', () => {
     if (!query) throw new Error('no `@container ankiview { .anki-workspace }` rule in styles.css');
     expect(query[2]).toMatch(/grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s*;/);
 
-    // 866 is the derived floor: `.anki-selects label` min-width 180 x2 + its 14 gap + the
-    // 48 px `.anki-card` pads = 422 for the main column, + 24 gap + the preview's 420 max.
-    // Anything below that and the two-column split cannot seat the main column's own primary
-    // control row, which is the whole reason the split exists.
-    expect(Number(query[1])).toBeGreaterThanOrEqual(866);
+    // 746 is the derived floor: `.anki-selects label` min-width 180 x2 + its 14 gap + the
+    // 48 px `.anki-card` pads = 422 for the main column, + 24 gap + the preview's 300 px
+    // MINIMUM. Anything below that and the two-column split cannot seat the main column's own
+    // primary control row, which is the whole reason the split exists.
+    //
+    // REVISED 2026-09-05: this read 866 while the preview's max was a fixed 420 band, because
+    // the threshold then had to clear the preview's MAXIMUM. With a percentage max (see the
+    // next case) the preview shrinks with the container, so the binding constraint is its
+    // minimum. The number went DOWN and that is the point: at 880 the split collapsed at the
+    // app's own default window size, which put the preview 1148 px below the fold.
+    expect(Number(query[1])).toBeGreaterThanOrEqual(746);
+    // ...and it must still collapse before the main column is starved. A threshold below the
+    // floor would let the split survive into widths it cannot seat.
+    expect(Number(query[1])).toBeLessThan(880);
   });
 
   it('places the query AFTER the base rule, so it is not lost on source order', () => {
@@ -77,7 +86,34 @@ describe('anki workspace reflow', () => {
     // not a deletion of the preview's minimum.
     const body = ruleBody(CSS, '.anki-workspace');
     expect(body).not.toBeNull();
-    expect(body).toMatch(/grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s+minmax\(\s*320px\s*,\s*420px\s*\)/);
+    const tracks =
+      /grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s+minmax\(\s*(\d+)px\s*,\s*(\d+)(px|%)\s*\)/.exec(
+        body ?? '',
+      );
+    if (!tracks) throw new Error('`.anki-workspace` no longer declares a two-track minmax grid');
+    expect(Number(tracks[1])).toBeGreaterThanOrEqual(300);
+  });
+
+  it('makes the preview track a SHARE, so the editing column gets some of the growth', () => {
+    /*
+     * The defect this replaces, measured 2026-09-05 by the category 4 harness on the live
+     * window: the editing column was `772px` at 820x580 and `772px` maximized at 1264x773.
+     * The window gained 444 px of width and the WORK gained none of it — the whole gain went
+     * to the preview's fixed 420 band plus the 24 gap. `contentGrowsNotChrome` is exactly
+     * that bar, and a fixed band can never pass it: a track that cannot grow means the track
+     * beside it absorbs every pixel until the band's maximum, and none after.
+     *
+     * A percentage maximum is the fix, so this asserts the UNIT and not just a number.
+     */
+    const body = ruleBody(CSS, '.anki-workspace');
+    const tracks =
+      /grid-template-columns:\s*minmax\(\s*0\s*,\s*1fr\s*\)\s+minmax\(\s*\d+px\s*,\s*(\d+)(px|%)\s*\)/.exec(
+        body ?? '',
+      );
+    if (!tracks) throw new Error('`.anki-workspace` no longer declares a two-track minmax grid');
+    expect(tracks[2]).toBe('%');
+    // A share above half would put the read-only preview ahead of the work it annotates.
+    expect(Number(tracks[1])).toBeLessThanOrEqual(40);
   });
 
   it('lets the field-mapping action row wrap instead of pushing Reset out of the frame', () => {
