@@ -1,8 +1,6 @@
 {
   "src/media/StudyPlayerSlice.tsx": 11,
-  "src/renderer/components/AnkiCardPreview.tsx": 7,
   "src/renderer/components/AppErrorBoundary.tsx": 6,
-  "src/renderer/components/FieldMappingEditor.tsx": 30,
   "src/renderer/components/FocusMusicBar.tsx": 17,
   "src/renderer/components/GlobalDictionaryOverlay.tsx": 6,
   "src/renderer/components/immersion/VisualNovelImportPanel.tsx": 13,

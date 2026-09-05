@@ -10,6 +10,7 @@ import {
 } from '../../shared/profileFields';
 import type { StudyProfile } from '../../shared/profiles';
 import { ContextualSurface } from './liquid/LiquidSurface';
+import { useT } from '../i18n';
 
 export type MappingPreviewState = {
   templates: Record<string, string>;
@@ -17,7 +18,7 @@ export type MappingPreviewState = {
   exampleFallback: boolean;
 };
 
-function PreviewFrame({ html, css }: { html: string; css: string }) {
+function PreviewFrame({ html, css, title }: { html: string; css: string; title: string }) {
   const doc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     html, body {
       margin: 0;
@@ -37,7 +38,7 @@ function PreviewFrame({ html, css }: { html: string; css: string }) {
   return (
     <iframe
       className="card-preview-iframe"
-      title="Card face preview"
+      title={title}
       srcDoc={doc}
       tabIndex={-1}
     />
@@ -55,6 +56,7 @@ export default function AnkiCardPreview({
   mapping: MappingPreviewState;
   noteCss?: string;
 }) {
+  const { t, lang } = useT();
   const [showFallback, setShowFallback] = useState(false);
 
   const css = noteCss ?? profile.noteCss ?? DEFAULT_CARD_CSS;
@@ -86,11 +88,19 @@ export default function AnkiCardPreview({
     return renderCardPreview(profile, fieldHtml, css);
   }, [activeTemplates, css, fields, profile, sampleValues]);
 
-  const profileHint = useMemo(() => {
-    const fl = profile.card.frontLang.toUpperCase();
-    const bl = profile.card.backLang.toUpperCase();
-    return `${profile.label} — ${fl} front / ${bl} back`;
-  }, [profile]);
+  // `lang`, never `t` — `t`'s identity is stable by design, so a `t` dependency goes
+  // silently stale after a language switch instead of erroring (CLAUDE.md i18n rule 6).
+  // No eslint-disable: `react-hooks/exhaustive-deps` is not a configured rule here, so
+  // the directive would itself be reported as an error.
+  const profileHint = useMemo(
+    () =>
+      t('anki.cardPreview.profileHint', {
+        label: profile.label,
+        front: profile.card.frontLang.toUpperCase(),
+        back: profile.card.backLang.toUpperCase(),
+      }),
+    [profile, lang],
+  );
 
   // L7: a preview is exactly what the plan lists as a Liquid region — context beside the work,
   // never the work itself. `ContextualSurface` is inert outside a window in Liquid presentation,
@@ -99,8 +109,8 @@ export default function AnkiCardPreview({
   if (!preview) {
     return (
       <ContextualSurface as="aside" className="card-preview card-preview-empty">
-        <p className="card-preview-label">Card preview</p>
-        <p className="muted">Configure field mappings to see how cards will look.</p>
+        <p className="card-preview-label">{t('anki.cardPreview.label')}</p>
+        <p className="muted">{t('anki.cardPreview.emptyHint')}</p>
       </ContextualSurface>
     );
   }
@@ -109,7 +119,7 @@ export default function AnkiCardPreview({
     <ContextualSurface as="aside" className="card-preview">
       <div className="card-preview-head">
         <div>
-          <p className="card-preview-label">Card preview</p>
+          <p className="card-preview-label">{t('anki.cardPreview.label')}</p>
           <p className="muted card-preview-profile">{profileHint}</p>
         </div>
         {mapping.exampleFallback && hasFieldTemplates(mapping.fallbackTemplates) && (
@@ -119,29 +129,35 @@ export default function AnkiCardPreview({
               checked={showFallback}
               onChange={(e) => setShowFallback(e.target.checked)}
             />
-            Expression fallback
+            {t('anki.cardPreview.expressionFallback')}
           </label>
         )}
       </div>
 
       <div className="card-preview-pair">
         <div className="card-preview-face">
-          <div className="card-preview-face-label">Front</div>
+          <div className="card-preview-face-label">{t('anki.cardPreview.front')}</div>
           <div className="card-preview-frame">
-            <PreviewFrame html={preview.frontHtml} css={preview.css} />
+            <PreviewFrame
+              html={preview.frontHtml}
+              css={preview.css}
+              title={t('anki.cardPreview.frameTitle')}
+            />
           </div>
         </div>
         <div className="card-preview-face">
-          <div className="card-preview-face-label">Back</div>
+          <div className="card-preview-face-label">{t('anki.cardPreview.back')}</div>
           <div className="card-preview-frame">
-            <PreviewFrame html={preview.backHtml} css={preview.css} />
+            <PreviewFrame
+              html={preview.backHtml}
+              css={preview.css}
+              title={t('anki.cardPreview.frameTitle')}
+            />
           </div>
         </div>
       </div>
 
-      <p className="muted card-preview-hint">
-        Sample content for this profile. Mined cards use live dictionary and Tatoeba data.
-      </p>
+      <p className="muted card-preview-hint">{t('anki.cardPreview.sampleHint')}</p>
     </ContextualSurface>
   );
 }
