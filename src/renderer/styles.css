@@ -5762,6 +5762,13 @@ mark.lookup-mark,
 }
 .anki-view {
   max-width: 1280px;
+  /* The `ankiview` container exists so `.anki-workspace` can answer its own width rather than
+     the viewport's: this view lives in a `.fwin`, and a floating window's width is not the
+     viewport's, so a media query here would read the desk and reflow the wrong thing. An
+     element cannot answer a `@container` condition against itself, so the query below is
+     hung on this parent. */
+  container-type: inline-size;
+  container-name: ankiview;
 }
 .dict-lang-toggle {
   display: flex;
@@ -6021,6 +6028,34 @@ mark.lookup-mark,
   grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
   gap: 24px;
   align-items: start;
+}
+/* The preview track is GREEDY and the editing track is the one that pays, so below the width
+   at which the split still buys anything the preview goes underneath instead of beside.
+
+   Measured 2026-09-05 through rubric category 4 on the live Anki window (84 decks, 35 note
+   types), which FAILED three bars — `clipped`, `horizontal`, `contentGrowsNotChrome`:
+     - at the window minimum (`MIN_W` 260, `DesktopShell.tsx`) five `section.collapse-section`
+       reported `182>0`, `83>0`, `92>0`, `74>0`, `64>0` — a client width of **ZERO**. Every
+       control in the main column — deck, note type, field mapping, note CSS, manual card form
+       and the whole deck workbench — had no width at all.
+     - `div.fwin-body 362>248`: 114 px of content outside the frame, and `.fwin-body` is
+       `overflow-x: hidden`, so there was no scrollbar to reach it.
+     - six nodes painted outside the frame, the entire `.card-preview-*` cluster among them.
+   Cause: `minmax(320px, 420px)` cannot shrink, so the grid's floor is 320 + 24 gap = 344 while
+   the track beside it is `minmax(0, 1fr)` and goes to 0. Same shape as the dock status that
+   deleted the routes next to it (`4f49860d`).
+
+   880px is derived, not chosen: `.anki-selects label` carries `min-width: 180px` and its own
+   row is the main column's primary control, so two-up costs 180 + 14 gap + 180 = 374 plus
+   `.anki-card`'s 48 px of padding = 422. With the preview at its 420 maximum and the 24 gap
+   that is 866; 880 leaves the main column a little over its bare floor rather than exactly on
+   it. This deliberately collapses at the window's OWN default size too — measured there the
+   tracks were `328px 420px`, i.e. the read-only preview was larger than the entire editing
+   column. */
+@container ankiview (max-width: 880px) {
+  .anki-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .anki-workspace-main {
   min-width: 0;
