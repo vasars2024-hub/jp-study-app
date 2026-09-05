@@ -27857,3 +27857,46 @@ leaves the 3 controls GREEN. The live crash remains unobserved.
 (`SeanimeDevPanel.tsx` hardcoded strings, `VisualNovelCommunityPanel.tsx` `toFixed`). Re-derived
 here at HEAD: `i18n.test.ts` + `i18nNumberFormatting.test.ts` = **29 passed**, and
 `node tools/i18n-check.cjs` exit 0 on 12,509 keys. They belong to their dirty-hunk owners.
+
+## 2026-09-05 primary — Track 9 gate 14 CLOSES live, and a settings-shaped defect found chasing it
+
+**Gate 14, `ad493a19`.** Superseded the 2026-08-19 "0 of 7 can drive it" block by re-deriving it,
+not inheriting it. Today: **10 transfers, 5 infohash-matched, 4 legal by category, 0 accepted by
+the listing.** The two titles driven each produced exactly 1 candidate and it was the same
+`jp-study-subtitles` one both times — the `adopted` branch, again. Structural reason, so nobody
+re-derives it a third time: the gate needs one torrent to be hands-off by category *and*
+acceptable to the **subtitle** listing, but that listing drops video for `shape`/`muxed` and a
+user's non-subtitle torrents are video releases. Only a subtitle release acquired outside the app
+satisfies both, and no agent can arrange that without writing to the user's client.
+Result through the mount: **ok, 39 files, 2 s, wire log 8 entries — `torrents/info` ×3 and
+`torrents/files` ×2 and nothing else.** filePrio 0 / start 0 / delete 0 / setCategory 0.
+**CONTROL** (rewrite off → `adopted` branch): it **attempts filePrio**, so the 0/0 is the rule
+holding rather than a code path that never calls those verbs.
+
+**TRAP, and it is the expensive one here.** `nyaaFetchAll` reaps `jp-study-subtitles` with
+`deleteFiles=true` at `subtitleNyaaSource.ts:604` — **before** the `qbitAddStopped` at `:627`.
+So *driving* gate 14 against the live daemon destroys whatever sits in that category, which on
+this machine is the Kitsunekko archive, which is MAL gate 31's evidence. Drive it only through a
+mount that refuses `torrents/delete`. `debug/qbit-basepath-proxy.cjs` now does, plus
+`G14_RECATEGORIZE=<hash>` to rewrite one real torrent's category in `torrents/info`.
+**`debug/` is gitignored in full, so both live on disk only and will not survive a clean clone.**
+
+**Disclosed slip:** the control's extra fence went through an env var Git Bash mangled, so
+`filePrio` was NOT fenced and reached the real daemon. It answered **400** and applied nothing;
+verified after with no proxy — torrent present, still `jp-study-subtitles`, still paused, still
+progress 1, 10 rows, 3 categories. Report the fence you *verified*, not the one you passed.
+
+**`2884252b` — PRODUCT, found while chasing the above.** Every one of 10 nyaa cross-match
+searches returned **0 results**, because the active profile's `sources.entries` is `[]` (also the
+shipped default). Chasing that surfaced a real defect: `MalDownloadDialog` filtered candidate
+indexes by `kind` and `indexerIds` but **not** by `enabled`, while main narrows by `enabled` too
+(`scraper/torrents.ts:269`). A profile whose only index is switched off passed the guard, reached
+main, came back `[]`, and the dialog rendered "0 releases found" plus *"try editing the search
+text above"* — actionable-looking advice pointing at the wrong thing. The message was never
+missing: `malDownload.error.noIndexers` exists in all four catalogs and already says *enabled*.
+`TorrentManagerPage.tsx:110` had learned this exact lesson; this surface had not. 2 tests;
+mutation (refuse every entry) reddens **10 of 42** including the rival, restored md5 `fc1e46a5`.
+
+**Instrument note:** `debug/g14-live.cjs` now injects a real nyaa indexer **on the request** when
+the profile carries none — every scraper call takes its config on the request, so the stored
+profile is never written to. Without it every step here is unmeasurable.
