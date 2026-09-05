@@ -340,7 +340,31 @@ const PROBE = `(function(){
     for (var pti = 0; pti < ptoks.length; pti++) {
       if (KEY.test(ptoks[pti])) rawKeys.push({ token: ptoks[pti], el: name(pe), source: 'placeholder' });
     }
-    if (PLACEHOLDER.test(ps)) placeholders.push({ text: ps.slice(0, 80), el: name(pe), source: 'placeholder' });
+    /*
+     * CORRECTION 47 -- A FORMAT HINT IN A placeholder ATTRIBUTE IS NOT FAKE DATA.
+     * (Written without backticks on purpose: this whole PROBE is a template literal, and one
+     * backtick in a comment closes it -- the file then does not parse at all.)
+     *
+     * novels failed this bar on ONE string: https://example.com/book.epub, the placeholder of
+     * the "Direct EPUB URL" input (NovelsContent.tsx:992). Correction 7's own words for this
+     * list are "these are wrong on ANY profile", and the harm the bar names is content that
+     * MASQUERADES AS THE USER'S DATA. A URL-shaped hint in an empty URL field is the opposite
+     * of that: it is visibly not data, it vanishes the moment the user types, it is the
+     * standard way to show the expected input shape, and RFC 2606 reserves example.com for
+     * exactly this. Scoring it dishonest would push the product toward a WORSE placeholder --
+     * this repo's own convention next door is https://api.jiten.moe/api and
+     * https://proxy.example:8080, i.e. a plausible-looking host, which is strictly MORE
+     * confusable with real data.
+     *
+     * NARROW ON PURPOSE, and only along the axis that argument covers:
+     *  - Only in the placeholder ATTRIBUTE. The same token in a rendered TEXT RUN stays fatal
+     *    -- there it IS pretending to be content, and that is where the control plants it.
+     *  - Only the example-host terms. lorem ipsum / todo / tbd / fixme / coming soon /
+     *    sample data / foo bar stay fatal even as a placeholder: those name unfinished work
+     *    rather than an input format, and no field legitimately hints them.
+     */
+    var HINT_OK = /^(?:https?:\\/\\/)?[^\\s]*\\bexample\\.(?:com|org|net)\\b/i;
+    if (PLACEHOLDER.test(ps) && !HINT_OK.test(ps)) placeholders.push({ text: ps.slice(0, 80), el: name(pe), source: 'placeholder' });
     if (STATUS.test(ps)) statusCandidates.push({ text: ps, el: name(pe), source: 'placeholder' });
     emptyFormPrompts.push({ el: name(pe), message: ps, named: weigh(ps) >= 12 && !KEY.test(ps) });
   }
