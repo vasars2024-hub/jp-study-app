@@ -50,8 +50,6 @@ async function settle(): Promise<void> {
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   document.body.innerHTML = '';
-  const registry = await import('../SeanimeToastHost');
-  registry.resetSeanimeToastHostForTests();
 });
 
 afterEach(async () => {
@@ -125,6 +123,23 @@ describe('SeanimeToastHost', () => {
     });
     await settle();
     expect(document.body.textContent).toContain('after handover');
+  });
+
+  it('preserves the active notification and keyboard focus when a shell closes', async () => {
+    const first = await mountHost();
+    await mountHost();
+    const { toast } = await import('sonner');
+    await act(async () => { toast.error('keep this error', { duration: Infinity }); });
+    await settle();
+    const notification = document.querySelector('[data-sonner-toast]');
+    const close = notification?.querySelector<HTMLButtonElement>('[data-close-button]');
+    close?.focus();
+    expect(document.activeElement).toBe(close);
+    await act(async () => first.root.unmount());
+    roots = roots.filter((root) => root !== first.root);
+    expect(document.body.textContent).toContain('keep this error');
+    expect(document.querySelector('[data-sonner-toast]')).toBe(notification);
+    expect(document.activeElement).toBe(close);
   });
 
   it('leaves no layer behind once every shell has unmounted', async () => {
