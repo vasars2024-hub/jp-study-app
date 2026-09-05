@@ -5231,3 +5231,76 @@ cat5 at 9/10 pending Q4). **46 category cells remain**, 154 of 200.
 > **154 of 200, 46 remaining**. This entry first said "50 remain, 150 of 200", which was correct
 > against a 151 denominator it could not see; that is corrected here rather than left to be
 > discovered.
+
+## 2026-09-05 04:00-05:00 EDT, `primary2` — `translate` cat5 closes 10/10: the Q4 defect was two instruments and one real a11y bug
+
+Opening slice named by the previous handoff, and it was right that Q4 was an instrument
+defect — but only **half** of the gap was the interlinear. The other half was a genuine
+product defect the instrument was correctly reporting, and it is fixed rather than excluded.
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki`** — six,
+unchanged from the previous turn and for the unchanged reasons: `city`/`immersion`/`reading`
+belong to the other liquid worker, `anki`/`player`/`reading` have no `l6-parity.js` spec so
+cat6 there is a spec-authoring slice, and `files` must not be scored on this matrix at all.
+
+### The cell
+
+| cell | verdict | the numbers |
+| --- | --- | --- |
+| cat5 UI clarity | **PASS 10/10** | All ten questions YES. Q4 `scannedControls` **16 -> 12 -> 10** against a bar of 12, `collapsedDisclosures` 5, `behindDisclosure` 0. Q5 78 runs both themes, 0 failing, min 5.35 / 5.71. Q7/Q8/Q9 from this surface's own cat6 baseline. Control run separately: **`CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10`**, `controlQ4.scannedControls` **32** vs bar 12. `storeIdentical` true, `plantResidue` 0. |
+
+### The product defect: a mutually exclusive picker exposed as six unrelated buttons
+
+`TranslateView`'s direction rows rendered six bare `button.gram-level-btn` inside two
+undeclared `div.dict-lang-toggle` wrappers. Nothing told assistive tech that the row is one
+choice, and the current language was carried **only by an `.active` class** — a paint, not a
+state. Fixed at `01e9b036` with the idiom this repo already uses in five places
+(`LensClipboardPassage`, `ReadingLensOverlay`, `AiAnalysisSection` x2, `FormalityToggle`):
+`role="radiogroup"` + `role="radio"` + `aria-checked`, and deliberately **no roving
+tabindex**, because none of those five has one and a lone divergent keyboard model is worse
+than a consistent one. Two new i18n keys in all four catalogs. 3 tests; the mutation control
+(force `aria-checked` true on every chip) turns 2 of 3 RED — the count assertion is the
+load-bearing one, because a row where every chip reports checked is valid ARIA and a worse
+lie than no ARIA at all.
+
+### Corrections 57 and 58, both at `4bf07248`
+
+- **57 — a radiogroup is one choice, by correction 35's own argument.** 35 accepted
+  `role="tablist"` on the grounds that APG treats the whole tablist as ONE tab stop: one
+  visible panel out of N chosen by a switcher. A declared radiogroup is that object with a
+  different payload and gets the identical APG treatment. **All three of correction 34's
+  guards apply verbatim** — declared role, at least 3, exactly one control signature — so
+  this is one more accepted ROLE, not a new rule. It could not have fired before `01e9b036`:
+  a div a surface merely styles as chips does not collapse. Measured: **16 -> 12**.
+- **58 — a control made of the content is not an advanced tool.** Q4's population included
+  the interlinear's per-token `button.lexicon-sense-token`. Measured by typing into the live
+  surface: a short sentence gives **3**, one ordinary long sentence gives **15**. The term
+  scales with **content**, not tool density, so Q4 on any surface that makes its prose
+  interactive was answering a question about the passage and failing harder the more the user
+  reads. A group of >=3 controls sharing exactly one signature inside a **declared text run**
+  now counts once. The declaration is the `lang` attribute — a W3C semantic meaning "running
+  text in language X", made by the product, checkable by an auditor — and **both** live sites
+  in this repo that build per-token affordances already carried it, untouched:
+  `div.lexicon-interlinear-flow` and `.lens-clipboard-text`. Measured: **12 -> 10**.
+  `contentRunGroups` publishes each collapsed run with its host, language, signature and size.
+
+### The guard control for 58, and it cost no count
+
+Correction 19's `#cat5-ctl-open` panel now also declares `lang="ja"`. Its 8 buttons carry
+**8 distinct signatures**, so correction 58's one-signature guard must buy it nothing — and
+the receipt says so: **`controlQ4.scannedControls` is 32 both before and after the attribute
+was added.** Every banked control run stays comparable, and if Q4 ever stops going NO on that
+panel, 58 has become the escape hatch it is written not to be.
+
+The one-signature guard is what makes the Q4 plant structurally immune to both corrections,
+which is why "widening a term disarms its plant" did not happen here: 16 planted buttons of 16
+different classes cannot collapse under either rule no matter what is declared around them.
+
+### The number that is knife-edge, and is not
+
+10 against a bar of 12 leaves two of headroom. The pre-correction 16 would have gone to 12 —
+exactly the bar — on correction 57 alone, and a single extra token would have failed it again.
+That is why 58 was not deferred as "the surface passes anyway".
+
+**Running total: 19 of 25 sections at 80/80.** `translate` is now **2 of 8** cells banked
+(cat5, cat6). **155 of 200 cells, 45 remaining.**
