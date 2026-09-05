@@ -1327,13 +1327,51 @@ async function measure(surface, taskSpec, undoSpec = UNDO, withIdle = false) {
   // construction, so a surface that does not come back cannot be compared with itself.
   let undo = null;
   if (undoSpec) {
-    const u = await runTask(surface, undoSpec);
-    const back = await snapOf(surface);
+    /*
+     * CORRECTION 40 — AN UNDO THAT IS A TOGGLE RE-DOES THE TASK WHEN THE SURFACE IS ALREADY BACK.
+     *
+     * Correction 15 already knew the modal leg can revert the task before the undo runs: it
+     * presses a real Escape at every open dialog, and a drawer the task opened is then legitimately
+     * closed. Its remedy was the trailing `?` — "drive this step only if its control is still
+     * there" — which is the right answer for a CLOSE button, because a close button unmounts with
+     * the thing it closes. It is the wrong answer for a TOGGLE, whose control is present in both
+     * states: `click:<toggle>?` still fires and puts the surface back into the state the undo was
+     * supposed to leave.
+     *
+     * Measured on City (Mooncap Garden), 2026-09-04, with a MutationObserver plus capture-phase
+     * click/keydown recorders in the page while the harness drove it:
+     *   click .reading-garden-mushroom-hitbox -> aria-expanded true   (the task)
+     *   Escape (modalLeg; the dossier is role="dialog") -> aria-expanded false   (already restored)
+     *   click .reading-garden-mushroom-hitbox -> aria-expanded true   (the undo, re-opening it)
+     * and the run VOIDed as "undo did not restore" on a surface whose disclosure is correct in both
+     * directions — proven separately by four consecutive bridge clicks toggling true/false/true/false.
+     *
+     * Worse than a false VOID, it is NON-DETERMINISTIC: `.reading-garden-info` carries
+     * `animation: garden-info-reveal 220ms both` whose 0% frame is `opacity:0`, and the dialog
+     * inventory only counts painted nodes. A snapshot landing inside those 220 ms sees no dialog,
+     * sends no Escape, and the same command then restores cleanly. The first run of this surface
+     * did exactly that and PASSED; the next three VOIDed. One harness, one surface, two answers.
+     *
+     * So the restore leg asks the question a restore leg actually has: is the surface already back?
+     * If it is, the undo is a no-op and driving it is what breaks the round trip. This cannot mask a
+     * defect. A task that moved nothing is already a dead end and fails its own bar; a task that
+     * moved and was reverted by the harness's own Escape is genuinely restored, and the reason is
+     * recorded here rather than inferred. When the surface is NOT at base the undo runs exactly as
+     * before, so every banked scorecard stays byte-identical.
+     */
+    const pre = await snapOf(surface);
+    const alreadyBack = !pre.refuse && pre.stateHash === base.stateHash;
+    const u = alreadyBack ? null : await runTask(surface, undoSpec);
+    const back = alreadyBack ? pre : await snapOf(surface);
     undo = {
       spec: undoSpec,
-      steps: u.refuse ? u.refuse : u.steps.map((s) => s.step),
+      steps: alreadyBack ? [] : (u.refuse ? u.refuse : u.steps.map((s) => s.step)),
+      // Disclosed, never silent: a skipped undo has to say why it was skipped and what put the
+      // surface back, or this correction becomes a way to pass a restore that never happened.
+      skipped: alreadyBack ? 'already-at-base' : null,
+      restoredBy: alreadyBack ? (modal.closedByEscape.length ? `modalLeg Escape: ${modal.closedByEscape.join(', ')}` : 'the task itself left the surface at base') : null,
       // Correction 17: judged on the surface, never on the announcement about the trip.
-      restored: !u.refuse && !back.refuse && back.stateHash === base.stateHash,
+      restored: alreadyBack || (!u.refuse && !back.refuse && back.stateHash === base.stateHash),
       baseHash: base.stateHash,
       afterHash: back.stateHash,
       // Reported rather than dropped, so an announcement that should have been cleared is visible.

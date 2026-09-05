@@ -4299,7 +4299,7 @@ worth a run. cat7 is the heaviest and should be last.
 > other until the sync-down. They found the SAME Q5 defect from the same live app and reached
 > the same two instrument conclusions. That is duplicated effort — and it is also the strongest
 > corroboration any cell in this document has, because two workers hit the same VOID from two
-> directions. Merged at **`a4a3af6c`**, resolving in favour of the branch wherever the two
+> directions. Merged at **`e2194e28`**, resolving in favour of the branch wherever the two
 > overlapped:
 >
 > | primary2 wrote | outcome |
@@ -4426,3 +4426,116 @@ the recorded parallax grounds (39 layers at 910x1137 in a 680x747 window ON PURP
 frameless window has no Maximize button so only 2 of 3 gesture legs run); `cat2-clunkiness.cjs`
 carries that art-plate exclusion and cat4 still has none. **City stands at 4 of 8 closed —
 cat1, cat3, cat6, cat8 closed; cat5 at 9/10; cat2 VOID; cat4 and cat7 not run.**
+
+## 2026-09-04 · backup — City cat2 PASS 10/10, and correction 40: a toggle-shaped undo re-does the task
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged
+from the two entries above; this turn continued City rather than opening a nineteenth surface.
+
+City is now **6 of 8 categories closed** (cat1, cat2, cat3, cat5, cat6, cat8). cat4 and cat7 remain.
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 2 | Clunkiness | **10/10** | input cost **1 click / 0 keystrokes** for the dominant task; `deadEnds` **0**, `modalTraps` **0**, `scrollTraps` **0**; worst `recvMs` **34.1** standard / **32.6** liquid, `overBar100` **0**, `sharedPaintSamples` **0**; costParity **1 = 1**, presentation round trip `restored true`, box `680x657` in both cells | harness `--control`: all three counters moved `[0,0,0] → [1,1,1] → [0,0,0]`, `backToBaseline true`, inert-element floor **1.3 ms** measured in the same run |
+
+Instrument: `probes/cat2-clunkiness.cjs`, `--surface "@.fwin-frameless" --win 1
+--both-presentations --control`, **zero new probes** (RULE 1). Dominant task is the dossier
+disclosure `click:.reading-garden-mushroom-hitbox`, per the previous entry's instruction and
+*not* a card click. `decorativeClips` 144 px on `main.reading-garden`, correctly excluded as
+out-of-flow plates with no control past the fold.
+
+**CORRECTION 40 — the undo leg re-did the task, and it did so NON-DETERMINISTICALLY.** This is
+the finding of the turn and it is worth more than the cell.
+
+`.reading-garden-info` carries `role="dialog"` (`ReadingGarden.tsx:1039`), so it enters the modal
+leg's inventory; the leg presses a real Escape at every open dialog **before** the undo runs, and
+the garden's own `onGardenKeyDown` closes the dossier on Escape — correct product behaviour in
+both directions. The undo then clicked the toggle again and **re-opened** it. Measured in-page
+with a MutationObserver on `aria-expanded` plus capture-phase click/keydown recorders, while the
+harness drove:
+
+    click .reading-garden-mushroom-hitbox  -> aria-expanded true    (the task)
+    Escape                                 -> aria-expanded false   (modalLeg; already restored)
+    click .reading-garden-mushroom-hitbox  -> aria-expanded true    (the undo, re-opening it)
+
+and the run VOIDed as "undo did not restore the surface" on a disclosure that is correct. The
+product was falsified separately: four consecutive bridge clicks at the hitbox centre toggled
+`true/false/true/false`, every click hit-tested to `BUTTON.reading-garden-mushroom-hitbox`.
+
+Correction 15 already knew the modal leg can revert a task, and its remedy — the trailing `?`,
+"drive this step only if its control is still there" — is right for a CLOSE button, which unmounts
+with the thing it closes. It is wrong for a TOGGLE, whose control is present in both states. So
+the restore leg now asks the question a restore leg actually has: **is the surface already back?**
+If `stateHash === base.stateHash` the undo is skipped and records `skipped: "already-at-base"`
+plus `restoredBy: "modalLeg Escape: aside.lq-contextual"`. It cannot mask a defect — a task that
+moved nothing is already a dead end and fails its own bar — and when the surface is not at base
+the undo runs exactly as before, so every banked scorecard stays byte-identical.
+
+**Worse than a false VOID: the same command gave two different answers.** The dossier animates in
+under `garden-info-reveal 220ms both`, whose 0% frame is `opacity:0`, and the dialog inventory only
+counts painted nodes. A snapshot landing inside those 220 ms sees no dialog, sends no Escape, and
+the run restores cleanly. **The first run of this surface did exactly that and reported PASS; the
+next three VOIDed on the identical command.** Mutation control for the correction itself: reverting
+it reproduces the VOID (measured three times, byte-identical message); with it, four consecutive
+runs pass. Both halves measured, neither inferred.
+
+**THE 277.5 ms OUTLIER, DISCLOSED RATHER THAN DROPPED.** The very first measurement of this
+surface read `worstRecv` **277.5 ms**, `overBar100` **1** — a latency FAIL. It has not reproduced
+in five consecutive samples since (**34.1 / 32.6 / 39.7 / 34.6 / 34.5**). It is not scored, and the
+reason is the harness's own correction 2 rather than convenience: that run was taken **without
+`--control`, so it carries no contemporaneous inert-element floor**, and correction 2 measured an
+inert element across this bridge at 154 / 355 / 187 / 76 / 22 ms — three of five over the rubric's
+own bar. A sample with no floor beside it cannot be attributed to the surface. Every scored run
+here carries its floor: **1.3 ms**. Ruled out as a product cause on inspection rather than assumed:
+`mooncapMusicPlayer.unlockFromGesture()` on the first gesture (`ReadingGarden.tsx:1004`) is a no-op
+while music is disabled — `apply()` returns before `audio.play()` unless `settings.enabled` and
+`volume > 0.001` (`mooncapMusic.ts:123-128`). **Cause not determined. Never run cat2 without
+`--control` on a surface whose only interaction is a single click** — one unfloored sample IS the
+whole distribution there.
+
+**EXACT NEXT SLICE: City cat4 (use of space).** Port cat2's art-plate/decorative-clip exclusion
+into `cat4-use-of-space.cjs` FIRST — cat2 correctly excluded 144 px on `main.reading-garden` as
+out-of-flow plates and cat4 has no such judgement, so it will score the garden's deliberate
+910x1137 parallax inside a 680x657 window as overflow. A frameless window also has no Maximize
+button, so only 2 of 3 gesture legs run. cat7 is the heaviest and stays last.
+
+**App state left as found:** dossier CLOSED, presentation STANDARD, window `680x657` at
+`(162,114)`. All in-page recorder globals (`__ck`, `__ckh`, `__ev`) deleted.
+
+## 2026-09-04 · backup — City cat4 PASS 10/10; the art-plate exclusion was already ported, and its control proves it is not a free pass
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged.
+
+City is now **7 of 8 categories closed** (cat1, cat2, cat3, cat4, cat5, cat6, cat8). **Only cat7
+remains.**
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 4 | Use of space | **10/10** | 2 of 2 reachable sizes: default `680x657` and compact `260x170`, each `clipped 0` / `overlaps 0` / `horizontalScrollers 0` / `hiddenOverflowX 0` / `deadPctViewport 0%`; `dominantCanvasPct` **99.4** default, **98.1** compact; `chromePct 0`; every leg `restored true`, `visibleAtEveryRead true` | four, three applicable and all fired: injected clip `clipped 0→1→0`; **art-plate exclusion** plant hanging out by **279 px** counted as a plate with `clipped` correctly NOT rising and the box named in `artPlateClips` (21→23); backdrop plant `overlaps 0→3→0` and **not** excused as a backdrop; sub-minimum shrink to `200x140` held at 0/0/0/0 |
+
+**The handoff's instruction to "port cat2's art-plate exclusion into cat4 FIRST" is STALE — it was
+already there, and I checked before writing code rather than after.** `cat4-use-of-space.cjs`
+carries it at its own corrections 19/20 and again in `overflowIsAllPlates` (lines 573-599 and
+878-915), and those comments cite City's `main.reading-garden` and the 39-layer scene **by name**,
+so the port had already been made by the worker that hit it. Zero harness lines changed this cell.
+
+What makes it a judgement rather than an escape hatch is its own control, which is why the number
+above is quotable: a planted box that hangs out by 279 px **is** a plate, so `clipped` must not
+rise — and separately the plain injected clip **must**, which it does, `0 → 1 → 0`. Both halves
+measured in the same run.
+
+**The missing Maximize is refused, not faked, and not silently dropped from the denominator.**
+`sizesExpected 2`, `sizesRan 2`, and `sizesUnreachable` names the reason with the evidence beside
+it: `chromeButtonTitles` = `["Pop out into its own window", "Make Liquid", "Minimize", "Close"]`,
+`frameless true`, `noMaximizeAffordance true`. `contentGrowsNotChromePair` therefore reads
+`compact -> default` rather than pretending a third size ran. A `.fwin-max` faked with an inline
+width would measure a size the product never paints.
+
+**EXACT NEXT SLICE: City cat7 (performance under real load) — the last cell, and City closes at
+8 of 8 if it holds.** Note for whoever runs it: an earlier L9 cat7 run scored City PASS 10/10 on
+2026-08-31 (p50 16.6 / p95 17.1, `noiseFloorOver100 0`, 131 elements), but that was the RULE C
+pair for a different bullet and is **not** transferable to this surface's 8-category card — re-run
+it. Its heavy leg is unprompted (13 canvas layers, 48 stars, 22 dust motes paint untouched) and the
+sky console's Star / Asteroid / Ice-barrage buttons are `data-dev-only` and must NOT be fired.
+
+**App state left as found:** window `680x657` at `(162,114)`, presentation STANDARD, dossier CLOSED.
