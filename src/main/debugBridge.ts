@@ -21,6 +21,15 @@ import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
 import { llamaHostStats } from './llamaHost';
 import { forceCollect } from './debugGc';
+import {
+  EMPTY_WITNESS,
+  INPUT_WITNESS_SOURCE,
+  cdpKeyEvents,
+  cdpMouseEvents,
+  normaliseWitness,
+  summariseDelivery,
+  type InputWitness,
+} from './debugBridgeInput';
 
 /**
  * The bridge port. 39273 unless `JP_DEBUG_PORT` says otherwise.
@@ -188,6 +197,39 @@ function resolveWindow(target: unknown): BrowserWindow | null {
         w.webContents.getURL().toLowerCase().includes(needle),
     ) ?? null
   );
+}
+
+/**
+ * The DevTools agent for a window, or null if it cannot be had.
+ *
+ * `sendInputEvent` is kept as the fallback rather than removed: it is the only
+ * path that exists when a human has DevTools open on the window (only one client
+ * may attach), and the receipt now says which transport ran, so a reader can tell
+ * the two apart instead of guessing.
+ */
+function cdpSender(
+  win: BrowserWindow,
+): ((method: string, params?: Record<string, unknown>) => Promise<unknown>) | null {
+  const wc = win.webContents;
+  try {
+    if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
+  } catch {
+    if (!wc.debugger.isAttached()) return null;
+  }
+  return (method, params) => wc.debugger.sendCommand(method, params ?? {});
+}
+
+/**
+ * Samples the renderer's own view of what arrived. A page that refuses to run the
+ * witness (mid-navigation, crashed) reads as zeros, which makes the receipt say
+ * "not delivered" — the safe direction, since the alternative is a false ok.
+ */
+async function readInputWitness(win: BrowserWindow): Promise<InputWitness> {
+  try {
+    return normaliseWitness(await win.webContents.executeJavaScript(INPUT_WITNESS_SOURCE, true));
+  } catch {
+    return EMPTY_WITNESS;
+  }
 }
 
 function json(res: http.ServerResponse, code: number, body: unknown): void {
@@ -591,19 +633,50 @@ async function handle(
       }
       const button = (String(body.button ?? 'left') as 'left' | 'right' | 'middle');
       const clickCount = Number(body.clickCount ?? 1) || 1;
-      win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button, clickCount });
-      win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button, clickCount });
-      return { code: 200, body: { ok: true, x, y, button } };
+      const modifiers = Array.isArray(body.modifiers) ? (body.modifiers as string[]) : [];
+      const before = await readInputWitness(win);
+      const cdp = cdpSender(win);
+      if (cdp) {
+        for (const event of cdpMouseEvents(x, y, button, clickCount, modifiers)) {
+          await cdp('Input.dispatchMouseEvent', event as unknown as Record<string, unknown>);
+        }
+      } else {
+        win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button, clickCount });
+        win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button, clickCount });
+      }
+      const after = await readInputWitness(win);
+      const receipt = summariseDelivery(before, after, 'mouse', 1, cdp ? 'cdp' : 'sendInputEvent');
+      return { code: 200, body: { ...receipt, x, y, button } };
     }
 
     case '/type': {
       const win = resolveWindow(body.window);
       if (!win) return { code: 404, body: { ok: false, error: 'no matching window' } };
       const text = String(body.text ?? '');
-      for (const ch of text) {
-        win.webContents.sendInputEvent({ type: 'char', keyCode: ch });
+      if (!text) return { code: 400, body: { ok: false, error: 'missing text' } };
+      const chars = Array.from(text);
+      const before = await readInputWitness(win);
+      const cdp = cdpSender(win);
+      if (cdp) {
+        for (const ch of chars) {
+          for (const event of cdpKeyEvents(ch)) {
+            await cdp('Input.dispatchKeyEvent', event as unknown as Record<string, unknown>);
+          }
+        }
+      } else {
+        for (const ch of chars) {
+          win.webContents.sendInputEvent({ type: 'char', keyCode: ch });
+        }
       }
-      return { code: 200, body: { ok: true, typed: text.length } };
+      const after = await readInputWitness(win);
+      const receipt = summariseDelivery(
+        before,
+        after,
+        'key',
+        chars.length,
+        cdp ? 'cdp' : 'sendInputEvent',
+      );
+      return { code: 200, body: { ...receipt, text } };
     }
 
     case '/key': {
@@ -612,9 +685,19 @@ async function handle(
       const key = String(body.key ?? '');
       if (!key) return { code: 400, body: { ok: false, error: 'missing key' } };
       const modifiers = Array.isArray(body.modifiers) ? (body.modifiers as string[]) : [];
-      win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers });
-      win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers });
-      return { code: 200, body: { ok: true, key, modifiers } };
+      const before = await readInputWitness(win);
+      const cdp = cdpSender(win);
+      if (cdp) {
+        for (const event of cdpKeyEvents(key, modifiers)) {
+          await cdp('Input.dispatchKeyEvent', event as unknown as Record<string, unknown>);
+        }
+      } else {
+        win.webContents.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers });
+        win.webContents.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers });
+      }
+      const after = await readInputWitness(win);
+      const receipt = summariseDelivery(before, after, 'key', 1, cdp ? 'cdp' : 'sendInputEvent');
+      return { code: 200, body: { ...receipt, key, modifiers } };
     }
 
     /**
