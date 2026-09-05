@@ -67,7 +67,17 @@ afterAll(async () => {
     server.close(() => resolve());
   });
   setScraperStoreRoot(null);
-  await fsp.rm(tempRoot, { recursive: true, force: true });
+  /*
+   * `maxRetries`, and it is not cosmetic. Measured 2026-09-05: this file failed a
+   * FULL `vitest run` with
+   *   ENOTEMPTY: directory not empty, rmdir '...\scraper-sources-A8VQwH\scraper\logs'
+   * while every one of its 13 assertions passed — the suite reported `3036 passed`
+   * and one FAILED FILE, and the same file passed alone and on a second parallel
+   * run. `force: true` only swallows ENOENT; the race here is a scraper log write
+   * that lands between the recursive walk and the `rmdir`, which is the exact case
+   * Node documents `maxRetries`/`retryDelay` for on Windows.
+   */
+  await fsp.rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 beforeEach(() => {
