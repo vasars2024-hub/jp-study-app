@@ -91,6 +91,7 @@ import {
 import { EXAMPLE_DICTIONARY_KIND } from '../../shared/dictionarySources';
 import { pinyinSearchKey } from '../../shared/pinyin';
 import type { SqliteDb } from './db';
+import { prepareCached } from './db';
 
 export type DictLangCode = string;
 
@@ -299,14 +300,56 @@ interface HeadwordRow {
  */
 const WORD_SOURCE_WHERE = `d.enabled = 1 and d.kind <> '${EXAMPLE_DICTIONARY_KIND}'`;
 
-const HEADWORD_SELECT = `
-  select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
-         h.variant_of, h.score, h.freq_rank,
-         coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
-  from headwords h
+/** The `HeadwordRow` column list — one source of truth for both shapes below. */
+const HEADWORD_COLUMNS = `
+  h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
+  h.variant_of, h.score, h.freq_rank,
+  coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
+`;
+
+/** The dictionary and pair-priority joins every headword probe needs. */
+const HEADWORD_JOINS = `
   join dictionaries d on d.id = h.dict_id
   left join dict_pair_priority pp
     on pp.dict_id = d.id and pp.source_lang = h.lang and pp.target_lang = ?
+`;
+
+const HEADWORD_SELECT = `
+  select ${HEADWORD_COLUMNS}
+  from headwords h
+  ${HEADWORD_JOINS}
+  where ${WORD_SOURCE_WHERE}
+`;
+
+/**
+ * The inflection probe, driven from `inflections` rather than from `headwords`.
+ *
+ * This is the same question the obvious `${'${HEADWORD_SELECT}'} and h.id in (select
+ * headword_id from inflections where form = ?)` asks, and it must stay that way —
+ * but SQLite will not plan that form usefully. Measured on the shipped 842,500-row
+ * database: the `in (...)` shape plans as `SEARCH h USING INDEX idx_hw_reading
+ * (lang=?)`, i.e. it walks *every headword in the language* and bloom-filters each
+ * against the subquery, taking **64,000-84,000 us per probe — even for a word with
+ * zero inflection rows**, while the subquery alone answers in 8.6 us. `in (...)` is
+ * a filter to the planner, never a driver, so neither `json_each` nor an explicit
+ * id list moves it; only putting `inflections` in the FROM clause does. Joined this
+ * way the plan becomes `SEARCH i USING INDEX idx_infl_form (form=?)` then `SEARCH h
+ * USING INTEGER PRIMARY KEY (rowid=?)`, and the same ten probes went 696,159 us ->
+ * 643.6 us, **1,082x**, returning byte-identical id sets.
+ *
+ * `distinct` is what preserves the old row count: one surface can carry several
+ * inflection analyses of the same headword, which the subquery collapsed for free
+ * and a join does not.
+ *
+ * Why it mattered enough to restructure a query: this probe runs once per language
+ * per token, so the Workbench interlinear paid it for every token of a passage. A
+ * 47-character paragraph blocked the main process for 2,960 ms because of it.
+ */
+const INFLECTION_HEADWORD_SELECT = `
+  select distinct ${HEADWORD_COLUMNS}
+  from inflections i
+  join headwords h on h.id = i.headword_id
+  ${HEADWORD_JOINS}
   where ${WORD_SOURCE_WHERE}
 `;
 
@@ -323,8 +366,7 @@ export function pairTarget(query: LookupQuery): string {
 }
 
 function readSenses(db: SqliteDb, headwordId: number, glossLangs?: string[]): LookupSense[] {
-  const senses = db
-    .prepare('select id, pos, tags from senses where headword_id = ? order by ord, id')
+  const senses = prepareCached(db, 'select id, pos, tags from senses where headword_id = ? order by ord, id')
     .all(headwordId) as { id: number; pos: string | null; tags: string | null }[];
 
   const langFilter = glossLangs?.length
@@ -333,8 +375,10 @@ function readSenses(db: SqliteDb, headwordId: number, glossLangs?: string[]): Lo
 
   return senses
     .map((sense) => {
-      const glosses = db
-        .prepare(`select lang, text, html from glosses where sense_id = ?${langFilter} order by ord, id`)
+      const glosses = prepareCached(
+        db,
+        `select lang, text, html from glosses where sense_id = ?${langFilter} order by ord, id`,
+      )
         .all(sense.id, ...(glossLangs?.length ? glossLangs : [])) as
         { lang: string; text: string; html: string | null }[];
       return {
@@ -571,15 +615,19 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
   };
 
   const pair = pairTarget(query);
-  const byNorm = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by priority, h.id`);
-  const byReading = db.prepare(`${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`);
-  const byInflection = db.prepare(`
-    ${HEADWORD_SELECT}
+  const byNorm = prepareCached(db, `${HEADWORD_SELECT} and h.lang = ? and h.norm = ? order by priority, h.id`);
+  const byReading = prepareCached(
+    db,
+    `${HEADWORD_SELECT} and h.lang = ? and h.reading_norm = ? order by priority, h.id`,
+  );
+  const byInflection = prepareCached(db, `
+    ${INFLECTION_HEADWORD_SELECT}
     and h.lang = ?
-    and h.id in (select headword_id from inflections where form = ?)
+    and i.form = ?
     order by priority, h.id
   `);
-  const byPrefix = db.prepare(
+  const byPrefix = prepareCached(
+    db,
     `${HEADWORD_SELECT} and h.lang = ? and h.norm > ? and h.norm < ? order by length(h.norm), priority, h.id limit ?`,
   );
 
@@ -594,7 +642,8 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     // de-inflector cannot derive (irregular paradigms are the important case).
     // The schema has always indexed these rows; consult that index before the
     // looser reading and prefix probes so imported morphology is not dead data.
-    const inflectionRows = db.prepare(
+    const inflectionRows = prepareCached(
+      db,
       // One surface may have several analyses for the same headword. `headword_id`
       // alone leaves their order undefined, which makes the displayed reason chain
       // depend on SQLite's query plan. `rowid` preserves importer order within a
@@ -639,8 +688,9 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const reverseLangFilter = reverseSourceLangs.length
       ? ` and h.lang in (${reverseSourceLangs.map(() => '?').join(',')})`
       : '';
-    const glossRows = db
-      .prepare(`
+    const glossRows = prepareCached(
+      db,
+      `
         select h.id, h.dict_id, d.title as dict_title, h.lang, h.text, h.norm, h.reading, h.reading_norm,
                h.variant_of, h.score, h.freq_rank,
                coalesce(pp.priority, d.priority) as priority, d.licence, d.attribution
@@ -654,8 +704,8 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
         where glosses_fts match ? and ${WORD_SOURCE_WHERE}${reverseLangFilter}
         order by priority, h.id
         limit ?
-      `)
-      .all(pair, ftsQuery(text), ...reverseSourceLangs, gather) as HeadwordRow[];
+      `,
+    ).all(pair, ftsQuery(text), ...reverseSourceLangs, gather) as HeadwordRow[];
     if (glossRows.length >= gather) saturated = true;
     for (const row of glossRows) push(row, 'gloss', []);
   }
@@ -670,7 +720,7 @@ export function lookup(db: SqliteDb, query: LookupQuery): LookupResult {
     const chars = [...norm];
     if (budget > 0) {
       const prefix = chars.slice(0, Math.min(FUZZY_PREFIX_CHARS, chars.length - 1)).join('');
-      const byFuzzyPrefix = db.prepare(`
+      const byFuzzyPrefix = prepareCached(db, `
         ${HEADWORD_SELECT}
         and h.lang = ?
         and ((h.norm >= ? and h.norm < ?) or (h.reading_norm >= ? and h.reading_norm < ?))
