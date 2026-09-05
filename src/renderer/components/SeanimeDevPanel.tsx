@@ -18,11 +18,12 @@
  * halves are exported so the rule is testable rather than a claim in a comment —
  * which is exactly how the last one got away with being false for a whole day.
  *
- * Not translated on purpose: ADR-003 scopes the i18n gate to shipped Media-workspace
- * chrome, and this panel is not shipped chrome.
+ * Panel disclosure controls use the shared i18n seam; technical diagnostics remain
+ * the existing development-only output.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useT } from '../i18n';
 import type { SeanimeProbeResult, SeanimeStatus } from '../../shared/seanime';
 
 /** Marks `<html>` while the panel is on screen, so the media-workspace launcher can
@@ -77,6 +78,7 @@ const STATUS_COLOR: Record<SeanimeStatus['kind'], string> = {
 };
 
 export default function SeanimeDevPanel() {
+  const { t } = useT();
   const [status, setStatus] = useState<SeanimeStatus | null>(null);
   const [probe, setProbe] = useState<SeanimeProbeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,7 +193,7 @@ export default function SeanimeDevPanel() {
           onClick={() => setOpen((v) => !v)}
           style={btn}
           aria-expanded={open}
-          title={open ? 'Collapse sidecar panel' : 'Expand sidecar panel'}
+          title={t(open ? 'seanimeDev.collapse' : 'seanimeDev.expand')}
         >
           {open ? '–' : '+'}
         </button>

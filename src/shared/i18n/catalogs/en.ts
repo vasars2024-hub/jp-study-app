@@ -12053,4 +12053,6 @@ export const en: Catalog = {
   'readingLists.view.author.onlyOne': 'This is the only book by {author} on your lists.',
   'readingLists.view.author.goList': 'Go to the list “{name}”',
   'readingLists.view.coverReveal': 'Show “{title}” in the library',
+  'seanimeDev.collapse': 'Collapse sidecar panel',
+  'seanimeDev.expand': 'Expand sidecar panel',
 };
