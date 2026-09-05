@@ -6440,3 +6440,38 @@ Days to 2026-09-07 11:00 EDT, measured 13:35 EDT: **1.8924**.
 Single biggest cause, unchanged and again illustrated here: opening a surface costs more than
 scoring it. Of this turn, one cell went to finishing another worker's product fix and one went to
 repairing the instrument that was voiding a correct score. Reported, not fixed by cutting scope.
+
+### CORRECTION, same turn, before the gates — **cat1 was NOT mine to claim. One cell, not two.**
+
+`d132787d` landed at **13:04:40**, concurrently, from another worker: *"cat1/reading closes
+10/10 — two icon buttons kept a 26px box while their own headers used the token"*. It moved
+`belowFloorByHit 3 → 0` on the same three controls, on the same surface, at 42 real captures.
+
+**Every cat1 run above started at ~13:17 — thirteen minutes AFTER that fix, and Vite had
+hot-reloaded `readingCaptures.css` into my instance.** That is exactly why my run read
+`smallestHit 32.99` with `targets32: true` and never saw the failing bar. I did not close cat1;
+I measured a surface someone else had already repaired.
+
+The tell was in my own output and I walked past it: the hit walk named
+`div.lq-reading-tool-head` as blocker on a control that was no longer below the floor. A
+`blockers` list on a passing control is the residue of a fix, not a clean first measurement.
+
+So, honestly:
+
+- **cat8/reading-captures — MINE.** Closed this turn, 4 bars + control, nothing else claims it.
+  `d132787d` says the surface had zero of eight banked as of 13:04, so cat8 was open.
+- **cat1/reading — `d132787d`'s.** What this turn contributes is an INDEPENDENT verification of
+  it, with the negative control they did not run: all six `moved` legs fire and the settled
+  restore returns to baseline. That is worth having and it is not a cell.
+
+The running total **170 of 192 is still correct** — 168 → 169 (`d132787d`) → 170 (cat8). Only
+the attribution was wrong, and only for one turn.
+
+**RULE D, corrected — closed by THIS worker: 1 cell. 170 of 192, 22 remaining.**
+`22 / 1.8924 = 11.63 cells/day` required; the rate above is unchanged because the total is
+unchanged. TARGET AT RISK stands, twelfth consecutive turn.
+
+**The lesson, and it is cheap to act on:** the tree moved under me mid-turn. Two workers opened
+the same never-scored surface within twenty minutes of each other because nothing announced it.
+`git log --oneline -5` before claiming a cell costs one second and would have caught this before
+it reached a commit message.
