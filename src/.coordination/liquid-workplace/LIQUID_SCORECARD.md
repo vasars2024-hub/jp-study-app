@@ -6184,6 +6184,85 @@ rebuild logged `08:06:51`, the new unit tests ran at `08:12:22` and the full sui
 that clock is skewed too — left as its author wrote it, since I cannot know which offset was
 intended, but **do not order these sections by their headings.** Order them by commit timestamp.
 
+> **Merge note, `primary2`.** Three sections below were appended at EOF concurrently by two
+> workers who could not see each other: `primary`'s 08:30-09:00 block and my 08:30-09:10 /
+> 09:10-09:40 blocks. All are kept, ordered by section start time. My second block RETRACTS my
+> first — read them as a pair, in order, not as two independent findings.
+
+## primary, 2026-09-05 08:30-09:00 EDT (12:30-13:00 UTC). Branch `feat/nyaa-subtitles`, from `7e65faa4`.
+
+**cat7/translate: the cause named in the entry above is WRONG, and the correction is the slice.**
+The previous entry's exact-next-slice said the remainder "has the shape of cold index pages on a
+375 MB `dict.db`". Measured, it is not, and the arms disagree with that hypothesis by two orders
+of magnitude. Three arms, one per process, against the real database (**537 MB**, not 375 — a
+`page_size * page_count` reading, not a guess):
+
+| arm | scored |
+| --- | --- |
+| `lookupOfflineInterlinear` over SQLite, cold | **86.0 ms** |
+| warm with a DISJOINT passage first, then the scored one | 53.2 ms |
+| the same passage twice | 41.6 ms |
+
+86 ms is not 5,886 ms, and the three agree with each other, which is what rules the SQLite half
+out rather than one lucky reading. **Warming index pages would have bought nothing.**
+
+**What the cost actually is — three in-process caches, each built once per process, each on main:**
+
+| cache | cold | warm file cache |
+| --- | --- | --- |
+| `listFrequencyDictionaryFiles()` (`mining.ts:957`) — 4 files, 20.12 MB, **551,605 ranks** | 2,315 ms | 525 ms |
+| kuromoji IPADIC build (`getMainJapaneseTokenizer`) | 938 ms | 265 ms |
+| prepared-statement cache + db open | 86 ms | 42 ms |
+
+`dictionary/warmup.ts` (`9cee1e0e`) already warms the OS **file** cache. These are V8 objects; no
+amount of file-cache warming touches them. A worker cannot help either — every one is process-wide
+state **main itself** reads on the next lookup.
+
+**PRODUCT, `e8cf934e` + `f72b25ae`.** `src/main/dictionary/cacheWarmup.ts`: a leg-agnostic chunker
+(legs injected, so it closes no import cycle and is testable without a 537 MB file) armed at 12 s
+from `registerDictionaryIpc`, after the 5 s page warm-up, so its own last leg reads a cached file.
+Never on the boot path; the schedule call returns `void` so a caller cannot await it back onto it.
+
+**Verified through the real product path, real userData, two arms, each run twice, with a write
+control** hashing size+mtime across `mining/frequency-dicts` and `dictionary/` before and after
+(unchanged, every run):
+
+| arm | run 1 | run 2 |
+| --- | --- | --- |
+| cold, scored 48-char passage | **27,962 ms** | **4,368 ms** |
+| after the warm-up | **96.4 ms** | **92.3 ms** |
+
+**A CONFOUND THAT MUST NOT BE QUOTED AS A RESULT.** Those two cold readings are the same pair the
+entry above attributes to `f9541e9e`'s restart (27,585 -> 4,240). Both reproduce here in processes
+containing `f9541e9e` either way, so **the 6.5x is OS file-cache state, not demonstrably the fix**.
+Recorded rather than corrected: I cannot re-run that turn's conditions, and `f9541e9e` is separately
+proven 122x on its own query.
+
+**Two corrections the measurement forced on my own work, both in `f72b25ae`:**
+1. One 11-character warm sentence left the scored passage at **1,519 ms**, still 3x over the bar.
+   Four sentences take it to 96 ms; sentences 2-4 cost **133 ms** between them for a 16x return.
+2. **My reason for splitting was wrong.** As four legs: **4,697 / 68.4 / 37.2 / 27.4 ms**. Nearly
+   all of it is a one-time init the *first* merged lookup performs whatever it is handed — so
+   splitting does NOT divide the block. The comment claiming it did was replaced by the numbers.
+
+**cat7/translate STAYS OPEN. I am not closing it and the reason is specific.** Every number above
+is a node process driving the product's own functions; the rubric's bar is the longest **Electron
+main-loop** block under `tools/liquid-perf-probe.ps1`. That harness needs an app restart, and
+`ClaudeRelay-primary2-20260905-082923` was **Running** for this whole turn — restarting the shared
+app kills a concurrent worker's turn. Cause fixed and measured 290x; the CELL awaits a live
+eight-swap run, and **swap 2 is still the cell that has to move.**
+
+**Exact next slice, in order.** (1) Restart and run the eight-swap sequence; if swap 2 is now
+under 500 ms, cat7 closes and translate is 8 of 8. (2) If a residual remains, it is the 4.7 s
+one-time init inside `lookupOfflineInterlinearMerged` — make *that* interruptible, which is a
+change inside the merged lookup, not in the warm-up.
+
+**Trap for whoever measures this next.** The cold arm swings **27,962 -> 4,368 ms** on OS
+file-cache state alone, in the same build. A single cold reading cannot attribute anything; take
+two, and say which one you are quoting.
+
+---
+
 ---
 
 ## 2026-09-05 08:30-09:10 EDT, `primary2` — the cat7 "warm the interlinear" slice HAS BEEN SHIPPED SINCE 2026-08-25, and cold pages cannot account for the 4.2 s

@@ -79,6 +79,10 @@ import { normalizePolicy } from '../shared/agentExecutionBridge';
 import { dictionaryDir } from './dictionary/db';
 import { disposeDictionaryReads, readDictionary } from './dictionary/readIpc';
 import { warmDictionaryPages, type DictWarmResult } from './dictionary/warmup';
+import {
+  scheduleDictionaryCacheWarmup,
+  type CacheWarmupLeg,
+} from './dictionary/cacheWarmup';
 import { runLexiconExplain, type LexiconExplainResult } from './dictionary/explainRun';
 import {
   notesToCsv,
@@ -753,11 +757,75 @@ export function cancelScheduledDictionaryWarmup(): void {
   warmupTimer = null;
 }
 
+/**
+ * The warm-up's own passages — ORDINARY sentences, and there are four of them
+ * for two separate measured reasons.
+ *
+ * **Why more than one sentence.** Warming with a single 11-character sentence
+ * left the scored 48-character passage at 1,519 ms, still over cat7's 500 ms
+ * bar. Warming with roughly this much text left it at **91.5 ms**. Same three
+ * legs, same order, only the passage differed — so the size of the warm text is
+ * the whole effect. One short sentence does not touch enough of the shared
+ * structure to matter.
+ *
+ * **Why split rather than one long string — and what splitting does NOT buy.**
+ * It was split expecting the block to divide with the text. It does not, and
+ * the measurement says so plainly: as four legs the costs are
+ * **4,697 / 68.4 / 37.2 / 27.4 ms**. Nearly all of it is a one-time
+ * initialisation the *first* merged lookup performs whatever it is handed, not
+ * work proportional to the passage. So the honest claim is the cheap one:
+ * sentences 2-4 cost 133 ms between them and took the scored passage from
+ * 1,519 ms down to 96.4 ms — a 16x return for 133 ms. The 4.7 s remains one
+ * uninterruptible block and cannot be chunked away from here; what this module
+ * does is move it off the user's first swap to a moment nothing is waiting.
+ * Splitting it for real would mean making that initialisation interruptible,
+ * which is a change inside the merged lookup, not out here.
+ *
+ * Every one contains kana, so `analyzeInterlinearPartOfSpeech`'s kana gate opens
+ * and the part-of-speech path is genuinely exercised rather than skipped.
+ */
+export const DICT_CACHE_WARMUP_PASSAGES = [
+  '猫が窓の外を見ている。',
+  '昨日の会議で決まった予算案を、来週までに部長へ提出する必要がある。',
+  '子供たちは公園で楽しそうに遊んでいました。',
+  'この本を読んだことがありますか。',
+] as const;
+
+/**
+ * The three caches the first interlinear otherwise builds mid-interaction.
+ *
+ * `interlinear` runs LAST on purpose: by then the other two are warm, so its
+ * recorded time is the *residual*. A large residual means the warm-up is aimed
+ * at the wrong things and says so in its own log line, rather than needing a
+ * separate probe to find out.
+ */
+export function dictionaryCacheWarmupLegs(): CacheWarmupLeg[] {
+  return [
+    // One resolve is enough: the 551,605-rank tables are parsed on the first
+    // call and held in `freqDictFilesCache` for the life of the process.
+    { name: 'frequency', run: () => resolveCustomFrequencyRanks('猫', undefined, 'ja') },
+    { name: 'tokenizer', run: () => getMainJapaneseTokenizer() },
+    ...DICT_CACHE_WARMUP_PASSAGES.map((passage, index): CacheWarmupLeg => ({
+      name: `interlinear:${index + 1}`,
+      run: () =>
+        lookupOfflineInterlinearMerged(passage, {
+          sourceLangs: ['ja'],
+          withFrequency: true,
+          withPartOfSpeech: true,
+        }),
+    })),
+  ];
+}
+
 export function registerDictionaryIpc(): void {
   // The read worker (`dictionary/readIpc.ts`) is spawned on first use; this is
   // the one place that knows the app is leaving, so it is where it is reaped.
   app.on('before-quit', disposeDictionaryReads);
   scheduleDictionaryWarmup();
+  // ...and the in-process half of the same problem, armed later so the page
+  // warm-up above has already put dict.db in the file cache. See
+  // `dictionary/cacheWarmup.ts` for the measurement that separates the two.
+  scheduleDictionaryCacheWarmup({ legs: dictionaryCacheWarmupLegs() });
   ipcMain.handle('dict:lookup', (_e, query: string) => lookupWord(query));
   ipcMain.handle('dict:lookupTerm', (_e, query: string, limit?: number) => lookupTerm(query, limit));
   // Phase 4: the Chinese surfaces' lookup, moved out of `renderer/chineseDict.ts`.
