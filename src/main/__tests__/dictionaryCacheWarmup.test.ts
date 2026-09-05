@@ -2,11 +2,12 @@
 // before each one, that a failing leg cannot take the warm-up (or a boot) down,
 // and that it happens exactly once per process.
 //
-// The value it delivers — 2,315 ms of frequency-table parsing and 938 ms of
-// IPADIC build moved off the user's first language swap — is a property of a
-// 20 MB rank table and a real Electron process, so it is measured live and
-// recorded in the plan, not asserted here. What IS asserted here is every part
-// of the orchestration a later edit could break silently.
+// The value it delivers — a first merged interlinear that cost 27,962 ms on a
+// cold OS file cache and 4,368 ms on a warm one, answering in 92-96 ms instead —
+// is a property of a 537 MB database and a 551,605-rank table, so it is measured
+// against those (twice per arm) and recorded in the plan, never asserted here.
+// What IS asserted here is every part of the orchestration that a later edit
+// could break silently while all of those numbers still looked fine.
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
   DICT_CACHE_WARMUP_DELAY_MS,
@@ -17,6 +18,9 @@ import {
   type CacheWarmupLeg,
 } from '../dictionary/cacheWarmup';
 import { DICT_WARMUP_DELAY_MS } from '../dictionary';
+
+/** A sink for the warm-up's log line. Not `() => {}`: eslint rejects an empty body. */
+const silent = (): undefined => undefined;
 
 /** A clock that only moves when a leg says it did, so a leg's ms is exact. */
 function fakeClock() {
@@ -37,7 +41,7 @@ describe('runDictionaryCacheWarmup', () => {
       { name: 'tokenizer', run: () => { clock.advance(938); } },
       { name: 'interlinear', run: () => { clock.advance(86); } },
     ];
-    const report = await runDictionaryCacheWarmup({ legs, now: clock.now, log: () => {} });
+    const report = await runDictionaryCacheWarmup({ legs, now: clock.now, log: silent });
 
     expect(report.legs.map((leg) => leg.name)).toEqual(['frequency', 'tokenizer', 'interlinear']);
     expect(report.legs.map((leg) => leg.ms)).toEqual([2315, 938, 86]);
@@ -56,7 +60,7 @@ describe('runDictionaryCacheWarmup', () => {
     ];
     await runDictionaryCacheWarmup({
       legs,
-      log: () => {},
+      log: silent,
       yieldToLoop: async () => { order.push('yield'); },
     });
 
@@ -68,7 +72,7 @@ describe('runDictionaryCacheWarmup', () => {
       { name: 'frequency', run: () => { throw new Error('no rank tables on disk'); } },
       { name: 'tokenizer', run: () => 'built' },
     ];
-    const report = await runDictionaryCacheWarmup({ legs, log: () => {} });
+    const report = await runDictionaryCacheWarmup({ legs, log: silent });
 
     expect(report.legs[0]).toMatchObject({
       name: 'frequency',
@@ -91,7 +95,7 @@ describe('runDictionaryCacheWarmup', () => {
         },
       },
     ];
-    const report = await runDictionaryCacheWarmup({ legs, now: clock.now, log: () => {} });
+    const report = await runDictionaryCacheWarmup({ legs, now: clock.now, log: silent });
 
     expect(report.legs[0].ms).toBe(938);
   });
@@ -100,8 +104,8 @@ describe('runDictionaryCacheWarmup', () => {
     let runs = 0;
     const legs: CacheWarmupLeg[] = [{ name: 'frequency', run: () => { runs += 1; } }];
 
-    const first = await runDictionaryCacheWarmup({ legs, log: () => {} });
-    const second = await runDictionaryCacheWarmup({ legs, log: () => {} });
+    const first = await runDictionaryCacheWarmup({ legs, log: silent });
+    const second = await runDictionaryCacheWarmup({ legs, log: silent });
 
     expect(runs).toBe(1);
     expect(second).toBe(first);
@@ -117,7 +121,7 @@ describe('scheduleDictionaryCacheWarmup', () => {
 
     scheduleDictionaryCacheWarmup({
       legs,
-      log: () => {},
+      log: silent,
       schedule: (fn, ms) => { fired = fn; delay = ms; return null; },
     });
 
@@ -130,11 +134,11 @@ describe('scheduleDictionaryCacheWarmup', () => {
 
   it('arms only one timer no matter how many times it is scheduled', () => {
     let armed = 0;
-    const legs: CacheWarmupLeg[] = [{ name: 'frequency', run: () => {} }];
+    const legs: CacheWarmupLeg[] = [{ name: 'frequency', run: silent }];
     const schedule = () => { armed += 1; return null; };
 
-    scheduleDictionaryCacheWarmup({ legs, log: () => {}, schedule });
-    scheduleDictionaryCacheWarmup({ legs, log: () => {}, schedule });
+    scheduleDictionaryCacheWarmup({ legs, log: silent, schedule });
+    scheduleDictionaryCacheWarmup({ legs, log: silent, schedule });
 
     expect(armed).toBe(1);
   });
@@ -146,7 +150,7 @@ describe('scheduleDictionaryCacheWarmup', () => {
 
     scheduleDictionaryCacheWarmup({
       legs,
-      log: () => {},
+      log: silent,
       schedule: (fn) => { fired = fn; return null; },
     });
     cancelScheduledDictionaryCacheWarmup();
@@ -155,7 +159,7 @@ describe('scheduleDictionaryCacheWarmup', () => {
     let rearmed = false;
     scheduleDictionaryCacheWarmup({
       legs,
-      log: () => {},
+      log: silent,
       schedule: () => { rearmed = true; return null; },
     });
 

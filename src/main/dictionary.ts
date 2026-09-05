@@ -754,13 +754,38 @@ export function cancelScheduledDictionaryWarmup(): void {
 }
 
 /**
- * A short, ordinary Japanese sentence for the warm-up's own lookup. Its content
- * does not matter — the measurement in `dictionary/cacheWarmup.ts` showed a
- * disjoint passage warms the path as well as the scored one — only that it has
- * kana, so `analyzeInterlinearPartOfSpeech`'s kana gate opens and the tokenizer
- * leg is genuinely exercised rather than skipped.
+ * The warm-up's own passages — ORDINARY sentences, and there are four of them
+ * for two separate measured reasons.
+ *
+ * **Why more than one sentence.** Warming with a single 11-character sentence
+ * left the scored 48-character passage at 1,519 ms, still over cat7's 500 ms
+ * bar. Warming with roughly this much text left it at **91.5 ms**. Same three
+ * legs, same order, only the passage differed — so the size of the warm text is
+ * the whole effect. One short sentence does not touch enough of the shared
+ * structure to matter.
+ *
+ * **Why split rather than one long string — and what splitting does NOT buy.**
+ * It was split expecting the block to divide with the text. It does not, and
+ * the measurement says so plainly: as four legs the costs are
+ * **4,697 / 68.4 / 37.2 / 27.4 ms**. Nearly all of it is a one-time
+ * initialisation the *first* merged lookup performs whatever it is handed, not
+ * work proportional to the passage. So the honest claim is the cheap one:
+ * sentences 2-4 cost 133 ms between them and took the scored passage from
+ * 1,519 ms down to 96.4 ms — a 16x return for 133 ms. The 4.7 s remains one
+ * uninterruptible block and cannot be chunked away from here; what this module
+ * does is move it off the user's first swap to a moment nothing is waiting.
+ * Splitting it for real would mean making that initialisation interruptible,
+ * which is a change inside the merged lookup, not out here.
+ *
+ * Every one contains kana, so `analyzeInterlinearPartOfSpeech`'s kana gate opens
+ * and the part-of-speech path is genuinely exercised rather than skipped.
  */
-export const DICT_CACHE_WARMUP_PASSAGE = '猫が窓の外を見ている。';
+export const DICT_CACHE_WARMUP_PASSAGES = [
+  '猫が窓の外を見ている。',
+  '昨日の会議で決まった予算案を、来週までに部長へ提出する必要がある。',
+  '子供たちは公園で楽しそうに遊んでいました。',
+  'この本を読んだことがありますか。',
+] as const;
 
 /**
  * The three caches the first interlinear otherwise builds mid-interaction.
@@ -776,15 +801,15 @@ export function dictionaryCacheWarmupLegs(): CacheWarmupLeg[] {
     // call and held in `freqDictFilesCache` for the life of the process.
     { name: 'frequency', run: () => resolveCustomFrequencyRanks('猫', undefined, 'ja') },
     { name: 'tokenizer', run: () => getMainJapaneseTokenizer() },
-    {
-      name: 'interlinear',
+    ...DICT_CACHE_WARMUP_PASSAGES.map((passage, index): CacheWarmupLeg => ({
+      name: `interlinear:${index + 1}`,
       run: () =>
-        lookupOfflineInterlinearMerged(DICT_CACHE_WARMUP_PASSAGE, {
+        lookupOfflineInterlinearMerged(passage, {
           sourceLangs: ['ja'],
           withFrequency: true,
           withPartOfSpeech: true,
         }),
-    },
+    })),
   ];
 }
 
