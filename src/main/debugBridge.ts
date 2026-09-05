@@ -261,6 +261,30 @@ function readBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
   });
 }
 
+/**
+ * Where a `/heap-snapshot` file is allowed to land, and the reason it is a
+ * separate function: the caller supplies a NAME and never a location.
+ *
+ * A heap snapshot of main is on the order of a gigabyte, so a caller that could
+ * steer the directory could drop one under `src/` and it would reach a commit.
+ * `raw` is therefore stripped to `[A-Za-z0-9._-]`, which removes `/`, `\` and
+ * `:` and so cannot express a traversal, a sibling directory or a drive; the
+ * result is then joined onto `tempDir` rather than resolved against it.
+ *
+ * Exported for its test. `path.join` alone is NOT the guard — `join(tmp, '../x')`
+ * escapes happily — so the guard is the character class, and the test asserts
+ * containment rather than asserting the class.
+ */
+export function heapSnapshotPath(tempDir: string, rawName: unknown, now: Date): string {
+  const safe = String(rawName ?? '')
+    .trim()
+    .replace(/[^A-Za-z0-9._-]/g, '')
+    .replace(/^\.+/, '')
+    .slice(0, 60);
+  const stamp = now.toISOString().replace(/[:.]/g, '-');
+  return path.join(tempDir, `jp-main-heap-${safe ? `${safe}-` : ''}${stamp}.heapsnapshot`);
+}
+
 async function handle(
   route: string,
   url: URL,
@@ -384,6 +408,60 @@ async function handle(
           // between cycles cannot tell "the cache was rebuilt" from "the weights were reloaded" —
           // the two look identical in `privateMb` and differ only in which pool was warm.
           llamaContexts: llamaHost.contexts,
+        },
+      };
+    }
+
+    /**
+     * `/mem` says HOW MUCH main retains; it cannot say WHAT. That gap is why
+     * cat7's episodic block went three turns without a mechanism: measured
+     * 2026-09-05 on an idle instance driving nothing, main's `old_space` sat at
+     * 639-661 MB of 669-676 (~98% of its size), a forced full collection freed
+     * only 43.7 MB of it, and the resulting major GC blocked main for 477 ms —
+     * the same magnitude as the 500 ms bar that leg keeps failing. The heap is
+     * RETAINED, so the next question is by what, and no route here could answer it.
+     *
+     * Written OUTSIDE the repository, always. A snapshot of this heap is on the
+     * order of a gigabyte; landing one under `src/` would put a generated artifact
+     * in a commit. `app.getPath('temp')` is deliberate and the caller cannot
+     * redirect it — only name the file — because "let the probe choose the
+     * directory" is exactly how such a file reaches the tree.
+     *
+     * The write is SYNCHRONOUS and blocks main for seconds on a heap this size.
+     * That cost is reported rather than hidden: a probe that treats this as a
+     * free read would attribute its own snapshot to the surface it is scoring.
+     */
+    case '/heap-snapshot': {
+      const file = heapSnapshotPath(app.getPath('temp'), body.name, new Date());
+      const before = v8.getHeapStatistics();
+      const t0 = Date.now();
+      let written: string;
+      try {
+        written = v8.writeHeapSnapshot(file);
+      } catch (err) {
+        return {
+          code: 500,
+          body: { ok: false, error: `heap snapshot failed: ${(err as Error).message}` },
+        };
+      }
+      const blockedMs = Date.now() - t0;
+      let sizeMb = -1;
+      try {
+        sizeMb = Math.round((fs.statSync(written).size / (1024 * 1024)) * 10) / 10;
+      } catch {
+        /* the snapshot exists or writeHeapSnapshot threw; a stat failure is not fatal */
+      }
+      return {
+        code: 200,
+        body: {
+          ok: true,
+          path: written,
+          sizeMb,
+          // Named `blockedMs` and not `durationMs`: main could not serve anything
+          // for this long, which is the number a concurrent probe needs.
+          blockedMs,
+          heapUsedMb: Math.round((before.used_heap_size / (1024 * 1024)) * 10) / 10,
+          insideRepo: false,
         },
       };
     }
