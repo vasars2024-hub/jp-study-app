@@ -5378,3 +5378,32 @@ already carries the full list one click away.
 **Running total: 19 of 25 sections at 80/80.** `translate` is now **4 of 8** cells banked
 (cat1, cat3, cat5, cat6); cat4 attempted and open; cat2, cat7, cat8 not run.
 **157 of 200 cells, 43 remaining.**
+
+## 2026-09-05 04:40 EDT — codexB, interrupted backup recovery (Liquid)
+
+- Recovery base HEAD `56c28674`; index empty. Recent tracked/untracked mtimes show no
+  unfinished backup product file: its rail repair `ade54175` and visit fix `ddeb6c5b`
+  both landed before the 03:38 interruption. The 03:20 handoff predated both commits.
+- Re-ran recovered renderer suites: **8/8**. Added main-store coverage in
+  `immersionVisitPersistence.test.ts`: **3/3**, temporary storage only. Three five-second
+  accumulations keep **1 visit / 15 seconds / 30 characters**; a later arrival makes **2**.
+  First accumulation starts at **0 visits**; invalid URL refuses without changing disk.
+- Live cat4 through debug bridge 39274, renderer localhost:5174, real NHK page:
+  default/compact/maximized dead space **2.9 / 0.6 / 8.8%**, all below 15;
+  clipped/overlaps/horizontal scrollers/hidden overflow **0 at all three sizes**;
+  content grows and all geometry restores. **PASS 10/10** for the recovered rail fix.
+- Fresh control run: injected clip **0 -> 1 -> 0**, overlap **0 -> 10 -> 0**,
+  art plate counted and removed, sub-minimum hidden overflow **1**, restored true.
+  Five destinations visibly available beside the loaded page: NHK Easy, Wikipedia JP,
+  Hacker News, Chinese Wikipedia, Russian Wikipedia. Three saved rows rendered.
+- Main visit fix is verified through the real service with temporary disk; **no fresh
+  Electron main acceptance claimed**. Shared app was not restarted. Its old main still
+  counts flushes; a reload cannot validate `countVisit` in that process.
+- Audit F2/F3 addressed first at `03912128`: disclosure labels join i18n, two VN rating
+  slots now receive rounded numbers. Shared census + formatting + dev-panel suites **42/42**;
+  reconstructed HEAD-only candidates tested detached **14/14**, import/export **0 missing**,
+  eslint **0 errors**. Foreign component hunks excluded from the commit.
+- Immersion now **5/8** banked (cat1/3/4/5/6); cat2/7/8 remain open.
+  Running scorecard **158/200 cells**, **19/25 sections** fully certified. This adds the
+  recovered cat4 to primary2's last measured 157; it is recovery credit, not a new build.
+  sampled-out: every other scorecard surface; this checkpoint only re-verifies Immersion.
