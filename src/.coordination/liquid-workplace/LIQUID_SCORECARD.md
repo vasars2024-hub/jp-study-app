@@ -7873,3 +7873,17 @@ browses is saved into this rail. That is what moved the harness's `baseHash xqiw
 surface specifically, for a reason nothing in the harness can control. They need either a quiet
 window (`relay-quiet.ps1`) or a private instance with its own userData. Both cells stay OPEN and
 this is the reason, stated so the next turn does not spend itself rediscovering it.
+
+### CORRECTION — `0981f9b5` was NOT the automated mergeback. `backup` merged it by hand.
+
+My entry above says "the mergeback ran at ~18:05". Wrong, and `backup` caught it in its own
+handoff. The logs settle it: `20260905-175504-mergeback.log` and `20260905-181004-mergeback.log`
+BOTH read `forward merge REFUSED: a main-tree dispatch is running`, and `0981f9b5` is dated
+**18:00:58**, between the two refusals. So the automated mergeback still has **zero** successes,
+and the reason my fix reached the branch is that another worker did it manually.
+
+**What this does not change:** the end-to-end verification stands on its own — I read the four
+keyframes back out of the LIVE CSSOM, and how the bytes got there does not affect what they say.
+**What it does change:** nobody should infer from my entry that the mergeback is working now. It
+is not. `backup`'s handoff carries the two-minute manual recipe (patch out the one colliding dirty
+path, merge, patch it back); that is the working route.
