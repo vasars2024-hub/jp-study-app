@@ -6543,3 +6543,87 @@ Caveat on the numerator, stated because it inflates the total: **4 of the 170 ar
 that live on `wt/files-app` and are NOT on `feat/nyaa-subtitles`.** On this branch alone the
 figure is 167. Single biggest cause, again: this turn spent two of its four slices on product
 repairs the scoring forced (a hit floor and a dead control), which is the work, not overhead.
+
+---
+
+## 2026-09-05 13:37-14:45 EDT — primary. `reading-captures` **cat4 CLOSES 10/10.**
+
+Same surface the 13:45 entry left failing, same harness, same window (user's app pid 36988,
+bridge 39273, window 1, `Reading Finder` fwin at 820x580). No new probe: `cat4-use-of-space.cjs
+--surface "@.reading-captures" --win 1`, `--control` for the falsification leg.
+
+**One cell closed. 171 -> 172 of 192, 20 remaining.**
+
+### cat4 — Use of space, PASS 10/10
+
+    size        box        dead    clipped  overlaps  hscroll  hiddenX  chrome   restored
+    default     782x470    1.9%    0        0         0        0        38.4     true
+    compact     222x57     0.4%    0        0         0        0        94.4     true
+    maximized   1226x663   7.0%    0        0         0        0        25.5     true
+
+    contentGrowsNotChrome true (38.4 -> 25.5, falls)   allThreeSizes true
+
+BEFORE, measured this turn on the unchanged tree, not inherited: `dead 9.6 / 0.4 / 33.8`,
+one **705x497** rectangle at maximized, and `clipped 9` at compact. The 13:45 entry's 36.1%
+is the same defect on a different selected capture.
+
+**CONTROLS, all in the same process as the measurement (`--control`):**
+`injectedClip` base 0 -> dirty 1 -> restored 0, `removalProven` true — the zero is a
+measurement, not a blind detector. `backdropExclusion` overlaps 0 -> 10 -> 0, plant painted in
+front and correctly NOT excused. `artPlateExclusion` plant hangs out 280px, counted as a plate,
+`clipped` did not rise. `provenPagerDeadRegion` not applicable (no pager on its last page).
+`subMinimumShrink` 200x140 -> box 152x31, clipped 2 — below the product's own minimum, reported
+rather than scored.
+
+### Two product defects, both fixed, both with the numbers that found them
+
+**1. `cc9209b4` — the reader ended in nothing.** deadRegion is not fixable by shrinking a panel;
+the detector counts text and interactive nodes, so an emptier smaller panel leaves the identical
+rectangle. The honest reading is that a reader with nothing after the passage IS a dead end, and
+this surface's only other way onward was a 260px side list that a covering sheet removes at a
+narrow canvas. The passage now continues into "More captures" — the others in the index's current
+filter and sort, rotating past the end. `dead` 33.8 -> 7.0% at maximized, 9.6 -> 1.9% at default.
+Same commit: `.reading-workspace-nav` wrapped with no ceiling, so at 260x170
+`.reading-workspace-panel` computed to **height 0, 84px below the window's own bottom edge** and
+`.reading-captures` painted outside the frame at 202x20. `max-height: 45%` + `overflow-y: auto`
+-> nav 46px, panel 222x57, inside the window. That collapse hit **all nine** workspace sections.
+
+**2. `<COMMIT2>` — a tool shorter than its own head swallowed it.** `.lq-reading-tool-head`
+cannot shrink below a 32px `--lq-hit-target` button plus padding (~49px). The docked branch was
+`overflow: hidden` and cut the head off; the **sheet branch declared no overflow at all**, so it
+was `visible` and painted the head outside the canvas. At the compact leg the canvas is 37px and
+the reader resolved to **2px** against a 53px header — the tool's Close and the control that
+reopens the capture list were both off-surface and unreachable. `overflow-y: auto` on the docked
+tool, the sheet, and `.reading-captures-reader`: `clipped 12 -> 0`.
+
+### TRAPS from this turn, each of which cost a run
+
+- **`nav` IS CHROME to cat4.** The chrome selector is
+  `.fwin-bar,nav,header,footer,aside,[role=toolbar],[role=tablist]`. Wrapping the new content in
+  `<nav>` took `chromePct` 38.4 -> 69.9 and failed `contentGrowsNotChrome` on a change that added
+  nothing but content. `<section>` is also the more accurate tag; the instrument was right.
+- **A JSX comment inside a ternary's parentheses is a SYNTAX ERROR**, and the app answered the
+  bridge normally the whole time — the tell was `vite-error-overlay` in `document.body.children`
+  and an error-boundary string in `body.textContent`, not a bridge failure. HMR silently kept
+  serving the last good module for ~15 minutes while I measured it as if the edit had landed.
+- **A second cat4 run stranded the window maximized** (`restoreAttempts 2`, `restoredTo
+  1264x773`), and the next run's compact leg then measured 202x20 and reported clipped 9 for the
+  wrong reason. Re-check `.fwin-max` before believing a compact number.
+- **A CSS-text assertion on `.lq-reading > .lq-reading-sheet` matched the wrong rule**: that
+  selector is also the second member of a grouped selector list, so `selector\s*\{[^}]*\}` hit the
+  padding/background block and reported the declaration missing while it sat two rules below.
+  Filter rules by selector-list membership, not by the first regex hit.
+
+### RULE D — liquid. Closed by this worker: **1 cell. 172 of 192, 20 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 14:45 EDT: **1.8438**.
+`20 / 1.8438 = 10.85 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 10.85 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn.**
+The numerator caveat from the 13:45 entry still stands: 4 of these are `anki` cells that live on
+`wt/files-app` and are NOT on `feat/nyaa-subtitles`; on this branch alone the figure is 168.
+Biggest cause this turn: closing one cell took two product repairs plus a third in the shared
+reading primitive, and the primitive repair is the one that will pay again — Immersion, VN, manga
+and the novel reader all sit on the branch that had no overflow declared at all.
+
+**sampled-out (RULE C):** no other surface was scored this turn. cat2 and cat5/cat6 on
+`reading-captures` remain open exactly as the 13:45 entry left them — cat2 needs a `--compare`
+surface for `costParity`, cat5+cat6 need an `l6-parity.js` spec entry.

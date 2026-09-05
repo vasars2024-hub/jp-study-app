@@ -125,10 +125,28 @@
 
 /* Docked: a sibling of the document, never over it. `position: static` is the
    load-bearing declaration in this file — it is the difference from the
-   `.settings-panel` popover this primitive replaces. */
+   `.settings-panel` popover this primitive replaces.
+
+   THE Y AXIS WAS `hidden` AND A SHORT CANVAS THREW THE TOOL'S OWN HEAD AWAY.
+   `.lq-reading-tool-head` cannot shrink below its content — a 32px
+   `--lq-hit-target` close button plus `--lq-space-3` padding is about 49px — and
+   the body under it is `flex: 1 1 auto`, so at a canvas shorter than the head the
+   head simply overflowed and `hidden` cut it off with nothing to scroll.
+   Measured live 2026-09-05 on Captures at the category-4 compact leg (260x170
+   window, 37px canvas): head 49px against a 37px tool, `.lq-reading-tool-head`
+   and its title, actions and refresh button all clipped and unreachable — the
+   tool's Close was not on screen and could not be scrolled to.
+
+   `auto`, not a smaller head: in every normal case head + body is exactly the
+   tool's height, `scrollHeight === clientHeight`, and no scrollbar appears, so
+   this changes nothing about the four other canvas surfaces. It only decides what
+   happens in the degenerate case, and reachable beats cut off. The x axis stays
+   `hidden` — sideways overflow in a docked tool is a nowrap row to fix, not
+   content to reach, which is the same call `.reading-workspace-panel` makes. */
 .lq-reading > .lq-reading-tool {
   position: static;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ---------------------------------------------------------------------------
@@ -163,10 +181,18 @@
 /* Sheet: the whole canvas, and only ever the whole canvas. Anchored to the
    canvas box rather than the viewport so a reader docked inside a larger
    window covers its own document and not the app around it. */
+/* The sheet never declared an overflow at all, so it was `visible`: below the dock
+   minimum the SAME tool becomes this, and its unshrinkable ~49px head then painted
+   straight out of the canvas box — measured at the category-4 compact leg with the
+   head's title, actions and the close button all outside the surface and no
+   scroller anywhere above them. Same call as the docked branch above, and it has
+   to be made twice because the two branches are two different rules. */
 .lq-reading > .lq-reading-sheet {
   position: absolute;
   inset: 0;
   z-index: 2;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* A stacked sheet stays MOUNTED and hidden, so closing the one on top hands

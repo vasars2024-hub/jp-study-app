@@ -250,12 +250,21 @@
   color: var(--text, #fff4f5);
 }
 
+/* `overflow-y: auto`, and it was `hidden`. The reader's own header cannot shrink
+   below its content — two `--lq-hit-target` buttons and a title, about 53px — and
+   `.reading-captures .lq-reading-doc > .reading-captures-reader` pins the box to
+   `height: 100%`. Measured live 2026-09-05 at the category-4 compact leg: the
+   document region was 37px and the reader resolved to **2px**, so its whole
+   header, including the control that reopens the capture list, sat outside a
+   `hidden` box with nothing to scroll. In every normal size head + document fill
+   the box exactly, `scrollHeight === clientHeight`, and no scrollbar appears. */
 .reading-captures-reader {
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--border, #5a252b) 70%, transparent);
   border-radius: 10px;
   background: var(--panel, #151012);

@@ -321,6 +321,58 @@ describe('readingCanvas.css', () => {
     expect(tokens).toMatch(/--lq-space-4:\s*12px/);
   });
 
+  /**
+   * A tool shorter than its own head must scroll, not swallow it.
+   *
+   * `.lq-reading-tool-head` cannot shrink below its content — a 32px
+   * `--lq-hit-target` close button plus `--lq-space-3` padding is about 49px —
+   * and the body under it takes the remainder, so at a canvas shorter than the
+   * head the head overflows. The docked branch was `overflow: hidden` and cut it
+   * off; the sheet branch declared no overflow at all, so it was `visible` and
+   * painted the head outside the canvas. Both lose the tool's Close.
+   *
+   * Measured live 2026-09-05 through the category-4 harness on Captures at its
+   * compact leg (260x170 window, 37px canvas): head 49px against a 37px tool,
+   * `.lq-reading-tool-head` plus its title, actions and refresh button all
+   * reported clipped and unreachable. After: **clipped 0 at all three sizes**,
+   * with the harness's injected-clip control still moving base 0 -> dirty 1 ->
+   * restored 0, so the zero is a measurement rather than a blind detector.
+   *
+   * Both branches are asserted because they are two separate rules and fixing
+   * one is exactly how the other survives.
+   */
+  it('lets a tool too short for its own head scroll instead of losing it', () => {
+    /*
+     * Every rule whose SELECTOR LIST contains this one, not the first regex hit.
+     * `.lq-reading > .lq-reading-sheet` also appears as the second selector of a
+     * grouped rule, and a naive `selector\s*\{[^}]*\}` matched THAT block — the
+     * padding-and-background one — and reported the declaration missing while it
+     * sat two rules further down. This is the cascade for the selector, which is
+     * the thing being asserted.
+     */
+    const cascade = (selector: string): string =>
+      [...CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+        .filter(([, list]) => list.split(',').some((s) => s.trim() === selector))
+        .map(([, , body]) => body)
+        .join('\n');
+
+    const docked = cascade('.lq-reading > .lq-reading-tool');
+    expect(docked, 'the docked tool rule set is gone').not.toBe('');
+    expect(docked).toMatch(/overflow-y:\s*auto/);
+    expect(docked, 'y hidden throws the head away with nothing to scroll').not.toMatch(
+      /overflow:\s*hidden/,
+    );
+
+    const sheet = cascade('.lq-reading > .lq-reading-sheet');
+    expect(sheet, 'the sheet rule set is gone').not.toBe('');
+    expect(sheet).toMatch(/overflow-y:\s*auto/);
+
+    // The x axis stays clipped in both: sideways overflow in a tool is a nowrap
+    // row to fix, not content to reach.
+    expect(docked).toMatch(/overflow-x:\s*hidden/);
+    expect(sheet).toMatch(/overflow-x:\s*hidden/);
+  });
+
   it('keeps a docked tool out of the positioning layer', () => {
     expect(CSS).toMatch(/\.lq-reading-tool\s*\{[^}]*position:\s*static/);
     expect(CSS).toMatch(/\.lq-reading-sheet\s*\{[^}]*position:\s*absolute/);
