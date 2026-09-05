@@ -7010,3 +7010,26 @@ UNMEASURED), cat5+cat6 (parity spec), cat7 (SPECS entry).
                                             168 of 192, 24 remaining
 
 **Quote `168 of 192, 24 remaining` from here forward.**
+
+### Which cells are FREE, re-derived from the harnesses rather than assumed
+
+The previous handoff priced `anki` at "5 free cells" and told the next worker to re-check the
+same arithmetic for `player` and `reading` before quoting it. Done, against the two files that
+decide it — `cat7-perf.cjs`'s `SPECS` keys and `l6-parity.js`'s spec keys (cat5 reads Q7/Q8/Q9
+out of a category-6 baseline, so no cat6 spec means no cat5 score either):
+
+    surface   cat1 cat2 cat3 cat4 cat8   cat7            cat5+cat6
+    anki       ok   ok   ok   ok   ok    NO SPECS entry  NO l6-parity spec
+    player     ok   ok   ok   ok   ok    HAS one         NO l6-parity spec
+    reading    ok   ok   ok   ok   ok    NO SPECS entry  NO l6-parity spec
+
+So **`anki` is 5 free cells and 4 are banked** — only cat8 is left reachable there, and it needs
+a driver that can produce an empty/loading/error/offline host. **`player` is SIX**, not five:
+`SPECS.player` is substantive (`title: '@#media-workspace'`, `root: '#media-workspace'`,
+`playerFramesOnly: true`, `videoSelector: '#media-workspace video'`), so cat7 is reachable there
+without writing a spec. That is the cheapest unopened surface on the board.
+
+`l6-parity.js` carries 30 specs and none of them is `anki`, `player` or `reading`; its nearest
+neighbours are `video`, `mediaCenter` and `mediaWorkspace`. Writing a `player` spec would unlock
+cat5+cat6 as a pair, which is 2 cells for one piece of scaffolding — the best ratio available,
+but it is scaffolding, so RULE 1 applies: extend the existing spec table, never a new probe.
