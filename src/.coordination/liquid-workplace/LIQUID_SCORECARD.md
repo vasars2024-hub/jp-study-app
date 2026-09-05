@@ -7577,7 +7577,7 @@ wants one turn that owns the app.
   the player still requires its own populated, controlled rubric pass. Full gates follow later
   this turn against a detached checkpoint, not the foreign dirty tree.
 
-## 2026-09-05 17:40-18:45 EDT — primary2 — `fwinIn` freezes at t=0 and leaves a window **invisible forever**. No cell closed; the cause of a whole class of harness refusals is now named.
+## 2026-09-05 17:29-17:50 EDT — primary2 — `fwinIn` freezes at t=0 and leaves a window **invisible forever**. No cell closed; the cause of a whole class of harness refusals is now named.
 
 **Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** What moved is a product defect
 that has been silently VOIDing runs on every surface, mine included.
