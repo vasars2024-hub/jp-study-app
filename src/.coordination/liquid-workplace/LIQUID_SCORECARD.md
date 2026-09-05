@@ -5378,3 +5378,56 @@ already carries the full list one click away.
 **Running total: 19 of 25 sections at 80/80.** `translate` is now **4 of 8** cells banked
 (cat1, cat3, cat5, cat6); cat4 attempted and open; cat2, cat7, cat8 not run.
 **157 of 200 cells, 43 remaining.**
+
+### cat4 CLOSES — PASS 10/10. This supersedes the "still open" paragraph directly above it.
+
+Both bars named as open in the entry above were closed in the same turn, and the entry is
+left standing rather than rewritten because the sequence is the useful part.
+
+**1. `clipped` and `horizontal` — a floating window cannot use a viewport media query.**
+`.tr-panes` stacked under `@media (max-width: 780px)`, and a media query reads the
+**viewport**. The window was 260px and the viewport 1264px, so it never fired: the
+two-column grid pushed 325px of content into a 248px body clipped by `overflow-x: hidden`.
+Now `@container` on `.tr-view` — at **520px, not 780** — because 780 was picked against a
+screen and is most of a default 820px window, and reusing it stacked the panes at the
+DEFAULT size, a layout change nobody asked for. `minmax(0, 1fr)` went with it: a bare `1fr`
+floors each track at the pane's min-content, which for a `textarea` is its default `cols`.
+The ruby's own residue was capped by `.lexicon-gloss-stack`, an inline-block inside the `rt`
+at `max-width: 100cqi` — an `rt` is `display: ruby-text` and ignores `max-width`, and
+blockifying it leaves ruby layout altogether; both were measured before choosing. `99093c30`.
+
+    div.fwin-body scrollWidth vs clientWidth, live, at the three cat4 sizes
+    before  compact  601>248     default  2884>808     maximized  2884>1252
+    after   compact  248=248     default   808=808     maximized  1252=1252
+    grid tracks after: 379+379 default, 212 single compact, 601+601 maximized
+
+**2. `deadRegion` at maximized — the surface was at rest, and a surface at rest is not a
+measurement.** The 17.9% was taken with **seven characters** in the source pane and the
+literal string "Translation appears here." in the output: a 601x240 empty textarea is what
+the dead-region walk was measuring. This repo has the precedent recorded — empty Dictionary
+read 53.3% and the same surface loaded read 15.0% and passed — so the surface was loaded
+through its own UI rather than the number argued with: a 71-character Japanese paragraph
+typed in, `Translate` clicked, Qwen3-1.7B loaded and returned **176 characters**, giving
+**29 sense tokens and 27 harvest rows**.
+
+    deadRegion   default   12.9% -> 9.7%      compact 0.9% (unchanged)
+                 maximized 17.9% -> 14.6%     bar 15
+
+**Say this plainly: 14.6 against a bar of 15 is thin, and it is a LOADED reading.** It is
+the honest reading — an editor with no text in it is not evidence about use of space — but a
+future turn that re-runs cat4 on a cold Translate window will see 17.9% again and should not
+read that as a regression. The load is part of the measurement.
+
+**The overflow fix also held under that load, which is the stronger test:** 71 characters and
+29 sense tokens produced `scrollWidth` **808 = clientWidth 808**, where 7 characters had
+produced 2884 before the cap.
+
+**Control (`--control`), every arm fired.** `injectedClip` 0 -> 1 -> 0 with `removalProven`;
+`artPlateExclusion` correctly excluded a plate hanging out by 269px while proving it was
+named in `artPlateClips`; `backdropExclusion` raised `overlaps` 0 -> **14** and refused to
+excuse them as backdrop; `subMinimumShrink` to 200x140 produced 27 clipped, so the clipped
+term is live rather than vacuously zero. `provenPagerDeadRegion` was not applicable (no
+proven pager). All arms restored.
+
+**`translate` is now 5 of 8 cells banked** (cat1, cat3, cat4, cat5, cat6). cat2, cat7 and
+cat8 are not run. **158 of 200 cells, 42 remaining.**
