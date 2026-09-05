@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -668,6 +670,30 @@ describe('Files app — reveal is offered only where it can work (gate 12)', () 
       await click(host?.querySelector('.lq-inspector-close') as HTMLElement);
       expect(document.activeElement?.className).toContain('fa-row');
       expect(document.activeElement?.textContent).toContain('JMdict');
+    });
+
+    it('the primitive owns scrolling, so the close control cannot scroll away', async () => {
+      // Read from the CSS text because jsdom does no layout. `.fa-details` is
+      // stacked onto `LiquidInspector`'s root, and that root is `display: flex;
+      // flex-direction: column` with `.lq-inspector-head` at `flex: none` and
+      // `.lq-inspector-body` as the scroller. `.fa-details`'s own
+      // `overflow-y: auto` would make the ROOT a second scroll container
+      // wrapping the head -- the close button scrolls out of view, and two
+      // scrollers nest. Neutralised by the two-class selector.
+      const css = readFileSync(
+        resolve(__dirname, '..', 'components', 'filesapp', 'filesApp.css'),
+        'utf8',
+      ).replace(/\/\*[\s\S]*?\*\//g, '');
+      const scoped = css.slice(css.indexOf('.fa-details.lq-inspector {'));
+      expect(scoped.slice(0, scoped.indexOf('}'))).toMatch(/overflow:\s*visible/);
+      // And the SUMMARY branch, which has no primitive under it, keeps its own.
+      const plain = css.slice(css.indexOf('.fa-details {'));
+      expect(plain.slice(0, plain.indexOf('}'))).toMatch(/overflow-y:\s*auto/);
+      // The mount proves both classes really are on one element, so the
+      // two-class selector above is not scoping to something that never occurs.
+      await openRow('JMdict');
+      const panel = host?.querySelector('.lq-inspector');
+      expect(panel?.classList.contains('fa-details')).toBe(true);
     });
 
     it('CONTROL: selecting does NOT steal focus from the list', async () => {

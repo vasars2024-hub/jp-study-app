@@ -833,6 +833,21 @@
   color: var(--lq-liquid-text);
 }
 
+/* The DETAILS branch stacks `.fa-details` onto `LiquidInspector`'s root, and the
+   primitive owns scrolling: `.lq-inspector-head` is `flex: none` so the close
+   control stays pinned, and `.lq-inspector-body` is the scroller. Leaving
+   `.fa-details`'s own `overflow-y: auto` on that root would make it a SECOND
+   scroll container wrapping the head -- the close button would scroll out of
+   view, which is the one control the primitive exists to guarantee -- and nest
+   two scrollers inside each other. The SUMMARY branch is a plain `.fa-details`
+   with no primitive under it, so it keeps its own scrolling and is untouched:
+   this selector is deliberately the two-class form. */
+.fa-details.lq-inspector {
+  overflow: visible;
+}
+
+/* Still the SUMMARY heading's rule. The details heading is now the primitive's
+   own `.lq-inspector-title`, which already ellipsizes on one line. */
 .fa-details-title {
   margin: 0 0 var(--lq-space-3);
   font-size: 1rem;
