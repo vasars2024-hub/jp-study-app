@@ -708,6 +708,16 @@ const SPECS = {
        * and cannot leave the surface changed. The proof refuses unless the pair actually came
        * back AND unless at least two distinct pairs were observed -- a swap control wired to
        * nothing would otherwise report 40 clean ticks of doing nothing at all.
+       *
+       * EVEN IS LOAD-BEARING, AND IT IS NOT ONLY ABOUT THE LANGUAGES. `.tr-swap` also moves the
+       * TEXT: the source box takes the output pane's contents. So an ODD number of swaps leaves
+       * the source box holding whatever the output held -- which, on a surface that has not been
+       * translated since it was loaded, is EMPTY. Measured 2026-09-05: a one-click attribution
+       * probe run between two cat7 runs left `.tr-textarea` at length 0, and the next full run
+       * refused with "the load never armed" and VOIDed after every gesture leg had been paid
+       * for. Any hand-driven swap must be undone by a second swap BEFORE the surface is reloaded,
+       * and the source text re-set afterwards -- restoring the pair alone is not restoring the
+       * surface.
        */
       label: 'swap the language pair 40 times through its own control',
       // 40 ticks at 120 ms is 4.8 s; the window is widened for the same reason `agent` widens
