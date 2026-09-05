@@ -226,12 +226,24 @@ async function ctrlClick(node: Element | null) {
   });
 }
 
-/** Records what `popOut` was asked for and answers with `answer`. */
-function installPopOut(answer: boolean | undefined | Promise<never>): string[] {
+/**
+ * Records what `popOut` was asked for and answers with `answer`.
+ *
+ * The rejecting case is a FACTORY, not a `Promise<never>`, and that is not style. Passed as
+ * a value, `Promise.reject(...)` is constructed at the CALL SITE — before `render()`, before
+ * the click, and therefore several ticks before the product attaches its `.catch`. Node
+ * reports that window as an unhandled rejection, so `npx vitest run` ended
+ * `1091 passed | 0 failed` and still exited **1** on `Errors 1 error`, with the whole branch
+ * reading red at its own tip for a test that passes. A factory defers construction to the
+ * moment `popOut` is actually called, where the caller's `.catch` is attached synchronously —
+ * which is also what really happens in production: the bridge rejects when it is asked, not
+ * before the view exists.
+ */
+function installPopOut(answer: boolean | undefined | (() => Promise<never>)): string[] {
   const asked: string[] = [];
   (window as unknown as { api: Record<string, unknown> }).api.popOut = (section: string) => {
     asked.push(section);
-    return answer instanceof Promise ? answer : Promise.resolve(answer);
+    return typeof answer === 'function' ? answer() : Promise.resolve(answer);
   };
   return asked;
 }
@@ -289,7 +301,7 @@ describe('ReadingListsView', () => {
     it('opens the list in-window when the hand-off itself rejects', async () => {
       const { document } = seeded();
       installBridge(new FakeStore(document));
-      installPopOut(Promise.reject(new Error('no bridge')));
+      installPopOut(() => Promise.reject(new Error('no bridge')));
       await render();
 
       await ctrlClick(host.querySelector('.rlv__card-open'));
