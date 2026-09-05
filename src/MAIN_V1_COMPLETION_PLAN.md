@@ -1397,15 +1397,31 @@ share the words. `JoJo … Ougon no Kaze 字幕` → **0**. `Date a Live 字幕`
 (`BIG5_MP4`), correctly scoring zero signals — a useful negative check that this turn's widening
 did not turn 22 video releases into packs.
 
-**So the honest next action is a re-listing, not another search.** The plan already records that
-`The Big O`'s 6 title-matched rows were **all dropped for `shape`** and `Date a Live II`'s 5 were
-2 `muxed` + 3 `shape` — and those verdicts were taken **before** the word-order fix. `shape` is
-exactly the bucket a release lands in when `subtitlePackSignals` returns `[]`, which is the defect
-this turn fixed. Re-run the listing for those three titles after the restart; if one converts to
-`sub-pack`, gate 11 has its true subject and the record clause is reachable. If none does, say so
-with the drop counts and record that Route A has no subject in this library — an honest result the
-gate can be closed or amended against, but **not** something to fake by attaching Conan cues to a
-Big O episode.
+**RE-DERIVED, and the answer is NO — no restart was needed to get it.** The obvious next action was
+to re-list those titles after a restart, because `shape` is exactly the bucket an empty
+`subtitlePackSignals` produces and their old verdicts predate the fix. That question is now
+**answered offline**: the raw index rows were dumped live (`g14-live.cjs dump`, 75 rows each) and
+run through the product's **own** `rankSubtitleCandidatesDetailed` with `languages: ['ja']` — the
+fix is in the tree, so vitest reads the fixed module even though main has not restarted.
+
+| title | rows | candidates | drops |
+| --- | --- | --- | --- |
+| The Big O | 75 | **0** | titleMatched 7, title 68, **shape 7**, muxed 0, language 0 |
+| Date a Live II | 75 | **1** | titleMatched 21, title 54, shape 16, muxed 4, language 0 |
+
+Date a Live II's single candidate is a **`batch-sidecar`, 5,427 MB, 0 seeders** — not Route A, and
+unfetchable regardless. **So Route A has no subject in this library even with the fix**, and the
+word-order defect was never what stood between The Big O and a pack: its 7 title-matched rows are
+genuinely not subtitle releases.
+
+**What gate 11 therefore is, stated honestly rather than forced.** Its clauses split cleanly:
+*"a subtitle-only release under the 50 MB ceiling is taken whole"* has a real subject today (the
+Conan pack) and is drivable in one turn; *"lands as a `SubtitleRecord`, and its cues render in the
+player"* requires a library item the cues genuinely belong to, and this library has none for any
+title with a Route A pack. The next turn owning the app should drive the fetch clause, report the
+file counts, and then make the scope call under the standing auto-approval — amend the gate to its
+measurable half and record the rest as blocked on library contents, or hold it open. **What it must
+not do is attach Conan cues to a Big O episode to make three clauses read green.**
 
 **Attribution note, so the log is not read wrong.** The first fix's blobs are inside `971dc4d4`,
 a *concurrent* worker's liquid-scorecard commit. Two `primary` sessions share one git index here;
