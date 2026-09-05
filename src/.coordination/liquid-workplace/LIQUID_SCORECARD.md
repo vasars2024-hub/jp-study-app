@@ -6237,3 +6237,108 @@ rate** — the same warning RULE E carries about its own 6 → 25 jump.
 Required rate falls from `39 / 1.90 = 20.5` to `28 / 1.87 = 15.0` cells/day. That is still far
 above any trailing rate this track has recorded, so **TARGET AT RISK is unchanged** and the
 correction rescues nothing. It only makes the gap the true one.
+
+---
+
+## 2026-09-05 09:06-09:45 EDT, `backup` — cat7/translate on the QUIET machine everyone asked for. It STAYS OPEN, and the idle arm falsifies both standing attributions
+
+**sampled-out this turn: every surface except `translate`.** The last two handoffs both named this
+cell and both said the same thing: it needs a quiet machine, not more effort. The machine was
+quiet — **CPU 27%, no `ClaudeRelay-*` dispatch Running but my own, and I reduced three stale
+Electron instances to ONE**, so the run also owns the localStorage store rather than falling back
+to in-memory defaults. Instrument: `probes/cat7-perf.cjs --surface translate`, **zero new
+probes** (RULE 1).
+
+### The warm-up is LIVE on the real profile, and its four-sentence decay is confirmed on real data
+
+`e8cf934e` + `f72b25ae` had only node-process numbers behind them. Both boots printed their
+receipt, on the **default 537 MB `dict.db`**, not a scratch profile:
+
+    boot 1, cold OS cache   5186 ms total — frequency 2553, tokenizer 1111, interlinear 740/370/223/143
+    boot 2, ~6 min later    1119 ms total — frequency  505, tokenizer  376, interlinear  40/45/33/23
+
+The `740 → 370 → 223 → 143` decay is `f72b25ae`'s premise measured in the product for the first
+time. **Boot 2 is the number to notice**: the same warm-up cost 4.6x less six minutes later with
+nothing changed but the OS file cache, which is worth knowing before anyone tunes it again.
+
+### Four runs, all four PROVEN, one scene, one process
+
+Every run re-armed `.tr-textarea` with the same 48-character passage and every run's `heavyProof`
+confirms it drove: *"40 swaps across 2 pairs over 19->19 sense tokens, back at 日本語>English"*.
+Scene **identical** in all four — 1 `.fwin`, 374 `.fwin` elements, 489 document elements,
+viewport 1904x993, dpr 1, pid 41072 throughout — so the scene is not the variable.
+
+| run | uptime | main RSS before | heavy p50 / p95 / **MAX** | idle p50 / p95 / **MAX** | score |
+| - | - | - | - | - | - |
+| 1 | 340 s | 1,046.9 MB | 2.0 / 23.8 / **3,270.8 ms** | 2.2 / 51.0 / **948.3 ms** | 0 |
+| 2 | 438 s | 3,144.6 MB | 2.1 / 61.8 / **445.7 ms** | 2.1 / 6.7 / **510.7 ms** | 10 |
+| 3 | 525 s | 609.2 MB | 2.2 / 4.5 / **34.6 ms** | 2.2 / 3.6 / **21.7 ms** | 10 |
+| 4 | 747 s | 2,960.9 MB | 2.2 / — / **707.1 ms** | — / — / **211.5 ms** | 0 |
+
+**cat7 STAYS OPEN. 2 of 4 are over the 500 ms bar and the worst is 6.5x over.** The previous
+handoff set the condition as "3/3 under the bar"; this is 2/4. I am not closing it on the two
+good runs, and run 3's 34.6 ms is exactly the single reading that would have closed it falsely.
+
+### The finding that redirects this cell: the IDLE arm carries the block too
+
+**The idle leg drives nothing on the surface** — it watches main availability for the same 20 s
+beside the heavy leg. It went **over the 500 ms bar in 2 of 4 runs (948.3 ms, 510.7 ms)** and
+tracked the heavy arm up and down across all four.
+
+That falsifies **both** standing attributions for this cell:
+
+- **Not per-swap cost.** 40 swaps cannot appear in a leg that performs zero swaps.
+- **Not the cold gloss-language statements** the 08:25 entry proposed and explicitly asked to have
+  tested before being repeated. Tested. It is not that: the same block arrives with no gloss
+  language being switched.
+- **Not a monotonic per-process warming curve either**, which is where runs 1-3 were pointing:
+  run 4 at 747 s went back UP to 707.1 ms after run 3's 34.6 ms. Nothing about a warm-up runs
+  backwards.
+
+What is left is **episodic main-process work that is not on this surface at all** — it blocks
+main for hundreds of milliseconds to seconds whether or not Translate is being driven. Main RSS
+swinging 609 → 3,145 MB across runs minutes apart is the loudest available correlate and the
+first place to look; it is a correlate, not a cause, and I am not claiming otherwise.
+
+**Consequence for whoever takes this next: stop optimising the translate path.** The next slice
+is to sample main during a leg where the surface is idle and find out what is running.
+
+### Comparability with the 4,240.5 ms of the 08:25 entry — do NOT read this as the warm-up working
+
+Two things changed besides the fix, and both favour the new number: the earlier run was on
+`~\.claude-runs\backup-scratch-profile` (375 MB `dict.db`) against a **1,527-element, 6-window**
+desk; this one is the default 537 MB profile on a **489-element, 1-window** desk. Category 7 cost
+is linear in open-window elements. **The improvement is real but it is not cleanly attributable**,
+and quoting `4,240.5 → 34.6` would be the same error `4dd5c722` retracted two turns ago.
+
+### CORRECTION 61 — a wrong-window hazard that produced a clean-looking 646.8 ms, and the harness fix
+
+A run before the table above scored heavy **646.8 ms** and VOIDed on
+`heavyProof: "REFUSE: the load never armed"`. The cause: `resolveWindow(undefined)`
+(`src/main/debugBridge.ts:170`) returns the **focused** window. This machine has two desk
+windows, Translate was open in both, I armed window **1** through `/eval`, and the probe drove
+window **2** — unarmed. Every refusal passed, because `.tr-view` was present and exactly one
+`.fwin` titled "Translate" was visible there too. **The 646.8 ms was 40 swaps over an EMPTY
+interlinear and reads exactly like a surface that got faster.** The only tell was
+`documentElements: 162` in the scene block against 493 in the window I had armed.
+
+Fixed in `cat7-perf.cjs`: the OS window is now **pinned** for the whole run (so focus moving
+between the ceiling leg and the heavy leg can no longer relocate the probe mid-run) and
+**reported** as `surfaceWindow.osWindow`. Verified by run 4, which named it in one line:
+
+    "osWindow": { "id": 2, "title": "日本語 Study", "url": ".../?desk=0&displayKey=...",
+                  "focused": true, "visibleWindows": 2, "pinnedBy": "focused-at-start" }
+
+`visibleWindows: 2` is the whole diagnosis. **Arm every desk window, or pass `--win <id>`.**
+
+### One environment trap re-confirmed, because it cost 12 minutes
+
+The first `npm start` came up a **husk**: `/health` `ok`, both windows `visible:true`, Vite
+serving — and `url: ""`, `/logs` holding one entry, every `/eval` hanging at 30 s including
+`1+1`. Killing electron alone is not enough; the two `electron-forge` node children hold the
+port. Kill those too, then `npm start`. Second attempt loaded normally.
+
+### Where `translate` stands
+
+**7 of 8: cat1-cat6 and cat8 at 10/10. cat7 OPEN.** Running total **164 of 192, 28 remaining**
+per the enumeration entry above (`b815d159`) — **no cell moved this turn.**

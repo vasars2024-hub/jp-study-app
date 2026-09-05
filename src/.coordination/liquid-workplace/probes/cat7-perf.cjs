@@ -1842,6 +1842,10 @@ if (PLAYER_FRAMES && !spec.videoSelector && !SELECTOR) {
  * time; `--win <id>` overrides it. Both unset is the old, focused-window behaviour.
  */
 let WIN = arg('win', '');
+const WIN_FROM_CLI = WIN;
+// Correction 61: the OS window every /eval and every interaction leg of this run actually
+// reached. Reported in `surfaceWindow` so an arm/measure mismatch is visible, not forensic.
+let pinnedWindow = null;
 
 const cfg = JSON.parse(fs.readFileSync('debug/bridge.json', 'utf8'));
 const H = { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json', Connection: 'close' };
@@ -1911,6 +1915,36 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
     }
     WIN = String(hit[0].id);
   }
+  /*
+   * CORRECTION 61 - "both unset is the old, focused-window behaviour" was not a neutral
+   * fallback, it was a silent WRONG-WINDOW hazard, and it cost a whole cat7 run on 2026-09-05.
+   *
+   * `resolveWindow(undefined)` in `src/main/debugBridge.ts:170` returns
+   * `BrowserWindow.getFocusedWindow()`. On a two-desk machine the surface can be open in BOTH
+   * windows, so arming one of them through /eval with `window: 1` and then running this probe
+   * armed a window the probe never touched. Every refusal above passed -- `.tr-view` was
+   * present, exactly one `.fwin` titled "Translate" was visible, the root had elements -- so
+   * the run went all the way to the heavy leg before `heavyProof` caught it with
+   * "REFUSE: the load never armed", and the leg still published a 646.8 ms max that reads
+   * exactly like a surface that got faster. The ONLY tell was `documentElements` 162 in the
+   * scene block against 493 in the window that had actually been armed.
+   *
+   * Two things are fixed here and both matter. The window is PINNED for the whole run, so a
+   * focus change between the ceiling leg and the heavy leg can no longer move the probe from
+   * one window to another mid-run. And it is REPORTED, so the next mis-arm is one line of
+   * output instead of element-count forensics.
+   */
+  if (!WIN) {
+    const h = await get('/health');
+    const live = (h.windows || []).filter((w) => !w.destroyed && w.visible);
+    if (live.length === 0) throw new Error('REFUSE - /health reports no visible window to measure.');
+    const pick = live.find((w) => w.focused) || live[0];
+    WIN = String(pick.id);
+    pinnedWindow = { id: pick.id, title: pick.title, url: pick.url, focused: !!pick.focused, visibleWindows: live.length, pinnedBy: 'focused-at-start' };
+  } else {
+    pinnedWindow = { id: Number(WIN), pinnedBy: WIN_FROM_CLI ? 'explicit --win' : `spec.winMatch "${spec.winMatch}"` };
+  }
+
   const mem = await get('/mem');
   if (!mem.ok) throw new Error('REFUSE - /mem did not answer; main memory is part of this score');
   if (mem.uptimeSec < 120) {
@@ -2242,7 +2276,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, rendererPid: baseline.pid },
       surfaceWindow: {
         mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
-        matched: found.matched, deskWindows: found.windows, titles: found.titles,
+        matched: found.matched, deskWindows: found.windows, titles: found.titles, osWindow: pinnedWindow,
       },
       legs, findings, voided, score,
     };
@@ -2414,7 +2448,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec },
       surfaceWindow: {
         mechanism: found.rootInFwin ? 'floating .fwin' : 'root OS window',
-        matched: found.matched, deskWindows: found.windows, titles: found.titles,
+        matched: found.matched, deskWindows: found.windows, titles: found.titles, osWindow: pinnedWindow,
         rootElements: found.rootElements,
       },
       legs: { scored, control, restored, controlRate: CONTROL_RATE, controlFired },
@@ -2980,6 +3014,7 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       elements: found.rootInFwin ? found.matchedElements : found.rootElements,
       deskWindows: found.windows,
       titles: found.titles,
+      osWindow: pinnedWindow,
     },
     process: { pid: mem.pid, uptimeSecAtStart: mem.uptimeSec, mainRssMbBefore: mem.rssMb, mainRssMbAfter: memAfter.rssMb, mainHeapUsedMbAfter: memAfter.heapUsedMb },
     sessionCeiling: {
