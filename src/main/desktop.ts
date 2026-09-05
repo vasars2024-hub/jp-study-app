@@ -695,6 +695,11 @@ class DesktopStore {
     const nextLayout = this.normalizeLayout(payload.layout, index);
     // A commit carries geometry only; the name is owned by renameDesktop.
     nextLayout.name = previous?.name ?? defaultDesktopName(index);
+    // Epochs belong to main. An echoed snapshot (including an older epoch) is
+    // not a layout edit and must not write/broadcast again: a synchronous
+    // Windows rename here was observed blocking the main loop for 1.22 s.
+    nextLayout.layoutEpoch = previous.layoutEpoch;
+    if (JSON.stringify(nextLayout) === JSON.stringify(previous)) return { ok: true };
     this.schema.desktops[index] = nextLayout;
     this.schema.desktops[index].layoutEpoch += 1;
     this.schema.globalZTop = Math.max(

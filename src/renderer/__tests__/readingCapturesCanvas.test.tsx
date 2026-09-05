@@ -147,6 +147,25 @@ describe('Captures through the L6 reading canvas', () => {
     expect(h.container.querySelectorAll('.reading-captures-row').length).toBe(2);
   });
 
+  it.each([500, 1200])('reveals a selected capture at %i px without removing docked navigation', async (width) => {
+    const h = await mountAt(width);
+    const row = h.container.querySelectorAll<HTMLButtonElement>('.reading-captures-row')[1];
+    const title = row.querySelector('.reading-captures-row-title')!.textContent;
+    await h.click('.reading-captures-row', 1);
+
+    expect(h.container.querySelector('.reading-captures-reader-head h2')!.textContent).toBe(title);
+    expect(h.doc().hasAttribute('inert')).toBe(false);
+    expect(h.doc().getAttribute('aria-hidden')).toBe(null);
+    if (width === 500) {
+      expect(h.tool('captures')).toBe(null);
+      await h.click(TOGGLE);
+      expect(h.tool('captures')!.dataset.placement).toBe('sheet');
+    } else {
+      expect(h.tool('captures')!.dataset.placement).toBe('docked');
+    }
+    expect(h.container.querySelector('.reading-captures-row[aria-current="true"] .reading-captures-row-title')!.textContent).toBe(title);
+  });
+
   it('keeps the capture list itself across a placement change', async () => {
     // Bullet 2's "capture" on the surface that owns it. This list is a scrolled
     // history; before `ReadingCanvas` grouped by declared side, narrowing the
