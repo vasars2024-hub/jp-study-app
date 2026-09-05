@@ -6367,3 +6367,76 @@ per the enumeration entry above (`b815d159`) — **no cell moved this turn.**
   not every possible main-loop pause. No absolute timing improvement or cat7 closure claimed.
 - Next: Anki's five-minute poll retains every note's full HTML fields until the final fold;
   reduce that retained payload while preserving note counts, interval merge and profile cancellation.
+
+## 2026-09-05 13:35 EDT — backup — `reading-captures` OPENED: cat8 and cat1 both 10/10
+
+Recovery turn. The worker that died at 09:54 left an untested edit in the tree; it is finished
+and committed as `7d962c2b`, and the surface it repairs is the one scored here.
+
+**Two cells closed. 168 → 170 of 192, 22 remaining.**
+
+### The surface, and why it is a real subject rather than a harness
+
+`@.reading-captures`, in the Reading Finder window, on a PRIVATE instance
+(`JP_USER_DATA_DIR=~\.claude-runs\bk-t1-profile`, `JP_DEBUG_PORT=39360`) seeded with the real
+`reading-lens-history.json` copied out of the user's userData — **42 entries, 28,841 bytes**,
+20 mounted at a time by `VirtualList`. Read-from-production, write-to-scratch: the user's own
+store was never opened for writing and their Electron (pid 36988 + 6 children) was never touched.
+A bare scratch profile would have scored an empty list, which the rubric caps at 0.
+
+### cat8 — honest states, PASS 10/10
+
+`cat8-honest-states.cjs --surface "@.reading-captures" --win 1 --drive-input
+".reading-captures-search" --drive-value "zzzzzzzz" --langs --control`. Zero new probes.
+
+    rawKeyCount 0    placeholderCount 0    mutePairCount 0
+    statesNamed 1 of 1 observable (empty; loading/error/offline notObservable)
+    languagesDiffer true
+
+Control moved all three counts 0 → 1 → 0 and returned to baseline.
+
+**`statesNamed` is 1 of 1 and that denominator is honest, not flattering** — see the trap below
+for why loading and error genuinely cannot be produced from outside the app. The error branch's
+evidence is `7d962c2b`'s 21 tests and its two mutation controls, not this run.
+
+**The first `--langs` run VOIDed**: "no ui-language card on screen". The leg drives
+`#ui-language` in Settings > Appearance and refuses to click a bare `.sp-seg-btn` because the
+Subtitle & transcription segment matches it too. Open Settings > Appearance FIRST, in the same
+OS window, then raise the surface's own window — both stay mounted and the leg passes.
+
+### cat1 — accessibility, PASS 10/10 (after correction 62)
+
+`cat1-accessibility.cjs --surface "@.reading-captures" --win 1 --control`. Zero new probes.
+
+    minRatio 5.15    smallestHit 32.99 (button.reading-captures-refresh, rect 32x32, not shrunk)
+    controls 25      unreachable 0      focusHosts 0      motionAfter 0
+
+All six control legs fire. **It VOIDed three times first, and the cause was the probe** —
+correction 62, committed with the fix: removing the plant re-renders the surface, and both
+`.reading-captures-reader-head` toggles reported "focus() did not take" during that commit.
+`restoredUnreachableAfterSettle: []` is the proof. Those two buttons share a class and are NOT
+a duplicated control — one is the capture list, one is Live Captions.
+
+### TRAP — `window.api` is FROZEN, so a renderer-side stub of any preload binding silently no-ops
+
+I tried to drive the surface's error state live by replacing `window.api.lensHistoryList` with a
+rejecting stub and clicking refresh. The surface kept its 20 rows and its passage and rendered no
+error — which reads exactly like "the fix works". It is not evidence of anything:
+
+    Object.isFrozen(window.api)  true
+    descriptor.writable          false
+    assignmentTook               false
+
+The assignment never took, so no failure ever occurred and I measured the untouched happy path.
+The restore "worked" for the same reason. **Any conclusion drawn from patching `window.api` in
+this app is void** — contextBridge hands the renderer an immutable object. This is a false-PASS
+generator: it produces the reading you were hoping for, from a surface you never perturbed.
+Drive a failure from MAIN, or accept the unit test as the evidence and say so.
+
+### RULE D — liquid. Closed this turn: **2 cells. 170 of 192, 22 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 13:35 EDT: **1.8924**.
+`22 / 1.8924 = 11.63 cells/day` required. Trailing: **≤8 cells across the last 10 liquid turns**.
+**Required 11.63 against ≤8-per-10-turns: TARGET AT RISK, twelfth consecutive turn.**
+Single biggest cause, unchanged and again illustrated here: opening a surface costs more than
+scoring it. Of this turn, one cell went to finishing another worker's product fix and one went to
+repairing the instrument that was voiding a correct score. Reported, not fixed by cutting scope.
