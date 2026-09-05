@@ -6270,3 +6270,88 @@ receipt — the question stops being arguable.
 sampled-out: every other scorecard surface; this entry scores NO cell.
 **`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
 39 remaining, unchanged this turn.**
+
+---
+
+## 2026-09-05 09:10-09:40 EDT, `primary2` — RETRACTION of my own entry above: cold pages are NOT 9% of cat7's spike, and one timing on this machine is worth nothing
+
+**This entry scores no cell and it withdraws a number I published forty minutes ago.** The
+section directly above says cold `dict.db` pages cost **539.8 ms** for 20 tokens, therefore
+"about **9%** of the observed spike", therefore *"cold `dict.db` pages are too small to be the
+explanation."* **That conclusion is wrong and I am withdrawing it.** The measurement was real;
+the inference from it was not, for two independent reasons, both now measured.
+
+### Reason 1 — the probe measured about an eighth of the work `lookup()` does
+
+I listed my omissions honestly in that entry, but I did not price them, and one of them is the
+whole ballgame. `readSenses` runs **one `glosses` query per sense**, against a different and
+larger index than `headwords`. For these same 20 tokens that is **836 gloss queries**, and my
+probe ran zero of them.
+
+Priced, on warm pages, three fresh processes each:
+
+| arm, 20 tokens | warm |
+| --- | --- |
+| headword probes only — what I measured before | 6.1 / 6.2 / 7.9 ms |
+| **+ glosses per sense + the prefix probe** | **51.3 / 53.8 / 67.0 ms** |
+
+**8.4x.** So the earlier 539.8 ms was roughly **12%** of the SQL leg, not the whole of it, and
+scaling it puts the cold SQL cost in seconds — the same order as the thing it was being used to
+exonerate. **Corrected conclusion: cold pages are a leading candidate for cat7's block, not a
+ruled-out one.** Which means the shipped `9cee1e0e` warm-up should have prevented it, which
+makes "did the warm-up actually run?" the live question — and that is exactly what `8dd16ea6`'s
+receipt now answers. The fix I landed is more clearly right than the reasoning I published with it.
+
+### Reason 2 — and this one outranks reason 1: a single timing here is not evidence
+
+Same probe, same 20 tokens, same database, six fresh processes over thirty minutes:
+
+| # | state | headword probes | + glosses + prefix |
+| --- | --- | --- | --- |
+| 1 | cold | 539.8 ms | not run |
+| 3 | cold | 394.4 ms | **1,443 ms** |
+| 4 | cold, machine contended | **2,715.3 ms** | **13,154.7 ms** |
+| 2 | warm | 13.7 ms | not run |
+| 5 | warm | 16.6 ms | 67.0 ms |
+| 6 | warm | 13.3 ms | 53.8 ms |
+| 7 | warm | 12.6 ms | 51.3 ms |
+
+**Warm is reproducible and tight** (12.6-16.6, and 51.3-67.0, n=3-4). **Cold is high and wildly
+variable** — and run 4 was taken *seconds after* run 3 had warmed those exact pages, on a
+machine running several relay workers. **The same query set spans 51 ms to 13,155 ms: a factor
+of 258.** I ran run 4 expecting it to be the fastest of the set, as a control that the cold
+readings were real. It came back the slowest by 9x, which is what forced this section.
+
+**So `backup`'s 5,886.0 ms swap-2 spike, its 4,240.5 ms longest block, and every number I
+published above are all SINGLE readings on a contended machine.** None of them is safe to build
+on. This is `one-gesture-reading-is-noise` at three orders of magnitude, on the one surface
+where four turns have now been spent chasing a point estimate.
+
+### The kuromoji hypothesis, raised and killed in the same turn
+
+`analyzeInterlinearPartOfSpeech` awaits `getMainJapaneseTokenizer()`, which builds kuromoji's
+IPADIC **once per process**, lazily. That fits `backup`'s data suspiciously well: one spike per
+process, on the first full interlinear, cheap forever after. Measured directly, with an event
+loop sampled every 5 ms:
+
+    buildMs 748.5   loopMaxGapMs 26.3   gaps over 100 ms: 0   tokenize 2.3 ms, again 1.2 ms
+
+**748 ms of wall, and it does not hold the loop** — kuromoji's build is chunked, so it lengthens
+the first interlinear's latency but is not the multi-second *freeze*. Hypothesis raised, tested,
+**disconfirmed**, and written down so the next worker does not spend a turn re-raising it.
+
+### What the next cat7 run must do differently
+
+1. **Repeat, or do not report.** Three readings minimum per arm; publish the spread, never a
+   single number. A cat7 cell decided on one swap is not decided.
+2. **Read the receipt first.** `<userData>/logs/main.log`, `operation=page-warmup`. If it says
+   `status=warmed fileBytes=537...`, the pages were resident at T+5s and the remaining block is
+   elsewhere; if it says anything else, that is the whole answer and it costs one grep.
+3. Note that `9cee1e0e` is documented as **"One boot, one warm-up"**, deliberately. Runs 3 and 4
+   show pages going cold again on this machine within the hour, so that policy may simply be
+   defeated by real eviction pressure — but **that is a hypothesis, not a finding**, and it
+   needs the repeat protocol in (1) before anyone acts on it.
+
+sampled-out: every other scorecard surface; this entry scores NO cell.
+**`translate` stays 7 of 8 — cat1-cat6 and cat8 at 10/10, cat7 OPEN. Running total 161 of 200,
+39 remaining, unchanged this turn.**
