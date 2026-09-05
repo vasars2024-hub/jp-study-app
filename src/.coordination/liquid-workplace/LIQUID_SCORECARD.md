@@ -5905,3 +5905,82 @@ unchanged at **161 of 200 cells** — the 161 was already correct, because the b
 **The lesson, and it is the same one the boss-audit instrument taught on 2026-08-31:** when a
 standing count and the sections above it disagree, the count is the thing to distrust. Re-derive a
 "where X stands" line from the sections, never from the previous "where X stands" line.
+
+---
+
+## 2026-09-05 ~13:10-14:20 EDT, `backup` — `translate` cat7 STAYS OPEN. `f9541e9e` is worth 6.5x and it is still 8.5x over the bar.
+
+**sampled-out this turn: `city` `immersion` `reading` `files` `player` `anki` `dictionary` `music`
+`flashcards`** — this entry measures exactly one cell, `translate` cat7, because the previous
+handoff named it as needing "ONE `cat7-perf.cjs` run after an app restart and nothing else".
+That was true about the *procedure* and wrong about the *outcome*: the run happened and the cell
+does not close.
+
+Instrument: `probes/cat7-perf.cjs --surface translate`, **zero new probes** (RULE 1).
+
+### The restart IS the mutation control, and it is a better one than the fix's own unit tests
+
+`f9541e9e` is a main-process change, so it was inert in the running app. Rather than restart and
+measure once, I measured the SAME passage, in the SAME profile, on the SAME 6-window scene, on
+the old main and then on the new one. The restart is the only thing that changed between them.
+
+    passage   猫が好きです。毎朝公園を散歩しながら、野良猫を見つけるのが楽しみです。彼らは自由に生きています。
+              48 characters, 20 `.lexicon-sense-token` at arm — IDENTICAL in both runs
+    scene     6 `.fwin` both runs, same six titles, viewport 1264x821, dpr 1
+    profile   ~\.claude-runs\backup-scratch-profile — dict.db 375 MB, a real dictionary
+
+| leg | BEFORE (main of 09-04, pre-fix) | AFTER (restart onto `f9541e9e`) |
+| --- | --- | --- |
+| heavy, longest main block | **27,585.2 ms** | **4,240.5 ms** |
+| heavy, p95 | 2,640.5 ms | **11.6 ms** |
+| heavy, p50 | 2.5 ms | 2.2 ms |
+| heavy, **samples taken in the window** | **22** across 30,900 ms | **471** across 20,020 ms |
+| heavyProof | `REFUSE: the interlinear never came back within 12009 ms (20 at arm)` | `40 swaps across 2 pairs over 20->20 sense tokens, back at 日本語>English, interlinear recovered in 856 ms` |
+| idle, max | 37.3 ms | 30.0 ms |
+
+**The sample count is the number to read first.** The availability sampler asks main for a tick
+about 24 times a second. Before the fix it landed **22 ticks in 31 seconds** — main was
+unavailable for essentially the whole leg. After, **471 in 20 seconds**, which is the healthy
+rate. p95 falling from 2,640.5 ms to 11.6 ms says the same thing from the other side: the typical
+moment during a 40-swap burst went from a two-and-a-half-second freeze to a normal frame.
+
+**And the leg that could not even prove it ran now proves it.** `heavyProof` REFUSED before,
+because the interlinear never rebuilt inside the 12 s poll; the whole run was unscoreable for
+that reason alone. It now rebuilds in **856 ms**.
+
+### The honest part: the cell does NOT close, and I am not rounding it
+
+**4,240.5 ms against a 500 ms bar is 8.5x over.** `f9541e9e` removed 85% of the block and the
+remainder is still a failure by the rubric's own number. Both runs also scored `VOID` overall,
+on different legs — BEFORE on `heavy leg left no proof it ran`, AFTER on
+`resize: readings disagree across repeats (clean, BREACH, clean, BREACH, clean); UNSTABLE`.
+
+**Where the remaining 4.2 s almost certainly is, stated as an attribution to TEST and not as a
+result.** It is one outlier in 471 samples: p50 2.2 ms, p95 11.6 ms, max 4,240.5 ms. A single
+4.2 s gap in an otherwise clean distribution is not a per-swap cost — 40 swaps at 106 ms each
+would flatten into p95, and p95 is 11.6 ms. The shape says **one cold pass**, most likely the
+first swap into a gloss language whose statements are not yet in the new `prepareCached` map,
+after which the leg alternates between two now-warm languages. If that holds, the fix is to warm
+or share the per-language statements, and the bar is reachable. **Nobody has measured this. Do
+not repeat it as a finding** — the previous turn's cat7 attribution was wrong in exactly this
+way and re-deriving it was that turn's whole slice.
+
+**One instrument caveat recorded rather than smoothed over:** `fwinElements` was 2,086 before and
+1,527 after. Same six windows, but the pre-restart desk had been driven for 21 hours and carried
+more built-out interiors. Category 7 cost is linear in open-window elements, so the AFTER scene
+is the *lighter* one — which makes the improvement a floor, not a ceiling, and does not rescue
+the 4,240.5 ms.
+
+### Where `translate` stands
+
+**7 of 8: cat1-cat6 and cat8 at 10/10. cat7 OPEN with the number above.** Running total
+**161 of 200 cells, 39 remaining** — **no cell moved this turn.** See the correction directly
+above for why the previous "5 of 8" line was wrong; that correction moved no cell either.
+
+**Exact next slice for cat7:** test the one-cold-pass attribution before writing any more product
+code. Drive `.tr-swap` ONCE from a settled app with the passage armed, timing main availability
+across that single swap, then a SECOND swap back, then a third. If swap 1 carries the seconds and
+swaps 2-3 are tens of milliseconds, the attribution holds and the fix is statement warming. If
+all three are equal, it is per-swap query cost and the attribution above is wrong — say so.
+Remember an ODD number of swaps leaves `.tr-textarea` holding the empty output pane, which VOIDs
+the next full run; the spec comment in `cat7-perf.cjs` records that trap in full.
