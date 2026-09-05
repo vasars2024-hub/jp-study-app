@@ -7691,3 +7691,33 @@ An earlier full run in this same turn reported 6 failed files; **all 6 passed on
 suites, `i18n`) — the known parallel-run flake class, named in the 2026-09-05 boss audit as
 explicitly not committed regressions. The clean run above is the one that counts, and it is
 **after** both CSS slices.
+
+### CORRECTION to my own headline, same turn — "invisible **forever**" is stronger than my evidence
+
+`afe88e35`'s commit subject says the window "stayed invisible forever". **What I actually measured
+is narrower and I am withdrawing the stronger half.** Evidence I have: `/focus` returning
+`focused: true`, `document.hasFocus() === true`, a `/screenshot`, and close-and-reopen all left it
+at `fwinIn:running:0` — read 3 s later, i.e. 21x the 0.14 s duration, so a painting window would
+have finished and dropped the animation from `getAnimations()`. Evidence I do **not** have: what a
+physical raise by a human does. An animation resumes when frames resume, so the supportable claim
+is **"invisible until that window next paints, and I could not make it paint from the bridge"** —
+not "forever". The body of the commit and the scorecard entry above both state the narrow version;
+only the subject line overreaches, and this is the correction rather than an amend.
+
+**The fix is unaffected.** A window that is invisible until some unknown later repaint is a defect
+on either reading, and `consent-fade`'s blocking invisible backdrop is worse under both.
+
+### `.boot-logo` was checked and deliberately NOT included — it is a DIFFERENT construction
+
+Auditing the `NOT_USER_DRIVEN` list I encoded in the test: `.boot-logo` runs at launch, so it is
+plainly not user-driven and my first classification of it as "the other 12 are user-driven" was
+loose. It is excluded for a better reason. `styles.css:1223` puts **`opacity: 0` in the BASE rule**
+and `:1224` runs `bootLogo 2.7s ease forwards` to reveal it — so unlike `fwinIn`, whose base rests
+at 1, the base state here is genuinely invisible and removing the keyframe's opacity would fix
+nothing. Its parent at `:1216` is `bootOut 0.5s ease 2.2s forwards`, so a frozen boot leaves the
+`z-index: 9999` splash up rather than blank. Both self-heal when frames resume, and correcting it
+means restructuring `BootScreen.tsx`, not editing a keyframe. **Recorded as a known, bounded gap.**
+
+The remaining 11 (`cover-level-badge--flash`, `media-gen-dot`, `mwidget-lyrics-track`,
+`os-companion-spark`, `os-set-pane-anim`, five `game-*`, `scifi-loader`) are user- or
+playback-driven and decorative; none gates content or takes clicks.
