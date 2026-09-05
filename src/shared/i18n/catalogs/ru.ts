@@ -12537,4 +12537,6 @@ export const ru: Catalog = {
   'readingLists.view.coverReveal': 'Показать «{title}» в библиотеке',
   'seanimeDev.collapse': 'Свернуть панель вспомогательного сервиса',
   'seanimeDev.expand': 'Развернуть панель вспомогательного сервиса',
+  'immersion.rail.search': 'Поиск сохранённых сайтов',
+  'immersion.rail.noMatches': 'Совпадений нет. Очистите поиск, чтобы увидеть все сайты.',
 };

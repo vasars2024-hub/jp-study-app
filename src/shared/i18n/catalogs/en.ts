@@ -12055,4 +12055,6 @@ export const en: Catalog = {
   'readingLists.view.coverReveal': 'Show “{title}” in the library',
   'seanimeDev.collapse': 'Collapse sidecar panel',
   'seanimeDev.expand': 'Expand sidecar panel',
+  'immersion.rail.search': 'Search saved sites',
+  'immersion.rail.noMatches': 'No saved sites match. Clear the search to show all sites.',
 };

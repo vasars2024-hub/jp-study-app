@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ImmersionBody,
   ImmersionPopups,
+  ImmersionSiteSearch,
   ImmersionToolbar,
   IMMERSION_MODE_CYCLE,
   IMMERSION_STARTERS,
@@ -321,8 +322,9 @@ export default function ImmersionView() {
                 {sites.length === 0 && (
                   <p className="aero-immersion-rail-empty">Saved sites appear here. Bookmark any page.</p>
                 )}
+                <ImmersionSiteSearch state={state} />
                 <ul className="aero-immersion-site-list">
-                  {sites.map((s) => (
+                  {state.filteredSites.map((s) => (
                     <li key={s.id}>
                       <button type="button" className="aero-immersion-site" onClick={() => state.navigate(s.url)} title={s.url}>
                         <span className="aero-immersion-site-title">

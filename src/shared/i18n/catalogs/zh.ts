@@ -11404,4 +11404,6 @@ export const zh: Catalog = {
   'readingLists.view.coverReveal': '在书库中显示“{title}”',
   'seanimeDev.collapse': '折叠辅助面板',
   'seanimeDev.expand': '展开辅助面板',
+  'immersion.rail.search': '搜索已保存的网站',
+  'immersion.rail.noMatches': '没有匹配的网站。清除搜索以显示所有网站。',
 };

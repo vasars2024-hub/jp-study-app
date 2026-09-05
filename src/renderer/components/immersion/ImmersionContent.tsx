@@ -130,6 +130,11 @@ export function useImmersion() {
   const [error, setError] = useState<string | null>(null);
   const [readerHtml, setReaderHtml] = useState('');
   const [sites, setSites] = useState<ImmersionSite[]>([]);
+  const [siteQuery, setSiteQuery] = useState('');
+  const normalizedSiteQuery = siteQuery.trim().normalize('NFKC').toLowerCase();
+  const filteredSites = useMemo(() => sites.filter((site) =>
+    `${site.title} ${site.url}`.normalize('NFKC').toLowerCase().includes(normalizedSiteQuery),
+  ), [sites, normalizedSiteQuery]);
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const [popup, setPopup] = useState<PopupState>(null);
@@ -799,7 +804,7 @@ export function useImmersion() {
 
   return {
     t, MODE_LABELS,
-    urlInput, setUrlInput,
+    urlInput, setUrlInput, siteQuery, setSiteQuery, filteredSites,
     currentUrl, title, mode, loading, error, status, setStatus,
     readerHtml, readerHtmlProp,
     sites, history, histIdx, popup, setPopup,
@@ -1140,13 +1145,45 @@ export const IMMERSION_SITE_ROW_HEIGHT = 53;
  * Measured 883 saved sites laying out to 46,822px inside a 418px viewport —
  * 112x overdraw and 6,182 elements — with every row in the DOM.
  */
+/** Local search stays in the shared hook so a dock/sheet reflow keeps the draft. */
+export function ImmersionSiteSearch({ state }: { state: ImmersionState }) {
+  const { t, siteQuery, setSiteQuery, sites, filteredSites } = state;
+  if (sites.length === 0) return null;
+  return (
+    <>
+      <AnchorSurface as="label" className="immersion-site-search">
+        <Icon name="search" size={14} />
+        <input
+          type="search"
+          value={siteQuery}
+          onChange={(event) => setSiteQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && siteQuery) {
+              event.preventDefault();
+              event.stopPropagation();
+              setSiteQuery('');
+            }
+          }}
+          aria-label={t('immersion.rail.search')}
+          placeholder={t('immersion.rail.search')}
+        />
+      </AnchorSurface>
+      {filteredSites.length === 0 && (
+        <p className="immersion-rail-empty" role="status">{t('immersion.rail.noMatches')}</p>
+      )}
+    </>
+  );
+}
+
 export function ImmersionSiteList({ state }: { state: ImmersionState }) {
-  const { t, sites, currentUrl } = state;
+  const { t, sites, currentUrl, filteredSites, siteQuery } = state;
   return (
     <div className="immersion-rail">
+      <ImmersionSiteSearch state={state} />
       {sites.length === 0 && <p className="muted immersion-rail-empty">{t('immersion.rail.empty')}</p>}
       <VirtualList
-        items={sites}
+        key={siteQuery.trim().normalize('NFKC').toLowerCase()}
+        items={filteredSites}
         itemHeight={IMMERSION_SITE_ROW_HEIGHT}
         /* `lq-hit-scope` on the list, not on 20 identical rows: the remove button renders
            20x49, so it is under the floor on the x axis alone and every row repeats it. */
