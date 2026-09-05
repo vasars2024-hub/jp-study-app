@@ -4970,4 +4970,6 @@ on a live plant BEFORE landing: `denseWorkOnTranslucent` 0 → exactly 1, the pl
 | cat3 liquid utilization | **PASS 10/10** | driven to Liquid from Standard and restored. 46 regions — Work 3 / Liquid-eligible 4 / Anchor 37 / Ambient 2. `denseWorkOnTranslucent` **0**, eligible **4 of 4 treated** and **4 of 4 on a shared primitive**. Control: base [0,4,4,4,3] → planted [1,4,4,5,4] → restored [0,4,4,4,3]; `movedDense` true, `movedEligible` true, `sharedHeld` true, `cleaned` true, and `barsWhilePlanted` **denseWorkAnchored false, sharedPrimitives false** — "CONTROL FAILED AS REQUIRED - category 3 instrument is proven by plant". |
 
 **`novels` is 8 of 8 — 80/80, the 19th section.** Running total **19 of 25 sections at 80/80**;
-**48 category cells remain**.
+**51 category cells remain** — 56 at the start of this turn, minus cat5, cat6, cat7, cat8 and
+cat3. (Corrected in the same turn: this line first read 48, which was 52 − 4 instead of 52 − 1.
+The five cells closed are five, and 144 + 5 = **149 of 200**.)
