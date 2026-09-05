@@ -1207,6 +1207,27 @@ async function runKeyboard() {
     const dirtyHit = await hitArea();
     await ev(CONTROL_REMOVE);
     const restored = await run();
+    /*
+     * CORRECTION 62 — the restore read raced React, and it VOIDed a correct 10/10 three times.
+     *
+     * `unreachable` is measured by calling `focus()` and asserting `activeElement === el`. The
+     * plant is appended INTO the surface, so removing it re-renders it; a node focused during
+     * that commit is replaced under the probe and reports "focus() did not take". On
+     * `reading-captures` this named BOTH `.reading-captures-reader-head` buttons every run —
+     * the capture-list and Live Captions toggles, which share a class — while a plain run
+     * measured 25 controls and 0 unreachable, twice. The churn, not the surface.
+     *
+     * The assertion is NOT dropped: a re-read is taken after a settle and the restore is scored
+     * on that. A control that really leaked focusability leaks in both reads, so this cannot
+     * launder a real failure — it only stops a React commit from voiding a passing surface. Both
+     * reads are reported, so a disagreement is visible rather than smoothed away.
+     */
+    let restoreSettled = null;
+    if (restored.keyboard.unreachableCount !== base.keyboard.unreachableCount) {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      restoreSettled = await run();
+    }
+    const restoreRead = restoreSettled || restored;
     // Correction 31, and it cost `files` a whole scored category. The pointer leg used to be
     // `dirtyHit.belowFloorByHit > base.hit.belowFloorByHit` — a COUNT comparison — and the
     // plant is a 48px-tall flex row appended into a fixed-height `.fwin` flex column. On Files
@@ -1241,7 +1262,7 @@ async function runKeyboard() {
     const backToBaseline = restored.text.failingCount === base.text.failingCount
       && restored.text.decorativeSkipped === base.text.decorativeSkipped
       && restored.targets.wcag258FailCount === base.targets.wcag258FailCount
-      && restored.keyboard.unreachableCount === base.keyboard.unreachableCount;
+      && restoreRead.keyboard.unreachableCount === base.keyboard.unreachableCount;
     const rectDrift = restored.targets.under32Count - base.targets.under32Count;
     out.control = {
       moved,
@@ -1257,6 +1278,13 @@ async function runKeyboard() {
         dirty: [dirty.text.failingCount, dirty.targets.under32Count, dirty.targets.wcag258FailCount, dirty.keyboard.unreachableCount, dirtyHit.belowFloorByHit],
         restored: [restored.text.failingCount, restored.targets.under32Count, restored.targets.wcag258FailCount, restored.keyboard.unreachableCount],
       },
+      // A restore that fails on `unreachable` has to NAME its victims or the next worker cannot
+      // tell a real leak from virtual-list churn. Two VOIDs on `reading-captures` were read as a
+      // product defect until this line existed; both were the same two rows.
+      restoredUnreachable: restored.keyboard.unreachable || [],
+      // null unless the first restore read disagreed with the baseline; see correction 62.
+      restoredUnreachableAfterSettle: restoreSettled ? (restoreSettled.keyboard.unreachable || []) : null,
+      baseUnreachable: base.keyboard.unreachable || [],
     };
     if (!Object.values(moved).every(Boolean) || !backToBaseline) {
       out.verdict = 'VOID - negative control did not falsify';

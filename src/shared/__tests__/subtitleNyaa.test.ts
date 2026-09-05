@@ -121,6 +121,57 @@ describe('subtitlePackSignals', () => {
     expect(subtitlePackSignals('[Subtitle Pack] Show 01-24')).toContain('sub-pack');
   });
 
+  it('reads "only subs" as the same claim as "subs only"', () => {
+    // Measured live 2026-09-05 against the running app's own classifier: these
+    // two rows are the ONLY ones under the 50 MB ceiling in the whole
+    // `Detective Conan` listing — 5.3 MB / 12 seeders and 19.8 MB / 14 seeders,
+    // both carrying a Japanese track — and both scored zero signals, so the
+    // listing dropped them for `shape` and offered a 6.1 GB whole-site archive
+    // instead. Nothing about them is unusual except English word order.
+    const movies = 'Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]';
+    expect(subtitlePackSignals(movies)).toContain('subs-only');
+    expect(looksLikeSubtitleOnly(row({ name: movies, sizeBytes: 5_557_452 }))).toBe(true);
+    expect(subtitlePackSignals('Show - only subtitles')).toContain('subs-only');
+    // The forward order is unchanged; this is an addition, not a replacement.
+    expect(subtitlePackSignals('Show - subs only')).toContain('subs-only');
+  });
+
+  it('reads a payload stated in the format\'s own vocabulary', () => {
+    // The second and last genuine miss in the same 53-row live scan:
+    // `[ASS FILE ONLY] Goodbye Don Glees English Subs`, 0.1 MB, scored zero.
+    // Two guards fired in sequence — the group strip ate the leading bracket
+    // (and with it the only format tag), and what remained, `English Subs`,
+    // is a video-release phrase. The release is 0.1 MB of `.ass`.
+    const donGlees = '[ASS FILE ONLY] Goodbye Don Glees English Subs';
+    expect(subtitlePackSignals(donGlees)).toContain('format-tag');
+    expect(looksLikeSubtitleOnly(row({ name: donGlees, sizeBytes: 104_857 }))).toBe(true);
+    expect(subtitlePackSignals('Show 01-12 [SRT only]')).toContain('format-tag');
+  });
+
+  it('NEGATIVE CONTROL: a format tag alone does not claim the payload', () => {
+    // `only` has to follow the format within one word, or every soft-subbed
+    // episode that mentions its subtitle format becomes a pack.
+    expect(subtitlePackSignals('[Erai-raws] Show - 01 [1080p][ASS][Multi-Sub]')).toEqual([]);
+    // A leading bracket naming only the FORMAT is still a group tag: it is
+    // stripped, and the `English Subs` that remains vetoes the whole row. If
+    // the exemption keyed on the format token instead of the claim, this 1.4 GB
+    // episode would read as a subtitle pack.
+    expect(subtitlePackSignals('[ASS] Show - 01 [1080p] English Subs')).toEqual([]);
+  });
+
+  it('NEGATIVE CONTROL: "only" next to no subtitle word is still nothing', () => {
+    // The word this rule newly leans on is one of the commonest in English, so
+    // the rival is a real release name that carries it beside a DIFFERENT noun.
+    // If `only\s*sub` were loosened to "only … sub anywhere", this 370 KB row
+    // would become a pack on the strength of a disc-source tag.
+    expect(subtitlePackSignals('Sing a Bit of Harmony English Subs V2 [BD ONLY]')).toEqual([]);
+    expect(subtitlePackSignals('Show S01 [Dual Audio] [Sub and Dub] [BD ONLY]')).toEqual([]);
+    // And the ceiling — not the phrase — is what keeps a video release honest:
+    // the claim is read, and the size still refuses it.
+    expect(subtitlePackSignals('Show S01-S03 Only Subs Edition')).toContain('subs-only');
+    expect(looksLikeSubtitleOnly(row({ name: 'Show S01-S03 Only Subs Edition', sizeBytes: 15 * 1024 * MB }))).toBe(false);
+  });
+
   it('NEGATIVE CONTROL: a leading group tag is still stripped, phrase or not', () => {
     // The exemption is the phrase, not the vocabulary. If it leaked, every
     // `[SubsPlease]` episode on the index would read as a subtitle pack.
@@ -906,6 +957,30 @@ describe('selectSubtitleFiles', () => {
     expect(chosen.files.map((f) => f.index)).toEqual([2, 0]);
   });
 
+  it('refuses a Chinese-only sidecar set before the transfer, not after it', () => {
+    // The other half of the pair above, and the distinction is the whole point:
+    // `sc_jp`/`tc_jp` is bilingual and IS Japanese, while a bare `sc`/`tc` is
+    // Chinese and is not. Verbatim from the live gate-12 release of 2026-09-05,
+    // which ships twelve of each and used to read as unlabelled — so a `ja`
+    // harvest kept twelve, paid for a 26.4 GB torrent's worth of handshake and
+    // transfer, and only the post-download kana floor said no.
+    const files = [
+      file(0, '[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass', 40_000),
+      file(1, '[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass', 40_000),
+      file(2, '[孤独摇滚][02][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass', 41_000),
+      file(3, '[孤独摇滚][02][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass', 41_000),
+    ];
+    const refused = selectSubtitleFiles(files, { languages: ['ja'] });
+    expect(refused.reason).toBe('wrong-language');
+    expect(refused.files).toHaveLength(0);
+
+    // RIVAL: the same release is exactly what a `zh` harvest wants, so the
+    // refusal has to be about the ask and not about the names.
+    const wanted = selectSubtitleFiles(files, { languages: ['zh'] });
+    expect(wanted.reason).toBe('ok');
+    expect(wanted.files).toHaveLength(2);
+  });
+
   it('NEGATIVE CONTROL: distinct episodes are never collapsed, and unnumbered files are all kept', () => {
     // The failure this dedupe could cause is silent cue loss, so both shapes it
     // could eat are pinned. A 3-episode pack must stay 3 files, and two files
@@ -1033,6 +1108,35 @@ describe('episodeFromFileName / languageFromFileName', () => {
     expect(languageFromFileName('Japanese/Show.ass')).toBe('ja');
     expect(languageFromFileName('Subs/eng/Show.srt')).toBe('en');
     expect(languageFromFileName('Show - 07.ass')).toBeNull();
+  });
+
+  it('reads the simplified/traditional tag a CJK sidecar set uses', () => {
+    // The exact names off the live gate-12 release, 2026-09-05: 24 `.ass`
+    // files, twelve `.sc.ass` and twelve `.tc.ass`, all previously unlabelled —
+    // so a `ja` harvest kept every one and only found out after paying for the
+    // transfer.
+    expect(
+      languageFromFileName('【悠哈璃羽字幕组】[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].sc.ass'),
+    ).toBe('zh');
+    expect(
+      languageFromFileName('【悠哈璃羽字幕组】[孤独摇滚][01][BDRIP 1920x1080 HEVC-YUV420P10 FLAC].tc.ass'),
+    ).toBe('zh');
+    expect(languageFromFileName('Show - 07.big5.ass')).toBe('zh');
+    expect(languageFromFileName('Subs/简体/Show.ass')).toBe('zh');
+    expect(languageFromFileName('Subs/繁體/Show.ass')).toBe('zh');
+  });
+
+  it('takes the two-letter CJK tag only in the slot before the extension', () => {
+    // `sc` and `tc` are too short for the general delimiter rule: widening that
+    // rule instead would relabel a release group and a hyphenated title, and a
+    // wrongly-`zh` file is DROPPED from a `ja` harvest — a lost subtitle, which
+    // is worse than the wasted transfer this fix is removing.
+    expect(languageFromFileName('[SC] Show - 07.ass')).toBeNull();
+    expect(languageFromFileName('Show - tc - 07.ass')).toBeNull();
+    expect(languageFromFileName('Discs/sc/Show.ass')).toBeNull();
+    // Still Japanese: a name that states `ja` outranks a trailing tag, because
+    // the Japanese branch is asked first.
+    expect(languageFromFileName('Show - 07.ja.ass')).toBe('ja');
   });
 });
 

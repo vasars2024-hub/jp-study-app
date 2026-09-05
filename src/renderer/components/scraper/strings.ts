@@ -422,6 +422,8 @@ const TEXT = {
   'torrent.searchPlaceholder': 'Search releases…',
   'torrent.minSeeders': 'Min seeders',
   'torrent.matches': (n: number) => `${n} matching release${n === 1 ? '' : 's'}`,
+  'torrent.noIndexers': 'No torrent index in this profile — add one in Sources to search.',
+  'torrent.indexersAllOff': 'Every torrent index in this profile is turned off — enable one in Sources.',
   'torrent.send': (n: number) => `Send ${n} to qBittorrent`,
   'torrent.mirror': 'qBittorrent mirror',
   'torrent.mirrorDesc': 'Every transfer, with the peer, availability and piece detail the client’s own list leaves out.',

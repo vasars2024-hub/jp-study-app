@@ -61,6 +61,9 @@ async function mountWith(lensHistoryList: () => Promise<unknown>): Promise<Readi
 }
 
 const text = (h: ReadingSurfaceHarness): string => h.container.textContent ?? '';
+/** The reader's own text, or null when the passage is gone — the two are different failures. */
+const passage = (h: ReadingSurfaceHarness): string | null =>
+  h.container.querySelector('.reading-captures-passage')?.textContent ?? null;
 
 beforeEach(() => {
   installResizeObserver();
@@ -123,14 +126,14 @@ describe('Captures list states are mutually exclusive', () => {
 
     // The in-flight state must keep the reader and its selected row intact.
     expect(text(h)).toContain(LOADING);
-    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
+    expect(passage(h)).toBe(ENTRY.text);
     const newer = { ...ENTRY, text: '最新の文章です。' };
     await act(async () => pending[1].resolve([newer]));
     await act(async () => {
       if (completion === 'resolve') pending[0].resolve([]);
       else pending[0].reject(new Error('older request failed'));
     });
-    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(newer.text);
+    expect(passage(h)).toBe(newer.text);
     expect(text(h)).not.toContain(FAILED);
     expect(text(h)).not.toContain(EMPTY);
     expect(text(h)).not.toContain(LOADING);
@@ -142,11 +145,11 @@ describe('Captures list states are mutually exclusive', () => {
     list.mockRejectedValueOnce(new Error('temporary failure'));
     await h.click('.reading-captures-refresh');
     expect(text(h)).toContain(FAILED);
-    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
+    expect(passage(h)).toBe(ENTRY.text);
     expect(text(h)).not.toContain(EMPTY);
     await h.click('.reading-captures-refresh');
     expect(text(h)).not.toContain(FAILED);
-    expect(h.container.querySelector('.reading-captures-passage')!.textContent).toBe(ENTRY.text);
+    expect(passage(h)).toBe(ENTRY.text);
   });
 
   /*

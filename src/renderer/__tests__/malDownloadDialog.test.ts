@@ -56,10 +56,16 @@ function qbitReady(patch: Record<string, unknown> = {}): Record<string, unknown>
   };
 }
 
+/**
+ * Mutable for the same reason `qbitSettings` is: a disabled index is a real
+ * profile state and the dialog has to be shown one. Reset in `beforeEach`.
+ */
+let sourceEntries: Record<string, unknown>[] = [{ id: 'nyaa', kind: 'torrent', enabled: true }];
+
 vi.mock('../scraperSettingsStore', () => ({
   getActiveScraperSettings: () => ({
     sources: {
-      entries: [{ id: 'nyaa', kind: 'torrent', enabled: true }],
+      entries: sourceEntries,
       perSourceTimeoutMs: 8_000,
     },
     torrents: { indexerIds: [], minSeeders: 1, resolutionPriority: [1080] },
@@ -227,6 +233,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  sourceEntries = [{ id: 'nyaa', kind: 'torrent', enabled: true }];
   qbitSettings = {
     enabled: false,
     host: '',
@@ -380,6 +387,39 @@ describe('MalDownloadDialog — anime', () => {
     expect([...picker.options].map((option) => option.value))
       .toEqual(['torrent-client', 'qbittorrent']);
     expect(document.querySelector('.mal-dl-target-only')).toBeNull();
+  });
+
+  // Main V1 Track 9, gate 16's family, found live 2026-09-05: the dialog
+  // filtered candidate indexes by `kind` and `indexerIds` but NOT by `enabled`,
+  // while `searchTorrents` in main narrows by `enabled` as well. So a profile
+  // whose only index is switched off passed this guard, reached main, and came
+  // back `[]` — reported as "0 releases found", which is the sentence for a
+  // query that genuinely matched nothing. `TorrentManagerPage.tsx:110` had
+  // already learned exactly this ("a profile whose only index is switched off
+  // reaches nothing while passing the port's half"); this surface had not.
+  // The message was never the problem — it already says *enabled*.
+  it('names the disabled index instead of reporting an empty search', async () => {
+    sourceEntries = [{ id: 'nyaa', kind: 'torrent', enabled: false }];
+    stubApi({ scraperSearchTorrents: vi.fn(async () => []) });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(text()).toContain('No torrent index is enabled in this profile');
+    // The load-bearing half: it must refuse *before* the request, or the reason
+    // and an empty result table disagree about whether a search ever ran.
+    expect(api().scraperSearchTorrents).not.toHaveBeenCalled();
+    expect(text()).not.toContain('0 releases found');
+  });
+
+  // The rival the test above needs: with the only difference being `enabled`,
+  // the search must actually run. Without this, deleting the whole filter and
+  // refusing everything would read green.
+  it('searches when that same index is enabled', async () => {
+    sourceEntries = [{ id: 'nyaa', kind: 'torrent', enabled: true }];
+    stubApi({ scraperSearchTorrents: vi.fn(async () => [frierenRelease()]) });
+    await open(anime);
+    await act(async () => button('Find releases').click());
+    expect(api().scraperSearchTorrents).toHaveBeenCalledTimes(1);
+    expect(text()).not.toContain('No torrent index is enabled in this profile');
   });
 
   // No target at all is a third state, and it must not borrow either of the

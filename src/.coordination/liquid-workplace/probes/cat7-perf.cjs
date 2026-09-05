@@ -187,6 +187,71 @@ const scrollProof = `(() => {
 const scrollProgress = `(window.__lqScrollLoad ? window.__lqScrollLoad.ticks : -1)`;
 
 /**
+ * CORRECTION 47 — CAPTURES' HEAVY LEG HAD NO RECEIPT, so the whole category VOIDed.
+ *
+ * `captures` declared `js` and nothing else, and the harness refused the run with
+ * "heavy leg declares no proof, so 'select every capture in turn' cannot be told apart from
+ * an expression that refused: no proof, no claim". That refusal is CORRECT — the old
+ * expression returned `'clicking N'` the instant it scheduled the timeouts and would have
+ * said exactly that with N = 0, on a closed capture list, on a throttled timer, or with every
+ * click landing on a detached node. The numbers under it (drag p50 10.0 ms, resize p50 10.0,
+ * theme p50 10.0) would then have described an IDLE renderer and read as a fast surface.
+ *
+ * So this is `scrollAll`'s shape for a list whose work is SELECTION rather than scrolling:
+ * clear the receipt first so a previous run cannot vouch for this one, refuse before arming
+ * when the subject is absent, count ticks the timer actually fired, and — the part that makes
+ * it a load rather than a click — count DISTINCT rendered passages, because a click that
+ * lands but re-selects the same capture re-renders nothing.
+ *
+ * Distinctness is hashed off `.reading-captures-passage`, not off the reader heading: several
+ * captures share a `sourceLabel` (the live store has many reading "clipboard"), so headings
+ * collapse and would under-report the work by a lot.
+ *
+ * It restores the selection it found, and `proof` refuses if it did not — a load that strands
+ * a different capture selected has changed the user's surface to take a measurement.
+ */
+const selectEachCapture = `(() => {
+  delete window.__lqSelectLoad;
+  const root = document.querySelector('.reading-captures');
+  if (!root) return 'REFUSE: no .reading-captures';
+  const rows = Array.from(root.querySelectorAll('.reading-captures-row'));
+  if (rows.length < 2) return 'REFUSE: .reading-captures-row - ' + rows.length + ' row(s); one selection is not a load';
+  const startRow = rows.find((r) => r.getAttribute('aria-current') === 'true') || rows[0];
+  const hash = () => {
+    const p = root.querySelector('.reading-captures-passage');
+    const t = p ? p.textContent || '' : '';
+    let h = 0;
+    for (let i = 0; i < t.length; i += 1) h = ((h << 5) - h + t.charCodeAt(i)) | 0;
+    return t.length + ':' + h;
+  };
+  const s = { rows: rows.length, ticks: 0, detached: 0, seen: {}, distinct: 0, start: hash(), restored: false };
+  window.__lqSelectLoad = s;
+  rows.forEach((r, i) => setTimeout(() => {
+    if (!r.isConnected) { s.detached += 1; return; }
+    r.click();
+    s.ticks += 1;
+    const k = hash();
+    if (!s.seen[k]) { s.seen[k] = 1; s.distinct += 1; }
+  }, i * 12));
+  setTimeout(() => {
+    if (startRow.isConnected) startRow.click();
+    s.restored = hash() === s.start;
+  }, rows.length * 12 + 120);
+  return 'clicking ' + rows.length;
+})()`;
+
+const selectProgress = `(window.__lqSelectLoad ? window.__lqSelectLoad.ticks : -1)`;
+
+const selectProof = `(() => {
+  const s = window.__lqSelectLoad;
+  if (!s) return 'REFUSE: the selection load never armed - nothing recorded a receipt';
+  if (s.ticks < s.rows) return 'REFUSE: the selection load fired only ' + s.ticks + ' of ' + s.rows + ' clicks (' + s.detached + ' on detached rows); its timer was throttled or the list closed under it';
+  if (s.distinct < 2) return 'REFUSE: every click rendered the same passage (' + s.distinct + ' distinct of ' + s.ticks + '); the clicks landed but selected nothing';
+  if (!s.restored) return 'REFUSE: the selection load did not restore the capture it found selected';
+  return 'selected ' + s.ticks + ' of ' + s.rows + ' rows, ' + s.distinct + ' distinct passages rendered, selection restored';
+})()`;
+
+/**
  * CORRECTION 46 — A PAGED READER HAS NO SCROLLER, so `scrollAll` is the wrong load for it.
  *
  * `novels` declared `scrollAll('.novel-scroller')` and VOIDed on 2026-09-05 with "the scroll
@@ -533,7 +598,9 @@ const SPECS = {
       durationMs: 2500,
       // Clicking each row re-renders the reader pane against a different capture. That is
       // what a user does with this surface and it is the only work it does at any scale.
-      js: `(() => { const rows = Array.from(document.querySelectorAll('.reading-captures-row')); rows.forEach((r, i) => setTimeout(() => r.click(), i * 12)); return 'clicking ' + rows.length; })()`,
+      js: selectEachCapture,
+      progress: selectProgress,
+      proof: selectProof,
     },
     collection: { container: '.reading-captures', row: '.reading-captures-row' },
   },

@@ -3643,9 +3643,13 @@ export const zh: Catalog = {
     '还没有捕获。用阅读透镜扫描一段文字并发送到这里。',
   'reading.captures.justCaptured': '刚刚发送',
   'reading.captures.selectHint': '选择一条捕获来阅读。',
+  'reading.captures.moreCaptures': '更多捕获',
   'reading.captures.untitled': '屏幕捕获',
   'reading.captures.lineCount': {
     other: '{count} 行',
+  },
+  'reading.captures.refreshed': {
+    other: '已刷新 — {count} 条捕获',
   },
 
   'search.reading': '阅读设置',

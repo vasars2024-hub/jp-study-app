@@ -7084,3 +7084,419 @@ change** (`.study-player-slice[data-study-player]` stayed `idle`). Two findings 
 
 `sampled-out:` for this turn — no surface was scored, so nothing was skipped; `player`'s
 eight cells stay open and `anki` keeps its four banked.
+## 2026-09-05 13:35 EDT — backup — `reading-captures` OPENED: cat8 and cat1 both 10/10
+
+Recovery turn. The worker that died at 09:54 left an untested edit in the tree; it is finished
+and committed as `7d962c2b`, and the surface it repairs is the one scored here.
+
+**Two cells closed. 168 → 170 of 192, 22 remaining.**
+
+### The surface, and why it is a real subject rather than a harness
+
+`@.reading-captures`, in the Reading Finder window, on a PRIVATE instance
+(`JP_USER_DATA_DIR=~\.claude-runs\bk-t1-profile`, `JP_DEBUG_PORT=39360`) seeded with the real
+`reading-lens-history.json` copied out of the user's userData — **42 entries, 28,841 bytes**,
+20 mounted at a time by `VirtualList`. Read-from-production, write-to-scratch: the user's own
+store was never opened for writing and their Electron (pid 36988 + 6 children) was never touched.
+A bare scratch profile would have scored an empty list, which the rubric caps at 0.
+
+### cat8 — honest states, PASS 10/10
+
+`cat8-honest-states.cjs --surface "@.reading-captures" --win 1 --drive-input
+".reading-captures-search" --drive-value "zzzzzzzz" --langs --control`. Zero new probes.
+
+    rawKeyCount 0    placeholderCount 0    mutePairCount 0
+    statesNamed 1 of 1 observable (empty; loading/error/offline notObservable)
+    languagesDiffer true
+
+Control moved all three counts 0 → 1 → 0 and returned to baseline.
+
+**`statesNamed` is 1 of 1 and that denominator is honest, not flattering** — see the trap below
+for why loading and error genuinely cannot be produced from outside the app. The error branch's
+evidence is `7d962c2b`'s 21 tests and its two mutation controls, not this run.
+
+**The first `--langs` run VOIDed**: "no ui-language card on screen". The leg drives
+`#ui-language` in Settings > Appearance and refuses to click a bare `.sp-seg-btn` because the
+Subtitle & transcription segment matches it too. Open Settings > Appearance FIRST, in the same
+OS window, then raise the surface's own window — both stay mounted and the leg passes.
+
+### cat1 — accessibility, PASS 10/10 (after correction 62)
+
+`cat1-accessibility.cjs --surface "@.reading-captures" --win 1 --control`. Zero new probes.
+
+    minRatio 5.15    smallestHit 32.99 (button.reading-captures-refresh, rect 32x32, not shrunk)
+    controls 25      unreachable 0      focusHosts 0      motionAfter 0
+
+All six control legs fire. **It VOIDed three times first, and the cause was the probe** —
+correction 62, committed with the fix: removing the plant re-renders the surface, and both
+`.reading-captures-reader-head` toggles reported "focus() did not take" during that commit.
+`restoredUnreachableAfterSettle: []` is the proof. Those two buttons share a class and are NOT
+a duplicated control — one is the capture list, one is Live Captions.
+
+### TRAP — `window.api` is FROZEN, so a renderer-side stub of any preload binding silently no-ops
+
+I tried to drive the surface's error state live by replacing `window.api.lensHistoryList` with a
+rejecting stub and clicking refresh. The surface kept its 20 rows and its passage and rendered no
+error — which reads exactly like "the fix works". It is not evidence of anything:
+
+    Object.isFrozen(window.api)  true
+    descriptor.writable          false
+    assignmentTook               false
+
+The assignment never took, so no failure ever occurred and I measured the untouched happy path.
+The restore "worked" for the same reason. **Any conclusion drawn from patching `window.api` in
+this app is void** — contextBridge hands the renderer an immutable object. This is a false-PASS
+generator: it produces the reading you were hoping for, from a surface you never perturbed.
+Drive a failure from MAIN, or accept the unit test as the evidence and say so.
+
+### RULE D — liquid. Closed this turn: **2 cells. 170 of 192, 22 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 13:35 EDT: **1.8924**.
+`22 / 1.8924 = 11.63 cells/day` required. Trailing: **≤8 cells across the last 10 liquid turns**.
+**Required 11.63 against ≤8-per-10-turns: TARGET AT RISK, twelfth consecutive turn.**
+Single biggest cause, unchanged and again illustrated here: opening a surface costs more than
+scoring it. Of this turn, one cell went to finishing another worker's product fix and one went to
+repairing the instrument that was voiding a correct score. Reported, not fixed by cutting scope.
+
+### CORRECTION, same turn, before the gates — **cat1 was NOT mine to claim. One cell, not two.**
+
+`d132787d` landed at **13:04:40**, concurrently, from another worker: *"cat1/reading closes
+10/10 — two icon buttons kept a 26px box while their own headers used the token"*. It moved
+`belowFloorByHit 3 → 0` on the same three controls, on the same surface, at 42 real captures.
+
+**Every cat1 run above started at ~13:17 — thirteen minutes AFTER that fix, and Vite had
+hot-reloaded `readingCaptures.css` into my instance.** That is exactly why my run read
+`smallestHit 32.99` with `targets32: true` and never saw the failing bar. I did not close cat1;
+I measured a surface someone else had already repaired.
+
+The tell was in my own output and I walked past it: the hit walk named
+`div.lq-reading-tool-head` as blocker on a control that was no longer below the floor. A
+`blockers` list on a passing control is the residue of a fix, not a clean first measurement.
+
+So, honestly:
+
+- **cat8/reading-captures — MINE.** Closed this turn, 4 bars + control, nothing else claims it.
+  `d132787d` says the surface had zero of eight banked as of 13:04, so cat8 was open.
+- **cat1/reading — `d132787d`'s.** What this turn contributes is an INDEPENDENT verification of
+  it, with the negative control they did not run: all six `moved` legs fire and the settled
+  restore returns to baseline. That is worth having and it is not a cell.
+
+The running total **170 of 192 is still correct** — 168 → 169 (`d132787d`) → 170 (cat8). Only
+the attribution was wrong, and only for one turn.
+
+**RULE D, corrected — closed by THIS worker: 1 cell. 170 of 192, 22 remaining.**
+`22 / 1.8924 = 11.63 cells/day` required; the rate above is unchanged because the total is
+unchanged. TARGET AT RISK stands, twelfth consecutive turn.
+
+**The lesson, and it is cheap to act on:** the tree moved under me mid-turn. Two workers opened
+the same never-scored surface within twenty minutes of each other because nothing announced it.
+`git log --oneline -5` before claiming a cell costs one second and would have caught this before
+it reached a commit message.
+
+## 2026-09-05 12:56-13:45 EDT — backup — `reading` cat3 closes; cat4 and cat2 FAIL with their numbers
+
+**sampled-out this turn: every surface except `reading`.** Recovery turn: codexB died at
+12:54:43 and its slice was already committed as `7d962c2b` (complete, 21 tests, two mutation
+controls) — nothing was half-applied, so no reconstruction was owed. The scorecard entry it never
+wrote is what was missing, and the section directly above pays it.
+
+**Measured against the USER'S live app** (pid 36988, bridge 39273, 42 real captures, window 1 at
+820x580) — not a scratch profile. Two workers opened this same never-scored surface within the
+same hour; see the trap below.
+
+**One cell closed by this worker: cat3. 170 → 171 of 192, 21 remaining.** cat1 is
+`d132787d`, mine, earlier in this turn and already counted at 169 above. cat8 I ran
+independently and it reproduced their exact figures — that is a cross-check, not a cell.
+
+### cat3 — Liquid utilization, PASS 10/10
+
+`cat3-liquid-utilization.cjs --surface "Reading Finder" --win 1 --presentation liquid`. Zero new
+probes. `--presentation as-is` REFUSED first, correctly: the window was standard, and a standard
+window is correctly opaque.
+
+    regions 40   Work 1 · Liquid-eligible 2 · Anchor 10 · Anchor(holds work) 3 · Ambient 24
+    denseWorkOnTranslucent 0   liquidTreatedEligible 2 of 2   sharedPrimitiveEligible 2 of 2
+    window own paint: alpha 0.72, backdrop blur(8px) saturate(1.25)
+
+The passage pane reads as `Anchor(holds work)` and the list as Liquid — which is the rule
+CLAUDE.md states, holding on a surface nobody had scored. Control: `movedOne`, `allWorkFailed`,
+`ungroundedAllFailed`, `ungroundVacuous: false`, `ungroundMarked 9 / survivors 0`, and every
+`returned` flag true. Presentation verified back to `standard` afterwards.
+
+### cat4 — FAIL, and the number is `deadRegion` at maximized
+
+`deadPctViewport` **default 9% · compact 0.5% · maximized 36.1%** — one 726x517 empty rectangle
+at 1264x773. Every other bar passed at all three sizes: clipped 0, overlaps 0, horizontal
+scrollers 0, hiddenOverflowX 0, `contentGrowsNotChrome` true, `restored` true, chrome 42.4 →
+101.1 → 30.9. **Do not "fix" this by shrinking a panel** — the dead region counts text and
+interactive nodes, so an emptier smaller panel leaves the rectangle identical. The passage pane
+stretches an under-filled document across the freed width; the fix is a bounded measure with the
+freed width going to the index, and it is the next slice on this surface.
+
+### cat2 — FAIL `deadEnds`, REPAIRED in `a7ea2f71`, cell STAYS OPEN
+
+Refresh sampled `any:false` at 345/483/1257 ms, `sawMove:false`, no live region. Repaired; live
+after: absent → "Refreshed — 42 captures", `role="status"`. The cell does not close, because
+`costParity` is UNMEASURED without a `--compare` surface. Also VOID, and it is the INSTRUMENT:
+the chip round trip (`more > summary` → Clipboard → All sources → close) reported
+`restored:false`, and a hand-driven replay of the identical four clicks returned **67 leaf text
+nodes, add 0 / gone 0** — the surface round-trips exactly. A 25 s idle re-read gave an identical
+hash, so it is not a clock in the surface either.
+
+### TRAP — the shared repo's `debug/bridge.json` is overwritten by anyone's private instance
+
+A concurrent worker's scratch Electron (pid 40104, port 39360) wrote its own token into
+`jp-study-app/debug/bridge.json`, so every probe in the MAIN tree — which reads that path — began
+answering `fetch failed` against a dead process while the user's app was fine on 39273. Repointed
+it at the live instance. Two workers also drove window 1 at once; a `Translate` window appeared
+inside my run and the `Reading Finder` closed under me. **`git log --oneline -3` before claiming a
+cell**, as the correction above says, and re-read `bridge.json` before believing a bridge failure.
+
+### RULE D — liquid. Closed by this worker: **1 cell. 171 of 192, 21 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 13:45 EDT: **1.8854**.
+`21 / 1.8854 = 11.14 cells/day` required. Trailing: **≤9 cells across the last 10 liquid turns**.
+**Required 11.14 against ≤9-per-10-turns: TARGET AT RISK, thirteenth consecutive turn.**
+Caveat on the numerator, stated because it inflates the total: **4 of the 170 are `anki` cells
+that live on `wt/files-app` and are NOT on `feat/nyaa-subtitles`.** On this branch alone the
+figure is 167. Single biggest cause, again: this turn spent two of its four slices on product
+repairs the scoring forced (a hit floor and a dead control), which is the work, not overhead.
+
+---
+
+## 2026-09-05 13:37-14:05 EDT — primary. `reading-captures` **cat4 CLOSES 10/10.**
+
+Same surface the 13:45 entry left failing, same harness, same window (user's app pid 36988,
+bridge 39273, window 1, `Reading Finder` fwin at 820x580). No new probe: `cat4-use-of-space.cjs
+--surface "@.reading-captures" --win 1`, `--control` for the falsification leg.
+
+**One cell closed. 171 -> 172 of 192, 20 remaining.**
+
+### cat4 — Use of space, PASS 10/10
+
+    size        box        dead    clipped  overlaps  hscroll  hiddenX  chrome   restored
+    default     782x470    1.9%    0        0         0        0        38.4     true
+    compact     222x57     0.4%    0        0         0        0        94.4     true
+    maximized   1226x663   7.0%    0        0         0        0        25.5     true
+
+    contentGrowsNotChrome true (38.4 -> 25.5, falls)   allThreeSizes true
+
+BEFORE, measured this turn on the unchanged tree, not inherited: `dead 9.6 / 0.4 / 33.8`,
+one **705x497** rectangle at maximized, and `clipped 9` at compact. The 13:45 entry's 36.1%
+is the same defect on a different selected capture.
+
+**CONTROLS, all in the same process as the measurement (`--control`):**
+`injectedClip` base 0 -> dirty 1 -> restored 0, `removalProven` true — the zero is a
+measurement, not a blind detector. `backdropExclusion` overlaps 0 -> 10 -> 0, plant painted in
+front and correctly NOT excused. `artPlateExclusion` plant hangs out 280px, counted as a plate,
+`clipped` did not rise. `provenPagerDeadRegion` not applicable (no pager on its last page).
+`subMinimumShrink` 200x140 -> box 152x31, clipped 2 — below the product's own minimum, reported
+rather than scored.
+
+### Two product defects, both fixed, both with the numbers that found them
+
+**1. `cc9209b4` (13:58) — the reader ended in nothing.** deadRegion is not fixable by shrinking a panel;
+the detector counts text and interactive nodes, so an emptier smaller panel leaves the identical
+rectangle. The honest reading is that a reader with nothing after the passage IS a dead end, and
+this surface's only other way onward was a 260px side list that a covering sheet removes at a
+narrow canvas. The passage now continues into "More captures" — the others in the index's current
+filter and sort, rotating past the end. `dead` 33.8 -> 7.0% at maximized, 9.6 -> 1.9% at default.
+Same commit: `.reading-workspace-nav` wrapped with no ceiling, so at 260x170
+`.reading-workspace-panel` computed to **height 0, 84px below the window's own bottom edge** and
+`.reading-captures` painted outside the frame at 202x20. `max-height: 45%` + `overflow-y: auto`
+-> nav 46px, panel 222x57, inside the window. That collapse hit **all nine** workspace sections.
+
+**2. `f155d576` — a tool shorter than its own head swallowed it.** `.lq-reading-tool-head`
+cannot shrink below a 32px `--lq-hit-target` button plus padding (~49px). The docked branch was
+`overflow: hidden` and cut the head off; the **sheet branch declared no overflow at all**, so it
+was `visible` and painted the head outside the canvas. At the compact leg the canvas is 37px and
+the reader resolved to **2px** against a 53px header — the tool's Close and the control that
+reopens the capture list were both off-surface and unreachable. `overflow-y: auto` on the docked
+tool, the sheet, and `.reading-captures-reader`: `clipped 12 -> 0`.
+
+### TRAPS from this turn, each of which cost a run
+
+- **`nav` IS CHROME to cat4.** The chrome selector is
+  `.fwin-bar,nav,header,footer,aside,[role=toolbar],[role=tablist]`. Wrapping the new content in
+  `<nav>` took `chromePct` 38.4 -> 69.9 and failed `contentGrowsNotChrome` on a change that added
+  nothing but content. `<section>` is also the more accurate tag; the instrument was right.
+- **A JSX comment inside a ternary's parentheses is a SYNTAX ERROR**, and the app answered the
+  bridge normally the whole time — the tell was `vite-error-overlay` in `document.body.children`
+  and an error-boundary string in `body.textContent`, not a bridge failure. HMR silently kept
+  serving the last good module for ~15 minutes while I measured it as if the edit had landed.
+- **A second cat4 run stranded the window maximized** (`restoreAttempts 2`, `restoredTo
+  1264x773`), and the next run's compact leg then measured 202x20 and reported clipped 9 for the
+  wrong reason. Re-check `.fwin-max` before believing a compact number.
+- **A CSS-text assertion on `.lq-reading > .lq-reading-sheet` matched the wrong rule**: that
+  selector is also the second member of a grouped selector list, so `selector\s*\{[^}]*\}` hit the
+  padding/background block and reported the declaration missing while it sat two rules below.
+  Filter rules by selector-list membership, not by the first regex hit.
+
+### RULE D — liquid. Closed by this worker: **1 cell. 172 of 192, 20 remaining.**
+Days to 2026-09-07 11:00 EDT, measured 14:05 EDT: **1.8715** (44 h 55 min).
+`20 / 1.8715 = 10.69 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 10.69 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn.**
+The numerator caveat from the 13:45 entry still stands: 4 of these are `anki` cells that live on
+`wt/files-app` and are NOT on `feat/nyaa-subtitles`; on this branch alone the figure is 168.
+Biggest cause this turn: closing one cell took two product repairs plus a third in the shared
+reading primitive, and the primitive repair is the one that will pay again — Immersion, VN, manga
+and the novel reader all sit on the branch that had no overflow declared at all.
+
+**sampled-out (RULE C):** no other surface was scored this turn. cat2 and cat5/cat6 on
+`reading-captures` remain open exactly as the 13:45 entry left them — cat2 needs a `--compare`
+surface for `costParity`, cat5+cat6 need an `l6-parity.js` spec entry.
+
+### Same turn, second slice — `reading-captures` **cat6 and cat5 both CLOSE 10/10.**
+
+Two cells for one piece of scaffolding, exactly as the 13:45 entry predicted, though not for
+the reason it gave: the `captures` spec in `l6-parity.js` **already existed** (line 896, six
+feature rows). What was missing was a harness escape hatch and a cat6 baseline for cat5 to read.
+
+#### cat6 — Feature parity, PASS 10/10
+
+`cat6-feature-parity.cjs --app captures --win 1 --label reading-captures`.
+
+    parity  standard 6/6 · liquid 6/6 · na 0 · equal true · rowsAgree true · onlyInOne []
+    drive   openSection{Captures} · toggleList{true} · toggleList{false}
+            select{picked "clipboard"} · scroll{reading-captures-rows top 240 of range 1809}
+    roundTrip  standard -> liquid -> standard, fieldsHeld true, shellHeld true, diffs []
+    CONTROL    3 of 3 mutations armed, each flipped EXACTLY its own row: "CONTROL FAILED AS
+               REQUIRED - category 6 instrument is proven"
+
+**FIRST RUN WAS 4/6 IN BOTH PRESENTATIONS, AND IT WAS THE INSTRUMENT.** `captureList` read
+`rows=0 withSource=0` and `selection` read `selected="" heading="clipboard"`; the drive log
+carried two refusals, `select` "only 0 rows" and `scroll` "nothing scrollable". Cause: the
+harness's round-trip step types `lqp-roundtrip-食` into the first visible text field, and this
+surface's only text field is `.reading-captures-search` — **the filter over the very rows those
+two questions score**. The driver emptied the surface it was scoring, and because it did so in
+both presentations the two halves agreed and `parityEqual` stayed true. A wrong number that
+looks like a finding.
+
+Fixed as the documented escape hatch's **third shape**: `probeInput` redirects the mark to a
+safe field, and `captures` has none to redirect it to, so the spec now declares
+`noSafeInput: true` and `dirtyField` records `field: null` with the reason — the weaker,
+already-supported outcome the harness defines for a surface with no editable field. `video`'s
+`probeInput` and every other spec are untouched, and the round trip for this app now honestly
+reports that it carries no user-entered state rather than inventing some.
+
+#### cat5 — UI clarity, PASS 10/10
+
+`cat5-ui-clarity.cjs --surface "Reading Finder" --label reading-captures`.
+**All ten questions YES, `voided: []`, `findings: []`, 48 painted controls.**
+`--control`: **"CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10"**, `plantResidue 0`,
+restored to `presentation standard`, `820x580`.
+
+**TWO INVOCATION TRAPS, both of which produced a VOID that reads like a defect.**
+1. `--surface "@.reading-captures"` scores the SECTION, and the Liquid presentation button
+   lives in the `.fwin` chrome — an **ancestor** of that root, not a descendant. `OWN_LIQUID_BTN`
+   queries inside the root, found nothing, and Q6 refused `surface has no Liquid presentation
+   control` -> `NO-SUBJECT` -> whole category VOID. Q6 has to be asked with the WINDOW as the
+   root, which is what cat3 already did. cat1, cat4 and cat8 keep the `@` form.
+2. Q7/Q8/Q9 are `MEASURE` until `baselines/cat6-<label>.json` exists, so cat6 must run FIRST and
+   write it — and `--out` must name that path, because cat6 writes only where `--out` points.
+   `--label` alone writes nothing. That file is **gitignored** (`.gitignore:232`), which is why
+   every number above is in this entry rather than behind a path no other worker can open.
+
+### RULE D — liquid. Closed by this worker: **3 cells (cat4, cat6, cat5). 174 of 192, 18 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:12 EDT: **1.8667** (44 h 48 min).
+`18 / 1.8667 = 9.64 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 9.64 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn** — but by
+the narrowest margin yet, and this turn's 3 is above the trailing rate rather than below it.
+Numerator caveat unchanged: 4 of the 174 are `anki` cells on `wt/files-app`, so on
+`feat/nyaa-subtitles` alone it is 170.
+
+**`reading-captures` now stands at cat1 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat8 ✓ — 6 of 8.**
+Open: **cat2** (`costParity` unmeasured without a `--compare` surface) and **cat7** (never run
+here). **sampled-out (RULE C):** no other surface was scored this turn.
+
+### Same turn, third slice — `reading-captures` **cat2 CLOSES 10/10.** Surface is 7 of 8.
+
+The 13:45 entry left cat2 open on one term: "`costParity` is UNMEASURED without a `--compare`
+surface". **It does not need one.** `cat2-clunkiness.cjs` has `--both-presentations`, which
+measures the same task in the same window at the same geometry in Standard and in Liquid — a
+strictly better second operand than a different surface, and this window has a Liquid toggle so
+the `N/A-single-path` branch does not apply either.
+
+`cat2-clunkiness.cjs --surface "Reading Finder" --win 1 --both-presentations
+--task "click:.reading-captures-list-toggle >> wait:500"
+--undo "click:.reading-captures-list-toggle" --result ".lq-reading-tool"`
+
+    deadEnds 0 · modalTraps 0 · scrollTraps 0 · latency ok · costParity TRUE
+    costParity  standard total 1, worstRecv 20.4 ms  ·  liquid total 1, worstRecv 17.4 ms
+                flipAttempts 4, restoreAttempts 1, restored true, back to standard at 820x580
+    undo        baseHash lzh52g -> afterHash lzh52g, restored true, no live-region residue
+    unmeasuredBars []   failedBars []
+
+**CONTROL:** all three plants moved their own number and only their own —
+`deadEnd`, `modalTrap`, `scrollTrap` each `base 0 -> dirty 1 -> restored 0`,
+`backToBaseline true`, inert-click recv 0.3 ms.
+
+**THE TASK CHANGED BETWEEN THE FIRST RUN AND THE CONTROL, AND THE FIRST TASK IS THE LESSON.**
+The scored run first used `click:.reading-captures-next-row` — the continuation this turn added —
+and PASSED 10/10 with the same bars. The control then REFUSED:
+`occluded: .reading-captures-next-row centre resolves to null`. That is correct product
+behaviour, not a defect: the first run's click selected a different, longer capture, so the
+continuation moved below the fold and has to be scrolled to. A control that cannot run leaves
+the score VOID rather than 10, so **both** legs were re-run on a target that is always visible —
+the reader header's list toggle, which is also a genuine reversible gesture with a real undo.
+A task whose reachability depends on what the previous step selected is not a stable cat2 task.
+
+`reading-captures`: **cat1 ✓ cat2 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat8 ✓ — 7 of 8. Only cat7
+(performance under real load) has never been run here.**
+
+### RULE D — liquid. Closed by this worker: **4 cells (cat4, cat6, cat5, cat2). 175 of 192, 17 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:16 EDT: **1.8639** (44 h 44 min).
+`17 / 1.8639 = 9.12 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 9.12 against <=9-per-10-turns: TARGET AT RISK, fourteenth consecutive turn** — but the
+gap is now ~0.1 cells/day, the closest it has been, and this turn's 4 is the highest single-turn
+figure in that window. Numerator caveat unchanged: 4 of the 175 are `anki` cells on
+`wt/files-app`, so on `feat/nyaa-subtitles` alone it is 171.
+
+### Same turn, fourth slice — `reading-captures` **cat7 CLOSES 10/10. THE SURFACE IS 8 OF 8.**
+
+`cat7-perf.cjs --surface captures` VOIDed first, and the refusal was the harness being right:
+
+    VOID  heavy leg declares no proof, so "select every capture in turn" cannot be told apart
+          from an expression that refused: no proof, no claim
+
+The `captures` spec declared a `js` and neither `progress` nor `proof`. Its expression returned
+`'clicking N'` the instant it SCHEDULED its timeouts — it would have said exactly that with
+N = 0, with the capture list closed, with the timer throttled, or with every click landing on a
+detached node. The numbers underneath it (drag p50 **10.0 ms**, resize p50 **10.0**, theme p50
+**10.0** — flat 10s, a display cadence, not work) would then have described an IDLE renderer and
+read as a fast surface.
+
+**Correction 47** gives it `scrollAll`'s shape for a list whose work is SELECTION: clear the
+receipt before arming so a previous run cannot vouch for this one, refuse before arming when the
+subject is absent, count ticks the timer actually fired, count **distinct rendered passages**
+(a click that re-selects the same capture re-renders nothing), and restore the selection it
+found. Distinctness is hashed off `.reading-captures-passage` and not off the reader heading,
+because many captures share a `sourceLabel` and headings collapse.
+
+    heavyProof  "selected 20 of 20 rows, 7 distinct passages rendered, selection restored"
+    ceiling     p50 8.3  p95 8.5  max 9.1   over16 0   frames 225   main p95 3.7 ms
+    drag        p50 8.3  p95 8.5  max 8.6   over16 0
+    resize      p50 8.4  p95 16.8 max 25.1  over16 18
+    theme       p50 8.3  p95 8.5  max 25.1  over16 1
+    score 10 · voided [] · findings []
+
+**SENSITIVITY CONTROL (`--jank`), and it is what makes the numbers above mean anything.** The
+same drag leg re-run with the interaction probe's 120 ms renderer blocks: `dragJank` p95
+**116.7 ms**, max 116.8, `jank_blocks 10`, over16 10 — against the clean `drag` p95 of 8.5 with
+**0** frames over 16. The distribution gets far worse under injected blocking, so the recorder
+is seeing real frames rather than reporting a cadence.
+
+Also worth keeping: the three ceiling runs read p50 8.3 / 8.3 / 8.3 within this run — this is
+the paired in-process comparison the pin prefers over a quiet machine, and it held while a
+second worker was active in the same tree.
+
+**`reading-captures` is COMPLETE: cat1 ✓ cat2 ✓ cat3 ✓ cat4 ✓ cat5 ✓ cat6 ✓ cat7 ✓ cat8 ✓ — 8 of 8.**
+
+### RULE D — liquid. Closed by this worker: **5 cells (cat4, cat6, cat5, cat2, cat7). 176 of 192, 16 left.**
+Days to 2026-09-07 11:00 EDT, measured 14:21 EDT: **1.8604** (44 h 39 min).
+`16 / 1.8604 = 8.60 cells/day` required. Trailing: **<=9 cells across the last 10 liquid turns.**
+**Required 8.60 against a trailing <=9: the required rate is BELOW the trailing rate for the
+first time — TARGET AT RISK is NOT declared this turn.** Stated with its caveat rather than as
+a headline: the trailing figure is an upper bound (`<=9`), so if the true trailing rate is 8 or
+lower the target is still at risk; and 4 of the 176 are `anki` cells on `wt/files-app`, so on
+`feat/nyaa-subtitles` alone the figure is 172 and 20 cells are outstanding there.
+The honest reading is that one surface finished 8 of 8 in a single turn, which has not happened
+before, and that the next surface starts from zero rather than from seven.

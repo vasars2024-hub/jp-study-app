@@ -573,8 +573,15 @@ export default function MalDownloadDialog({ candidate, onClose }: Props) {
     try {
       const settings = getActiveScraperSettings();
       const wanted = new Set(settings.torrents.indexerIds);
+      // `enabled` is part of the filter because main applies it too
+      // (`scraper/torrents.ts:269`). Without it a profile whose only index is
+      // switched off passed this guard, reached main, and came back `[]` — and
+      // the dialog reported "0 releases found" with the advice to retype the
+      // query. Same narrowing as `TorrentManagerPage`, which already had it.
       const indexers = settings.sources.entries.filter(
-        (entry) => entry.kind === 'torrent' && (!wanted.size || wanted.has(entry.id)),
+        (entry) => entry.kind === 'torrent'
+          && entry.enabled
+          && (!wanted.size || wanted.has(entry.id)),
       );
       if (!indexers.length) throw new Error(t('malDownload.error.noIndexers'));
       const search = window.api?.scraperSearchTorrents;

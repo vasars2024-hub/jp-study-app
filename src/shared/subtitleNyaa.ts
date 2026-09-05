@@ -395,6 +395,48 @@ function withoutReleaseGroup(name: string): string {
 }
 
 /**
+ * "This release is subtitles and nothing else", in **either word order**.
+ *
+ * English puts the qualifier on either side of the noun and the index carries
+ * both: `(subs only)` and `(Only subs)` are the same claim. Only the first was
+ * recognised, and the cost was measured rather than imagined —
+ * `Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs]
+ * [EN-MS-TH-ID-VI-ZH-JA]`, **5.3 MB with 12 seeders and a Japanese track**, and
+ * its 19.8 MB / 14-seeder sibling covering 520 episodes, were the only two rows
+ * under the ceiling in that title's whole listing and both scored **zero
+ * signals**. They were dropped for `shape` — the verdict that means "nothing
+ * here is fetchable" — while being exactly what Route A exists to fetch.
+ *
+ * Reversing the order carries no new risk, because it is the same claim the
+ * forward order already makes and the same guard already covers it: the size
+ * ceiling. A video release calling itself "only subs" is still hundreds of
+ * megabytes and never reaches `looksLikeSubtitleOnly`.
+ *
+ * Split into its two halves so `subtitlePackSignals` can attribute which claim
+ * it saw, and recombined here so there is one source of truth for the phrase.
+ */
+const SUBS_ONLY_RE = /\b(?:sub(?:title)?s?\s*only|only\s*sub(?:title)?s?)\b/i;
+
+const SUB_PACK_RE = /\bsub(?:title)?\s*pack\b/i;
+
+/**
+ * The same payload claim made in the *format's* vocabulary instead of the
+ * word "subtitle": `[ASS FILE ONLY]`, `[SRT only]`.
+ *
+ * Found by the same corpus scan as `SUBS_ONLY_RE` and it is the only other
+ * genuine miss in 53 live rows: `[ASS FILE ONLY] Goodbye Don Glees English
+ * Subs` scored **zero** signals, because the leading bracket was stripped as a
+ * release group — taking the one format tag with it — and what remained,
+ * `English Subs`, is a video-release phrase. Two guards firing in sequence on a
+ * release that is 0.1 MB of `.ass`.
+ *
+ * `\b` on the format token is what keeps `Cassiopeia` out, the same anchoring
+ * the `format-tag` signal already uses, and `only` must follow within one word
+ * so a release merely *containing* `[ASS]` cannot claim to be one.
+ */
+const FORMAT_ONLY_RE = /\b(?:ass|srt|ssa|vtt)(?:\s+files?)?\s+only\b/i;
+
+/**
  * A phrase that states the release *is* subtitles, as opposed to one that says
  * a video release has them.
  *
@@ -402,7 +444,10 @@ function withoutReleaseGroup(name: string): string {
  * protects a leading bracket from the group strip above, and it outranks
  * `VIDEO_WITH_SUBS_RE` inside `subtitlePackSignals`.
  */
-const STATED_PAYLOAD_RE = /\b(?:sub(?:title)?s?\s*only|sub(?:title)?\s*pack)\b/i;
+const STATED_PAYLOAD_RE = new RegExp(
+  `${SUBS_ONLY_RE.source}|${SUB_PACK_RE.source}|${FORMAT_ONLY_RE.source}`,
+  'i',
+);
 
 /**
  * Phrases that describe *a video release that has subtitles*, not a subtitle
@@ -509,10 +554,11 @@ export function subtitlePackSignals(name: string): string[] {
   // of megabytes and never reaches `looksLikeSubtitleOnly`.
   if (!STATED_PAYLOAD_RE.test(text) && VIDEO_WITH_SUBS_RE.test(text)) return found;
 
-  if (/\bsub(?:title)?\s*pack\b/i.test(text)) found.push('sub-pack');
+  if (SUB_PACK_RE.test(text)) found.push('sub-pack');
   // `subtitles only` spelled out, not just `subs only` — same claim, and the
-  // longer form is what the one real release in this library uses.
-  if (/\bsub(?:title)?s?\s*only\b/i.test(text)) found.push('subs-only');
+  // longer form is what the one real release in this library uses. Either word
+  // order, for the reason written on `SUBS_ONLY_RE`.
+  if (SUBS_ONLY_RE.test(text)) found.push('subs-only');
   // Bare "subtitles" survives only because the video-release phrasings above
   // were already excluded.
   if (/\bsubtitles?\b/i.test(text)) found.push('subtitles');
@@ -1252,6 +1298,21 @@ export function episodeFromFileName(name: string): number | null {
 }
 
 /**
+ * The simplified/traditional pair a CJK sidecar set names its tracks with,
+ * taken only from the tag immediately before the extension.
+ *
+ * `sc` and `tc` are two letters and would collide freely with the general rule
+ * above — a release group `[SC]`, a `- tc -` in a title. In the dotted-tag slot
+ * they do not: `…FLAC].sc.ass` is a language tag and nothing else uses that
+ * position. Measured on the release that produced it, live on 2026-09-05:
+ * `【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock]…MKV 简繁外挂字幕`, whose 24 `.ass`
+ * files are twelve `.sc.ass` and twelve `.tc.ass` and which `languageFromFileName`
+ * read as **unlabelled**, so a `ja` harvest kept all 24, paid for the transfer,
+ * and only then rejected them on kana count.
+ */
+const CJK_TRACK_TAG_RE = /\.(sc|tc|chs|cht|big5|gb)\.[a-z0-9]+$/;
+
+/**
  * A language hinted by a file's path.
  *
  * Packs signal language by directory (`Subs/ja/`), by a dotted tag
@@ -1262,7 +1323,11 @@ export function languageFromFileName(name: string): string | null {
   const text = (name ?? '').toLowerCase();
   if (/(^|[\\/._[( -])(ja|jpn|jp)([\\/._\])  -]|$)/.test(text) || /japanese|日本語/.test(text)) return 'ja';
   if (/(^|[\\/._[( -])(en|eng)([\\/._\])  -]|$)/.test(text) || /english/.test(text)) return 'en';
-  if (/(^|[\\/._[( -])(zh|chi|chs|cht)([\\/._\])  -]|$)/.test(text) || /chinese|中文/.test(text)) return 'zh';
+  if (
+    /(^|[\\/._[( -])(zh|chi|chs|cht)([\\/._\])  -]|$)/.test(text)
+    || /chinese|中文|简体|繁體|简中|繁中/.test(text)
+    || CJK_TRACK_TAG_RE.test(text)
+  ) return 'zh';
   if (/(^|[\\/._[( -])(ru|rus)([\\/._\])  -]|$)/.test(text) || /russian|русск/.test(text)) return 'ru';
   return null;
 }

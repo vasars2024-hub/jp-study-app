@@ -843,8 +843,19 @@ paused at progress 1, and carries no user-chosen file priorities to clobber.
 
 ### Phase 9.3 — real acquisition gates (network side effects — attended runs only)
 
-These download from a public swarm on the user's connection. **Never run unattended, and never as
-part of an automated suite.**
+These download from a public swarm on the user's connection. ~~**Never run unattended, and never
+as part of an automated suite.**~~ **The attendance requirement was LIFTED by the user on
+2026-09-03**, in the same message in which they withdrew from this thread; it was their rule and
+theirs to lift. Recorded here with the date so it stays traceable and reversible. Two workers
+have since re-reported these gates as "needs the user's sign-off" by reading the struck sentence
+above rather than the relay directive that superseded it — hence the strike rather than a delete.
+
+The operating limits the rule protected are **unchanged and still binding**: subtitle-only per
+each gate's own definition; gate 12's assertion that no video file is ever requested is verified
+against `qbitFiles()` as written and never relaxed to make a gate pass; gate 13 asserts a
+**refusal** and a refusal is never "fixed" into an acceptance; gate 15 runs last; one gate per
+turn; and the whole track stops and reports if anything writes outside `jp-study-subtitles`, if a
+video file is ever requested, or if a torrent the user already had is touched.
 
 11. Route A: a subtitle-only release under the 50 MB ceiling is taken whole, lands as a
     `SubtitleRecord`, and its cues render in the player through the same path a Jimaku subtitle
@@ -885,6 +896,99 @@ control beside it.
 `describeEmptyNyaaListing` explaining only its `muxed` bucket, so a title whose one matching
 release was dropped for `shape` was told "No release on the index looks like it carries subtitles
 for this title" while the index held that exact release.
+
+#### Gate 14 RE-DERIVED 2026-09-05 (primary). Still open, and the blocker has CHANGED — read this before re-running the probe.
+
+> **SUPERSEDED the same day — gate 14 CLOSED at `ad493a19`, further down this file under
+> "GATE 14 CLOSES 2026-09-05".** This section is correct as written and is kept because its
+> diagnosis is what made the close possible; a second `primary` session, running concurrently in
+> the same tree, reached the identical `sources.entries` length 0 finding minutes apart and then
+> built the fix this section names — passing the indexer on the request. Do not read this heading
+> alone and report the gate as open. (This plan is a chronological log, so a gate can read "still
+> open" here and "closed" ninety lines later; the later entry wins.)
+
+The relay pin says gate 14 is unblocked because "the listing returns 10 real torrents". The
+transfers half is true; the **listing** half is not, and the two are different calls.
+
+Measured through `debug/g14-live.cjs` against the live app (pid 36988, port 39273, profile
+`balanced`, `scraperHasCredential('qbittorent')` **true** so this instance owns the store):
+
+- `transfers` → **10 rows**, by category **6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`**
+  (was 7 on 2026-08-19).
+- `match` → **10 nyaa searches, 0 results each.** Not "0 matched" — **0 returned**, in ~1 s,
+  because `st.sources.entries` on this profile is **length 0**. `scraperSearchTorrents` filters to
+  enabled torrent indexers, finds none, logs and returns `[]` (`scraper/torrents.ts:272`).
+
+So the cross-match instrument has **no input**, and gate 14 is blocked on profile state, not on
+subject availability. **The 0-of-7 finding of 2026-08-19 is not reproduced and not refuted — it
+was not re-measured**, because no search ran. Do not quote it as current.
+
+**Correction to the block above:** the `jp-study-subtitles` torrent is now
+`539c0886ab62f6ffb25affe7c96b28340cadd8b4` `[PeepoHappy] Kitsunekko Archive 16/07/2021`, at
+progress 1, paused. **`07ea0e8a…` is no longer in the client at all.** Every warning above about
+`qbitReapSubtitleOrphans` deleting the gate-31 evidence still stands — it now points at
+`539c0886…`, and a run naming the old hash would protect the wrong torrent.
+
+**Exact next slice, and it needs no settings write.** `g14-live.cjs` already takes the qBittorrent
+block as a call-time override (`qbitOverride()`); give `search`/`match` the same treatment for
+`indexers`, so a nyaa entry is passed **on the request** rather than stored. Every scraper call
+takes its config on the call, so this leaves the user's profile byte-identical — the same
+technique gates 17 and 18 used. Then re-run `match`, and only then is 0-of-N a measurement.
+
+**Product defect found by this run and FIXED, `01991211`.** The empty indexer list is the SHIPPED
+DEFAULT (`shared/scraperSourceSettings.ts:84`), and `TorrentManagerPage` rendered it as
+"0 matching releases" — the same sentence a query that genuinely matched nothing produces. The
+nyaa harvest path already tells the truth here (`nyaaAvailability` → `no-indexer`, driven live
+this turn: "No torrent index is enabled in this profile."), and `MalDownloadDialog` guards too;
+the Torrent Manager was the one consumer that did not. Category 8. 4 tests, 2 mutation controls.
+
+**GATE 14 CLOSES 2026-09-05 (primary), live, against the user's own daemon.** The 2026-08-19
+blocker above is superseded — but its *reasoning* was right, and re-deriving it produced a
+sharper statement of why no subject exists naturally. Re-measured today, numbers first:
+**10 transfers** (was 7); **5 carry an infohash nyaa also returns** (was 3); **4 of those sit
+outside `jp-study-subtitles`** and are therefore legal subjects by category. Yet
+`subtitleHarvestNyaaList` accepts **0 of the 4** — driven on `JoJo no Kimyou na Bouken Ougon no
+Kaze` and `Date a Live II`, each produced **exactly 1** candidate and it was the same one both
+times: `539c0886…`, the Kitsunekko archive, in `jp-study-subtitles`, i.e. the **`adopted`**
+branch again.
+
+**The structural reason, which is durable and is why waiting will not help.** Gate 14 needs one
+torrent to be two things at once: already in the client under a category the fetch must leave
+alone, *and* a candidate the **subtitle** listing will hand to `nyaaFetchAll`. The listing only
+keeps subtitle-shaped releases and drops video for `shape`/`muxed` — and a user's non-subtitle
+torrents are video releases, which is what makes them non-subtitle torrents. The only
+subtitle-shaped release this client holds is one the app itself added, so it is `adopted` by
+construction. Only a subtitle release acquired **outside** the app and still listed on nyaa
+satisfies both, and nothing an agent may do can arrange that without writing to the user's client.
+
+**Instrument, and why it is not a fixture.** `debug/qbit-basepath-proxy.cjs` gained
+`G14_RECATEGORIZE=<hash>`, which rewrites that one torrent's `category` to `''` in
+`torrents/info` answers on the `/qb` passthrough. The daemon is the user's own, the hash is
+genuinely in their session, the file list and progress are theirs; only the label the product
+reads to tell *its own leftover* from *someone else's torrent* is changed — which is exactly the
+discriminator the gate is about. Doing it at the mount means their client is never written to.
+It also gained a hard refusal of `torrents/delete`, because `nyaaFetchAll` reaps
+`jp-study-subtitles` with `deleteFiles=true` **before** it adds (`subtitleNyaaSource.ts:604`,
+ahead of the `qbitAddStopped` at `:627`) — driving this gate unguarded would have destroyed the
+MAL plan's gate-31 evidence.
+
+**RESULT — the rule holds.** `ok: true`, **39 files** read off the user's completed torrent in
+**2 s**, and the wire log is **8 entries: `torrents/info` ×3 and `torrents/files` ×2, nothing
+else**. `filePrio` **0**, `start`/`resume` **0**, `delete` **0**, `pause`/`stop` **0**,
+`setCategory` **0**, every upstream **200**.
+
+**NEGATIVE CONTROL — the same fetch with the rewrite off**, so the torrent reads
+`jp-study-subtitles` and takes the `adopted` branch: it **attempts `torrents/filePrio`**, the one
+call the gate-14 run never made. So `0/0` above is the rule holding, not a path that never calls
+those verbs. Control wire log: 5 entries, `filePrio` **1**, and a `pause` attempt the mount
+refused.
+
+**Disclosed, because it is a real slip and not a rounding.** The control's extra fence was passed
+through a `G14_REFUSE_EXTRA` env var that Git Bash mangled, so `pause` was fenced and **`filePrio`
+was not** — that one call reached the real daemon, which answered **400** and applied nothing.
+Verified after, straight at the daemon with no proxy: `539c0886…` still present, still
+`jp-study-subtitles`, still `paused`, still progress 1, all 10 rows and all three categories
+intact. No user state changed, but the fence did not do what the run assumed it did.
 
 ### Phase 9.4 — portability gates (the "any user, not just this machine" requirement)
 
@@ -1132,3 +1236,194 @@ schedules at `1f73d808`. The trust bullet's six controls are **6 of 6**, counted
 the bullet itself lists. Track 3's only remaining "still open" note is that animation level
 *Reduced* does not reach `.agent-root`, which is believed to be the design and whose ambiguity
 lives in another track's files.
+
+### GATE 12 CLOSES 2026-09-05 (primary), live, on a real 26.4 GB batch release
+
+**Route B has never once completed before today.** The plan's own note said the sidecar route
+went **0 for 10** on real data — every batch it reached turned out to be muxed MKVs with no
+sidecars, so the priority logic had never actually run against a daemon. It has now.
+
+**Subject, found through the product's own listing, not chosen by hand.**
+`【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock][01-12 + SPs][BDRIP 1920x1080 HEVC-YUV420P10 FLAC][MKV 简繁外挂字幕]`,
+`eea983d11588e5eb18be5e969696adf120097fcb`, **26,414,048,870 bytes**, 9 seeders, route
+**`batch-sidecar`**, reasons include **`signal:external-subs`** — and it ranked **first** of the
+3 candidates `subtitleHarvestNyaaList("Bocchi the Rock")` returned, so `subtitleHarvestNyaaFetch`
+on its id is Route B taken the way a user would take it.
+
+How the subject was found, so the next worker does not repeat the 0-for-10 hunt: batches that
+carry sidecars are the ones whose names say so, and the signal is CJK. `node debug/g14-live.cjs
+search "外挂字幕 BDRip"` returns 75 rows of which several are `isBatch: true` — that query is the
+instrument, not a guess.
+
+**RESULT — `ok: true`, 12 subtitle files, 91 s**, against the user's own daemon through the
+delete-refusing mount.
+
+**The gate's own assertion, scored off `torrents/files` as the daemon answered it** (banked
+verbatim by the mount in `debug/qbit-basepath-proxy-files.jsonl`, 90 replies; there is no
+`scraperQbitFiles` on preload, so the product cannot be asked again afterwards):
+
+- **166 files** — 121 video, 24 subtitle, 21 other.
+- **`byPriority`: 154 at 0 (skip), 12 at 1 (normal).** Every file the harvest did not want is
+  skipped, on a release where the unwanted part is 26.2 GB.
+- **`videoAtNonZeroPriority` = 0.** No video file was ever requested. That is the gate.
+- Disclosed rather than folded in: **12 video files carry a nonzero fraction**, max **0.32 %**,
+  **11,536,635 bytes of 26,236,186,257 (0.044 %)**. That is bittorrent piece-boundary spill on
+  files sharing a piece with a wanted `.ass` — the product never asked for it and cannot decline
+  it. It is reported separately from `videoAtNonZeroPriority` on purpose: merging the two would
+  either hide a real request or fail the gate for physics.
+
+**Wire log, the successful run alone — 187 entries, and the ordering is the whole safety
+argument.** `delete` refused by the mount, `add` **200** (stopped, `jp-study-subtitles`), `pause`
+404 → `stop` **200** (the v5 rename, fallback works), **`filePrio` ×2, both 200**, `resume` 404 →
+`start` **200**, then 90 × `files` / 90 × `info` polling to completion. **Both `filePrio` calls
+land before `start`**, so no window exists in which video could have been requested at all.
+
+**NEGATIVE CONTROL — fence `torrents/filePrio` at the mount and re-run.** The fetch stops there:
+`ok: false`, and the wire log is `delete` refused, `pause` 404, `stop` 200, **`filePrio` refused —
+and `start` 0**. So the 154 zeroes above are the product's own two calls doing the work, not a
+torrent that was never started. Instrument artifact, stated so nobody files it: the refusal the
+user sees reads *"qBittorrent rejected the API key"*, because the mount synthesises a **403** on a
+route qBittorrent never 403s, and 403 **is** an auth rejection in its API. Not a product defect.
+
+**Instrument defect found and fixed, and it had hidden itself for weeks.** The mount deleted
+`content-length` and let Node re-send the body chunked. qBittorrent 5.2.3 answers a chunked
+`torrents/add` with a bare **409 Conflict** — twice, on a magnet the same daemon accepts once the
+length is present. Every GET through the mount was unaffected, and gate 18's auth work drove the
+**stub** leg, so this was the first POST ever forwarded to the real daemon. A mount that silently
+breaks writes would have failed gates 11/13/15 too and looked like a product defect each time.
+
+**Cleanup, by the product's own reap, triple-guarded.** A gate-12 run leaves its torrent in
+`jp-study-subtitles`, and `qbitReapSubtitleOrphans` holds out its own in-flight hash — so the
+reap only removes it under a *different* target. Run with `G14_REFUSE_EXTRA=/api/v2/torrents/add`
+(nothing new can be added), `G14_RECATEGORIZE=539c0886…` (the Kitsunekko archive is hidden from
+the reap's own filter) and the new `G12_ALLOW_DELETE_HASH=eea983d1…` (delete is forwarded only
+when it names exactly that one hash, otherwise 403). Wire: `delete-allowed-exact eea983d1…` →
+200, `add` refused. **Both guards had to hold for a file to be lost, and the exact-hash one is
+the independent second.**
+
+**Client verified back at its baseline afterwards, at the real daemon with no mount: 10 rows,
+6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`, `539c0886…` still present, paused,
+progress 100.** Identical to the state gate 14 recorded this morning.
+
+**Product defect this run found, FIXED `520baecf`.** The release's 24 `.ass` files are twelve
+`.sc.ass` and twelve `.tc.ass`, and `languageFromFileName` knew `zh|chi|chs|cht` but not `sc`/`tc`
+— the pair CJK sidecar sets actually use. So all 24 read as **unlabelled**, which the documented
+policy keeps; a `ja` harvest would take twelve, pay for the transfer, and only then reject them on
+the kana floor. That is precisely the cost the name check exists to avoid. The pair is read only
+in the dotted slot before the extension, because two letters on the general rule would relabel a
+`[SC]` group tag, and a wrongly-`zh` file is *dropped* — a lost subtitle is worse than wasted
+bytes. See the ledger entry.
+
+**Track 9 is now 16 of 20: gates 11, 13, 15 remain as agent work, and gate 7 is external.**
+
+#### Gate 11 (Route A) — SUBJECT FOUND, and the reason it had none is FIXED. Still OPEN; the acquisition itself did not run.
+
+**2026-09-05 (primary).** Gate 11 asks for a subtitle-only release under the 50 MB ceiling. The
+honest reason no turn had ever driven it is not that the index carries none — it is that the
+**detector could not see the ones it carries.** Measured, not inferred, and in that order:
+
+1. The product's own listing for `Detective Conan` returned **1 candidate**: the 6.1 GB
+   `[PeepoHappy] Kitsunekko Archive`, route `sub-archive`. Not a Route A subject.
+2. The raw index search for the same title returned **75 rows, 2 of them under 50 MB** —
+   `Detective Conan Movies 01-26 (Only subs) [Netflix SEA] [Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]`
+   at **5.3 MB / 12 seeders**, and its **19.8 MB / 14-seeder** sibling covering 520 episodes.
+   Both are subtitles and nothing else, and **both carry a Japanese track** — which the `ja`
+   harvest needs, since `subtitleHarvest.ts:511` hardcodes `languages: ['ja']`.
+3. Run through `subtitlePackSignals` **in the running app** (dynamic import of the product's own
+   module, not a reimplementation): both scored `[]`. `(subs only)` → pack; `(Only subs)` → not a
+   pack. Same claim, reversed English word order. They were dropped for `shape`, the verdict that
+   means "nothing here is fetchable".
+
+**FIXED, and the second fix came from widening the same measurement.** `971dc4d4` (see below on
+its attribution) teaches `STATED_PAYLOAD_RE` the reversed order, which also stops `[Multi-Subs]`
+firing the video-release veto on a name where it means "many subtitle languages". `70a8941c` adds
+`FORMAT_ONLY_RE` after scanning **all 53 under-50 MB rows nyaa returned live today**: the scan
+read **49/53** after the first fix and **50/53** after the second, and the one further miss was
+`[ASS FILE ONLY] Goodbye Don Glees English Subs` — 0.1 MB of `.ass`, refused because the group
+strip ate its only format tag and the remaining `English Subs` vetoed the row. Of the 3 rows still
+refused: `[BD ONLY]` is correct and is now a committed control; one is my own search output
+truncating the name at 90 chars; one is `pack subs fr`, the reversed `sub pack` order, a single
+French row, deliberately not chased.
+
+**WHAT DID NOT HAPPEN, stated plainly: the acquisition.** Both fixes are in `src/shared/`, read by
+**main**, and main does not hot-reload. Driving the gate needs an app restart, and this turn had
+no right to one — a **second live `primary` session** (pid 29032, started 13:36) was in the same
+tree running `cat7-perf.cjs` against the shared app, and its commit `971dc4d4` at 14:17:18 proves
+it was live. Restarting would have destroyed its measurements. So gate 11 is **OPEN**, with its
+subject and its blocker both now known.
+
+**EXACT NEXT SLICE, for a turn that owns the app.** Restart, then:
+
+```
+node debug/g14-live.cjs list  "Detective Conan"                    # expect route sub-pack, rank 1
+node debug/g14-live.cjs fetch "Detective Conan" 22d2e2e6fb301f7dc0b32ed04c5e678a6c6e27ba
+```
+
+**The hash and the ranking arithmetic are pre-checked, so no turn spends a lap on them.** Read
+off the live index this turn (read-only, no restart needed, `g14-live.cjs search` now reports the
+field): the 5.3 MB row is `22d2e2e6fb301f7dc0b32ed04c5e678a6c6e27ba`, **11–12 seeders**,
+`isBatch: true`, and — the part that could have silently killed it — `subtitleLanguages:
+["en","ja"]`. That matters because the ranker **drops** a row outright when it advertises
+languages and none is wanted (`dropped.language`); `ja` is advertised, so it is kept and scores
+`language:ja` **+40** on top of `route:sub-pack` **+50** and `batch` **+5**, against the
+Kitsunekko archive's measured **39**. The pack ranks first. Both size guards clear either way:
+`packCoversEpisodeCount` wants 26 × 6 KB = 156 KB and the row is 5.3 MB; the ceiling is 50 MB flat
+with no episode count, or 78 MB with one. The 19.8 MB / 14-seeder sibling
+(`45921c38c5c45ae5b0d67116894b1880dd587967`, 520 episodes) is the fallback.
+
+`5.3 MB / 12 seeders` is the one to take — smallest with healthy seeds, per the standing rule.
+Then `attachSubtitleText({mediaId, text, format, lang:'ja', ...})`, which is the same call
+`SubtitleHarvestPanel.tsx:507` makes, to land the `SubtitleRecord` and satisfy the gate's second
+and third clauses. Two things to expect rather than misread: the multi-language pack means
+`selectSubtitleFiles` will skip the non-`ja` files, so "taken whole" is the *release*, not every
+file in it — disclose the skip count; and `qbitReapSubtitleOrphans` deletes the whole
+`jp-study-subtitles` category minus the in-flight hash, so drive it through
+`debug/qbit-basepath-proxy.cjs` with `G14_RECATEGORIZE=539c0886…` or lose the Kitsunekko archive.
+
+#### Gate 11's REAL constraint is the LIBRARY, not the index. Measured read-only 2026-09-05.
+
+This reframes the gate and it was found *before* paying for a transfer, which is the whole point of
+checking it. `attachSubtitleText` refuses with *"That media item is no longer in the library"* when
+`listItems()` has no match (`main/subtitleDiscovery.ts:975`) — so the gate's second and third
+clauses need a media item the cues honestly belong to. **`listMedia()` returns 39 items and ZERO
+match "conan"**: the library is `The Big O` (26 episodes + 3 creditless), `JoJo … Ougon no Kaze`
+(2 RAW episodes), `Date a Live II` (1 OVA), three Hana podcasts and four fixtures. So the Detective
+Conan packs prove the *fetch* half and cannot prove the record half.
+
+Searched the index for a Route A subject for the titles the user actually owns, with the language
+field read: `The Big O` → 75 rows, **3 under 90 MB and all three are different works** that merely
+share the words. `JoJo … Ougon no Kaze 字幕` → **0**. `Date a Live 字幕` → 26 rows, **0 under
+50 MB**. `Big O 字幕` → 22 under 50 MB and every one is a `幻樱字幕组` **video** release
+(`BIG5_MP4`), correctly scoring zero signals — a useful negative check that this turn's widening
+did not turn 22 video releases into packs.
+
+**RE-DERIVED, and the answer is NO — no restart was needed to get it.** The obvious next action was
+to re-list those titles after a restart, because `shape` is exactly the bucket an empty
+`subtitlePackSignals` produces and their old verdicts predate the fix. That question is now
+**answered offline**: the raw index rows were dumped live (`g14-live.cjs dump`, 75 rows each) and
+run through the product's **own** `rankSubtitleCandidatesDetailed` with `languages: ['ja']` — the
+fix is in the tree, so vitest reads the fixed module even though main has not restarted.
+
+| title | rows | candidates | drops |
+| --- | --- | --- | --- |
+| The Big O | 75 | **0** | titleMatched 7, title 68, **shape 7**, muxed 0, language 0 |
+| Date a Live II | 75 | **1** | titleMatched 21, title 54, shape 16, muxed 4, language 0 |
+
+Date a Live II's single candidate is a **`batch-sidecar`, 5,427 MB, 0 seeders** — not Route A, and
+unfetchable regardless. **So Route A has no subject in this library even with the fix**, and the
+word-order defect was never what stood between The Big O and a pack: its 7 title-matched rows are
+genuinely not subtitle releases.
+
+**What gate 11 therefore is, stated honestly rather than forced.** Its clauses split cleanly:
+*"a subtitle-only release under the 50 MB ceiling is taken whole"* has a real subject today (the
+Conan pack) and is drivable in one turn; *"lands as a `SubtitleRecord`, and its cues render in the
+player"* requires a library item the cues genuinely belong to, and this library has none for any
+title with a Route A pack. The next turn owning the app should drive the fetch clause, report the
+file counts, and then make the scope call under the standing auto-approval — amend the gate to its
+measurable half and record the rest as blocked on library contents, or hold it open. **What it must
+not do is attach Conan cues to a Big O episode to make three clauses read green.**
+
+**Attribution note, so the log is not read wrong.** The first fix's blobs are inside `971dc4d4`,
+a *concurrent* worker's liquid-scorecard commit. Two `primary` sessions share one git index here;
+mine were staged and that worker's `git commit` swept them in. The content is intact and verified
+at HEAD. History was not rewritten — with a live sibling that is the more dangerous option.

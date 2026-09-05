@@ -27857,3 +27857,136 @@ leaves the 3 controls GREEN. The live crash remains unobserved.
 (`SeanimeDevPanel.tsx` hardcoded strings, `VisualNovelCommunityPanel.tsx` `toFixed`). Re-derived
 here at HEAD: `i18n.test.ts` + `i18nNumberFormatting.test.ts` = **29 passed**, and
 `node tools/i18n-check.cjs` exit 0 on 12,509 keys. They belong to their dirty-hunk owners.
+
+## 2026-09-05 primary — Track 9 gate 14 CLOSES live, and a settings-shaped defect found chasing it
+
+**Gate 14, `ad493a19`.** Superseded the 2026-08-19 "0 of 7 can drive it" block by re-deriving it,
+not inheriting it. Today: **10 transfers, 5 infohash-matched, 4 legal by category, 0 accepted by
+the listing.** The two titles driven each produced exactly 1 candidate and it was the same
+`jp-study-subtitles` one both times — the `adopted` branch, again. Structural reason, so nobody
+re-derives it a third time: the gate needs one torrent to be hands-off by category *and*
+acceptable to the **subtitle** listing, but that listing drops video for `shape`/`muxed` and a
+user's non-subtitle torrents are video releases. Only a subtitle release acquired outside the app
+satisfies both, and no agent can arrange that without writing to the user's client.
+Result through the mount: **ok, 39 files, 2 s, wire log 8 entries — `torrents/info` ×3 and
+`torrents/files` ×2 and nothing else.** filePrio 0 / start 0 / delete 0 / setCategory 0.
+**CONTROL** (rewrite off → `adopted` branch): it **attempts filePrio**, so the 0/0 is the rule
+holding rather than a code path that never calls those verbs.
+
+**TRAP, and it is the expensive one here.** `nyaaFetchAll` reaps `jp-study-subtitles` with
+`deleteFiles=true` at `subtitleNyaaSource.ts:604` — **before** the `qbitAddStopped` at `:627`.
+So *driving* gate 14 against the live daemon destroys whatever sits in that category, which on
+this machine is the Kitsunekko archive, which is MAL gate 31's evidence. Drive it only through a
+mount that refuses `torrents/delete`. `debug/qbit-basepath-proxy.cjs` now does, plus
+`G14_RECATEGORIZE=<hash>` to rewrite one real torrent's category in `torrents/info`.
+**`debug/` is gitignored in full, so both live on disk only and will not survive a clean clone.**
+
+**Disclosed slip:** the control's extra fence went through an env var Git Bash mangled, so
+`filePrio` was NOT fenced and reached the real daemon. It answered **400** and applied nothing;
+verified after with no proxy — torrent present, still `jp-study-subtitles`, still paused, still
+progress 1, 10 rows, 3 categories. Report the fence you *verified*, not the one you passed.
+
+**`2884252b` — PRODUCT, found while chasing the above.** Every one of 10 nyaa cross-match
+searches returned **0 results**, because the active profile's `sources.entries` is `[]` (also the
+shipped default). Chasing that surfaced a real defect: `MalDownloadDialog` filtered candidate
+indexes by `kind` and `indexerIds` but **not** by `enabled`, while main narrows by `enabled` too
+(`scraper/torrents.ts:269`). A profile whose only index is switched off passed the guard, reached
+main, came back `[]`, and the dialog rendered "0 releases found" plus *"try editing the search
+text above"* — actionable-looking advice pointing at the wrong thing. The message was never
+missing: `malDownload.error.noIndexers` exists in all four catalogs and already says *enabled*.
+`TorrentManagerPage.tsx:110` had learned this exact lesson; this surface had not. 2 tests;
+mutation (refuse every entry) reddens **10 of 42** including the rival, restored md5 `fc1e46a5`.
+
+**Instrument note:** `debug/g14-live.cjs` now injects a real nyaa indexer **on the request** when
+the profile carries none — every scraper call takes its config on the request, so the stored
+profile is never written to. Without it every step here is unmeasurable.
+
+## 2026-09-05 (primary) — Track 9 gate 12 closes live; the sidecar-language hole it exposed
+
+**Gate 12 CLOSES.** Route B ran end to end for the first time — the plan's own record was
+0 for 10 on real batches. Subject `eea983d1…`, `【悠哈璃羽字幕组】[孤独摇滚_Bocchi the Rock]…简繁外挂字幕`,
+26,414,048,870 bytes, ranked **first** of 3 by the product's own listing. `ok: true`, **12
+subtitle files, 91 s**. Off the daemon's own `torrents/files`: **166 files, byPriority 154:0 /
+12:1, `videoAtNonZeroPriority` = 0.** Disclosed separately: 12 video files carry piece-boundary
+spill, max 0.32 %, **11.5 MB of 26.24 GB (0.044 %)** — block granularity, not a request, and kept
+apart from the scored term so neither claim can hide the other.
+**CONTROL** — fence `filePrio` at the mount: `ok: false`, `filePrio` refused, **`start` 0**. So
+the 154 zeroes are the product's two calls, not a torrent that never started. Both `filePrio`
+calls precede `start`, so no window for video exists. Plan `1f236c71`.
+
+**Finding a Route B subject is a query, not luck.** Batches that carry sidecars say so, in CJK:
+`node debug/g14-live.cjs search "外挂字幕 BDRip"` → 75 rows, several `isBatch: true`. Searching by
+anime title alone will keep reproducing 0-for-10, because the shipped-default profile carries
+**no torrent index at all** and the muxing groups dominate what is left.
+
+**PRODUCT, `520baecf`.** The release's 24 `.ass` are twelve `.sc.ass` + twelve `.tc.ass`, and
+`languageFromFileName` had `zh|chi|chs|cht` but not `sc`/`tc`. All 24 read **unlabelled**, and the
+documented policy KEEPS unlabelled — so a `ja` harvest takes twelve, pays for the transfer, and
+only the post-download kana floor rejects them. Exactly the waste the name check exists to
+prevent, and the reasoning `declaresMuxedSubtitles` already applies to muxing.
+Tradeoff, and it is why the fix is narrow: `sc`/`tc` on the general delimiter rule would relabel a
+`[SC]` group tag and a hyphenated title, and a wrongly-`zh` file is **dropped** from a `ja`
+harvest. A lost subtitle is worse than wasted bytes, so the pair is read only in the dotted slot
+before the extension. MUTATION 1 of 127 red, the exact test; restored md5 `65c24821`.
+
+**TRAP — the mount silently broke every POST, and had done since it was written.** It deleted
+`content-length`, so Node re-sent bodies chunked, and qBittorrent 5.2.3 answers a chunked
+`torrents/add` with a bare **409 Conflict**. Twice. GETs were unaffected and gate 18 drove the
+**stub** leg, so today was the first POST ever forwarded to the real daemon. Gates 11/13/15 would
+each have failed against it and read as product defects. Fixed in the mount, with the measurement
+in the comment.
+
+**TRAP — the reap cannot delete the torrent its own run created**, because `inFlight` holds that
+hash out. Cleanup needs a second run against a *different* target with `add` fenced. The mount
+gained `G12_ALLOW_DELETE_HASH`: `torrents/delete` is forwarded only when it names exactly one
+hash and that hash matches. It is deliberately independent of `G14_RECATEGORIZE`, so the
+Kitsunekko archive (MAL gate 31's evidence) survives either guard failing alone. Verified after,
+no mount: **10 rows, 6 uncategorised / 3 `jp-study` / 1 `jp-study-subtitles`, `539c0886…` present,
+paused, progress 100** — the morning's baseline exactly.
+
+**NOT a defect, stated so it is not filed as one:** the control's refusal reads *"qBittorrent
+rejected the API key"* because the mount synthesises a 403 on a route qBittorrent never 403s, and
+403 **is** an auth rejection in its API. Instrument artifact.
+
+## 2026-09-05 — `primary` — Track 9 gate 11: the index had subjects; the detector could not see them
+
+**`971dc4d4` (attribution below) + `70a8941c`.** Gate 11 wants a subtitle-only release under
+50 MB. Every prior turn treated "no Route A subject" as a fact about nyaa. It was a fact about
+`subtitlePackSignals`.
+
+**Measured in this order, so the finding is falsifiable.** The product's own listing for
+`Detective Conan` → **1 candidate**, the 6.1 GB Kitsunekko archive (`sub-archive`). The raw index
+search for the same title → **75 rows, 2 under 50 MB**: `… Movies 01-26 (Only subs) [Netflix SEA]
+[Multi-Subs] [EN-MS-TH-ID-VI-ZH-JA]` at **5.3 MB / 12 seeders**, and its **19.8 MB / 14-seeder**
+sibling over 520 episodes. Both subtitles-only, both carrying **JA** — which the harvest needs,
+`subtitleHarvest.ts:511` hardcoding `languages: ['ja']`. Fed to the classifier **inside the
+running app** (dynamic import of the real module, not a reimplementation): both `[]`, while
+`(subs only)` scored `subs-only`. The difference is English word order.
+
+**Two guards, one cause.** `STATED_PAYLOAD_RE` knew `subs only`, not `only subs`. So the payload
+claim went unread, and — because nothing outranked it — `[Multi-Subs]` fired the video-release
+veto on a name where it means "many subtitle languages". One regex fixes both halves; the 50 MB
+ceiling is unchanged and is still what makes it safe.
+
+**The second fix is what the widened measurement bought.** Scanning **all 53** under-50 MB rows
+returned live today: **49/53** accept after fix 1, **50/53** after fix 2. The extra miss was
+`[ASS FILE ONLY] Goodbye Don Glees English Subs`, 0.1 MB of `.ass` — the group strip ate the
+bracket holding its only format tag, then `English Subs` vetoed what remained. Of the 3 still
+refused, 1 is correct (`[BD ONLY]` is a *source* claim, now a committed control), 1 is my own
+search output truncating at 90 chars, 1 is `pack subs fr` (reversed `sub pack`, one French row,
+not chased). MUTATIONS: drop the reversed order → **2 of 130** red; drop `FORMAT_ONLY_RE` →
+**1 of 132** red. Both files restored byte-identical.
+
+**GATE 11 IS OPEN. The acquisition did not run, and the reason is not a product one.** Both fixes
+are in `src/shared/`, read by main, and main does not hot-reload. A **second live `primary`
+session** (pid 29032, 13:36) was in this tree driving `cat7-perf.cjs` against the shared app —
+its own commit `971dc4d4` at 14:17:18 proves it. A restart would have destroyed its measurements.
+
+**TRAPS, both of which cost real minutes here.**
+1. **My first corpus scan read `PACK 0/53`** — including rows the committed test proves are packs.
+   The helper set `id: name` and never `name`, so every row classified an empty string. A scan
+   that disagrees with a green test is the scan being wrong. Fixed → 49/53.
+2. **The shared git index swept my blobs into a stranger's commit.** `git add` then `git commit`
+   in two tool calls: between them the sibling committed, and my two files rode into its
+   liquid-scorecard commit `971dc4d4`. Content verified intact at HEAD; history NOT rewritten,
+   which with a live sibling is the more dangerous option. Stage and commit in one call.

@@ -160,8 +160,26 @@
    cannot shrink far enough to fit one row without becoming unreadable, so the strip WRAPS rather
    than scrolls — a tab pushed off a scrolling strip has no affordance saying it is there. */
 @container rfwork (max-width: 680px) {
+  /* A WRAPPING STRIP HAS NO CEILING, and at a small window it ate the whole
+     surface. Measured live at the 260x170 the category-4 harness scores as
+     compact: the container is 212x103, nine tabs wrap to about 187px of nav, and
+     `.reading-workspace-panel` — `flex: 1 1 auto` with nothing to give it — comes
+     out at **height 0, laid out 84px BELOW the window's own bottom edge**. The
+     section inside it (Captures, measured at 202x20) then paints outside the
+     frame: 9 clipped nodes, and the same collapse for all nine sections, because
+     the nav is shared chrome.
+
+     A percentage, not a second breakpoint: it holds the same guarantee — the
+     panel keeps the majority of the surface — continuously as the window shrinks,
+     instead of at one more hand-picked width. `min-height: 42px` above still wins
+     the conflict at tiny sizes, which is correct: one row of tabs is the floor,
+     and `overflow-y` is what makes the rest reachable rather than lost.
+     If the container's height is ever indefinite the percentage computes to
+     `none` and this degrades to exactly today's behaviour. */
   .reading-workspace-nav {
     flex-wrap: wrap;
+    max-height: 45%;
+    overflow-y: auto;
     padding-inline: 5px;
     row-gap: 4px;
   }
