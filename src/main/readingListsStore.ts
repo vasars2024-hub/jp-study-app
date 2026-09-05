@@ -41,6 +41,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import {
   emptyReadingListsDocument,
+  isReadingListsDocumentShape,
   normalizeReadingListsDocument,
   type ReadingListEvent,
   type ReadingListsDocument,
@@ -119,13 +120,15 @@ function readDocument(filePath: string): ReadingListsDocument | 'absent' | 'unre
   }
   try {
     const parsed: unknown = JSON.parse(text);
-    // `normalizeReadingListsDocument` is total, so a non-object parses to an empty
-    // document rather than throwing. That would turn a corrupt-but-valid-JSON file
-    // (`"null"`, `"[]"`) into a silent wipe, which is the whole failure this
-    // function exists to catch — so reject the shape here instead.
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return 'unreadable';
-    }
+    // `normalizeReadingListsDocument` is total, so ANY input parses to a usable
+    // document rather than throwing. That would turn a corrupt-but-valid-JSON
+    // file into a silent wipe, which is the whole failure this function exists to
+    // catch — so require the document shape here instead.
+    //
+    // This used to reject only `null`, arrays and scalars, which let `{}` — the
+    // shape a half-written file most easily lands on — through as a healthy empty
+    // library (boss audit 2026-09-05, Finding 1).
+    if (!isReadingListsDocumentShape(parsed)) return 'unreadable';
     return normalizeReadingListsDocument(parsed);
   } catch {
     return 'unreadable';

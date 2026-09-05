@@ -26,6 +26,7 @@
  */
 
 import {
+  isReadingListsDocumentShape,
   normalizeReadingListsDocument,
   type ReadingListEvent,
   type ReadingListsDocument,
@@ -160,6 +161,13 @@ export function readingListsFailure(code: ReadingListsFailureCode): ReadingLists
  * token would turn a compare-and-swap into a blind overwrite, which is the exact
  * failure this contract exists to prevent, and defaulting it would make every
  * caller that forgot it silently unsafe rather than loudly refused.
+ *
+ * `document` must carry the document SHAPE, not merely be an object. It used to
+ * accept `{}` and `[]`, and because `write` normalizes whatever it is given, a
+ * caller holding the correct revision could commit a wipe through the front door
+ * — the same P0 as the read side (boss audit 2026-09-05, Finding 1). Refusing it
+ * here means the malformed write is reported as `invalid-request` rather than
+ * applied and broadcast.
  */
 export function isReadingListsWriteRequest(
   value: unknown,
@@ -167,7 +175,7 @@ export function isReadingListsWriteRequest(
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const raw = value as { baseRevision?: unknown; document?: unknown };
   if (typeof raw.baseRevision !== 'number' || !Number.isFinite(raw.baseRevision)) return false;
-  return typeof raw.document === 'object' && raw.document !== null;
+  return isReadingListsDocumentShape(raw.document);
 }
 
 export function normalizeReadingListsHealth(value: unknown): ReadingListsHealth {

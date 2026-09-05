@@ -168,6 +168,60 @@ describe('a corrupt document recovers to last-good, and says so', () => {
     }
   });
 
+  it('does not read an OBJECT of the wrong shape as an empty library', () => {
+    // Boss audit 2026-09-05, Finding 1, P0. The check above rejected `null`, an
+    // array and scalars — but `{}` is an object, so it sailed through, normalized
+    // to zero lists, and was reported `ok`. `{}` is precisely the shape a
+    // half-written or hand-truncated file lands on, so this was the likely case,
+    // not the exotic one.
+    const store = createReadingListsStore(root);
+    store.write(0, fixture());
+    store.read();
+
+    for (const corruption of ['{}', '{"revision":3}', '{"lists":{}}', '{"lists":[],"works":7}']) {
+      fs.writeFileSync(store.filePath, corruption, 'utf8');
+      const snapshot = createReadingListsStore(root).read();
+      expect(snapshot.health.state, `\`${corruption}\` was served as a document`)
+        .toBe('recovered');
+      expect(snapshot.document.lists).toHaveLength(1);
+    }
+  });
+
+  it('does not let a corrupt read overwrite the restore point', () => {
+    // The half that turns a bad read into permanent loss: `snapshot()` promotes
+    // whatever it accepted to last-good. If `{}` is accepted once, the only copy
+    // of the lists is gone and the NEXT read has nothing to recover from.
+    const store = createReadingListsStore(root);
+    store.write(0, fixture());
+    store.read();
+
+    fs.writeFileSync(store.filePath, '{}', 'utf8');
+    createReadingListsStore(root).read();
+
+    const lastGood = JSON.parse(fs.readFileSync(store.lastGoodPath, 'utf8')) as {
+      lists: unknown[];
+    };
+    expect(lastGood.lists).toHaveLength(1);
+  });
+
+  it('still reads a document written by a build that predates a field', () => {
+    // The control on the fix: the shape check must reject corruption without
+    // rejecting forward compatibility. A document with `lists` but no `works`
+    // and no `schemaVersion` is what an older build wrote, and refusing it would
+    // be data loss of its own making.
+    const store = createReadingListsStore(root);
+    fs.mkdirSync(path.dirname(store.filePath), { recursive: true });
+    fs.writeFileSync(
+      store.filePath,
+      JSON.stringify({ lists: [{ id: 'list-1', name: 'from Kenji', kind: 'ordered', entries: [] }] }),
+      'utf8',
+    );
+
+    const snapshot = createReadingListsStore(root).read();
+    expect(snapshot.health.state).toBe('ok');
+    expect(snapshot.document.lists).toHaveLength(1);
+  });
+
   it('reports `reset` — not `recovered` — when there is no restore point', () => {
     const store = createReadingListsStore(root);
     fs.mkdirSync(path.dirname(store.filePath), { recursive: true });

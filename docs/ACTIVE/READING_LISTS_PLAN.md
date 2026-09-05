@@ -1651,3 +1651,39 @@ These are pass/fail rows on P4, not aspirations:
   every row when one entry's state changes.
 - **Density.** Comfortable and compact modes — a 20-book list and a 300-book list are not
   the same UI problem.
+
+**2026-09-05, `primary2` (worktree `jp-wt-filesapp`). P0's corrupt-recovery
+acceptance was NOT met. Boss audit Finding 1, P0, fixed and re-derived.**
+
+The audit dated 2026-09-05 06:44 MSK contradicted line 395's `P0 CLOSED` with a
+reproduction, and it was right. §9's P0 gate reads *"corrupt file recovers to last
+good with a diagnostic"*. It did not, for the most likely corruption of all.
+
+- **The defect.** `readDocument` rejected `null`, arrays and scalars, then handed
+  everything else to `normalizeReadingListsDocument` — which is deliberately
+  **total**, so `{}` normalized to a valid document with zero lists. That was
+  served as health `ok`, and `snapshot()` then promoted it OVER the restore point.
+  One read of a half-written file and both copies were empty. Reproduced against
+  the real store before any edit: `beforeLastGood 1 → afterLastGood 0`.
+
+- **The write half, same root cause.** `isReadingListsWriteRequest` required only
+  `typeof document === 'object'`, so a caller holding the CORRECT revision could
+  commit `{}` and have the wipe applied and broadcast as a healthy write.
+
+- **The fix** is one predicate, `isReadingListsDocumentShape`, used by both seams.
+  `lists` is required and must be an array; `works`/`revision`/`schemaVersion` are
+  checked only **when present**, because a build that predates a field omits it
+  legitimately and refusing that would be data loss of the fix's own making. That
+  forward-compatibility case ships as a passing control.
+
+- **Evidence.** 5 new tests across the store and IPC suites. Mutation control:
+  reverting the predicate to its old body turned exactly **3 RED** (object
+  corruption, restore-point overwrite, malformed write) and left the two controls
+  — genuinely-empty-library accepted, older-document accepted — GREEN. Restored
+  byte-identical. Reading-lists suites **47 → 52, all passing**.
+
+P0's recovery clause is closed against its own words now, not against the word
+`CLOSED` in an earlier block. The lesson worth keeping: **a total normalizer must
+never be the document-level guard.** Totality is right per FIELD (repair a broken
+volume range) and wrong per DOCUMENT (`{}` is not an empty library, it is a file
+that lost its contents).

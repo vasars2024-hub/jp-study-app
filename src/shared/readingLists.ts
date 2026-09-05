@@ -624,6 +624,32 @@ export function normalizeReadingList(value: unknown): ReadingList | null {
  * can arrive after the entry that wants it, and dropping the entry would silently
  * delete a book off a user's list because an enrichment step had not run yet.
  */
+/**
+ * Whether a value is shaped like a document at all — the guard `normalize` can
+ * never be, because `normalize` is deliberately total.
+ *
+ * Totality is right at the *field* level: a broken volume range or a duplicate
+ * work should be repaired, not thrown away. It is wrong at the *document* level,
+ * because `{}` normalizes to a perfectly valid document with zero lists, and
+ * "zero lists" is indistinguishable from "I never made any". Boss audit
+ * 2026-09-05 Finding 1 traced a P0 out of exactly that: a primary file truncated
+ * to `{}` was served as healthy AND promoted over the restore point, so the
+ * second read had nothing left to recover.
+ *
+ * `lists` is the field that makes it a document, so it is required and must be an
+ * array. Everything else is checked only WHEN PRESENT: a file written by a build
+ * that predates a field legitimately omits it, and refusing to read that would be
+ * data loss of this function's own making.
+ */
+export function isReadingListsDocumentShape(value: unknown): value is Partial<ReadingListsDocument> {
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.lists)) return false;
+  if (value.works !== undefined && !Array.isArray(value.works)) return false;
+  if (value.revision !== undefined && typeof value.revision !== 'number') return false;
+  if (value.schemaVersion !== undefined && typeof value.schemaVersion !== 'number') return false;
+  return true;
+}
+
 export function normalizeReadingListsDocument(value: unknown): ReadingListsDocument {
   if (!isRecord(value)) return emptyReadingListsDocument();
   const revision = num(value.revision);

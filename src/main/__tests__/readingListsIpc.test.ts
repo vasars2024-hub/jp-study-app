@@ -199,6 +199,41 @@ describe('write', () => {
       .toEqual({ ok: false, code: 'invalid-request' });
   });
 
+  it('refuses a malformed document instead of normalizing it into a wipe', () => {
+    // Boss audit 2026-09-05, Finding 1, the write half. The guard accepted any
+    // object, and `write` normalizes what it is given — so a caller holding the
+    // CORRECT revision could commit `{}` and erase every list, applied and
+    // broadcast as a healthy write. The refusal has to happen at the seam.
+    store.write(0, document('from Kenji'));
+    expect(store.read().document.lists).toHaveLength(1);
+
+    for (const malformed of [{}, [], { revision: 1 }, { lists: {} }]) {
+      expect(
+        invoke<ReadingListsResult>('readingLists:write', null, {
+          baseRevision: 1,
+          document: malformed,
+        }),
+        `${JSON.stringify(malformed)} was accepted as a document`,
+      ).toEqual({ ok: false, code: 'invalid-request' });
+    }
+
+    // The list survived every one of them.
+    expect(store.read().document.lists).toHaveLength(1);
+    expect(store.read().document.revision).toBe(1);
+  });
+
+  it('still accepts a genuinely empty library, which is not malformed', () => {
+    // The control on the guard: `{lists: []}` is a user who deleted their last
+    // list, and refusing it would make the product unable to reach empty.
+    store.write(0, document('from Kenji'));
+    const cleared = invoke<ReadingListsResult>('readingLists:write', null, {
+      baseRevision: 1,
+      document: { schemaVersion: 1, revision: 1, lists: [], works: [] },
+    });
+    expect(cleared.ok).toBe(true);
+    expect(store.read().document.lists).toEqual([]);
+  });
+
   it('skips a destroyed window rather than throwing into the handler', () => {
     const gone = makeWindow(2);
     gone.destroyed = true;
