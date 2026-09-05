@@ -7576,3 +7576,51 @@ wants one turn that owns the app.
 - **No rubric cell or timeline bullet closed**: this repairs the blocking notification path;
   the player still requires its own populated, controlled rubric pass. Full gates follow later
   this turn against a detached checkpoint, not the foreign dirty tree.
+
+## 2026-09-05 17:40-18:45 EDT — primary2 — `fwinIn` freezes at t=0 and leaves a window **invisible forever**. No cell closed; the cause of a whole class of harness refusals is now named.
+
+**Closed this turn: 0 cells. 176 of 192, 16 left — unchanged.** What moved is a product defect
+that has been silently VOIDing runs on every surface, mine included.
+
+### The measurement, and the control that proves it
+
+Shared instance, bridge 39273 / pid 36988, window 1. `os:open` -> `immersion`, then
+`cat2-clunkiness.cjs --surface Immersion --win 1` refused **three times** with
+`0 rendered text runs; an empty surface scores 0, not 10` — on a window holding
+**13 `.immersion-site-card`s and 68 text nodes.**
+
+    document.querySelector('.fwin').getAnimations()  ->  ["fwinIn:running:0"]
+    getComputedStyle(w).opacity                      ->  0
+    document.hasFocus()                              ->  true
+
+`playState` is **running** and `currentTime` is **0**, and it stays there. The compositor never
+advances the animation while the OS window is occluded, so the `from` keyframe
+(`opacity: 0; scale(0.98)`, `styles.css:14887`) is what paints — permanently.
+
+**Control (a real mutation, applied and restored):** setting `animation: none` on the stuck
+window read `opacity` **0 -> 1** and painted text runs **0 -> 56 of 68**; removing the plant read
+`opacity` back to **0**. So `.fwin`'s base style is visible and the frozen animation is the sole
+cause. `w.style` was captured and restored; no residue.
+
+### Why this is a PRODUCT defect and not a probe artifact
+
+`animation: fwinIn var(--motion-duration, 0.14s) ease` (`styles.css:14882`) has no fill-mode, so
+`fill: none` — the base `.fwin` carries no `opacity` and rests at 1. The window is invisible
+*only while the animation is running*, and it never finishes. **Re-focusing does not recover it**:
+measured with `hasFocus=true` after an explicit `/focus`, and again after close-and-reopen while
+focused. Any `.fwin` opened while the app is behind another window is a blank desk to the user
+until something else forces that window to repaint. `.os-start` carries the same rule at `:15288`.
+
+### The fix, and why I did not land it in this turn's last ten minutes
+
+Animate **transform only** and drop `opacity` from the `fwinIn` keyframes. A frozen transform at
+`scale(0.98)` is a 2% shrink — visible and usable — so the worst case becomes correct rather than
+merely less bad. Starting the fade from a nonzero opacity only makes "invisible forever" into
+"faint forever" and is not a fix.
+
+`.fwin` is the shared primitive under every window in the app and `secretIdentityScope.test.ts:18`
+asserts `fwinIn`/0.14s -> `none`/0s under reduce-motion, so this needs the full gate run. **That is
+the next turn's opening slice**, and it is ~10 minutes of work now that the cause is measured.
+
+`sampled-out:` no surface was scored, so nothing was skipped. `immersion` keeps cat2/cat7/cat8
+open, `player` its 8, `anki` its 4, `translate` cat7.
