@@ -125,6 +125,8 @@ const CONTROL = has('control');
  * every snapshot either way, so a run taken with it stays attributable rather than silent.
  */
 const ALLOW_SCROLL = has('allow-scroll');
+/** `--allow-hover` — score with the pointer parked on a control (correction 39). */
+const ALLOW_HOVER = has('allow-hover');
 /**
  * `--shell-chrome "<selector list>"` — DEFAULT EMPTY, and every baseline taken before this
  * option existed is therefore bit-identical under it.
@@ -321,12 +323,38 @@ const SNAP = `(function(){
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0 (minimised or unmounted) - refusing to record zeros' });
 
   var CTRL = 'button,a[href],input,select,textarea,[role="button"],[role="tab"],summary';
+  /*
+   * CORRECTION 36 (2026-09-04, primary2) -- A DEV-ONLY OVERLAY IS NOT PART OF THE SURFACE.
+   *
+   * These harnesses walk the running DEV app, so anything behind an \`import.meta.env.DEV\`
+   * guard is on screen here and on no user's machine. \`cat4-use-of-space.cjs\` (its spec item
+   * 21) and \`cat7-perf.cjs\` both already honour the product's own \`data-dev-only\` marker;
+   * cat5 was the one census that did not, and City is where it showed. Four of its nine
+   * scanned controls were the sky console's \`Sky sim\` / \`Star\` / \`Asteroid\` /
+   * \`Ice barrage\` buttons (\`ReadingGardenSkyEvents.tsx\`, marked \`data-dev-only="true"\`
+   * next to the guard), and the ONLY Liquid region Q6 found without a transition was that
+   * console's body. Two of the five questions City answered NO were answering for a panel
+   * that does not ship.
+   *
+   * It is an ATTRIBUTE the product sets, never a class list this file knows about -- a
+   * surface-specific exception is what RULE 1 forbids, and a harness deciding for itself
+   * which panels "look like" debug tools would hide real inspectors. Everything it removes
+   * is counted and named in \`devOnlyExcluded\`, so adding the attribute to a shipping
+   * element to dodge a score shows up there by name.
+   */
+  var devOnlyExcluded = [];
   function painted(e){
+    if (e.closest && e.closest('[data-dev-only]')) return false;
     return typeof e.checkVisibility === 'function'
       ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
       : true;
   }
   function name(e){ return e.tagName.toLowerCase() + '.' + String(e.className || '').split(' ')[0]; }
+  // Named, not dropped (correction 36). Reported even when the list is empty, so a reader can
+  // tell "this surface has no dev-only overlay" from "this run predates the exclusion".
+  [].slice.call(root.querySelectorAll('[data-dev-only]')).forEach(function(e){
+    devOnlyExcluded.push(name(e) + ' (+' + e.querySelectorAll(CTRL).length + ' controls)');
+  });
   function parseRgb(s){
     var m = String(s).match(/-?[\\d.]+/g);
     if (!m) return null;
@@ -523,6 +551,28 @@ const SNAP = `(function(){
   var bodyScrollTop = Math.round(body.scrollTop || 0);
   if (bodyScrollTop > 0 && !${ALLOW_SCROLL})
     return JSON.stringify({ refuse: 'body is scrolled ' + bodyScrollTop + 'px off its resting position - "at rest" (Q3) and "the default state" (Q4) are undefined here. Scroll it to the top, or pass --allow-scroll to score it where it stands.' });
+  /*
+   * CORRECTION 39 (2026-09-04, primary2) -- A PARKED CURSOR MANUFACTURES AN ENTRY POINT.
+   *
+   * filled() is "paints a background and separates from its host by >= 1.2:1". A hover fill
+   * satisfies it, and the pointer stays wherever the last bridge /click left it: an operator
+   * who clicked a control to set the surface up leaves that control in :hover for the whole
+   * run. Caught on City the same turn it was introduced -- a manual click on the frameless
+   * Liquid toggle (to restore a presentation an earlier run had stranded) left button.fwin-b
+   * hovered, its 16% hover wash counted as the only filled button among its siblings, and Q1
+   * scored entryPoints 1 on an ambient canvas scene that has no accent control at all.
+   * Verdict PASS 10/10, one term of it fabricated by the mouse.
+   *
+   * The harness's own Q6 leg is not the culprit -- it clicks synthetically, which sets no
+   * hover state -- so this is about the state a run INHERITS. It cannot be corrected for
+   * (a hovered element's computed background is not its resting one, and there is no way to
+   * read the resting one back), so it is a REFUSAL, in the same shape as bodyScrollTop:
+   * cheap to clear by parking the pointer, and --allow-hover scores it where it stands.
+   */
+  var hoveredControls = rq(CTRL).filter(function(e){ return e.matches(':hover'); }).map(name);
+  if (hoveredControls.length && !${ALLOW_HOVER})
+    return JSON.stringify({ refuse: 'the pointer is parked on ' + hoveredControls.join(', ')
+      + ' - a hover fill satisfies filled() and invents a Q1 entry point, and a hover colour is not the resting one Q5 walks. Move the pointer off the surface, or pass --allow-hover to score it where it stands.' });
   var controls = rq(CTRL).filter(painted);
   function inBody(e){
     var b = e.getBoundingClientRect();
@@ -1164,11 +1214,22 @@ const SNAP = `(function(){
           controlsInHostedWindows: root.querySelectorAll(CTRL).length - rq(CTRL).length }
       : null,
     theme: document.documentElement.getAttribute('data-theme'),
+    /*
+     * CORRECTION 38 (2026-09-04, primary2) -- DID THE AXIS REACH THE DOCUMENT, as opposed to
+     * did it reach THIS SURFACE. The two are different questions and only the second was
+     * being asked. Read from :root, so it is true whatever the surface is made of.
+     */
+    themeWitness: (function(){
+      var rs = getComputedStyle(document.documentElement);
+      return ['--text','--panel','--sidebar','--bg','--muted']
+        .map(function(v){ return v + '=' + String(rs.getPropertyValue(v) || '').trim(); }).join(' ');
+    })(),
     lang: document.documentElement.lang,
     presentation: root.getAttribute('data-presentation') || null,
     box: Math.round(R.width) + 'x' + Math.round(R.height),
     bodyScrollTop: bodyScrollTop,
     controlsPainted: controls.length,
+    devOnlyExcluded: devOnlyExcluded,
     q1: { entryPoints: entryPoints, primaryInputs: primaryInputs.length, accentButtons: accentButtons.length,
           accentList: accentButtons.map(function(e){ return name(e) + '::' + (e.textContent||'').trim().slice(0,18); }),
           inputList: primaryInputs.map(name) },
@@ -1481,8 +1542,8 @@ const BARS = {
   q1: '1..3 entry points in the host entry band — top for an app, taskbar for a shell',
   q2: 'a non-empty location label AND at least one way back',
   q3: 'the primary action is inside the body viewport at rest — "without hunting" means without scrolling',
-  q4: '<=12 controls scanned in the default state AND (>=1 collapsed disclosure OR <=3 controls with none already behind a disclosure)',
-  q5: 'no failing text run in EITHER theme, with a moved paint digest OR a declared fixed material owning every measured run',
+  q4: '<=12 controls scanned in the default state AND (>=1 disclosure of EITHER kind - a <details> or an aria-expanded/aria-controls region - OR <=3 controls with none already behind a disclosure)',
+  q5: 'no failing text run in EITHER theme, with a moved paint digest OR a declared fixed material (every measured run on an inline-authored opaque ground, OR the swap proven to reach :root while the surface paint stays byte-identical)',
   q6: 'every Liquid-treated region carries a state-change transition and none loops forever',
   q7: "category 6's parity: the same features reachable in standard as in Liquid",
   q8: "category 6's round trip: 0 field/shell diffs across standard->liquid->standard",
@@ -1495,8 +1556,29 @@ function scoreSnapshot(s) {
     q1: s.q1.entryPoints >= 1 && s.q1.entryPoints <= 3 ? 'YES' : 'NO',
     q2: s.q2.titleText && s.q2.backAffordances >= 1 ? 'YES' : 'NO',
     q3: s.q3.insideBodyViewport ? 'YES' : 'NO',
+    /*
+     * CORRECTION 37 (2026-09-04, primary2) -- THE VERDICT NEVER FOLLOWED ITS OWN INSTRUMENT.
+     *
+     * `inDisclosure` was extended to the APG `aria-expanded`/`aria-controls` pattern because
+     * scoring a surface on `<details>` alone charged it for a rule its markup could not
+     * satisfy (the block above says exactly that, and Scraper's drawer is its example). The
+     * COUNT that decides the verdict was left behind: `collapsedDisclosures` is
+     * `allDetails.length`, so a surface whose only disclosure is an aria one had its tucked
+     * contents correctly removed from `scanned` and was then failed for having no disclosure.
+     *
+     * City is the case that exposes it. `ariaDisclosures` in the very same receipt reads
+     * `[{region: 'aside.lq-contextual', controlsTaken: 4}]` -- the mushroom hitbox is an
+     * `aria-expanded` button that opens the dossier -- while `collapsedDisclosures` reads 0.
+     * The mushroom IS the disclosure. This is the same shape cat1's correction 33 had to
+     * learn, one level up.
+     *
+     * Deliberately NOT a loosening: `ariaRegions` is already built under two guards (a region
+     * containing its own toggle is ignored, and the toggle itself is never excluded), so this
+     * term can only fire where the instrument already removed something. Both counts stay in
+     * the snapshot separately so a reader can disagree with the rule rather than the verdict.
+     */
     q4: s.q4.scannedControls <= 12
-      && (s.q4.collapsedDisclosures >= 1
+      && (s.q4.collapsedDisclosures + (s.q4.ariaDisclosures || []).length >= 1
         || (s.q4.scannedControls <= 3 && s.q4.behindDisclosure === 0)) ? 'YES' : 'NO',
     q6: s.q6.liquidRegions === 0
       ? 'NO-SUBJECT'
@@ -1787,11 +1869,43 @@ function scoreSnapshot(s) {
   const q5MovedRatio = A_CELL.q5.minRatio !== B_CELL.q5.minRatio;
   const q5MovedPaint = A_CELL.q5.paintKey !== B_CELL.q5.paintKey;
   const q5Moved = q5MovedRatio || q5MovedPaint;
+  /*
+   * CORRECTION 38 (2026-09-04, primary2) -- A SURFACE THAT PASSES BY BEING THEME-INDEPENDENT
+   * WAS VOIDED FOR IT.
+   *
+   * `--fixed-material` had exactly one proof: every measured run resolves to an opaque
+   * background authored INLINE. That is the sticky note, which is what it was written for --
+   * its paper colour is user state, set on the element. A surface that paints its own fixed
+   * palette from its OWN STYLESHEET could never satisfy it, because `getComputedStyle`
+   * cannot tell a literal from a resolved `var()`.
+   *
+   * City forced this and it is worth stating, because the shape looks like a waiver and is
+   * the opposite. `.reading-garden-sky` is a hardcoded night gradient over a `#050711` root
+   * with no day phase; every text run in the garden is a literal colour. The only
+   * theme-tracking text it had was its four window-control glyphs, which is exactly the Q5
+   * defect repaired in `f0b76b55` (1.62:1 in classic-light). Repairing it made the surface
+   * fully theme-independent, so both cells now report the same 12.6 minimum and the same
+   * paint digest -- and the guard read that as "the swap never reached the paint" and VOIDed
+   * a surface for the fix. Passing Q5 by being stable is the answer Q5 is asking for.
+   *
+   * SECOND PROOF, and it is stricter than the first rather than looser: the theme swap must
+   * be shown to have reached the DOCUMENT (`themeWitness` is five palette tokens read off
+   * `:root`, so it moves for any real palette change regardless of what the surface is made
+   * of) while nothing about the SURFACE's own paint moved (`paintKey` identical -- every
+   * measured foreground and its composited background, byte for byte). Axis applied,
+   * surface unmoved, therefore the surface is genuinely fixed. A swap that silently failed
+   * moves neither and still VOIDs. `--fixed-material` is still REQUIRED, so this cannot
+   * become a blanket waiver for a surface that never declared itself fixed, and the ordinary
+   * contrast plant is still the negative control and still has to make Q5 fail.
+   */
+  const q5ThemeReachedDocument =
+    A_CELL.theme !== B_CELL.theme && !!A_CELL.themeWitness && A_CELL.themeWitness !== B_CELL.themeWitness;
   const q5FixedProved = FIXED_MATERIAL
     && A_CELL.theme !== B_CELL.theme
     && A_CELL.q5.measured > 0 && B_CELL.q5.measured > 0
-    && A_CELL.q5.fixedMaterialRuns === A_CELL.q5.measured
-    && B_CELL.q5.fixedMaterialRuns === B_CELL.q5.measured;
+    && ((A_CELL.q5.fixedMaterialRuns === A_CELL.q5.measured
+      && B_CELL.q5.fixedMaterialRuns === B_CELL.q5.measured)
+      || (q5ThemeReachedDocument && !q5MovedPaint));
   const q5AxisProved = q5Moved || q5FixedProved;
   const q5 = {
     verdict: q5Failing === 0 ? 'YES' : 'NO',
@@ -1802,7 +1916,8 @@ function scoreSnapshot(s) {
     themeAxisMoved: q5Moved,
     fixedMaterialProved: q5FixedProved,
     axisWitness: { minRatioMoved: q5MovedRatio, paintDigestMoved: q5MovedPaint,
-      fixedMaterialRequested: FIXED_MATERIAL },
+      fixedMaterialRequested: FIXED_MATERIAL, themeReachedDocument: q5ThemeReachedDocument,
+      themeWitness: cells.map((c) => ({ cell: c.cell, tokens: c.themeWitness })) },
   };
 
   const fromC6 = (term, ok) => (c6 ? (ok ? 'YES' : 'NO') : 'MEASURE');
