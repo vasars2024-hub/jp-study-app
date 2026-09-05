@@ -416,9 +416,36 @@ async function plantControls() {
     nav.textContent = 'cat3 control C';
     host.appendChild(nav);
 
+    // CORRECTION 48 -- plant D was written against the OLD meaning of its own bar, and so it
+    // could not falsify on any windowed surface. It self-tinted (alpha 0.5) because the bar
+    // used to ask "is this region on a translucent material". CORRECTION 35 changed the bar to
+    // !r.grounded -- does the region reach an opaque GROUND -- and nothing updated the plant.
+    //
+    // Under Liquid, .fwin-body is pinned OPAQUE by rule 1 of liquid-window.css. So the
+    // plant's own alpha is irrelevant: backingOf walks up, hits alpha 1 one level above it,
+    // and settles grounded: true. Measured on novels before the fix, from the instrument's
+    // own row: ownAlpha 0.5, grounded true, "opaque ground at div.fwin-body=1", and
+    // denseWorkOnTranslucent stayed 0 while byRole.Work correctly went 3 -> 4. The plant was
+    // SEEN and simply could not move the scored term -- which VOIDed the whole cell, on this
+    // surface and on every other window, while the bar itself was passing honestly.
+    //
+    // backingOf settles ungrounded on exactly three triggers: a backdrop-filter, opacity < 1,
+    // or an unparseable paint. A backdrop-filter is the truthful one here -- it is what "dense
+    // work sitting on glass" physically IS, and it is what the surfaces this bar polices would
+    // actually be doing wrong. The alpha stays because it is still true of the plant.
+    //
+    // Verified live before landing, plant applied by hand and the instrument re-run against the
+    // same window: denseWorkOnTranslucent 0 -> 1 (exactly one), the plant's row flipping to
+    // grounded false, "backdrop-filter on div.=0.5+blur", and all three REAL Work regions
+    // unchanged at grounded true, "opaque ground at div.reading-workspace=1".
+    //
+    // It cannot leak into the other two bars: liquidTreatedEligible and
+    // sharedPrimitiveEligible both filter role === 'Liquid-eligible', and this plant is
+    // role Work by its form content.
     var dense = document.createElement('div');
     dense.setAttribute('data-lq-cat3-plant', 'dense');
-    dense.setAttribute('style', box + 'background-color:rgba(30,30,40,0.5);');
+    dense.setAttribute('style', box + 'background-color:rgba(30,30,40,0.5);'
+      + '-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);');
     dense.appendChild(document.createElement('input'));
     host.appendChild(dense);
 
