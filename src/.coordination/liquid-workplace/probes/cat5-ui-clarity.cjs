@@ -125,6 +125,8 @@ const CONTROL = has('control');
  * every snapshot either way, so a run taken with it stays attributable rather than silent.
  */
 const ALLOW_SCROLL = has('allow-scroll');
+/** `--allow-hover` — score with the pointer parked on a control (correction 42). */
+const ALLOW_HOVER = has('allow-hover');
 /**
  * `--shell-chrome "<selector list>"` — DEFAULT EMPTY, and every baseline taken before this
  * option existed is therefore bit-identical under it.
@@ -321,6 +323,13 @@ const SNAP = `(function(){
   if (!R.width || !R.height) return JSON.stringify({ refuse: 'surface is 0x0 (minimised or unmounted) - refusing to record zeros' });
 
   var CTRL = 'button,a[href],input,select,textarea,[role="button"],[role="tab"],summary';
+  /*
+   * The dev-only exclusion is correction 38's, further down (\`devOnly()\`), NOT here.
+   * primary2 wrote the identical exclusion into this predicate on 2026-09-04, concurrently
+   * and independently, and it was dropped on the merge rather than kept alongside: two
+   * overlapping exclusions of the same subtree would have double-reported it, and 38's
+   * numbers (Q4 9->5, Q6 2->1) are the ones already committed to the scorecard.
+   */
   function painted(e){
     return typeof e.checkVisibility === 'function'
       ? e.checkVisibility({ checkOpacity:true, checkVisibilityCSS:true, contentVisibilityAuto:true })
@@ -523,6 +532,28 @@ const SNAP = `(function(){
   var bodyScrollTop = Math.round(body.scrollTop || 0);
   if (bodyScrollTop > 0 && !${ALLOW_SCROLL})
     return JSON.stringify({ refuse: 'body is scrolled ' + bodyScrollTop + 'px off its resting position - "at rest" (Q3) and "the default state" (Q4) are undefined here. Scroll it to the top, or pass --allow-scroll to score it where it stands.' });
+  /*
+   * CORRECTION 42 (2026-09-04, primary2) -- A PARKED CURSOR MANUFACTURES AN ENTRY POINT.
+   *
+   * filled() is "paints a background and separates from its host by >= 1.2:1". A hover fill
+   * satisfies it, and the pointer stays wherever the last bridge /click left it: an operator
+   * who clicked a control to set the surface up leaves that control in :hover for the whole
+   * run. Caught on City the same turn it was introduced -- a manual click on the frameless
+   * Liquid toggle (to restore a presentation an earlier run had stranded) left button.fwin-b
+   * hovered, its 16% hover wash counted as the only filled button among its siblings, and Q1
+   * scored entryPoints 1 on an ambient canvas scene that has no accent control at all.
+   * Verdict PASS 10/10, one term of it fabricated by the mouse.
+   *
+   * The harness's own Q6 leg is not the culprit -- it clicks synthetically, which sets no
+   * hover state -- so this is about the state a run INHERITS. It cannot be corrected for
+   * (a hovered element's computed background is not its resting one, and there is no way to
+   * read the resting one back), so it is a REFUSAL, in the same shape as bodyScrollTop:
+   * cheap to clear by parking the pointer, and --allow-hover scores it where it stands.
+   */
+  var hoveredControls = rq(CTRL).filter(function(e){ return e.matches(':hover'); }).map(name);
+  if (hoveredControls.length && !${ALLOW_HOVER})
+    return JSON.stringify({ refuse: 'the pointer is parked on ' + hoveredControls.join(', ')
+      + ' - a hover fill satisfies filled() and invents a Q1 entry point, and a hover colour is not the resting one Q5 walks. Move the pointer off the surface, or pass --allow-hover to score it where it stands.' });
   var controls = rq(CTRL).filter(painted);
   function inBody(e){
     var b = e.getBoundingClientRect();
@@ -1562,7 +1593,7 @@ const BARS = {
   q1: '1..3 entry points in the host entry band — top for an app, taskbar for a shell',
   q2: 'a non-empty location label AND at least one way back',
   q3: 'the primary action is inside the body viewport at rest — "without hunting" means without scrolling',
-  q4: '<=12 controls scanned in the default state AND (>=1 collapsed disclosure OR <=3 controls with none already behind a disclosure)',
+  q4: '<=12 controls scanned in the default state AND (>=1 disclosure of EITHER kind - a <details> or an aria-expanded/aria-controls region - OR <=3 controls with none already behind a disclosure)',
   q5: 'no failing text run in EITHER theme, with a moved paint digest OR moved palette tokens on documentElement OR a declared fixed material owning every measured run',
   q6: 'every Liquid-treated region carries a state-change transition and none loops forever',
   q7: "category 6's parity: the same features reachable in standard as in Liquid",
@@ -1576,8 +1607,29 @@ function scoreSnapshot(s) {
     q1: s.q1.entryPoints >= 1 && s.q1.entryPoints <= 3 ? 'YES' : 'NO',
     q2: s.q2.titleText && s.q2.backAffordances >= 1 ? 'YES' : 'NO',
     q3: s.q3.insideBodyViewport ? 'YES' : 'NO',
+    /*
+     * CORRECTION 41 (2026-09-04, primary2) -- THE VERDICT NEVER FOLLOWED ITS OWN INSTRUMENT.
+     *
+     * `inDisclosure` was extended to the APG `aria-expanded`/`aria-controls` pattern because
+     * scoring a surface on `<details>` alone charged it for a rule its markup could not
+     * satisfy (the block above says exactly that, and Scraper's drawer is its example). The
+     * COUNT that decides the verdict was left behind: `collapsedDisclosures` is
+     * `allDetails.length`, so a surface whose only disclosure is an aria one had its tucked
+     * contents correctly removed from `scanned` and was then failed for having no disclosure.
+     *
+     * City is the case that exposes it. `ariaDisclosures` in the very same receipt reads
+     * `[{region: 'aside.lq-contextual', controlsTaken: 4}]` -- the mushroom hitbox is an
+     * `aria-expanded` button that opens the dossier -- while `collapsedDisclosures` reads 0.
+     * The mushroom IS the disclosure. This is the same shape cat1's correction 33 had to
+     * learn, one level up.
+     *
+     * Deliberately NOT a loosening: `ariaRegions` is already built under two guards (a region
+     * containing its own toggle is ignored, and the toggle itself is never excluded), so this
+     * term can only fire where the instrument already removed something. Both counts stay in
+     * the snapshot separately so a reader can disagree with the rule rather than the verdict.
+     */
     q4: s.q4.scannedControls <= 12
-      && (s.q4.collapsedDisclosures >= 1
+      && (s.q4.collapsedDisclosures + (s.q4.ariaDisclosures || []).length >= 1
         || (s.q4.scannedControls <= 3 && s.q4.behindDisclosure === 0)) ? 'YES' : 'NO',
     q6: s.q6.liquidRegions === 0
       ? 'NO-SUBJECT'
@@ -1868,6 +1920,15 @@ function scoreSnapshot(s) {
   const q5MovedRatio = A_CELL.q5.minRatio !== B_CELL.q5.minRatio;
   const q5MovedPaint = A_CELL.q5.paintKey !== B_CELL.q5.paintKey;
   const q5Moved = q5MovedRatio || q5MovedPaint;
+  /*
+   * primary2 reached correction 38's conclusion independently and concurrently the same day,
+   * from City: repairing its Q5 defect made the garden theme-independent, both cells reported
+   * the same 12.6 minimum and the same paint digest, and the guard VOIDed the surface for the
+   * very property the fix delivered. Its proof was narrower (it required --fixed-material and
+   * a five-token witness); backup's palette digest below needs no flag and covers it, so only
+   * this note survived the merge. Two workers arriving at the same VOID from two surfaces is
+   * the strongest evidence the guard was wrong.
+   */
   const q5FixedProved = FIXED_MATERIAL
     && A_CELL.theme !== B_CELL.theme
     && A_CELL.q5.measured > 0 && B_CELL.q5.measured > 0

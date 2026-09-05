@@ -461,6 +461,19 @@ export function MushroomStage({
         <button
           className="reading-garden-mushroom-hitbox"
           type="button"
+          /* The garden's ONE action, said out loud. Everything else on this surface is
+             window chrome or a control inside the dossier this button opens, so a reader
+             arriving at City has exactly one thing to do and no painted affordance saying
+             so — the mushroom is art with an invisible hitbox over it. Category 5 Q1 and Q3
+             both measured that as "no entry point / no primary action", and they were right
+             about the surface rather than wrong about the bar: an ambient scene still owes
+             the user one obvious way in. `data-primary` is the app's existing way of
+             declaring it (`DesktopShell.tsx:3310`, `MusicWidget.tsx:193`,
+             `VisualizerContent.tsx:104` — the visualizer is the same shape of surface and
+             settled it the same way), it has no CSS hook, and it changes nothing about how
+             the button behaves. It is a claim about which control matters, and here it is
+             simply true. */
+          data-primary
           ref={activateRef}
           onClick={onActivate}
           aria-label={

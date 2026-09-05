@@ -1762,6 +1762,28 @@
   }
 }
 
+/* CATEGORY 5 Q5, THE HALF `bfba48af` DID NOT COVER — the KEYBOARD ring, one property over
+   from the glyph colour it repaired. `a11y.css` sets `--focus-ring-color: var(--text)`, so
+   in every light palette Tab drew a near-black ring on the frameless cluster's near-black
+   plate: the glyph is now legible and the focus indicator still is not.
+
+   primary2 measured the glyph half of this independently and concurrently the same day
+   (1.62:1 focused / 1.24:1 at rest in classic-light, and a 130x28 `capturePage` reading the
+   true paint as (52,52,52) on (13,13,19) = 1.65:1) and repaired it here, in the garden's own
+   sheet. `bfba48af` landed first, in `shell.css`, with the same ink value from the same
+   `.popout-root-mooncap .popout-btn` precedent AND a `:not(.fwin-liquid)` guard mine did not
+   have — Liquid swaps the plate for a LIGHT `--lq-liquid-bg`, where a light wash destroys the
+   hover cue. That version won the merge whole; only this rule, which it has no counterpart
+   for, survived. Guarded identically for the same reason.
+
+   Not `--focus-ring-color` itself: that token is the app's, and this is one cluster's ground. */
+:where(html:not([data-materials='aero']):not([data-materials='wired']))
+  .fwin-frameless:not(.fwin-liquid)
+  .fwin-frameless-controls
+  .fwin-b:focus-visible {
+  outline-color: rgba(233, 247, 249, 0.92);
+}
+
 /* ---------------------------------------------------------------------------
    Stand the decorative blur down for the duration of a window resize.
 

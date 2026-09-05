@@ -2446,14 +2446,44 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       }
     }
   }
-  const themeControlP50 = legs.themeControlRuns
+  let themeControlP50 = legs.themeControlRuns
     ? Math.min(...legs.themeControlRuns.map((r) => r.p50)) : ceilingP50;
-  const themeControlP95 = legs.themeControlRuns
+  let themeControlP95 = legs.themeControlRuns
     ? Math.min(...legs.themeControlRuns.map((r) => r.p95)) : ceilingP95;
-  const themeControlOver100 = legs.themeControlRuns
+  let themeControlOver100 = legs.themeControlRuns
     ? Math.max(...legs.themeControlRuns.map((r) => r.over100)) : ceilingOver100;
-  const themeControlMaxMs = legs.themeControlRuns
+  let themeControlMaxMs = legs.themeControlRuns
     ? Math.max(...legs.themeControlRuns.map((r) => r.max)) : ceilingMaxMs;
+
+  // CORRECTION 43 — hiding the root of a CONTINUOUSLY ANIMATING surface does not subtract the
+  // theme swap, it subtracts the surface. The control above assumes `visibility: hidden` on the
+  // root leaves the renderer's resting cadence alone, which holds for a static surface and is
+  // false for a canvas scene that paints every frame whether or not anyone touches it.
+  // Measured on City (Mooncap Garden), 2026-09-05: the session ceiling — City visible, at rest,
+  // no gesture — was p50 16.7 / p95 25.0, and the hidden-root theme control ran at 8.3 / 8.5,
+  // because the garden's thirteen canvases had stopped painting and the 120 Hz panel was free.
+  // The theme leg then measured 16.7 / 25.0, byte-identical to the resting ceiling, and was
+  // scored a FINDING twice over. The swap cost nothing; the control had charged it the whole
+  // ambient budget of the surface.
+  //
+  // The guard is deliberately one-directional, so it can never soften a real theme regression.
+  // It fires ONLY when the control came back FASTER than the surface's own resting ceiling —
+  // which means hiding the root sped the renderer up, i.e. the two legs no longer describe the
+  // same scene. On a static surface the control and the ceiling land on the same vsync step and
+  // nothing changes. A control that is slower than the ceiling, or equal to it, is untouched.
+  const themeControlFasterThanRest = legs.themeControlRuns && themeControlP50 < ceilingP50 - 0.5;
+  const themeControlSubstitution = themeControlFasterThanRest
+    ? `theme control VOID and replaced by the session ceiling: hiding ${spec.root} ran at p50 `
+      + `${themeControlP50} / p95 ${themeControlP95} ms, FASTER than the surface's own resting `
+      + `ceiling of ${ceilingP50} / ${ceilingP95} ms, so it removed this surface's continuous `
+      + `paint rather than the theme swap (correction 43)`
+    : null;
+  if (themeControlFasterThanRest) {
+    themeControlP50 = ceilingP50;
+    themeControlP95 = ceilingP95;
+    themeControlOver100 = ceilingOver100;
+    themeControlMaxMs = ceilingMaxMs;
+  }
 
   // --- 2-4. the three gestures, every one scoped to THIS surface's window -----------
   // TWICE, then a third reading to break a tie. If those three disagree, take two final
@@ -2608,6 +2638,9 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
   const findings = [];
   const voided = [...voidedEarly];
   const environment = [];
+  // Correction 43's substitution is always published. A control that was silently swapped is
+  // exactly the flattering-number failure this file exists to stop.
+  if (themeControlSubstitution) environment.push(themeControlSubstitution);
   for (const g of ['drag', 'resize', 'theme']) {
     const r = legs[g];
     const controlP50 = g === 'theme' ? themeControlP50 : ceilingP50;
@@ -2713,6 +2746,13 @@ const PPROBE = 'tools/liquid-perf-probe.ps1';
       environmentNote: ceilingOver100 > 0 || ceilingMaxMs > 100
         ? `THE MACHINE ITSELF STALLED DURING THIS RUN: the ceiling leg, which runs no product code, produced ${ceilingOver100} frame(s) over 100 ms and a ${ceilingMaxMs} ms longest frame. Gesture over-100 counts are scored against that floor.`
         : 'ceiling clean — no environmental stall observed in this session',
+    },
+    themeControl: {
+      p50: themeControlP50, p95: themeControlP95,
+      over100: themeControlOver100, maxMs: themeControlMaxMs,
+      measured: legs.themeControlRuns,
+      substitutedByCeiling: Boolean(themeControlSubstitution),
+      substitutionReason: themeControlSubstitution,
     },
     legs, findings, voided, environment, score,
     l0Provenance: L0,
