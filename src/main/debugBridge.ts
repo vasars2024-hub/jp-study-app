@@ -20,6 +20,7 @@ import v8 from 'node:v8';
 import vm from 'node:vm';
 import { BrowserWindow, app } from 'electron';
 import { llamaHostStats } from './llamaHost';
+import { forceCollect } from './debugGc';
 
 /**
  * The bridge port. 39273 unless `JP_DEBUG_PORT` says otherwise.
@@ -266,24 +267,25 @@ async function handle(
       // stale reference, and it distinguishes a leak from a high-water mark.
       const forceGc = body.gc === true;
       let gcRan = false;
+      let gcSource = 'not-requested';
+      let gcReason = '';
       if (forceGc) {
-        // The app is not launched with `--expose-gc`, so borrow it for one call.
-        // This is what separates "GC never got idle time under cadence" from
-        // "the memory is genuinely still referenced": if private bytes fall
-        // after this, the allocation was collectable all along.
-        try {
-          v8.setFlagsFromString('--expose_gc');
-          (vm.runInNewContext('gc') as () => void)();
-          gcRan = true;
-        } catch {
-          /* best effort — never take the app down for a measurement */
-        } finally {
-          try {
-            v8.setFlagsFromString('--no-expose_gc');
-          } catch {
-            /* ignore */
-          }
-        }
+        // Borrowing a collector separates "GC never got idle time under cadence" from "the
+        // memory is genuinely still referenced": if private bytes fall after this, the
+        // allocation was collectable all along.
+        //
+        // The borrow lives in `debugGc.ts` because the version inlined here re-toggled a V8
+        // flag and minted a fresh vm context on EVERY request, and killed main on the fifth
+        // call of a 2026-09-05 rubric run — asynchronously, after the route had answered 200,
+        // which the `try/catch` around it could never have caught. See that file's header.
+        const outcome = forceCollect({
+          globalGc: (globalThis as { gc?: unknown }).gc,
+          setFlagsFromString: (flag) => v8.setFlagsFromString(flag),
+          runInNewContext: (code) => vm.runInNewContext(code),
+        });
+        gcRan = outcome.ran;
+        gcSource = outcome.source;
+        gcReason = outcome.reason;
       }
       const mu = process.memoryUsage();
       const hs = v8.getHeapStatistics();
@@ -298,6 +300,10 @@ async function handle(
           ok: true,
           gcRequested: forceGc,
           gcRan,
+          // Reported so a run that scores against a collection can say WHICH collector fired,
+          // and so a refusal reads as a refusal instead of a silent no-op.
+          gcSource,
+          gcReason,
           pid: process.pid,
           uptimeSec: Math.round(process.uptime()),
           // Electron reports these in KB; normalize everything to MB.
