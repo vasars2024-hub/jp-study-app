@@ -4197,3 +4197,96 @@ art-plate exclusion and cat4 still has none.
 **Baseline banked:** `baselines/cat6-city.json` (gitignored, like every baseline here). cat5's
 Q7/Q8/Q9 VOID without it and read `MEASURE`; with it they are all three YES. **Run cat6 before
 cat5, always.**
+
+## 2026-09-04 · backup — City cat5 closes at 10/10, and every one of its five NOs was the instrument or a shared-chrome defect
+
+**sampled-out: `novels` `immersion` `reading` `translate` `files` `player` `anki`** — unchanged
+from the entry above; this turn continued City rather than opening a ninth surface.
+
+City is now **5 of 8 categories closed** (cat1, cat3, cat5, cat6, cat8). cat2, cat4 and cat7
+remain and cat2 is the exact-next slice.
+
+| # | Category | Score | Number measured | Negative control |
+| - | -------- | ----- | --------------- | ---------------- |
+| 5 | UI clarity | **10/10** | all ten YES. Q4 scanned **5** (devOnly 4, collapsed 1); Q6 regions **1** with **1** carrying a transition (devOnly 2); Q5 `failingCount` **0** in BOTH cells, `minRatio` **12.42** in both, `paletteTokensMoved` **true**; Q1 entryPoints 1; Q10 identityCount 3 | harness `--control`: **CONTROL FAILED AS REQUIRED on Q2, Q3, Q4, Q5, Q10**. Plus two mutation controls on the corrections themselves, below |
+
+**`bfba48af` — the frameless window buttons read 1.60:1 in EVERY light palette, and the reason
+it had never been seen is that a second defect was hiding it.** This is the slice `primary` was
+mid-write when it hit its usage limit at 20:12; it was recovered from three uncommitted files
+(mtimes 20:07 / 20:09 / 20:12) and finished here.
+
+- `.fwin-frameless` sat at **(0,1,0)** and LOST to `.fwin { background: var(--bg) }` further
+  down the same file at the same specificity. The night-window material computed to nothing and
+  the window painted the palette's `--bg` — white under `classic-light`. It never showed on
+  screen, because the garden canvas covers the body; the one place it showed was the contrast
+  model, where the cluster composited over WHITE and read **4.41:1** while a 130x28 capture of
+  those same pixels read the plate as `rgb(13,13,19)`. Raised to `.fwin.fwin-frameless` and the
+  two agree: backdrop `rgb(14,14,20)` vs painted `rgb(13,13,19)`.
+- With that fixed, the real reading: glyph `rgb(52,52,52)` on composited `rgb(83,82,86)` =
+  **1.60:1**, all four of `⧉ ◇ ─ ×`. forest-night is **12.6:1**. A defect that moves with the
+  palette while the plate does not — the plate is `rgba(16,15,21,0.72)` over a night-sky canvas
+  in every palette, the glyph derived from `--text`. The glyph now takes the plate's own ink,
+  the value `.popout-root-mooncap .popout-btn` already uses for the SAME cluster.
+- `:not(.fwin-liquid)` is load-bearing and was added AFTER a measurement: Liquid presentation
+  swaps the plate for `--lq-liquid-bg`, `rgb(251,251,251)` with `rgb(30,30,30)` ink at
+  **16.16:1**, and has no defect. The first draft left hover unguarded and put a 14% LIGHT wash
+  on that light plate — hovered `rgb(247,250,250)` against a `rgb(251,251,251)` rest, i.e. the
+  hover cue destroyed on a surface that was already fine.
+- Guard: `liquidChromeContrast.test.ts` reconstructs the composite from the two fixed rgba
+  layers over WHITE — the lightest ground they can produce, stricter than the 8.91:1 measured
+  over the real canvas — and requires ≥ 4.5:1. **Three mutation controls, each 1 of 6 RED and
+  each on its own assertion:** revert the selector to (0,1,0); put `var(--text)` back on the
+  glyph; drop `:not(.fwin-liquid)` from one rule. Run at the commit in a **detached worktree**,
+  not the shared tree.
+
+**`02afa598` — cat5's two remaining NOs were both the instrument, and one of them was created by
+the fix above.**
+
+- **Correction 38 — cat5 was the LAST harness still scoring debug controls no packaged build
+  ships.** The product marks a dev-only subtree `data-dev-only` beside its own
+  `import.meta.env.DEV` guard (`ReadingGardenSkyEvents.tsx:300-309`); cat4 (`isDevOnly`:555),
+  cat7 (correction 28) and cat8 (correction 28, both legs) honour it, cat5 did not. Measured
+  live through the bridge BEFORE the change: one `[data-dev-only]` root,
+  `DIV.lq-hit-scope reading-garden-sky-console`, holding **4 of City's 9** painted controls
+  (`Sky sim`, `Star`, `Asteroid`, `Ice barrage`). Q6's ONLY untreated Liquid region was
+  `div.reading-garden-sky-console-body` — that same subtree's panel. **The whole category
+  turned on motion the user can never see, and its only possible repair was decorating a debug
+  panel.** Q4 scanned 9 → 5, Q6 regions 2 → 1. Not an escape hatch: `--shell-chrome` is a RUN
+  parameter and a run can name anything; this reads an attribute the PRODUCT writes next to a
+  build-time guard, so a surface cannot opt out of its score without also removing the control
+  from the shipped build. Both counts published (`devOnlyControls`, `devOnlyLiquidRegions`).
+- **Correction 39 — a THIRD axis witness, because the first two cannot tell "the swap never
+  happened" from "this surface does not read the palette".** `minRatio` and the paint digest are
+  both properties of the surface's OWN paint, which is exactly why that guard is a VOID and not
+  a pass. But it means a surface can be VOIDed for being CORRECT, and City was: after `bfba48af`
+  its chrome is fixed rgba on fixed rgba, so both cells reported `minRatio 12.42` and the same
+  digest and **the run VOIDed on the very property the product fix delivered.** The new witness
+  is off-surface — eight palette custom properties resolved on `documentElement`, digested.
+  Across City's two cells: `--bg` `#0d0c12` → `#ffffff`, `--text` `#f5f4f7` → `#1e1e1e`. The
+  swap provably reached the cascade; the surface's paint provably did not. It cannot manufacture
+  a pass — it only retires a VOID, `failingCount` must still be 0 in BOTH cells, both cells must
+  have measured something, and a run whose theme never changed leaves this digest identical too.
+
+**MUTATION CONTROLS ON THE TWO CORRECTIONS, run at the commit, each restored byte-identical by
+SHA256 with `git status` clean afterwards:**
+
+- correction 38 disarmed (`devOnly()` → `false`): **9/10, Q6 NO** — exactly its own question,
+  and Q4 stayed YES, so the two halves are independently attributed.
+- correction 39 disarmed (`paletteKey` frozen): **VOID returns**, on the Q5 axis term alone.
+
+**WHAT THIS TURN IS ACTUALLY EVIDENCE OF, and it is not "City was fine".** `primary` measured
+five NOs on this surface. **One was a real, shared, user-visible defect** (Q5 — every frameless
+window in the app, in every light palette). **Two were the instrument** (Q4, Q6 — dev-only
+controls). **Two were a stale measurement state**: Q1 and Q3 read NO with the Mooncap dossier
+OPEN, which is where an earlier cat1 run left it, and both read YES at the surface's real
+default. cat5 does NOT open disclosures of its own, so it inherits whatever the previous probe
+left behind — the same shape as trap 6's scrolled body, one axis over. **Run cat5 before any
+probe that opens a disclosure, or re-close them first.**
+
+**EXACT NEXT SLICE: City cat2 (clunkiness).** It is the cheapest of the three left — it already
+carries the art-plate exclusion cat4 lacks. Its `--task` must be the dossier toggle
+(`Show Mooncap dossier` → the `aria-expanded` mushroom), with `--undo` clicking it again, and
+**not** a card click. cat4 is expected to fail on the recorded parallax grounds (39 layers
+measuring 910x1137 in a 680x709 window ON PURPOSE, and a frameless window has no Maximize
+button so only 2 of 3 gesture legs run); it needs cat2's art-plate exclusion ported before it is
+worth a run. cat7 is the heaviest and should be last.
